@@ -380,6 +380,7 @@ button, input, select, textarea, optgroup {
   padding: 14px 16px;
   margin: -14px -14px 14px;
   background: var(--primary);
+  border-bottom: 3px solid var(--brand-green);   /* mirrors #green-rule, which lives outside #board-capture and is never exported */
 }
 .capture-left { display: flex; align-items: center; gap: 14px; }
 .capture-logo { height: 38px; width: auto; }
