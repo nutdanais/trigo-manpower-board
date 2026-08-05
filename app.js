@@ -400,7 +400,8 @@ function renderZones() {
     const emps = plan.zones[z]
       .map(empId => D().employees.find(e => e.id === empId))
       .filter(e => e && e.boardId === D().activeBoardId);
-    for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
+    if (!emps.length) body.innerHTML = `<span class="zone-empty">No one</span>`;
+    else for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
   }
   renderFloatPool();
 }

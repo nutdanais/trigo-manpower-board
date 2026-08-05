@@ -110,10 +110,11 @@ button, input, select, textarea, optgroup {
   margin-top: 2px;
 }
 
-/* thin brand-green accent rule under the navy header (TRIGO signature detail) */
+/* thin brand-green accent rule under the navy header (TRIGO signature detail) —
+   full width, edge to edge, not just a segment under the logo */
 #green-rule {
   height: 3px;
-  background: linear-gradient(90deg, var(--brand-green) 0, var(--brand-green) 46px, var(--primary-dark) 46px);
+  background: var(--brand-green);
 }
 
 /* date button + ghost buttons living on the navy header need a light variant */
@@ -381,46 +382,47 @@ button, input, select, textarea, optgroup {
 #capture-date { text-align: right; }
 #capture-date small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
 
+/* card grid, not a stacked list — each zone is its own card (header on top,
+   body below) so empty zones shrink to just their header + "No one" instead
+   of every zone reserving a full-width row regardless of headcount.
+   align-items:start stops a tall neighbor from stretching an empty card. */
 #status-zones, #export-pools {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  align-items: start;
+  gap: 10px;
   margin-bottom: 14px;
 }
+/* the last leave zone (Exchange Working Day) spans the full row, matching
+   the odd-one-out 5th card in a layout that otherwise fills 4 per row */
+.zone[data-zone="exchange"] { grid-column: 1 / -1; }
 .zone {
   display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
 }
 .zone-label {
-  width: 110px;
-  min-width: 110px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   font-weight: 700;
   background: var(--bg-soft);
-  border-right: 1px solid var(--border);
-  padding: 8px;
-  text-align: center;
+  border-bottom: 1px solid var(--border);
+  padding: 9px 12px;
+  text-align: left;
 }
 .zone-label small { font-weight: 400; color: var(--muted); }
 .zone-body {
-  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px;
-  min-height: 54px;
+  padding: 9px 12px;
   align-items: flex-start;
   align-content: flex-start;
 }
+.zone-empty { color: var(--muted); font-style: italic; font-size: 13px; }
 .zone-pool .zone-label { background: var(--pool-tint); }
 .zone-leave .zone-label { background: var(--leave-tint); font-size: 12.5px; }
-.zone-leave .zone-body { min-height: 44px; }
 /* on-call being unassigned is normal — deliberately plain/calm, not the pool tint */
 .zone-oncall-pool .zone-label { background: var(--bg-soft); font-size: 12.5px; }
 
