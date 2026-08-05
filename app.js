@@ -567,8 +567,12 @@ function boardStats(boardId) {
     oncallAvailableList,
     available: unassigned.length,
     missions: plan.missions.length,
-    dayMissions: plan.missions.filter(m => m.shift !== "night").length,
-    nightMissions: plan.missions.filter(m => m.shift === "night").length,
+    // headcount of people working each shift, not mission-slot count — consistent
+    // with every other chip in the stats row (Assigned/Leave/Standby are all headcounts)
+    dayMissions: plan.missions.filter(m => m.shift !== "night")
+      .reduce((sum, m) => sum + m.members.filter(e => ids.has(e)).length, 0),
+    nightMissions: plan.missions.filter(m => m.shift === "night")
+      .reduce((sum, m) => sum + m.members.filter(e => ids.has(e)).length, 0),
     permanent: emps.filter(e => e.contract === "permanent").length,
     oncall: emps.filter(e => e.contract === "oncall").length,
   };
