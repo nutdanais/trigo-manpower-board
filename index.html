@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manpower Management Board</title>
+<script>
+  // applied before first paint so the page never flashes the wrong theme
+  (function () {
+    try {
+      if (localStorage.getItem("mpm-theme") === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="login-screen" class="hidden">
+  <div class="login-box">
+    <div class="login-brand">
+      <img src="logo.png" alt="TRIGO Global Quality Solutions" onerror="this.onerror=null;this.src='logo.svg'">
+    </div>
+    <h2>Manpower Board</h2>
+    <p class="login-sub">Sign in with the account your admin created for you.</p>
+    <form id="form-login">
+      <label>Email <input name="email" type="email" required autocomplete="username"></label>
+      <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
+      <p id="login-error" class="login-error hidden"></p>
+      <button type="submit" class="btn btn-primary login-submit">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<div id="app-root" class="hidden">
+
+<header id="topbar">
+  <div class="topbar-left">
+    <img id="app-logo" src="logo-on-navy.png" alt="TRIGO" onerror="this.onerror=null;this.src='logo.svg'">
+    <div id="app-title">Manpower Board<small>Operations Planning</small></div>
+  </div>
+  <div class="topbar-right">
+    <div class="date-nav">
+      <button id="btn-date-prev" class="btn btn-date-arrow" title="Previous day" aria-label="Previous day">‹</button>
+      <button id="btn-date" class="btn btn-date" title="Click to pick a date"></button>
+      <button id="btn-date-next" class="btn btn-date-arrow" title="Next day" aria-label="Next day">›</button>
+    </div>
+    <button id="btn-theme" class="btn btn-ghost" title="Toggle dark mode">🌙</button>
+    <button id="btn-settings" class="btn btn-ghost" title="Settings">⚙ Settings</button>
+    <button id="btn-signout" class="btn btn-ghost" title="Sign out">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      Sign out
+    </button>
+  </div>
+</header>
+<div id="green-rule"></div>
+
+<div id="stats-row"><div id="stats-bar"></div><div id="area-bar"></div></div>
+
+<div id="board-bar">
+  <div id="board-tabs"></div>
+  <button id="btn-add-board" class="btn btn-ghost" title="Create new board">+ Board</button>
+</div>
+
+<div id="toolbar">
+  <button id="btn-import-mission" class="btn btn-danger hidden">Add Mission</button>
+  <button id="btn-new-mission" class="btn btn-primary">+ New Mission</button>
+  <button id="btn-new-employee" class="btn btn-primary">+ New Employee</button>
+  <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
+    <input type="checkbox" id="holiday-check">
+    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+    <span class="toggle-text">Holiday</span>
+  </label>
+  <div class="toolbar-spacer"></div>
+  <div id="filters">
+    <div class="ms" data-filter="engineer">
+      <button type="button" class="ms-btn">Engineer: All</button>
+      <div class="ms-pop hidden"></div>
+    </div>
+    <div class="ms" data-filter="host">
+      <button type="button" class="ms-btn">Host: All</button>
+      <div class="ms-pop hidden"></div>
+    </div>
+    <div class="ms" data-filter="customer">
+      <button type="button" class="ms-btn">Customer: All</button>
+      <div class="ms-pop hidden"></div>
+    </div>
+    <div class="ms" data-filter="shift">
+      <button type="button" class="ms-btn">Shift: All</button>
+      <div class="ms-pop hidden"></div>
+    </div>
+    <select id="sort-by" title="Sort missions">
+      <option value="number">Sort: Mission No.</option>
+      <option value="engineer">Sort: Engineer</option>
+      <option value="host">Sort: Host</option>
+      <option value="customer">Sort: Customer</option>
+      <option value="shift">Sort: Shift</option>
+    </select>
+  </div>
+  <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day">↺ Reset Board</button>
+  <button id="btn-undo" class="btn" title="Undo last assignment change (Ctrl+Z)" disabled>↩ Undo</button>
+  <button id="btn-export" class="btn">📷 Export</button>
+  <span id="readonly-badge" class="hidden">🔒 Read-only (past date)</span>
+</div>
+
+<main id="board-capture">
+  <div id="capture-header" class="hidden">
+    <div class="capture-left">
+      <img class="capture-logo" src="logo.png" alt="TRIGO" onerror="this.onerror=null;this.src='logo.svg'">
+      <span id="capture-title"></span>
+    </div>
+    <span id="capture-date"></span>
+  </div>
+  <section id="status-zones">
+    <div class="zone zone-leave" data-zone="annual">
+      <div class="zone-label">Annual Leave<small class="zone-th">ลาพักร้อน</small></div>
+      <div class="zone-body dropzone" data-drop="zone:annual"></div>
+    </div>
+    <div class="zone zone-leave" data-zone="sick">
+      <div class="zone-label">Sick Leave<small class="zone-th">ลาป่วย</small></div>
+      <div class="zone-body dropzone" data-drop="zone:sick"></div>
+    </div>
+    <div class="zone zone-leave" data-zone="business">
+      <div class="zone-label">Business Leave<small class="zone-th">ลากิจ</small></div>
+      <div class="zone-body dropzone" data-drop="zone:business"></div>
+    </div>
+    <div class="zone zone-leave" data-zone="unpaid">
+      <div class="zone-label">Unpaid Leave<small class="zone-th">ลาไม่รับค่าจ้าง</small></div>
+      <div class="zone-body dropzone" data-drop="zone:unpaid"></div>
+    </div>
+    <div class="zone zone-leave" data-zone="exchange">
+      <div class="zone-label">Exchange Working Day<small class="zone-th">สลับวันหยุด</small></div>
+      <div class="zone-body dropzone" data-drop="zone:exchange"></div>
+    </div>
+  </section>
+  <section id="missions-grid"></section>
+  <section id="overview-panel" class="hidden"></section>
+  <section id="emplist-panel" class="hidden">
+    <div id="emplist-toolbar">
+      <input id="emplist-search" type="search" placeholder="Search name or mobile…" autocomplete="off">
+      <div id="emplist-filters">
+        <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
+        <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
+        <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
+        <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <span id="emplist-count"></span>
+    </div>
+    <div id="emplist-bulkbar" class="hidden">
+      <span id="emplist-bulk-count"></span>
+      <select id="emplist-bulk-contract">
+        <option value="">Set contract…</option>
+        <option value="permanent">Permanent</option>
+        <option value="oncall">On-call</option>
+      </select>
+      <select id="emplist-bulk-position">
+        <option value="">Set position…</option>
+        <option value="inspector">Inspector</option>
+        <option value="senior_inspector">Senior Inspector</option>
+        <option value="technician">Technician</option>
+        <option value="team_leader">Team Leader</option>
+        <option value="assistant_site_engineer">Assistant Site Engineer</option>
+        <option value="__none__">— none —</option>
+      </select>
+      <select id="emplist-bulk-area">
+        <option value="">Set service area…</option>
+      </select>
+      <select id="emplist-bulk-board">
+        <option value="">Move to board…</option>
+      </select>
+      <button type="button" class="btn btn-danger btn-small" id="emplist-bulk-delete">🗑 Delete</button>
+      <button type="button" class="btn btn-small" id="emplist-bulk-clear">Clear selection</button>
+    </div>
+    <div class="table-wrap">
+      <table id="emplist-table">
+        <thead>
+          <tr>
+            <th class="el-check"><input type="checkbox" id="emplist-select-all" title="Select all"></th>
+            <th data-sort="name">Name</th>
+            <th data-sort="contract">Contract type</th>
+            <th data-sort="position">Position</th>
+            <th data-sort="phone">Mobile number</th>
+            <th data-sort="areaId">Service area</th>
+            <th data-sort="boardId">Current board</th>
+          </tr>
+        </thead>
+        <tbody id="emplist-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- floating available-employee panel (fixed to the right edge, scrolls independently) -->
+<aside id="float-pool">
+  <div class="fp-head">
+    <input id="emp-search" type="search" placeholder="Search employee…" autocomplete="off">
+    <div id="area-filter" class="fp-areas"></div>
+    <div id="selection-bar" class="hidden">
+      <span id="selection-count"></span>
+      <button id="btn-clear-selection" title="Clear selection">Clear</button>
+    </div>
+    <p class="fp-hint">Click to select · Ctrl-click for many · drag or click a mission to assign</p>
+  </div>
+  <div class="fp-section">
+    <div class="fp-label">Standby <span class="fp-count" id="standby-count"></span><small>permanent, unassigned</small></div>
+    <div class="fp-body dropzone" data-drop="pool" data-pool="standby"></div>
+  </div>
+  <div class="fp-section">
+    <div class="fp-label">Available On-call <span class="fp-count" id="oncall-count"></span><small>not flagged</small></div>
+    <div class="fp-body dropzone" data-drop="pool" data-pool="oncall"></div>
+  </div>
+</aside>
+
+<div id="context-menu" class="hidden"></div>
+
+<!-- floating action bar for touch: stays visible while a selection is active so you
+     can scroll to a mission/leave area and tap to place, or open bulk actions -->
+<div id="touch-actions">
+  <span id="touch-actions-count"></span>
+  <span id="touch-actions-hint">Tap a mission or leave area to place</span>
+  <button type="button" class="btn btn-small" id="btn-touch-actions">Actions ▾</button>
+  <button type="button" class="btn btn-small" id="btn-touch-clear">Clear</button>
+</div>
+
+<!-- ===== Modals ===== -->
+<div id="modal-backdrop" class="hidden">
+
+  <div class="modal hidden" id="modal-mission">
+    <h3 id="mission-modal-title">New Mission</h3>
+    <form id="form-mission">
+      <label>Mission number <input name="number" required placeholder="e.g. BANGN.26.0007"></label>
+      <label>Host (company) <input name="host" required placeholder="e.g. Fortune"></label>
+      <label>Customer (company) <input name="customer" required placeholder="e.g. Hayashi"></label>
+      <label>PPE (required equipment) <input name="ppe" placeholder="e.g. Safety shoes, helmet, glasses"></label>
+      <div class="form-row">
+        <label>Shift
+          <select name="shift"><option value="day">Day</option><option value="night">Night</option></select>
+        </label>
+        <label>Start <input name="startTime" type="time" value="08:00"></label>
+        <label>End <input name="endTime" type="time" value="17:00"></label>
+      </div>
+      <label>Engineer
+        <select name="engineerId" required></select>
+      </label>
+      <label>Remark <textarea name="remark" rows="2" placeholder="Optional notes"></textarea></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger hidden" id="btn-delete-mission">Delete</button>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal hidden" id="modal-employee">
+    <h3 id="employee-modal-title">New Employee</h3>
+    <form id="form-employee">
+      <label>Employee name <input name="name" required placeholder="e.g. สุริยา"></label>
+      <label>Contract type
+        <select name="contract">
+          <option value="permanent">Permanent</option>
+          <option value="oncall">On-call</option>
+        </select>
+      </label>
+      <label>Position
+        <select name="position">
+          <option value="">— none —</option>
+          <option value="inspector">Inspector</option>
+          <option value="senior_inspector">Senior Inspector</option>
+          <option value="technician">Technician</option>
+          <option value="team_leader">Team Leader</option>
+          <option value="assistant_site_engineer">Assistant Site Engineer</option>
+        </select>
+      </label>
+      <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+      <label>Service area <select name="areaId" required></select></label>
+      <label>Board <select name="boardId" required></select></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger hidden" id="btn-delete-employee">Delete</button>
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal hidden" id="modal-settings">
+    <h3>Settings</h3>
+    <div class="settings-section">
+      <h4>Engineers <button class="btn btn-small" id="btn-add-engineer">+ Add</button></h4>
+      <div id="settings-engineers"></div>
+    </div>
+    <div class="settings-section">
+      <h4>Service areas <button class="btn btn-small" id="btn-add-area">+ Add</button></h4>
+      <div id="settings-areas"></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" data-close>Done</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="modal-board">
+    <h3>New Board</h3>
+    <form id="form-board">
+      <label>Board name <input name="name" required placeholder="e.g. Rayong"></label>
+      <div class="field-label">Weekend (non-working) days</div>
+      <div id="board-weekend-days" class="weekday-picker"></div>
+      <p class="import-note">Ticked days are the board's weekend — they start empty and use "Add Mission". You can still override a single date later with "Mark as Holiday" / "Unmark Holiday".</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create board</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal hidden" id="modal-import">
+    <h3>Add Mission</h3>
+    <p id="import-source-note" class="import-note"></p>
+    <div id="import-list"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-import-confirm">Add selected</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="modal-confirm">
+    <h3 id="confirm-title">Confirm</h3>
+    <p id="confirm-message"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="btn-confirm-no">Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-confirm-yes">Yes</button>
+    </div>
+  </div>
+
+</div>
+
+<div id="datepicker-pop" class="hidden"></div>
+
+</div> <!-- /#app-root -->
+
+<script src="vendor/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="cloud.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

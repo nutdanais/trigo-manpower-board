@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 205 66" width="205" height="66" role="img" aria-label="TRIGO Global Quality Solutions">
+  <text x="1" y="43" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="46" letter-spacing="1" fill="#003f7f">TRIGO</text>
+  <g fill="#8cc63f">
+    <rect x="151" y="3"  width="30" height="9" rx="2"/>
+    <rect x="151" y="16" width="41" height="9" rx="2"/>
+    <rect x="151" y="29" width="41" height="9" rx="2"/>
+    <rect x="151" y="42" width="30" height="9" rx="2"/>
+  </g>
+  <text x="2" y="62" font-family="Arial, Helvetica, sans-serif" font-weight="400" font-size="12.3" letter-spacing="0.3" fill="#8a9099">Global Quality Solutions</text>
+</svg>
