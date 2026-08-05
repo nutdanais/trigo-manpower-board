@@ -400,8 +400,7 @@ function renderZones() {
     const emps = plan.zones[z]
       .map(empId => D().employees.find(e => e.id === empId))
       .filter(e => e && e.boardId === D().activeBoardId);
-    if (!emps.length) body.innerHTML = `<span class="zone-empty">No one</span>`;
-    else for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
+    for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
   }
   renderFloatPool();
 }
@@ -1200,6 +1199,7 @@ async function exportBoard() {
     $("#status-zones").insertAdjacentElement("afterend", pools);
   }
   try {
+    await document.fonts.ready;   // avoid capturing the fallback font mid-swap
     const el = $("#board-capture");
     const windowWidth = Math.max(document.documentElement.scrollWidth, 1600);
     // Many mobile GPUs (Android especially) silently return a blank/black canvas

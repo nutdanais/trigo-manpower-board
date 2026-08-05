@@ -368,61 +368,70 @@ button, input, select, textarea, optgroup {
 
 /* ===== Board ===== */
 #board-capture { padding: 14px; background: var(--bg); }
+/* export header mirrors the live navy topbar (bleeds edge-to-edge via negative
+   margins matching #board-capture's own padding) so the exported JPG carries
+   the same brand chrome as the on-screen app, not just a plain title line. */
 #capture-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 20px;
   font-weight: 700;
-  padding: 4px 4px 12px;
+  padding: 14px 16px;
+  margin: -14px -14px 14px;
+  background: var(--primary);
 }
 .capture-left { display: flex; align-items: center; gap: 14px; }
-.capture-logo { height: 46px; width: auto; }
-#capture-title { color: var(--primary); }
-#capture-date { text-align: right; }
-#capture-date small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.capture-logo { height: 38px; width: auto; }
+#capture-title { color: #fff; }
+#capture-date { text-align: right; color: #fff; }
+#capture-date small { display: block; font-size: 13px; font-weight: 400; color: rgba(255,255,255,.7); }
 
-/* card grid, not a stacked list — each zone is its own card (header on top,
-   body below) so empty zones shrink to just their header + "No one" instead
-   of every zone reserving a full-width row regardless of headcount.
-   align-items:start stops a tall neighbor from stretching an empty card. */
 #status-zones, #export-pools {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  align-items: start;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-/* the last leave zone (Exchange Working Day) spans the full row, matching
-   the odd-one-out 5th card in a layout that otherwise fills 4 per row */
-.zone[data-zone="exchange"] { grid-column: 1 / -1; }
-.zone {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+/* section divider before the mission grid */
+#status-zones {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+}
+.zone {
+  display: flex;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
 }
 .zone-label {
+  width: 110px;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
   background: var(--bg-soft);
-  border-bottom: 1px solid var(--border);
-  padding: 9px 12px;
-  text-align: left;
+  border-right: 1px solid var(--border);
+  padding: 8px;
+  text-align: center;
 }
 .zone-label small { font-weight: 400; color: var(--muted); }
 .zone-body {
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 9px 12px;
+  padding: 8px;
+  min-height: 54px;
   align-items: flex-start;
   align-content: flex-start;
 }
-.zone-empty { color: var(--muted); font-style: italic; font-size: 13px; }
 .zone-pool .zone-label { background: var(--pool-tint); }
 .zone-leave .zone-label { background: var(--leave-tint); font-size: 12.5px; }
+.zone-leave .zone-body { min-height: 44px; }
 /* on-call being unassigned is normal — deliberately plain/calm, not the pool tint */
 .zone-oncall-pool .zone-label { background: var(--bg-soft); font-size: 12.5px; }
 
