@@ -34,10 +34,12 @@
   --emp-oncall-border: #6b737c;
   --charcoal: #59595b;   /* CI guide, 80% black */
 
-  /* Type — per TRIGO CI guide: Helvetica Neue primary, Arial the sanctioned
-     substitute (what Windows actually renders); Arial Narrow for dense data. */
-  --font-ui: "Helvetica Neue", Arial, "Segoe UI", sans-serif;
-  --font-condensed: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  /* Type — Noto Sans + Noto Sans Thai (Google), replacing the earlier CI-guide
+     Helvetica Neue/Arial Narrow pairing. Noto Sans has no condensed cut, so
+     dense numeric data (mission numbers, stat counts) leans on
+     font-variant-numeric: tabular-nums instead of a narrower face. */
+  --font-ui: "Noto Sans", "Noto Sans Thai", Arial, sans-serif;
+  --font-condensed: "Noto Sans", "Noto Sans Thai", Arial, sans-serif;
 }
 
 :root[data-theme="dark"] {
@@ -527,7 +529,9 @@ body {
 }
 .emp-card.dragging { opacity: 0.4; }
 
-/* small service-area code, bottom-right (area is otherwise encoded only by card color) */
+/* service-area pill, bottom-right — background set inline per-card from the
+   area's own color (same data-driven pattern as .mission-header); text stays
+   on --card-ink since the pill's fill is data color, not a themed surface. */
 .emp-card { padding-bottom: 13px; }
 .emp-card .emp-area {
   position: absolute;
@@ -536,7 +540,10 @@ body {
   font-size: 8px;
   font-weight: 700;
   letter-spacing: .2px;
-  color: rgba(0,0,0,.55);
+  color: var(--card-ink);
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.15);
 }
 
 /* multi-selection highlight */
@@ -968,19 +975,19 @@ body.board-view #app-root { margin-right: 264px; }
 .ctx-item.ctx-danger { color: var(--danger); font-weight: 600; }
 
 /* ===== Overview ===== */
-#overview-panel { display: flex; flex-direction: column; gap: 14px; }
-.ov-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+#overview-panel { display: flex; flex-direction: column; gap: 18px; }
+.ov-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .ov-card {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 14px;
+  padding: 16px;
 }
-.ov-card h4 { font-size: 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: baseline; }
+.ov-card h4 { font-size: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; }
 .ov-card h4 .ov-total { font-size: 22px; }
-.ov-card.ov-overall { border: 2px solid var(--primary-text); }
-.ov-rows { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
-.ov-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed #eceff3; }
+.ov-card.ov-overall { border: 1.5px solid var(--primary-text); }
+.ov-rows { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.ov-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--border); }
 .ov-row b { font-size: 14px; }
 .ov-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
 .ov-row-sub { color: var(--muted); font-size: 12px; padding-left: 12px; border-bottom: none; }

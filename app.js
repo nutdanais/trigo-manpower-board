@@ -232,7 +232,7 @@ function empCard(emp) {
   card.dataset.empId = emp.id;
   card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span>${emp.name}`
     + (pos ? `<span class="emp-pos">${pos.short}</span>` : "")
-    + (area ? `<span class="emp-area">${area.name}</span>` : "");
+    + (area ? `<span class="emp-area" style="background:${area.color}">${area.name}</span>` : "");
   card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
   card.addEventListener("click", (ev) => {
@@ -609,7 +609,7 @@ function renderStats() {
   // per-service-area counts sit on the right of the same row
   for (const a of D().areas) {
     const n = boardEmployees(D().activeBoardId).filter(e => e.areaId === a.id).length;
-    if (n) areaBar.appendChild(statChip(a.name, n, a.color));
+    if (n) areaBar.appendChild(statChip(a.name, n));
   }
 }
 
@@ -1130,9 +1130,11 @@ function renderSettings() {
     const row = document.createElement("div");
     row.className = "settings-row";
     row.innerHTML = `
+      <input type="color" value="${a.color}" title="Area color">
       <input type="text" value="${a.name}" placeholder="Area name">
       <button class="btn btn-danger btn-small">✕</button>`;
-    const [name, del] = row.children;
+    const [color, name, del] = row.children;
+    color.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "color", color.value); render(); });
     name.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "name", name.value.trim() || a.name); render(); });
     del.onclick = () => {
       const used = D().employees.some(e => e.areaId === a.id);
