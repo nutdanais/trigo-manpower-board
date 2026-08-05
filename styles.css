@@ -64,6 +64,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* browsers don't inherit the page font into form controls by default —
+   without this, every button/select/input (toolbar buttons, filter
+   dropdowns, settings fields, sign-out, date-picker nav) falls back to the
+   OS UI font regardless of --font-ui above. */
+button, input, select, textarea, optgroup {
+  font-family: inherit;
+}
+
 .hidden { display: none !important; }
 
 /* ===== Top bar =====
