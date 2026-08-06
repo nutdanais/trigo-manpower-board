@@ -439,7 +439,13 @@ button, input, select, textarea, optgroup {
 /* missions grid */
 #missions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  /* 383px = mission-card's own border(2) + header(130) + body padding(16) +
+     2-card emps row(234), +1px safety margin — the snug minimum for a
+     2-column mission box. Sized so 4 columns always fit within the exported
+     JPG's guaranteed minimum width (see exportBoard's windowWidth floor of
+     1600px in app.js): 4*383 + 3*12 gap = 1568 ≤ 1572 (1600 minus
+     #board-capture's 14px side padding). */
+  grid-template-columns: repeat(auto-fill, minmax(383px, 1fr));
   gap: 12px;
 }
 .mission-card {
@@ -479,6 +485,10 @@ button, input, select, textarea, optgroup {
   gap: 6px;
   align-items: flex-start;
   align-content: flex-start;
+  /* no max-width: the #missions-grid column floor (383px) already guarantees
+     at least 2 employee cards fit per row — this lets a mission box that
+     renders wider (fewer, bigger columns on a normal-width screen) naturally
+     wrap 3+ cards per row instead of capping at 2 */
 }
 .m-remark {
   margin-top: auto;
@@ -503,7 +513,7 @@ button, input, select, textarea, optgroup {
    calm and brand-aligned. The fill is fixed (like --card-ink): a card is a data
    object with its own identity, not a themed surface, so it won't flip in dark mode. */
 .emp-card {
-  width: 124px;
+  width: 114px;
   height: 62px;
   border-radius: 5px;
   padding: 5px 22px 5px 6px;   /* right gutter reserved for the P/OC badge */
