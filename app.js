@@ -44,6 +44,29 @@ function defaultPlanningDate() {
   return d;
 }
 
+/* Remember the last board+date the user was looking at, so closing the tab and
+   coming back lands them where they left off instead of always resetting to
+   tomorrow's date on the first board. Without this, a plan made for a later
+   date (or on the non-default board) looked "gone" after a reopen — it was
+   never deleted, the app just landed somewhere else and nobody scrolled to find it. */
+const VIEW_KEY = "mpm-last-view";
+function saveViewState() {
+  try {
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ boardId: D().activeBoardId, date: state.date }));
+  } catch { /* storage unavailable (private mode, quota) — just skip persisting */ }
+}
+/* apply the saved board+date if still valid, else fall back to today's default */
+function restoreViewState() {
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY));
+    if (v && (v.boardId === OVERVIEW_ID || v.boardId === EMPLIST_ID || D().boards.some(b => b.id === v.boardId))) {
+      D().activeBoardId = v.boardId;
+    }
+    if (v && /^\d{4}-\d{2}-\d{2}$/.test(v.date)) { state.date = v.date; return; }
+  } catch { /* no saved view, or it's corrupt — fall through to the default */ }
+  state.date = defaultPlanningDate();
+}
+
 /* zone labels (keys come from ZONES in cloud.js) */
 const ZONE_LABELS = {
   annual: "Annual Leave", sick: "Sick Leave", business: "Business Leave",
@@ -138,6 +161,7 @@ function guardEdit(action) {
 
 /* ---------- rendering ---------- */
 function render() {
+  saveViewState();
   hideContextMenu();
   renderTabs();
   renderDateButton();
@@ -1621,8 +1645,9 @@ async function boot() {
   $("#app-root").classList.remove("hidden");
   wireApp();
   await cloud.init(() => state.date);
-  // holidays are known now — recompute the landing date so we skip a holiday tomorrow
-  state.date = defaultPlanningDate();
+  // holidays are known now — restore the last board/date the user was on, falling
+  // back to the next working day if there's nothing saved (or it's stale/invalid)
+  restoreViewState();
   cloud.onChange(() => refreshAndRender());
   await refreshAndRender();
 }
