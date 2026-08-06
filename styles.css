@@ -503,10 +503,10 @@ button, input, select, textarea, optgroup {
    calm and brand-aligned. The fill is fixed (like --card-ink): a card is a data
    object with its own identity, not a themed surface, so it won't flip in dark mode. */
 .emp-card {
-  width: 92px;
-  min-height: 46px;
+  width: 124px;
+  height: 62px;
   border-radius: 5px;
-  padding: 5px 22px 8px 6px;   /* right gutter reserved for the P/OC badge; extra bottom room for the position tag */
+  padding: 5px 22px 5px 6px;   /* right gutter reserved for the P/OC badge */
   font-size: 12px;
   font-weight: 600;
   cursor: grab;
@@ -514,9 +514,22 @@ button, input, select, textarea, optgroup {
   background: var(--emp-bg);
   border: 1px solid var(--emp-perm-border);
   position: relative;
-  word-break: break-word;
+  overflow: hidden;
   user-select: none;
   color: var(--card-ink);
+}
+/* name wraps up to 2 lines (sized to fit the longest name in the system,
+   "Wannaphatson T329", on two lines) instead of growing the card; a name
+   longer than that clamps with an ellipsis. The card's fixed height already
+   leaves clearance below a max 2-line name for the corner-anchored tags
+   below, so neither can ever overlap it. */
+.emp-card .emp-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  line-height: 1.2;
 }
 .emp-card.oncall {
   border: 1.5px dashed var(--emp-oncall-border);
@@ -535,35 +548,33 @@ button, input, select, textarea, optgroup {
   letter-spacing: .2px;
 }
 .emp-card.oncall .emp-badge { background: var(--charcoal); }
-.emp-card .emp-pos {
-  position: absolute;
-  bottom: 2px;
-  left: 4px;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: .2px;
-  color: var(--primary);
-  background: rgba(0,73,131,.09);
-  border-radius: 3px;
-  padding: 0 3px;
-}
 .emp-card.dragging { opacity: 0.4; }
 
-/* service-area pill, bottom-right — background set inline per-card from the
-   area's own color (same data-driven pattern as .mission-header); text stays
-   on --card-ink since the pill's fill is data color, not a themed surface. */
-.emp-card { padding-bottom: 13px; }
+/* position tag (bottom-left) + service-area pill (bottom-right) — same
+   corner clearance as the P/OC badge above them (2px/3px), same pill
+   typography/shape as each other so they read as a matched pair. Area
+   color is set inline per-card from the area's own color (same data-driven
+   pattern as .mission-header); each keeps its own text/background so
+   position vs. area are still told apart at a glance. */
+.emp-card .emp-pos,
 .emp-card .emp-area {
   position: absolute;
   bottom: 2px;
-  right: 3px;
   font-size: 8px;
   font-weight: 700;
   letter-spacing: .2px;
-  color: var(--card-ink);
   padding: 1px 5px;
   border-radius: 999px;
   border: 1px solid rgba(0,0,0,.15);
+}
+.emp-card .emp-pos {
+  left: 3px;
+  color: var(--primary);
+  background: rgba(0,73,131,.09);
+}
+.emp-card .emp-area {
+  right: 3px;
+  color: var(--card-ink);
 }
 
 /* multi-selection highlight */

@@ -254,7 +254,7 @@ function empCard(emp) {
     + (state.selectedEmps.has(emp.id) ? " selected" : "");
   card.draggable = true;
   card.dataset.empId = emp.id;
-  card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span>${emp.name}`
+  card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span><span class="emp-name">${emp.name}</span>`
     + (pos ? `<span class="emp-pos">${pos.short}</span>` : "")
     + (area ? `<span class="emp-area" style="background:${area.color}">${area.name}</span>` : "");
   card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
