@@ -295,17 +295,28 @@
 
   <div class="modal hidden" id="modal-settings">
     <h3>Settings</h3>
-    <div class="settings-section">
-      <h4>Engineers <button class="btn btn-small" id="btn-add-engineer">+ Add</button></h4>
-      <div id="settings-engineers"></div>
+    <div id="settings-tabs" class="settings-tabs">
+      <button type="button" class="settings-tab" data-tab="engineers">Engineer</button>
+      <button type="button" class="settings-tab" data-tab="areas">Service Area</button>
+      <button type="button" class="settings-tab" data-tab="boards">Board</button>
     </div>
-    <div class="settings-section">
-      <h4>Service areas <button class="btn btn-small" id="btn-add-area">+ Add</button></h4>
-      <div id="settings-areas"></div>
+    <div class="settings-pane" data-pane="engineers">
+      <div class="settings-section">
+        <h4>Engineers <button class="btn btn-small" id="btn-add-engineer">+ Add</button></h4>
+        <div id="settings-engineers"></div>
+      </div>
     </div>
-    <div class="settings-section">
-      <h4>Boards — weekly weekend days</h4>
-      <div id="settings-boards"></div>
+    <div class="settings-pane" data-pane="areas">
+      <div class="settings-section">
+        <h4>Service areas <button class="btn btn-small" id="btn-add-area">+ Add</button></h4>
+        <div id="settings-areas"></div>
+      </div>
+    </div>
+    <div class="settings-pane" data-pane="boards">
+      <div class="settings-section">
+        <h4>Boards — weekly weekend days</h4>
+        <div id="settings-boards"></div>
+      </div>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-primary" data-close>Done</button>

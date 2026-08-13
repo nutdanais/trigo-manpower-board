@@ -895,6 +895,23 @@ body.board-view #app-root { margin-right: 264px; }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
 .modal-actions .btn-primary { min-width: 90px; }
 
+/* Settings modal sub-menu tabs (Engineer / Service Area / Board) */
+.settings-tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.settings-tab {
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.settings-tab:hover { color: var(--text); }
+.settings-tab.active { color: var(--primary-text); border-bottom-color: var(--primary-text); }
+
 .settings-section { margin-bottom: 18px; }
 .settings-section h4 { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
 .settings-row {

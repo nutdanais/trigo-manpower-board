@@ -102,6 +102,7 @@ const state = {
   empSearch: "",              // name filter for the floating available panel
   poolAreas: new Set(),       // service-area filter for the floating panel; empty = all
   undoStack: [],              // [{date, entries:[{empId, prior}]}] — inverse of recent assignment changes
+  settingsTab: "engineers",   // Settings modal: which sub-menu (Engineer / Service Area / Board) is showing
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
     filters: { contract: [], position: [], areaId: [], boardId: [] },
@@ -1443,7 +1444,16 @@ function deleteEmployee() {
   });
 }
 
-/* settings modal */
+/* settings modal — Engineer / Service Area / Board sub-menu tabs */
+function applySettingsTab() {
+  for (const btn of $$("#settings-tabs .settings-tab")) {
+    btn.classList.toggle("active", btn.dataset.tab === state.settingsTab);
+  }
+  for (const pane of $$(".settings-pane")) {
+    pane.classList.toggle("hidden", pane.dataset.pane !== state.settingsTab);
+  }
+}
+
 function renderSettings() {
   const engBox = $("#settings-engineers");
   engBox.innerHTML = "";
@@ -1519,6 +1529,8 @@ function renderSettings() {
     row.appendChild(picker);
     boardsBox.appendChild(row);
   }
+
+  applySettingsTab();
 }
 
 /* ---------- export to JPG ---------- */
@@ -1872,6 +1884,9 @@ function wireApp() {
   $("#btn-delete-employee").onclick = deleteEmployee;
 
   $("#btn-settings").onclick = () => { renderSettings(); openModal("#modal-settings"); };
+  for (const btn of $$("#settings-tabs .settings-tab")) {
+    btn.onclick = () => { state.settingsTab = btn.dataset.tab; applySettingsTab(); };
+  }
   $("#btn-add-engineer").onclick = () => safely(async () => { await cloud.addEngineer(); renderSettings(); });
   $("#btn-add-area").onclick = () => safely(async () => { await cloud.addArea(); renderSettings(); });
 
