@@ -770,16 +770,26 @@ function renderOverview() {
   /* ---------- KPI strip: the handful of numbers that read fine as numbers ---------- */
   const kpiRow = document.createElement("div");
   kpiRow.className = "ov-kpi-row";
-  const kpi = (value, label) => {
+  // `perBoard`: [[boardName, value], ...] — one line under the tile's label
+  // breaking the headline number down per board. Omit it for a tile where a
+  // per-board split wouldn't mean anything (e.g. the board COUNT itself).
+  const kpi = (value, label, perBoard) => {
     const tile = document.createElement("div");
     tile.className = "ov-kpi-tile";
     tile.innerHTML = `<div class="ov-kpi-value">${value}</div><div class="ov-kpi-label">${label}</div>`;
+    if (perBoard && perBoard.length) {
+      const sub = document.createElement("div");
+      sub.className = "ov-kpi-breakdown";
+      sub.textContent = perBoard.map(([name, v]) => `${name} ${v}`).join(" · ");
+      tile.appendChild(sub);
+    }
     return tile;
   };
-  kpiRow.appendChild(kpi(totalEmp, "Total employees"));
+  kpiRow.appendChild(kpi(totalEmp, "Total employees", boards.map(b => [b.name, stats[b.id].total])));
   kpiRow.appendChild(kpi(boards.length, "Boards"));
-  kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`));
-  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization"));
+  kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`, boards.map(b => [b.name, stats[b.id].missions])));
+  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization",
+    boards.map(b => [b.name, utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave) + "%"])));
   panel.appendChild(kpiRow);
 
   /* ---------- deployment: whole-workforce donut + one 100%-stacked bar per board ---------- */
@@ -875,7 +885,6 @@ function renderOverview() {
     { key: "perm", label: `Permanent (${totalPerm})`, color: "var(--chart-permanent)" },
     { key: "oncall", label: `On-call (${totalOncall})`, color: "var(--chart-oncall)" },
   ]));
-  panel.appendChild(contractSec);
 
   /* ---------- service-area distribution, all boards ---------- */
   const areaSec = ovSection("By service area", "Headcount across all boards");
@@ -891,7 +900,13 @@ function renderOverview() {
   } else {
     areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
   }
-  panel.appendChild(areaSec);
+
+  // side by side to save vertical space — both are compact enough to share a row
+  const contractAreaRow = document.createElement("div");
+  contractAreaRow.className = "ov-side-by-side";
+  contractAreaRow.appendChild(contractSec);
+  contractAreaRow.appendChild(areaSec);
+  panel.appendChild(contractAreaRow);
 
   /* ---------- utilization trend: 7/14/30 days, one line per board ---------- */
   const trendSec = ovSection("Utilization trend",
