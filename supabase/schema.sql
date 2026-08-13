@@ -66,6 +66,7 @@ create table if not exists missions (
   end_time time not null default '17:00',
   ppe text,
   remark text,
+  hidden boolean not null default false,
   engineer_id uuid references engineers(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

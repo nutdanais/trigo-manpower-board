@@ -14,6 +14,11 @@ function todayStrISO() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+function addDaysISO(iso, n) {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
 const hhmm = (t) => (t || "08:00:00").slice(0, 5);
 const dowOf = (iso) => new Date(iso + "T00:00:00").getDay();
 const boardWeekendDays = (boardId) => {
@@ -141,7 +146,7 @@ const cloud = {
       const obj = {
         id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
-        ppe: m.ppe || "", remark: m.remark || "", members: [],
+        ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
       };
       missionMap[m.id] = obj;
       plan.missions.push(obj);
@@ -170,14 +175,32 @@ const cloud = {
     const { error } = await sb.from("missions")
       .upsert(rows, { onConflict: "board_id,plan_date,number,shift", ignoreDuplicates: true });
     if (!error) return;
-    // remark migration not run yet on this database — retry without that column
-    if (/remark/i.test(error.message || "") && /column/i.test(error.message || "")) {
-      return this._upsertMissionsGuarded(rows.map(({ remark, ...rest }) => rest));
+    // a column-level migration (remark, hidden, ...) hasn't been run yet on this
+    // database - read the missing column's name out of Postgres's error message
+    // and retry without it, so saves still work either way.
+    const missingCol = this._missingColumnFromError(error);
+    if (missingCol && rows.some((r) => missingCol in r)) {
+      return this._upsertMissionsGuarded(rows.map((r) => { const { [missingCol]: _drop, ...rest } = r; return rest; }));
     }
     const noConstraintYet = error.code === "42P10" || /no unique or exclusion constraint/i.test(error.message || "");
     if (!noConstraintYet) throw error;
     const { error: fallbackErr } = await sb.from("missions").insert(rows);
     if (fallbackErr) throw fallbackErr;
+  },
+
+  /* Postgres reports a missing column as e.g. "column missions.hidden does not
+     exist" (or, on insert/upsert, "Could not find the 'hidden' column of
+     'missions' in the schema cache" from PostgREST) - pull the column name out
+     of either shape so callers can retry without it. Returns null if the error
+     doesn't look like a missing-column error at all. */
+  _missingColumnFromError(error) {
+    const msg = (error && error.message) || "";
+    if (!/column/i.test(msg)) return null;
+    let m = msg.match(/column\s+"?(?:[\w]+"?\.)?"?(\w+)"?\b[^]*does not exist/i);
+    if (m) return m[1];
+    m = msg.match(/find the .([\w]+). column/i);
+    if (m) return m[1];
+    return null;
   },
 
   async _copyPlanForward(boardId, srcDate, destDate) {
@@ -196,7 +219,7 @@ const cloud = {
       const inserts = srcMissions.map((m) => ({
         board_id: boardId, plan_date: destDate, number: m.number, host: m.host, customer: m.customer,
         shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id,
-        ppe: m.ppe, remark: m.remark,
+        ppe: m.ppe, remark: m.remark, hidden: m.hidden,
       }));
       // guarded upsert makes this safe to run twice at once (e.g. the holiday
       // toggle's own refresh racing with the Realtime-triggered one): whichever
@@ -329,6 +352,7 @@ const cloud = {
     return (data || []).map((m) => ({
       id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
       startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id, ppe: m.ppe || "",
+      hidden: !!m.hidden,
     }));
   },
   /* copy chosen missions (definitions only, no member assignments) onto targetDate.
@@ -341,13 +365,37 @@ const cloud = {
     const inserts = rows.map((m) => ({
       board_id: boardId, plan_date: targetDate, number: m.number, host: m.host, customer: m.customer,
       shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id, ppe: m.ppe,
-      remark: m.remark,
+      remark: m.remark, hidden: false,   // an explicitly imported mission is always visible
     }));
     const before = await sb.from("missions").select("id", { count: "exact", head: true }).eq("board_id", boardId).eq("plan_date", targetDate);
     await this._upsertMissionsGuarded(inserts);
     const after = await sb.from("missions").select("id", { count: "exact", head: true }).eq("board_id", boardId).eq("plan_date", targetDate);
     const added = (after.count || 0) - (before.count || 0);
     return { added, skipped: inserts.length - added };
+  },
+
+  /* ---------- hide/unhide missions (declutter without deleting) ---------- */
+  /* Hiding a mission that still has people on it first returns them to Standby
+     (their assignments for this mission are deleted outright, not moved to a
+     zone - "unassigned" is exactly what Standby already means) so nobody
+     becomes invisible and the stats stay truthful. missionIds are already
+     date-scoped (each day has its own mission rows), so this only ever touches
+     the day the mission belongs to. */
+  async setMissionsHidden(missionIds, hidden) {
+    if (!missionIds.length) return;
+    if (hidden) {
+      const { error: aErr } = await sb.from("assignments").delete().in("mission_id", missionIds);
+      if (aErr) throw aErr;
+    }
+    const { error } = await sb.from("missions").update({ hidden }).in("id", missionIds);
+    if (error) {
+      const missingCol = this._missingColumnFromError(error);
+      if (missingCol === "hidden") {
+        throw new Error("Hiding missions needs a one-time database update (migration-2026-08-13-hidden-missions.sql) before it can be used.");
+      }
+      throw error;
+    }
+    this._invalidatePlans();
   },
 
   /* ---------- per-date working/non-working override (per board) ---------- */
@@ -511,6 +559,77 @@ const cloud = {
     const { error } = await sb.from("service_areas").delete().eq("id", id);
     if (error) throw error;
     await this._loadAreas();
+  },
+
+  /* ---------- utilization trend (Overview 7/14/30-day chart) ---------- */
+  /* Two bulk queries (not one per day) covering `boardIds` over
+     [fromDate, toDate] inclusive. Returns { [boardId]: { [date]: { assigned,
+     leave, headcount, oncallAssigned, oncallLeave, oncallHeadcount } } } with
+     an entry for EVERY calendar date in range — working day, weekend, and
+     holiday alike. Different charts need different subsets of dates (the
+     utilization trend skips non-working days; the on-call availability trend
+     skips only each board's weekly weekend, deliberately keeping holidays —
+     see renderOverview() in app.js), so the "which dates count" decision is
+     made by each chart at render time, not baked in here.
+     Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
+     use each employee's CURRENT board membership for the whole window - board
+     moves aren't tracked historically - and hidden missions on that date are
+     excluded from `assigned`/`oncallAssigned`, matching what the board
+     itself shows today. */
+  async getUtilizationRange(boardIds, fromDate, toDate) {
+    if (!boardIds.length) return {};
+    const [{ data: missionRows, error: mErr }, { data: assignRows, error: aErr }] = await Promise.all([
+      sb.from("missions").select("id, board_id, plan_date, hidden")
+        .in("board_id", boardIds).gte("plan_date", fromDate).lte("plan_date", toDate),
+      sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
+        .gte("plan_date", fromDate).lte("plan_date", toDate),
+    ]);
+    if (mErr) throw mErr;
+    if (aErr) throw aErr;
+
+    const missionBoard = new Map();    // mission id -> board id
+    const missionHidden = new Set();   // mission ids that are hidden on their date
+    for (const m of missionRows || []) {
+      missionBoard.set(m.id, m.board_id);
+      if (m.hidden) missionHidden.add(m.id);
+    }
+    const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
+    const empContract = new Map(this.data.employees.map((e) => [e.id, e.contract]));
+    const headcountByBoard = {};
+    const oncallHeadcountByBoard = {};
+    for (const id of boardIds) {
+      const emps = this.data.employees.filter((e) => e.boardId === id);
+      headcountByBoard[id] = emps.length;
+      oncallHeadcountByBoard[id] = emps.filter((e) => e.contract === "oncall").length;
+    }
+
+    // seed every calendar date for every requested board so each chart has a
+    // full axis to work from, even on dates with zero assignments
+    const result = Object.fromEntries(boardIds.map((id) => [id, {}]));
+    for (let d = fromDate; d <= toDate; d = addDaysISO(d, 1)) {
+      for (const boardId of boardIds) {
+        result[boardId][d] = {
+          assigned: 0, leave: 0, headcount: headcountByBoard[boardId],
+          oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: oncallHeadcountByBoard[boardId],
+        };
+      }
+    }
+    for (const a of assignRows || []) {
+      const boardId = empBoard.get(a.employee_id);
+      const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
+      if (!bucket) continue;
+      const isOncall = empContract.get(a.employee_id) === "oncall";
+      if (a.mission_id) {
+        if (missionHidden.has(a.mission_id)) continue;
+        if (missionBoard.get(a.mission_id) !== boardId) continue;   // employee has since moved boards
+        bucket.assigned++;
+        if (isOncall) bucket.oncallAssigned++;
+      } else if (a.zone && ZONES.includes(a.zone)) {
+        bucket.leave++;
+        if (isOncall) bucket.oncallLeave++;
+      }
+    }
+    return result;
   },
 
   /* ---------- realtime ---------- */

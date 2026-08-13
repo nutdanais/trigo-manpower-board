@@ -70,6 +70,7 @@
 <div id="toolbar">
   <button id="btn-import-mission" class="btn btn-danger hidden">Add Mission</button>
   <button id="btn-new-mission" class="btn btn-primary">+ New Mission</button>
+  <button id="btn-hide-missions" class="btn" title="Choose which missions are hidden from this board">👁 Hide/Unhide</button>
   <button id="btn-new-employee" class="btn btn-primary">+ New Employee</button>
   <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
     <input type="checkbox" id="holiday-check">
@@ -200,6 +201,7 @@
 <aside id="float-pool">
   <div class="fp-head">
     <input id="emp-search" type="search" placeholder="Search employee…" autocomplete="off">
+    <p id="emp-search-note" class="fp-search-note hidden"></p>
     <div id="area-filter" class="fp-areas"></div>
     <div id="selection-bar" class="hidden">
       <span id="selection-count"></span>
@@ -251,6 +253,7 @@
       <label>Remark <textarea name="remark" rows="2" placeholder="Optional notes"></textarea></label>
       <div class="modal-actions">
         <button type="button" class="btn btn-danger hidden" id="btn-delete-mission">Delete</button>
+        <button type="button" class="btn hidden" id="btn-hide-mission" title="Take this mission off the board without deleting it">👁 Hide</button>
         <span class="toolbar-spacer"></span>
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -329,6 +332,16 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="modal-hide-missions">
+    <h3>Hide/Unhide Missions</h3>
+    <p class="import-note">Ticked missions are hidden from this board and date — their definition (and carried-forward days) is kept, just off the board. Anyone assigned to a mission you hide returns to Standby.</p>
+    <div id="hide-missions-list"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-hide-missions-save">Save</button>
+    </div>
+  </div>
+
   <div class="modal hidden" id="modal-confirm">
     <h3 id="confirm-title">Confirm</h3>
     <p id="confirm-message"></p>
@@ -341,6 +354,7 @@
 </div>
 
 <div id="datepicker-pop" class="hidden"></div>
+<div id="chart-tip" class="hidden"></div>
 
 </div> <!-- /#app-root -->
 
@@ -348,6 +362,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="cloud.js"></script>
+<script src="charts.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

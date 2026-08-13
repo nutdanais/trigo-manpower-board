@@ -12,6 +12,7 @@ Copy-Item (Join-Path $root "index.html") $deploy -Force
 Copy-Item (Join-Path $root "styles.css") $deploy -Force
 Copy-Item (Join-Path $root "app.js") $deploy -Force
 Copy-Item (Join-Path $root "cloud.js") $deploy -Force
+Copy-Item (Join-Path $root "charts.js") $deploy -Force
 Copy-Item (Join-Path $root "config.js") $deploy -Force
 Copy-Item (Join-Path $root "logo.svg") $deploy -Force
 if (Test-Path (Join-Path $root "logo.png")) { Copy-Item (Join-Path $root "logo.png") $deploy -Force }

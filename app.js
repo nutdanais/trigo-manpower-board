@@ -108,6 +108,13 @@ const state = {
     sortKey: "name",
     sortDir: 1,
   },
+  overview: {                 // Overview tab: utilization trend chart controls + its cache
+    trendRange: 14,           // 7 | 14 | 30 days, ending today (not state.date — the trend is
+                               // "recent history", independent of whatever date the rest of Overview is showing)
+    trendHidden: new Set(),   // board ids toggled off via the trend chart's legend
+    util: null,               // cloud.getUtilizationRange() result, keyed by utilCacheKey below
+    utilCacheKey: null,
+  },
 };
 
 const D = () => cloud.data;
@@ -131,10 +138,27 @@ function peekPlan(boardId) {
   return (D().plans[boardId] && D().plans[boardId][state.date]) || emptyPlan();
 }
 
+/* Refetches state.overview.util only when what it depends on actually changed
+   (board list, chosen range, or a new day rolling by) — every other Overview
+   redraw (a filter tick, a legend toggle, a realtime ping) reuses the cached
+   result. boot()'s cloud.onChange handler resets utilCacheKey to null on any
+   realtime data change, which is what forces a real refetch after an edit. */
+async function ensureUtilizationLoaded() {
+  const boardIds = D().boards.map(b => b.id);
+  if (!boardIds.length) { state.overview.util = {}; state.overview.utilCacheKey = "empty"; return; }
+  const toDate = todayStr();   // the trend is "recent history", always ending today
+  const fromDate = addDays(toDate, -(state.overview.trendRange - 1));
+  const cacheKey = boardIds.slice().sort().join(",") + "|" + fromDate + ".." + toDate;
+  if (state.overview.utilCacheKey === cacheKey) return;
+  state.overview.util = await cloud.getUtilizationRange(boardIds, fromDate, toDate);
+  state.overview.utilCacheKey = cacheKey;
+}
+
 /* warm the cache for whatever is currently in view, then redraw */
 async function refreshData() {
   if (isOverview()) {
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
+    await ensureUtilizationLoaded();
   } else if (isEmployeeList()) {
     // employee master data is already kept warm in the cache — nothing date-scoped to load
   } else if (D().activeBoardId) {
@@ -172,6 +196,7 @@ function render() {
   $("#overview-panel").classList.toggle("hidden", !ov);
   $("#emplist-panel").classList.toggle("hidden", !eml);
   $("#btn-new-mission").classList.toggle("hidden", ov || eml);
+  $("#btn-hide-missions").classList.toggle("hidden", ov || eml);
   $("#btn-new-employee").classList.toggle("hidden", ov);
   $("#btn-import-mission").classList.toggle("hidden", ov || eml || !isNonWorkingDate(state.date));
   // Holiday toggle: ON = this date is non-working. Any editable future date
@@ -195,10 +220,22 @@ function render() {
     renderZones();
     renderMissions();
     renderFilterOptions();
+    updateHideMissionsButton();
   }
   $("#readonly-badge").classList.toggle("hidden", ov || eml || !isReadOnly());
   updateSelectionUI();
   updateUndoButton();
+  applySearchHighlight();
+}
+
+/* label the Hide/Unhide toolbar button with how many missions are currently
+   hidden on this board+date, so it's obvious at a glance whether anything is
+   tucked away */
+function updateHideMissionsButton() {
+  const btn = $("#btn-hide-missions");
+  if (!btn) return;
+  const n = getPlan().missions.filter(m => m.hidden).length;
+  btn.textContent = n ? `👁 Hide/Unhide (${n})` : "👁 Hide/Unhide";
 }
 
 function renderTabs() {
@@ -331,15 +368,6 @@ function clearSelection() {
   markSelectedCards();
 }
 
-/* set position for one or many employees (from the right-click menu) */
-function setPositionFor(ids, position) {
-  safely(async () => {
-    await cloud.setEmployeesPosition(ids, position);
-    clearSelection();
-    await refreshAndRender();
-  });
-}
-
 function closeFilterPops() {
   for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop")) p.classList.add("hidden");
 }
@@ -363,28 +391,12 @@ function showContextMenu(emp, x, y) {
   const addSep = () => { const s = document.createElement("div"); s.className = "ctx-sep"; menu.appendChild(s); };
   const addHead = (label) => { const h = document.createElement("div"); h.className = "ctx-subhead"; h.textContent = label; menu.appendChild(h); };
 
+  // Kept deliberately short: Edit / Move to board / Delete. Position, contract
+  // and service area are still editable — one at a time from the Edit Employee
+  // modal, or in bulk from the Manpower List's selection bar — this menu just
+  // isn't the place for them any more (it grew to 15+ items and slowed down
+  // the three actions people actually reach for from the board).
   if (!many) addItem("✏ Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)));
-
-  // set position (bulk if multiple selected)
-  addSep();
-  addHead(many ? `Set position for ${ids.length}` : "Set position");
-  for (const key of Object.keys(POSITIONS)) {
-    addItem(`${POSITIONS[key].label} (${POSITIONS[key].short})`, () => setPositionFor(ids, key), "ctx-pos");
-  }
-  addItem("— none —", () => setPositionFor(ids, ""), "ctx-pos");
-
-  // set contract type (bulk if multiple selected)
-  addSep();
-  addHead(many ? `Set contract for ${ids.length}` : "Set contract");
-  addItem("Permanent", () => safely(async () => { await cloud.setEmployeesContract(ids, "permanent"); await refreshAndRender(); }), "ctx-pos");
-  addItem("On-call", () => safely(async () => { await cloud.setEmployeesContract(ids, "oncall"); await refreshAndRender(); }), "ctx-pos");
-
-  // set service area (bulk if multiple selected)
-  if (D().areas.length) {
-    addSep();
-    addHead(many ? `Set service area for ${ids.length}` : "Set service area");
-    for (const a of D().areas) addItem(a.name, () => safely(async () => { await cloud.setEmployeesArea(ids, a.id); await refreshAndRender(); }), "ctx-pos");
-  }
 
   // move to another board (bulk if multiple selected)
   const targetBoards = many ? D().boards : D().boards.filter(b => b.id !== emp.boardId);
@@ -494,6 +506,46 @@ function renderFloatPool() {
   markSelectedCards();
 }
 
+/* The floating panel above only ever searches the two UNASSIGNED pools, so
+   typing the name of someone already on a mission or a leave zone used to
+   just show "No match" on both — even though they were on screen the whole
+   time. This instead flashes/scrolls to their card wherever it actually is
+   (mission grid or leave zones), and says so. */
+let lastSearchMatchId = null;   // first assigned match found — re-scroll only when this changes
+
+function applySearchHighlight() {
+  const note = $("#emp-search-note");
+  if (!note) return;   // not on a board view right now (Overview / Manpower List)
+  const q = state.empSearch.trim().toLowerCase();
+  const cards = $$("#missions-grid .emp-card, #status-zones .emp-card");
+  if (!q) {
+    for (const c of cards) c.classList.remove("search-hit");
+    note.classList.add("hidden");
+    lastSearchMatchId = null;
+    return;
+  }
+  let firstMatch = null, n = 0;
+  for (const card of cards) {
+    const emp = D().employees.find(e => e.id === card.dataset.empId);
+    const hit = !!emp && emp.name.toLowerCase().includes(q);
+    card.classList.toggle("search-hit", hit);
+    if (hit) { n++; if (!firstMatch) firstMatch = card; }
+  }
+  if (!n) {
+    note.classList.add("hidden");
+    lastSearchMatchId = null;
+    return;
+  }
+  note.textContent = `${n} already assigned — flashing on the board ↴`;
+  note.classList.remove("hidden");
+  note.onclick = () => firstMatch.scrollIntoView({ block: "center", behavior: "smooth" });
+  const firstId = firstMatch.dataset.empId;
+  if (firstId !== lastSearchMatchId) {
+    firstMatch.scrollIntoView({ block: "center", behavior: "smooth" });
+    lastSearchMatchId = firstId;
+  }
+}
+
 function missionMatchesFilters(m) {
   const f = state.filters;
   if (f.engineer.length && !f.engineer.includes(m.engineerId)) return false;
@@ -519,7 +571,7 @@ function renderMissions() {
   const plan = getPlan();
   const grid = $("#missions-grid");
   grid.innerHTML = "";
-  let missions = [...plan.missions];
+  let missions = plan.missions.filter(m => !m.hidden);
   if (state.sort) {
     missions.sort((a, b) =>
       missionSortValue(a).localeCompare(missionSortValue(b)) || a.number.localeCompare(b.number));
@@ -570,8 +622,12 @@ function boardStats(boardId) {
   const emps = boardEmployees(boardId);
   const ids = new Set(emps.map(e => e.id));
   const plan = peekPlan(boardId);
+  // hidden missions are already emptied of members when hidden (their people
+  // return to Standby), but filter here too so a hidden row never counts even
+  // if data drifts out of sync with that rule
+  const visibleMissions = plan.missions.filter(m => !m.hidden);
   const placed = new Set();
-  for (const m of plan.missions) for (const e of m.members) if (ids.has(e)) placed.add(e);
+  for (const m of visibleMissions) for (const e of m.members) if (ids.has(e)) placed.add(e);
   const assigned = placed.size;
   const zoneCount = (z) => plan.zones[z].filter(e => ids.has(e)).length;
   for (const z of ZONES) for (const e of plan.zones[z]) if (ids.has(e)) placed.add(e);
@@ -590,12 +646,12 @@ function boardStats(boardId) {
     oncallAvailable: oncallAvailableList.length,
     oncallAvailableList,
     available: unassigned.length,
-    missions: plan.missions.length,
+    missions: visibleMissions.length,
     // headcount of people working each shift, not mission-slot count — consistent
     // with every other chip in the stats row (Assigned/Leave/Standby are all headcounts)
-    dayMissions: plan.missions.filter(m => m.shift !== "night")
+    dayMissions: visibleMissions.filter(m => m.shift !== "night")
       .reduce((sum, m) => sum + m.members.filter(e => ids.has(e)).length, 0),
-    nightMissions: plan.missions.filter(m => m.shift === "night")
+    nightMissions: visibleMissions.filter(m => m.shift === "night")
       .reduce((sum, m) => sum + m.members.filter(e => ids.has(e)).length, 0),
     permanent: emps.filter(e => e.contract === "permanent").length,
     oncall: emps.filter(e => e.contract === "oncall").length,
@@ -642,78 +698,309 @@ function renderStats() {
 }
 
 /* ---------- overview tab ---------- */
+function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); }
+
+/* assigned ÷ (headcount − leave) — "how much of the people actually available
+   today is deployed". Spelled out in the UI (not just this comment) since it's
+   not guessable from the number alone. */
+function utilizationPct(assigned, headcount, leave) {
+  const denom = headcount - leave;
+  return denom > 0 ? Math.round((assigned / denom) * 100) : 0;
+}
+
+function ovSection(title, subtitle) {
+  const sec = document.createElement("section");
+  sec.className = "ov-section";
+  const h = document.createElement("h3");
+  h.textContent = title;
+  sec.appendChild(h);
+  if (subtitle) {
+    const sub = document.createElement("p");
+    sub.className = "ov-section-sub";
+    sub.textContent = subtitle;
+    sec.appendChild(sub);
+  }
+  return sec;
+}
+
+/* the 4-way split every deployment chart in Overview uses: Assigned / Leave /
+   Standby / On-call free. `s` is anything shaped like boardStats()'s return
+   (or a hand-built aggregate with the same four fields). */
+function deploySegments(s) {
+  return [
+    { key: "assigned", label: "Assigned", value: s.assigned, color: "var(--chart-assigned)" },
+    { key: "leave", label: "Leave", value: s.leave, color: "var(--chart-leave)" },
+    { key: "standby", label: "Standby", value: s.standby, color: "var(--chart-standby)" },
+    { key: "oncallFree", label: "On-call free", value: s.oncallAvailable, color: "var(--muted)" },
+  ];
+}
+
 function renderOverview() {
   const panel = $("#overview-panel");
   panel.innerHTML = "";
-  const wrap = document.createElement("div");
-  wrap.className = "ov-cards";
-
-  const overall = document.createElement("div");
-  overall.className = "ov-card ov-overall";
-  const allP = D().employees.filter(e => e.contract === "permanent").length;
-  const allOC = D().employees.length - allP;
-  overall.innerHTML = `<h4>All boards <span class="ov-total">${D().employees.length}</span></h4>
-    <div class="ov-rows">
-      <div class="ov-row"><span>Permanent</span><b>${allP}</b></div>
-      <div class="ov-row"><span>On-call</span><b>${allOC}</b></div>
-      ${D().boards.map(b => `<div class="ov-row"><span>Deployed to ${b.name}</span><b>${boardEmployees(b.id).length}</b></div>`).join("")}
-      ${(() => { const n = D().boards.reduce((sum, b) => sum + boardStats(b.id).standby, 0);
-        return `<div class="ov-row ${n ? "ov-row-warn" : ""}"><span>Standby, unassigned permanent (all boards)</span><b>${n}</b></div>`; })()}
-      ${(() => { const n = D().boards.reduce((sum, b) => sum + boardStats(b.id).oncallAvailable, 0);
-        return `<div class="ov-row"><span>Available on-call (all boards)</span><b>${n}</b></div>`; })()}
-    </div>
-    <div class="ov-chips"></div>`;
-  const chipBox = overall.querySelector(".ov-chips");
-  for (const a of D().areas) {
-    const n = D().employees.filter(e => e.areaId === a.id).length;
-    if (n) chipBox.appendChild(statChip(a.name, n, a.color));
+  const boards = D().boards;
+  if (!boards.length) {
+    panel.innerHTML = '<p class="import-note">Create a board (+ Board, top left) to see the Overview dashboard.</p>';
+    return;
   }
-  wrap.appendChild(overall);
+  const stats = Object.fromEntries(boards.map(b => [b.id, boardStats(b.id)]));
+  const boardColor = (i) => Charts.catColor(i);
+  const makeMini = (emp, b) => {
+    const area = D().areas.find(a => a.id === emp.areaId);
+    const mini = document.createElement("span");
+    // same identity rule as the board cards: white = permanent, grey dashed = on-call
+    mini.className = "ov-mini" + (emp.contract === "oncall" ? " oncall" : "");
+    mini.textContent = area ? `${emp.name} · ${area.name}` : emp.name;
+    mini.title = `${emp.contract === "oncall" ? "On-call" : "Permanent"} • ${area ? area.name : "?"} — click to open ${b.name}`;
+    mini.onclick = () => { D().activeBoardId = b.id; refreshAndRender(); };
+    return mini;
+  };
 
-  for (const b of D().boards) {
-    const s = boardStats(b.id);
+  const totalEmp = D().employees.length;
+  const totalAssigned = boards.reduce((s, b) => s + stats[b.id].assigned, 0);
+  const totalLeave = boards.reduce((s, b) => s + stats[b.id].leave, 0);
+  const totalStandby = boards.reduce((s, b) => s + stats[b.id].standby, 0);
+  const totalOncallFree = boards.reduce((s, b) => s + stats[b.id].oncallAvailable, 0);
+  const totalMissions = boards.reduce((s, b) => s + stats[b.id].missions, 0);
+  const totalPerm = D().employees.filter(e => e.contract === "permanent").length;
+  const totalOncall = totalEmp - totalPerm;
+  const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave);
+
+  /* ---------- KPI strip: the handful of numbers that read fine as numbers ---------- */
+  const kpiRow = document.createElement("div");
+  kpiRow.className = "ov-kpi-row";
+  const kpi = (value, label) => {
+    const tile = document.createElement("div");
+    tile.className = "ov-kpi-tile";
+    tile.innerHTML = `<div class="ov-kpi-value">${value}</div><div class="ov-kpi-label">${label}</div>`;
+    return tile;
+  };
+  kpiRow.appendChild(kpi(totalEmp, "Total employees"));
+  kpiRow.appendChild(kpi(boards.length, "Boards"));
+  kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`));
+  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization"));
+  panel.appendChild(kpiRow);
+
+  /* ---------- deployment: whole-workforce donut + one 100%-stacked bar per board ---------- */
+  const deploySec = ovSection("Deployment", `Utilized = assigned ÷ (headcount − leave), for ${fmtDow(state.date)} ${fmtDate(state.date)}`);
+  const deployGrid = document.createElement("div");
+  deployGrid.className = "ov-deploy-grid";
+  const allDeploy = deploySegments({ assigned: totalAssigned, leave: totalLeave, standby: totalStandby, oncallAvailable: totalOncallFree });
+  const donutWrap = document.createElement("div");
+  donutWrap.className = "ov-deploy-donut-wrap";
+  donutWrap.innerHTML = Charts.donut({ segments: allDeploy, centerValue: overallUtil + "%", centerLabel: "Utilized", size: 152, thickness: 24 });
+  donutWrap.appendChild(Charts.legendEl(allDeploy.map(s => ({ key: s.key, label: `${s.label} (${s.value})`, color: s.color }))));
+  deployGrid.appendChild(donutWrap);
+
+  const barsWrap = document.createElement("div");
+  barsWrap.className = "ov-deploy-bars";
+  for (const b of boards) {
+    const s = stats[b.id];
+    const row = document.createElement("div");
+    row.className = "ov-deploy-bar-row";
+    row.innerHTML = `<button type="button" class="ov-deploy-bar-board" title="Open ${b.name}">${b.name}</button>
+      <div class="ov-deploy-bar-track"></div><span class="ov-deploy-bar-total">${s.total}</span>`;
+    row.querySelector(".ov-deploy-bar-board").onclick = () => { D().activeBoardId = b.id; refreshAndRender(); };
+    row.querySelector(".ov-deploy-bar-track").innerHTML = Charts.stackedBarH({ segments: deploySegments(s), height: 20 });
+    barsWrap.appendChild(row);
+  }
+  deployGrid.appendChild(barsWrap);
+  deploySec.appendChild(deployGrid);
+  panel.appendChild(deploySec);
+
+  /* ---------- needs attention: kept as an action list, not a stat — a chart
+     would just make "here are their names, click to jump" worse. Placed right
+     after Deployment since it's the direct follow-up action to that chart. ---------- */
+  const attnSec = ovSection("Needs attention");
+  let anyAttn = false;
+  for (const b of boards) {
+    const s = stats[b.id];
+    if (!s.standby && !s.oncallAvailable) continue;
+    anyAttn = true;
     const card = document.createElement("div");
     card.className = "ov-card";
-    card.innerHTML = `<h4>${b.name} <span class="ov-total">${s.total}</span></h4>
-      <div class="ov-rows">
-        <div class="ov-row"><span>Permanent</span><b>${s.permanent}</b></div>
-        <div class="ov-row"><span>On-call</span><b>${s.oncall}</b></div>
-        <div class="ov-row"><span>Missions (${fmtDate(state.date)})</span><b>${s.missions}</b></div>
-        <div class="ov-row"><span>Assigned to mission</span><b>${s.assigned}</b></div>
-        <div class="ov-row"><span>Leave (all types)</span><b>${s.leave}</b></div>
-        ${LEAVE_ZONES.map(z => `<div class="ov-row ov-row-sub"><span>· ${ZONE_LABELS[z]} (${ZONE_LABELS_TH[z]})</span><b>${s.zones[z]}</b></div>`).join("")}
-        <div class="ov-row ${s.standby ? "ov-row-warn" : ""}"><span>Standby (unassigned permanent)</span><b>${s.standby}</b></div>
-        <div class="ov-row"><span>Available on-call</span><b>${s.oncallAvailable}</b></div>
-      </div>
-      ${s.standby
-        ? `<div class="ov-avail"><div class="ov-avail-title">⚠ Permanent, not assigned yet — assign to a mission:</div><div class="ov-avail-cards"></div></div>`
-        : `<div class="ov-avail ov-avail-ok">✓ Everyone permanent is placed</div>`}
-      ${s.oncallAvailable
-        ? `<div class="ov-avail ov-avail-calm"><div class="ov-avail-title">Available on-call (not flagged):</div><div class="ov-avail-cards-oncall"></div></div>`
-        : ""}
-      <div class="ov-chips"></div>`;
-    const makeMini = (emp, b) => {
-      const area = D().areas.find(a => a.id === emp.areaId);
-      const mini = document.createElement("span");
-      // same identity rule as the board cards: white = permanent, grey dashed = on-call
-      mini.className = "ov-mini" + (emp.contract === "oncall" ? " oncall" : "");
-      mini.textContent = area ? `${emp.name} · ${area.name}` : emp.name;
-      mini.title = `${emp.contract === "oncall" ? "On-call" : "Permanent"} • ${area ? area.name : "?"} — click to open ${b.name}`;
-      mini.onclick = () => { D().activeBoardId = b.id; refreshAndRender(); };
-      return mini;
-    };
-    const availBox = card.querySelector(".ov-avail-cards");
-    if (availBox) for (const emp of s.availableList) availBox.appendChild(makeMini(emp, b));
-    const oncallBox = card.querySelector(".ov-avail-cards-oncall");
-    if (oncallBox) for (const emp of s.oncallAvailableList) oncallBox.appendChild(makeMini(emp, b));
-    const chips = card.querySelector(".ov-chips");
-    for (const a of D().areas) {
-      const n = boardEmployees(b.id).filter(e => e.areaId === a.id).length;
-      if (n) chips.appendChild(statChip(a.name, n, a.color));
+    card.innerHTML = `<h4>${b.name}</h4>`;
+    if (s.standby) {
+      const box = document.createElement("div");
+      box.className = "ov-avail";
+      box.innerHTML = `<div class="ov-avail-title">⚠ Permanent, not assigned yet — assign to a mission:</div><div class="ov-avail-cards"></div>`;
+      const cardsBox = box.querySelector(".ov-avail-cards");
+      for (const emp of s.availableList) cardsBox.appendChild(makeMini(emp, b));
+      card.appendChild(box);
     }
-    wrap.appendChild(card);
+    if (s.oncallAvailable) {
+      const box = document.createElement("div");
+      box.className = "ov-avail ov-avail-calm";
+      box.innerHTML = `<div class="ov-avail-title">Available on-call (not flagged):</div><div class="ov-avail-cards-oncall"></div>`;
+      const cardsBox = box.querySelector(".ov-avail-cards-oncall");
+      for (const emp of s.oncallAvailableList) cardsBox.appendChild(makeMini(emp, b));
+      card.appendChild(box);
+    }
+    attnSec.appendChild(card);
   }
-  panel.appendChild(wrap);
+  if (!anyAttn) {
+    attnSec.appendChild(Object.assign(document.createElement("p"), { className: "ov-avail ov-avail-ok", textContent: "✓ Everyone permanent is placed on every board." }));
+  }
+  panel.appendChild(attnSec);
+
+  /* ---------- contract mix: permanent vs on-call, all boards + each board ---------- */
+  const contractSec = ovSection("Contract mix", "Permanent vs on-call — all boards, then each board individually");
+  const contractGrid = document.createElement("div");
+  contractGrid.className = "ov-contract-grid";
+  const contractItem = (label, perm, oncall, onClick) => {
+    const item = document.createElement("div");
+    item.className = "ov-contract-item" + (onClick ? " clickable" : "");
+    item.innerHTML = Charts.donut({
+      segments: [
+        { label: "Permanent", value: perm, color: "var(--chart-permanent)" },
+        { label: "On-call", value: oncall, color: "var(--chart-oncall)" },
+      ],
+      centerValue: perm + oncall, size: 100, thickness: 15,
+    });
+    const cap = document.createElement("div");
+    cap.className = "ov-contract-item-label";
+    cap.textContent = label;
+    item.appendChild(cap);
+    if (onClick) { item.title = `Open ${label}`; item.onclick = onClick; }
+    return item;
+  };
+  contractGrid.appendChild(contractItem("All boards", totalPerm, totalOncall, null));
+  for (const b of boards) {
+    const s = stats[b.id];
+    contractGrid.appendChild(contractItem(b.name, s.permanent, s.oncall, () => { D().activeBoardId = b.id; refreshAndRender(); }));
+  }
+  contractSec.appendChild(contractGrid);
+  contractSec.appendChild(Charts.legendEl([
+    { key: "perm", label: `Permanent (${totalPerm})`, color: "var(--chart-permanent)" },
+    { key: "oncall", label: `On-call (${totalOncall})`, color: "var(--chart-oncall)" },
+  ]));
+  panel.appendChild(contractSec);
+
+  /* ---------- service-area distribution, all boards ---------- */
+  const areaSec = ovSection("By service area", "Headcount across all boards");
+  const areaRows = D().areas.map(a => ({ label: a.name, value: D().employees.filter(e => e.areaId === a.id).length, color: a.color }))
+    .filter(r => r.value > 0)
+    .sort((a, b) => b.value - a.value);
+  if (areaRows.length) {
+    const areaMax = Math.max(...areaRows.map(r => r.value));
+    const areaWrap = document.createElement("div");
+    areaWrap.className = "ov-area-bars";
+    areaWrap.innerHTML = Charts.barsH({ rows: areaRows, max: areaMax, barHeight: 16, rowGap: 10 });
+    areaSec.appendChild(areaWrap);
+  } else {
+    areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
+  }
+  panel.appendChild(areaSec);
+
+  /* ---------- utilization trend: 7/14/30 days, one line per board ---------- */
+  const trendSec = ovSection("Utilization trend",
+    "Utilized = assigned ÷ (headcount − leave), ending today. Headcount uses each employee's CURRENT board — a past board move isn't tracked historically, so a moved employee counts on their new board for the whole window shown.");
+  const controls = document.createElement("div");
+  controls.className = "ov-trend-controls";
+  for (const n of [7, 14, 30]) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-small" + (state.overview.trendRange === n ? " active" : "");
+    btn.textContent = n + "d";
+    btn.onclick = () => {
+      if (state.overview.trendRange === n) return;
+      state.overview.trendRange = n;
+      state.overview.utilCacheKey = null;
+      refreshAndRender();
+    };
+    controls.appendChild(btn);
+  }
+  trendSec.appendChild(controls);
+
+  const util = state.overview.util || {};
+  const toDate = todayStr();
+  const fromDate = addDays(toDate, -(state.overview.trendRange - 1));
+  const xDates = [];
+  for (let d = fromDate; d <= toDate; d = addDays(d, 1)) xDates.push(d);
+  // cloud.getUtilizationRange now seeds every calendar date (working, weekend,
+  // and holiday alike) — this chart deliberately still skips non-working days
+  // (isNonWorkingDate: weekends + holiday overrides), so the line gaps on
+  // them instead of dipping toward zero on a day nobody expected coverage.
+  const trendSeries = boards.map((b, i) => ({
+    key: b.id,
+    label: b.name,
+    color: boardColor(i),
+    visible: !state.overview.trendHidden.has(b.id),
+    points: xDates.map(d => {
+      if (isNonWorkingDate(d, b.id)) return { y: null };
+      const rec = util[b.id] && util[b.id][d];
+      return rec ? { y: utilizationPct(rec.assigned, rec.headcount, rec.leave), suffix: "%" } : { y: null };
+    }),
+  }));
+  const trendWrap = document.createElement("div");
+  trendWrap.className = "ov-trend-chart";
+  trendWrap.innerHTML = Charts.lineChart({ series: trendSeries, xLabels: xDates.map(shortDateLabel), yMax: 100, height: 200 });
+  trendSec.appendChild(trendWrap);
+  trendSec.appendChild(Charts.legendEl(
+    boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i), muted: state.overview.trendHidden.has(b.id) })),
+    (key) => {
+      state.overview.trendHidden.has(key) ? state.overview.trendHidden.delete(key) : state.overview.trendHidden.add(key);
+      render();
+    }
+  ));
+  panel.appendChild(trendSec);
+
+  /* ---------- on-call availability trend: same range/data fetch as above,
+     and now the SAME date filter too — excludes weekends AND holidays, same
+     as the utilization chart above (isNonWorkingDate covers both, honoring
+     any per-date override in either direction). Shares state.overview.trendRange
+     and trendHidden with the chart above (same range buttons, same legend
+     board-visibility set) rather than duplicating those controls. ---------- */
+  const oncallTrendSec = ovSection("On-call availability trend",
+    "Available on-call = on-call headcount − assigned to a mission − on leave, per board. Excludes weekends and holidays, same as the trend above — uses the same date range.");
+  const oncallYMax = Math.max(4, Math.ceil(Math.max(1, ...boards.map(b => stats[b.id].oncall)) / 4) * 4);
+  const oncallTrendSeries = boards.map((b, i) => ({
+    key: b.id,
+    label: b.name,
+    color: boardColor(i),
+    visible: !state.overview.trendHidden.has(b.id),
+    points: xDates.map(d => {
+      if (isNonWorkingDate(d, b.id)) return { y: null };
+      const rec = util[b.id] && util[b.id][d];
+      if (!rec) return { y: null };
+      const avail = Math.max(0, rec.oncallHeadcount - rec.oncallAssigned - rec.oncallLeave);
+      return { y: avail };
+    }),
+  }));
+  const oncallTrendWrap = document.createElement("div");
+  oncallTrendWrap.className = "ov-trend-chart";
+  oncallTrendWrap.innerHTML = Charts.lineChart({ series: oncallTrendSeries, xLabels: xDates.map(shortDateLabel), yMax: oncallYMax, height: 200 });
+  oncallTrendSec.appendChild(oncallTrendWrap);
+  oncallTrendSec.appendChild(Charts.legendEl(
+    boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i), muted: state.overview.trendHidden.has(b.id) })),
+    (key) => {
+      state.overview.trendHidden.has(key) ? state.overview.trendHidden.delete(key) : state.overview.trendHidden.add(key);
+      render();
+    }
+  ));
+  panel.appendChild(oncallTrendSec);
+
+  /* ---------- leave by type, broken down by board on a shared scale — the
+     last section on the page ---------- */
+  const leaveSec = ovSection("Leave by type", "Bar length is comparable across leave types; segments break each one down by board");
+  const leaveRows = document.createElement("div");
+  leaveRows.className = "ov-leave-rows";
+  const leaveTotals = LEAVE_ZONES.map(z => boards.reduce((sum, b) => sum + stats[b.id].zones[z], 0));
+  const leaveMax = Math.max(1, ...leaveTotals);
+  LEAVE_ZONES.forEach((z, zi) => {
+    const segs = boards.map((b, i) => ({ key: b.id, label: b.name, value: stats[b.id].zones[z], color: boardColor(i) }));
+    const row = document.createElement("div");
+    row.className = "ov-leave-row";
+    row.innerHTML = `<span class="ov-leave-row-label">${ZONE_LABELS[z]}<small>${ZONE_LABELS_TH[z]}</small></span>
+      <div class="ov-leave-row-track"></div><span class="ov-leave-row-total">${leaveTotals[zi]}</span>`;
+    row.querySelector(".ov-leave-row-track").innerHTML = Charts.stackedBarH({ segments: segs, scaleMax: leaveMax, height: 18 });
+    leaveRows.appendChild(row);
+  });
+  leaveSec.appendChild(leaveRows);
+  if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
+  panel.appendChild(leaveSec);
+
+  Charts.wireChartTooltips(panel);
 }
 
 const FILTER_LABELS = { engineer: "Engineer", host: "Host", customer: "Customer", shift: "Shift" };
@@ -722,7 +1009,7 @@ function filterOptions(key) {
   const plan = getPlan();
   if (key === "engineer") return D().engineers.map(e => ({ value: e.id, label: e.name }));
   if (key === "shift") return [{ value: "day", label: "Day" }, { value: "night", label: "Night" }];
-  const vals = [...new Set(plan.missions.map(m => m[key]))].sort();
+  const vals = [...new Set(plan.missions.filter(m => !m.hidden).map(m => m[key]))].sort();
   return vals.map(v => ({ value: v, label: v }));
 }
 
@@ -873,7 +1160,7 @@ function renderEmployeeRows() {
       <td>${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td>${pos ? pos.label : "—"}</td>
       <td>${e.phone || "—"}</td>
-      <td>${area ? area.name : "—"}</td>
+      <td>${area ? `<span class="area-pill" style="background:${area.color}">${area.name}</span>` : "—"}</td>
       <td>${board ? board.name : "—"}</td>`;
     tr.querySelector(".el-check input").onchange = (ev) => {
       ev.target.checked ? state.selectedEmps.add(e.id) : state.selectedEmps.delete(e.id);
@@ -1016,6 +1303,7 @@ function openMissionModal(missionId) {
   form.reset();
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
+  $("#btn-hide-mission").classList.toggle("hidden", !missionId);
   form.engineerId.innerHTML = D().engineers.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   if (missionId) {
     const m = getPlan().missions.find(x => x.id === missionId);
@@ -1047,12 +1335,16 @@ function saveMission(ev) {
     engineerId: form.engineerId.value,
   };
   // instant client-side check (same number + shift, excluding the mission being edited);
-  // the database constraint is still the final word, this just avoids a round trip
+  // scans hidden missions too — the DB unique constraint covers them regardless —
+  // this just avoids a round trip and points at the hidden one if that's the clash
   const dup = getPlan().missions.find(m =>
     m.number.trim().toLowerCase() === vals.number.toLowerCase() &&
     m.shift === vals.shift && m.id !== state.editingMissionId);
   if (dup) {
-    alert(`A mission "${vals.number}" already exists on the ${vals.shift === "night" ? "Night" : "Day"} shift for this date. Use a different shift, or edit the existing mission instead.`);
+    const shiftLabel = vals.shift === "night" ? "Night" : "Day";
+    alert(dup.hidden
+      ? `A hidden mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use "👁 Hide/Unhide" to unhide and reuse it, or pick a different shift.`
+      : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`);
     return;
   }
   safely(async () => {
@@ -1070,6 +1362,27 @@ function deleteMission() {
       await refreshAndRender();
     });
   });
+}
+
+/* Hide takes a mission off the board without deleting its record — its number,
+   host, engineer etc. all survive so it can be brought back with "👁 Hide/Unhide".
+   Carries forward day to day like any other mission field (cloud._copyPlanForward
+   copies the hidden flag), so a dormant mission stays off every future board
+   until someone explicitly unhides it. */
+function hideMission() {
+  const m = getPlan().missions.find(x => x.id === state.editingMissionId);
+  const doHide = () => safely(async () => {
+    await cloud.setMissionsHidden([state.editingMissionId], true);
+    closeModal();
+    await refreshAndRender();
+  });
+  if (m.members.length) {
+    showConfirm("Hide mission?",
+      `Hide ${m.number}? Its ${m.members.length} assigned employee${m.members.length === 1 ? "" : "s"} return to Standby. The mission itself is kept — unhide it any time from "👁 Hide/Unhide".`,
+      doHide);
+  } else {
+    doHide();
+  }
 }
 
 /* employee modal */
@@ -1353,7 +1666,11 @@ function openImportModal() {
         $("#import-list").innerHTML = '<p class="import-note">No missions found on recent weekdays to copy from.</p>';
         return;
       }
-      importCandidates = await cloud.getMissionsForDate(boardId, srcDate);
+      importCandidates = (await cloud.getMissionsForDate(boardId, srcDate)).filter(m => !m.hidden);
+      if (!importCandidates.length) {
+        $("#import-list").innerHTML = '<p class="import-note">Every mission from that date is hidden. Unhide from "👁 Hide/Unhide" first if you want to bring one forward.</p>';
+        return;
+      }
       $("#import-source-note").textContent =
         `Missions from ${fmtDow(srcDate)} ${fmtDate(srcDate)} — tick the ones that also run on ${fmtDow(state.date)} ${fmtDate(state.date)}:`;
       const list = $("#import-list");
@@ -1385,6 +1702,42 @@ function confirmImport() {
     if (result && result.skipped > 0) {
       alert(`${result.added} mission(s) added. ${result.skipped} already existed on this date/shift and were skipped.`);
     }
+  });
+}
+
+/* ---------- Hide/Unhide missions (declutter the board without deleting) ---------- */
+function openHideMissionsModal() {
+  guardEdit(() => {
+    const missions = [...getPlan().missions].sort((a, b) => a.number.localeCompare(b.number));
+    const list = $("#hide-missions-list");
+    list.innerHTML = "";
+    if (!missions.length) {
+      list.innerHTML = '<p class="import-note">No missions on this date yet.</p>';
+    }
+    for (const m of missions) {
+      const eng = D().engineers.find(e => e.id === m.engineerId);
+      const row = document.createElement("label");
+      row.className = "import-row";
+      row.innerHTML = `<input type="checkbox" value="${m.id}" ${m.hidden ? "checked" : ""}>
+        <span class="import-info"><b>${m.number}</b> — ${m.host} → ${m.customer}
+        <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + eng.name : ""} • ${m.members.length} assigned</small></span>`;
+      list.appendChild(row);
+    }
+    openModal("#modal-hide-missions");
+  });
+}
+
+function saveHideMissions() {
+  const missions = getPlan().missions;
+  const checked = new Set(Array.from($$("#hide-missions-list input[type=checkbox]:checked")).map(c => c.value));
+  const toHide = missions.filter(m => checked.has(m.id) && !m.hidden).map(m => m.id);
+  const toUnhide = missions.filter(m => !checked.has(m.id) && m.hidden).map(m => m.id);
+  if (!toHide.length && !toUnhide.length) { closeModal(); return; }
+  safely(async () => {
+    if (toHide.length) await cloud.setMissionsHidden(toHide, true);
+    if (toUnhide.length) await cloud.setMissionsHidden(toUnhide, false);
+    closeModal();
+    await refreshAndRender();
   });
 }
 
@@ -1478,6 +1831,9 @@ function wireApp() {
   $("#form-mission").onsubmit = saveMission;
   $("#form-employee").onsubmit = saveEmployee;
   $("#btn-delete-mission").onclick = deleteMission;
+  $("#btn-hide-mission").onclick = hideMission;
+  $("#btn-hide-missions").onclick = openHideMissionsModal;
+  $("#btn-hide-missions-save").onclick = saveHideMissions;
   $("#btn-delete-employee").onclick = deleteEmployee;
 
   $("#btn-settings").onclick = () => { renderSettings(); openModal("#modal-settings"); };
@@ -1542,7 +1898,7 @@ function wireApp() {
   $("#btn-reset-board").onclick = () => guardEdit(() => resetBoard());
 
   // employee search (floating panel) — filter as you type, keep selection
-  $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); });
+  $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });
   // undo + selection controls
   $("#btn-undo").onclick = undoLast;
   $("#btn-clear-selection").onclick = clearSelection;
@@ -1648,7 +2004,7 @@ async function boot() {
   // holidays are known now — restore the last board/date the user was on, falling
   // back to the next working day if there's nothing saved (or it's stale/invalid)
   restoreViewState();
-  cloud.onChange(() => refreshAndRender());
+  cloud.onChange(() => { state.overview.utilCacheKey = null; refreshAndRender(); });
   await refreshAndRender();
 }
 

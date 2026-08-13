@@ -12,17 +12,20 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 
 - **Boards**: tabs at the top-left. `+ Board` creates a new board (e.g. Rayong). Double-click a tab to rename it.
   - Every employee belongs to exactly **one board** — a card assigned on Non-Rayong can never appear as available on Rayong.
-  - **Right-click** an employee card → "Move to …" transfers the person to another board; they land in that board's Available pool.
-- **📊 Overview tab**: totals across all boards — employees per board, permanent vs on-call per board, and per-date deployment (missions, assigned, leave, standby, return, available) with service-area breakdowns.
-  - Boards with employees still **Available (not assigned)** show an amber warning listing their names — assign them to a mission or drag them to Standby. Click a name to jump to that board. Boards with everyone placed show "✓ Everyone is placed".
+  - **Right-click** an employee card → Edit / Move to another board / Delete. (Position, contract type, and service area move to the Manpower List tab — set them one at a time from Edit Employee, or in bulk from the list's selection bar.)
+- **📊 Overview tab**: a management dashboard, not a wall of numbers — a KPI strip, a deployment donut + per-board stacked bars (with the "Needs attention" list of unassigned names right after), a contract-mix donut per board, a service-area distribution, two 7/14/30-day trend lines per board (click a legend entry to hide/show its line) — **Utilization** and **On-call availability** (on-call headcount not on a mission or on leave) — both counting only working days (weekends and holidays excluded), and a leave-by-type breakdown at the bottom. Every chart has a hover/focus tooltip with the exact numbers.
+  - Boards with employees still **Available (not assigned)** keep the amber "Needs attention" list of names, right after the Deployment chart — assign them to a mission or drag them to Standby. Click a name to jump to that board.
 - **Date**: top-right button opens a calendar. Each date has its own saved plan.
   - Future date with no plan yet → starts as a copy of the latest plan.
   - Past date → read-only 🔒; trying to edit shows a confirmation popup.
-- **+ New Mission**: mission number, host, customer, shift (day/night) with start/end time, engineer. The mission header takes the engineer's color. Click a mission header to edit or delete it.
+- **+ New Mission**: mission number, host, customer, shift (day/night) with start/end time, engineer. The mission header takes the engineer's color. Click a mission header to edit, delete, or hide it.
+- **👁 Hide/Unhide**: takes a mission off the board without deleting its record — its definition is kept (and stays hidden as the plan carries forward day to day) until you unhide it. Anyone assigned to a mission you hide returns to Standby. Use this for a mission that's paused rather than gone for good.
 - **+ New Employee**: name, contract type (Permanent = solid card with `P`, On-call = dashed card with `OC`), service area (card color). Double-click an employee card to edit.
 - **Drag & drop** employee cards between missions, Leave / Standby zones, and the Available pool. (No "Return to Site" zone — since employees now belong to a specific board, sending someone back to their original board is done via right-click → Move to Board.)
+- **Search** (top-right, floating panel): filters the two unassigned pools as you type. If a match is already assigned to a mission or on leave, the box says so and flashes/scrolls to their card on the board instead of just showing "No match".
 - **Stats bar**: total / assigned / leave / standby / return / available + a counter per service area.
 - **Filters**: by engineer, host, customer, shift — non-matching missions fade out.
+- **Manpower List tab**: every employee across every board, with a colour pill for service area matching the rest of the app, plus search/filter/sort and bulk edit (contract, position, service area, board, delete).
 - **Export**: saves a high-resolution JPG of the current board.
 - **Settings** ⚙: manage engineers (name, phone, color) and service areas (name, color).
 
@@ -35,8 +38,10 @@ within a second or two via Supabase Realtime.
 ## Files
 
 - `index.html` / `styles.css` / `app.js` — the app UI (no build step)
+- `charts.js` — Overview dashboard charts: hand-drawn inline SVG (donut, stacked bar, bar list, line), no charting library
 - `cloud.js` — data layer: talks to Supabase, keeps an in-memory cache, subscribes to realtime changes
 - `config.js` — your Supabase Project URL + anon key (see `SUPABASE_SETUP.md`)
 - `supabase/schema.sql` — database schema, security rules, and seed data — run once in the Supabase SQL editor
+- `supabase/migration-*.sql` — incremental schema changes; run any you haven't yet in the Supabase SQL editor (each is safe to run more than once)
 - `vendor/html2canvas.min.js` — library used for JPG export
 - `serve.ps1` — optional local web server for development, not needed for normal use
