@@ -1484,6 +1484,41 @@ function renderSettings() {
     };
     areaBox.appendChild(row);
   }
+
+  // Weekly weekend days per board — set once at board creation and, until
+  // now, never editable afterward. Checking/unchecking saves immediately
+  // (same instant-save pattern as the engineer/area fields above), and
+  // affects every date-based calculation for that board going forward:
+  // the holiday toggle, the "Add Mission" weekend-import flow, the
+  // date-picker's weekend highlighting, and the Overview trend charts.
+  const boardsBox = $("#settings-boards");
+  boardsBox.innerHTML = "";
+  for (const b of D().boards) {
+    const row = document.createElement("div");
+    row.className = "settings-board-row";
+    const nameEl = document.createElement("div");
+    nameEl.className = "settings-board-name";
+    nameEl.textContent = b.name;
+    const picker = document.createElement("div");
+    picker.className = "weekday-picker settings-board-days";
+    for (let i = 0; i < DOW_LABELS.length; i++) {
+      const lab = document.createElement("label");
+      lab.className = "weekday-chip";
+      lab.innerHTML = `<input type="checkbox" value="${i}" ${b.weekendDays.includes(i) ? "checked" : ""}> ${DOW_LABELS[i]}`;
+      lab.querySelector("input").onchange = () => {
+        const weekendDays = Array.from(picker.querySelectorAll("input:checked")).map(c => Number(c.value));
+        safely(async () => {
+          await cloud.saveBoardWeekendDays(b.id, weekendDays);
+          renderSettings();
+          render();
+        });
+      };
+      picker.appendChild(lab);
+    }
+    row.appendChild(nameEl);
+    row.appendChild(picker);
+    boardsBox.appendChild(row);
+  }
 }
 
 /* ---------- export to JPG ---------- */

@@ -528,6 +528,16 @@ const cloud = {
     if (error) throw error;
     await this._loadBoards();
   },
+  /* which days of the week are this board's normal weekend — set once at
+     board creation (see createBoard) and, until now, never editable after
+     that. An empty array is valid and means "no weekly day off" (a board
+     that runs every day); it's the caller's job to confirm that's intended,
+     not this function's. */
+  async saveBoardWeekendDays(boardId, weekendDays) {
+    const { error } = await sb.from("boards").update({ weekend_days: weekendDays }).eq("id", boardId);
+    if (error) throw error;
+    await this._loadBoards();
+  },
 
   async saveEngineerField(id, field, value) {
     const { error } = await sb.from("engineers").update({ [field]: value }).eq("id", id);

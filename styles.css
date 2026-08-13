@@ -912,6 +912,9 @@ body.board-view #app-root { margin-right: 264px; }
   cursor: pointer;
 }
 .settings-row .btn-danger { padding: 4px 8px; }
+.settings-board-row { margin-bottom: 12px; }
+.settings-board-name { font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+.settings-board-days { margin-bottom: 0; }
 
 /* ===== Custom date picker ===== */
 #datepicker-pop {

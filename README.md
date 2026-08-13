@@ -27,7 +27,7 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 - **Filters**: by engineer, host, customer, shift — non-matching missions fade out.
 - **Manpower List tab**: every employee across every board, with a colour pill for service area matching the rest of the app, plus search/filter/sort and bulk edit (contract, position, service area, board, delete).
 - **Export**: saves a high-resolution JPG of the current board.
-- **Settings** ⚙: manage engineers (name, phone, color) and service areas (name, color).
+- **Settings** ⚙: manage engineers (name, phone, color), service areas (name, color), and each board's weekly weekend days (checkboxes, save instantly) — this drives the holiday toggle, weekend "Add Mission" import, the date picker's weekend highlighting, and both Overview trend charts, so it's worth checking a new board's checkboxes match its real schedule.
 
 ## Where is the data?
 
