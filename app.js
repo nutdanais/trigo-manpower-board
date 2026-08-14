@@ -158,12 +158,17 @@ async function ensureUtilizationLoaded() {
 /* warm the cache for whatever is currently in view, then redraw */
 async function refreshData() {
   if (isOverview()) {
+    // Read-only: the Overview aggregates every board, so it must never seed —
+    // otherwise one glance (or a login landing here) would materialize every
+    // board's day. A future day nobody has opened yet simply shows empty.
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
     await ensureUtilizationLoaded();
   } else if (isEmployeeList()) {
     // employee master data is already kept warm in the cache — nothing date-scoped to load
   } else if (D().activeBoardId) {
-    await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
+    // Intentional single-board open: this is the one place allowed to seed a
+    // brand-new day (once) with the previous working day's missions + crew.
+    await cloud.ensurePlanLoaded(D().activeBoardId, state.date, { allowSeed: true });
   }
 }
 async function refreshAndRender() {

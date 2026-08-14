@@ -102,7 +102,8 @@ const cloud = {
   },
 
   /* ---------- plan (missions + assignments) for one board+date ---------- */
-  async ensurePlanLoaded(boardId, date, force) {
+  async ensurePlanLoaded(boardId, date, opts = {}) {
+    const { force = false, allowSeed = false } = opts;
     if (!boardId) return { missions: [], zones: emptyZones(), updatedAt: null };
     if (!this.data.plans[boardId]) this.data.plans[boardId] = {};
     if (this.data.plans[boardId][date] && !force) return this.data.plans[boardId][date];
@@ -115,17 +116,20 @@ const cloud = {
     let assignRows = aRows || [];
 
     const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId).map((e) => e.id));
-    const boardHasAssignments = assignRows.some((a) => boardEmpIds.has(a.employee_id));
 
-    // Carry the latest working-day plan forward, gated on ASSIGNMENTS only —
-    // never on missions. As long as nobody has been placed on this board's day
-    // yet, we carry yesterday's employees over; the moment any assignment exists,
-    // we never auto-copy again (that stops the plan from "reverting to the
-    // original" after a re-open). Keying on assignments (not missions) means a
-    // planner can create/edit missions or remarks on a future day and still get
-    // yesterday's employees carried in — _copyPlanForward leaves their mission
-    // edits untouched and only brings the people. Weekends/holidays never copy.
-    if (!boardHasAssignments && date >= todayStrISO() && !isNonWorkingDate(date, boardId)) {
+    // Seed this day with the previous working day's plan (missions + crew) the
+    // FIRST time it is materialized, then never again. "First time" is recorded
+    // as a plan_days marker row — NOT inferred from whether assignments exist.
+    // An intentionally-adjusted day legitimately has zero assignments (everyone
+    // on Standby, which is computed not stored; people removed; or missions
+    // edited with nobody placed yet), and inferring "new" from that is exactly
+    // what used to re-fill an emptied board the moment another user loaded it.
+    // Seeding runs only on an intentional single-board open (allowSeed) — never
+    // from the Overview fan-out or a plain refresh — so merely viewing never
+    // writes. Weekends/holidays never seed. _copyPlanForward preserves any
+    // existing mission edits and only brings the people across.
+    if (allowSeed && date >= todayStrISO() && !isNonWorkingDate(date, boardId)
+        && !(await this._dayInitialized(boardId, date, boardEmpIds, assignRows))) {
       const { data: prior } = await sb
         .from("missions").select("plan_date")
         .eq("board_id", boardId).lte("plan_date", date)
@@ -163,6 +167,44 @@ const cloud = {
 
     this.data.plans[boardId][date] = plan;
     return plan;
+  },
+
+  /* Has this board+date already been materialized (seeded once)? Recorded as a
+     plan_days row so an intentionally-emptied day is never re-seeded by a later
+     load. If plan_days hasn't been migrated in yet, degrade to the legacy signal
+     (any assignment exists for a board employee) so the app keeps working until
+     the migration runs. */
+  async _dayInitialized(boardId, date, boardEmpIds, assignRows) {
+    try {
+      const { data, error } = await sb.from("plan_days")
+        .select("board_id").eq("board_id", boardId).eq("plan_date", date).limit(1);
+      if (error) throw error;
+      return !!(data && data.length);
+    } catch (e) {
+      if (!this._planDaysMissing(e)) throw e;
+      return (assignRows || []).some((a) => boardEmpIds.has(a.employee_id));
+    }
+  },
+
+  /* Record that this board+date has been materialized. Idempotent (unique on the
+     primary key); a no-op if plan_days hasn't been migrated in yet. */
+  async _markDayInitialized(boardId, date) {
+    try {
+      const { error } = await sb.from("plan_days")
+        .upsert({ board_id: boardId, plan_date: date }, { onConflict: "board_id,plan_date", ignoreDuplicates: true });
+      if (error) throw error;
+    } catch (e) {
+      if (!this._planDaysMissing(e)) throw e;
+    }
+  },
+
+  /* True when an error means the plan_days table isn't there yet (migration not
+     run) — lets the marker logic degrade gracefully instead of breaking loads. */
+  _planDaysMissing(error) {
+    const code = error && error.code;
+    const msg = (error && error.message) || "";
+    return code === "42P01" || code === "PGRST205" ||
+      (/plan_days/i.test(msg) && /(does not exist|schema cache|could not find)/i.test(msg));
   },
 
   /* upsert mission rows guarding against duplicates (board_id,plan_date,number,shift).
@@ -256,6 +298,9 @@ const cloud = {
       const { error } = await sb.from("assignments").upsert(assignInserts, { onConflict: "employee_id,plan_date", ignoreDuplicates: true });
       if (error) throw error;
     }
+    // Mark the day materialized so it is never auto-seeded again, even after a
+    // planner later empties it (everyone to Standby / people removed).
+    await this._markDayInitialized(boardId, destDate);
   },
 
   /* ---------- mutations ---------- */
