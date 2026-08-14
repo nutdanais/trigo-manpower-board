@@ -236,6 +236,7 @@ button, input, select, textarea, optgroup {
   border-radius: 8px;
 }
 .date-nav { display: flex; align-items: center; gap: 4px; }
+#btn-lock.locked { background: #f59e0b; color: #fff; border-color: #f59e0b; }
 .btn-date-arrow {
   font-size: 18px;
   font-weight: 700;

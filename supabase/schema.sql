@@ -99,6 +99,24 @@ create table if not exists assignments (
 );
 create index if not exists assignments_date_idx on assignments(plan_date);
 
+-- ===== Plan-day marker: which (board, date) plans have been materialized =====
+-- A day is auto-seeded from the previous working day at most once; a row here
+-- records that it happened, so an intentionally-emptied day is never re-seeded
+-- by a later load (that was the "adjusted board disappears on login" bug).
+--
+-- Also doubles as the "Lock board" marker: locked_by/locked_at are set when a
+-- planner locks a finished day (view-only for everyone) and cleared on unlock.
+-- Unlocking never deletes the row — it must keep suppressing auto-seed.
+
+create table if not exists plan_days (
+  board_id  uuid not null references boards(id) on delete cascade,
+  plan_date date not null,
+  initialized_at timestamptz not null default now(),
+  locked_by text,
+  locked_at timestamptz,
+  primary key (board_id, plan_date)
+);
+
 -- ===== Row Level Security =====
 -- Internal team tool: any signed-in user can read/write everything.
 
@@ -109,6 +127,7 @@ alter table employees enable row level security;
 alter table missions enable row level security;
 alter table assignments enable row level security;
 alter table day_overrides enable row level security;
+alter table plan_days enable row level security;
 
 drop policy if exists "authenticated read/write day_overrides" on day_overrides;
 create policy "authenticated read/write day_overrides" on day_overrides
@@ -136,6 +155,10 @@ create policy "authenticated read/write missions" on missions
 
 drop policy if exists "authenticated read/write assignments" on assignments;
 create policy "authenticated read/write assignments" on assignments
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+drop policy if exists "authenticated read/write plan_days" on plan_days;
+create policy "authenticated read/write plan_days" on plan_days
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ===== Realtime: broadcast changes to every connected client =====
@@ -174,6 +197,11 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table day_overrides;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table plan_days;
 exception when duplicate_object then null;
 end $$;
 
