@@ -103,11 +103,17 @@ create index if not exists assignments_date_idx on assignments(plan_date);
 -- A day is auto-seeded from the previous working day at most once; a row here
 -- records that it happened, so an intentionally-emptied day is never re-seeded
 -- by a later load (that was the "adjusted board disappears on login" bug).
+--
+-- Also doubles as the "Lock board" marker: locked_by/locked_at are set when a
+-- planner locks a finished day (view-only for everyone) and cleared on unlock.
+-- Unlocking never deletes the row — it must keep suppressing auto-seed.
 
 create table if not exists plan_days (
   board_id  uuid not null references boards(id) on delete cascade,
   plan_date date not null,
   initialized_at timestamptz not null default now(),
+  locked_by text,
+  locked_at timestamptz,
   primary key (board_id, plan_date)
 );
 
@@ -191,6 +197,11 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table day_overrides;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table plan_days;
 exception when duplicate_object then null;
 end $$;
 

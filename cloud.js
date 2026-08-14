@@ -41,7 +41,7 @@ const isNonWorkingDate = (iso, boardId = cloud.data.activeBoardId) => {
 const emptyZones = () => Object.fromEntries(ZONES.map((z) => [z, []]));
 
 const cloud = {
-  data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], activeBoardId: null },
+  data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], activeBoardId: null },
   _listeners: [],
   _currentDate: () => todayStrISO(),
 
@@ -63,7 +63,7 @@ const cloud = {
   /* ---------- initial load ---------- */
   async init(getCurrentDate) {
     this._currentDate = getCurrentDate;
-    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides()]);
+    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks()]);
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
   },
@@ -98,6 +98,19 @@ const cloud = {
     } catch (e) {
       console.warn("day_overrides table unavailable (run the workweek migration):", e.message || e);
       this.data.overrides = [];
+    }
+  },
+  async _loadLocks() {
+    // tolerate the lock columns not existing yet (before the locking migration
+    // is run) — the app still works, "Lock board" just no-ops until then.
+    try {
+      const { data, error } = await sb.from("plan_days")
+        .select("board_id, plan_date, locked_by, locked_at").not("locked_by", "is", null);
+      if (error) throw error;
+      this.data.locks = (data || []).map((r) => ({ boardId: r.board_id, date: r.plan_date, lockedBy: r.locked_by, lockedAt: r.locked_at }));
+    } catch (e) {
+      if (!this._planDaysMissing(e)) console.warn("plan_days locking unavailable (run the locking migration):", e.message || e);
+      this.data.locks = [];
     }
   },
 
@@ -467,6 +480,32 @@ const cloud = {
     await this._loadOverrides();
   },
 
+  /* ---------- lock/unlock a finished day's board (view-only for everyone) ---------- */
+  /* Locking never creates a new row type — it sets locked_by/locked_at on the
+     same plan_days row the auto-seed marker lives on, and never deletes that
+     row, so unlocking can't re-arm the "adjusted board disappears" bug. */
+  async lockDay(boardId, date) {
+    const { data: { session } } = await sb.auth.getSession();
+    const email = (session && session.user && session.user.email) || "unknown";
+    const { error } = await sb.from("plan_days").upsert(
+      { board_id: boardId, plan_date: date, locked_by: email, locked_at: new Date().toISOString() },
+      { onConflict: "board_id,plan_date" });
+    if (error) {
+      if (this._missingColumnFromError(error) || this._planDaysMissing(error)) {
+        throw new Error("Locking a board needs a one-time database update (migration-2026-08-14b-plan-day-locks.sql) before it can be used.");
+      }
+      throw error;
+    }
+    await this._loadLocks();
+  },
+  async unlockDay(boardId, date) {
+    const { error } = await sb.from("plan_days")
+      .update({ locked_by: null, locked_at: null })
+      .eq("board_id", boardId).eq("plan_date", date);
+    if (error) throw error;
+    await this._loadLocks();
+  },
+
   async saveEmployee(employeeId, vals) {
     const name = vals.name.trim();
     // guard against two employee cards for the same name (checked against the
@@ -703,6 +742,7 @@ const cloud = {
       .on("postgres_changes", { event: "*", schema: "public", table: "missions" }, refreshPlanAndNotify)
       .on("postgres_changes", { event: "*", schema: "public", table: "assignments" }, refreshPlanAndNotify)
       .on("postgres_changes", { event: "*", schema: "public", table: "day_overrides" }, async () => { await this._loadOverrides(); this.data.plans = {}; this.notify(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "plan_days" }, async () => { await this._loadLocks(); this.notify(); })
       .subscribe();
   },
 };

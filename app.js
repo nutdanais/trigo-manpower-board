@@ -124,8 +124,14 @@ const EMPLIST_ID = "__emplist__";
 const isOverview = () => D().activeBoardId === OVERVIEW_ID;
 const isEmployeeList = () => D().activeBoardId === EMPLIST_ID;
 const isPast = () => state.date < todayStr();
+/* ---------- lock (finalized board, view-only for everyone) ---------- */
+const lockInfo = (boardId, date) => D().locks.find(l => l.boardId === boardId && l.date === date) || null;
+/* cloud.unlockDay() awaits a fresh reload of cloud.data.locks before returning,
+   so lockInfo() already reflects "unlocked" the moment it resolves — no local
+   override needed (and one would risk masking a later re-lock by someone else). */
+const isLocked = (boardId, date) => !!lockInfo(boardId, date);
 /* past AND today are read-only by default — today's plan is already being executed */
-const isReadOnly = () => state.date <= todayStr() && !state.unlockedDates.has(state.date);
+const isReadOnly = () => isLocked(D().activeBoardId, state.date) || (state.date <= todayStr() && !state.unlockedDates.has(state.date));
 const boardEmployees = (boardId) => D().employees.filter(e => e.boardId === boardId);
 
 /* ---------- plan access (reads the cache cloud.js keeps warm) ---------- */
@@ -177,8 +183,27 @@ async function refreshAndRender() {
 }
 
 /* ---------- read-only guard ---------- */
+/* Shared by guardEdit and the Lock button itself: prompt naming who locked the
+   board, then unlock it (for everyone, not just this session) and continue. */
+function confirmUnlock(boardId, date, then) {
+  const lock = lockInfo(boardId, date);
+  if (!lock) { then(); return; }
+  const when = lock.lockedAt ? new Date(lock.lockedAt).toLocaleString() : "";
+  showConfirm(
+    "Unlock board?",
+    `${fmtDow(date)} ${fmtDate(date)} was locked by ${lock.lockedBy}${when ? " on " + when : ""}. ` +
+      `Unlock it for editing? This unlocks it for everyone, not just you.`,
+    () => safely(async () => {
+      await cloud.unlockDay(boardId, date);
+      render();
+      then();
+    })
+  );
+}
 function guardEdit(action) {
   if (!isReadOnly()) { action(); return; }
+  const boardId = D().activeBoardId;
+  if (lockInfo(boardId, state.date)) { confirmUnlock(boardId, state.date, action); return; }
   const today = state.date === todayStr();
   showConfirm(
     today ? "Edit today's board?" : "Edit a past date?",
@@ -189,12 +214,23 @@ function guardEdit(action) {
   );
 }
 
+/* ---------- lock button (finalize a day's plan; view-only for everyone) ---------- */
+function toggleLockBoard() {
+  const boardId = D().activeBoardId;
+  if (lockInfo(boardId, state.date)) {
+    confirmUnlock(boardId, state.date, () => {});
+  } else {
+    safely(async () => { await cloud.lockDay(boardId, state.date); render(); });
+  }
+}
+
 /* ---------- rendering ---------- */
 function render() {
   saveViewState();
   hideContextMenu();
   renderTabs();
   renderDateButton();
+  renderLockButton();
   const ov = isOverview();
   const eml = isEmployeeList();
   $("#status-zones").classList.toggle("hidden", ov || eml);
@@ -228,7 +264,9 @@ function render() {
     renderFilterOptions();
     updateHideMissionsButton();
   }
+  const lock = !ov && !eml ? lockInfo(D().activeBoardId, state.date) : null;
   $("#readonly-badge").classList.toggle("hidden", ov || eml || !isReadOnly());
+  $("#readonly-badge").textContent = lock ? `🔒 Locked by ${lock.lockedBy}` : "🔒 Read-only (past date)";
   updateSelectionUI();
   updateUndoButton();
   applySearchHighlight();
@@ -279,6 +317,24 @@ function renderTabs() {
 
 function renderDateButton() {
   $("#btn-date").textContent = "📅 " + fmtDow(state.date) + " " + fmtDate(state.date);
+}
+
+/* lock button: only on an actual board (hidden on Overview / Manpower List) */
+function renderLockButton() {
+  const btn = $("#btn-lock");
+  const hide = isOverview() || isEmployeeList();
+  btn.classList.toggle("hidden", hide);
+  if (hide) return;
+  const lock = lockInfo(D().activeBoardId, state.date);
+  btn.classList.toggle("locked", !!lock);
+  if (lock) {
+    const when = lock.lockedAt ? new Date(lock.lockedAt).toLocaleString() : "";
+    btn.textContent = "🔒 Locked";
+    btn.title = `Locked by ${lock.lockedBy}${when ? " on " + when : ""} — click to unlock for everyone`;
+  } else {
+    btn.textContent = "🔓 Lock";
+    btn.title = "Lock this board so it's view-only for everyone";
+  }
 }
 
 /* display order for any list of employee cards: permanent before on-call, then by name */
@@ -1927,6 +1983,7 @@ function wireApp() {
   // quick prev/next day — the most common navigation, one tap instead of the calendar
   $("#btn-date-prev").onclick = () => { clearSelection(); state.date = addDays(state.date, -1); refreshAndRender(); };
   $("#btn-date-next").onclick = () => { clearSelection(); state.date = addDays(state.date, 1); refreshAndRender(); };
+  $("#btn-lock").onclick = toggleLockBoard;
 
   // weekend mission import
   $("#btn-import-mission").onclick = openImportModal;

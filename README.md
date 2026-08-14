@@ -18,6 +18,7 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 - **Date**: top-right button opens a calendar. Each date has its own saved plan.
   - Future date with no plan yet → starts as a copy of the latest plan.
   - Past date → read-only 🔒; trying to edit shows a confirmation popup.
+- **🔓/🔒 Lock**: next to the date picker. Click it once a day's plan is finalized to make that board **view-only for everyone** — a finished plan can't be bumped by someone else's edit or an auto-refresh. Anyone can unlock it again, but they first see a popup naming who locked it (and when); confirming unlocks it for everyone, not just that person.
 - **+ New Mission**: mission number, host, customer, shift (day/night) with start/end time, engineer. The mission header takes the engineer's color. Click a mission header to edit, delete, or hide it.
 - **👁 Hide/Unhide**: takes a mission off the board without deleting its record — its definition is kept (and stays hidden as the plan carries forward day to day) until you unhide it. Anyone assigned to a mission you hide returns to Standby. Use this for a mission that's paused rather than gone for good.
 - **+ New Employee**: name, contract type (Permanent = solid card with `P`, On-call = dashed card with `OC`), service area (card color). Double-click an employee card to edit.
