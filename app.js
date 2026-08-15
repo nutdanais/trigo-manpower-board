@@ -553,6 +553,11 @@ function renderFloatPool() {
   oncallBody.innerHTML = "";
   const q = state.empSearch.trim().toLowerCase();
   const filtered = state.poolAreas.size > 0 || q.length > 0;
+  // on a holiday, unassigned permanent employees are off, not on standby —
+  // relabel the pool so the board doesn't read as a staffing gap
+  const holiday = isNonWorkingDate(state.date);
+  $("#standby-label").textContent = holiday ? "🏖 Holiday" : "Standby";
+  $("#standby-sub").textContent = holiday ? "permanent, on holiday" : "permanent, unassigned";
   let standbyN = 0, oncallN = 0;
   for (const emp of sortEmployeesDisplay(unassignedEmployees())) {
     const isOncall = emp.contract === "oncall";
@@ -563,7 +568,7 @@ function renderFloatPool() {
   }
   $("#standby-count").textContent = standbyN;
   $("#oncall-count").textContent = oncallN;
-  if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "Everyone permanent is assigned"}</span>`;
+  if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : (holiday ? "No one on holiday" : "Everyone permanent is assigned")}</span>`;
   if (!oncallBody.children.length) oncallBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "No on-call free"}</span>`;
   markSelectedCards();
 }
@@ -699,12 +704,21 @@ function boardStats(boardId) {
   // or a leave type. On-call employees in the same spot are just "available" —
   // deliberately tracked separately since that's normal, not worth flagging.
   const unassigned = emps.filter(e => !placed.has(e.id));
-  const standbyList = unassigned.filter(e => e.contract === "permanent");
+  const permanentUnassigned = unassigned.filter(e => e.contract === "permanent");
   const oncallAvailableList = unassigned.filter(e => e.contract === "oncall");
+  // On a holiday/weekend, an unassigned permanent employee isn't a staffing
+  // gap — it's their day off. Bucket them separately so Standby (and anything
+  // built from it) never flags a holiday as "needs attention".
+  const isHoliday = isNonWorkingDate(state.date, boardId);
+  const standbyList = isHoliday ? [] : permanentUnassigned;
+  const onHolidayList = isHoliday ? permanentUnassigned : [];
   return {
     total: emps.length, assigned, leave, zones,
+    isHoliday,
     standby: standbyList.length,
     availableList: standbyList,
+    onHoliday: onHolidayList.length,
+    onHolidayList,
     oncallAvailable: oncallAvailableList.length,
     oncallAvailableList,
     available: unassigned.length,
@@ -747,8 +761,10 @@ function renderStats() {
   const s = boardStats(D().activeBoardId);
   const chips = [
     ["Total", s.total], ["Assigned", s.assigned], ["Leave", s.leave],
-    ["Standby", s.standby], ["On-call free", s.oncallAvailable],
+    ["Standby", s.standby],
   ];
+  if (s.isHoliday) chips.push(["🏖 Holiday", s.onHoliday]);
+  chips.push(["On-call free", s.oncallAvailable]);
   for (const [label, n] of chips) bar.appendChild(statChip(label, n));
   bar.appendChild(statChip("☀️ Day", s.dayMissions));
   bar.appendChild(statChip("🌙 Night", s.nightMissions, null, "stat-chip-night"));
@@ -762,11 +778,12 @@ function renderStats() {
 /* ---------- overview tab ---------- */
 function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); }
 
-/* assigned ÷ (headcount − leave) — "how much of the people actually available
-   today is deployed". Spelled out in the UI (not just this comment) since it's
-   not guessable from the number alone. */
-function utilizationPct(assigned, headcount, leave) {
-  const denom = headcount - leave;
+/* assigned ÷ (headcount − leave − onHoliday) — "how much of the people actually
+   available today is deployed". onHoliday defaults to 0 for callers (e.g. the
+   historical trend chart) that don't track it separately. Spelled out in the
+   UI (not just this comment) since it's not guessable from the number alone. */
+function utilizationPct(assigned, headcount, leave, onHoliday = 0) {
+  const denom = headcount - leave - onHoliday;
   return denom > 0 ? Math.round((assigned / denom) * 100) : 0;
 }
 
@@ -785,14 +802,16 @@ function ovSection(title, subtitle) {
   return sec;
 }
 
-/* the 4-way split every deployment chart in Overview uses: Assigned / Leave /
-   Standby / On-call free. `s` is anything shaped like boardStats()'s return
-   (or a hand-built aggregate with the same four fields). */
+/* the 5-way split every deployment chart in Overview uses: Assigned / Leave /
+   Standby / Holiday / On-call free. `s` is anything shaped like boardStats()'s
+   return (or a hand-built aggregate with the same fields). onHoliday is 0 on
+   any board/date that isn't a holiday, so the segment just disappears then. */
 function deploySegments(s) {
   return [
     { key: "assigned", label: "Assigned", value: s.assigned, color: "var(--chart-assigned)" },
     { key: "leave", label: "Leave", value: s.leave, color: "var(--chart-leave)" },
     { key: "standby", label: "Standby", value: s.standby, color: "var(--chart-standby)" },
+    { key: "onHoliday", label: "Holiday", value: s.onHoliday || 0, color: "var(--chart-holiday)" },
     { key: "oncallFree", label: "On-call free", value: s.oncallAvailable, color: "var(--muted)" },
   ];
 }
@@ -822,11 +841,12 @@ function renderOverview() {
   const totalAssigned = boards.reduce((s, b) => s + stats[b.id].assigned, 0);
   const totalLeave = boards.reduce((s, b) => s + stats[b.id].leave, 0);
   const totalStandby = boards.reduce((s, b) => s + stats[b.id].standby, 0);
+  const totalOnHoliday = boards.reduce((s, b) => s + stats[b.id].onHoliday, 0);
   const totalOncallFree = boards.reduce((s, b) => s + stats[b.id].oncallAvailable, 0);
   const totalMissions = boards.reduce((s, b) => s + stats[b.id].missions, 0);
   const totalPerm = D().employees.filter(e => e.contract === "permanent").length;
   const totalOncall = totalEmp - totalPerm;
-  const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave);
+  const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday);
 
   /* ---------- KPI strip: the handful of numbers that read fine as numbers ---------- */
   const kpiRow = document.createElement("div");
@@ -850,14 +870,14 @@ function renderOverview() {
   kpiRow.appendChild(kpi(boards.length, "Boards"));
   kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`, boards.map(b => [b.name, stats[b.id].missions])));
   kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization",
-    boards.map(b => [b.name, utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave) + "%"])));
+    boards.map(b => [b.name, utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday) + "%"])));
   panel.appendChild(kpiRow);
 
   /* ---------- deployment: whole-workforce donut + one 100%-stacked bar per board ---------- */
   const deploySec = ovSection("Deployment", `Utilized = assigned ÷ (headcount − leave), for ${fmtDow(state.date)} ${fmtDate(state.date)}`);
   const deployGrid = document.createElement("div");
   deployGrid.className = "ov-deploy-grid";
-  const allDeploy = deploySegments({ assigned: totalAssigned, leave: totalLeave, standby: totalStandby, oncallAvailable: totalOncallFree });
+  const allDeploy = deploySegments({ assigned: totalAssigned, leave: totalLeave, standby: totalStandby, onHoliday: totalOnHoliday, oncallAvailable: totalOncallFree });
   const donutWrap = document.createElement("div");
   donutWrap.className = "ov-deploy-donut-wrap";
   donutWrap.innerHTML = Charts.donut({ segments: allDeploy, centerValue: overallUtil + "%", centerLabel: "Utilized", size: 152, thickness: 24 });
@@ -887,7 +907,7 @@ function renderOverview() {
   let anyAttn = false;
   for (const b of boards) {
     const s = stats[b.id];
-    if (!s.standby && !s.oncallAvailable) continue;
+    if (!s.standby && !s.oncallAvailable && !s.onHoliday) continue;
     anyAttn = true;
     const card = document.createElement("div");
     card.className = "ov-card";
@@ -906,6 +926,14 @@ function renderOverview() {
       box.innerHTML = `<div class="ov-avail-title">Available on-call (not flagged):</div><div class="ov-avail-cards-oncall"></div>`;
       const cardsBox = box.querySelector(".ov-avail-cards-oncall");
       for (const emp of s.oncallAvailableList) cardsBox.appendChild(makeMini(emp, b));
+      card.appendChild(box);
+    }
+    if (s.onHoliday) {
+      const box = document.createElement("div");
+      box.className = "ov-avail ov-avail-calm";
+      box.innerHTML = `<div class="ov-avail-title">🏖 On holiday today (not flagged):</div><div class="ov-avail-cards"></div>`;
+      const cardsBox = box.querySelector(".ov-avail-cards");
+      for (const emp of s.onHolidayList) cardsBox.appendChild(makeMini(emp, b));
       card.appendChild(box);
     }
     attnSec.appendChild(card);

@@ -45,6 +45,7 @@
   --chart-assigned: #2a78d6;
   --chart-leave: #eda100;
   --chart-standby: #e34948;
+  --chart-holiday: #1baf7a;  /* reuses chart-cat-3 — unused elsewhere in this group */
   --chart-permanent: #2a78d6;
   --chart-oncall: #eb6834;
   --chart-cat-1: #2a78d6;
@@ -82,6 +83,7 @@
   --chart-assigned: #3987e5;
   --chart-leave: #c98500;
   --chart-standby: #d0334f;
+  --chart-holiday: #199e70;  /* reuses chart-cat-3 — unused elsewhere in this group */
   --chart-permanent: #3987e5;
   --chart-oncall: #d95926;
   --chart-cat-1: #3987e5;
