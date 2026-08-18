@@ -874,14 +874,14 @@ function renderOverview() {
   panel.appendChild(kpiRow);
 
   /* ---------- deployment: whole-workforce donut + one 100%-stacked bar per board ---------- */
-  const deploySec = ovSection("Deployment", `Utilized = assigned ÷ (headcount − leave), for ${fmtDow(state.date)} ${fmtDate(state.date)}`);
+  const deploySec = ovSection("Deployment", `Utilized = assigned ÷ (headcount − leave − holiday), for ${fmtDow(state.date)} ${fmtDate(state.date)}`);
   const deployGrid = document.createElement("div");
   deployGrid.className = "ov-deploy-grid";
   const allDeploy = deploySegments({ assigned: totalAssigned, leave: totalLeave, standby: totalStandby, onHoliday: totalOnHoliday, oncallAvailable: totalOncallFree });
   const donutWrap = document.createElement("div");
   donutWrap.className = "ov-deploy-donut-wrap";
   donutWrap.innerHTML = Charts.donut({ segments: allDeploy, centerValue: overallUtil + "%", centerLabel: "Utilized", size: 152, thickness: 24 });
-  donutWrap.appendChild(Charts.legendEl(allDeploy.map(s => ({ key: s.key, label: `${s.label} (${s.value})`, color: s.color }))));
+  donutWrap.appendChild(Charts.legendEl(allDeploy.filter(s => s.value > 0).map(s => ({ key: s.key, label: `${s.label} (${s.value})`, color: s.color }))));
   deployGrid.appendChild(donutWrap);
 
   const barsWrap = document.createElement("div");
@@ -907,7 +907,11 @@ function renderOverview() {
   let anyAttn = false;
   for (const b of boards) {
     const s = stats[b.id];
-    if (!s.standby && !s.oncallAvailable && !s.onHoliday) continue;
+    // onHoliday deliberately does NOT trigger a card here — a holiday isn't
+    // something needing attention, and giving it a card (even calm-styled)
+    // under an "action list" heading recreates the exact problem this bucket
+    // exists to avoid.
+    if (!s.standby && !s.oncallAvailable) continue;
     anyAttn = true;
     const card = document.createElement("div");
     card.className = "ov-card";
@@ -926,14 +930,6 @@ function renderOverview() {
       box.innerHTML = `<div class="ov-avail-title">Available on-call (not flagged):</div><div class="ov-avail-cards-oncall"></div>`;
       const cardsBox = box.querySelector(".ov-avail-cards-oncall");
       for (const emp of s.oncallAvailableList) cardsBox.appendChild(makeMini(emp, b));
-      card.appendChild(box);
-    }
-    if (s.onHoliday) {
-      const box = document.createElement("div");
-      box.className = "ov-avail ov-avail-calm";
-      box.innerHTML = `<div class="ov-avail-title">🏖 On holiday today (not flagged):</div><div class="ov-avail-cards"></div>`;
-      const cardsBox = box.querySelector(".ov-avail-cards");
-      for (const emp of s.onHolidayList) cardsBox.appendChild(makeMini(emp, b));
       card.appendChild(box);
     }
     attnSec.appendChild(card);
