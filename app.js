@@ -1744,6 +1744,28 @@ function packMissionCardsByHeight() {
   return () => { for (const el of original) grid.appendChild(el); };
 }
 
+/* For the export only, hide any leave-type zone that has nobody in it (e.g. no
+   Sick Leave today) so the image isn't padded with empty boxes. If every leave
+   zone is empty, hide the whole strip. Returns a function that unhides them
+   again so the live board still shows all zones as drop targets. */
+function hideEmptyLeaveZonesForExport() {
+  const hidden = [];
+  for (const box of $$("#status-zones .zone-leave")) {
+    const body = box.querySelector(".zone-body");
+    if (!body || body.querySelectorAll(".emp-card").length === 0) {
+      box.style.display = "none";
+      hidden.push(box);
+    }
+  }
+  const strip = $("#status-zones");
+  const stripHidden = hidden.length === $$("#status-zones .zone-leave").length;
+  if (stripHidden) strip.style.display = "none";
+  return () => {
+    for (const box of hidden) box.style.display = "";
+    if (stripHidden) strip.style.display = "";
+  };
+}
+
 async function exportBoard() {
   const btn = $("#btn-export");
   btn.disabled = true;
@@ -1763,11 +1785,15 @@ async function exportBoard() {
     $("#status-zones").insertAdjacentElement("afterend", pools);
   }
   let restoreMissionOrder = null;
+  let restoreLeaveZones = null;
   try {
     await document.fonts.ready;   // avoid capturing the fallback font mid-swap
     // measure + pack after fonts are ready (so wrapping/heights are final) and
     // only on a real board — the Overview capture has no mission grid to pack
-    if (!isOverview()) restoreMissionOrder = packMissionCardsByHeight();
+    if (!isOverview()) {
+      restoreMissionOrder = packMissionCardsByHeight();
+      restoreLeaveZones = hideEmptyLeaveZonesForExport();
+    }
     const el = $("#board-capture");
     const windowWidth = Math.max(document.documentElement.scrollWidth, 1600);
     // Many mobile GPUs (Android especially) silently return a blank/black canvas
@@ -1785,6 +1811,7 @@ async function exportBoard() {
     a.click();
   } finally {
     if (restoreMissionOrder) restoreMissionOrder();   // put the board back the way the user had it
+    if (restoreLeaveZones) restoreLeaveZones();        // unhide the empty leave zones again
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting");
