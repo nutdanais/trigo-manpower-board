@@ -63,6 +63,16 @@
      font-variant-numeric: tabular-nums instead of a narrower face. */
   --font-ui: "Noto Sans", "Noto Sans Thai", Arial, sans-serif;
   --font-condensed: "Noto Sans", "Noto Sans Thai", Arial, sans-serif;
+
+  /* ---- Glassmorphism: frosted translucent surfaces over the body gradient.
+     Kept as tokens so body.exporting can swap them for opaque equivalents —
+     html2canvas cannot render backdrop-filter, and the JPG must stay crisp. ---- */
+  --glass: rgba(255, 255, 255, 0.55);          /* zones, panel, toolbar chrome */
+  --glass-strong: rgba(255, 255, 255, 0.72);   /* cards/modals holding dense text */
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 4px 24px rgba(20, 40, 80, 0.10), 0 1px 2px rgba(20, 40, 80, 0.06);
+  --glass-blur: saturate(1.5) blur(14px);
+  --navy-glass: rgba(0, 73, 131, 0.82);        /* the top bar */
 }
 
 :root[data-theme="dark"] {
@@ -94,14 +104,36 @@
   --chart-cat-6: #008300;
   --chart-cat-7: #9085e9;
   --chart-cat-8: #e66767;
+
+  /* darker, lower-key glass so text stays legible on the dark ground */
+  --glass: rgba(28, 34, 42, 0.52);
+  --glass-strong: rgba(30, 36, 45, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 6px 26px rgba(0, 0, 0, 0.42), 0 1px 2px rgba(0, 0, 0, 0.34);
+  --glass-blur: saturate(1.3) blur(14px);
+  --navy-glass: rgba(6, 26, 44, 0.66);
 }
 
 body {
   font-family: var(--font-ui);
-  background: var(--bg);
   color: var(--text);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  /* layered ground the frosted surfaces blur against: two soft brand-tinted
+     blobs (navy top-left, green bottom-right) over a cool diagonal wash */
+  background:
+    radial-gradient(1100px 720px at 6% -12%, rgba(0, 73, 131, 0.12), transparent 60%),
+    radial-gradient(1000px 820px at 110% 118%, rgba(168, 200, 85, 0.16), transparent 55%),
+    linear-gradient(158deg, #eef3f8 0%, #e8edf3 46%, #edf2e9 100%);
+  background-attachment: fixed;
+}
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(1100px 720px at 6% -12%, rgba(22, 92, 152, 0.22), transparent 60%),
+    radial-gradient(1000px 820px at 110% 118%, rgba(96, 128, 44, 0.16), transparent 55%),
+    linear-gradient(158deg, #0f1317 0%, #12161b 50%, #101410 100%);
+  background-attachment: fixed;
 }
 
 /* browsers don't inherit the page font into form controls by default —
@@ -1375,4 +1407,96 @@ body.exporting #app-root { margin-right: 0; }
   border-radius: 999px;
   border: 1px solid rgba(0,0,0,.15);
   color: var(--card-ink);
+}
+
+/* ==========================================================================
+   Glassmorphism — frosted translucent surfaces over the body gradient.
+   Applied here, after the base rules, as background/border/shadow overrides so
+   the change reads (and reverts) as one block. Every blur pulls from
+   --glass-blur so `body.exporting` (bottom) can switch the whole app back to
+   opaque surfaces for a crisp JPG — html2canvas can't render backdrop-filter.
+   ========================================================================== */
+
+/* let the body gradient show behind the board so the glass has something to blur */
+#board-capture { background: transparent; }
+
+/* top bar: translucent navy that frosts the content scrolling under it */
+#topbar {
+  background: var(--navy-glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+}
+
+/* lighter frosted panels */
+.zone,
+#board-empty {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+/* denser surfaces that hold a lot of text get the stronger (more opaque) glass */
+.mission-card,
+#float-pool,
+.modal,
+.ov-card,
+.ov-section {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+.mission-card, .zone { border-radius: 12px; }
+.zone-label { background: color-mix(in srgb, var(--glass) 55%, var(--panel)); }
+#status-zones { border-bottom-color: var(--glass-border); }
+
+/* dropdowns / date picker: strong tint + blur so their text stays readable
+   over whatever they cover */
+.ms-pop,
+#datepicker-pop {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-color: var(--glass-border);
+}
+
+/* a soft blur behind an open modal lifts it off the board */
+#modal-backdrop {
+  -webkit-backdrop-filter: saturate(1.1) blur(3px);
+  backdrop-filter: saturate(1.1) blur(3px);
+}
+
+/* plain toolbar buttons become frosted chips; the coloured variants below keep
+   their solid fills (re-asserted here because .btn now comes later in source) */
+.btn {
+  background: var(--glass);
+  -webkit-backdrop-filter: saturate(1.4) blur(6px);
+  backdrop-filter: saturate(1.4) blur(6px);
+  border-color: var(--glass-border);
+}
+.btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn-danger  { background: var(--danger);  border-color: var(--danger);  color: #fff; }
+.btn-holiday { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.btn-primary, .btn-danger, .btn-holiday {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+
+/* ---- EXPORT: swap the glass tokens for the theme's opaque surfaces and drop
+   all blur so the captured JPG is crisp (html2canvas ignores backdrop-filter) ---- */
+body.exporting {
+  --glass: var(--panel);
+  --glass-strong: var(--panel);
+  --glass-border: var(--border);
+  --glass-shadow: none;
+  --glass-blur: none;
+  --navy-glass: var(--primary);
+}
+body.exporting #board-capture { background: var(--bg); }
+body.exporting .zone-label { background: var(--bg-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  body { background-attachment: scroll; }   /* fixed bg can jank on some setups */
 }
