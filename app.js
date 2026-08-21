@@ -1718,6 +1718,32 @@ function buildExportPools() {
   return sec;
 }
 
+/* Reorder the mission cards by rendered height (tallest first) so the export
+   packs with minimal wasted space. CSS grid sizes every row to its tallest
+   card, so a big crew card leaves dead space under its shorter row-mates;
+   grouping similar-height missions into the same row shrinks that gap. Returns
+   a function that restores the board's original card order. Sort is stable
+   (height desc, then original position) so same-height missions keep their
+   board order. Safe/no-op on an empty grid. */
+function packMissionCardsByHeight() {
+  const grid = $("#missions-grid");
+  const original = [...grid.children];
+  if (original.length < 2) return () => {};
+  // Grid items stretch to their row's height, so offsetHeight would report the
+  // (already coupled) row height, not each card's own content height. Turn off
+  // stretching just long enough to measure each card's intrinsic height, then
+  // restore it so the capture still renders the cards normally.
+  const prevAlign = grid.style.alignItems;
+  grid.style.alignItems = "start";
+  const height = new Map(original.map((el) => [el, el.offsetHeight]));
+  grid.style.alignItems = prevAlign;
+  const pos = new Map(original.map((el, i) => [el, i]));
+  const packed = [...original].sort(
+    (a, b) => (height.get(b) - height.get(a)) || (pos.get(a) - pos.get(b)));
+  for (const el of packed) grid.appendChild(el);
+  return () => { for (const el of original) grid.appendChild(el); };
+}
+
 async function exportBoard() {
   const btn = $("#btn-export");
   btn.disabled = true;
@@ -1736,8 +1762,12 @@ async function exportBoard() {
     pools = buildExportPools();
     $("#status-zones").insertAdjacentElement("afterend", pools);
   }
+  let restoreMissionOrder = null;
   try {
     await document.fonts.ready;   // avoid capturing the fallback font mid-swap
+    // measure + pack after fonts are ready (so wrapping/heights are final) and
+    // only on a real board — the Overview capture has no mission grid to pack
+    if (!isOverview()) restoreMissionOrder = packMissionCardsByHeight();
     const el = $("#board-capture");
     const windowWidth = Math.max(document.documentElement.scrollWidth, 1600);
     // Many mobile GPUs (Android especially) silently return a blank/black canvas
@@ -1754,6 +1784,7 @@ async function exportBoard() {
     a.download = `${boardName.replace(/\s+/g, "_")}_${state.date}.jpg`;
     a.click();
   } finally {
+    if (restoreMissionOrder) restoreMissionOrder();   // put the board back the way the user had it
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting");
