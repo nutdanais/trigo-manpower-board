@@ -1718,30 +1718,58 @@ function buildExportPools() {
   return sec;
 }
 
-/* Reorder the mission cards by rendered height (tallest first) so the export
-   packs with minimal wasted space. CSS grid sizes every row to its tallest
-   card, so a big crew card leaves dead space under its shorter row-mates;
-   grouping similar-height missions into the same row shrinks that gap. Returns
-   a function that restores the board's original card order. Sort is stable
-   (height desc, then original position) so same-height missions keep their
-   board order. Safe/no-op on an empty grid. */
-function packMissionCardsByHeight() {
+/* For the export only, lay the mission cards out as a tight masonry so the JPG
+   isn't padded with blank space. The board is a CSS grid, which forces every
+   card in a row to the tallest card's height — a single big-crew mission leaves
+   dead space under all its shorter row-mates. Instead we absolutely-position the
+   cards into the board's own columns (same count, same width), each at its own
+   natural height, filling number order into whichever column is currently
+   shortest so the cards below rise into the gaps. Missions still read top-to-
+   bottom by number; only the wasted space goes. Returns a closure that restores
+   the normal grid, so the live board is untouched. Safe/no-op on an empty grid. */
+function layoutMissionsMasonryForExport() {
   const grid = $("#missions-grid");
-  const original = [...grid.children];
-  if (original.length < 2) return () => {};
-  // Grid items stretch to their row's height, so offsetHeight would report the
-  // (already coupled) row height, not each card's own content height. Turn off
-  // stretching just long enough to measure each card's intrinsic height, then
-  // restore it so the capture still renders the cards normally.
-  const prevAlign = grid.style.alignItems;
-  grid.style.alignItems = "start";
-  const height = new Map(original.map((el) => [el, el.offsetHeight]));
-  grid.style.alignItems = prevAlign;
-  const pos = new Map(original.map((el, i) => [el, i]));
-  const packed = [...original].sort(
-    (a, b) => (height.get(b) - height.get(a)) || (pos.get(a) - pos.get(b)));
-  for (const el of packed) grid.appendChild(el);
-  return () => { for (const el of original) grid.appendChild(el); };
+  const cards = [...grid.children];
+  if (!cards.length) return () => {};
+  const cs = getComputedStyle(grid);
+  // resolved pixel widths of the grid's own columns — reuse them so the export
+  // keeps the exact column count and card width the board is already showing
+  const tracks = cs.gridTemplateColumns.split(" ").map(parseFloat).filter(n => n > 0);
+  const cols = tracks.length || 1;
+  const colW = tracks.length ? tracks[0] : grid.clientWidth;
+  const gapX = parseFloat(cs.columnGap) || 12;
+  const gapY = parseFloat(cs.rowGap) || 12;
+
+  // snapshot inline styles (normally none) so restore is exact
+  const gridStyle = grid.getAttribute("style") || "";
+  const cardStyle = cards.map(c => c.getAttribute("style") || "");
+
+  grid.style.position = "relative";
+  grid.style.display = "block";
+  cards.forEach(c => {
+    c.style.position = "absolute"; c.style.width = colW + "px";
+    c.style.left = "0px"; c.style.top = "0px"; c.style.height = "auto";
+  });
+  void grid.offsetWidth;   // reflow so each card's natural height is final at colW
+  const h = cards.map(c => c.offsetHeight);
+
+  const colH = new Array(cols).fill(0);
+  cards.forEach((c, i) => {
+    // first row fills left-to-right in order; after that each card drops into the
+    // shortest column, so it rises into whatever gap the row above left behind
+    const j = i < cols ? i : colH.indexOf(Math.min(...colH));
+    c.style.left = (j * (colW + gapX)) + "px";
+    c.style.top = colH[j] + "px";
+    colH[j] += h[i] + gapY;
+  });
+  grid.style.height = Math.max(0, Math.max(...colH) - gapY) + "px";
+
+  return () => {
+    if (gridStyle) grid.setAttribute("style", gridStyle); else grid.removeAttribute("style");
+    cards.forEach((c, i) => {
+      if (cardStyle[i]) c.setAttribute("style", cardStyle[i]); else c.removeAttribute("style");
+    });
+  };
 }
 
 /* For the export only, hide any leave-type zone that has nobody in it (e.g. no
@@ -1784,14 +1812,14 @@ async function exportBoard() {
     pools = buildExportPools();
     $("#status-zones").insertAdjacentElement("afterend", pools);
   }
-  let restoreMissionOrder = null;
+  let restoreMissionLayout = null;
   let restoreLeaveZones = null;
   try {
     await document.fonts.ready;   // avoid capturing the fallback font mid-swap
-    // measure + pack after fonts are ready (so wrapping/heights are final) and
-    // only on a real board — the Overview capture has no mission grid to pack
+    // lay out after fonts are ready (so wrapping/heights are final) and only on a
+    // real board — the Overview capture has no mission grid to pack
     if (!isOverview()) {
-      restoreMissionOrder = packMissionCardsByHeight();
+      restoreMissionLayout = layoutMissionsMasonryForExport();
       restoreLeaveZones = hideEmptyLeaveZonesForExport();
     }
     const el = $("#board-capture");
@@ -1810,8 +1838,8 @@ async function exportBoard() {
     a.download = `${boardName.replace(/\s+/g, "_")}_${state.date}.jpg`;
     a.click();
   } finally {
-    if (restoreMissionOrder) restoreMissionOrder();   // put the board back the way the user had it
-    if (restoreLeaveZones) restoreLeaveZones();        // unhide the empty leave zones again
+    if (restoreMissionLayout) restoreMissionLayout();  // put the grid back the way the user had it
+    if (restoreLeaveZones) restoreLeaveZones();         // unhide the empty leave zones again
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting");
