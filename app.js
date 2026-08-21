@@ -1718,6 +1718,82 @@ function buildExportPools() {
   return sec;
 }
 
+/* For the export only, lay the mission cards out as a tight masonry so the JPG
+   isn't padded with blank space. The board is a CSS grid, which forces every
+   card in a row to the tallest card's height — a single big-crew mission leaves
+   dead space under all its shorter row-mates. Instead we absolutely-position the
+   cards into the board's own columns (same count, same width), each at its own
+   natural height, filling number order into whichever column is currently
+   shortest so the cards below rise into the gaps. Missions still read top-to-
+   bottom by number; only the wasted space goes. Returns a closure that restores
+   the normal grid, so the live board is untouched. Safe/no-op on an empty grid. */
+function layoutMissionsMasonryForExport() {
+  const grid = $("#missions-grid");
+  const cards = [...grid.children];
+  if (!cards.length) return () => {};
+  const cs = getComputedStyle(grid);
+  // resolved pixel widths of the grid's own columns — reuse them so the export
+  // keeps the exact column count and card width the board is already showing
+  const tracks = cs.gridTemplateColumns.split(" ").map(parseFloat).filter(n => n > 0);
+  const cols = tracks.length || 1;
+  const colW = tracks.length ? tracks[0] : grid.clientWidth;
+  const gapX = parseFloat(cs.columnGap) || 12;
+  const gapY = parseFloat(cs.rowGap) || 12;
+
+  // snapshot inline styles (normally none) so restore is exact
+  const gridStyle = grid.getAttribute("style") || "";
+  const cardStyle = cards.map(c => c.getAttribute("style") || "");
+
+  grid.style.position = "relative";
+  grid.style.display = "block";
+  cards.forEach(c => {
+    c.style.position = "absolute"; c.style.width = colW + "px";
+    c.style.left = "0px"; c.style.top = "0px"; c.style.height = "auto";
+  });
+  void grid.offsetWidth;   // reflow so each card's natural height is final at colW
+  const h = cards.map(c => c.offsetHeight);
+
+  const colH = new Array(cols).fill(0);
+  cards.forEach((c, i) => {
+    // first row fills left-to-right in order; after that each card drops into the
+    // shortest column, so it rises into whatever gap the row above left behind
+    const j = i < cols ? i : colH.indexOf(Math.min(...colH));
+    c.style.left = (j * (colW + gapX)) + "px";
+    c.style.top = colH[j] + "px";
+    colH[j] += h[i] + gapY;
+  });
+  grid.style.height = Math.max(0, Math.max(...colH) - gapY) + "px";
+
+  return () => {
+    if (gridStyle) grid.setAttribute("style", gridStyle); else grid.removeAttribute("style");
+    cards.forEach((c, i) => {
+      if (cardStyle[i]) c.setAttribute("style", cardStyle[i]); else c.removeAttribute("style");
+    });
+  };
+}
+
+/* For the export only, hide any leave-type zone that has nobody in it (e.g. no
+   Sick Leave today) so the image isn't padded with empty boxes. If every leave
+   zone is empty, hide the whole strip. Returns a function that unhides them
+   again so the live board still shows all zones as drop targets. */
+function hideEmptyLeaveZonesForExport() {
+  const hidden = [];
+  for (const box of $$("#status-zones .zone-leave")) {
+    const body = box.querySelector(".zone-body");
+    if (!body || body.querySelectorAll(".emp-card").length === 0) {
+      box.style.display = "none";
+      hidden.push(box);
+    }
+  }
+  const strip = $("#status-zones");
+  const stripHidden = hidden.length === $$("#status-zones .zone-leave").length;
+  if (stripHidden) strip.style.display = "none";
+  return () => {
+    for (const box of hidden) box.style.display = "";
+    if (stripHidden) strip.style.display = "";
+  };
+}
+
 async function exportBoard() {
   const btn = $("#btn-export");
   btn.disabled = true;
@@ -1736,8 +1812,16 @@ async function exportBoard() {
     pools = buildExportPools();
     $("#status-zones").insertAdjacentElement("afterend", pools);
   }
+  let restoreMissionLayout = null;
+  let restoreLeaveZones = null;
   try {
     await document.fonts.ready;   // avoid capturing the fallback font mid-swap
+    // lay out after fonts are ready (so wrapping/heights are final) and only on a
+    // real board — the Overview capture has no mission grid to pack
+    if (!isOverview()) {
+      restoreMissionLayout = layoutMissionsMasonryForExport();
+      restoreLeaveZones = hideEmptyLeaveZonesForExport();
+    }
     const el = $("#board-capture");
     const windowWidth = Math.max(document.documentElement.scrollWidth, 1600);
     // Many mobile GPUs (Android especially) silently return a blank/black canvas
@@ -1754,6 +1838,8 @@ async function exportBoard() {
     a.download = `${boardName.replace(/\s+/g, "_")}_${state.date}.jpg`;
     a.click();
   } finally {
+    if (restoreMissionLayout) restoreMissionLayout();  // put the grid back the way the user had it
+    if (restoreLeaveZones) restoreLeaveZones();         // unhide the empty leave zones again
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting");
