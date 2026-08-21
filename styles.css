@@ -478,6 +478,33 @@ button, input, select, textarea, optgroup {
 .zone-oncall-pool .zone-label { background: var(--bg-soft); font-size: 12.5px; }
 
 /* missions grid */
+/* empty-state prompt shown on an untouched future working day (see
+   renderBoardEmptyState in app.js) — invites carrying the last working day in */
+#board-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 28px 20px;
+  margin-bottom: 12px;
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+#board-empty.hidden { display: none; }
+body.exporting #board-empty { display: none; }   /* never bake the prompt into an exported JPG */
+#board-empty .empty-title { font-size: 15px; color: var(--text); }
+#board-empty .empty-sub { font-size: 13px; color: var(--muted); max-width: 460px; }
+#board-empty .btn-carry {
+  margin-top: 6px;
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+  color: #1a1a1a;
+  font-weight: 700;
+}
+#board-empty .btn-carry:hover { filter: brightness(0.96); }
+
 #missions-grid {
   display: grid;
   /* 383px = mission-card's own border(2) + header(130) + body padding(16) +
