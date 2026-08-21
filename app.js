@@ -732,6 +732,7 @@ function renderMissions() {
     grid.appendChild(card);
   }
   bindDropzones();
+  layoutMasonry();   // masonry-position the cards (on screen; re-run at export width during export)
 }
 
 /* stats for one board on the current date (reads cache only, never fetches) */
@@ -1718,58 +1719,54 @@ function buildExportPools() {
   return sec;
 }
 
-/* For the export only, lay the mission cards out as a tight masonry so the JPG
-   isn't padded with blank space. The board is a CSS grid, which forces every
-   card in a row to the tallest card's height — a single big-crew mission leaves
-   dead space under all its shorter row-mates. Instead we absolutely-position the
-   cards into the board's own columns (same count, same width), each at its own
-   natural height, filling number order into whichever column is currently
-   shortest so the cards below rise into the gaps. Missions still read top-to-
-   bottom by number; only the wasted space goes. Returns a closure that restores
-   the normal grid, so the live board is untouched. Safe/no-op on an empty grid. */
-function layoutMissionsMasonryForExport() {
+/* Masonry layout for the mission grid — used BOTH on screen and in the export.
+   Each card keeps its own natural height and is dropped into whichever column is
+   currently shortest (the first row fills left-to-right in number order), so the
+   cards below rise into the gaps instead of every card in a row stretching to
+   the tallest — the CSS-grid behaviour we're replacing. Recomputes from the
+   grid's live width, so it adapts to window resizing and to the wider export
+   capture alike. Cards that are display:none (e.g. empty missions hidden for the
+   export) are skipped. Safe/no-op when the grid is hidden or empty. */
+const MASONRY_GAP = 12, MASONRY_MIN_CARD = 383;
+function layoutMasonry() {
   const grid = $("#missions-grid");
-  const cards = [...grid.children];
-  if (!cards.length) return () => {};
-  const cs = getComputedStyle(grid);
-  // resolved pixel widths of the grid's own columns — reuse them so the export
-  // keeps the exact column count and card width the board is already showing
-  const tracks = cs.gridTemplateColumns.split(" ").map(parseFloat).filter(n => n > 0);
-  const cols = tracks.length || 1;
-  const colW = tracks.length ? tracks[0] : grid.clientWidth;
-  const gapX = parseFloat(cs.columnGap) || 12;
-  const gapY = parseFloat(cs.rowGap) || 12;
-
-  // snapshot inline styles (normally none) so restore is exact
-  const gridStyle = grid.getAttribute("style") || "";
-  const cardStyle = cards.map(c => c.getAttribute("style") || "");
-
-  grid.style.position = "relative";
-  grid.style.display = "block";
+  if (!grid || grid.classList.contains("hidden")) return;
+  const W = grid.clientWidth;
+  if (!W) return;
+  const cards = [...grid.children].filter(
+    c => c.classList && c.classList.contains("mission-card") && c.style.display !== "none");
+  const cols = Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
+  const colW = Math.floor((W - MASONRY_GAP * (cols - 1)) / cols);
   cards.forEach(c => {
     c.style.position = "absolute"; c.style.width = colW + "px";
     c.style.left = "0px"; c.style.top = "0px"; c.style.height = "auto";
   });
+  if (!cards.length) { grid.style.height = "0px"; return; }
   void grid.offsetWidth;   // reflow so each card's natural height is final at colW
-  const h = cards.map(c => c.offsetHeight);
-
   const colH = new Array(cols).fill(0);
   cards.forEach((c, i) => {
     // first row fills left-to-right in order; after that each card drops into the
     // shortest column, so it rises into whatever gap the row above left behind
     const j = i < cols ? i : colH.indexOf(Math.min(...colH));
-    c.style.left = (j * (colW + gapX)) + "px";
+    c.style.left = (j * (colW + MASONRY_GAP)) + "px";
     c.style.top = colH[j] + "px";
-    colH[j] += h[i] + gapY;
+    colH[j] += c.offsetHeight + MASONRY_GAP;
   });
-  grid.style.height = Math.max(0, Math.max(...colH) - gapY) + "px";
+  grid.style.height = (Math.max(...colH) - MASONRY_GAP) + "px";
+}
 
-  return () => {
-    if (gridStyle) grid.setAttribute("style", gridStyle); else grid.removeAttribute("style");
-    cards.forEach((c, i) => {
-      if (cardStyle[i]) c.setAttribute("style", cardStyle[i]); else c.removeAttribute("style");
-    });
-  };
+/* For the export only, hide any mission that has no crew on it, so an empty
+   mission box doesn't pad the JPG. Returns a closure that unhides them again.
+   (layoutMasonry skips display:none cards, so hidden missions leave no gap.) */
+function hideEmptyMissionsForExport() {
+  const hidden = [];
+  for (const card of $$("#missions-grid > .mission-card")) {
+    if (card.querySelectorAll(".mission-emps .emp-card").length === 0) {
+      card.style.display = "none";
+      hidden.push(card);
+    }
+  }
+  return () => { for (const c of hidden) c.style.display = ""; };
 }
 
 /* For the export only, hide any leave-type zone that has nobody in it (e.g. no
@@ -1812,15 +1809,17 @@ async function exportBoard() {
     pools = buildExportPools();
     $("#status-zones").insertAdjacentElement("afterend", pools);
   }
-  let restoreMissionLayout = null;
+  let restoreEmptyMissions = null;
   let restoreLeaveZones = null;
   try {
     await document.fonts.ready;   // avoid capturing the fallback font mid-swap
-    // lay out after fonts are ready (so wrapping/heights are final) and only on a
-    // real board — the Overview capture has no mission grid to pack
+    // On a real board only (the Overview capture has no mission grid): drop the
+    // empty missions and empty leave zones, then re-pack the masonry at the wider
+    // export width so the JPG is as tight as possible.
     if (!isOverview()) {
-      restoreMissionLayout = layoutMissionsMasonryForExport();
+      restoreEmptyMissions = hideEmptyMissionsForExport();
       restoreLeaveZones = hideEmptyLeaveZonesForExport();
+      layoutMasonry();
     }
     const el = $("#board-capture");
     const windowWidth = Math.max(document.documentElement.scrollWidth, 1600);
@@ -1838,13 +1837,14 @@ async function exportBoard() {
     a.download = `${boardName.replace(/\s+/g, "_")}_${state.date}.jpg`;
     a.click();
   } finally {
-    if (restoreMissionLayout) restoreMissionLayout();  // put the grid back the way the user had it
-    if (restoreLeaveZones) restoreLeaveZones();         // unhide the empty leave zones again
+    if (restoreEmptyMissions) restoreEmptyMissions();   // unhide the empty missions again
+    if (restoreLeaveZones) restoreLeaveZones();          // unhide the empty leave zones again
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting");
     btn.disabled = false;
     btn.textContent = "📷 Export";
+    if (!isOverview()) layoutMasonry();   // re-pack at the normal on-screen width
   }
 }
 
@@ -2271,6 +2271,12 @@ function wireApp() {
   });
   window.addEventListener("scroll", hideContextMenu, true);
 
+  // The mission grid is a JS masonry (cards are absolutely positioned), so it
+  // must re-pack when the viewport width changes the column count. Debounced so
+  // a drag-resize doesn't thrash. render() already re-packs on every data change.
+  let masonryRT;
+  window.addEventListener("resize", () => { clearTimeout(masonryRT); masonryRT = setTimeout(layoutMasonry, 120); });
+
   // Mobile browsers resume a backgrounded tab without reloading, and may have
   // missed Realtime events while suspended. On every return to the foreground,
   // drop the plan cache and re-read fresh so a re-opened board always reflects
@@ -2297,6 +2303,8 @@ async function boot() {
   restoreViewState();
   cloud.onChange(() => { state.overview.utilCacheKey = null; refreshAndRender(); });
   await refreshAndRender();
+  // fonts can settle after the first paint and change card heights — re-pack once ready
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);
 }
 
 async function main() {

@@ -505,16 +505,14 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 #board-empty .btn-carry:hover { filter: brightness(0.96); }
 
+/* JS masonry container: layoutMasonry() (app.js) absolutely-positions each
+   mission card into the shortest column and sets this element's height. The
+   383px minimum card width and 12px gap live in app.js (MASONRY_MIN_CARD /
+   MASONRY_GAP); 4 columns fit within the exported JPG's 1600px floor
+   (4*383 + 3*12 = 1568 ≤ 1572). position:relative anchors the absolute cards. */
 #missions-grid {
-  display: grid;
-  /* 383px = mission-card's own border(2) + header(130) + body padding(16) +
-     2-card emps row(234), +1px safety margin — the snug minimum for a
-     2-column mission box. Sized so 4 columns always fit within the exported
-     JPG's guaranteed minimum width (see exportBoard's windowWidth floor of
-     1600px in app.js): 4*383 + 3*12 gap = 1568 ≤ 1572 (1600 minus
-     #board-capture's 14px side padding). */
-  grid-template-columns: repeat(auto-fill, minmax(383px, 1fr));
-  gap: 12px;
+  position: relative;
+  min-height: 4px;
 }
 .mission-card {
   display: flex;
