@@ -115,48 +115,31 @@ const cloud = {
   },
 
   /* ---------- plan (missions + assignments) for one board+date ---------- */
+  /* A PURE READ — loading a board+date never writes to the database. There is
+     no auto carry-forward / seeding here: a future day stays empty until a user
+     explicitly brings the last working day's plan into it (the "Carry over" /
+     "Reset Board" button → resetBoardFromLastWorkingDay). This is deliberate.
+     The old design seeded the day during the load, so merely opening or
+     exporting a board — or a Realtime ping, or a tab refocus — could rewrite a
+     plan and broadcast that revert to everyone, including the planner. That was
+     the "adjusted board disappears when another user logs in" bug. Making the
+     load read-only removes the whole class of problem: only deliberate user
+     actions ever change a plan. */
   async ensurePlanLoaded(boardId, date, opts = {}) {
-    const { force = false, allowSeed = false } = opts;
+    const { force = false } = opts;
     if (!boardId) return { missions: [], zones: emptyZones(), updatedAt: null };
     if (!this.data.plans[boardId]) this.data.plans[boardId] = {};
     if (this.data.plans[boardId][date] && !force) return this.data.plans[boardId][date];
 
-    let { data: missionRows, error } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", date);
+    const { data: missionRows, error } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", date);
     if (error) throw error;
 
     const { data: aRows, error: aErr } = await sb.from("assignments").select("*").eq("plan_date", date);
     if (aErr) throw aErr;
-    let assignRows = aRows || [];
+    const assignRows = aRows || [];
 
     const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId).map((e) => e.id));
 
-    // Seed this day with the previous working day's plan (missions + crew) the
-    // FIRST time it is materialized, then never again. "First time" is recorded
-    // as a plan_days marker row — NOT inferred from whether assignments exist.
-    // An intentionally-adjusted day legitimately has zero assignments (everyone
-    // on Standby, which is computed not stored; people removed; or missions
-    // edited with nobody placed yet), and inferring "new" from that is exactly
-    // what used to re-fill an emptied board the moment another user loaded it.
-    // Seeding runs only on an intentional single-board open (allowSeed) — never
-    // from the Overview fan-out or a plain refresh — so merely viewing never
-    // writes. Weekends/holidays never seed. _copyPlanForward preserves any
-    // existing mission edits and only brings the people across.
-    if (allowSeed && date >= todayStrISO() && !isNonWorkingDate(date, boardId)
-        && !(await this._dayInitialized(boardId, date, boardEmpIds, assignRows))) {
-      const { data: prior } = await sb
-        .from("missions").select("plan_date")
-        .eq("board_id", boardId).lte("plan_date", date)
-        .order("plan_date", { ascending: false }).limit(60);
-      const srcDate = [...new Set((prior || []).map((r) => r.plan_date))]
-        .find((d) => d !== date && !isNonWorkingDate(d, boardId));
-      if (srcDate) {
-        await this._copyPlanForward(boardId, srcDate, date);
-        const retry = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", date);
-        missionRows = retry.data;
-        const retryA = await sb.from("assignments").select("*").eq("plan_date", date);
-        assignRows = retryA.data || [];
-      }
-    }
     const plan = { missions: [], zones: emptyZones(), updatedAt: null };
     const missionMap = {};
     for (const m of missionRows || []) {
@@ -182,37 +165,8 @@ const cloud = {
     return plan;
   },
 
-  /* Has this board+date already been materialized (seeded once)? Recorded as a
-     plan_days row so an intentionally-emptied day is never re-seeded by a later
-     load. If plan_days hasn't been migrated in yet, degrade to the legacy signal
-     (any assignment exists for a board employee) so the app keeps working until
-     the migration runs. */
-  async _dayInitialized(boardId, date, boardEmpIds, assignRows) {
-    try {
-      const { data, error } = await sb.from("plan_days")
-        .select("board_id").eq("board_id", boardId).eq("plan_date", date).limit(1);
-      if (error) throw error;
-      return !!(data && data.length);
-    } catch (e) {
-      if (!this._planDaysMissing(e)) throw e;
-      return (assignRows || []).some((a) => boardEmpIds.has(a.employee_id));
-    }
-  },
-
-  /* Record that this board+date has been materialized. Idempotent (unique on the
-     primary key); a no-op if plan_days hasn't been migrated in yet. */
-  async _markDayInitialized(boardId, date) {
-    try {
-      const { error } = await sb.from("plan_days")
-        .upsert({ board_id: boardId, plan_date: date }, { onConflict: "board_id,plan_date", ignoreDuplicates: true });
-      if (error) throw error;
-    } catch (e) {
-      if (!this._planDaysMissing(e)) throw e;
-    }
-  },
-
   /* True when an error means the plan_days table isn't there yet (migration not
-     run) — lets the marker logic degrade gracefully instead of breaking loads. */
+     run) — lets the lock code degrade gracefully instead of breaking. */
   _planDaysMissing(error) {
     const code = error && error.code;
     const msg = (error && error.message) || "";
@@ -311,9 +265,6 @@ const cloud = {
       const { error } = await sb.from("assignments").upsert(assignInserts, { onConflict: "employee_id,plan_date", ignoreDuplicates: true });
       if (error) throw error;
     }
-    // Mark the day materialized so it is never auto-seeded again, even after a
-    // planner later empties it (everyone to Standby / people removed).
-    await this._markDayInitialized(boardId, destDate);
   },
 
   /* ---------- mutations ---------- */
@@ -325,11 +276,13 @@ const cloud = {
      client always see its own write immediately. */
   _invalidatePlans() { this.data.plans = {}; },
 
-  /* "Reset Board": explicitly clear this board's plan for `date` and re-clone the
-     latest working-day plan (missions + employee assignments) into it. Unlike the
-     automatic carry-over this is destructive by design — the user asked to start
-     over from the last working day. Returns the source date used, or null if there
-     was no prior working-day plan to copy. */
+  /* "Carry over" / "Reset Board": the ONLY way a plan is carried forward — there
+     is no automatic seeding anymore. Explicitly clear this board's plan for
+     `date` and re-clone the latest working-day plan (missions + employee
+     assignments) into it. On an empty day this is a plain carry-over; on a day
+     that already has content it is a destructive replace, which is why the UI
+     confirms first. Returns the source date used, or null if there was no prior
+     working-day plan to copy. */
   async resetBoardFromLastWorkingDay(boardId, date) {
     const srcDate = await this.findLatestWeekdayMissionDate(boardId, date);
     if (!srcDate) return null;

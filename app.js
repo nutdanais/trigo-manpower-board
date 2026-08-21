@@ -161,20 +161,18 @@ async function ensureUtilizationLoaded() {
   state.overview.utilCacheKey = cacheKey;
 }
 
-/* warm the cache for whatever is currently in view, then redraw */
+/* warm the cache for whatever is currently in view, then redraw. Loading is
+   always a pure read — no view, refresh, Realtime ping, tab refocus, or login
+   ever seeds a plan. A future day stays empty until a user explicitly carries
+   the last working day into it (the Carry over / Reset Board button). */
 async function refreshData() {
   if (isOverview()) {
-    // Read-only: the Overview aggregates every board, so it must never seed —
-    // otherwise one glance (or a login landing here) would materialize every
-    // board's day. A future day nobody has opened yet simply shows empty.
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
     await ensureUtilizationLoaded();
   } else if (isEmployeeList()) {
     // employee master data is already kept warm in the cache — nothing date-scoped to load
   } else if (D().activeBoardId) {
-    // Intentional single-board open: this is the one place allowed to seed a
-    // brand-new day (once) with the previous working day's missions + crew.
-    await cloud.ensurePlanLoaded(D().activeBoardId, state.date, { allowSeed: true });
+    await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
   }
 }
 async function refreshAndRender() {
@@ -263,7 +261,9 @@ function render() {
     renderMissions();
     renderFilterOptions();
     updateHideMissionsButton();
+    updateResetButton();
   }
+  renderBoardEmptyState();
   const lock = !ov && !eml ? lockInfo(D().activeBoardId, state.date) : null;
   $("#readonly-badge").classList.toggle("hidden", ov || eml || !isReadOnly());
   $("#readonly-badge").textContent = lock ? `🔒 Locked by ${lock.lockedBy}` : "🔒 Read-only (past date)";
@@ -280,6 +280,56 @@ function updateHideMissionsButton() {
   if (!btn) return;
   const n = getPlan().missions.filter(m => m.hidden).length;
   btn.textContent = n ? `👁 Hide/Unhide (${n})` : "👁 Hide/Unhide";
+}
+
+/* A plan is "empty" when it has no missions and nobody in any leave zone —
+   nothing has been built for this day yet. Standby doesn't count (it's computed
+   from unassigned staff, not stored), so an empty plan really means untouched. */
+function planIsEmpty(plan) {
+  if (plan.missions.length) return false;
+  return ZONES.every(z => !plan.zones[z].length);
+}
+
+/* The toolbar button doubles as "Carry over" on an untouched day (bring the last
+   working day's plan in — nothing to lose) and "Reset Board" once the day has
+   content (a destructive replace, confirmed first). Same action either way. */
+function updateResetButton() {
+  const btn = $("#btn-reset-board");
+  if (!btn) return;
+  const empty = planIsEmpty(getPlan());
+  btn.textContent = empty ? "↺ Carry over" : "↺ Reset Board";
+  btn.title = empty
+    ? "Bring in a copy of the last working day's plan (missions + crew)"
+    : "Replace this day's plan with a fresh copy of the last working day";
+}
+
+/* Nothing is carried into a future day automatically anymore, so an untouched
+   working day would otherwise just look blank. Show a prompt that invites the
+   planner to carry the last working day's plan in (or start adding missions).
+   Hidden on the Overview / Manpower List, on read-only days, and on
+   holidays/weekends (which are meant to be empty and use "Add Mission" instead). */
+function renderBoardEmptyState() {
+  const box = $("#board-empty");
+  if (!box) return;
+  const show = !isOverview() && !isEmployeeList() && !isReadOnly()
+    && !isNonWorkingDate(state.date) && planIsEmpty(getPlan());
+  box.classList.toggle("hidden", !show);
+  box.innerHTML = "";
+  if (!show) return;
+  const msg = document.createElement("div");
+  msg.className = "empty-title";
+  msg.innerHTML = `This board is empty for <b>${fmtDow(state.date)} ${fmtDate(state.date)}</b>.`;
+  const sub = document.createElement("div");
+  sub.className = "empty-sub";
+  sub.textContent = "Carry over the last working day's missions and crew to start from there, or just add missions manually.";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "btn btn-carry";
+  btn.textContent = "↺ Carry over last working day's plan";
+  btn.onclick = () => guardEdit(() => resetBoard());
+  box.appendChild(msg);
+  box.appendChild(sub);
+  box.appendChild(btn);
 }
 
 function renderTabs() {
@@ -1892,13 +1942,17 @@ function saveHideMissions() {
 function resetBoard() {
   const board = D().boards.find(b => b.id === D().activeBoardId);
   const boardName = board ? board.name : "this board";
+  const run = () => safely(async () => {
+    const src = await cloud.resetBoardFromLastWorkingDay(D().activeBoardId, state.date);
+    await refreshAndRender();
+    if (!src) alert("No previous working-day plan was found to copy from.");
+  });
+  // On an untouched day there's nothing to overwrite, so carry over straight
+  // away. Once the day has content, confirm first — this replaces it.
+  if (planIsEmpty(getPlan())) { run(); return; }
   showConfirm("Reset board?",
     `This will replace ${fmtDow(state.date)} ${fmtDate(state.date)} on ${boardName} with a fresh copy of the last working day's plan — its missions and employee assignments. Any changes already made to this day will be overwritten. Continue?`,
-    () => safely(async () => {
-      const src = await cloud.resetBoardFromLastWorkingDay(D().activeBoardId, state.date);
-      await refreshAndRender();
-      if (!src) alert("No previous working-day plan was found to copy from.");
-    }));
+    run);
 }
 
 /* ---------- new board (with weekend-day config) ---------- */

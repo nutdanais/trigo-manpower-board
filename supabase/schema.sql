@@ -99,14 +99,14 @@ create table if not exists assignments (
 );
 create index if not exists assignments_date_idx on assignments(plan_date);
 
--- ===== Plan-day marker: which (board, date) plans have been materialized =====
--- A day is auto-seeded from the previous working day at most once; a row here
--- records that it happened, so an intentionally-emptied day is never re-seeded
--- by a later load (that was the "adjusted board disappears on login" bug).
---
--- Also doubles as the "Lock board" marker: locked_by/locked_at are set when a
--- planner locks a finished day (view-only for everyone) and cleared on unlock.
--- Unlocking never deletes the row — it must keep suppressing auto-seed.
+-- ===== Plan-day marker: "Lock board" state per (board, date) =====
+-- The app no longer auto-seeds a future day from the previous working day (that
+-- was the source of the "adjusted board disappears on login" bug — a load that
+-- wrote to the database). Carry-forward is now an explicit user action only
+-- (Carry over / Reset Board). This table's sole remaining job is the board lock:
+-- locked_by/locked_at are set when a planner locks a finished day (view-only for
+-- everyone) and cleared on unlock. (initialized_at is a harmless leftover column;
+-- rows are created only by locking now.)
 
 create table if not exists plan_days (
   board_id  uuid not null references boards(id) on delete cascade,
