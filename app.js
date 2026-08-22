@@ -874,7 +874,10 @@ function ovSection(title, subtitle) {
    forever. It also doubles as the table view the colour palette owes us: every
    value is printed as a number, so nothing is encoded by colour alone.
 
-   `rows`: [{ key, label, color, sub, onClick, values: {colKey: number} }]
+   `rows`: [{ key, label, color, sub, onClick, isTotal, values: {colKey: number} }]
+     `isTotal: true` marks the all-boards summary row: it prints numbers only
+     (no bars) and is excluded from the per-column max, since a total is always
+     the largest value and would otherwise squash every real row's bar.
    `cols`: [{ key, label, meter, plain, warn }] —
      `meter: true`  scales the bar 0–100 (a ratio against a fixed limit, e.g.
                     utilization %) and appends "%";
@@ -891,7 +894,8 @@ function ovCompareTable({ rows, cols }) {
   const table = document.createElement("table");
   table.className = "ov-table";
   const maxOf = {};
-  for (const c of cols) maxOf[c.key] = Math.max(1, ...rows.map(r => r.values[c.key] || 0));
+  const scaleRows = rows.filter(r => !r.isTotal);
+  for (const c of cols) maxOf[c.key] = Math.max(1, ...scaleRows.map(r => r.values[c.key] || 0));
 
   const thead = document.createElement("thead");
   const htr = document.createElement("tr");
@@ -912,12 +916,20 @@ function ovCompareTable({ rows, cols }) {
   const tbody = document.createElement("tbody");
   for (const r of rows) {
     const tr = document.createElement("tr");
+    if (r.isTotal) tr.className = "ov-table-totalrow";
     const nameTd = document.createElement("td");
     nameTd.className = "ov-table-name";
-    const dot = document.createElement("span");
-    dot.className = "ov-table-dot";
-    dot.style.background = r.color;
-    nameTd.appendChild(dot);
+    // the dot+label live in an inner flex box rather than making the <td>
+    // itself display:flex — a flex td drops out of table-cell layout and its
+    // row border no longer lines up with the numeric cells' borders
+    const nameInner = document.createElement("div");
+    nameInner.className = "ov-table-nameinner";
+    if (!r.isTotal) {          // the summary row is every board at once — no single colour identifies it
+      const dot = document.createElement("span");
+      dot.className = "ov-table-dot";
+      dot.style.background = r.color;
+      nameInner.appendChild(dot);
+    }
     const nameText = document.createElement("span");
     nameText.className = "ov-table-label";
     nameText.textContent = r.label;   // board/engineer names are user data — textContent, never innerHTML
@@ -926,7 +938,8 @@ function ovCompareTable({ rows, cols }) {
       sub.textContent = r.sub;
       nameText.appendChild(sub);
     }
-    nameTd.appendChild(nameText);
+    nameInner.appendChild(nameText);
+    nameTd.appendChild(nameInner);
     if (r.onClick) {
       nameTd.classList.add("clickable");
       nameTd.title = `Open ${r.label}`;
@@ -939,8 +952,9 @@ function ovCompareTable({ rows, cols }) {
       const td = document.createElement("td");
       td.className = "ov-table-num";
       const cell = document.createElement("div");
-      cell.className = "ov-cell" + (c.plain ? " plain" : "");
-      if (!c.plain) {
+      const noBar = c.plain || r.isTotal;
+      cell.className = "ov-cell" + (noBar ? " plain" : "");
+      if (!noBar) {
         const pct = c.meter ? Math.max(0, Math.min(100, v)) : (v / maxOf[c.key]) * 100;
         const track = document.createElement("div");
         track.className = "ov-cell-bar" + (c.meter ? " meter" : "");
@@ -964,20 +978,6 @@ function ovCompareTable({ rows, cols }) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   return wrap;
-}
-
-/* the 5-way split every deployment chart in Overview uses: Assigned / Leave /
-   Standby / Holiday / On-call free. `s` is anything shaped like boardStats()'s
-   return (or a hand-built aggregate with the same fields). onHoliday is 0 on
-   any board/date that isn't a holiday, so the segment just disappears then. */
-function deploySegments(s) {
-  return [
-    { key: "assigned", label: "Assigned", value: s.assigned, color: "var(--chart-assigned)" },
-    { key: "leave", label: "Leave", value: s.leave, color: "var(--chart-leave)" },
-    { key: "standby", label: "Standby", value: s.standby, color: "var(--chart-standby)" },
-    { key: "onHoliday", label: "Holiday", value: s.onHoliday || 0, color: "var(--chart-holiday)" },
-    { key: "oncallFree", label: "On-call free", value: s.oncallAvailable, color: "var(--muted)" },
-  ];
 }
 
 function renderOverview() {
@@ -1043,61 +1043,51 @@ function renderOverview() {
   panel.appendChild(kpiRow);
 
   /* ---------- by board: the per-board comparison, as rows not a sentence ---------- */
-  const boardSec = ovSection("By board", `Headcount, workload and utilization per board for ${fmtDow(state.date)} ${fmtDate(state.date)} — click a board name to open it`);
+  const boardSec = ovSection("By board", `Utilization and workload per board for ${fmtDow(state.date)} ${fmtDate(state.date)}, with the all-boards total at the bottom — click a board name to open it`);
+  const boardRows = boards.map((b, i) => ({
+    key: b.id,
+    label: b.name,
+    color: boardColor(i),
+    sub: stats[b.id].isHoliday ? "holiday" : null,
+    onClick: () => { D().activeBoardId = b.id; refreshAndRender(); },
+    values: {
+      util: utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday),
+      missions: stats[b.id].missions,
+      total: stats[b.id].total,
+      assigned: stats[b.id].assigned,
+      leave: stats[b.id].leave,
+      oncallFree: stats[b.id].oncallAvailable,
+    },
+  }));
+  // the overall figures the Deployment donut used to carry, as the table's last row
+  boardRows.push({
+    key: "__total__", label: "All boards", isTotal: true,
+    sub: `${boards.length} board${boards.length === 1 ? "" : "s"}`,
+    values: {
+      util: overallUtil, missions: totalMissions, total: totalEmp,
+      assigned: totalAssigned, leave: totalLeave, oncallFree: totalOncallFree,
+    },
+  });
   boardSec.appendChild(ovCompareTable({
     cols: Object.assign(
       [
-        { key: "total", label: "Headcount" },
-        { key: "missions", label: "Missions" },
-        { key: "assigned", label: "Assigned" },
-        { key: "unstaffed", label: "Unstaffed", plain: true, warn: true },
         { key: "util", label: "Utilized", meter: true },
+        { key: "missions", label: "Missions" },
+        { key: "total", label: "Headcount" },
+        { key: "assigned", label: "Assigned" },
+        { key: "leave", label: "Leave" },
+        { key: "oncallFree", label: "On-call (free)" },
       ],
       { nameLabel: "Board" }
     ),
-    rows: boards.map((b, i) => ({
-      key: b.id,
-      label: b.name,
-      color: boardColor(i),
-      sub: stats[b.id].isHoliday ? "holiday" : null,
-      onClick: () => { D().activeBoardId = b.id; refreshAndRender(); },
-      values: {
-        total: stats[b.id].total,
-        missions: stats[b.id].missions,
-        assigned: stats[b.id].assigned,
-        unstaffed: stats[b.id].unstaffed,
-        util: utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday),
-      },
-    })),
+    rows: boardRows,
   }));
   panel.appendChild(boardSec);
 
-  /* ---------- deployment: whole-workforce donut + one 100%-stacked bar per board ---------- */
-  const deploySec = ovSection("Deployment", `Utilized = assigned ÷ (headcount − leave − holiday), for ${fmtDow(state.date)} ${fmtDate(state.date)}`);
-  const deployGrid = document.createElement("div");
-  deployGrid.className = "ov-deploy-grid";
-  const allDeploy = deploySegments({ assigned: totalAssigned, leave: totalLeave, standby: totalStandby, onHoliday: totalOnHoliday, oncallAvailable: totalOncallFree });
-  const donutWrap = document.createElement("div");
-  donutWrap.className = "ov-deploy-donut-wrap";
-  donutWrap.innerHTML = Charts.donut({ segments: allDeploy, centerValue: overallUtil + "%", centerLabel: "Utilized", size: 152, thickness: 24 });
-  donutWrap.appendChild(Charts.legendEl(allDeploy.filter(s => s.value > 0).map(s => ({ key: s.key, label: `${s.label} (${s.value})`, color: s.color }))));
-  deployGrid.appendChild(donutWrap);
-
-  const barsWrap = document.createElement("div");
-  barsWrap.className = "ov-deploy-bars";
-  for (const b of boards) {
-    const s = stats[b.id];
-    const row = document.createElement("div");
-    row.className = "ov-deploy-bar-row";
-    row.innerHTML = `<button type="button" class="ov-deploy-bar-board" title="Open ${b.name}">${b.name}</button>
-      <div class="ov-deploy-bar-track"></div><span class="ov-deploy-bar-total">${s.total}</span>`;
-    row.querySelector(".ov-deploy-bar-board").onclick = () => { D().activeBoardId = b.id; refreshAndRender(); };
-    row.querySelector(".ov-deploy-bar-track").innerHTML = Charts.stackedBarH({ segments: deploySegments(s), height: 20 });
-    barsWrap.appendChild(row);
-  }
-  deployGrid.appendChild(barsWrap);
-  deploySec.appendChild(deployGrid);
-  panel.appendChild(deploySec);
+  /* The "Deployment" section (whole-workforce donut + a 100%-stacked bar per
+     board) used to sit here. It was removed: "By board" above now carries the
+     same figures as a utilization meter per board plus an all-boards total row,
+     which stays readable at 6 boards where a stack of donuts and bars did not. */
 
   /* ---------- needs attention: kept as an action list, not a stat — a chart
      would just make "here are their names, click to jump" worse. Placed right
