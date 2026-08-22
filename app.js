@@ -774,6 +774,10 @@ function boardStats(boardId) {
     oncallAvailableList,
     available: unassigned.length,
     missions: visibleMissions.length,
+    // missions on this board+date with nobody from this board on them — the
+    // mirror image of "standby": a job with no crew rather than a person with
+    // no job. Actionable in its own right, so Overview surfaces it per board.
+    unstaffed: visibleMissions.filter(m => !m.members.some(e => ids.has(e))).length,
     // headcount of people working each shift, not mission-slot count — consistent
     // with every other chip in the stats row (Assigned/Leave/Standby are all headcounts)
     dayMissions: visibleMissions.filter(m => m.shift !== "night")
@@ -838,6 +842,17 @@ function utilizationPct(assigned, headcount, leave, onHoliday = 0) {
   return denom > 0 ? Math.round((assigned / denom) * 100) : 0;
 }
 
+/* A line chart's SVG keeps its viewBox aspect ratio, so drawing it at a fixed
+   640×220 and letting CSS stretch it to 100% just letterboxes it — on a wide
+   card the plot ends up using well under half the row, which is exactly where
+   6 boards' worth of lines need the space. Measure the (already laid-out)
+   container and draw at that width instead. Callers queue these until the whole
+   panel is in the document, since an unattached element measures 0. */
+function fillLineChart(wrap, opts) {
+  const w = Math.max(520, Math.round(wrap.clientWidth) || 720);
+  wrap.innerHTML = Charts.lineChart({ ...opts, width: w });
+}
+
 function ovSection(title, subtitle) {
   const sec = document.createElement("section");
   sec.className = "ov-section";
@@ -851,6 +866,104 @@ function ovSection(title, subtitle) {
     sec.appendChild(sub);
   }
   return sec;
+}
+
+/* Comparison table with an inline bar in every numeric cell — the Overview's
+   answer to "this has to stay readable at 6+ boards". A per-board line of text
+   ("Non-Rayong 103 · Rayong 2") stops working past two or three; rows grow
+   forever. It also doubles as the table view the colour palette owes us: every
+   value is printed as a number, so nothing is encoded by colour alone.
+
+   `rows`: [{ key, label, color, sub, onClick, values: {colKey: number} }]
+   `cols`: [{ key, label, meter, plain, warn }] —
+     `meter: true`  scales the bar 0–100 (a ratio against a fixed limit, e.g.
+                    utilization %) and appends "%";
+     `plain: true`  prints the number with no bar. For an exception COUNT, a
+                    bar scaled to the column max is actively misleading — one
+                    board with 1 unstaffed mission would draw a full-width bar
+                    just for being the worst of a tiny set;
+     `warn: true`   tints a non-zero value with the warning status colour (and
+                    keeps the number, so it is never colour-alone).
+   Otherwise the bar is scaled against the largest value in that column. */
+function ovCompareTable({ rows, cols }) {
+  const wrap = document.createElement("div");
+  wrap.className = "ov-table-wrap";
+  const table = document.createElement("table");
+  table.className = "ov-table";
+  const maxOf = {};
+  for (const c of cols) maxOf[c.key] = Math.max(1, ...rows.map(r => r.values[c.key] || 0));
+
+  const thead = document.createElement("thead");
+  const htr = document.createElement("tr");
+  htr.appendChild(Object.assign(document.createElement("th"), { textContent: cols.nameLabel || "" }));
+  for (const c of cols) {
+    const th = document.createElement("th");
+    th.className = "ov-table-numhead";
+    // share a fixed 60% of the table between the numeric columns however many
+    // there are, so the name column stays ~40% whether a table has two metric
+    // columns or five — otherwise two columns get shoved to the far right.
+    th.style.width = (60 / cols.length).toFixed(1) + "%";
+    th.textContent = c.label;
+    htr.appendChild(th);
+  }
+  thead.appendChild(htr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    const nameTd = document.createElement("td");
+    nameTd.className = "ov-table-name";
+    const dot = document.createElement("span");
+    dot.className = "ov-table-dot";
+    dot.style.background = r.color;
+    nameTd.appendChild(dot);
+    const nameText = document.createElement("span");
+    nameText.className = "ov-table-label";
+    nameText.textContent = r.label;   // board/engineer names are user data — textContent, never innerHTML
+    if (r.sub) {
+      const sub = document.createElement("small");
+      sub.textContent = r.sub;
+      nameText.appendChild(sub);
+    }
+    nameTd.appendChild(nameText);
+    if (r.onClick) {
+      nameTd.classList.add("clickable");
+      nameTd.title = `Open ${r.label}`;
+      nameTd.onclick = r.onClick;
+    }
+    tr.appendChild(nameTd);
+
+    for (const c of cols) {
+      const v = r.values[c.key] || 0;
+      const td = document.createElement("td");
+      td.className = "ov-table-num";
+      const cell = document.createElement("div");
+      cell.className = "ov-cell" + (c.plain ? " plain" : "");
+      if (!c.plain) {
+        const pct = c.meter ? Math.max(0, Math.min(100, v)) : (v / maxOf[c.key]) * 100;
+        const track = document.createElement("div");
+        track.className = "ov-cell-bar" + (c.meter ? " meter" : "");
+        const fill = document.createElement("i");
+        fill.style.width = pct.toFixed(1) + "%";
+        // one colour per row entity, never per rank — filtering or re-sorting
+        // must never repaint a row (see the dataviz "colour follows the entity" rule)
+        fill.style.background = r.color;
+        track.appendChild(fill);
+        cell.appendChild(track);
+      }
+      const num = document.createElement("span");
+      num.className = "ov-cell-val" + (c.warn && v > 0 ? " warn" : "");
+      num.textContent = c.meter ? v + "%" : String(v);
+      cell.appendChild(num);
+      td.appendChild(cell);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return wrap;
 }
 
 /* the 5-way split every deployment chart in Overview uses: Assigned / Leave /
@@ -877,6 +990,9 @@ function renderOverview() {
   }
   const stats = Object.fromEntries(boards.map(b => [b.id, boardStats(b.id)]));
   const boardColor = (i) => Charts.catColor(i);
+  // charts that need their container's real width are drawn after the whole
+  // panel is in the document (see fillLineChart)
+  const pendingCharts = [];
   const makeMini = (emp, b) => {
     const area = D().areas.find(a => a.id === emp.areaId);
     const mini = document.createElement("span");
@@ -899,30 +1015,62 @@ function renderOverview() {
   const totalOncall = totalEmp - totalPerm;
   const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday);
 
-  /* ---------- KPI strip: the handful of numbers that read fine as numbers ---------- */
+  /* ---------- KPI strip: the handful of numbers that read fine as numbers ----------
+     Deliberately headline-only. These tiles used to carry a per-board breakdown
+     line ("Non-Rayong 103 · Rayong 2") which is unreadable past two or three
+     boards; the per-board split now lives in the "By board" table below, which
+     grows a row per board instead of a longer sentence. */
+  const totalUnstaffed = boards.reduce((s, b) => s + stats[b.id].unstaffed, 0);
   const kpiRow = document.createElement("div");
   kpiRow.className = "ov-kpi-row";
-  // `perBoard`: [[boardName, value], ...] — one line under the tile's label
-  // breaking the headline number down per board. Omit it for a tile where a
-  // per-board split wouldn't mean anything (e.g. the board COUNT itself).
-  const kpi = (value, label, perBoard) => {
+  const kpi = (value, label, sub) => {
     const tile = document.createElement("div");
     tile.className = "ov-kpi-tile";
     tile.innerHTML = `<div class="ov-kpi-value">${value}</div><div class="ov-kpi-label">${label}</div>`;
-    if (perBoard && perBoard.length) {
-      const sub = document.createElement("div");
-      sub.className = "ov-kpi-breakdown";
-      sub.textContent = perBoard.map(([name, v]) => `${name} ${v}`).join(" · ");
-      tile.appendChild(sub);
+    if (sub) {
+      const s = document.createElement("div");
+      s.className = "ov-kpi-breakdown";
+      s.textContent = sub;
+      tile.appendChild(s);
     }
     return tile;
   };
-  kpiRow.appendChild(kpi(totalEmp, "Total employees", boards.map(b => [b.name, stats[b.id].total])));
-  kpiRow.appendChild(kpi(boards.length, "Boards"));
-  kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`, boards.map(b => [b.name, stats[b.id].missions])));
-  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization",
-    boards.map(b => [b.name, utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday) + "%"])));
+  kpiRow.appendChild(kpi(totalEmp, "Total employees", `${boards.length} board${boards.length === 1 ? "" : "s"} · ${totalPerm} permanent · ${totalOncall} on-call`));
+  kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`,
+    totalUnstaffed ? `${totalUnstaffed} with no crew yet` : "all missions have crew"));
+  kpiRow.appendChild(kpi(totalAssigned, "Assigned to a mission", `${totalStandby} standby · ${totalLeave} on leave`));
+  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization", "assigned ÷ (headcount − leave − holiday)"));
   panel.appendChild(kpiRow);
+
+  /* ---------- by board: the per-board comparison, as rows not a sentence ---------- */
+  const boardSec = ovSection("By board", `Headcount, workload and utilization per board for ${fmtDow(state.date)} ${fmtDate(state.date)} — click a board name to open it`);
+  boardSec.appendChild(ovCompareTable({
+    cols: Object.assign(
+      [
+        { key: "total", label: "Headcount" },
+        { key: "missions", label: "Missions" },
+        { key: "assigned", label: "Assigned" },
+        { key: "unstaffed", label: "Unstaffed", plain: true, warn: true },
+        { key: "util", label: "Utilized", meter: true },
+      ],
+      { nameLabel: "Board" }
+    ),
+    rows: boards.map((b, i) => ({
+      key: b.id,
+      label: b.name,
+      color: boardColor(i),
+      sub: stats[b.id].isHoliday ? "holiday" : null,
+      onClick: () => { D().activeBoardId = b.id; refreshAndRender(); },
+      values: {
+        total: stats[b.id].total,
+        missions: stats[b.id].missions,
+        assigned: stats[b.id].assigned,
+        unstaffed: stats[b.id].unstaffed,
+        util: utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday),
+      },
+    })),
+  }));
+  panel.appendChild(boardSec);
 
   /* ---------- deployment: whole-workforce donut + one 100%-stacked bar per board ---------- */
   const deploySec = ovSection("Deployment", `Utilized = assigned ÷ (headcount − leave − holiday), for ${fmtDow(state.date)} ${fmtDate(state.date)}`);
@@ -990,6 +1138,67 @@ function renderOverview() {
   }
   panel.appendChild(attnSec);
 
+  /* ---------- by engineer: workload per responsible engineer, across all boards ----------
+     Missions carry an engineerId, so this is the one view that answers "who is
+     carrying how much today" — the board sections all slice by board instead.
+     Crew counts only members who still belong to the board the mission is on,
+     the same rule boardStats/renderMissions use, so a stale membership never
+     inflates the number. */
+  const engSec = ovSection("By engineer",
+    `Missions each engineer is responsible for on ${fmtDow(state.date)} ${fmtDate(state.date)}, and how many people are deployed under them — across all boards`);
+  const engLoad = new Map();   // engineerId (or "" = unassigned) -> {missions, crew, boards:Set}
+  const bump = (id, crew, boardName) => {
+    const rec = engLoad.get(id) || { missions: 0, crew: 0, boards: new Set() };
+    rec.missions += 1;
+    rec.crew += crew;
+    rec.boards.add(boardName);
+    engLoad.set(id, rec);
+  };
+  for (const b of boards) {
+    const ids = new Set(boardEmployees(b.id).map(e => e.id));
+    for (const m of peekPlan(b.id).missions) {
+      if (m.hidden) continue;
+      bump(m.engineerId || "", m.members.filter(e => ids.has(e)).length, b.name);
+    }
+  }
+  // every engineer gets a row (a zero tells you who is free today, which is the
+  // other half of "who is loaded"); an "unassigned" row appears only if some
+  // mission genuinely has no engineer on it.
+  // naming every board stops fitting once an engineer covers 4+ of them —
+  // past three, the count is the useful part
+  const boardsSub = (set) => set.size > 3 ? `${set.size} boards` : [...set].join(" · ");
+  const engRows = D().engineers.map(e => {
+    const rec = engLoad.get(e.id) || { missions: 0, crew: 0, boards: new Set() };
+    return {
+      key: e.id, label: e.name, color: e.color,
+      sub: rec.boards.size ? boardsSub(rec.boards) : "no missions today",
+      values: { missions: rec.missions, crew: rec.crew },
+    };
+  });
+  const noEng = engLoad.get("");
+  if (noEng) {
+    engRows.push({
+      key: "__none__", label: "— no engineer set —", color: "var(--muted)",
+      sub: boardsSub(noEng.boards),
+      values: { missions: noEng.missions, crew: noEng.crew },
+    });
+  }
+  engRows.sort((a, b) => b.values.missions - a.values.missions || b.values.crew - a.values.crew
+    || a.label.localeCompare(b.label));
+  if (engRows.length) {
+    engSec.appendChild(ovCompareTable({
+      cols: Object.assign(
+        [{ key: "missions", label: "Missions" }, { key: "crew", label: "Crew deployed" }],
+        { nameLabel: "Engineer" }
+      ),
+      rows: engRows,
+    }));
+  } else {
+    engSec.appendChild(Object.assign(document.createElement("p"),
+      { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
+  }
+  panel.appendChild(engSec);
+
   /* ---------- contract mix: permanent vs on-call, all boards + each board ---------- */
   const contractSec = ovSection("Contract mix", "Permanent vs on-call — all boards, then each board individually");
   const contractGrid = document.createElement("div");
@@ -1046,7 +1255,7 @@ function renderOverview() {
 
   /* ---------- utilization trend: 7/14/30 days, one line per board ---------- */
   const trendSec = ovSection("Utilization trend",
-    "Utilized = assigned ÷ (headcount − leave), ending today. Headcount uses each employee's CURRENT board — a past board move isn't tracked historically, so a moved employee counts on their new board for the whole window shown.");
+    "Utilized = assigned ÷ (headcount − leave), ending today. Days when every board is off (weekends, shared holidays) are left off the axis, so the line runs straight across them; a day when only some boards are off keeps its place and those boards' lines break. Headcount uses each employee's CURRENT board — a past board move isn't tracked historically, so a moved employee counts on their new board for the whole window shown.");
   const controls = document.createElement("div");
   controls.className = "ov-trend-controls";
   for (const n of [7, 14, 30]) {
@@ -1067,12 +1276,17 @@ function renderOverview() {
   const util = state.overview.util || {};
   const toDate = todayStr();
   const fromDate = addDays(toDate, -(state.overview.trendRange - 1));
+  // A date nobody works — every board's weekend or a shared holiday — is left
+  // OUT of the x-axis entirely, so the line runs straight from Friday to Monday
+  // instead of leaving a weekly hole that carries no information. A date where
+  // at least one board works stays on the axis: that board plots its point and
+  // the boards that are off gap individually (their y is null below), which is
+  // real information — one site working while another is closed.
   const xDates = [];
-  for (let d = fromDate; d <= toDate; d = addDays(d, 1)) xDates.push(d);
-  // cloud.getUtilizationRange now seeds every calendar date (working, weekend,
-  // and holiday alike) — this chart deliberately still skips non-working days
-  // (isNonWorkingDate: weekends + holiday overrides), so the line gaps on
-  // them instead of dipping toward zero on a day nobody expected coverage.
+  for (let d = fromDate; d <= toDate; d = addDays(d, 1)) {
+    if (boards.every(b => isNonWorkingDate(d, b.id))) continue;
+    xDates.push(d);
+  }
   const trendSeries = boards.map((b, i) => ({
     key: b.id,
     label: b.name,
@@ -1084,9 +1298,15 @@ function renderOverview() {
       return rec ? { y: utilizationPct(rec.assigned, rec.headcount, rec.leave), suffix: "%" } : { y: null };
     }),
   }));
+  const noWorkingDays = !xDates.length;   // whole range was weekend/holiday on every board
   const trendWrap = document.createElement("div");
   trendWrap.className = "ov-trend-chart";
-  trendWrap.innerHTML = Charts.lineChart({ series: trendSeries, xLabels: xDates.map(shortDateLabel), yMax: 100, height: 200 });
+  if (noWorkingDays) {
+    trendWrap.innerHTML = `<p class="import-note">No working days in the last ${state.overview.trendRange} days — every date was a weekend or holiday on every board.</p>`;
+  } else {
+    pendingCharts.push(() => fillLineChart(trendWrap,
+      { series: trendSeries, xLabels: xDates.map(shortDateLabel), yMax: 100, height: 220 }));
+  }
   trendSec.appendChild(trendWrap);
   trendSec.appendChild(Charts.legendEl(
     boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i), muted: state.overview.trendHidden.has(b.id) })),
@@ -1104,7 +1324,7 @@ function renderOverview() {
      and trendHidden with the chart above (same range buttons, same legend
      board-visibility set) rather than duplicating those controls. ---------- */
   const oncallTrendSec = ovSection("On-call availability trend",
-    "Available on-call = on-call headcount − assigned to a mission − on leave, per board. Excludes weekends and holidays, same as the trend above — uses the same date range.");
+    "Available on-call = on-call headcount − assigned to a mission − on leave, per board. Same date range and the same non-working-day handling as the trend above.");
   const oncallYMax = Math.max(4, Math.ceil(Math.max(1, ...boards.map(b => stats[b.id].oncall)) / 4) * 4);
   const oncallTrendSeries = boards.map((b, i) => ({
     key: b.id,
@@ -1121,7 +1341,12 @@ function renderOverview() {
   }));
   const oncallTrendWrap = document.createElement("div");
   oncallTrendWrap.className = "ov-trend-chart";
-  oncallTrendWrap.innerHTML = Charts.lineChart({ series: oncallTrendSeries, xLabels: xDates.map(shortDateLabel), yMax: oncallYMax, height: 200 });
+  if (noWorkingDays) {
+    oncallTrendWrap.innerHTML = `<p class="import-note">No working days in the last ${state.overview.trendRange} days — every date was a weekend or holiday on every board.</p>`;
+  } else {
+    pendingCharts.push(() => fillLineChart(oncallTrendWrap,
+      { series: oncallTrendSeries, xLabels: xDates.map(shortDateLabel), yMax: oncallYMax, height: 220 }));
+  }
   oncallTrendSec.appendChild(oncallTrendWrap);
   oncallTrendSec.appendChild(Charts.legendEl(
     boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i), muted: state.overview.trendHidden.has(b.id) })),
@@ -1152,6 +1377,8 @@ function renderOverview() {
   if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
   panel.appendChild(leaveSec);
 
+  // every section is in the document now, so containers have a real width
+  for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(panel);
 }
 
@@ -2275,7 +2502,14 @@ function wireApp() {
   // must re-pack when the viewport width changes the column count. Debounced so
   // a drag-resize doesn't thrash. render() already re-packs on every data change.
   let masonryRT;
-  window.addEventListener("resize", () => { clearTimeout(masonryRT); masonryRT = setTimeout(layoutMasonry, 120); });
+  window.addEventListener("resize", () => {
+    clearTimeout(masonryRT);
+    masonryRT = setTimeout(() => {
+      // Overview's line charts are drawn at their measured container width, so
+      // they need a redraw on resize too — the board just re-packs its masonry.
+      if (isOverview()) render(); else layoutMasonry();
+    }, 120);
+  });
 
   // Mobile browsers resume a backgrounded tab without reloading, and may have
   // missed Realtime events while suspended. On every return to the foreground,

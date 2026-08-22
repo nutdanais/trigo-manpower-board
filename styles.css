@@ -221,7 +221,13 @@ button, input, select, textarea, optgroup {
   flex-wrap: wrap;
 }
 
-#board-tabs { display: flex; gap: 4px; align-items: stretch; }
+/* Six boards' worth of tabs is wider than a narrow screen. The tab strip
+   scrolls on its own (min-width:0 is what actually lets a flex child shrink
+   below its content) so the PAGE never scrolls sideways and the board below
+   stays put; "+ Board" is pinned outside the scroller so it stays reachable. */
+#board-tabs { display: flex; gap: 4px; align-items: stretch; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+#board-bar { flex-wrap: nowrap; }
+#board-bar > .btn { flex: none; }
 .board-tab-sep {
   width: 1px;
   align-self: center;
@@ -888,7 +894,11 @@ body.board-view #app-root { margin-right: 264px; }
 @media (max-width: 640px) {
   /* stats wrap into compact rows instead of scrolling important counts off-screen */
   #stats-row { flex-wrap: wrap; gap: 8px 14px; overflow-x: visible; }
-  #stats-bar, #area-bar { flex-wrap: wrap; }
+  /* flex-shrink:0 (set above for the desktop scrolling row) would pin these at
+     their max-content width, so wrap never kicks in and 6 boards' chips push
+     the whole page sideways. Re-enable shrinking here — min-width:0 is the part
+     that actually lets a flex item drop below its content width. */
+  #stats-bar, #area-bar { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
   #area-bar { margin-left: 0; gap: 10px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
@@ -1180,7 +1190,9 @@ body.board-view #app-root { margin-right: 264px; }
   border-radius: 10px;
   padding: 14px 16px;
 }
-.ov-kpi-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--primary-text); }
+/* proportional figures, not tabular: these are standalone display numbers that
+   never line up vertically, and equal-width digits read loose at this size */
+.ov-kpi-value { font-size: 26px; font-weight: 700; color: var(--primary-text); }
 .ov-kpi-label { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 .ov-kpi-breakdown { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
 
@@ -1198,9 +1210,63 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-section h3 { font-size: 15px; margin-bottom: 2px; }
 .ov-section-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; max-width: 760px; }
 
+/* ===== Overview comparison table (By board / By engineer) =====
+   Rows scale where a per-board sentence didn't: 6+ boards just add rows. Each
+   numeric cell pairs an inline bar (quick visual ranking) with the printed
+   number (exact value, and the table view the palette owes us — nothing here
+   is encoded by colour alone). */
+.ov-table-wrap { overflow-x: auto; }          /* narrow screens scroll the table, never the page */
+.ov-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ov-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 10px 7px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ov-table th.ov-table-numhead { min-width: 96px; }   /* width itself is set per-table in ovCompareTable */
+.ov-table td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.ov-table tr:last-child td { border-bottom: none; }
+.ov-table-name { display: flex; align-items: center; gap: 8px; min-width: 130px; }
+.ov-table-name.clickable { cursor: pointer; }
+.ov-table-name.clickable:hover .ov-table-label { color: var(--primary-text); text-decoration: underline; }
+.ov-table-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.ov-table-label { font-weight: 600; line-height: 1.25; }
+.ov-table-label small { display: block; font-weight: 400; font-size: 10.5px; color: var(--muted); }
+.ov-cell { display: flex; align-items: center; gap: 8px; }
+/* a bar-less column: an exception count where the number is the whole story */
+.ov-cell.plain { justify-content: flex-start; }
+.ov-cell-val.warn { color: #b45309; }
+:root[data-theme="dark"] .ov-cell-val.warn { color: #e0a94a; }
+.ov-cell-bar {
+  flex: 1 1 auto;
+  min-width: 34px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+/* a meter is a ratio against a fixed 100 limit, so give it a visible full-scale
+   track — a plain bar is scaled against the column's own max instead */
+.ov-cell-bar.meter { background: var(--track-off); opacity: .45; }
+.ov-cell-bar i { display: block; height: 100%; border-radius: 999px; }
+.ov-cell-val {
+  flex: none;
+  min-width: 30px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;   /* these DO align vertically down a column */
+  font-weight: 600;
+}
+
 /* deployment: donut + legend on the left, one stacked bar per board on the right */
 .ov-deploy-grid { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
-.ov-deploy-donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 0 0 auto; }
+/* max-width/min-width let this shrink on a phone: `flex: 0 0 auto` otherwise
+   sizes it to the legend's max-content width, which pushes the page sideways */
+.ov-deploy-donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 0 0 auto; max-width: 100%; min-width: 0; }
 .ov-deploy-bars { display: flex; flex-direction: column; gap: 10px; flex: 1 1 320px; min-width: 260px; justify-content: center; }
 .ov-deploy-bar-row { display: flex; align-items: center; gap: 10px; }
 .ov-deploy-bar-board {
@@ -1245,7 +1311,9 @@ body.board-view #app-root { margin-right: 264px; }
 /* utilization trend */
 .ov-trend-controls { display: flex; gap: 6px; margin-bottom: 10px; }
 .ov-trend-controls .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-.ov-trend-chart { max-width: 780px; margin-bottom: 10px; }
+/* no max-width: the chart is drawn at the container's measured width
+   (fillLineChart in app.js), and 6 boards over 30 days needs the whole row */
+.ov-trend-chart { margin-bottom: 10px; }
 
 /* ===== chart marks (SVG, shared by every Overview chart) ===== */
 .chart-svg { display: block; overflow: visible; }
