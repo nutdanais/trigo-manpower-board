@@ -192,6 +192,7 @@ function wireSaveStatus() {
 /* ---------- app state ---------- */
 const state = {
   date: defaultPlanningDate(),   // land on the next weekday's plan, not today
+  myEmail: null,   // set once at boot from cloud.getSession() — who to NOT toast about
   filters: { engineer: [], host: [], customer: [], shift: [] },   // multi-select; [] = All
   sort: "number",                // default: sort by mission number on every board
   unlockedDates: new Set(),   // past/today dates the user confirmed they want to edit
@@ -2763,11 +2764,25 @@ async function boot() {
   $("#app-root").classList.remove("hidden");
   wireSaveStatus();
   wireApp();
+  try { const session = await cloud.getSession(); state.myEmail = session && session.user && session.user.email; } catch (e) { /* toast attribution just won't fire */ }
   await cloud.init(() => state.date);
   // holidays are known now — restore the last board/date the user was on, falling
   // back to the next working day if there's nothing saved (or it's stale/invalid)
   restoreViewState();
-  cloud.onChange(() => { state.overview.utilCacheKey = null; refreshAndRender(); });
+  cloud.onChange((payload) => {
+    state.overview.utilCacheKey = null;
+    // {boardId, planDate, updatedBy} from a missions/assignments write (see
+    // cloud.js's _attributionFromPayload) — undefined for every other kind of
+    // change, and for a write from before the updated-by migration was run.
+    // Only toast when it's a change to the board+date on screen right now,
+    // and it wasn't this browser's own write echoing back through Realtime.
+    if (payload && payload.updatedBy && payload.updatedBy !== state.myEmail &&
+        payload.boardId === D().activeBoardId && payload.planDate === state.date) {
+      const board = D().boards.find(b => b.id === payload.boardId);
+      toast(`${board ? board.name : "This board"} was just updated by ${payload.updatedBy}.`, "info");
+    }
+    refreshAndRender();
+  });
   await refreshAndRender();
   // fonts can settle after the first paint and change card heights — re-pack once ready
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);
