@@ -1073,8 +1073,8 @@ function renderStats() {
   bar.innerHTML = "";
   areaBar.innerHTML = "";
   if (isOverview()) {
-    bar.appendChild(statChip("All employees", D().employees.length));
-    for (const b of D().boards) bar.appendChild(statChip(b.name, boardEmployees(b.id).length));
+    bar.appendChild(statChip("All employees", D().employees.filter(onRoster).length));
+    for (const b of D().boards) bar.appendChild(statChip(b.name, rosterEmployees(b.id).length));
     return;
   }
   if (isEmployeeList()) {
@@ -1104,10 +1104,10 @@ function renderStats() {
 /* ---------- overview tab ---------- */
 function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); }
 
-/* assigned ÷ (headcount − leave − onHoliday) — "how much of the people actually
-   available today is deployed". onHoliday defaults to 0 for callers (e.g. the
-   historical trend chart) that don't track it separately. Spelled out in the
-   UI (not just this comment) since it's not guessable from the number alone. */
+/* assigned ÷ (headcount − leave − onHoliday − free on-call) — "how much of the
+   people actually available today is deployed". onHoliday and oncallFree default
+   to 0 for callers that don't track them separately. Spelled out in the UI (not
+   just this comment) since it's not guessable from the number alone. */
 /* Free on-call staff are NOT a utilization gap. On-call is surge capacity: not
    calling someone in is the system working as intended, not idle headcount. So
    they come out of the denominator entirely — a day where every permanent
@@ -1284,14 +1284,19 @@ function renderOverview() {
     return mini;
   };
 
-  const totalEmp = D().employees.length;
+  // roster for the date on screen — boardStats() is already roster-filtered, so
+  // these global totals have to use the same set or the KPI strip, the By board
+  // table and every utilization denominator disagree by however many people are
+  // currently deactivated. (Past dates keep everyone; see onRoster().)
+  const rosterAll = D().employees.filter(onRoster);
+  const totalEmp = rosterAll.length;
   const totalAssigned = boards.reduce((s, b) => s + stats[b.id].assigned, 0);
   const totalLeave = boards.reduce((s, b) => s + stats[b.id].leave, 0);
   const totalStandby = boards.reduce((s, b) => s + stats[b.id].standby, 0);
   const totalOnHoliday = boards.reduce((s, b) => s + stats[b.id].onHoliday, 0);
   const totalOncallFree = boards.reduce((s, b) => s + stats[b.id].oncallAvailable, 0);
   const totalMissions = boards.reduce((s, b) => s + stats[b.id].missions, 0);
-  const totalPerm = D().employees.filter(e => e.contract === "permanent").length;
+  const totalPerm = rosterAll.filter(e => e.contract === "permanent").length;
   const totalOncall = totalEmp - totalPerm;
   const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday, totalOncallFree);
 
@@ -1319,7 +1324,7 @@ function renderOverview() {
   kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`,
     totalUnstaffed ? `${totalUnstaffed} with no crew yet` : "all missions have crew"));
   kpiRow.appendChild(kpi(totalAssigned, "Assigned to a mission", `${totalStandby} standby · ${totalLeave} on leave`));
-  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization", "assigned ÷ (headcount − leave − holiday)"));
+  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization", "assigned ÷ (headcount − leave − holiday − free on-call)"));
   panel.appendChild(kpiRow);
 
   /* ---------- by board: the per-board comparison, as rows not a sentence ---------- */
@@ -1513,17 +1518,44 @@ function renderOverview() {
     { key: "oncall", label: `On-call (${totalOncall})`, color: "var(--chart-oncall)" },
   ]));
 
-  /* ---------- service-area distribution, all boards ---------- */
-  const areaSec = ovSection("By service area", "Headcount across all boards");
-  const areaRows = D().areas.map(a => ({ label: a.name, value: D().employees.filter(e => e.areaId === a.id).length, color: a.color }))
-    .filter(r => r.value > 0)
-    .sort((a, b) => b.value - a.value);
-  if (areaRows.length) {
-    const areaMax = Math.max(...areaRows.map(r => r.value));
+  /* ---------- service-area distribution, all boards ----------
+     One row per area on a shared scale, split permanent / on-call: the bar's
+     full length is the area's total headcount (so areas stay ranked by size and
+     comparable to each other), the two segments are its contract mix, and the
+     hover tooltip gives each segment's share of that area. Deliberately one
+     chart rather than three separate total/permanent/on-call charts — three
+     would cost three times the space and still make "how much of NPT is
+     on-call?" a cross-chart comparison instead of a glance. Same two colours as
+     the contract donuts beside it, so blue = permanent holds across the row. */
+  const areaSec = ovSection("By service area", "Bar length is total headcount; segments split permanent / on-call");
+  const areaData = D().areas.map(a => {
+    const emps = rosterAll.filter(e => e.areaId === a.id);
+    const perm = emps.filter(e => e.contract === "permanent").length;
+    return { area: a, perm, oncall: emps.length - perm, total: emps.length };
+  }).filter(r => r.total > 0).sort((a, b) => b.total - a.total);
+  if (areaData.length) {
+    const areaMax = Math.max(...areaData.map(r => r.total));
     const areaWrap = document.createElement("div");
-    areaWrap.className = "ov-area-bars";
-    areaWrap.innerHTML = Charts.barsH({ rows: areaRows, max: areaMax, barHeight: 16, rowGap: 10 });
+    areaWrap.className = "ov-area-rows";
+    for (const r of areaData) {
+      const row = document.createElement("div");
+      row.className = "ov-area-row";
+      row.innerHTML = `<span class="ov-area-row-label" title="${escapeHtml(r.area.name)}"><span class="ov-area-dot" style="background:${escapeHtml(r.area.color)}"></span><span class="ov-area-row-name">${escapeHtml(r.area.name)}</span></span>
+        <div class="ov-area-row-track"></div><span class="ov-area-row-total">${r.total}</span>`;
+      row.querySelector(".ov-area-row-track").innerHTML = Charts.stackedBarH({
+        segments: [
+          { label: "Permanent", value: r.perm, color: "var(--chart-permanent)" },
+          { label: "On-call", value: r.oncall, color: "var(--chart-oncall)" },
+        ],
+        scaleMax: areaMax, height: 18,
+      });
+      areaWrap.appendChild(row);
+    }
     areaSec.appendChild(areaWrap);
+    areaSec.appendChild(Charts.legendEl([
+      { key: "perm", label: `Permanent (${areaData.reduce((n, r) => n + r.perm, 0)})`, color: "var(--chart-permanent)" },
+      { key: "oncall", label: `On-call (${areaData.reduce((n, r) => n + r.oncall, 0)})`, color: "var(--chart-oncall)" },
+    ]));
   } else {
     areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
   }
@@ -1537,7 +1569,7 @@ function renderOverview() {
 
   /* ---------- utilization trend: 7/14/30 days, one line per board ---------- */
   const trendSec = ovSection("Utilization trend",
-    "Utilized = assigned ÷ (headcount − leave), ending today. Days when every board is off (weekends, shared holidays) are left off the axis, so the line runs straight across them; a day when only some boards are off keeps its place and those boards' lines break. Headcount uses each employee's CURRENT board — a past board move isn't tracked historically, so a moved employee counts on their new board for the whole window shown.");
+    "Utilized = assigned ÷ (headcount − leave − free on-call), ending today. Free on-call staff are surge capacity, not idle headcount, so an uncalled on-call employee leaves the denominator instead of dragging the day down. Days when every board is off (weekends, shared holidays) are left off the axis, so the line runs straight across them; a day when only some boards are off keeps its place and those boards' lines break. Headcount uses each employee's CURRENT board — a past board move isn't tracked historically, so a moved employee counts on their new board for the whole window shown.");
   const controls = document.createElement("div");
   controls.className = "ov-trend-controls";
   for (const n of [7, 14, 30]) {

@@ -1558,7 +1558,19 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-leave-row-label small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
 .ov-leave-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 
-.ov-area-bars { max-width: 640px; }
+.ov-area-rows { display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin-bottom: 10px; }
+.ov-area-row { display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px; }
+.ov-area-row-label { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
+/* the name is the row's identity and can be long, but the label column is
+   fixed so every row's bar starts at the same x (that shared scale is the whole
+   point of the chart). So wrap to two lines and ellipsis after — a phone has no
+   hover, so the title attribute alone isn't a good enough fallback there. */
+.ov-area-row-name {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere; line-height: 1.25;
+}
+.ov-area-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border); }
+.ov-area-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 
 /* utilization trend */
 .ov-trend-controls { display: flex; gap: 6px; margin-bottom: 10px; }
