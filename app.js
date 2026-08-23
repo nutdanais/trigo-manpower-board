@@ -48,6 +48,20 @@ function escapeHtml(s) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
+/* A translucent wash of a colour that came from DATA (an engineer's picked
+   colour), for a surface that still has to carry readable text in both themes.
+   Deliberately computed to a plain rgba() rather than written as color-mix():
+   Chromium serializes a color-mix() result as color(srgb ...), which
+   html2canvas cannot parse — that took out the JPG export once already.
+   Returns the input untouched if it isn't a hex colour, so a bad value degrades
+   to "no tint" rather than to no background at all. */
+function tintOf(color, alpha) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color).trim());
+  if (!m) return color;
+  const hex = m[1].length === 3 ? m[1].split("").map(c => c + c).join("") : m[1];
+  const n = parseInt(hex, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 /* strip everything but digits/+ so the href itself is always a valid,
    injection-safe tel: URI regardless of how the number was typed in */
 function telHref(phone) {
@@ -952,6 +966,11 @@ function missionSortValue(m) {
   }
 }
 
+/* how much of the engineer's colour washes behind the mission header. Low
+   enough that theme-coloured text stays legible on top of any engineer colour,
+   high enough that the header still reads as that engineer's block. */
+const MISSION_TINT = 0.15;
+
 function renderMissions() {
   const plan = getPlan();
   const grid = $("#missions-grid");
@@ -965,11 +984,21 @@ function renderMissions() {
   missions = [...missions.filter(missionMatchesFilters), ...missions.filter(m => !missionMatchesFilters(m))];
   for (const m of missions) {
     const eng = D().engineers.find(e => e.id === m.engineerId);
+    const engColor = eng ? eng.color : "#ccc";
     const card = document.createElement("div");
     card.className = "mission-card" + (missionMatchesFilters(m) ? "" : " dimmed");
+    // The engineer's colour is what lets you pick one engineer's missions out of
+    // a full board at a glance — but as a solid header fill it was the loudest
+    // thing on screen AND forced the header text to be pinned dark in both
+    // themes (it sat on an arbitrary data colour). Full strength on the card's
+    // left edge, a 15% wash behind the header: the edge and the tinted header
+    // sit against each other, so the two together still read as one full-height
+    // colour block from across the room, and the header text can follow the
+    // theme like every other label again.
+    card.style.borderLeftColor = engColor;
     const header = document.createElement("div");
     header.className = "mission-header";
-    header.style.background = eng ? eng.color : "#ccc";
+    header.style.background = tintOf(engColor, MISSION_TINT);
     header.title = "Click to edit mission";
     header.innerHTML = `
       <div class="m-number">${escapeHtml(m.number)}</div>
@@ -2360,7 +2389,22 @@ function buildExportPools() {
    grid's live width, so it adapts to window resizing and to the wider export
    capture alike. Cards that are display:none (e.g. empty missions hidden for the
    export) are skipped. Safe/no-op when the grid is hidden or empty. */
-const MASONRY_GAP = 12, MASONRY_MIN_CARD = 383;
+/* The column floor is not a taste value — it is the width at which two employee
+   cards still fit side by side in a mission body, which is what keeps a crew of
+   four from rendering as a four-storey card (and the exported JPG from doubling
+   in height). Derive it, don't guess it:
+
+     card width W
+     − 6px coloured left edge − 1px right border          → W −   7
+     − 130px header − its 1px right border                → W − 138
+     − 8px body padding, both sides                       → W − 154
+     must hold 2 × 114px .emp-card + one 6px flex gap = 234
+     → W ≥ 388
+
+   390 leaves a 2px cushion. If you change .emp-card's width, the header width,
+   or the left edge, redo this sum — the previous value (383) predated the 6px
+   edge and left the export exactly one pixel short, so every crew stacked. */
+const MASONRY_GAP = 12, MASONRY_MIN_CARD = 390;
 function layoutMasonry() {
   const grid = $("#missions-grid");
   if (!grid || grid.classList.contains("hidden")) return;

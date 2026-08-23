@@ -23,7 +23,7 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
   - **↺ Reset Board** (toolbar): once a day has content, the same button becomes a destructive "start over from the last working day" — it confirms first, since it replaces what's there.
   - Past date → read-only 🔒; trying to edit shows a confirmation popup.
 - **🔓/🔒 Lock**: next to the date picker. Click it once a day's plan is finalized to make that board **view-only for everyone** — a finished plan can't be bumped by someone else's edit or an auto-refresh. Anyone can unlock it again, but they first see a popup naming who locked it (and when); confirming unlocks it for everyone, not just that person.
-- **+ New Mission**: mission number, host, customer, shift (day/night) with start/end time, engineer. The mission header takes the engineer's color. Click a mission header to edit, delete, or hide it.
+- **+ New Mission**: mission number, host, customer, shift (day/night) with start/end time, engineer. The engineer's colour marks the card: full strength on its border, and a soft wash of the same colour behind the header — so you can still pick out one engineer's missions across the whole board, without the board being a wall of saturated blocks. Click a mission header to edit, delete, or hide it.
 - **👁 Hide/Unhide**: takes a mission off the board without deleting its record — its definition is kept (and stays hidden as the plan carries forward day to day) until you unhide it. Anyone assigned to a mission you hide returns to Standby. Use this for a mission that's paused rather than gone for good.
 - **+ New Employee**: name, contract type (Permanent = solid card with `P`, On-call = dashed card with `OC`), service area (card color). Double-click an employee card to edit.
 - **Drag & drop** employee cards between missions, Leave / Standby zones, and the Available pool. (No "Return to Site" zone — since employees now belong to a specific board, sending someone back to their original board is done via right-click → Move to Board.)
@@ -33,6 +33,20 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 - **Manpower List tab**: every employee across every board, with a colour pill for service area matching the rest of the app, plus search/filter/sort, bulk edit (contract, position, service area, board, deactivate), a **30D utilization** column (the share of the last 30 working days that person was on a mission, as a meter plus the number — this one is per-person, so unlike the board figures above an uncalled on-call employee does count those days), and a **⬇ CSV** button that exports whatever the current search/filters are showing.
 - **Export**: saves a high-resolution JPG of the current board.
 - **Settings** ⚙: manage engineers (name, phone, color), service areas (name, color), and each board's weekly weekend days (checkboxes, save instantly) — this drives the holiday toggle, weekend "Add Mission" import, the date picker's weekend highlighting, and both Overview trend charts, so it's worth checking a new board's checkboxes match its real schedule.
+
+## Releasing a change
+
+There's no build step, so the only release chore is one line. `index.html` loads
+`styles.css`, `cloud.js`, `charts.js` and `app.js` with a `?v=` version string —
+**bump it in all four tags whenever you change any of those files** (use the
+date; add a letter for a second release the same day). A changed URL is the one
+thing a caching proxy between a factory PC and the internet cannot ignore.
+
+Forgetting it is not a disaster: `_headers` tells every cache to revalidate on
+each load, so the browser still picks the new file up. The version string is
+there for the caches that ignore that instruction. If a deploy ever looks
+half-updated — new page, old behaviour — check the version string first, then
+hard-refresh.
 
 ## Where is the data?
 
@@ -48,5 +62,6 @@ within a second or two via Supabase Realtime.
 - `config.js` — your Supabase Project URL + anon key (see `SUPABASE_SETUP.md`)
 - `supabase/schema.sql` — database schema, security rules, and seed data — run once in the Supabase SQL editor
 - `supabase/migration-*.sql` — incremental schema changes; run any you haven't yet in the Supabase SQL editor (each is safe to run more than once)
+- `_headers` — Netlify caching rules. Everything is set to revalidate on every load; nothing is cached hard.
 - `vendor/html2canvas.min.js` — library used for JPG export
 - `serve.ps1` — optional local web server for development, not needed for normal use
