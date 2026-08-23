@@ -147,6 +147,13 @@ button, input, select, textarea, optgroup {
 
 .hidden { display: none !important; }
 
+/* Phone numbers as tel: links (mission engineer, Manpower List) — inherit the
+   surrounding text color rather than the browser's default link blue, since
+   one of the two places this appears is on an arbitrary engineer-color
+   header background where blue could go unreadable. */
+.tel-link { color: inherit; text-decoration: none; }
+.tel-link:hover, .tel-link:focus-visible { text-decoration: underline; }
+
 /* ===== Top bar =====
    Fixed brand navy, always — this is chrome, not a page surface, so it does
    NOT react to the light/dark toggle (same reasoning as --card-ink: a brand
@@ -364,8 +371,15 @@ button, input, select, textarea, optgroup {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
+  position: relative;
 }
 .toolbar-spacer { flex: 1; }
+/* #toolbar-more is a no-op wrapper above ~640px — display:contents makes its
+   children ordinary flex items of #toolbar itself, so nothing about the
+   desktop layout changes. Below that width (see the phone block) it becomes
+   an actual dropdown panel instead of wrapping into extra toolbar rows. */
+#toolbar-more { display: contents; }
+.toolbar-more-toggle { display: none; }
 #filters { display: flex; gap: 6px; align-items: center; }
 #filters select {
   padding: 5px 8px;
@@ -924,6 +938,64 @@ body.board-view #app-root { margin-right: 264px; }
 }
 .fp-empty { font-size: 11.5px; color: var(--muted); font-style: italic; padding: 4px 2px; }
 
+/* Collapsed float pool (see renderFloatPool in app.js): when both Standby and
+   Available On-call are genuinely empty, the panel shrinks to a thin rail
+   instead of reserving 264px to say "nobody's here" twice. Scoped to the
+   fixed right-edge desktop layout only (min-width matches the breakpoint
+   right below) — on a stacked mobile layout the panel is already full-width
+   and this collapse wouldn't make sense. */
+@media (min-width: 901px) {
+  #float-pool.fp-collapsed { width: 44px; }
+  body.fp-collapsed #app-root { margin-right: 44px; }
+  #float-pool.fp-collapsed .fp-head { display: none; }
+  #float-pool.fp-collapsed .fp-section { padding: 0; }
+  /* just the count, centered — the full label ("Available On-call") rotated
+     sideways could run taller than the window in a short viewport; a bare
+     "0" can't */
+  #float-pool.fp-collapsed .fp-label {
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #float-pool.fp-collapsed .fp-label-text,
+  #float-pool.fp-collapsed .fp-label small { display: none; }
+  #float-pool.fp-collapsed .fp-body { min-height: 20px; padding-bottom: 0; }
+  /* "Everyone permanent is assigned" etc. — at 44px wide this wraps into an
+     unreadable one-character-per-line column; the rail's whole point (both
+     pools are empty) already says the same thing via the "0" above it */
+  #float-pool.fp-collapsed .fp-empty { display: none; }
+
+  /* mouse hover expands it via plain CSS; an active drag toward it gets the
+     same look through .fp-drag-hover (app.js), since native drag doesn't
+     reliably keep :hover active in every browser. Either way this is an
+     overlay, not a reflow — #app-root's margin stays at 44px (above), so
+     nothing on the board shifts while a drag is in progress. */
+  #float-pool.fp-collapsed:hover,
+  #float-pool.fp-collapsed.fp-drag-hover { width: 264px; }
+  #float-pool.fp-collapsed:hover .fp-head,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-head { display: block; }
+  #float-pool.fp-collapsed:hover .fp-section,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-section { padding: 8px 10px 4px; }
+  #float-pool.fp-collapsed:hover .fp-label,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-label {
+    justify-content: flex-start;
+    align-items: baseline;
+    margin-bottom: 7px;
+    padding: 0;
+    border-bottom: none;
+  }
+  #float-pool.fp-collapsed:hover .fp-label-text,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-label-text { display: inline; }
+  #float-pool.fp-collapsed:hover .fp-label small,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-label small { display: block; }
+  #float-pool.fp-collapsed:hover .fp-body,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-body { min-height: 40px; padding-bottom: 6px; }
+  #float-pool.fp-collapsed:hover .fp-empty,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-empty { display: inline; }
+}
+
 @media (max-width: 900px) {
   #float-pool { position: static; width: auto; height: auto; border-left: none; border-top: 1px solid var(--border); box-shadow: none; }
   body.board-view #app-root { margin-right: 0; }
@@ -958,6 +1030,36 @@ body.board-view #app-root { margin-right: 264px; }
 
   /* the date group can wrap under the title on very narrow screens without clipping */
   .topbar-right { row-gap: 6px; }
+
+  /* Toolbar: the primary actions (+ New Mission, Export) stay in the main row;
+     everything else collapses behind "⋯ More" instead of wrapping into extra
+     rows above the board — that wrap was the single biggest chunk of the
+     "whole first screen is controls" problem on a phone. */
+  .toolbar-more-toggle { display: inline-flex; align-items: center; min-height: 40px; }
+  #toolbar-more {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 14px;
+    right: 14px;
+    margin-top: 6px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    box-shadow: var(--glass-shadow);
+    z-index: 90;
+  }
+  #toolbar-more.open { display: flex; }
+  #toolbar-more .toolbar-spacer { display: none; }   /* only meaningful in a horizontal row */
+  #toolbar-more #filters { width: 100%; margin: 0; }
+  #toolbar-more .btn { width: 100%; }
+  #toolbar-more .toggle { width: 100%; justify-content: center; }
 }
 
 /* ===== Modals ===== */

@@ -37,6 +37,16 @@ function addDays(iso, n) {
   d.setDate(d.getDate() + n);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* strip everything but digits/+ so the href itself is always a valid,
+   injection-safe tel: URI regardless of how the number was typed in */
+function telHref(phone) {
+  const digits = String(phone || "").replace(/[^\d+]/g, "");
+  return digits ? "tel:" + digits : "";
+}
+function telLink(phone, cls) {
+  const href = telHref(phone);
+  return href ? `<a class="tel-link${cls ? " " + cls : ""}" href="${href}" onclick="event.stopPropagation()">${phone}</a>` : (phone || "");
+}
 /* default landing = next working day: tomorrow, skipping weekends & holidays */
 function defaultPlanningDate() {
   let d = addDays(todayStr(), 1);
@@ -562,6 +572,15 @@ function closeFilterPops() {
   for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop")) p.classList.add("hidden");
 }
 
+/* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
+   above ~640px, where the panel is just an ordinary part of the toolbar row */
+function hideToolbarMore() {
+  const panel = $("#toolbar-more");
+  if (!panel || !panel.classList.contains("open")) return;
+  panel.classList.remove("open");
+  $("#btn-toolbar-more").setAttribute("aria-expanded", "false");
+}
+
 /* ---------- context menu ---------- */
 function hideContextMenu() { $("#context-menu").classList.add("hidden"); }
 
@@ -713,6 +732,14 @@ function renderFloatPool() {
   if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : (holiday ? "No one on holiday" : "Everyone permanent is assigned")}</span>`;
   if (!oncallBody.children.length) oncallBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "No on-call free"}</span>`;
   markSelectedCards();
+  // Both pools genuinely empty (not just filtered down by search/area) — the
+  // panel is reserving 264px to say "nobody's here" twice. Collapse it to a
+  // thin rail; it still expands on hover/drag (see the .fp-collapsed CSS and
+  // the dragenter/dragleave wiring in wireApp) so it's never actually gone as
+  // a drop target, just out of the way when there's nothing in it.
+  const bothEmpty = standbyN === 0 && oncallN === 0;
+  $("#float-pool").classList.toggle("fp-collapsed", bothEmpty);
+  document.body.classList.toggle("fp-collapsed", bothEmpty);
 }
 
 /* The floating panel above only ever searches the two UNASSIGNED pools, so
@@ -801,7 +828,7 @@ function renderMissions() {
       <div>${m.shift === "night" ? '<span class="night-badge">🌙 NIGHT</span>' : "☀️ Day"} ${m.startTime}-${m.endTime}</div>
       <div>Cust: ${m.customer}</div>
       ${m.ppe ? `<div class="m-ppe">PPE: ${m.ppe}</div>` : ""}
-      <div class="m-eng">${eng ? eng.name : "?"}${eng && eng.phone ? "<br>" + eng.phone : ""}</div>`;
+      <div class="m-eng">${eng ? eng.name : "?"}${eng && eng.phone ? "<br>" + telLink(eng.phone) : ""}</div>`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
     const body = document.createElement("div");
     body.className = "mission-body dropzone";
@@ -1620,7 +1647,7 @@ function renderEmployeeRows() {
       <td>${e.name}</td>
       <td>${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td>${pos ? pos.label : "—"}</td>
-      <td>${e.phone || "—"}</td>
+      <td>${e.phone ? telLink(e.phone) : "—"}</td>
       <td>${area ? `<span class="area-pill" style="background:${area.color}">${area.name}</span>` : "—"}</td>
       <td>${board ? board.name : "—"}</td>`;
     tr.querySelector(".el-check input").onchange = (ev) => {
@@ -2006,7 +2033,10 @@ function buildExportPools() {
     { key: "standby", cls: "zone-pool", label: "Standby", sub: "permanent, unassigned", list: sortEmployeesDisplay(unassigned.filter(e => e.contract !== "oncall")) },
     { key: "oncall", cls: "zone-oncall-pool", label: "Available On-call", sub: "not flagged", list: sortEmployeesDisplay(unassigned.filter(e => e.contract === "oncall")) },
   ];
-  for (const g of groups) {
+  // same rule as the leave zones (hideEmptyLeaveZonesForExport): an empty pool
+  // ("Standby (0) — None") is padding, not information — skip it entirely
+  // rather than printing a row that says nothing
+  for (const g of groups.filter(g => g.list.length)) {
     const zone = document.createElement("div");
     zone.className = "zone " + g.cls;
     const lab = document.createElement("div");
@@ -2020,7 +2050,6 @@ function buildExportPools() {
       c.draggable = false;
       body.appendChild(c);
     }
-    if (!g.list.length) body.innerHTML = `<span class="fp-empty">None</span>`;
     zone.appendChild(lab);
     zone.appendChild(body);
     sec.appendChild(zone);
@@ -2121,8 +2150,11 @@ async function exportBoard() {
   // (standby/available on-call are meaningless when nobody is expected in)
   let pools = null;
   if (!isOverview() && !isNonWorkingDate(state.date)) {
-    pools = buildExportPools();
-    $("#status-zones").insertAdjacentElement("afterend", pools);
+    const built = buildExportPools();
+    if (built.children.length) {   // both pools empty (fully staffed) — nothing to show
+      pools = built;
+      $("#status-zones").insertAdjacentElement("afterend", pools);
+    }
   }
   let restoreEmptyMissions = null;
   let restoreLeaveZones = null;
@@ -2429,6 +2461,32 @@ function wireLogin() {
 
 /* ---------- wiring ---------- */
 function wireApp() {
+  $("#btn-toolbar-more").onclick = (ev) => {
+    ev.stopPropagation();   // don't let the outside-click handler close it immediately
+    const panel = $("#toolbar-more");
+    const open = panel.classList.toggle("open");
+    $("#btn-toolbar-more").setAttribute("aria-expanded", String(open));
+  };
+  // Collapsed float pool (see renderFloatPool/.fp-collapsed): mouse hover expands
+  // it via plain CSS, but native HTML5 drag doesn't reliably keep :hover active
+  // in every browser, so a card dragged toward the empty pool needs this too.
+  // dragenter/dragleave bubble from every child as the cursor crosses them, so
+  // a depth counter (not a single boolean) is what keeps the panel open while
+  // the drag is still somewhere inside it.
+  let fpDragDepth = 0;
+  const floatPool = $("#float-pool");
+  floatPool.addEventListener("dragenter", () => {
+    fpDragDepth++;
+    floatPool.classList.add("fp-drag-hover");
+  });
+  floatPool.addEventListener("dragleave", () => {
+    fpDragDepth = Math.max(0, fpDragDepth - 1);
+    if (fpDragDepth === 0) floatPool.classList.remove("fp-drag-hover");
+  });
+  floatPool.addEventListener("drop", () => { fpDragDepth = 0; floatPool.classList.remove("fp-drag-hover"); });
+  // a cancelled drag (Escape, dropped outside any dropzone) fires dragend with
+  // no matching dragleave — reset here too or the panel could stay stuck open
+  document.addEventListener("dragend", () => { fpDragDepth = 0; floatPool.classList.remove("fp-drag-hover"); });
   $("#btn-new-mission").onclick = () => guardEdit(() => openMissionModal(null));
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
@@ -2576,9 +2634,10 @@ function wireApp() {
     hideContextMenu();
     if (!ev.target.closest("#datepicker-pop") && !ev.target.closest("#btn-date")) hideDatePicker();
     if (!ev.target.closest("#filters .ms") && !ev.target.closest("#emplist-filters .ms")) closeFilterPops();
+    if (!ev.target.closest("#toolbar-more")) hideToolbarMore();
   });
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape") { hideContextMenu(); hideDatePicker(); closeFilterPops(); clearSelection(); closeModal(); }
+    if (ev.key === "Escape") { hideContextMenu(); hideDatePicker(); closeFilterPops(); hideToolbarMore(); clearSelection(); closeModal(); }
     // Ctrl/Cmd+Z = undo last assignment change (ignore while typing in a field)
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) {
       ev.preventDefault();

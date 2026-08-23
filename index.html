@@ -72,41 +72,49 @@
 <div id="toolbar">
   <button id="btn-import-mission" class="btn btn-danger hidden">Add Mission</button>
   <button id="btn-new-mission" class="btn btn-primary">+ New Mission</button>
-  <button id="btn-hide-missions" class="btn" title="Choose which missions are hidden from this board">👁 Hide/Unhide</button>
-  <button id="btn-new-employee" class="btn btn-primary">+ New Employee</button>
-  <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
-    <input type="checkbox" id="holiday-check">
-    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-    <span class="toggle-text">Holiday</span>
-  </label>
-  <div class="toolbar-spacer"></div>
-  <div id="filters">
-    <div class="ms" data-filter="engineer">
-      <button type="button" class="ms-btn">Engineer: All</button>
-      <div class="ms-pop hidden"></div>
+  <button id="btn-toolbar-more" class="btn btn-ghost toolbar-more-toggle" type="button" title="More actions" aria-expanded="false">⋯ More</button>
+  <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
+       in styles.css) instead of wrapping into several rows of controls above the
+       board — on a phone that wrap was pushing every mission below the first
+       screen. Above that width it's `display: contents`, so nothing changes:
+       these are still ordinary toolbar children in the same flex row. -->
+  <div id="toolbar-more">
+    <button id="btn-hide-missions" class="btn" title="Choose which missions are hidden from this board">👁 Hide/Unhide</button>
+    <button id="btn-new-employee" class="btn btn-primary">+ New Employee</button>
+    <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
+      <input type="checkbox" id="holiday-check">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-text">Holiday</span>
+    </label>
+    <div class="toolbar-spacer"></div>
+    <div id="filters">
+      <div class="ms" data-filter="engineer">
+        <button type="button" class="ms-btn">Engineer: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <div class="ms" data-filter="host">
+        <button type="button" class="ms-btn">Host: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <div class="ms" data-filter="customer">
+        <button type="button" class="ms-btn">Customer: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <div class="ms" data-filter="shift">
+        <button type="button" class="ms-btn">Shift: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <select id="sort-by" title="Sort missions">
+        <option value="number">Sort: Mission No.</option>
+        <option value="engineer">Sort: Engineer</option>
+        <option value="host">Sort: Host</option>
+        <option value="customer">Sort: Customer</option>
+        <option value="shift">Sort: Shift</option>
+      </select>
     </div>
-    <div class="ms" data-filter="host">
-      <button type="button" class="ms-btn">Host: All</button>
-      <div class="ms-pop hidden"></div>
-    </div>
-    <div class="ms" data-filter="customer">
-      <button type="button" class="ms-btn">Customer: All</button>
-      <div class="ms-pop hidden"></div>
-    </div>
-    <div class="ms" data-filter="shift">
-      <button type="button" class="ms-btn">Shift: All</button>
-      <div class="ms-pop hidden"></div>
-    </div>
-    <select id="sort-by" title="Sort missions">
-      <option value="number">Sort: Mission No.</option>
-      <option value="engineer">Sort: Engineer</option>
-      <option value="host">Sort: Host</option>
-      <option value="customer">Sort: Customer</option>
-      <option value="shift">Sort: Shift</option>
-    </select>
+    <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day">↺ Reset Board</button>
+    <button id="btn-undo" class="btn" title="Undo last assignment change (Ctrl+Z)" disabled>↩ Undo</button>
   </div>
-  <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day">↺ Reset Board</button>
-  <button id="btn-undo" class="btn" title="Undo last assignment change (Ctrl+Z)" disabled>↩ Undo</button>
   <button id="btn-export" class="btn">📷 Export</button>
   <span id="readonly-badge" class="hidden">🔒 Read-only (past date)</span>
 </div>
@@ -213,11 +221,11 @@
     <p class="fp-hint">Click to select · Ctrl-click for many · drag or click a mission to assign</p>
   </div>
   <div class="fp-section">
-    <div class="fp-label"><span id="standby-label">Standby</span> <span class="fp-count" id="standby-count"></span><small id="standby-sub">permanent, unassigned</small></div>
+    <div class="fp-label"><span id="standby-label" class="fp-label-text">Standby</span> <span class="fp-count" id="standby-count"></span><small id="standby-sub">permanent, unassigned</small></div>
     <div class="fp-body dropzone" data-drop="pool" data-pool="standby"></div>
   </div>
   <div class="fp-section">
-    <div class="fp-label">Available On-call <span class="fp-count" id="oncall-count"></span><small>not flagged</small></div>
+    <div class="fp-label"><span class="fp-label-text">Available On-call</span> <span class="fp-count" id="oncall-count"></span><small>not flagged</small></div>
     <div class="fp-body dropzone" data-drop="pool" data-pool="oncall"></div>
   </div>
 </aside>
