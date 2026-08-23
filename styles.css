@@ -1416,8 +1416,22 @@ body.board-view #app-root { margin-right: 264px; }
 .ctx-item:hover { background: var(--hover-tint); }
 .ctx-sep { border-top: 1px solid var(--border); margin: 4px 0; }
 .ctx-title { padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
-.ctx-subhead { padding: 4px 12px 2px; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
-.ctx-item.ctx-pos { padding-left: 20px; font-size: 12.5px; }
+/* drills one level down (boards / missions / leave) — the chevron is the only
+   thing distinguishing it from a leaf action, so it earns its own rule */
+.ctx-item.ctx-sub { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ctx-item.ctx-sub::after { content: "›"; font-size: 15px; line-height: 1; color: var(--muted); }
+/* header of a submenu: reads as the title of the level you're on AND as the
+   way back up, so it's styled between .ctx-title and a normal item */
+.ctx-item.ctx-back {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 5px 5px 0 0;
+}
 .ctx-item.ctx-danger { color: var(--danger); font-weight: 600; }
 
 /* ===== Overview ===== */

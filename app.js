@@ -607,12 +607,42 @@ function hideToolbarMore() {
 /* ---------- context menu ---------- */
 function hideContextMenu() { $("#context-menu").classList.add("hidden"); }
 
+/* Two-layer menu. The long lists (missions, boards, leave types) live one
+   level down instead of all being inlined: a board with a dozen missions used
+   to push this past the height of the screen, which is what the scroll cap
+   was papering over. Drill-down rather than hover-out flyouts — no second
+   layer to position (so nothing can open off-screen), and it works the same
+   under a finger as under a mouse. `ctxMenu` holds what the open menu is
+   acting on so a submenu can re-render without recomputing the selection. */
+let ctxMenu = null;   // { emp, ids, many, x, y }
+
 function showContextMenu(emp, x, y) {
-  const menu = $("#context-menu");
   // acts on the whole selection when >1 is selected, else just this employee
   const ids = state.selectedEmps.size > 1 && state.selectedEmps.has(emp.id) ? [...state.selectedEmps] : [emp.id];
-  const many = ids.length > 1;
-  menu.innerHTML = `<div class="ctx-title">${many ? ids.length + " employees selected" : escapeHtml(emp.name)}</div>`;
+  ctxMenu = { emp, ids, many: ids.length > 1, x, y };
+  renderCtxMenu("root");
+}
+
+/* Keep the menu anchored where the click happened, but never let it hang off
+   an edge. The lower clamp matters now that a submenu can be a different
+   height than the level above it — and the max(8, …) stops a menu taller than
+   the viewport from being pushed to a negative top, which put its first items
+   out of reach entirely. */
+function positionContextMenu() {
+  const menu = $("#context-menu");
+  const { x, y } = ctxMenu;
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8)) + "px";
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8)) + "px";
+}
+
+function renderCtxMenu(view) {
+  const menu = $("#context-menu");
+  const { emp, ids, many } = ctxMenu;
+  menu.innerHTML = "";
+
+  const addTitle = (text) => { const h = document.createElement("div"); h.className = "ctx-title"; h.textContent = text; menu.appendChild(h); };
+  // a leaf action: run it and close
   const addItem = (label, fn, cls) => {
     const it = document.createElement("div");
     it.className = "ctx-item" + (cls ? " " + cls : "");
@@ -620,84 +650,86 @@ function showContextMenu(emp, x, y) {
     it.onclick = () => { hideContextMenu(); fn(); };
     menu.appendChild(it);
   };
+  // Drills one level down instead of closing. stopPropagation is load-bearing:
+  // renderCtxMenu replaces innerHTML, so by the time this click reaches the
+  // document handler its own target is detached and closest("#context-menu")
+  // no longer matches — the menu would be treated as an outside click and hide
+  // itself the instant you opened a submenu.
+  const addSub = (label, target) => {
+    const it = document.createElement("div");
+    it.className = "ctx-item ctx-sub";
+    it.textContent = label;
+    it.onclick = (ev) => { ev.stopPropagation(); renderCtxMenu(target); };
+    menu.appendChild(it);
+  };
+  const addBack = (text) => {
+    const it = document.createElement("div");
+    it.className = "ctx-item ctx-back";
+    it.textContent = text;
+    it.onclick = (ev) => { ev.stopPropagation(); renderCtxMenu("root"); };
+    menu.appendChild(it);
+  };
   const addSep = () => { const s = document.createElement("div"); s.className = "ctx-sep"; menu.appendChild(s); };
-  const addHead = (label) => { const h = document.createElement("div"); h.className = "ctx-subhead"; h.textContent = label; menu.appendChild(h); };
 
-  // Assign to a mission / send to leave / return to standby — the actions
-  // people reach for constantly, previously drag-only (painful once the
-  // target has scrolled off-screen, impossible on touch). Uses the exact
-  // same assignEmployeesTo(ids, payload) drag-and-drop already calls, so
-  // there's no new assignment logic here, just a menu path to the old one.
   // peekPlan(menuBoardId) (not getPlan(), which reads state.date under
-  // D().activeBoardId) — this menu is also opened from the Manpower List,
-  // where activeBoardId is "__emplist__", not the employee's real board.
-  // A mixed-board bulk selection has no single mission list to offer, so
-  // these sections are skipped entirely then — "Move to board" below still
-  // covers that case, same as it always has.
+  // D().activeBoardId) — this menu also opens from the Manpower List, where
+  // activeBoardId is "__emplist__", not the employee's real board. A
+  // mixed-board bulk selection has no single mission list to offer, so the
+  // placement actions are hidden then; "Move to board" still covers it.
   const menuBoardId = emp.boardId;
   const sameBoard = ids.every(id => {
     const e = D().employees.find(x => x.id === id);
     return e && e.boardId === menuBoardId;
   });
-  if (sameBoard) {
-    const plan = peekPlan(menuBoardId);
-    const current = !many ? currentAssignmentOfIn(plan, emp.id) : null;
-    const missions = plan.missions.filter(m => !m.hidden);
-    if (missions.length) {
-      addHead("Assign to mission");
-      for (const m of missions) {
-        if (current && current.missionId === m.id) continue;
-        addItem(m.number, () => guardEdit(() => assignEmployeesTo(ids, { missionId: m.id })), "ctx-pos");
-      }
-    }
-    addHead("Leave");
-    for (const z of LEAVE_ZONES) {
-      if (current && current.zone === z) continue;
-      addItem(ZONE_LABELS[z], () => guardEdit(() => assignEmployeesTo(ids, { zone: z })), "ctx-pos");
-    }
-    if (many || current) {
-      const standbyLabel = many ? "↩ Return to standby / pool" : `↩ Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`;
-      addItem(standbyLabel, () => guardEdit(() => assignEmployeesTo(ids, null)));
-    }
-    addSep();
-  }
-
-  // Kept deliberately short otherwise: Edit / Move to board / Delete.
-  // Position, contract and service area are still editable — one at a time
-  // from the Edit Employee modal, or in bulk from the Manpower List's
-  // selection bar — this menu just isn't the place for them any more (it
-  // grew to 15+ items and slowed down the actions people actually reach
-  // for from the board).
-  if (!many) addItem("✏ Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)));
-
-  // move to another board (bulk if multiple selected)
+  const plan = sameBoard ? peekPlan(menuBoardId) : null;
+  const current = sameBoard && !many ? currentAssignmentOfIn(plan, emp.id) : null;
+  // already-there targets are dropped: assigning someone to where they already
+  // are is a no-op assignEmployeesTo would skip anyway
+  const missions = sameBoard ? plan.missions.filter(m => !m.hidden && !(current && current.missionId === m.id)) : [];
+  const leaveZones = sameBoard ? LEAVE_ZONES.filter(z => !(current && current.zone === z)) : [];
   const targetBoards = many ? D().boards : D().boards.filter(b => b.id !== emp.boardId);
-  if (targetBoards.length) {
-    addSep();
-    if (many) addHead(`Move ${ids.length} to board`);
+  const who = many ? `${ids.length} employees` : emp.name;
+
+  if (view === "boards") {
+    addBack("‹ Move to board");
     for (const b of targetBoards) {
-      const label = many ? b.name : `➜ Move to ${b.name}`;
-      addItem(label, () => guardEdit(() => safely(async () => {
+      addItem(b.name, () => guardEdit(() => safely(async () => {
         await cloud.moveEmployeesToBoard(ids, b.id, state.date);
         clearSelection();
         await refreshAndRender();
-      })), many ? "ctx-pos" : undefined);
+      })));
     }
+  } else if (view === "missions") {
+    addBack("‹ Assign to mission");
+    for (const m of missions) {
+      addItem(m.number, () => guardEdit(() => assignEmployeesTo(ids, { missionId: m.id })));
+    }
+  } else if (view === "leave") {
+    addBack("‹ Leave");
+    for (const z of leaveZones) {
+      addItem(ZONE_LABELS[z], () => guardEdit(() => assignEmployeesTo(ids, { zone: z })));
+    }
+  } else {
+    addTitle(many ? `${ids.length} employees selected` : emp.name);
+    if (!many) addItem("✏ Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)));
+    if (targetBoards.length) addSub("➜ Move to board", "boards");
+    if (missions.length) addSub("⊕ Assign to mission", "missions");
+    if (leaveZones.length) addSub("🌴 Leave", "leave");
+    if (sameBoard && (many || current)) {
+      addItem(many ? "↩ Return to standby / pool" : `↩ Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`,
+        () => guardEdit(() => assignEmployeesTo(ids, null)));
+    }
+    addSep();
+    addItem(many ? `📦 Archive ${ids.length} employees` : "📦 Archive employee", () => {
+      showConfirm("Archive employee" + (many ? "s" : "") + "?",
+        `Archive ${who}? Removes them from pools and dropdowns; their history stays.`,
+        () => safely(async () => { await cloud.archiveEmployees(ids); clearSelection(); await refreshAndRender(); }));
+    }, "ctx-danger");
   }
 
-  addSep();
-  addItem(many ? `📦 Archive ${ids.length} employees` : "📦 Archive employee", () => {
-    showConfirm("Archive employee" + (many ? "s" : "") + "?",
-      many
-        ? `Archive ${ids.length} selected employees? Removes them from pools and dropdowns; their history stays.`
-        : `Archive ${emp.name}? Removes them from pools and dropdowns; their history stays.`,
-      () => safely(async () => { await cloud.archiveEmployees(ids); clearSelection(); await refreshAndRender(); }));
-  }, "ctx-danger");
-
   menu.classList.remove("hidden");
-  const rect = menu.getBoundingClientRect();
-  menu.style.left = Math.min(x, window.innerWidth - rect.width - 8) + "px";
-  menu.style.top = Math.min(y, window.innerHeight - rect.height - 8) + "px";
+  menu.scrollTop = 0;   // a submenu opened after scrolling the level above starts at its own top
+  positionContextMenu();
 }
 
 function renderZones() {
@@ -2726,7 +2758,10 @@ function wireApp() {
 
   // dismiss context menu / date picker on any outside click or Escape
   document.addEventListener("click", (ev) => {
-    hideContextMenu();
+    // NOT unconditional: a click on the menu's own scrollbar targets
+    // #context-menu itself, so hiding here killed the menu mid-drag. Items
+    // close it themselves (addItem), submenu rows deliberately don't.
+    if (!ev.target.closest("#context-menu")) hideContextMenu();
     if (!ev.target.closest("#datepicker-pop") && !ev.target.closest("#btn-date")) hideDatePicker();
     if (!ev.target.closest("#filters .ms") && !ev.target.closest("#emplist-filters .ms")) closeFilterPops();
     if (!ev.target.closest("#toolbar-more")) hideToolbarMore();
@@ -2739,7 +2774,13 @@ function wireApp() {
       undoLast();
     }
   });
-  window.addEventListener("scroll", hideContextMenu, true);
+  // capture-phase so a scroll in any container closes the menu (it's anchored
+  // to a fixed viewport position, so it would otherwise detach from its card) —
+  // but scrolling INSIDE the menu is not "the page moved under it".
+  window.addEventListener("scroll", (ev) => {
+    if (ev.target && ev.target.closest && ev.target.closest("#context-menu")) return;
+    hideContextMenu();
+  }, true);
 
   // The mission grid is a JS masonry (cards are absolutely positioned), so it
   // must re-pack when the viewport width changes the column count. Debounced so
