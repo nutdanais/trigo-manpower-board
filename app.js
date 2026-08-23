@@ -65,26 +65,34 @@ function defaultPlanningDate() {
   return d;
 }
 
-/* Remember the last board+date the user was looking at, so closing the tab and
-   coming back lands them where they left off instead of always resetting to
-   tomorrow's date on the first board. Without this, a plan made for a later
-   date (or on the non-default board) looked "gone" after a reopen — it was
-   never deleted, the app just landed somewhere else and nobody scrolled to find it. */
+/* Remember the last BOARD the user was looking at (not the date) so reopening
+   the app doesn't dump a multi-board planner back on board #1 every time.
+   The date is deliberately NOT restored: the app always opens on the next
+   working day. Restoring it meant a daily user who planned tomorrow today
+   came back tomorrow and landed on that same date — by then <= today, so
+   read-only 🔒 (see isReadOnly) — and had to click forward every morning.
+   Landing on a date is a pure read (cloud.ensurePlanLoaded), so the choice
+   is purely about where it's most useful to start, not about data safety. */
 const VIEW_KEY = "mpm-last-view";
 function saveViewState() {
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ boardId: D().activeBoardId, date: state.date }));
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ boardId: D().activeBoardId }));
   } catch { /* storage unavailable (private mode, quota) — just skip persisting */ }
 }
-/* apply the saved board+date if still valid, else fall back to today's default */
+/* Restore the saved board if it's still valid, then always land on the next
+   working day. Order matters: activeBoardId is assigned FIRST because
+   defaultPlanningDate() → isNonWorkingDate() defaults to the active board, and
+   boards have their own weekendDays plus per-date holiday overrides — so the
+   answer depends on which board we just restored. (On Overview / Manpower List
+   there's no real board to read config from; boardWeekendDays() falls back to
+   Sat/Sun, which is the sensible default for those non-board-scoped views.) */
 function restoreViewState() {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY));
     if (v && (v.boardId === OVERVIEW_ID || v.boardId === EMPLIST_ID || D().boards.some(b => b.id === v.boardId))) {
       D().activeBoardId = v.boardId;
     }
-    if (v && /^\d{4}-\d{2}-\d{2}$/.test(v.date)) { state.date = v.date; return; }
-  } catch { /* no saved view, or it's corrupt — fall through to the default */ }
+  } catch { /* no saved view, or it's corrupt — just keep the default board */ }
   state.date = defaultPlanningDate();
 }
 
@@ -191,7 +199,10 @@ function wireSaveStatus() {
 
 /* ---------- app state ---------- */
 const state = {
-  date: defaultPlanningDate(),   // land on the next weekday's plan, not today
+  // Provisional: at module-init cloud.data.boards/.overrides are still empty, so
+  // this can't see weekend config or holidays yet. boot() re-derives it via
+  // restoreViewState() once cloud.init() has loaded both — that's the real value.
+  date: defaultPlanningDate(),   // land on the next working day's plan, not today
   myEmail: null,   // set once at boot from cloud.getSession() — who to NOT toast about
   filters: { engineer: [], host: [], customer: [], shift: [] },   // multi-select; [] = All
   sort: "number",                // default: sort by mission number on every board
