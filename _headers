@@ -1,0 +1,18 @@
+# Netlify serves this file's rules with every response. It is here to state the
+# caching policy explicitly instead of relying on a platform default: an
+# intermediate proxy that sees no directive is free to invent one, and a stale
+# app.js behind a fresh index.html is exactly how a deploy comes out looking
+# half-updated.
+#
+# Nothing is cached hard on purpose. Deliberately NOT "immutable": the ?v=
+# strings in index.html are maintained by hand, so a forgotten bump must fail
+# safe (revalidate, get the new file) rather than pin everyone to a stale copy.
+
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The one file with no version string of its own, so it must never be held.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache

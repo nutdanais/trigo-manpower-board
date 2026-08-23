@@ -17,7 +17,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<!-- ?v= on every file that changes with a release. Netlify already sends
+     "must-revalidate", so a forgotten bump degrades to today's behaviour (the
+     browser revalidates and gets the new file) rather than pinning anyone to a
+     stale one — but a caching proxy between a factory PC and the internet can
+     ignore that header, and a changed URL it cannot ignore.
+     BUMP THIS whenever styles.css / cloud.js / charts.js / app.js change.
+     Date of the release; add a letter (b, c, ...) for a second release the
+     same day. config.js and the vendor bundle are deliberately left off: one
+     isn't in the repo, the other never changes. -->
+<link rel="stylesheet" href="styles.css?v=2026-08-23a">
 </head>
 <body>
 
@@ -396,8 +405,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js"></script>
-<script src="charts.js"></script>
-<script src="app.js"></script>
+<script src="cloud.js?v=2026-08-23a"></script>
+<script src="charts.js?v=2026-08-23a"></script>
+<script src="app.js?v=2026-08-23a"></script>
 </body>
 </html>
