@@ -730,6 +730,47 @@ const cloud = {
     return result;
   },
 
+  /* ---------- per-employee utilization (Manpower List's 30D column) ---------- */
+  /* Same two bulk queries as getUtilizationRange, bucketed by employee instead
+     of by board. Returns { [employeeId]: { workedDates:Set, leaveDates:Set } }
+     — raw date sets, not a percentage, because the denominator is each
+     employee's own board's working days, and only app.js knows the weekend /
+     holiday rules. Applies the same two exclusions the board figures use: a
+     hidden mission doesn't count as work, and neither does a mission on a
+     board the employee no longer belongs to. */
+  async getEmployeeUtilization(fromDate, toDate) {
+    const [{ data: missionRows, error: mErr }, { data: assignRows, error: aErr }] = await Promise.all([
+      sb.from("missions").select("id, board_id, plan_date, hidden")
+        .gte("plan_date", fromDate).lte("plan_date", toDate),
+      sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
+        .gte("plan_date", fromDate).lte("plan_date", toDate),
+    ]);
+    if (mErr) throw mErr;
+    if (aErr) throw aErr;
+
+    const missionBoard = new Map();
+    const missionHidden = new Set();
+    for (const m of missionRows || []) {
+      missionBoard.set(m.id, m.board_id);
+      if (m.hidden) missionHidden.add(m.id);
+    }
+    const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
+
+    const out = {};
+    const rec = (id) => (out[id] = out[id] || { workedDates: new Set(), leaveDates: new Set() });
+    for (const a of assignRows || []) {
+      if (!empBoard.has(a.employee_id)) continue;
+      if (a.mission_id) {
+        if (missionHidden.has(a.mission_id)) continue;
+        if (missionBoard.get(a.mission_id) !== empBoard.get(a.employee_id)) continue;
+        rec(a.employee_id).workedDates.add(a.plan_date);
+      } else if (a.zone && ZONES.includes(a.zone)) {
+        rec(a.employee_id).leaveDates.add(a.plan_date);
+      }
+    }
+    return out;
+  },
+
   /* Resolve {boardId, planDate, updatedBy} from a missions/assignments
      realtime payload — app.js compares updatedBy to the viewing user's own
      email, and boardId+planDate to what's currently on screen, to decide

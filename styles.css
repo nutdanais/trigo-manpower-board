@@ -1713,6 +1713,22 @@ body.exporting #app-root { margin-right: 0; }
 #emplist-table th.sorted-asc::after { content: " \25B2"; }
 #emplist-table th.sorted-desc::after { content: " \25BC"; }
 #emplist-table th.el-check, #emplist-table td.el-check { cursor: default; width: 30px; }
+/* 30D utilization: a meter (one ratio against a fixed 0-100 limit), with the
+   number always printed beside it so nothing is encoded by width alone */
+#emplist-table td.el-util { white-space: nowrap; }
+.el-util-meter {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 7px;
+}
+.el-util-fill { display: block; height: 100%; border-radius: 999px; background: var(--chart-assigned); }
+.el-util-val { font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.el-util-empty { color: var(--muted); }
 /* Deactivated: mute the data cells so they read as off-roster at a glance,
    but leave the Status and checkbox cells at full strength — dimming the
    control you came here to click would be self-defeating. */

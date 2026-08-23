@@ -219,6 +219,8 @@ const state = {
     filters: { contract: [], position: [], areaId: [], boardId: [] },
     sortKey: "name",
     sortDir: 1,
+    util: null,          // { [empId]: pct } once loaded; null = not fetched yet
+    utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
   },
   overview: {                 // Overview tab: utilization trend chart controls + its cache
     trendRange: 14,           // 7 | 14 | 30 days, ending today (not state.date — the trend is
@@ -282,6 +284,45 @@ async function ensureUtilizationLoaded() {
   state.overview.utilCacheKey = cacheKey;
 }
 
+/* Manpower List's 30D column. Per employee: days actually deployed on a mission
+   / working days available to them (their board's working days in the window,
+   minus their own leave). So leave doesn't punish the figure, and someone whose
+   board was shut all month reads "—" rather than a misleading 0%.
+   Note this is deliberately NOT the board-level rule, where free on-call is
+   dropped from the denominator: at board level "we didn't need to call anyone"
+   is the system working, but for one on-call individual, days-not-worked is
+   exactly the number you're looking for. An on-call person reading low here is
+   information, not a bug. */
+const EMPLIST_UTIL_DAYS = 30;
+async function ensureEmplistUtilLoaded() {
+  const toDate = todayStr();
+  const fromDate = addDays(toDate, -(EMPLIST_UTIL_DAYS - 1));
+  const cacheKey = fromDate + ".." + toDate + "|" + D().employees.length;
+  if (state.emplist.utilCacheKey === cacheKey) return;
+  const raw = await cloud.getEmployeeUtilization(fromDate, toDate);
+  // working days per board across the window, computed once rather than per employee
+  const workingByBoard = {};
+  for (const b of D().boards) {
+    let n = 0;
+    for (let d = fromDate; d <= toDate; d = addDays(d, 1)) if (!isNonWorkingDate(d, b.id)) n++;
+    workingByBoard[b.id] = n;
+  }
+  const out = {};
+  for (const e of D().employees) {
+    const r = raw[e.id];
+    const working = workingByBoard[e.boardId] || 0;
+    // only leave that lands on a working day shrinks the denominator
+    let leaveOnWorkdays = 0;
+    if (r) for (const d of r.leaveDates) if (!isNonWorkingDate(d, e.boardId)) leaveOnWorkdays++;
+    const denom = working - leaveOnWorkdays;
+    let worked = 0;
+    if (r) for (const d of r.workedDates) if (!isNonWorkingDate(d, e.boardId)) worked++;
+    out[e.id] = denom > 0 ? Math.round((worked / denom) * 100) : null;
+  }
+  state.emplist.util = out;
+  state.emplist.utilCacheKey = cacheKey;
+}
+
 /* warm the cache for whatever is currently in view, then redraw. Loading is
    always a pure read — no view, refresh, Realtime ping, tab refocus, or login
    ever seeds a plan. A future day stays empty until a user explicitly carries
@@ -291,7 +332,10 @@ async function refreshData() {
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
     await ensureUtilizationLoaded();
   } else if (isEmployeeList()) {
-    // employee master data is already kept warm in the cache — nothing date-scoped to load
+    // employee master data is already warm in the cache; the 30D column is the
+    // one thing here that needs a fetch, and it's cached across redraws so
+    // typing in the search box doesn't re-query
+    await ensureEmplistUtilLoaded();
   } else if (D().activeBoardId) {
     await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
   }
@@ -1064,8 +1108,17 @@ function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); 
    available today is deployed". onHoliday defaults to 0 for callers (e.g. the
    historical trend chart) that don't track it separately. Spelled out in the
    UI (not just this comment) since it's not guessable from the number alone. */
-function utilizationPct(assigned, headcount, leave, onHoliday = 0) {
-  const denom = headcount - leave - onHoliday;
+/* Free on-call staff are NOT a utilization gap. On-call is surge capacity: not
+   calling someone in is the system working as intended, not idle headcount. So
+   they come out of the denominator entirely — a day where every permanent
+   employee is deployed reads 100%, however many on-call people went uncalled.
+   (They're still counted the moment they ARE deployed: an on-call person on a
+   mission is in `assigned` and, being neither free nor on leave, stays in the
+   denominator.) "On-call free" keeps its own chip in the stats bar and its own
+   column in Overview's By board table — the number isn't hidden, it just
+   doesn't drag utilization down. */
+function utilizationPct(assigned, headcount, leave, onHoliday = 0, oncallFree = 0) {
+  const denom = headcount - leave - onHoliday - oncallFree;
   return denom > 0 ? Math.round((assigned / denom) * 100) : 0;
 }
 
@@ -1240,7 +1293,7 @@ function renderOverview() {
   const totalMissions = boards.reduce((s, b) => s + stats[b.id].missions, 0);
   const totalPerm = D().employees.filter(e => e.contract === "permanent").length;
   const totalOncall = totalEmp - totalPerm;
-  const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday);
+  const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday, totalOncallFree);
 
   /* ---------- KPI strip: the handful of numbers that read fine as numbers ----------
      Deliberately headline-only. These tiles used to carry a per-board breakdown
@@ -1278,7 +1331,7 @@ function renderOverview() {
     sub: stats[b.id].isHoliday ? "holiday" : null,
     onClick: () => { D().activeBoardId = b.id; refreshAndRender(); },
     values: {
-      util: utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday),
+      util: utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday, stats[b.id].oncallAvailable),
       missions: stats[b.id].missions,
       total: stats[b.id].total,
       assigned: stats[b.id].assigned,
@@ -1403,6 +1456,18 @@ function renderOverview() {
   engRows.sort((a, b) => b.values.missions - a.values.missions || b.values.crew - a.values.crew
     || a.label.localeCompare(b.label));
   if (engRows.length) {
+    // Summed from engLoad, not from the rows above — the rows include a zero
+    // entry for every engineer, and (when present) the "no engineer set" row,
+    // so summing them would be right only by luck. This counts each mission
+    // once regardless of who it's attributed to.
+    const engTotals = [...engLoad.values()].reduce(
+      (acc, r) => ({ missions: acc.missions + r.missions, crew: acc.crew + r.crew }),
+      { missions: 0, crew: 0 });
+    engRows.push({
+      key: "__total__", label: "All engineers", isTotal: true,
+      sub: `${boards.length} board${boards.length === 1 ? "" : "s"}`,
+      values: engTotals,
+    });
     engSec.appendChild(ovCompareTable({
       cols: Object.assign(
         [{ key: "missions", label: "Missions" }, { key: "crew", label: "Crew deployed" }],
@@ -1512,7 +1577,9 @@ function renderOverview() {
     points: xDates.map(d => {
       if (isNonWorkingDate(d, b.id)) return { y: null };
       const rec = util[b.id] && util[b.id][d];
-      return rec ? { y: utilizationPct(rec.assigned, rec.headcount, rec.leave), suffix: "%" } : { y: null };
+      // oncallFree for the day = on-call headcount minus those deployed or on leave
+      const oncallFree = rec ? Math.max(0, rec.oncallHeadcount - rec.oncallAssigned - rec.oncallLeave) : 0;
+      return rec ? { y: utilizationPct(rec.assigned, rec.headcount, rec.leave, 0, oncallFree), suffix: "%" } : { y: null };
     }),
   }));
   const noWorkingDays = !xDates.length;   // whole range was weekend/holiday on every board
@@ -1726,8 +1793,32 @@ function emplistFilteredSorted() {
       default: return e.name;
     }
   };
+  // utilization is the one numeric column — "100" vs "9" sorts wrong as text.
+  // Unknown/no-working-days sorts to the bottom either way rather than as 0%,
+  // which would read as "never deployed" and isn't the same claim.
+  if (sortKey === "util") {
+    const u = (e) => {
+      const v = state.emplist.util ? state.emplist.util[e.id] : undefined;
+      return (v === undefined || v === null) ? -1 : v;
+    };
+    emps.sort((a, b) => (u(a) - u(b)) * sortDir || a.name.localeCompare(b.name));
+    return emps;
+  }
   emps.sort((a, b) => sortVal(a).localeCompare(sortVal(b)) * sortDir || a.name.localeCompare(b.name));
   return emps;
+}
+
+/* 30D utilization cell: a meter, not a bar chart — it's one ratio against a
+   fixed 0–100 limit, so the track carries the scale and the number is always
+   printed beside it (never encoded by width alone). `undefined` = still
+   loading, `null` = no working days in the window to divide by. */
+/* CSV wants a bare number so it stays sortable/averageable in Excel */
+function utilCsv(pct) { return (pct === undefined || pct === null) ? "" : String(pct); }
+function utilCell(pct) {
+  if (pct === undefined) return `<span class="el-util-empty">…</span>`;
+  if (pct === null) return `<span class="el-util-empty" title="No working days for this board in the last 30 days">—</span>`;
+  return `<span class="el-util-meter"><span class="el-util-fill" style="width:${Math.min(100, pct)}%"></span></span>`
+    + `<b class="el-util-val">${pct}%</b>`;
 }
 
 /* RFC 4180: a field only needs quoting if it contains a comma, quote, or
@@ -1738,13 +1829,14 @@ function csvField(v) {
 }
 function exportEmplistCsv() {
   const emps = emplistFilteredSorted();   // same rows the table is showing right now
-  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board", "Status"];
+  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board", "30D utilization", "Status"];
   const rows = emps.map(e => {
     const area = D().areas.find(a => a.id === e.areaId);
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return [e.name, e.contract === "oncall" ? "On-call" : "Permanent", pos ? pos.label : "",
       e.phone || "", area ? area.name : "", board ? board.name : "",
+      utilCsv(state.emplist.util ? state.emplist.util[e.id] : undefined),
       e.active === false ? "Inactive" : "Active"];
   });
   const csv = [header, ...rows].map(r => r.map(csvField).join(",")).join("\r\n");
@@ -1775,6 +1867,7 @@ function renderEmployeeRows() {
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     const isActive = e.active !== false;   // undefined (pre-migration) counts as active
+    const util = state.emplist.util ? state.emplist.util[e.id] : undefined;
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
@@ -1790,6 +1883,7 @@ function renderEmployeeRows() {
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
+      <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
         <label class="toggle toggle-active">
           <input type="checkbox" ${isActive ? "checked" : ""}>
