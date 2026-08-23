@@ -174,7 +174,7 @@ function setSaveStatus(kind) {
 const CLOUD_WRITE_METHODS = [
   "_copyPlanForward", "resetBoardFromLastWorkingDay", "setAssignment",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
-  "lockDay", "unlockDay", "saveEmployee", "archiveEmployee", "archiveEmployees",
+  "lockDay", "unlockDay", "saveEmployee", "archiveEmployee", "archiveEmployees", "setEmployeesActive",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
@@ -244,6 +244,16 @@ const isLocked = (boardId, date) => !!lockInfo(boardId, date);
 /* past AND today are read-only by default — today's plan is already being executed */
 const isReadOnly = () => isLocked(D().activeBoardId, state.date) || (state.date <= todayStr() && !state.unlockedDates.has(state.date));
 const boardEmployees = (boardId) => D().employees.filter(e => e.boardId === boardId);
+/* A deactivated employee (Status column in the Manpower List) is off the
+   planning roster: they disappear from the pools, from mission/leave cards and
+   from the counts built out of them — but only on today's and future boards.
+   A past date is a record of what actually happened, so it keeps showing
+   everyone who was really there; that's the whole reason deactivating is a
+   flag rather than a delete. boardEmployees() above stays unfiltered on
+   purpose — it's the raw lookup history rendering depends on. */
+const showsDeactivated = () => state.date < todayStr();
+const onRoster = (e) => showsDeactivated() || e.active !== false;
+const rosterEmployees = (boardId) => boardEmployees(boardId).filter(onRoster);
 
 /* ---------- plan access (reads the cache cloud.js keeps warm) ---------- */
 function emptyPlan() { return { missions: [], zones: emptyZones(), updatedAt: null }; }
@@ -739,7 +749,7 @@ function renderZones() {
     body.innerHTML = "";
     const emps = plan.zones[z]
       .map(empId => D().employees.find(e => e.id === empId))
-      .filter(e => e && e.boardId === D().activeBoardId);
+      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
     for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
     // an empty leave zone collapses to a thin one-line drop target instead of
     // a fixed-height card — most days only 1-2 of the 5 types are ever used,
@@ -765,7 +775,7 @@ function unassignedEmployees() {
   const placed = new Set();
   for (const m of plan.missions) for (const e of m.members) placed.add(e);
   for (const z of ZONES) for (const e of plan.zones[z]) placed.add(e);
-  return boardEmployees(D().activeBoardId).filter(e => !placed.has(e.id));
+  return rosterEmployees(D().activeBoardId).filter(e => !placed.has(e.id));
 }
 
 /* service-area filter chips in the floating panel (empty selection = show all) */
@@ -932,7 +942,7 @@ function renderMissions() {
     empRow.className = "mission-emps";
     const memberEmps = m.members
       .map(empId => D().employees.find(e => e.id === empId))
-      .filter(e => e && e.boardId === D().activeBoardId);
+      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
     for (const emp of sortEmployeesDisplay(memberEmps)) empRow.appendChild(empCard(emp));
     body.appendChild(empRow);
     if (m.remark) {
@@ -951,7 +961,10 @@ function renderMissions() {
 
 /* stats for one board on the current date (reads cache only, never fetches) */
 function boardStats(boardId) {
-  const emps = boardEmployees(boardId);
+  // rosterEmployees, not boardEmployees: `ids` below gates which assignments
+  // get counted, so this one swap keeps the headcount AND the assigned/leave
+  // tallies consistent with what the board actually renders
+  const emps = rosterEmployees(boardId);
   const ids = new Set(emps.map(e => e.id));
   const plan = peekPlan(boardId);
   // hidden missions are already emptied of members when hidden (their people
@@ -1709,6 +1722,7 @@ function emplistFilteredSorted() {
       case "phone": return e.phone || "";
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
+      case "active": return e.active === false ? "Inactive" : "Active";
       default: return e.name;
     }
   };
@@ -1724,13 +1738,14 @@ function csvField(v) {
 }
 function exportEmplistCsv() {
   const emps = emplistFilteredSorted();   // same rows the table is showing right now
-  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board"];
+  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board", "Status"];
   const rows = emps.map(e => {
     const area = D().areas.find(a => a.id === e.areaId);
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return [e.name, e.contract === "oncall" ? "On-call" : "Permanent", pos ? pos.label : "",
-      e.phone || "", area ? area.name : "", board ? board.name : ""];
+      e.phone || "", area ? area.name : "", board ? board.name : "",
+      e.active === false ? "Inactive" : "Active"];
   });
   const csv = [header, ...rows].map(r => r.map(csvField).join(",")).join("\r\n");
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
@@ -1759,6 +1774,7 @@ function renderEmployeeRows() {
     const area = D().areas.find(a => a.id === e.areaId);
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
+    const isActive = e.active !== false;   // undefined (pre-migration) counts as active
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
@@ -1773,7 +1789,28 @@ function renderEmployeeRows() {
       <td data-label="Position">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "—"}</td>
-      <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>`;
+      <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
+      <td data-label="Status" class="el-status">
+        <label class="toggle toggle-active">
+          <input type="checkbox" ${isActive ? "checked" : ""}>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">${isActive ? "Active" : "Inactive"}</span>
+        </label>
+      </td>`;
+    tr.classList.toggle("row-inactive", !isActive);
+    // No confirm: unlike Archive this is one click to undo. No guardEdit
+    // either — the roster is employee master data, not the day's plan (the
+    // existing bulk actions in this table take the same line).
+    tr.querySelector(".el-status input").onchange = (ev) => {
+      const on = ev.target.checked;
+      safely(async () => {
+        await cloud.setEmployeesActive([e.id], on);
+        await refreshAndRender();
+        toast(on
+          ? `${e.name} is active again — back on today's and future boards.`
+          : `${e.name} deactivated — hidden from today's and future boards. Past dates keep them.`, "info");
+      });
+    };
     tr.querySelector(".el-check input").onchange = (ev) => {
       ev.target.checked ? state.selectedEmps.add(e.id) : state.selectedEmps.delete(e.id);
       tr.classList.toggle("selected", ev.target.checked);
@@ -1788,7 +1825,11 @@ function renderEmployeeRows() {
     });
     body.appendChild(tr);
   }
-  $("#emplist-count").textContent = `${emps.length} of ${D().employees.length}`;
+  // surface the inactive tally — otherwise deactivated people are invisible in
+  // a long list and there's no hint the Status column has anything to find
+  const inactiveN = emps.filter(e => e.active === false).length;
+  $("#emplist-count").textContent = `${emps.length} of ${D().employees.length}`
+    + (inactiveN ? ` · ${inactiveN} inactive` : "");
   $("#emplist-select-all").checked = emps.length > 0 && emps.every(e => state.selectedEmps.has(e.id));
   updateEmplistBulkBar();
   for (const th of $$("#emplist-table th[data-sort]")) {

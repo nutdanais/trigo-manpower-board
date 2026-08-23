@@ -504,6 +504,11 @@ button, input, select, textarea, optgroup {
 }
 .toggle input:checked + .toggle-track { background: #f59e0b; }
 .toggle input:checked + .toggle-track .toggle-thumb { left: 20px; }
+/* The base checked colour is the Holiday toggle's amber, which reads as a
+   warning — wrong for "this employee is active". Green is already this app's
+   active/selected signal (the current board tab), so the roster toggle uses it. */
+.toggle-active input:checked + .toggle-track { background: var(--brand-green); }
+.toggle-active .toggle-text { font-weight: 600; font-size: 12px; }
 #readonly-badge {
   background: #fef3c7;
   border: 1px solid #f59e0b;
@@ -1708,6 +1713,12 @@ body.exporting #app-root { margin-right: 0; }
 #emplist-table th.sorted-asc::after { content: " \25B2"; }
 #emplist-table th.sorted-desc::after { content: " \25BC"; }
 #emplist-table th.el-check, #emplist-table td.el-check { cursor: default; width: 30px; }
+/* Deactivated: mute the data cells so they read as off-roster at a glance,
+   but leave the Status and checkbox cells at full strength — dimming the
+   control you came here to click would be self-defeating. */
+#emplist-table tbody tr.row-inactive td { opacity: .5; }
+#emplist-table tbody tr.row-inactive td.el-status,
+#emplist-table tbody tr.row-inactive td.el-check { opacity: 1; }
 #emplist-table tbody tr:hover { background: var(--hover-tint); }
 #emplist-table tbody tr.selected { background: var(--pool-tint); }
 #emplist-table td.el-check input, #emplist-table th.el-check input { width: auto; margin: 0; }

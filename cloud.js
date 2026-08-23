@@ -557,6 +557,21 @@ const cloud = {
     this._invalidatePlans();
     await this._loadEmployees();
   },
+  /* Activate / deactivate (the Manpower List's Status column). Unlike
+     archiveEmployees above there's no pre-migration fallback to offer — you
+     can't express "active again" as a delete — so this reports the missing
+     migration plainly instead of failing with a raw Postgres error. */
+  async setEmployeesActive(ids, active) {
+    if (!ids.length) return;
+    const { error } = await sb.from("employees").update({ active }).in("id", ids);
+    if (error) {
+      if (this._missingColumnFromError(error) === "active") {
+        throw new Error('Run supabase/migration-2026-08-23-employee-active.sql in the Supabase SQL editor to use Active/Inactive.');
+      }
+      throw error;
+    }
+    await this._loadEmployees();
+  },
   /* bulk-set the position of one or many employees */
   async setEmployeesPosition(ids, position) {
     if (!ids.length) return;
