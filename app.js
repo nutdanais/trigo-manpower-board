@@ -988,13 +988,14 @@ function renderMissions() {
     const card = document.createElement("div");
     card.className = "mission-card" + (missionMatchesFilters(m) ? "" : " dimmed");
     // The engineer's colour is what lets you pick one engineer's missions out of
-    // a full board at a glance, so it has to stay a long, full-height mark — but
-    // as a solid header fill it was the loudest thing on screen AND forced the
-    // header text to be pinned dark in both themes (it sat on an arbitrary data
-    // colour). Full strength on the card's border, a 15% wash behind the header:
-    // same grouping at a distance, quiet surface, and the header text can follow
-    // the theme like every other label again.
-    card.style.borderColor = engColor;
+    // a full board at a glance — but as a solid header fill it was the loudest
+    // thing on screen AND forced the header text to be pinned dark in both
+    // themes (it sat on an arbitrary data colour). Full strength on the card's
+    // left edge, a 15% wash behind the header: the edge and the tinted header
+    // sit against each other, so the two together still read as one full-height
+    // colour block from across the room, and the header text can follow the
+    // theme like every other label again.
+    card.style.borderLeftColor = engColor;
     const header = document.createElement("div");
     header.className = "mission-header";
     header.style.background = tintOf(engColor, MISSION_TINT);
@@ -2388,7 +2389,22 @@ function buildExportPools() {
    grid's live width, so it adapts to window resizing and to the wider export
    capture alike. Cards that are display:none (e.g. empty missions hidden for the
    export) are skipped. Safe/no-op when the grid is hidden or empty. */
-const MASONRY_GAP = 12, MASONRY_MIN_CARD = 383;
+/* The column floor is not a taste value — it is the width at which two employee
+   cards still fit side by side in a mission body, which is what keeps a crew of
+   four from rendering as a four-storey card (and the exported JPG from doubling
+   in height). Derive it, don't guess it:
+
+     card width W
+     − 6px coloured left edge − 1px right border          → W −   7
+     − 130px header − its 1px right border                → W − 138
+     − 8px body padding, both sides                       → W − 154
+     must hold 2 × 114px .emp-card + one 6px flex gap = 234
+     → W ≥ 388
+
+   390 leaves a 2px cushion. If you change .emp-card's width, the header width,
+   or the left edge, redo this sum — the previous value (383) predated the 6px
+   edge and left the export exactly one pixel short, so every crew stacked. */
+const MASONRY_GAP = 12, MASONRY_MIN_CARD = 390;
 function layoutMasonry() {
   const grid = $("#missions-grid");
   if (!grid || grid.classList.contains("hidden")) return;

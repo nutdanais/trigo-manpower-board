@@ -647,9 +647,10 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 .mission-card {
   display: flex;
-  /* 2px, because this border carries the engineer's colour (set inline in
-     renderMissions) — at 1px the identity mark is too thin to scan a board by */
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
+  /* the left edge carries the engineer's colour (set inline in renderMissions),
+     so it is thick enough to read as a mark rather than as a hairline */
+  border-left-width: 6px;
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
@@ -686,10 +687,11 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   gap: 6px;
   align-items: flex-start;
   align-content: flex-start;
-  /* no max-width: the #missions-grid column floor (383px) already guarantees
-     at least 2 employee cards fit per row — this lets a mission box that
-     renders wider (fewer, bigger columns on a normal-width screen) naturally
-     wrap 3+ cards per row instead of capping at 2 */
+  /* no max-width: the #missions-grid column floor (MASONRY_MIN_CARD in app.js,
+     derived from these exact numbers) guarantees at least 2 employee cards fit
+     per row — this lets a mission box that renders wider (fewer, bigger columns
+     on a normal-width screen) naturally wrap 3+ cards per row instead of
+     capping at 2. Changing .emp-card's width below means redoing that sum. */
 }
 .m-remark {
   margin-top: auto;
