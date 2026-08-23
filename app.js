@@ -544,8 +544,19 @@ function renderTabs() {
   }
 }
 
+/* Built from spans rather than one string so the phone header can drop the
+   parts it can't afford (see .btn-date .d-ico / .d-yr in styles.css). Once the
+   two arrows and the four icon buttons share this one row, a full
+   "📅 Tue 25-Aug-2026" no longer fits — and a date cut off by an ellipsis is
+   worse than one deliberately shortened to "Tue 25-Aug". The title keeps the
+   full date on every screen size, and the picker itself always shows the year. */
 function renderDateButton() {
-  $("#btn-date").textContent = "📅 " + fmtDow(state.date) + " " + fmtDate(state.date);
+  const dow = fmtDow(state.date);
+  const full = fmtDate(state.date);
+  const [d, mon, yr] = full.split("-");
+  const btn = $("#btn-date");
+  btn.innerHTML = `<span class="d-ico">📅</span> ${dow} ${d}-${mon}<span class="d-yr">-${yr}</span>`;
+  btn.title = `${dow} ${full} — click to pick a date`;
 }
 
 /* lock button: only on an actual board (hidden on Overview / Manpower List) */
@@ -558,10 +569,10 @@ function renderLockButton() {
   btn.classList.toggle("locked", !!lock);
   if (lock) {
     const when = lock.lockedAt ? new Date(lock.lockedAt).toLocaleString() : "";
-    btn.textContent = "🔒 Locked";
+    btn.innerHTML = '🔒<span class="btn-label"> Locked</span>';
     btn.title = `Locked by ${lock.lockedBy}${when ? " on " + when : ""} — click to unlock for everyone`;
   } else {
-    btn.textContent = "🔓 Lock";
+    btn.innerHTML = '🔓<span class="btn-label"> Lock</span>';
     btn.title = "Lock this board so it's view-only for everyone";
   }
 }
@@ -580,7 +591,12 @@ function empCard(emp) {
   // service area is carried by the area code text, not colour
   card.className = "emp-card" + (emp.contract === "oncall" ? " oncall" : "")
     + (state.selectedEmps.has(emp.id) ? " selected" : "");
-  card.draggable = true;
+  // Not draggable on touch: Android Chrome starts a native drag from a long
+  // press on a draggable element, which is the same gesture that now opens the
+  // context menu — the two would race for it. Nothing is lost, because HTML5
+  // drag never worked on touch anyway (iOS doesn't fire it at all); placing a
+  // card by finger goes through tap-to-select then tap-a-mission, as before.
+  card.draggable = !IS_TOUCH;
   card.dataset.empId = emp.id;
   card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span><span class="emp-name">${escapeHtml(emp.name)}</span>`
     + (pos ? `<span class="emp-pos">${pos.short}</span>` : "")
@@ -606,11 +622,8 @@ function empCard(emp) {
   });
   card.addEventListener("dragend", () => { for (const c of $$(".emp-card.dragging")) c.classList.remove("dragging"); });
   card.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(emp.id)));
-  card.addEventListener("contextmenu", (ev) => {
-    ev.preventDefault();
-    if (!state.selectedEmps.has(emp.id)) selectOnly(emp.id);
-    showContextMenu(emp, ev.clientX, ev.clientY);
-  });
+  card.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(emp, ev.clientX, ev.clientY); });
+  attachLongPress(card, (x, y) => openEmpMenu(emp, x, y));
   return card;
 }
 
@@ -674,6 +687,62 @@ function hideToolbarMore() {
 
 /* ---------- context menu ---------- */
 function hideContextMenu() { $("#context-menu").classList.add("hidden"); }
+
+/* Right-click (mouse) and long-press (finger) open the same menu on the same
+   terms: pressing an unselected card acts on that card alone, pressing one
+   that's part of a selection acts on the whole selection. */
+function openEmpMenu(emp, x, y) {
+  if (!state.selectedEmps.has(emp.id)) selectOnly(emp.id);
+  showContextMenu(emp, x, y);
+}
+
+/* ---------- long-press = right-click (touch) ----------
+   A phone has no right mouse button, so everything behind the context menu
+   (edit, move to board, assign, leave, deactivate) used to be reachable only
+   by selecting a card and going through the floating "Actions" bar. Holding a
+   card now opens the same menu at the finger.
+
+   Cancelled by any finger drift past LONG_PRESS_SLOP so a press that turns
+   into a scroll stays a scroll, and by a second finger (pinch-zoom). */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
+
+/* The browser still synthesizes a click when the finger comes up after a long
+   press. Left alone it would land on whatever is now under that point — the
+   card (toggling it out of the selection) or, worse, the menu item that just
+   opened under the finger. This swallows exactly that one click; it is cleared
+   by the next touchstart, so a real tap on a menu item is never eaten. */
+let swallowNextClick = false;
+
+function attachLongPress(el, open) {
+  // Coarse pointers only, which is the same test that decides whether the card
+  // stays draggable (see empCard) — so a device gets exactly one of the two
+  // gestures on a held card, never both racing for it.
+  if (!IS_TOUCH) return;
+  let timer = null, sx = 0, sy = 0;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  el.addEventListener("touchstart", (ev) => {
+    cancel();
+    if (ev.touches.length !== 1) return;
+    sx = ev.touches[0].clientX;
+    sy = ev.touches[0].clientY;
+    timer = setTimeout(() => {
+      timer = null;
+      swallowNextClick = true;
+      // a short buzz is the only feedback that the hold "took" — the menu
+      // itself opens under the finger, where it can't be seen yet
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+      open(sx, sy);
+    }, LONG_PRESS_MS);
+  }, { passive: true });
+  el.addEventListener("touchmove", (ev) => {
+    const t = ev.touches[0];
+    if (!t) return;
+    if (Math.abs(t.clientX - sx) > LONG_PRESS_SLOP || Math.abs(t.clientY - sy) > LONG_PRESS_SLOP) cancel();
+  }, { passive: true });
+  el.addEventListener("touchend", cancel);
+  el.addEventListener("touchcancel", cancel);
+}
 
 /* Two-layer menu. The long lists (missions, boards, leave types) live one
    level down instead of all being inlined: a board with a dozen missions used
@@ -1973,11 +2042,8 @@ function renderEmployeeRows() {
       $("#emplist-select-all").checked = emps.length > 0 && emps.every(x => state.selectedEmps.has(x.id));
     };
     tr.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(e.id)));
-    tr.addEventListener("contextmenu", (ev) => {
-      ev.preventDefault();
-      if (!state.selectedEmps.has(e.id)) selectOnly(e.id);
-      showContextMenu(e, ev.clientX, ev.clientY);
-    });
+    tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(e, ev.clientX, ev.clientY); });
+    attachLongPress(tr, (x, y) => openEmpMenu(e, x, y));
     body.appendChild(tr);
   }
   // surface the inactive tally — otherwise deactivated people are invisible in
@@ -2910,6 +2976,13 @@ function wireApp() {
   // touch action bar: mark the device so CSS can reveal touch-only affordances,
   // and route its buttons to the same selection/context-menu logic desktop uses
   document.body.classList.toggle("touch-mode", IS_TOUCH);
+  // the default hint is written for a mouse (Ctrl-click, drag); on a phone say
+  // what actually works there instead — long-press in particular is invisible
+  // unless something names it
+  if (IS_TOUCH) {
+    const hint = $(".fp-hint");
+    if (hint) hint.textContent = "Tap to select · tap again for more · tap a mission or leave area to place · long-press for actions";
+  }
   $("#btn-touch-clear").onclick = clearSelection;
   $("#btn-touch-actions").onclick = (ev) => {
     ev.stopPropagation();
@@ -2968,6 +3041,19 @@ function wireApp() {
       () => safely(async () => { await cloud.setEmployeesActive(ids, false); state.selectedEmps = new Set(); await refreshAndRender(); }));
   };
   $("#emplist-bulk-clear").onclick = clearSelection;
+
+  // Long-press bookkeeping (see attachLongPress). Capture phase on both: the
+  // swallowed click must die before it reaches the card's own handler AND
+  // before the outside-click handler right below closes the menu we just
+  // opened. A fresh touchstart means the previous gesture's click has either
+  // already been dealt with or is never coming, so the flag clears there.
+  document.addEventListener("touchstart", () => { swallowNextClick = false; }, true);
+  document.addEventListener("click", (ev) => {
+    if (!swallowNextClick) return;
+    swallowNextClick = false;
+    ev.stopPropagation();
+    ev.preventDefault();
+  }, true);
 
   // dismiss context menu / date picker on any outside click or Escape
   document.addEventListener("click", (ev) => {
