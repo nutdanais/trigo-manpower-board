@@ -12,7 +12,8 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 
 - **Boards**: tabs at the top-left. `+ Board` creates a new board (e.g. Rayong). Double-click a tab to rename it.
   - Every employee belongs to exactly **one board** — a card assigned on Non-Rayong can never appear as available on Rayong.
-  - **Right-click** an employee card → Edit / Move to another board / Delete. (Position, contract type, and service area move to the Manpower List tab — set them one at a time from Edit Employee, or in bulk from the list's selection bar.)
+  - **Right-click** an employee card → Assign to a mission, send to a leave type, or return to Standby/Available On-call — the same as dragging, for when the target has scrolled off-screen or you're on touch — plus Edit / Move to another board / Archive. (Position, contract type, and service area move to the Manpower List tab — set them one at a time from Edit Employee, or in bulk from the list's selection bar.)
+  - **Archive** (right-click, or the Edit Employee modal) replaces "Delete" — it hides the employee from pools and dropdowns but keeps their history: past mission and leave assignments still show their name, and past stats still count them. There's no "show archived" view yet, so archive someone who's actually gone (resigned, transferred), not as a way to temporarily hide them.
 - **📊 Overview tab**: a management dashboard, not a wall of numbers — a KPI strip, a deployment donut + per-board stacked bars (with the "Needs attention" list of unassigned names right after), a contract-mix donut per board, a service-area distribution, two 7/14/30-day trend lines per board (click a legend entry to hide/show its line) — **Utilization** and **On-call availability** (on-call headcount not on a mission or on leave) — both counting only working days (weekends and holidays excluded), and a leave-by-type breakdown at the bottom. Every chart has a hover/focus tooltip with the exact numbers.
   - Boards with employees still **Available (not assigned)** keep the amber "Needs attention" list of names, right after the Deployment chart — assign them to a mission or drag them to Standby. Click a name to jump to that board.
 - **Date**: top-right button opens a calendar. Each date has its own saved plan.
@@ -27,7 +28,7 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 - **Search** (top-right, floating panel): filters the two unassigned pools as you type. If a match is already assigned to a mission or on leave, the box says so and flashes/scrolls to their card on the board instead of just showing "No match".
 - **Stats bar**: total / assigned / leave / standby / return / available + a counter per service area.
 - **Filters**: by engineer, host, customer, shift — non-matching missions fade out.
-- **Manpower List tab**: every employee across every board, with a colour pill for service area matching the rest of the app, plus search/filter/sort and bulk edit (contract, position, service area, board, delete).
+- **Manpower List tab**: every employee across every board, with a colour pill for service area matching the rest of the app, plus search/filter/sort, bulk edit (contract, position, service area, board, archive), and a **⬇ CSV** button that exports whatever the current search/filters are showing.
 - **Export**: saves a high-resolution JPG of the current board.
 - **Settings** ⚙: manage engineers (name, phone, color), service areas (name, color), and each board's weekly weekend days (checkboxes, save instantly) — this drives the holiday toggle, weekend "Add Mission" import, the date picker's weekend highlighting, and both Overview trend charts, so it's worth checking a new board's checkboxes match its real schedule.
 

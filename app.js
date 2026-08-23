@@ -37,6 +37,17 @@ function addDays(iso, n) {
   d.setDate(d.getDate() + n);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* Bounded pass, not a rewrite of every innerHTML site in this file: applied
+   where markup is built from a free-typed field (employee/area names,
+   mission number/host/customer/PPE, phone). Most other innerHTML call sites
+   interpolate static enum labels, or already use .textContent (see e.g.
+   board/engineer names in the Overview charts) — this only touches the
+   sites that were actually building HTML from user-entered text. */
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
 /* strip everything but digits/+ so the href itself is always a valid,
    injection-safe tel: URI regardless of how the number was typed in */
 function telHref(phone) {
@@ -45,7 +56,7 @@ function telHref(phone) {
 }
 function telLink(phone, cls) {
   const href = telHref(phone);
-  return href ? `<a class="tel-link${cls ? " " + cls : ""}" href="${href}" onclick="event.stopPropagation()">${phone}</a>` : (phone || "");
+  return href ? `<a class="tel-link${cls ? " " + cls : ""}" href="${href}" onclick="event.stopPropagation()">${escapeHtml(phone)}</a>` : (phone || "");
 }
 /* default landing = next working day: tomorrow, skipping weekends & holidays */
 function defaultPlanningDate() {
@@ -155,7 +166,7 @@ function setSaveStatus(kind) {
 const CLOUD_WRITE_METHODS = [
   "_copyPlanForward", "resetBoardFromLastWorkingDay", "setAssignment",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
-  "lockDay", "unlockDay", "saveEmployee", "deleteEmployee", "deleteEmployees",
+  "lockDay", "unlockDay", "saveEmployee", "archiveEmployee", "archiveEmployees",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
@@ -491,9 +502,9 @@ function empCard(emp) {
     + (state.selectedEmps.has(emp.id) ? " selected" : "");
   card.draggable = true;
   card.dataset.empId = emp.id;
-  card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span><span class="emp-name">${emp.name}</span>`
+  card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span><span class="emp-name">${escapeHtml(emp.name)}</span>`
     + (pos ? `<span class="emp-pos">${pos.short}</span>` : "")
-    + (area ? `<span class="emp-area" style="background:${area.color}">${area.name}</span>` : "");
+    + (area ? `<span class="emp-area" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "");
   card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
   card.addEventListener("click", (ev) => {
@@ -589,7 +600,7 @@ function showContextMenu(emp, x, y) {
   // acts on the whole selection when >1 is selected, else just this employee
   const ids = state.selectedEmps.size > 1 && state.selectedEmps.has(emp.id) ? [...state.selectedEmps] : [emp.id];
   const many = ids.length > 1;
-  menu.innerHTML = `<div class="ctx-title">${many ? ids.length + " employees selected" : emp.name}</div>`;
+  menu.innerHTML = `<div class="ctx-title">${many ? ids.length + " employees selected" : escapeHtml(emp.name)}</div>`;
   const addItem = (label, fn, cls) => {
     const it = document.createElement("div");
     it.className = "ctx-item" + (cls ? " " + cls : "");
@@ -600,11 +611,51 @@ function showContextMenu(emp, x, y) {
   const addSep = () => { const s = document.createElement("div"); s.className = "ctx-sep"; menu.appendChild(s); };
   const addHead = (label) => { const h = document.createElement("div"); h.className = "ctx-subhead"; h.textContent = label; menu.appendChild(h); };
 
-  // Kept deliberately short: Edit / Move to board / Delete. Position, contract
-  // and service area are still editable — one at a time from the Edit Employee
-  // modal, or in bulk from the Manpower List's selection bar — this menu just
-  // isn't the place for them any more (it grew to 15+ items and slowed down
-  // the three actions people actually reach for from the board).
+  // Assign to a mission / send to leave / return to standby — the actions
+  // people reach for constantly, previously drag-only (painful once the
+  // target has scrolled off-screen, impossible on touch). Uses the exact
+  // same assignEmployeesTo(ids, payload) drag-and-drop already calls, so
+  // there's no new assignment logic here, just a menu path to the old one.
+  // peekPlan(menuBoardId) (not getPlan(), which reads state.date under
+  // D().activeBoardId) — this menu is also opened from the Manpower List,
+  // where activeBoardId is "__emplist__", not the employee's real board.
+  // A mixed-board bulk selection has no single mission list to offer, so
+  // these sections are skipped entirely then — "Move to board" below still
+  // covers that case, same as it always has.
+  const menuBoardId = emp.boardId;
+  const sameBoard = ids.every(id => {
+    const e = D().employees.find(x => x.id === id);
+    return e && e.boardId === menuBoardId;
+  });
+  if (sameBoard) {
+    const plan = peekPlan(menuBoardId);
+    const current = !many ? currentAssignmentOfIn(plan, emp.id) : null;
+    const missions = plan.missions.filter(m => !m.hidden);
+    if (missions.length) {
+      addHead("Assign to mission");
+      for (const m of missions) {
+        if (current && current.missionId === m.id) continue;
+        addItem(m.number, () => guardEdit(() => assignEmployeesTo(ids, { missionId: m.id })), "ctx-pos");
+      }
+    }
+    addHead("Leave");
+    for (const z of LEAVE_ZONES) {
+      if (current && current.zone === z) continue;
+      addItem(ZONE_LABELS[z], () => guardEdit(() => assignEmployeesTo(ids, { zone: z })), "ctx-pos");
+    }
+    if (many || current) {
+      const standbyLabel = many ? "↩ Return to standby / pool" : `↩ Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`;
+      addItem(standbyLabel, () => guardEdit(() => assignEmployeesTo(ids, null)));
+    }
+    addSep();
+  }
+
+  // Kept deliberately short otherwise: Edit / Move to board / Delete.
+  // Position, contract and service area are still editable — one at a time
+  // from the Edit Employee modal, or in bulk from the Manpower List's
+  // selection bar — this menu just isn't the place for them any more (it
+  // grew to 15+ items and slowed down the actions people actually reach
+  // for from the board).
   if (!many) addItem("✏ Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)));
 
   // move to another board (bulk if multiple selected)
@@ -623,12 +674,12 @@ function showContextMenu(emp, x, y) {
   }
 
   addSep();
-  addItem(many ? `🗑 Delete ${ids.length} employees` : "🗑 Delete employee", () => {
-    showConfirm("Delete employee" + (many ? "s" : "") + "?",
+  addItem(many ? `📦 Archive ${ids.length} employees` : "📦 Archive employee", () => {
+    showConfirm("Archive employee" + (many ? "s" : "") + "?",
       many
-        ? `Delete ${ids.length} selected employees? This removes them from every mission/zone assignment, past and future.`
-        : `Delete ${emp.name}? This removes them from every mission/zone assignment, past and future.`,
-      () => safely(async () => { await cloud.deleteEmployees(ids); clearSelection(); await refreshAndRender(); }));
+        ? `Archive ${ids.length} selected employees? Removes them from pools and dropdowns; their history stays.`
+        : `Archive ${emp.name}? Removes them from pools and dropdowns; their history stays.`,
+      () => safely(async () => { await cloud.archiveEmployees(ids); clearSelection(); await refreshAndRender(); }));
   }, "ctx-danger");
 
   menu.classList.remove("hidden");
@@ -686,7 +737,7 @@ function renderAreaFilter() {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "fp-area-chip" + (state.poolAreas.has(a.id) ? " on" : "");
-    chip.innerHTML = `<span class="dot" style="background:${a.color}"></span>${a.name}<b>${counts.get(a.id)}</b>`;
+    chip.innerHTML = `<span class="dot" style="background:${a.color}"></span>${escapeHtml(a.name)}<b>${counts.get(a.id)}</b>`;
     chip.onclick = () => {
       state.poolAreas.has(a.id) ? state.poolAreas.delete(a.id) : state.poolAreas.add(a.id);
       renderFloatPool();
@@ -823,12 +874,12 @@ function renderMissions() {
     header.style.background = eng ? eng.color : "#ccc";
     header.title = "Click to edit mission";
     header.innerHTML = `
-      <div class="m-number">${m.number}</div>
-      <div>Host: ${m.host}</div>
+      <div class="m-number">${escapeHtml(m.number)}</div>
+      <div>Host: ${escapeHtml(m.host)}</div>
       <div>${m.shift === "night" ? '<span class="night-badge">🌙 NIGHT</span>' : "☀️ Day"} ${m.startTime}-${m.endTime}</div>
-      <div>Cust: ${m.customer}</div>
-      ${m.ppe ? `<div class="m-ppe">PPE: ${m.ppe}</div>` : ""}
-      <div class="m-eng">${eng ? eng.name : "?"}${eng && eng.phone ? "<br>" + telLink(eng.phone) : ""}</div>`;
+      <div>Cust: ${escapeHtml(m.customer)}</div>
+      ${m.ppe ? `<div class="m-ppe">PPE: ${escapeHtml(m.ppe)}</div>` : ""}
+      <div class="m-eng">${eng ? escapeHtml(eng.name) : "?"}${eng && eng.phone ? "<br>" + telLink(eng.phone) : ""}</div>`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
     const body = document.createElement("div");
     body.className = "mission-body dropzone";
@@ -1223,7 +1274,7 @@ function renderOverview() {
     anyAttn = true;
     const card = document.createElement("div");
     card.className = "ov-card";
-    card.innerHTML = `<h4>${b.name}</h4>`;
+    card.innerHTML = `<h4>${escapeHtml(b.name)}</h4>`;
     if (s.standby) {
       const box = document.createElement("div");
       box.className = "ov-avail";
@@ -1590,9 +1641,9 @@ function renderEmplistFilterOptions() {
   }
   // the bulk-edit dropdowns list the same live areas/boards, so keep them in sync too
   $("#emplist-bulk-area").innerHTML = `<option value="">Set service area…</option>` +
-    D().areas.map(a => `<option value="${a.id}">${a.name}</option>`).join("");
+    D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
   $("#emplist-bulk-board").innerHTML = `<option value="">Move to board…</option>` +
-    D().boards.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+    D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
 }
 
 function emplistFilteredSorted() {
@@ -1621,6 +1672,31 @@ function emplistFilteredSorted() {
   return emps;
 }
 
+/* RFC 4180: a field only needs quoting if it contains a comma, quote, or
+   newline — quoting everything is also correct, just noisier to read raw */
+function csvField(v) {
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function exportEmplistCsv() {
+  const emps = emplistFilteredSorted();   // same rows the table is showing right now
+  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board"];
+  const rows = emps.map(e => {
+    const area = D().areas.find(a => a.id === e.areaId);
+    const board = D().boards.find(b => b.id === e.boardId);
+    const pos = e.position ? POSITIONS[e.position] : null;
+    return [e.name, e.contract === "oncall" ? "On-call" : "Permanent", pos ? pos.label : "",
+      e.phone || "", area ? area.name : "", board ? board.name : ""];
+  });
+  const csv = [header, ...rows].map(r => r.map(csvField).join(",")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `manpower_list_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function updateEmplistBulkBar() {
   const bar = $("#emplist-bulkbar");
   if (!bar) return;
@@ -1642,14 +1718,18 @@ function renderEmployeeRows() {
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
+    // data-label feeds the phone breakpoint's ::before (styles.css) — below
+    // 640px each <tr> becomes a card and each <td> grows its column header as
+    // an inline label, so the same markup works as a table on desktop and a
+    // card list on phone with no separate render path
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td>${e.name}</td>
-      <td>${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td>${pos ? pos.label : "—"}</td>
-      <td>${e.phone ? telLink(e.phone) : "—"}</td>
-      <td>${area ? `<span class="area-pill" style="background:${area.color}">${area.name}</span>` : "—"}</td>
-      <td>${board ? board.name : "—"}</td>`;
+      <td data-label="Name">${escapeHtml(e.name)}</td>
+      <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
+      <td data-label="Position">${pos ? pos.label : "—"}</td>
+      <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "—"}</td>
+      <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>`;
     tr.querySelector(".el-check input").onchange = (ev) => {
       ev.target.checked ? state.selectedEmps.add(e.id) : state.selectedEmps.delete(e.id);
       tr.classList.toggle("selected", ev.target.checked);
@@ -1682,11 +1762,13 @@ function renderEmployeeList() {
 
 /* where is this employee assigned right now on the current plan?
    returns the payload shape setAssignment expects: {missionId} | {zone} | null */
-function currentAssignmentOf(empId) {
-  const plan = getPlan();
+function currentAssignmentOfIn(plan, empId) {
   for (const m of plan.missions) if (m.members.includes(empId)) return { missionId: m.id };
   for (const z of ZONES) if (plan.zones[z].includes(empId)) return { zone: z };
   return null;
+}
+function currentAssignmentOf(empId) {
+  return currentAssignmentOfIn(getPlan(), empId);
 }
 function samePayload(a, b) {
   if (!a && !b) return true;
@@ -1792,7 +1874,7 @@ function openMissionModal(missionId) {
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
   $("#btn-hide-mission").classList.toggle("hidden", !missionId);
-  form.engineerId.innerHTML = D().engineers.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
+  form.engineerId.innerHTML = D().engineers.map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
   if (missionId) {
     const m = getPlan().missions.find(x => x.id === missionId);
     form.number.value = m.number;
@@ -1880,8 +1962,8 @@ function openEmployeeModal(empId) {
   form.reset();
   $("#employee-modal-title").textContent = empId ? "Edit Employee" : "New Employee";
   $("#btn-delete-employee").classList.toggle("hidden", !empId);
-  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}">${a.name}</option>`).join("");
-  form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+  form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
   if (empId) {
     const e = D().employees.find(x => x.id === empId);
     form.name.value = e.name;
@@ -1921,11 +2003,11 @@ function saveEmployee(ev) {
   });
 }
 
-function deleteEmployee() {
+function archiveEmployee() {
   const e = D().employees.find(x => x.id === state.editingEmployeeId);
-  showConfirm("Delete employee?", `Delete ${e.name}? This removes them from every mission/zone assignment, past and future.`, () => {
+  showConfirm("Archive employee?", `Archive ${e.name}? Removes them from pools and dropdowns; their history stays.`, () => {
     safely(async () => {
-      await cloud.deleteEmployee(state.editingEmployeeId);
+      await cloud.archiveEmployee(state.editingEmployeeId);
       await refreshAndRender();
     });
   });
@@ -2311,8 +2393,8 @@ function openImportModal() {
         const row = document.createElement("label");
         row.className = "import-row";
         row.innerHTML = `<input type="checkbox" value="${m.id}">
-          <span class="import-info"><b>${m.number}</b> — ${m.host} → ${m.customer}
-          <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + eng.name : ""}</small></span>`;
+          <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
+          <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""}</small></span>`;
         list.appendChild(row);
       }
     } catch (e) {
@@ -2350,8 +2432,8 @@ function openHideMissionsModal() {
       const row = document.createElement("label");
       row.className = "import-row";
       row.innerHTML = `<input type="checkbox" value="${m.id}" ${m.hidden ? "checked" : ""}>
-        <span class="import-info"><b>${m.number}</b> — ${m.host} → ${m.customer}
-        <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + eng.name : ""} • ${m.members.length} assigned</small></span>`;
+        <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
+        <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""} • ${m.members.length} assigned</small></span>`;
       list.appendChild(row);
     }
     openModal("#modal-hide-missions");
@@ -2495,7 +2577,7 @@ function wireApp() {
   $("#btn-hide-mission").onclick = hideMission;
   $("#btn-hide-missions").onclick = openHideMissionsModal;
   $("#btn-hide-missions-save").onclick = saveHideMissions;
-  $("#btn-delete-employee").onclick = deleteEmployee;
+  $("#btn-delete-employee").onclick = archiveEmployee;
 
   $("#btn-settings").onclick = () => { renderSettings(); openModal("#modal-settings"); };
   for (const btn of $$("#settings-tabs .settings-tab")) {
@@ -2582,6 +2664,7 @@ function wireApp() {
   };
 
   // ---------- Manpower List tab ----------
+  $("#btn-emplist-csv").onclick = exportEmplistCsv;
   $("#emplist-search").addEventListener("input", (e) => { state.emplist.search = e.target.value; renderEmployeeRows(); });
   for (const th of $$("#emplist-table th[data-sort]")) {
     th.onclick = () => {
@@ -2623,9 +2706,9 @@ function wireApp() {
   $("#emplist-bulk-delete").onclick = () => {
     const ids = [...state.selectedEmps];
     if (!ids.length) return;
-    showConfirm("Delete employees?",
-      `Delete ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? This removes them from every mission/zone assignment, past and future.`,
-      () => safely(async () => { await cloud.deleteEmployees(ids); state.selectedEmps = new Set(); await refreshAndRender(); }));
+    showConfirm("Archive employees?",
+      `Archive ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? Removes them from pools and dropdowns; their history stays.`,
+      () => safely(async () => { await cloud.archiveEmployees(ids); state.selectedEmps = new Set(); await refreshAndRender(); }));
   };
   $("#emplist-bulk-clear").onclick = clearSelection;
 

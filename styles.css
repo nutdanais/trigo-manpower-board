@@ -26,12 +26,21 @@
      light-on-light. Never redefined under [data-theme="dark"]. */
   --card-ink: #1a1a1a;
   --night: #1c2430;   /* dark pill for the Night stat */
-  /* employee card identity — fixed in both themes (see .emp-card).
-     Same light grey for both; only the border tells them apart
-     (permanent = solid, on-call = dashed). */
+  /* employee card SURFACE — unlike --card-ink above, this one DOES redefine
+     under dark mode (see the dark block below). It used to be pinned too, so
+     the exported JPG looked the same regardless of theme — but the export
+     now forces light theme for its own capture (see body.exporting), so that
+     constraint no longer applies to the on-screen card only. Border still
+     carries the permanent/on-call distinction (solid vs dashed) in both
+     themes. --emp-ink is the card's own text color — a separate token from
+     --card-ink because --card-ink's fixed-regardless-of-theme text is also
+     used on backgrounds that stay data-colored in dark mode (mission headers,
+     the area pill) and must NOT lighten just because the card surface can. */
   --emp-bg: #e6e9ec;
   --emp-perm-border: #b4bcc4;
   --emp-oncall-border: #6b737c;
+  --emp-ink: #1a1a1a;
+  --emp-pos-bg: rgba(0,73,131,.09);   /* .emp-pos tint — plain rgba, see its comment for why not color-mix() */
   --charcoal: #59595b;   /* CI guide, 80% black */
 
   /* Overview chart data colors — a validated categorical set (dataviz skill:
@@ -87,6 +96,15 @@
   --bg-soft: #232a33;
   --hover-tint: #232c38;
   --track-off: #3a424b;
+  /* employee card surface, a step lighter than --panel/--bg-soft so cards
+     read as distinct from the board underneath them (was previously fixed
+     to the light-mode value — see the light block's comment on why that's
+     safe to change now) */
+  --emp-bg: #2a3038;
+  --emp-perm-border: #4a525c;
+  --emp-oncall-border: #7a838d;
+  --emp-ink: #e8ebed;
+  --emp-pos-bg: rgba(111,177,224,.14);
   --pool-tint: #12303f;
   --leave-tint: #232a33;
 
@@ -153,6 +171,19 @@ button, input, select, textarea, optgroup {
    header background where blue could go unreadable. */
 .tel-link { color: inherit; text-decoration: none; }
 .tel-link:hover, .tel-link:focus-visible { text-decoration: underline; }
+
+/* Sticky as one unit — topbar, green rule, and board tabs (which day, which
+   board) stay visible while a long board scrolls beneath them. A single
+   sticky wrapper avoids stacking multiple sticky rows at hardcoded offsets,
+   which would break the moment #topbar's height changes (it wraps onto a
+   second line on narrow screens). #stats-row/#toolbar are NOT included — they
+   stay in normal flow so the permanently-visible footprint stays small,
+   especially on phone. */
+#sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
 
 /* ===== Top bar =====
    Fixed brand navy, always — this is chrome, not a page surface, so it does
@@ -684,7 +715,7 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   position: relative;
   overflow: hidden;
   user-select: none;
-  color: var(--card-ink);
+  color: var(--emp-ink);
 }
 /* name wraps up to 2 lines (sized to fit the longest name in the system,
    "Wannaphatson T329", on two lines) instead of growing the card; a name
@@ -737,8 +768,15 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 .emp-card .emp-pos {
   left: 3px;
-  color: var(--primary);
-  background: rgba(0,73,131,.09);
+  /* --primary-text (not the fixed --primary) — this sits on the card's own
+     themed surface, not a data color, so it should lighten in dark mode like
+     any other navy-as-text use. (Left as --primary before the card surface
+     itself could go dark, navy-on-dark-navy was unreadable there.) --emp-pos-bg
+     is a plain rgba (not color-mix()) on purpose — html2canvas (the export)
+     can't parse the color(srgb ...) function Chromium serializes a color-mix()
+     result to, and this sits inside the exported capture area. */
+  color: var(--primary-text);
+  background: var(--emp-pos-bg);
 }
 .emp-card .emp-area {
   right: 3px;
@@ -1022,8 +1060,75 @@ body.board-view #app-root { margin-right: 264px; }
   #topbar .btn-ghost { min-height: 40px; }
   .ms-btn, #filters select, #sort-by { min-height: 40px; }
   .ms-opt { padding: 9px 8px; }
-  #emplist-table th, #emplist-table td { padding: 11px 10px; }
   #emplist-table td.el-check input, #emplist-table th.el-check input { width: 22px; height: 22px; }
+
+  /* Manpower List: table -&gt; cards. Standard CSS-only responsive-table
+     pattern — no new markup, just data-label attributes already added per
+     <td> in renderEmployeeRows() (app.js), surfaced here via ::before. Below
+     640px, mobile number/service area (what a supervisor in the field
+     actually wants) were the two columns cut off entirely; now every field
+     is visible, tap-to-call included (phone already renders via telLink()). */
+  /* the sortable column headers don't carry over into card view (tapping a
+     tiny header to sort isn't a real touch target anyway), but "select all"
+     still needs a home — keep just that one checkbox, with its own label
+     since the column header text next to it is gone */
+  #emplist-table thead { display: block; margin-bottom: 8px; }
+  #emplist-table thead tr { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  #emplist-table thead th { display: none; }
+  #emplist-table thead th.el-check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: auto;
+    padding: 0;
+  }
+  #emplist-table thead th.el-check::after { content: "Select all"; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  #emplist-table, #emplist-table tbody, #emplist-table tr, #emplist-table td { display: block; width: auto; }
+  .table-wrap { border: none; background: none; }
+  #emplist-table tbody tr {
+    position: relative;
+    margin-bottom: 10px;
+    padding: 12px 44px 4px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  #emplist-table tbody tr.selected { background: var(--pool-tint); }
+  #emplist-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+  }
+  #emplist-table td:last-child { border-bottom: none; }
+  #emplist-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+  }
+  /* the name is the card's title, not another labeled row */
+  #emplist-table td[data-label="Name"] {
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: none;
+    padding-bottom: 4px;
+  }
+  #emplist-table td[data-label="Name"]::before { content: none; }
+  #emplist-table td.el-check {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 0;
+    border: none;
+  }
 
   /* toolbar filters get their own full-width row so they don't crowd the buttons */
   #filters { width: 100%; flex-wrap: wrap; }
@@ -1294,6 +1399,12 @@ body.board-view #app-root { margin-right: 264px; }
   box-shadow: 0 8px 24px rgba(0,0,0,.2);
   min-width: 200px;
   padding: 4px;
+  /* a board with many missions (Assign to mission) or many boards (Move to
+     board) had no cap before — scroll rather than run off the bottom of the
+     screen (showContextMenu already clamps its left/top against the viewport
+     using this element's own height, so the cap keeps that math sane too) */
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
 }
 .ctx-item {
   padding: 7px 12px;
@@ -1494,7 +1605,7 @@ button.chart-legend-item:hover { text-decoration: underline; }
   font-weight: 600;
   background: var(--emp-bg);
   border: 1px solid var(--emp-perm-border);
-  color: var(--card-ink);
+  color: var(--emp-ink);
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,.12);
 }

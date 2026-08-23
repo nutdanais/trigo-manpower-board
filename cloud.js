@@ -86,7 +86,12 @@ const cloud = {
   async _loadEmployees() {
     const { data, error } = await sb.from("employees").select("*").order("name");
     if (error) throw error;
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", areaId: e.area_id, boardId: e.board_id }));
+    // active is carried through as-is (undefined pre-migration, true/false after)
+    // and NOT filtered out here — an archived employee's past mission/zone
+    // assignments still need to resolve through D().employees when rendering
+    // history. app.js filters to "active only" at the specific call sites
+    // where "current roster" (not "who was really there") is the right idea.
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
   },
   async _loadOverrides() {
     // tolerate the table not existing yet (before the workweek migration is run) —
@@ -489,17 +494,30 @@ const cloud = {
     if (error) throw error;
     await this._loadEmployees();
   },
-  async deleteEmployee(employeeId) {
-    const { error } = await sb.from("employees").delete().eq("id", employeeId);
-    if (error) throw error;
-    this._invalidatePlans();   // their assignments cascade-delete — drop stale plan cache
+  /* Soft-delete: flips active off instead of removing the row. A hard DELETE
+     here cascades (assignments.employee_id references employees(id) on
+     delete cascade — schema.sql) and silently wipes every past mission/zone
+     assignment for that person, past and future — exactly the "rewrites
+     finished plans" problem archiving exists to avoid. Pre-migration (no
+     active column yet), falls back to the old hard-delete so the button
+     still works, just without history preserved, same as before. */
+  async archiveEmployee(employeeId) {
+    const { error } = await sb.from("employees").update({ active: false }).eq("id", employeeId);
+    if (!error) { await this._loadEmployees(); return; }
+    if (this._missingColumnFromError(error) !== "active") throw error;
+    const { error: delErr } = await sb.from("employees").delete().eq("id", employeeId);
+    if (delErr) throw delErr;
+    this._invalidatePlans();
     await this._loadEmployees();
   },
-  /* bulk-delete one or many employees (Manpower List multi-select) */
-  async deleteEmployees(ids) {
+  /* bulk-archive one or many employees (Manpower List multi-select) */
+  async archiveEmployees(ids) {
     if (!ids.length) return;
-    const { error } = await sb.from("employees").delete().in("id", ids);
-    if (error) throw error;
+    const { error } = await sb.from("employees").update({ active: false }).in("id", ids);
+    if (!error) { await this._loadEmployees(); return; }
+    if (this._missingColumnFromError(error) !== "active") throw error;
+    const { error: delErr } = await sb.from("employees").delete().in("id", ids);
+    if (delErr) throw delErr;
     this._invalidatePlans();
     await this._loadEmployees();
   },
