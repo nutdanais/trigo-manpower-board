@@ -37,6 +37,27 @@ function addDays(iso, n) {
   d.setDate(d.getDate() + n);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* Bounded pass, not a rewrite of every innerHTML site in this file: applied
+   where markup is built from a free-typed field (employee/area names,
+   mission number/host/customer/PPE, phone). Most other innerHTML call sites
+   interpolate static enum labels, or already use .textContent (see e.g.
+   board/engineer names in the Overview charts) — this only touches the
+   sites that were actually building HTML from user-entered text. */
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+/* strip everything but digits/+ so the href itself is always a valid,
+   injection-safe tel: URI regardless of how the number was typed in */
+function telHref(phone) {
+  const digits = String(phone || "").replace(/[^\d+]/g, "");
+  return digits ? "tel:" + digits : "";
+}
+function telLink(phone, cls) {
+  const href = telHref(phone);
+  return href ? `<a class="tel-link${cls ? " " + cls : ""}" href="${href}" onclick="event.stopPropagation()">${escapeHtml(phone)}</a>` : (phone || "");
+}
 /* default landing = next working day: tomorrow, skipping weekends & holidays */
 function defaultPlanningDate() {
   let d = addDays(todayStr(), 1);
@@ -44,26 +65,34 @@ function defaultPlanningDate() {
   return d;
 }
 
-/* Remember the last board+date the user was looking at, so closing the tab and
-   coming back lands them where they left off instead of always resetting to
-   tomorrow's date on the first board. Without this, a plan made for a later
-   date (or on the non-default board) looked "gone" after a reopen — it was
-   never deleted, the app just landed somewhere else and nobody scrolled to find it. */
+/* Remember the last BOARD the user was looking at (not the date) so reopening
+   the app doesn't dump a multi-board planner back on board #1 every time.
+   The date is deliberately NOT restored: the app always opens on the next
+   working day. Restoring it meant a daily user who planned tomorrow today
+   came back tomorrow and landed on that same date — by then <= today, so
+   read-only 🔒 (see isReadOnly) — and had to click forward every morning.
+   Landing on a date is a pure read (cloud.ensurePlanLoaded), so the choice
+   is purely about where it's most useful to start, not about data safety. */
 const VIEW_KEY = "mpm-last-view";
 function saveViewState() {
   try {
-    localStorage.setItem(VIEW_KEY, JSON.stringify({ boardId: D().activeBoardId, date: state.date }));
+    localStorage.setItem(VIEW_KEY, JSON.stringify({ boardId: D().activeBoardId }));
   } catch { /* storage unavailable (private mode, quota) — just skip persisting */ }
 }
-/* apply the saved board+date if still valid, else fall back to today's default */
+/* Restore the saved board if it's still valid, then always land on the next
+   working day. Order matters: activeBoardId is assigned FIRST because
+   defaultPlanningDate() → isNonWorkingDate() defaults to the active board, and
+   boards have their own weekendDays plus per-date holiday overrides — so the
+   answer depends on which board we just restored. (On Overview / Manpower List
+   there's no real board to read config from; boardWeekendDays() falls back to
+   Sat/Sun, which is the sensible default for those non-board-scoped views.) */
 function restoreViewState() {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY));
     if (v && (v.boardId === OVERVIEW_ID || v.boardId === EMPLIST_ID || D().boards.some(b => b.id === v.boardId))) {
       D().activeBoardId = v.boardId;
     }
-    if (v && /^\d{4}-\d{2}-\d{2}$/.test(v.date)) { state.date = v.date; return; }
-  } catch { /* no saved view, or it's corrupt — fall through to the default */ }
+  } catch { /* no saved view, or it's corrupt — just keep the default board */ }
   state.date = defaultPlanningDate();
 }
 
@@ -87,12 +116,94 @@ const POSITIONS = {
   assistant_site_engineer: { label: "Assistant Site Engineer", short: "AE" },
 };
 async function safely(fn) {
-  try { await fn(); } catch (e) { alert("Something went wrong: " + (e.message || e)); }
+  try { await fn(); } catch (e) { toast("Something went wrong: " + (e.message || e), "error"); }
+}
+
+/* ---------- toasts ----------
+   Replaces window.alert() everywhere: a blocking dialog stops the whole app
+   (and on a factory-floor tablet, easily gets tapped through without being
+   read). These stack bottom-left, auto-dismiss, and never block input. */
+function toast(message, type = "info", opts = {}) {
+  const stack = $("#toast-stack");
+  if (!stack) return;
+  const el = document.createElement("div");
+  el.className = "toast toast-" + type;
+  el.setAttribute("role", type === "error" ? "alert" : "status");
+  const msg = document.createElement("span");
+  msg.className = "toast-msg";
+  msg.textContent = message;
+  el.appendChild(msg);
+  const close = document.createElement("button");
+  close.className = "toast-close";
+  close.type = "button";
+  close.setAttribute("aria-label", "Dismiss");
+  close.textContent = "×";
+  close.onclick = () => remove();
+  el.appendChild(close);
+  stack.appendChild(el);
+  let timer = null;
+  const remove = () => { clearTimeout(timer); el.classList.add("toast-out"); setTimeout(() => el.remove(), 180); };
+  // errors stay up longer (and the user can still dismiss early) — a "your
+  // name already exists" toast that vanishes before it's read helps no one
+  const ms = opts.duration != null ? opts.duration : (type === "error" ? 7000 : 3500);
+  if (ms > 0) timer = setTimeout(remove, ms);
+  return remove;
+}
+
+/* ---------- save/sync status pill ----------
+   Wraps every cloud.js write method so the topbar can show Saving… / Saved
+   HH:MM / Save failed without cloud.js itself knowing about the UI. Reads
+   (ensurePlanLoaded, the _load* calls, getUtilizationRange) are deliberately
+   NOT wrapped — this pill answers "did my change stick?", not "is data
+   loading?". */
+function setSaveStatus(kind) {
+  const el = $("#save-status");
+  if (!el) return;
+  el.classList.remove("hidden", "save-saving", "save-saved", "save-error");
+  if (kind === "saving") {
+    el.classList.add("save-saving");
+    el.textContent = "Saving…";
+  } else if (kind === "saved") {
+    el.classList.add("save-saved");
+    el.textContent = "Saved " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  } else if (kind === "error") {
+    el.classList.add("save-error");
+    el.textContent = "⚠ Save failed";
+  }
+}
+const CLOUD_WRITE_METHODS = [
+  "_copyPlanForward", "resetBoardFromLastWorkingDay", "setAssignment",
+  "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
+  "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
+  "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
+  "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
+  "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
+];
+function wireSaveStatus() {
+  for (const name of CLOUD_WRITE_METHODS) {
+    const orig = cloud[name];
+    if (typeof orig !== "function") continue;
+    cloud[name] = async function (...args) {
+      setSaveStatus("saving");
+      try {
+        const result = await orig.apply(this, args);
+        setSaveStatus("saved");
+        return result;
+      } catch (e) {
+        setSaveStatus("error");
+        throw e;
+      }
+    };
+  }
 }
 
 /* ---------- app state ---------- */
 const state = {
-  date: defaultPlanningDate(),   // land on the next weekday's plan, not today
+  // Provisional: at module-init cloud.data.boards/.overrides are still empty, so
+  // this can't see weekend config or holidays yet. boot() re-derives it via
+  // restoreViewState() once cloud.init() has loaded both — that's the real value.
+  date: defaultPlanningDate(),   // land on the next working day's plan, not today
+  myEmail: null,   // set once at boot from cloud.getSession() — who to NOT toast about
   filters: { engineer: [], host: [], customer: [], shift: [] },   // multi-select; [] = All
   sort: "number",                // default: sort by mission number on every board
   unlockedDates: new Set(),   // past/today dates the user confirmed they want to edit
@@ -108,6 +219,8 @@ const state = {
     filters: { contract: [], position: [], areaId: [], boardId: [] },
     sortKey: "name",
     sortDir: 1,
+    util: null,          // { [empId]: pct } once loaded; null = not fetched yet
+    utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
   },
   overview: {                 // Overview tab: utilization trend chart controls + its cache
     trendRange: 14,           // 7 | 14 | 30 days, ending today (not state.date — the trend is
@@ -133,6 +246,16 @@ const isLocked = (boardId, date) => !!lockInfo(boardId, date);
 /* past AND today are read-only by default — today's plan is already being executed */
 const isReadOnly = () => isLocked(D().activeBoardId, state.date) || (state.date <= todayStr() && !state.unlockedDates.has(state.date));
 const boardEmployees = (boardId) => D().employees.filter(e => e.boardId === boardId);
+/* A deactivated employee (Status column in the Manpower List) is off the
+   planning roster: they disappear from the pools, from mission/leave cards and
+   from the counts built out of them — but only on today's and future boards.
+   A past date is a record of what actually happened, so it keeps showing
+   everyone who was really there; that's the whole reason deactivating is a
+   flag rather than a delete. boardEmployees() above stays unfiltered on
+   purpose — it's the raw lookup history rendering depends on. */
+const showsDeactivated = () => state.date < todayStr();
+const onRoster = (e) => showsDeactivated() || e.active !== false;
+const rosterEmployees = (boardId) => boardEmployees(boardId).filter(onRoster);
 
 /* ---------- plan access (reads the cache cloud.js keeps warm) ---------- */
 function emptyPlan() { return { missions: [], zones: emptyZones(), updatedAt: null }; }
@@ -161,6 +284,45 @@ async function ensureUtilizationLoaded() {
   state.overview.utilCacheKey = cacheKey;
 }
 
+/* Manpower List's 30D column. Per employee: days actually deployed on a mission
+   / working days available to them (their board's working days in the window,
+   minus their own leave). So leave doesn't punish the figure, and someone whose
+   board was shut all month reads "—" rather than a misleading 0%.
+   Note this is deliberately NOT the board-level rule, where free on-call is
+   dropped from the denominator: at board level "we didn't need to call anyone"
+   is the system working, but for one on-call individual, days-not-worked is
+   exactly the number you're looking for. An on-call person reading low here is
+   information, not a bug. */
+const EMPLIST_UTIL_DAYS = 30;
+async function ensureEmplistUtilLoaded() {
+  const toDate = todayStr();
+  const fromDate = addDays(toDate, -(EMPLIST_UTIL_DAYS - 1));
+  const cacheKey = fromDate + ".." + toDate + "|" + D().employees.length;
+  if (state.emplist.utilCacheKey === cacheKey) return;
+  const raw = await cloud.getEmployeeUtilization(fromDate, toDate);
+  // working days per board across the window, computed once rather than per employee
+  const workingByBoard = {};
+  for (const b of D().boards) {
+    let n = 0;
+    for (let d = fromDate; d <= toDate; d = addDays(d, 1)) if (!isNonWorkingDate(d, b.id)) n++;
+    workingByBoard[b.id] = n;
+  }
+  const out = {};
+  for (const e of D().employees) {
+    const r = raw[e.id];
+    const working = workingByBoard[e.boardId] || 0;
+    // only leave that lands on a working day shrinks the denominator
+    let leaveOnWorkdays = 0;
+    if (r) for (const d of r.leaveDates) if (!isNonWorkingDate(d, e.boardId)) leaveOnWorkdays++;
+    const denom = working - leaveOnWorkdays;
+    let worked = 0;
+    if (r) for (const d of r.workedDates) if (!isNonWorkingDate(d, e.boardId)) worked++;
+    out[e.id] = denom > 0 ? Math.round((worked / denom) * 100) : null;
+  }
+  state.emplist.util = out;
+  state.emplist.utilCacheKey = cacheKey;
+}
+
 /* warm the cache for whatever is currently in view, then redraw. Loading is
    always a pure read — no view, refresh, Realtime ping, tab refocus, or login
    ever seeds a plan. A future day stays empty until a user explicitly carries
@@ -170,7 +332,10 @@ async function refreshData() {
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
     await ensureUtilizationLoaded();
   } else if (isEmployeeList()) {
-    // employee master data is already kept warm in the cache — nothing date-scoped to load
+    // employee master data is already warm in the cache; the 30D column is the
+    // one thing here that needs a fetch, and it's cached across redraws so
+    // typing in the search box doesn't re-query
+    await ensureEmplistUtilLoaded();
   } else if (D().activeBoardId) {
     await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
   }
@@ -403,9 +568,9 @@ function empCard(emp) {
     + (state.selectedEmps.has(emp.id) ? " selected" : "");
   card.draggable = true;
   card.dataset.empId = emp.id;
-  card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span><span class="emp-name">${emp.name}</span>`
+  card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span><span class="emp-name">${escapeHtml(emp.name)}</span>`
     + (pos ? `<span class="emp-pos">${pos.short}</span>` : "")
-    + (area ? `<span class="emp-area" style="background:${area.color}">${area.name}</span>` : "");
+    + (area ? `<span class="emp-area" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "");
   card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
   card.addEventListener("click", (ev) => {
@@ -484,15 +649,54 @@ function closeFilterPops() {
   for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop")) p.classList.add("hidden");
 }
 
+/* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
+   above ~640px, where the panel is just an ordinary part of the toolbar row */
+function hideToolbarMore() {
+  const panel = $("#toolbar-more");
+  if (!panel || !panel.classList.contains("open")) return;
+  panel.classList.remove("open");
+  $("#btn-toolbar-more").setAttribute("aria-expanded", "false");
+}
+
 /* ---------- context menu ---------- */
 function hideContextMenu() { $("#context-menu").classList.add("hidden"); }
 
+/* Two-layer menu. The long lists (missions, boards, leave types) live one
+   level down instead of all being inlined: a board with a dozen missions used
+   to push this past the height of the screen, which is what the scroll cap
+   was papering over. Drill-down rather than hover-out flyouts — no second
+   layer to position (so nothing can open off-screen), and it works the same
+   under a finger as under a mouse. `ctxMenu` holds what the open menu is
+   acting on so a submenu can re-render without recomputing the selection. */
+let ctxMenu = null;   // { emp, ids, many, x, y }
+
 function showContextMenu(emp, x, y) {
-  const menu = $("#context-menu");
   // acts on the whole selection when >1 is selected, else just this employee
   const ids = state.selectedEmps.size > 1 && state.selectedEmps.has(emp.id) ? [...state.selectedEmps] : [emp.id];
-  const many = ids.length > 1;
-  menu.innerHTML = `<div class="ctx-title">${many ? ids.length + " employees selected" : emp.name}</div>`;
+  ctxMenu = { emp, ids, many: ids.length > 1, x, y };
+  renderCtxMenu("root");
+}
+
+/* Keep the menu anchored where the click happened, but never let it hang off
+   an edge. The lower clamp matters now that a submenu can be a different
+   height than the level above it — and the max(8, …) stops a menu taller than
+   the viewport from being pushed to a negative top, which put its first items
+   out of reach entirely. */
+function positionContextMenu() {
+  const menu = $("#context-menu");
+  const { x, y } = ctxMenu;
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8)) + "px";
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8)) + "px";
+}
+
+function renderCtxMenu(view) {
+  const menu = $("#context-menu");
+  const { emp, ids, many } = ctxMenu;
+  menu.innerHTML = "";
+
+  const addTitle = (text) => { const h = document.createElement("div"); h.className = "ctx-title"; h.textContent = text; menu.appendChild(h); };
+  // a leaf action: run it and close
   const addItem = (label, fn, cls) => {
     const it = document.createElement("div");
     it.className = "ctx-item" + (cls ? " " + cls : "");
@@ -500,44 +704,86 @@ function showContextMenu(emp, x, y) {
     it.onclick = () => { hideContextMenu(); fn(); };
     menu.appendChild(it);
   };
+  // Drills one level down instead of closing. stopPropagation is load-bearing:
+  // renderCtxMenu replaces innerHTML, so by the time this click reaches the
+  // document handler its own target is detached and closest("#context-menu")
+  // no longer matches — the menu would be treated as an outside click and hide
+  // itself the instant you opened a submenu.
+  const addSub = (label, target) => {
+    const it = document.createElement("div");
+    it.className = "ctx-item ctx-sub";
+    it.textContent = label;
+    it.onclick = (ev) => { ev.stopPropagation(); renderCtxMenu(target); };
+    menu.appendChild(it);
+  };
+  const addBack = (text) => {
+    const it = document.createElement("div");
+    it.className = "ctx-item ctx-back";
+    it.textContent = text;
+    it.onclick = (ev) => { ev.stopPropagation(); renderCtxMenu("root"); };
+    menu.appendChild(it);
+  };
   const addSep = () => { const s = document.createElement("div"); s.className = "ctx-sep"; menu.appendChild(s); };
-  const addHead = (label) => { const h = document.createElement("div"); h.className = "ctx-subhead"; h.textContent = label; menu.appendChild(h); };
 
-  // Kept deliberately short: Edit / Move to board / Delete. Position, contract
-  // and service area are still editable — one at a time from the Edit Employee
-  // modal, or in bulk from the Manpower List's selection bar — this menu just
-  // isn't the place for them any more (it grew to 15+ items and slowed down
-  // the three actions people actually reach for from the board).
-  if (!many) addItem("✏ Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)));
-
-  // move to another board (bulk if multiple selected)
+  // peekPlan(menuBoardId) (not getPlan(), which reads state.date under
+  // D().activeBoardId) — this menu also opens from the Manpower List, where
+  // activeBoardId is "__emplist__", not the employee's real board. A
+  // mixed-board bulk selection has no single mission list to offer, so the
+  // placement actions are hidden then; "Move to board" still covers it.
+  const menuBoardId = emp.boardId;
+  const sameBoard = ids.every(id => {
+    const e = D().employees.find(x => x.id === id);
+    return e && e.boardId === menuBoardId;
+  });
+  const plan = sameBoard ? peekPlan(menuBoardId) : null;
+  const current = sameBoard && !many ? currentAssignmentOfIn(plan, emp.id) : null;
+  // already-there targets are dropped: assigning someone to where they already
+  // are is a no-op assignEmployeesTo would skip anyway
+  const missions = sameBoard ? plan.missions.filter(m => !m.hidden && !(current && current.missionId === m.id)) : [];
+  const leaveZones = sameBoard ? LEAVE_ZONES.filter(z => !(current && current.zone === z)) : [];
   const targetBoards = many ? D().boards : D().boards.filter(b => b.id !== emp.boardId);
-  if (targetBoards.length) {
-    addSep();
-    if (many) addHead(`Move ${ids.length} to board`);
+  const who = many ? `${ids.length} employees` : emp.name;
+
+  if (view === "boards") {
+    addBack("‹ Move to board");
     for (const b of targetBoards) {
-      const label = many ? b.name : `➜ Move to ${b.name}`;
-      addItem(label, () => guardEdit(() => safely(async () => {
+      addItem(b.name, () => guardEdit(() => safely(async () => {
         await cloud.moveEmployeesToBoard(ids, b.id, state.date);
         clearSelection();
         await refreshAndRender();
-      })), many ? "ctx-pos" : undefined);
+      })));
     }
+  } else if (view === "missions") {
+    addBack("‹ Assign to mission");
+    for (const m of missions) {
+      addItem(m.number, () => guardEdit(() => assignEmployeesTo(ids, { missionId: m.id })));
+    }
+  } else if (view === "leave") {
+    addBack("‹ Leave");
+    for (const z of leaveZones) {
+      addItem(ZONE_LABELS[z], () => guardEdit(() => assignEmployeesTo(ids, { zone: z })));
+    }
+  } else {
+    addTitle(many ? `${ids.length} employees selected` : emp.name);
+    if (!many) addItem("✏ Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)));
+    if (targetBoards.length) addSub("➜ Move to board", "boards");
+    if (missions.length) addSub("⊕ Assign to mission", "missions");
+    if (leaveZones.length) addSub("🌴 Leave", "leave");
+    if (sameBoard && (many || current)) {
+      addItem(many ? "↩ Return to standby / pool" : `↩ Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`,
+        () => guardEdit(() => assignEmployeesTo(ids, null)));
+    }
+    addSep();
+    addItem(many ? `🚫 Deactivate ${ids.length} employees` : "🚫 Deactivate employee", () => {
+      showConfirm("Deactivate employee" + (many ? "s" : "") + "?",
+        `Deactivate ${who}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
+        () => safely(async () => { await cloud.setEmployeesActive(ids, false); clearSelection(); await refreshAndRender(); }));
+    }, "ctx-danger");
   }
 
-  addSep();
-  addItem(many ? `🗑 Delete ${ids.length} employees` : "🗑 Delete employee", () => {
-    showConfirm("Delete employee" + (many ? "s" : "") + "?",
-      many
-        ? `Delete ${ids.length} selected employees? This removes them from every mission/zone assignment, past and future.`
-        : `Delete ${emp.name}? This removes them from every mission/zone assignment, past and future.`,
-      () => safely(async () => { await cloud.deleteEmployees(ids); clearSelection(); await refreshAndRender(); }));
-  }, "ctx-danger");
-
   menu.classList.remove("hidden");
-  const rect = menu.getBoundingClientRect();
-  menu.style.left = Math.min(x, window.innerWidth - rect.width - 8) + "px";
-  menu.style.top = Math.min(y, window.innerHeight - rect.height - 8) + "px";
+  menu.scrollTop = 0;   // a submenu opened after scrolling the level above starts at its own top
+  positionContextMenu();
 }
 
 function renderZones() {
@@ -547,8 +793,22 @@ function renderZones() {
     body.innerHTML = "";
     const emps = plan.zones[z]
       .map(empId => D().employees.find(e => e.id === empId))
-      .filter(e => e && e.boardId === D().activeBoardId);
+      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
     for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
+    // an empty leave zone collapses to a thin one-line drop target instead of
+    // a fixed-height card — most days only 1-2 of the 5 types are ever used,
+    // so the other 3-4 were costing ~175px of screen space for nothing.
+    // The element and its data-drop target don't change, so drag/drop keeps
+    // working exactly as before; only the CSS presentation shrinks.
+    const zoneEl = body.closest(".zone");
+    const isEmpty = emps.length === 0;
+    zoneEl.classList.toggle("zone-empty", isEmpty);
+    if (isEmpty) {
+      const hint = document.createElement("span");
+      hint.className = "zone-empty-hint";
+      hint.textContent = "Drag here";
+      body.appendChild(hint);
+    }
   }
   renderFloatPool();
 }
@@ -559,7 +819,7 @@ function unassignedEmployees() {
   const placed = new Set();
   for (const m of plan.missions) for (const e of m.members) placed.add(e);
   for (const z of ZONES) for (const e of plan.zones[z]) placed.add(e);
-  return boardEmployees(D().activeBoardId).filter(e => !placed.has(e.id));
+  return rosterEmployees(D().activeBoardId).filter(e => !placed.has(e.id));
 }
 
 /* service-area filter chips in the floating panel (empty selection = show all) */
@@ -575,7 +835,7 @@ function renderAreaFilter() {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "fp-area-chip" + (state.poolAreas.has(a.id) ? " on" : "");
-    chip.innerHTML = `<span class="dot" style="background:${a.color}"></span>${a.name}<b>${counts.get(a.id)}</b>`;
+    chip.innerHTML = `<span class="dot" style="background:${a.color}"></span>${escapeHtml(a.name)}<b>${counts.get(a.id)}</b>`;
     chip.onclick = () => {
       state.poolAreas.has(a.id) ? state.poolAreas.delete(a.id) : state.poolAreas.add(a.id);
       renderFloatPool();
@@ -621,6 +881,14 @@ function renderFloatPool() {
   if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : (holiday ? "No one on holiday" : "Everyone permanent is assigned")}</span>`;
   if (!oncallBody.children.length) oncallBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "No on-call free"}</span>`;
   markSelectedCards();
+  // Both pools genuinely empty (not just filtered down by search/area) — the
+  // panel is reserving 264px to say "nobody's here" twice. Collapse it to a
+  // thin rail; it still expands on hover/drag (see the .fp-collapsed CSS and
+  // the dragenter/dragleave wiring in wireApp) so it's never actually gone as
+  // a drop target, just out of the way when there's nothing in it.
+  const bothEmpty = standbyN === 0 && oncallN === 0;
+  $("#float-pool").classList.toggle("fp-collapsed", bothEmpty);
+  document.body.classList.toggle("fp-collapsed", bothEmpty);
 }
 
 /* The floating panel above only ever searches the two UNASSIGNED pools, so
@@ -704,12 +972,12 @@ function renderMissions() {
     header.style.background = eng ? eng.color : "#ccc";
     header.title = "Click to edit mission";
     header.innerHTML = `
-      <div class="m-number">${m.number}</div>
-      <div>Host: ${m.host}</div>
+      <div class="m-number">${escapeHtml(m.number)}</div>
+      <div>Host: ${escapeHtml(m.host)}</div>
       <div>${m.shift === "night" ? '<span class="night-badge">🌙 NIGHT</span>' : "☀️ Day"} ${m.startTime}-${m.endTime}</div>
-      <div>Cust: ${m.customer}</div>
-      ${m.ppe ? `<div class="m-ppe">PPE: ${m.ppe}</div>` : ""}
-      <div class="m-eng">${eng ? eng.name : "?"}${eng && eng.phone ? "<br>" + eng.phone : ""}</div>`;
+      <div>Cust: ${escapeHtml(m.customer)}</div>
+      ${m.ppe ? `<div class="m-ppe">PPE: ${escapeHtml(m.ppe)}</div>` : ""}
+      <div class="m-eng">${eng ? escapeHtml(eng.name) : "?"}${eng && eng.phone ? "<br>" + telLink(eng.phone) : ""}</div>`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
     const body = document.createElement("div");
     body.className = "mission-body dropzone";
@@ -718,7 +986,7 @@ function renderMissions() {
     empRow.className = "mission-emps";
     const memberEmps = m.members
       .map(empId => D().employees.find(e => e.id === empId))
-      .filter(e => e && e.boardId === D().activeBoardId);
+      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
     for (const emp of sortEmployeesDisplay(memberEmps)) empRow.appendChild(empCard(emp));
     body.appendChild(empRow);
     if (m.remark) {
@@ -737,7 +1005,10 @@ function renderMissions() {
 
 /* stats for one board on the current date (reads cache only, never fetches) */
 function boardStats(boardId) {
-  const emps = boardEmployees(boardId);
+  // rosterEmployees, not boardEmployees: `ids` below gates which assignments
+  // get counted, so this one swap keeps the headcount AND the assigned/leave
+  // tallies consistent with what the board actually renders
+  const emps = rosterEmployees(boardId);
   const ids = new Set(emps.map(e => e.id));
   const plan = peekPlan(boardId);
   // hidden missions are already emptied of members when hidden (their people
@@ -802,8 +1073,8 @@ function renderStats() {
   bar.innerHTML = "";
   areaBar.innerHTML = "";
   if (isOverview()) {
-    bar.appendChild(statChip("All employees", D().employees.length));
-    for (const b of D().boards) bar.appendChild(statChip(b.name, boardEmployees(b.id).length));
+    bar.appendChild(statChip("All employees", D().employees.filter(onRoster).length));
+    for (const b of D().boards) bar.appendChild(statChip(b.name, rosterEmployees(b.id).length));
     return;
   }
   if (isEmployeeList()) {
@@ -833,12 +1104,21 @@ function renderStats() {
 /* ---------- overview tab ---------- */
 function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); }
 
-/* assigned ÷ (headcount − leave − onHoliday) — "how much of the people actually
-   available today is deployed". onHoliday defaults to 0 for callers (e.g. the
-   historical trend chart) that don't track it separately. Spelled out in the
-   UI (not just this comment) since it's not guessable from the number alone. */
-function utilizationPct(assigned, headcount, leave, onHoliday = 0) {
-  const denom = headcount - leave - onHoliday;
+/* assigned ÷ (headcount − leave − onHoliday − free on-call) — "how much of the
+   people actually available today is deployed". onHoliday and oncallFree default
+   to 0 for callers that don't track them separately. Spelled out in the UI (not
+   just this comment) since it's not guessable from the number alone. */
+/* Free on-call staff are NOT a utilization gap. On-call is surge capacity: not
+   calling someone in is the system working as intended, not idle headcount. So
+   they come out of the denominator entirely — a day where every permanent
+   employee is deployed reads 100%, however many on-call people went uncalled.
+   (They're still counted the moment they ARE deployed: an on-call person on a
+   mission is in `assigned` and, being neither free nor on leave, stays in the
+   denominator.) "On-call free" keeps its own chip in the stats bar and its own
+   column in Overview's By board table — the number isn't hidden, it just
+   doesn't drag utilization down. */
+function utilizationPct(assigned, headcount, leave, onHoliday = 0, oncallFree = 0) {
+  const denom = headcount - leave - onHoliday - oncallFree;
   return denom > 0 ? Math.round((assigned / denom) * 100) : 0;
 }
 
@@ -1004,16 +1284,21 @@ function renderOverview() {
     return mini;
   };
 
-  const totalEmp = D().employees.length;
+  // roster for the date on screen — boardStats() is already roster-filtered, so
+  // these global totals have to use the same set or the KPI strip, the By board
+  // table and every utilization denominator disagree by however many people are
+  // currently deactivated. (Past dates keep everyone; see onRoster().)
+  const rosterAll = D().employees.filter(onRoster);
+  const totalEmp = rosterAll.length;
   const totalAssigned = boards.reduce((s, b) => s + stats[b.id].assigned, 0);
   const totalLeave = boards.reduce((s, b) => s + stats[b.id].leave, 0);
   const totalStandby = boards.reduce((s, b) => s + stats[b.id].standby, 0);
   const totalOnHoliday = boards.reduce((s, b) => s + stats[b.id].onHoliday, 0);
   const totalOncallFree = boards.reduce((s, b) => s + stats[b.id].oncallAvailable, 0);
   const totalMissions = boards.reduce((s, b) => s + stats[b.id].missions, 0);
-  const totalPerm = D().employees.filter(e => e.contract === "permanent").length;
+  const totalPerm = rosterAll.filter(e => e.contract === "permanent").length;
   const totalOncall = totalEmp - totalPerm;
-  const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday);
+  const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday, totalOncallFree);
 
   /* ---------- KPI strip: the handful of numbers that read fine as numbers ----------
      Deliberately headline-only. These tiles used to carry a per-board breakdown
@@ -1039,7 +1324,7 @@ function renderOverview() {
   kpiRow.appendChild(kpi(totalMissions, `Missions (${fmtDate(state.date)})`,
     totalUnstaffed ? `${totalUnstaffed} with no crew yet` : "all missions have crew"));
   kpiRow.appendChild(kpi(totalAssigned, "Assigned to a mission", `${totalStandby} standby · ${totalLeave} on leave`));
-  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization", "assigned ÷ (headcount − leave − holiday)"));
+  kpiRow.appendChild(kpi(overallUtil + "%", "Overall utilization", "assigned ÷ (headcount − leave − holiday − free on-call)"));
   panel.appendChild(kpiRow);
 
   /* ---------- by board: the per-board comparison, as rows not a sentence ---------- */
@@ -1051,7 +1336,7 @@ function renderOverview() {
     sub: stats[b.id].isHoliday ? "holiday" : null,
     onClick: () => { D().activeBoardId = b.id; refreshAndRender(); },
     values: {
-      util: utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday),
+      util: utilizationPct(stats[b.id].assigned, stats[b.id].total, stats[b.id].leave, stats[b.id].onHoliday, stats[b.id].oncallAvailable),
       missions: stats[b.id].missions,
       total: stats[b.id].total,
       assigned: stats[b.id].assigned,
@@ -1104,7 +1389,7 @@ function renderOverview() {
     anyAttn = true;
     const card = document.createElement("div");
     card.className = "ov-card";
-    card.innerHTML = `<h4>${b.name}</h4>`;
+    card.innerHTML = `<h4>${escapeHtml(b.name)}</h4>`;
     if (s.standby) {
       const box = document.createElement("div");
       box.className = "ov-avail";
@@ -1176,6 +1461,18 @@ function renderOverview() {
   engRows.sort((a, b) => b.values.missions - a.values.missions || b.values.crew - a.values.crew
     || a.label.localeCompare(b.label));
   if (engRows.length) {
+    // Summed from engLoad, not from the rows above — the rows include a zero
+    // entry for every engineer, and (when present) the "no engineer set" row,
+    // so summing them would be right only by luck. This counts each mission
+    // once regardless of who it's attributed to.
+    const engTotals = [...engLoad.values()].reduce(
+      (acc, r) => ({ missions: acc.missions + r.missions, crew: acc.crew + r.crew }),
+      { missions: 0, crew: 0 });
+    engRows.push({
+      key: "__total__", label: "All engineers", isTotal: true,
+      sub: `${boards.length} board${boards.length === 1 ? "" : "s"}`,
+      values: engTotals,
+    });
     engSec.appendChild(ovCompareTable({
       cols: Object.assign(
         [{ key: "missions", label: "Missions" }, { key: "crew", label: "Crew deployed" }],
@@ -1221,17 +1518,44 @@ function renderOverview() {
     { key: "oncall", label: `On-call (${totalOncall})`, color: "var(--chart-oncall)" },
   ]));
 
-  /* ---------- service-area distribution, all boards ---------- */
-  const areaSec = ovSection("By service area", "Headcount across all boards");
-  const areaRows = D().areas.map(a => ({ label: a.name, value: D().employees.filter(e => e.areaId === a.id).length, color: a.color }))
-    .filter(r => r.value > 0)
-    .sort((a, b) => b.value - a.value);
-  if (areaRows.length) {
-    const areaMax = Math.max(...areaRows.map(r => r.value));
+  /* ---------- service-area distribution, all boards ----------
+     One row per area on a shared scale, split permanent / on-call: the bar's
+     full length is the area's total headcount (so areas stay ranked by size and
+     comparable to each other), the two segments are its contract mix, and the
+     hover tooltip gives each segment's share of that area. Deliberately one
+     chart rather than three separate total/permanent/on-call charts — three
+     would cost three times the space and still make "how much of NPT is
+     on-call?" a cross-chart comparison instead of a glance. Same two colours as
+     the contract donuts beside it, so blue = permanent holds across the row. */
+  const areaSec = ovSection("By service area", "Bar length is total headcount; segments split permanent / on-call");
+  const areaData = D().areas.map(a => {
+    const emps = rosterAll.filter(e => e.areaId === a.id);
+    const perm = emps.filter(e => e.contract === "permanent").length;
+    return { area: a, perm, oncall: emps.length - perm, total: emps.length };
+  }).filter(r => r.total > 0).sort((a, b) => b.total - a.total);
+  if (areaData.length) {
+    const areaMax = Math.max(...areaData.map(r => r.total));
     const areaWrap = document.createElement("div");
-    areaWrap.className = "ov-area-bars";
-    areaWrap.innerHTML = Charts.barsH({ rows: areaRows, max: areaMax, barHeight: 16, rowGap: 10 });
+    areaWrap.className = "ov-area-rows";
+    for (const r of areaData) {
+      const row = document.createElement("div");
+      row.className = "ov-area-row";
+      row.innerHTML = `<span class="ov-area-row-label" title="${escapeHtml(r.area.name)}"><span class="ov-area-dot" style="background:${escapeHtml(r.area.color)}"></span><span class="ov-area-row-name">${escapeHtml(r.area.name)}</span></span>
+        <div class="ov-area-row-track"></div><span class="ov-area-row-total">${r.total}</span>`;
+      row.querySelector(".ov-area-row-track").innerHTML = Charts.stackedBarH({
+        segments: [
+          { label: "Permanent", value: r.perm, color: "var(--chart-permanent)" },
+          { label: "On-call", value: r.oncall, color: "var(--chart-oncall)" },
+        ],
+        scaleMax: areaMax, height: 18,
+      });
+      areaWrap.appendChild(row);
+    }
     areaSec.appendChild(areaWrap);
+    areaSec.appendChild(Charts.legendEl([
+      { key: "perm", label: `Permanent (${areaData.reduce((n, r) => n + r.perm, 0)})`, color: "var(--chart-permanent)" },
+      { key: "oncall", label: `On-call (${areaData.reduce((n, r) => n + r.oncall, 0)})`, color: "var(--chart-oncall)" },
+    ]));
   } else {
     areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
   }
@@ -1245,7 +1569,7 @@ function renderOverview() {
 
   /* ---------- utilization trend: 7/14/30 days, one line per board ---------- */
   const trendSec = ovSection("Utilization trend",
-    "Utilized = assigned ÷ (headcount − leave), ending today. Days when every board is off (weekends, shared holidays) are left off the axis, so the line runs straight across them; a day when only some boards are off keeps its place and those boards' lines break. Headcount uses each employee's CURRENT board — a past board move isn't tracked historically, so a moved employee counts on their new board for the whole window shown.");
+    "Utilized = assigned ÷ (headcount − leave − free on-call), ending today. Free on-call staff are surge capacity, not idle headcount, so an uncalled on-call employee leaves the denominator instead of dragging the day down. Days when every board is off (weekends, shared holidays) are left off the axis, so the line runs straight across them; a day when only some boards are off keeps its place and those boards' lines break. Headcount uses each employee's CURRENT board — a past board move isn't tracked historically, so a moved employee counts on their new board for the whole window shown.");
   const controls = document.createElement("div");
   controls.className = "ov-trend-controls";
   for (const n of [7, 14, 30]) {
@@ -1285,7 +1609,9 @@ function renderOverview() {
     points: xDates.map(d => {
       if (isNonWorkingDate(d, b.id)) return { y: null };
       const rec = util[b.id] && util[b.id][d];
-      return rec ? { y: utilizationPct(rec.assigned, rec.headcount, rec.leave), suffix: "%" } : { y: null };
+      // oncallFree for the day = on-call headcount minus those deployed or on leave
+      const oncallFree = rec ? Math.max(0, rec.oncallHeadcount - rec.oncallAssigned - rec.oncallLeave) : 0;
+      return rec ? { y: utilizationPct(rec.assigned, rec.headcount, rec.leave, 0, oncallFree), suffix: "%" } : { y: null };
     }),
   }));
   const noWorkingDays = !xDates.length;   // whole range was weekend/holiday on every board
@@ -1471,9 +1797,9 @@ function renderEmplistFilterOptions() {
   }
   // the bulk-edit dropdowns list the same live areas/boards, so keep them in sync too
   $("#emplist-bulk-area").innerHTML = `<option value="">Set service area…</option>` +
-    D().areas.map(a => `<option value="${a.id}">${a.name}</option>`).join("");
+    D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
   $("#emplist-bulk-board").innerHTML = `<option value="">Move to board…</option>` +
-    D().boards.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+    D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
 }
 
 function emplistFilteredSorted() {
@@ -1495,11 +1821,63 @@ function emplistFilteredSorted() {
       case "phone": return e.phone || "";
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
+      case "active": return e.active === false ? "Inactive" : "Active";
       default: return e.name;
     }
   };
+  // utilization is the one numeric column — "100" vs "9" sorts wrong as text.
+  // Unknown/no-working-days sorts to the bottom either way rather than as 0%,
+  // which would read as "never deployed" and isn't the same claim.
+  if (sortKey === "util") {
+    const u = (e) => {
+      const v = state.emplist.util ? state.emplist.util[e.id] : undefined;
+      return (v === undefined || v === null) ? -1 : v;
+    };
+    emps.sort((a, b) => (u(a) - u(b)) * sortDir || a.name.localeCompare(b.name));
+    return emps;
+  }
   emps.sort((a, b) => sortVal(a).localeCompare(sortVal(b)) * sortDir || a.name.localeCompare(b.name));
   return emps;
+}
+
+/* 30D utilization cell: a meter, not a bar chart — it's one ratio against a
+   fixed 0–100 limit, so the track carries the scale and the number is always
+   printed beside it (never encoded by width alone). `undefined` = still
+   loading, `null` = no working days in the window to divide by. */
+/* CSV wants a bare number so it stays sortable/averageable in Excel */
+function utilCsv(pct) { return (pct === undefined || pct === null) ? "" : String(pct); }
+function utilCell(pct) {
+  if (pct === undefined) return `<span class="el-util-empty">…</span>`;
+  if (pct === null) return `<span class="el-util-empty" title="No working days for this board in the last 30 days">—</span>`;
+  return `<span class="el-util-meter"><span class="el-util-fill" style="width:${Math.min(100, pct)}%"></span></span>`
+    + `<b class="el-util-val">${pct}%</b>`;
+}
+
+/* RFC 4180: a field only needs quoting if it contains a comma, quote, or
+   newline — quoting everything is also correct, just noisier to read raw */
+function csvField(v) {
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function exportEmplistCsv() {
+  const emps = emplistFilteredSorted();   // same rows the table is showing right now
+  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board", "30D utilization", "Status"];
+  const rows = emps.map(e => {
+    const area = D().areas.find(a => a.id === e.areaId);
+    const board = D().boards.find(b => b.id === e.boardId);
+    const pos = e.position ? POSITIONS[e.position] : null;
+    return [e.name, e.contract === "oncall" ? "On-call" : "Permanent", pos ? pos.label : "",
+      e.phone || "", area ? area.name : "", board ? board.name : "",
+      utilCsv(state.emplist.util ? state.emplist.util[e.id] : undefined),
+      e.active === false ? "Inactive" : "Active"];
+  });
+  const csv = [header, ...rows].map(r => r.map(csvField).join(",")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `manpower_list_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function updateEmplistBulkBar() {
@@ -1520,17 +1898,45 @@ function renderEmployeeRows() {
     const area = D().areas.find(a => a.id === e.areaId);
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
+    const isActive = e.active !== false;   // undefined (pre-migration) counts as active
+    const util = state.emplist.util ? state.emplist.util[e.id] : undefined;
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
+    // data-label feeds the phone breakpoint's ::before (styles.css) — below
+    // 640px each <tr> becomes a card and each <td> grows its column header as
+    // an inline label, so the same markup works as a table on desktop and a
+    // card list on phone with no separate render path
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td>${e.name}</td>
-      <td>${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td>${pos ? pos.label : "—"}</td>
-      <td>${e.phone || "—"}</td>
-      <td>${area ? `<span class="area-pill" style="background:${area.color}">${area.name}</span>` : "—"}</td>
-      <td>${board ? board.name : "—"}</td>`;
+      <td data-label="Name">${escapeHtml(e.name)}</td>
+      <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
+      <td data-label="Position">${pos ? pos.label : "—"}</td>
+      <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "—"}</td>
+      <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
+      <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
+      <td data-label="Status" class="el-status">
+        <label class="toggle toggle-active">
+          <input type="checkbox" ${isActive ? "checked" : ""}>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">${isActive ? "Active" : "Inactive"}</span>
+        </label>
+      </td>`;
+    tr.classList.toggle("row-inactive", !isActive);
+    // No confirm: unlike the menu's Deactivate this is one click to undo. No guardEdit
+    // either — the roster is employee master data, not the day's plan (the
+    // existing bulk actions in this table take the same line).
+    tr.querySelector(".el-status input").onchange = (ev) => {
+      const on = ev.target.checked;
+      safely(async () => {
+        await cloud.setEmployeesActive([e.id], on);
+        await refreshAndRender();
+        toast(on
+          ? `${e.name} is active again — back on today's and future boards.`
+          : `${e.name} deactivated — hidden from today's and future boards. Past dates keep them.`, "info");
+      });
+    };
     tr.querySelector(".el-check input").onchange = (ev) => {
       ev.target.checked ? state.selectedEmps.add(e.id) : state.selectedEmps.delete(e.id);
       tr.classList.toggle("selected", ev.target.checked);
@@ -1545,7 +1951,11 @@ function renderEmployeeRows() {
     });
     body.appendChild(tr);
   }
-  $("#emplist-count").textContent = `${emps.length} of ${D().employees.length}`;
+  // surface the inactive tally — otherwise deactivated people are invisible in
+  // a long list and there's no hint the Status column has anything to find
+  const inactiveN = emps.filter(e => e.active === false).length;
+  $("#emplist-count").textContent = `${emps.length} of ${D().employees.length}`
+    + (inactiveN ? ` · ${inactiveN} inactive` : "");
   $("#emplist-select-all").checked = emps.length > 0 && emps.every(e => state.selectedEmps.has(e.id));
   updateEmplistBulkBar();
   for (const th of $$("#emplist-table th[data-sort]")) {
@@ -1563,11 +1973,13 @@ function renderEmployeeList() {
 
 /* where is this employee assigned right now on the current plan?
    returns the payload shape setAssignment expects: {missionId} | {zone} | null */
-function currentAssignmentOf(empId) {
-  const plan = getPlan();
+function currentAssignmentOfIn(plan, empId) {
   for (const m of plan.missions) if (m.members.includes(empId)) return { missionId: m.id };
   for (const z of ZONES) if (plan.zones[z].includes(empId)) return { zone: z };
   return null;
+}
+function currentAssignmentOf(empId) {
+  return currentAssignmentOfIn(getPlan(), empId);
 }
 function samePayload(a, b) {
   if (!a && !b) return true;
@@ -1673,7 +2085,7 @@ function openMissionModal(missionId) {
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
   $("#btn-hide-mission").classList.toggle("hidden", !missionId);
-  form.engineerId.innerHTML = D().engineers.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
+  form.engineerId.innerHTML = D().engineers.map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
   if (missionId) {
     const m = getPlan().missions.find(x => x.id === missionId);
     form.number.value = m.number;
@@ -1711,9 +2123,9 @@ function saveMission(ev) {
     m.shift === vals.shift && m.id !== state.editingMissionId);
   if (dup) {
     const shiftLabel = vals.shift === "night" ? "Night" : "Day";
-    alert(dup.hidden
+    toast(dup.hidden
       ? `A hidden mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use "👁 Hide/Unhide" to unhide and reuse it, or pick a different shift.`
-      : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`);
+      : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`, "warn");
     return;
   }
   safely(async () => {
@@ -1760,9 +2172,9 @@ function openEmployeeModal(empId) {
   const form = $("#form-employee");
   form.reset();
   $("#employee-modal-title").textContent = empId ? "Edit Employee" : "New Employee";
-  $("#btn-delete-employee").classList.toggle("hidden", !empId);
-  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}">${a.name}</option>`).join("");
-  form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+  $("#btn-deactivate-employee").classList.toggle("hidden", !empId);
+  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+  form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
   if (empId) {
     const e = D().employees.find(x => x.id === empId);
     form.name.value = e.name;
@@ -1786,7 +2198,7 @@ function saveEmployee(ev) {
   const dup = D().employees.find(e =>
     e.id !== state.editingEmployeeId && e.name.trim().toLowerCase() === vals.name.toLowerCase());
   if (dup) {
-    alert(`An employee named "${vals.name}" already exists. Use a different name (e.g. add an ID/initial) to tell them apart.`);
+    toast(`An employee named "${vals.name}" already exists. Use a different name (e.g. add an ID/initial) to tell them apart.`, "warn");
     return;
   }
   safely(async () => {
@@ -1802,11 +2214,13 @@ function saveEmployee(ev) {
   });
 }
 
-function deleteEmployee() {
+function deactivateEmployee() {
   const e = D().employees.find(x => x.id === state.editingEmployeeId);
-  showConfirm("Delete employee?", `Delete ${e.name}? This removes them from every mission/zone assignment, past and future.`, () => {
+  showConfirm("Deactivate employee?",
+    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`, () => {
     safely(async () => {
-      await cloud.deleteEmployee(state.editingEmployeeId);
+      await cloud.setEmployeesActive([state.editingEmployeeId], false);
+      closeModal();
       await refreshAndRender();
     });
   });
@@ -1914,7 +2328,10 @@ function buildExportPools() {
     { key: "standby", cls: "zone-pool", label: "Standby", sub: "permanent, unassigned", list: sortEmployeesDisplay(unassigned.filter(e => e.contract !== "oncall")) },
     { key: "oncall", cls: "zone-oncall-pool", label: "Available On-call", sub: "not flagged", list: sortEmployeesDisplay(unassigned.filter(e => e.contract === "oncall")) },
   ];
-  for (const g of groups) {
+  // same rule as the leave zones (hideEmptyLeaveZonesForExport): an empty pool
+  // ("Standby (0) — None") is padding, not information — skip it entirely
+  // rather than printing a row that says nothing
+  for (const g of groups.filter(g => g.list.length)) {
     const zone = document.createElement("div");
     zone.className = "zone " + g.cls;
     const lab = document.createElement("div");
@@ -1928,7 +2345,6 @@ function buildExportPools() {
       c.draggable = false;
       body.appendChild(c);
     }
-    if (!g.list.length) body.innerHTML = `<span class="fp-empty">None</span>`;
     zone.appendChild(lab);
     zone.appendChild(body);
     sec.appendChild(zone);
@@ -2018,13 +2434,22 @@ async function exportBoard() {
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
   document.body.classList.add("exporting");
+  // The exported JPG is a shared artifact (printed, posted, sent to a customer) —
+  // it must not depend on the viewer's own dark-mode preference. Force light for
+  // the capture, since --bg/--panel/--emp-card etc. all redefine under
+  // [data-theme="dark"] and body.exporting only swaps the glass tokens.
+  const wasDark = document.documentElement.getAttribute("data-theme") === "dark";
+  if (wasDark) document.documentElement.removeAttribute("data-theme");
   // temporarily fold the available pools into the captured board — but not on a
   // holiday, where only the employees actually assigned to work should show up
   // (standby/available on-call are meaningless when nobody is expected in)
   let pools = null;
   if (!isOverview() && !isNonWorkingDate(state.date)) {
-    pools = buildExportPools();
-    $("#status-zones").insertAdjacentElement("afterend", pools);
+    const built = buildExportPools();
+    if (built.children.length) {   // both pools empty (fully staffed) — nothing to show
+      pools = built;
+      $("#status-zones").insertAdjacentElement("afterend", pools);
+    }
   }
   let restoreEmptyMissions = null;
   let restoreLeaveZones = null;
@@ -2059,6 +2484,7 @@ async function exportBoard() {
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting");
+    if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     btn.disabled = false;
     btn.textContent = "📷 Export";
     if (!isOverview()) layoutMasonry();   // re-pack at the normal on-screen width
@@ -2180,8 +2606,8 @@ function openImportModal() {
         const row = document.createElement("label");
         row.className = "import-row";
         row.innerHTML = `<input type="checkbox" value="${m.id}">
-          <span class="import-info"><b>${m.number}</b> — ${m.host} → ${m.customer}
-          <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + eng.name : ""}</small></span>`;
+          <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
+          <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""}</small></span>`;
         list.appendChild(row);
       }
     } catch (e) {
@@ -2200,7 +2626,7 @@ function confirmImport() {
     if (D().plans[D().activeBoardId]) delete D().plans[D().activeBoardId][state.date];
     await refreshAndRender();
     if (result && result.skipped > 0) {
-      alert(`${result.added} mission(s) added. ${result.skipped} already existed on this date/shift and were skipped.`);
+      toast(`${result.added} mission(s) added. ${result.skipped} already existed on this date/shift and were skipped.`, "info");
     }
   });
 }
@@ -2219,8 +2645,8 @@ function openHideMissionsModal() {
       const row = document.createElement("label");
       row.className = "import-row";
       row.innerHTML = `<input type="checkbox" value="${m.id}" ${m.hidden ? "checked" : ""}>
-        <span class="import-info"><b>${m.number}</b> — ${m.host} → ${m.customer}
-        <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + eng.name : ""} • ${m.members.length} assigned</small></span>`;
+        <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
+        <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""} • ${m.members.length} assigned</small></span>`;
       list.appendChild(row);
     }
     openModal("#modal-hide-missions");
@@ -2248,7 +2674,7 @@ function resetBoard() {
   const run = () => safely(async () => {
     const src = await cloud.resetBoardFromLastWorkingDay(D().activeBoardId, state.date);
     await refreshAndRender();
-    if (!src) alert("No previous working-day plan was found to copy from.");
+    if (!src) toast("No previous working-day plan was found to copy from.", "warn");
   });
   // On an untouched day there's nothing to overwrite, so carry over straight
   // away. Once the day has content, confirm first — this replaces it.
@@ -2330,6 +2756,32 @@ function wireLogin() {
 
 /* ---------- wiring ---------- */
 function wireApp() {
+  $("#btn-toolbar-more").onclick = (ev) => {
+    ev.stopPropagation();   // don't let the outside-click handler close it immediately
+    const panel = $("#toolbar-more");
+    const open = panel.classList.toggle("open");
+    $("#btn-toolbar-more").setAttribute("aria-expanded", String(open));
+  };
+  // Collapsed float pool (see renderFloatPool/.fp-collapsed): mouse hover expands
+  // it via plain CSS, but native HTML5 drag doesn't reliably keep :hover active
+  // in every browser, so a card dragged toward the empty pool needs this too.
+  // dragenter/dragleave bubble from every child as the cursor crosses them, so
+  // a depth counter (not a single boolean) is what keeps the panel open while
+  // the drag is still somewhere inside it.
+  let fpDragDepth = 0;
+  const floatPool = $("#float-pool");
+  floatPool.addEventListener("dragenter", () => {
+    fpDragDepth++;
+    floatPool.classList.add("fp-drag-hover");
+  });
+  floatPool.addEventListener("dragleave", () => {
+    fpDragDepth = Math.max(0, fpDragDepth - 1);
+    if (fpDragDepth === 0) floatPool.classList.remove("fp-drag-hover");
+  });
+  floatPool.addEventListener("drop", () => { fpDragDepth = 0; floatPool.classList.remove("fp-drag-hover"); });
+  // a cancelled drag (Escape, dropped outside any dropzone) fires dragend with
+  // no matching dragleave — reset here too or the panel could stay stuck open
+  document.addEventListener("dragend", () => { fpDragDepth = 0; floatPool.classList.remove("fp-drag-hover"); });
   $("#btn-new-mission").onclick = () => guardEdit(() => openMissionModal(null));
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
@@ -2338,7 +2790,7 @@ function wireApp() {
   $("#btn-hide-mission").onclick = hideMission;
   $("#btn-hide-missions").onclick = openHideMissionsModal;
   $("#btn-hide-missions-save").onclick = saveHideMissions;
-  $("#btn-delete-employee").onclick = deleteEmployee;
+  $("#btn-deactivate-employee").onclick = deactivateEmployee;
 
   $("#btn-settings").onclick = () => { renderSettings(); openModal("#modal-settings"); };
   for (const btn of $$("#settings-tabs .settings-tab")) {
@@ -2425,6 +2877,7 @@ function wireApp() {
   };
 
   // ---------- Manpower List tab ----------
+  $("#btn-emplist-csv").onclick = exportEmplistCsv;
   $("#emplist-search").addEventListener("input", (e) => { state.emplist.search = e.target.value; renderEmployeeRows(); });
   for (const th of $$("#emplist-table th[data-sort]")) {
     th.onclick = () => {
@@ -2463,30 +2916,40 @@ function wireApp() {
       await refreshAndRender();
     }));
   };
-  $("#emplist-bulk-delete").onclick = () => {
+  $("#emplist-bulk-deactivate").onclick = () => {
     const ids = [...state.selectedEmps];
     if (!ids.length) return;
-    showConfirm("Delete employees?",
-      `Delete ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? This removes them from every mission/zone assignment, past and future.`,
-      () => safely(async () => { await cloud.deleteEmployees(ids); state.selectedEmps = new Set(); await refreshAndRender(); }));
+    showConfirm("Deactivate employees?",
+      `Deactivate ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column.`,
+      () => safely(async () => { await cloud.setEmployeesActive(ids, false); state.selectedEmps = new Set(); await refreshAndRender(); }));
   };
   $("#emplist-bulk-clear").onclick = clearSelection;
 
   // dismiss context menu / date picker on any outside click or Escape
   document.addEventListener("click", (ev) => {
-    hideContextMenu();
+    // NOT unconditional: a click on the menu's own scrollbar targets
+    // #context-menu itself, so hiding here killed the menu mid-drag. Items
+    // close it themselves (addItem), submenu rows deliberately don't.
+    if (!ev.target.closest("#context-menu")) hideContextMenu();
     if (!ev.target.closest("#datepicker-pop") && !ev.target.closest("#btn-date")) hideDatePicker();
     if (!ev.target.closest("#filters .ms") && !ev.target.closest("#emplist-filters .ms")) closeFilterPops();
+    if (!ev.target.closest("#toolbar-more")) hideToolbarMore();
   });
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape") { hideContextMenu(); hideDatePicker(); closeFilterPops(); clearSelection(); closeModal(); }
+    if (ev.key === "Escape") { hideContextMenu(); hideDatePicker(); closeFilterPops(); hideToolbarMore(); clearSelection(); closeModal(); }
     // Ctrl/Cmd+Z = undo last assignment change (ignore while typing in a field)
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) {
       ev.preventDefault();
       undoLast();
     }
   });
-  window.addEventListener("scroll", hideContextMenu, true);
+  // capture-phase so a scroll in any container closes the menu (it's anchored
+  // to a fixed viewport position, so it would otherwise detach from its card) —
+  // but scrolling INSIDE the menu is not "the page moved under it".
+  window.addEventListener("scroll", (ev) => {
+    if (ev.target && ev.target.closest && ev.target.closest("#context-menu")) return;
+    hideContextMenu();
+  }, true);
 
   // The mission grid is a JS masonry (cards are absolutely positioned), so it
   // must re-pack when the viewport width changes the column count. Debounced so
@@ -2520,12 +2983,27 @@ function wireApp() {
 async function boot() {
   $("#login-screen").classList.add("hidden");
   $("#app-root").classList.remove("hidden");
+  wireSaveStatus();
   wireApp();
+  try { const session = await cloud.getSession(); state.myEmail = session && session.user && session.user.email; } catch (e) { /* toast attribution just won't fire */ }
   await cloud.init(() => state.date);
   // holidays are known now — restore the last board/date the user was on, falling
   // back to the next working day if there's nothing saved (or it's stale/invalid)
   restoreViewState();
-  cloud.onChange(() => { state.overview.utilCacheKey = null; refreshAndRender(); });
+  cloud.onChange((payload) => {
+    state.overview.utilCacheKey = null;
+    // {boardId, planDate, updatedBy} from a missions/assignments write (see
+    // cloud.js's _attributionFromPayload) — undefined for every other kind of
+    // change, and for a write from before the updated-by migration was run.
+    // Only toast when it's a change to the board+date on screen right now,
+    // and it wasn't this browser's own write echoing back through Realtime.
+    if (payload && payload.updatedBy && payload.updatedBy !== state.myEmail &&
+        payload.boardId === D().activeBoardId && payload.planDate === state.date) {
+      const board = D().boards.find(b => b.id === payload.boardId);
+      toast(`${board ? board.name : "This board"} was just updated by ${payload.updatedBy}.`, "info");
+    }
+    refreshAndRender();
+  });
   await refreshAndRender();
   // fonts can settle after the first paint and change card heights — re-pack once ready
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);

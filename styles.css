@@ -26,12 +26,21 @@
      light-on-light. Never redefined under [data-theme="dark"]. */
   --card-ink: #1a1a1a;
   --night: #1c2430;   /* dark pill for the Night stat */
-  /* employee card identity — fixed in both themes (see .emp-card).
-     Same light grey for both; only the border tells them apart
-     (permanent = solid, on-call = dashed). */
+  /* employee card SURFACE — unlike --card-ink above, this one DOES redefine
+     under dark mode (see the dark block below). It used to be pinned too, so
+     the exported JPG looked the same regardless of theme — but the export
+     now forces light theme for its own capture (see body.exporting), so that
+     constraint no longer applies to the on-screen card only. Border still
+     carries the permanent/on-call distinction (solid vs dashed) in both
+     themes. --emp-ink is the card's own text color — a separate token from
+     --card-ink because --card-ink's fixed-regardless-of-theme text is also
+     used on backgrounds that stay data-colored in dark mode (mission headers,
+     the area pill) and must NOT lighten just because the card surface can. */
   --emp-bg: #e6e9ec;
   --emp-perm-border: #b4bcc4;
   --emp-oncall-border: #6b737c;
+  --emp-ink: #1a1a1a;
+  --emp-pos-bg: rgba(0,73,131,.09);   /* .emp-pos tint — plain rgba, see its comment for why not color-mix() */
   --charcoal: #59595b;   /* CI guide, 80% black */
 
   /* Overview chart data colors — a validated categorical set (dataviz skill:
@@ -87,6 +96,15 @@
   --bg-soft: #232a33;
   --hover-tint: #232c38;
   --track-off: #3a424b;
+  /* employee card surface, a step lighter than --panel/--bg-soft so cards
+     read as distinct from the board underneath them (was previously fixed
+     to the light-mode value — see the light block's comment on why that's
+     safe to change now) */
+  --emp-bg: #2a3038;
+  --emp-perm-border: #4a525c;
+  --emp-oncall-border: #7a838d;
+  --emp-ink: #e8ebed;
+  --emp-pos-bg: rgba(111,177,224,.14);
   --pool-tint: #12303f;
   --leave-tint: #232a33;
 
@@ -146,6 +164,26 @@ button, input, select, textarea, optgroup {
 }
 
 .hidden { display: none !important; }
+
+/* Phone numbers as tel: links (mission engineer, Manpower List) — inherit the
+   surrounding text color rather than the browser's default link blue, since
+   one of the two places this appears is on an arbitrary engineer-color
+   header background where blue could go unreadable. */
+.tel-link { color: inherit; text-decoration: none; }
+.tel-link:hover, .tel-link:focus-visible { text-decoration: underline; }
+
+/* Sticky as one unit — topbar, green rule, and board tabs (which day, which
+   board) stay visible while a long board scrolls beneath them. A single
+   sticky wrapper avoids stacking multiple sticky rows at hardcoded offsets,
+   which would break the moment #topbar's height changes (it wraps onto a
+   second line on narrow screens). #stats-row/#toolbar are NOT included — they
+   stay in normal flow so the permanently-visible footprint stays small,
+   especially on phone. */
+#sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
 
 /* ===== Top bar =====
    Fixed brand navy, always — this is chrome, not a page surface, so it does
@@ -275,6 +313,28 @@ button, input, select, textarea, optgroup {
   border-radius: 8px;
 }
 .date-nav { display: flex; align-items: center; gap: 4px; }
+
+/* save/sync status pill — plain text on the navy topbar, same treatment as
+   #app-title's subtitle. Hidden until the first write of the session so it
+   never implies a save happened before one actually did. */
+#save-status {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,.65);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#save-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+#save-status.save-saving { color: rgba(255,255,255,.85); }
+#save-status.save-saving::before { animation: save-pulse 1s ease-in-out infinite; }
+#save-status.save-saved { color: rgba(255,255,255,.65); }
+#save-status.save-error { color: #ffd9a0; }
+@keyframes save-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #save-status.save-saving::before { animation: none; }
+}
 #btn-lock.locked { background: #f59e0b; color: #fff; border-color: #f59e0b; }
 .btn-date-arrow {
   font-size: 18px;
@@ -286,18 +346,21 @@ button, input, select, textarea, optgroup {
   border-radius: 8px;
 }
 
-/* stats — one row: summary on the left, service-area counters on the right */
+/* stats — one row: summary on the left, service-area counters on the right.
+   Wraps rather than scrolling at any width — a scrolling stats strip hides
+   counters off-screen with no visual hint (the same problem the board tabs
+   had), so this wraps into a second row instead once boards/areas add up. */
 #stats-row {
   display: flex;
   align-items: center;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 8px 18px;
   padding: 9px 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
 }
-#stats-bar { display: flex; gap: 0; flex-wrap: nowrap; align-items: center; flex-shrink: 0; }
-#area-bar  { display: flex; gap: 16px; flex-wrap: nowrap; align-items: center; flex-shrink: 0; margin-left: auto; }
+#stats-bar { display: flex; gap: 0; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; }
+#area-bar  { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; margin-left: auto; }
 #btn-signout { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
 
 .stat-chip {
@@ -339,8 +402,15 @@ button, input, select, textarea, optgroup {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
+  position: relative;
 }
 .toolbar-spacer { flex: 1; }
+/* #toolbar-more is a no-op wrapper above ~640px — display:contents makes its
+   children ordinary flex items of #toolbar itself, so nothing about the
+   desktop layout changes. Below that width (see the phone block) it becomes
+   an actual dropdown panel instead of wrapping into extra toolbar rows. */
+#toolbar-more { display: contents; }
+.toolbar-more-toggle { display: none; }
 #filters { display: flex; gap: 6px; align-items: center; }
 #filters select {
   padding: 5px 8px;
@@ -434,6 +504,11 @@ button, input, select, textarea, optgroup {
 }
 .toggle input:checked + .toggle-track { background: #f59e0b; }
 .toggle input:checked + .toggle-track .toggle-thumb { left: 20px; }
+/* The base checked colour is the Holiday toggle's amber, which reads as a
+   warning — wrong for "this employee is active". Green is already this app's
+   active/selected signal (the current board tab), so the roster toggle uses it. */
+.toggle-active input:checked + .toggle-track { background: var(--brand-green); }
+.toggle-active .toggle-text { font-weight: 600; font-size: 12px; }
 #readonly-badge {
   background: #fef3c7;
   border: 1px solid #f59e0b;
@@ -511,6 +586,22 @@ button, input, select, textarea, optgroup {
 .zone-pool .zone-label { background: var(--pool-tint); }
 .zone-leave .zone-label { background: var(--leave-tint); font-size: 12.5px; }
 .zone-leave .zone-body { min-height: 44px; }
+
+/* an empty leave zone (see renderZones) collapses to one thin row — still a
+   full-size drop target (data-drop is unchanged), just visually compact */
+.zone-leave.zone-empty { flex-shrink: 0; }
+.zone-leave.zone-empty .zone-label {
+  flex-direction: row;
+  width: auto;
+  min-width: 150px;
+  gap: 6px;
+  padding: 5px 10px;
+  justify-content: flex-start;
+  text-align: left;
+}
+.zone-leave.zone-empty .zone-label small { display: none; }
+.zone-leave.zone-empty .zone-body { min-height: 0; padding: 5px 10px; align-items: center; }
+.zone-empty-hint { font-size: 11.5px; color: var(--muted); font-style: italic; }
 /* on-call being unassigned is normal — deliberately plain/calm, not the pool tint */
 .zone-oncall-pool .zone-label { background: var(--bg-soft); font-size: 12.5px; }
 
@@ -629,7 +720,7 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   position: relative;
   overflow: hidden;
   user-select: none;
-  color: var(--card-ink);
+  color: var(--emp-ink);
 }
 /* name wraps up to 2 lines (sized to fit the longest name in the system,
    "Wannaphatson T329", on two lines) instead of growing the card; a name
@@ -682,8 +773,15 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 .emp-card .emp-pos {
   left: 3px;
-  color: var(--primary);
-  background: rgba(0,73,131,.09);
+  /* --primary-text (not the fixed --primary) — this sits on the card's own
+     themed surface, not a data color, so it should lighten in dark mode like
+     any other navy-as-text use. (Left as --primary before the card surface
+     itself could go dark, navy-on-dark-navy was unreadable there.) --emp-pos-bg
+     is a plain rgba (not color-mix()) on purpose — html2canvas (the export)
+     can't parse the color(srgb ...) function Chromium serializes a color-mix()
+     result to, and this sits inside the exported capture area. */
+  color: var(--primary-text);
+  background: var(--emp-pos-bg);
 }
 .emp-card .emp-area {
   right: 3px;
@@ -883,6 +981,64 @@ body.board-view #app-root { margin-right: 264px; }
 }
 .fp-empty { font-size: 11.5px; color: var(--muted); font-style: italic; padding: 4px 2px; }
 
+/* Collapsed float pool (see renderFloatPool in app.js): when both Standby and
+   Available On-call are genuinely empty, the panel shrinks to a thin rail
+   instead of reserving 264px to say "nobody's here" twice. Scoped to the
+   fixed right-edge desktop layout only (min-width matches the breakpoint
+   right below) — on a stacked mobile layout the panel is already full-width
+   and this collapse wouldn't make sense. */
+@media (min-width: 901px) {
+  #float-pool.fp-collapsed { width: 44px; }
+  body.fp-collapsed #app-root { margin-right: 44px; }
+  #float-pool.fp-collapsed .fp-head { display: none; }
+  #float-pool.fp-collapsed .fp-section { padding: 0; }
+  /* just the count, centered — the full label ("Available On-call") rotated
+     sideways could run taller than the window in a short viewport; a bare
+     "0" can't */
+  #float-pool.fp-collapsed .fp-label {
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 0;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #float-pool.fp-collapsed .fp-label-text,
+  #float-pool.fp-collapsed .fp-label small { display: none; }
+  #float-pool.fp-collapsed .fp-body { min-height: 20px; padding-bottom: 0; }
+  /* "Everyone permanent is assigned" etc. — at 44px wide this wraps into an
+     unreadable one-character-per-line column; the rail's whole point (both
+     pools are empty) already says the same thing via the "0" above it */
+  #float-pool.fp-collapsed .fp-empty { display: none; }
+
+  /* mouse hover expands it via plain CSS; an active drag toward it gets the
+     same look through .fp-drag-hover (app.js), since native drag doesn't
+     reliably keep :hover active in every browser. Either way this is an
+     overlay, not a reflow — #app-root's margin stays at 44px (above), so
+     nothing on the board shifts while a drag is in progress. */
+  #float-pool.fp-collapsed:hover,
+  #float-pool.fp-collapsed.fp-drag-hover { width: 264px; }
+  #float-pool.fp-collapsed:hover .fp-head,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-head { display: block; }
+  #float-pool.fp-collapsed:hover .fp-section,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-section { padding: 8px 10px 4px; }
+  #float-pool.fp-collapsed:hover .fp-label,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-label {
+    justify-content: flex-start;
+    align-items: baseline;
+    margin-bottom: 7px;
+    padding: 0;
+    border-bottom: none;
+  }
+  #float-pool.fp-collapsed:hover .fp-label-text,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-label-text { display: inline; }
+  #float-pool.fp-collapsed:hover .fp-label small,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-label small { display: block; }
+  #float-pool.fp-collapsed:hover .fp-body,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-body { min-height: 40px; padding-bottom: 6px; }
+  #float-pool.fp-collapsed:hover .fp-empty,
+  #float-pool.fp-collapsed.fp-drag-hover .fp-empty { display: inline; }
+}
+
 @media (max-width: 900px) {
   #float-pool { position: static; width: auto; height: auto; border-left: none; border-top: 1px solid var(--border); box-shadow: none; }
   body.board-view #app-root { margin-right: 0; }
@@ -890,13 +1046,9 @@ body.board-view #app-root { margin-right: 264px; }
 
 /* ===== Phone layout pass ===== */
 @media (max-width: 640px) {
-  /* stats wrap into compact rows instead of scrolling important counts off-screen */
-  #stats-row { flex-wrap: wrap; gap: 8px 14px; overflow-x: visible; }
-  /* flex-shrink:0 (set above for the desktop scrolling row) would pin these at
-     their max-content width, so wrap never kicks in and 6 boards' chips push
-     the whole page sideways. Re-enable shrinking here — min-width:0 is the part
-     that actually lets a flex item drop below its content width. */
-  #stats-bar, #area-bar { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
+  /* stats already wrap at every width (see #stats-row above); phone just
+     tightens the spacing so more chips fit per row */
+  #stats-row { gap: 8px 14px; }
   #area-bar { margin-left: 0; gap: 10px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
@@ -913,14 +1065,111 @@ body.board-view #app-root { margin-right: 264px; }
   #topbar .btn-ghost { min-height: 40px; }
   .ms-btn, #filters select, #sort-by { min-height: 40px; }
   .ms-opt { padding: 9px 8px; }
-  #emplist-table th, #emplist-table td { padding: 11px 10px; }
   #emplist-table td.el-check input, #emplist-table th.el-check input { width: 22px; height: 22px; }
+
+  /* Manpower List: table -&gt; cards. Standard CSS-only responsive-table
+     pattern — no new markup, just data-label attributes already added per
+     <td> in renderEmployeeRows() (app.js), surfaced here via ::before. Below
+     640px, mobile number/service area (what a supervisor in the field
+     actually wants) were the two columns cut off entirely; now every field
+     is visible, tap-to-call included (phone already renders via telLink()). */
+  /* the sortable column headers don't carry over into card view (tapping a
+     tiny header to sort isn't a real touch target anyway), but "select all"
+     still needs a home — keep just that one checkbox, with its own label
+     since the column header text next to it is gone */
+  #emplist-table thead { display: block; margin-bottom: 8px; }
+  #emplist-table thead tr { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  #emplist-table thead th { display: none; }
+  #emplist-table thead th.el-check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: auto;
+    padding: 0;
+  }
+  #emplist-table thead th.el-check::after { content: "Select all"; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  #emplist-table, #emplist-table tbody, #emplist-table tr, #emplist-table td { display: block; width: auto; }
+  .table-wrap { border: none; background: none; }
+  #emplist-table tbody tr {
+    position: relative;
+    margin-bottom: 10px;
+    padding: 12px 44px 4px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  #emplist-table tbody tr.selected { background: var(--pool-tint); }
+  #emplist-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+  }
+  #emplist-table td:last-child { border-bottom: none; }
+  #emplist-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+  }
+  /* the name is the card's title, not another labeled row */
+  #emplist-table td[data-label="Name"] {
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: none;
+    padding-bottom: 4px;
+  }
+  #emplist-table td[data-label="Name"]::before { content: none; }
+  #emplist-table td.el-check {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 0;
+    border: none;
+  }
 
   /* toolbar filters get their own full-width row so they don't crowd the buttons */
   #filters { width: 100%; flex-wrap: wrap; }
 
   /* the date group can wrap under the title on very narrow screens without clipping */
   .topbar-right { row-gap: 6px; }
+
+  /* Toolbar: the primary actions (+ New Mission, Export) stay in the main row;
+     everything else collapses behind "⋯ More" instead of wrapping into extra
+     rows above the board — that wrap was the single biggest chunk of the
+     "whole first screen is controls" problem on a phone. */
+  .toolbar-more-toggle { display: inline-flex; align-items: center; min-height: 40px; }
+  #toolbar-more {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 14px;
+    right: 14px;
+    margin-top: 6px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    box-shadow: var(--glass-shadow);
+    z-index: 90;
+  }
+  #toolbar-more.open { display: flex; }
+  #toolbar-more .toolbar-spacer { display: none; }   /* only meaningful in a horizontal row */
+  #toolbar-more #filters { width: 100%; margin: 0; }
+  #toolbar-more .btn { width: 100%; }
+  #toolbar-more .toggle { width: 100%; justify-content: center; }
 }
 
 /* ===== Modals ===== */
@@ -1155,6 +1404,12 @@ body.board-view #app-root { margin-right: 264px; }
   box-shadow: 0 8px 24px rgba(0,0,0,.2);
   min-width: 200px;
   padding: 4px;
+  /* a board with many missions (Assign to mission) or many boards (Move to
+     board) had no cap before — scroll rather than run off the bottom of the
+     screen (showContextMenu already clamps its left/top against the viewport
+     using this element's own height, so the cap keeps that math sane too) */
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
 }
 .ctx-item {
   padding: 7px 12px;
@@ -1166,8 +1421,22 @@ body.board-view #app-root { margin-right: 264px; }
 .ctx-item:hover { background: var(--hover-tint); }
 .ctx-sep { border-top: 1px solid var(--border); margin: 4px 0; }
 .ctx-title { padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
-.ctx-subhead { padding: 4px 12px 2px; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
-.ctx-item.ctx-pos { padding-left: 20px; font-size: 12.5px; }
+/* drills one level down (boards / missions / leave) — the chevron is the only
+   thing distinguishing it from a leaf action, so it earns its own rule */
+.ctx-item.ctx-sub { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ctx-item.ctx-sub::after { content: "›"; font-size: 15px; line-height: 1; color: var(--muted); }
+/* header of a submenu: reads as the title of the level you're on AND as the
+   way back up, so it's styled between .ctx-title and a normal item */
+.ctx-item.ctx-back {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 5px 5px 0 0;
+}
 .ctx-item.ctx-danger { color: var(--danger); font-weight: 600; }
 
 /* ===== Overview ===== */
@@ -1289,7 +1558,19 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-leave-row-label small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
 .ov-leave-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 
-.ov-area-bars { max-width: 640px; }
+.ov-area-rows { display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin-bottom: 10px; }
+.ov-area-row { display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px; }
+.ov-area-row-label { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
+/* the name is the row's identity and can be long, but the label column is
+   fixed so every row's bar starts at the same x (that shared scale is the whole
+   point of the chart). So wrap to two lines and ellipsis after — a phone has no
+   hover, so the title attribute alone isn't a good enough fallback there. */
+.ov-area-row-name {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere; line-height: 1.25;
+}
+.ov-area-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border); }
+.ov-area-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 
 /* utilization trend */
 .ov-trend-controls { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -1355,7 +1636,7 @@ button.chart-legend-item:hover { text-decoration: underline; }
   font-weight: 600;
   background: var(--emp-bg);
   border: 1px solid var(--emp-perm-border);
-  color: var(--card-ink);
+  color: var(--emp-ink);
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,.12);
 }
@@ -1444,6 +1725,28 @@ body.exporting #app-root { margin-right: 0; }
 #emplist-table th.sorted-asc::after { content: " \25B2"; }
 #emplist-table th.sorted-desc::after { content: " \25BC"; }
 #emplist-table th.el-check, #emplist-table td.el-check { cursor: default; width: 30px; }
+/* 30D utilization: a meter (one ratio against a fixed 0-100 limit), with the
+   number always printed beside it so nothing is encoded by width alone */
+#emplist-table td.el-util { white-space: nowrap; }
+.el-util-meter {
+  display: inline-block;
+  width: 60px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 7px;
+}
+.el-util-fill { display: block; height: 100%; border-radius: 999px; background: var(--chart-assigned); }
+.el-util-val { font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.el-util-empty { color: var(--muted); }
+/* Deactivated: mute the data cells so they read as off-roster at a glance,
+   but leave the Status and checkbox cells at full strength — dimming the
+   control you came here to click would be self-defeating. */
+#emplist-table tbody tr.row-inactive td { opacity: .5; }
+#emplist-table tbody tr.row-inactive td.el-status,
+#emplist-table tbody tr.row-inactive td.el-check { opacity: 1; }
 #emplist-table tbody tr:hover { background: var(--hover-tint); }
 #emplist-table tbody tr.selected { background: var(--pool-tint); }
 #emplist-table td.el-check input, #emplist-table th.el-check input { width: auto; margin: 0; }
@@ -1550,4 +1853,60 @@ body.exporting .zone-label { background: var(--bg-soft); }
 
 @media (prefers-reduced-motion: reduce) {
   body { background-attachment: scroll; }   /* fixed bg can jank on some setups */
+}
+
+/* ===== Toasts (replaces window.alert()) =====
+   Bottom-left stack so it never covers the float pool or a modal's own
+   actions. z-index above modals (300) — a duplicate-name warning must still
+   be visible while the mission/employee modal is open. */
+#toast-stack {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 400;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+/* clear the floating touch action bar (bottom:8px, full-width) when it's on screen */
+body.touch-mode.has-selection #toast-stack { bottom: 76px; }
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-left: 4px solid var(--muted);
+  font-size: 13px;
+  color: var(--text);
+  animation: toast-in .18s ease-out;
+}
+.toast-out { animation: toast-out .18s ease-in forwards; }
+.toast-info    { border-left-color: var(--primary-text); }
+.toast-warn    { border-left-color: #d97706; }
+.toast-error   { border-left-color: var(--danger); }
+.toast-msg { flex: 1; line-height: 1.4; }
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.toast-close:hover { color: var(--text); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .toast, .toast-out { animation: none; }
 }

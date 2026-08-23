@@ -46,12 +46,23 @@ const cloud = {
   _currentDate: () => todayStrISO(),
 
   onChange(fn) { this._listeners.push(fn); },
-  notify() { for (const fn of this._listeners) fn(); },
+  // optional payload, currently only set by the missions/assignments realtime
+  // handlers ({boardId, updatedBy}) — every other caller still calls notify()
+  // with nothing, and existing listeners that ignore the argument are unaffected
+  notify(payload) { for (const fn of this._listeners) fn(payload); },
 
   /* ---------- auth ---------- */
   async getSession() {
     const { data } = await sb.auth.getSession();
     return data.session;
+  },
+  /* same pattern lockDay already used for locked_by — stamp the acting
+     user's email into updated_by on every missions/assignments write, so
+     the realtime "changed by someone else" toast has something to compare
+     against (see _attributionFromPayload) */
+  async _currentEmail() {
+    const { data: { session } } = await sb.auth.getSession();
+    return (session && session.user && session.user.email) || "unknown";
   },
   onAuthChange(fn) { sb.auth.onAuthStateChange((_event, session) => fn(session)); },
   async signIn(email, password) {
@@ -86,7 +97,12 @@ const cloud = {
   async _loadEmployees() {
     const { data, error } = await sb.from("employees").select("*").order("name");
     if (error) throw error;
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", areaId: e.area_id, boardId: e.board_id }));
+    // active is carried through as-is (undefined pre-migration, true/false after)
+    // and NOT filtered out here — a deactivated employee's past mission/zone
+    // assignments still need to resolve through D().employees when rendering
+    // history. app.js filters to "active only" at the specific call sites
+    // where "current roster" (not "who was really there") is the right idea.
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
   },
   async _loadOverrides() {
     // tolerate the table not existing yet (before the workweek migration is run) —
@@ -213,6 +229,7 @@ const cloud = {
   },
 
   async _copyPlanForward(boardId, srcDate, destDate) {
+    const updatedBy = await this._currentEmail();
     const { data: srcMissions } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", srcDate);
     const { data: srcAssignments } = await sb.from("assignments").select("*").eq("plan_date", srcDate);
 
@@ -228,7 +245,7 @@ const cloud = {
       const inserts = srcMissions.map((m) => ({
         board_id: boardId, plan_date: destDate, number: m.number, host: m.host, customer: m.customer,
         shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id,
-        ppe: m.ppe, remark: m.remark, hidden: m.hidden,
+        ppe: m.ppe, remark: m.remark, hidden: m.hidden, updated_by: updatedBy,
       }));
       // guarded upsert makes this safe to run twice at once (e.g. the holiday
       // toggle's own refresh racing with the Realtime-triggered one): whichever
@@ -246,23 +263,33 @@ const cloud = {
       const match = (destMissions || []).find((dm) => dm.number === sm.number && dm.shift === sm.shift);
       if (match) idMap[sm.id] = match.id;
     }
-    const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId).map((e) => e.id));
+    // active !== false — a new day's plan is a "current roster" operation,
+    // unlike a historical read (ensurePlanLoaded's own boardEmpIds, above,
+    // deliberately does NOT filter this way). Employees load unfiltered now
+    // (see _loadEmployees), so a deactivated employee's old assignment would
+    // otherwise get carried into a brand new day — exactly what deactivating
+    // them should prevent.
+    const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
     const assignInserts = [];
     for (const a of srcAssignments || []) {
       if (!boardEmpIds.has(a.employee_id)) continue;
       if (a.mission_id) {
         const mapped = idMap[a.mission_id];
         if (!mapped) continue;   // that mission isn't on the destination day → leave the employee on standby
-        assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: mapped, zone: null });
+        assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: mapped, zone: null, updated_by: updatedBy });
       } else if (a.zone) {
-        assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: null, zone: a.zone });
+        assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: null, zone: a.zone, updated_by: updatedBy });
       }
     }
     if (assignInserts.length) {
       // insert-only (never overwrite): the caller already guarantees the target
       // day has no assignments, and ignoreDuplicates keeps a racing/duplicate
       // copy from clobbering a plan someone just made.
-      const { error } = await sb.from("assignments").upsert(assignInserts, { onConflict: "employee_id,plan_date", ignoreDuplicates: true });
+      let { error } = await sb.from("assignments").upsert(assignInserts, { onConflict: "employee_id,plan_date", ignoreDuplicates: true });
+      if (error && this._missingColumnFromError(error) === "updated_by") {
+        const stripped = assignInserts.map(({ updated_by, ...rest }) => rest);
+        ({ error } = await sb.from("assignments").upsert(stripped, { onConflict: "employee_id,plan_date", ignoreDuplicates: true }));
+      }
       if (error) throw error;
     }
   },
@@ -304,10 +331,12 @@ const cloud = {
       const { error } = await sb.from("assignments").delete().eq("employee_id", employeeId).eq("plan_date", date);
       if (error) throw error;
     } else {
-      const { error } = await sb.from("assignments").upsert(
-        { employee_id: employeeId, plan_date: date, mission_id: target.missionId || null, zone: target.zone || null },
-        { onConflict: "employee_id,plan_date" }
-      );
+      const row = { employee_id: employeeId, plan_date: date, mission_id: target.missionId || null, zone: target.zone || null };
+      const updatedBy = await this._currentEmail();
+      let { error } = await sb.from("assignments").upsert({ ...row, updated_by: updatedBy }, { onConflict: "employee_id,plan_date" });
+      if (error && this._missingColumnFromError(error) === "updated_by") {
+        ({ error } = await sb.from("assignments").upsert(row, { onConflict: "employee_id,plan_date" }));
+      }
       if (error) throw error;
     }
     this._invalidatePlans();
@@ -322,20 +351,28 @@ const cloud = {
   },
 
   async saveMission(boardId, date, missionId, vals) {
-    const row = {
+    const updatedBy = await this._currentEmail();
+    let row = {
       number: vals.number, host: vals.host, customer: vals.customer, shift: vals.shift,
       start_time: vals.startTime, end_time: vals.endTime, engineer_id: vals.engineerId,
-      ppe: vals.ppe || null,
-      updated_at: new Date().toISOString(),
+      ppe: vals.ppe || null, remark: vals.remark || null,
+      updated_at: new Date().toISOString(), updated_by: updatedBy,
     };
-    const rowWithRemark = { ...row, remark: vals.remark || null };
     const attempt = (r) => missionId
       ? sb.from("missions").update(r).eq("id", missionId)
       : sb.from("missions").insert({ ...r, board_id: boardId, plan_date: date });
-    let { error } = await attempt(rowWithRemark);
-    if (error && /remark/i.test(error.message || "") && /column/i.test(error.message || "")) {
-      // remark migration not run yet — retry without it so saves still work
+    // remark and updated_by are both optional (migrations that may not have
+    // run yet) — shed whichever column Postgres reports missing and retry,
+    // same guarded pattern as _upsertMissionsGuarded, so saves still work
+    // either way
+    let error;
+    for (let i = 0; i < 3; i++) {
       ({ error } = await attempt(row));
+      if (!error) break;
+      const missingCol = this._missingColumnFromError(error);
+      if (!missingCol || !(missingCol in row)) break;
+      const { [missingCol]: _drop, ...rest } = row;
+      row = rest;
     }
     if (error) throw this._friendlyMissionError(error);
     this._invalidatePlans();
@@ -398,7 +435,11 @@ const cloud = {
       const { error: aErr } = await sb.from("assignments").delete().in("mission_id", missionIds);
       if (aErr) throw aErr;
     }
-    const { error } = await sb.from("missions").update({ hidden }).in("id", missionIds);
+    const updatedBy = await this._currentEmail();
+    let { error } = await sb.from("missions").update({ hidden, updated_by: updatedBy }).in("id", missionIds);
+    if (error && this._missingColumnFromError(error) === "updated_by") {
+      ({ error } = await sb.from("missions").update({ hidden }).in("id", missionIds));
+    }
     if (error) {
       const missingCol = this._missingColumnFromError(error);
       if (missingCol === "hidden") {
@@ -489,18 +530,28 @@ const cloud = {
     if (error) throw error;
     await this._loadEmployees();
   },
-  async deleteEmployee(employeeId) {
-    const { error } = await sb.from("employees").delete().eq("id", employeeId);
-    if (error) throw error;
-    this._invalidatePlans();   // their assignments cascade-delete — drop stale plan cache
-    await this._loadEmployees();
-  },
-  /* bulk-delete one or many employees (Manpower List multi-select) */
-  async deleteEmployees(ids) {
+  /* The single way an employee goes on/off the roster — the Manpower List's
+     Status column, the right-click menu and the Edit Employee modal all land
+     here. Flips `active` rather than deleting the row: a hard DELETE cascades
+     (assignments.employee_id references employees(id) on delete cascade —
+     schema.sql) and silently wipes every past mission/zone assignment for that
+     person, which is exactly the "rewrites finished plans" problem this
+     exists to avoid.
+
+     There is deliberately no pre-migration fallback. The earlier archive
+     helpers (removed) fell back to that hard DELETE when the `active` column was
+     missing, which meant the one path that was supposed to protect history
+     could destroy it instead. Failing with a clear "run the migration"
+     message is strictly better than silently doing the destructive thing. */
+  async setEmployeesActive(ids, active) {
     if (!ids.length) return;
-    const { error } = await sb.from("employees").delete().in("id", ids);
-    if (error) throw error;
-    this._invalidatePlans();
+    const { error } = await sb.from("employees").update({ active }).in("id", ids);
+    if (error) {
+      if (this._missingColumnFromError(error) === "active") {
+        throw new Error('Run supabase/migration-2026-08-23-employee-active.sql in the Supabase SQL editor to use Active/Inactive.');
+      }
+      throw error;
+    }
     await this._loadEmployees();
   },
   /* bulk-set the position of one or many employees */
@@ -679,13 +730,71 @@ const cloud = {
     return result;
   },
 
+  /* ---------- per-employee utilization (Manpower List's 30D column) ---------- */
+  /* Same two bulk queries as getUtilizationRange, bucketed by employee instead
+     of by board. Returns { [employeeId]: { workedDates:Set, leaveDates:Set } }
+     — raw date sets, not a percentage, because the denominator is each
+     employee's own board's working days, and only app.js knows the weekend /
+     holiday rules. Applies the same two exclusions the board figures use: a
+     hidden mission doesn't count as work, and neither does a mission on a
+     board the employee no longer belongs to. */
+  async getEmployeeUtilization(fromDate, toDate) {
+    const [{ data: missionRows, error: mErr }, { data: assignRows, error: aErr }] = await Promise.all([
+      sb.from("missions").select("id, board_id, plan_date, hidden")
+        .gte("plan_date", fromDate).lte("plan_date", toDate),
+      sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
+        .gte("plan_date", fromDate).lte("plan_date", toDate),
+    ]);
+    if (mErr) throw mErr;
+    if (aErr) throw aErr;
+
+    const missionBoard = new Map();
+    const missionHidden = new Set();
+    for (const m of missionRows || []) {
+      missionBoard.set(m.id, m.board_id);
+      if (m.hidden) missionHidden.add(m.id);
+    }
+    const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
+
+    const out = {};
+    const rec = (id) => (out[id] = out[id] || { workedDates: new Set(), leaveDates: new Set() });
+    for (const a of assignRows || []) {
+      if (!empBoard.has(a.employee_id)) continue;
+      if (a.mission_id) {
+        if (missionHidden.has(a.mission_id)) continue;
+        if (missionBoard.get(a.mission_id) !== empBoard.get(a.employee_id)) continue;
+        rec(a.employee_id).workedDates.add(a.plan_date);
+      } else if (a.zone && ZONES.includes(a.zone)) {
+        rec(a.employee_id).leaveDates.add(a.plan_date);
+      }
+    }
+    return out;
+  },
+
+  /* Resolve {boardId, planDate, updatedBy} from a missions/assignments
+     realtime payload — app.js compares updatedBy to the viewing user's own
+     email, and boardId+planDate to what's currently on screen, to decide
+     whether to toast "changed by someone else". missions rows carry board_id
+     directly; assignments rows don't (schema.sql), so resolve it via the
+     employee cache instead. Pre-migration (no updated_by column yet) every
+     row.updated_by is simply undefined, so this returns null and nothing
+     toasts — same silent-refetch behavior as before this feature existed.
+     DELETE payloads only carry the primary key by default (no table here has
+     REPLICA IDENTITY FULL), so a deleted row can't be attributed — also null. */
+  _attributionFromPayload(payload) {
+    const row = payload && payload.new;
+    if (!row || !row.updated_by) return null;
+    const boardId = row.board_id || (this.data.employees.find((e) => e.id === row.employee_id) || {}).boardId;
+    return boardId ? { boardId, planDate: row.plan_date, updatedBy: row.updated_by } : null;
+  },
+
   /* ---------- realtime ---------- */
   _subscribeRealtime() {
     // Drop all cached plans on any missions/assignments change — app.js's own
     // onChange handler reloads exactly what the current view needs before redrawing.
-    const refreshPlanAndNotify = async () => {
+    const refreshPlanAndNotify = async (payload) => {
       this.data.plans = {};
-      this.notify();
+      this.notify(this._attributionFromPayload(payload));
     };
     sb.channel("db-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, async () => { await this._loadEmployees(); this.notify(); })

@@ -39,12 +39,17 @@
 
 <div id="app-root" class="hidden">
 
+<!-- Sticky as one unit (see #sticky-header in styles.css) so "which day, which
+     board" stays visible while a long board scrolls — #stats-row and #toolbar
+     stay in normal flow below it so the sticky footprint stays small. -->
+<div id="sticky-header">
 <header id="topbar">
   <div class="topbar-left">
     <img id="app-logo" src="logo-on-navy.png" alt="TRIGO" onerror="this.onerror=null;this.src='logo.svg'">
     <div id="app-title">Manpower Board<small>Operations Planning</small></div>
   </div>
   <div class="topbar-right">
+    <span id="save-status" class="hidden"></span>
     <div class="date-nav">
       <button id="btn-date-prev" class="btn btn-date-arrow" title="Previous day" aria-label="Previous day">‹</button>
       <button id="btn-date" class="btn btn-date" title="Click to pick a date"></button>
@@ -61,51 +66,60 @@
 </header>
 <div id="green-rule"></div>
 
-<div id="stats-row"><div id="stats-bar"></div><div id="area-bar"></div></div>
-
 <div id="board-bar">
   <div id="board-tabs"></div>
   <button id="btn-add-board" class="btn btn-ghost" title="Create new board">+ Board</button>
 </div>
+</div>
+
+<div id="stats-row"><div id="stats-bar"></div><div id="area-bar"></div></div>
 
 <div id="toolbar">
   <button id="btn-import-mission" class="btn btn-danger hidden">Add Mission</button>
   <button id="btn-new-mission" class="btn btn-primary">+ New Mission</button>
-  <button id="btn-hide-missions" class="btn" title="Choose which missions are hidden from this board">👁 Hide/Unhide</button>
-  <button id="btn-new-employee" class="btn btn-primary">+ New Employee</button>
-  <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
-    <input type="checkbox" id="holiday-check">
-    <span class="toggle-track"><span class="toggle-thumb"></span></span>
-    <span class="toggle-text">Holiday</span>
-  </label>
-  <div class="toolbar-spacer"></div>
-  <div id="filters">
-    <div class="ms" data-filter="engineer">
-      <button type="button" class="ms-btn">Engineer: All</button>
-      <div class="ms-pop hidden"></div>
+  <button id="btn-toolbar-more" class="btn btn-ghost toolbar-more-toggle" type="button" title="More actions" aria-expanded="false">⋯ More</button>
+  <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
+       in styles.css) instead of wrapping into several rows of controls above the
+       board — on a phone that wrap was pushing every mission below the first
+       screen. Above that width it's `display: contents`, so nothing changes:
+       these are still ordinary toolbar children in the same flex row. -->
+  <div id="toolbar-more">
+    <button id="btn-hide-missions" class="btn" title="Choose which missions are hidden from this board">👁 Hide/Unhide</button>
+    <button id="btn-new-employee" class="btn btn-primary">+ New Employee</button>
+    <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
+      <input type="checkbox" id="holiday-check">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-text">Holiday</span>
+    </label>
+    <div class="toolbar-spacer"></div>
+    <div id="filters">
+      <div class="ms" data-filter="engineer">
+        <button type="button" class="ms-btn">Engineer: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <div class="ms" data-filter="host">
+        <button type="button" class="ms-btn">Host: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <div class="ms" data-filter="customer">
+        <button type="button" class="ms-btn">Customer: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <div class="ms" data-filter="shift">
+        <button type="button" class="ms-btn">Shift: All</button>
+        <div class="ms-pop hidden"></div>
+      </div>
+      <select id="sort-by" title="Sort missions">
+        <option value="number">Sort: Mission No.</option>
+        <option value="engineer">Sort: Engineer</option>
+        <option value="host">Sort: Host</option>
+        <option value="customer">Sort: Customer</option>
+        <option value="shift">Sort: Shift</option>
+      </select>
     </div>
-    <div class="ms" data-filter="host">
-      <button type="button" class="ms-btn">Host: All</button>
-      <div class="ms-pop hidden"></div>
-    </div>
-    <div class="ms" data-filter="customer">
-      <button type="button" class="ms-btn">Customer: All</button>
-      <div class="ms-pop hidden"></div>
-    </div>
-    <div class="ms" data-filter="shift">
-      <button type="button" class="ms-btn">Shift: All</button>
-      <div class="ms-pop hidden"></div>
-    </div>
-    <select id="sort-by" title="Sort missions">
-      <option value="number">Sort: Mission No.</option>
-      <option value="engineer">Sort: Engineer</option>
-      <option value="host">Sort: Host</option>
-      <option value="customer">Sort: Customer</option>
-      <option value="shift">Sort: Shift</option>
-    </select>
+    <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day">↺ Reset Board</button>
+    <button id="btn-undo" class="btn" title="Undo last assignment change (Ctrl+Z)" disabled>↩ Undo</button>
   </div>
-  <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day">↺ Reset Board</button>
-  <button id="btn-undo" class="btn" title="Undo last assignment change (Ctrl+Z)" disabled>↩ Undo</button>
   <button id="btn-export" class="btn">📷 Export</button>
   <span id="readonly-badge" class="hidden">🔒 Read-only (past date)</span>
 </div>
@@ -154,6 +168,7 @@
       </div>
       <div class="toolbar-spacer"></div>
       <span id="emplist-count"></span>
+      <button type="button" class="btn btn-small" id="btn-emplist-csv" title="Export the rows below as a CSV file">⬇ CSV</button>
     </div>
     <div id="emplist-bulkbar" class="hidden">
       <span id="emplist-bulk-count"></span>
@@ -177,7 +192,7 @@
       <select id="emplist-bulk-board">
         <option value="">Move to board…</option>
       </select>
-      <button type="button" class="btn btn-danger btn-small" id="emplist-bulk-delete">🗑 Delete</button>
+      <button type="button" class="btn btn-danger btn-small" id="emplist-bulk-deactivate">🚫 Deactivate</button>
       <button type="button" class="btn btn-small" id="emplist-bulk-clear">Clear selection</button>
     </div>
     <div class="table-wrap">
@@ -191,6 +206,8 @@
             <th data-sort="phone">Mobile number</th>
             <th data-sort="areaId">Service area</th>
             <th data-sort="boardId">Current board</th>
+            <th data-sort="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for.">30D utilization</th>
+            <th data-sort="active">Status</th>
           </tr>
         </thead>
         <tbody id="emplist-body"></tbody>
@@ -212,11 +229,11 @@
     <p class="fp-hint">Click to select · Ctrl-click for many · drag or click a mission to assign</p>
   </div>
   <div class="fp-section">
-    <div class="fp-label"><span id="standby-label">Standby</span> <span class="fp-count" id="standby-count"></span><small id="standby-sub">permanent, unassigned</small></div>
+    <div class="fp-label"><span id="standby-label" class="fp-label-text">Standby</span> <span class="fp-count" id="standby-count"></span><small id="standby-sub">permanent, unassigned</small></div>
     <div class="fp-body dropzone" data-drop="pool" data-pool="standby"></div>
   </div>
   <div class="fp-section">
-    <div class="fp-label">Available On-call <span class="fp-count" id="oncall-count"></span><small>not flagged</small></div>
+    <div class="fp-label"><span class="fp-label-text">Available On-call</span> <span class="fp-count" id="oncall-count"></span><small>not flagged</small></div>
     <div class="fp-body dropzone" data-drop="pool" data-pool="oncall"></div>
   </div>
 </aside>
@@ -287,7 +304,7 @@
       <label>Service area <select name="areaId" required></select></label>
       <label>Board <select name="boardId" required></select></label>
       <div class="modal-actions">
-        <button type="button" class="btn btn-danger hidden" id="btn-delete-employee">Delete</button>
+        <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee">🚫 Deactivate</button>
         <span class="toolbar-spacer"></span>
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -372,6 +389,7 @@
 
 <div id="datepicker-pop" class="hidden"></div>
 <div id="chart-tip" class="hidden"></div>
+<div id="toast-stack" aria-live="polite"></div>
 
 </div> <!-- /#app-root -->
 
