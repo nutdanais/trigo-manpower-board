@@ -87,7 +87,85 @@ const POSITIONS = {
   assistant_site_engineer: { label: "Assistant Site Engineer", short: "AE" },
 };
 async function safely(fn) {
-  try { await fn(); } catch (e) { alert("Something went wrong: " + (e.message || e)); }
+  try { await fn(); } catch (e) { toast("Something went wrong: " + (e.message || e), "error"); }
+}
+
+/* ---------- toasts ----------
+   Replaces window.alert() everywhere: a blocking dialog stops the whole app
+   (and on a factory-floor tablet, easily gets tapped through without being
+   read). These stack bottom-left, auto-dismiss, and never block input. */
+function toast(message, type = "info", opts = {}) {
+  const stack = $("#toast-stack");
+  if (!stack) return;
+  const el = document.createElement("div");
+  el.className = "toast toast-" + type;
+  el.setAttribute("role", type === "error" ? "alert" : "status");
+  const msg = document.createElement("span");
+  msg.className = "toast-msg";
+  msg.textContent = message;
+  el.appendChild(msg);
+  const close = document.createElement("button");
+  close.className = "toast-close";
+  close.type = "button";
+  close.setAttribute("aria-label", "Dismiss");
+  close.textContent = "×";
+  close.onclick = () => remove();
+  el.appendChild(close);
+  stack.appendChild(el);
+  let timer = null;
+  const remove = () => { clearTimeout(timer); el.classList.add("toast-out"); setTimeout(() => el.remove(), 180); };
+  // errors stay up longer (and the user can still dismiss early) — a "your
+  // name already exists" toast that vanishes before it's read helps no one
+  const ms = opts.duration != null ? opts.duration : (type === "error" ? 7000 : 3500);
+  if (ms > 0) timer = setTimeout(remove, ms);
+  return remove;
+}
+
+/* ---------- save/sync status pill ----------
+   Wraps every cloud.js write method so the topbar can show Saving… / Saved
+   HH:MM / Save failed without cloud.js itself knowing about the UI. Reads
+   (ensurePlanLoaded, the _load* calls, getUtilizationRange) are deliberately
+   NOT wrapped — this pill answers "did my change stick?", not "is data
+   loading?". */
+function setSaveStatus(kind) {
+  const el = $("#save-status");
+  if (!el) return;
+  el.classList.remove("hidden", "save-saving", "save-saved", "save-error");
+  if (kind === "saving") {
+    el.classList.add("save-saving");
+    el.textContent = "Saving…";
+  } else if (kind === "saved") {
+    el.classList.add("save-saved");
+    el.textContent = "Saved " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  } else if (kind === "error") {
+    el.classList.add("save-error");
+    el.textContent = "⚠ Save failed";
+  }
+}
+const CLOUD_WRITE_METHODS = [
+  "_copyPlanForward", "resetBoardFromLastWorkingDay", "setAssignment",
+  "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
+  "lockDay", "unlockDay", "saveEmployee", "deleteEmployee", "deleteEmployees",
+  "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
+  "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
+  "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
+];
+function wireSaveStatus() {
+  for (const name of CLOUD_WRITE_METHODS) {
+    const orig = cloud[name];
+    if (typeof orig !== "function") continue;
+    cloud[name] = async function (...args) {
+      setSaveStatus("saving");
+      try {
+        const result = await orig.apply(this, args);
+        setSaveStatus("saved");
+        return result;
+      } catch (e) {
+        setSaveStatus("error");
+        throw e;
+      }
+    };
+  }
 }
 
 /* ---------- app state ---------- */
@@ -549,6 +627,20 @@ function renderZones() {
       .map(empId => D().employees.find(e => e.id === empId))
       .filter(e => e && e.boardId === D().activeBoardId);
     for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
+    // an empty leave zone collapses to a thin one-line drop target instead of
+    // a fixed-height card — most days only 1-2 of the 5 types are ever used,
+    // so the other 3-4 were costing ~175px of screen space for nothing.
+    // The element and its data-drop target don't change, so drag/drop keeps
+    // working exactly as before; only the CSS presentation shrinks.
+    const zoneEl = body.closest(".zone");
+    const isEmpty = emps.length === 0;
+    zoneEl.classList.toggle("zone-empty", isEmpty);
+    if (isEmpty) {
+      const hint = document.createElement("span");
+      hint.className = "zone-empty-hint";
+      hint.textContent = "Drag here";
+      body.appendChild(hint);
+    }
   }
   renderFloatPool();
 }
@@ -1711,9 +1803,9 @@ function saveMission(ev) {
     m.shift === vals.shift && m.id !== state.editingMissionId);
   if (dup) {
     const shiftLabel = vals.shift === "night" ? "Night" : "Day";
-    alert(dup.hidden
+    toast(dup.hidden
       ? `A hidden mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use "👁 Hide/Unhide" to unhide and reuse it, or pick a different shift.`
-      : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`);
+      : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`, "warn");
     return;
   }
   safely(async () => {
@@ -1786,7 +1878,7 @@ function saveEmployee(ev) {
   const dup = D().employees.find(e =>
     e.id !== state.editingEmployeeId && e.name.trim().toLowerCase() === vals.name.toLowerCase());
   if (dup) {
-    alert(`An employee named "${vals.name}" already exists. Use a different name (e.g. add an ID/initial) to tell them apart.`);
+    toast(`An employee named "${vals.name}" already exists. Use a different name (e.g. add an ID/initial) to tell them apart.`, "warn");
     return;
   }
   safely(async () => {
@@ -2018,6 +2110,12 @@ async function exportBoard() {
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
   document.body.classList.add("exporting");
+  // The exported JPG is a shared artifact (printed, posted, sent to a customer) —
+  // it must not depend on the viewer's own dark-mode preference. Force light for
+  // the capture, since --bg/--panel/--emp-card etc. all redefine under
+  // [data-theme="dark"] and body.exporting only swaps the glass tokens.
+  const wasDark = document.documentElement.getAttribute("data-theme") === "dark";
+  if (wasDark) document.documentElement.removeAttribute("data-theme");
   // temporarily fold the available pools into the captured board — but not on a
   // holiday, where only the employees actually assigned to work should show up
   // (standby/available on-call are meaningless when nobody is expected in)
@@ -2059,6 +2157,7 @@ async function exportBoard() {
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting");
+    if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     btn.disabled = false;
     btn.textContent = "📷 Export";
     if (!isOverview()) layoutMasonry();   // re-pack at the normal on-screen width
@@ -2200,7 +2299,7 @@ function confirmImport() {
     if (D().plans[D().activeBoardId]) delete D().plans[D().activeBoardId][state.date];
     await refreshAndRender();
     if (result && result.skipped > 0) {
-      alert(`${result.added} mission(s) added. ${result.skipped} already existed on this date/shift and were skipped.`);
+      toast(`${result.added} mission(s) added. ${result.skipped} already existed on this date/shift and were skipped.`, "info");
     }
   });
 }
@@ -2248,7 +2347,7 @@ function resetBoard() {
   const run = () => safely(async () => {
     const src = await cloud.resetBoardFromLastWorkingDay(D().activeBoardId, state.date);
     await refreshAndRender();
-    if (!src) alert("No previous working-day plan was found to copy from.");
+    if (!src) toast("No previous working-day plan was found to copy from.", "warn");
   });
   // On an untouched day there's nothing to overwrite, so carry over straight
   // away. Once the day has content, confirm first — this replaces it.
@@ -2520,6 +2619,7 @@ function wireApp() {
 async function boot() {
   $("#login-screen").classList.add("hidden");
   $("#app-root").classList.remove("hidden");
+  wireSaveStatus();
   wireApp();
   await cloud.init(() => state.date);
   // holidays are known now — restore the last board/date the user was on, falling

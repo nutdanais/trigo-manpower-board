@@ -275,6 +275,28 @@ button, input, select, textarea, optgroup {
   border-radius: 8px;
 }
 .date-nav { display: flex; align-items: center; gap: 4px; }
+
+/* save/sync status pill — plain text on the navy topbar, same treatment as
+   #app-title's subtitle. Hidden until the first write of the session so it
+   never implies a save happened before one actually did. */
+#save-status {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,.65);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+#save-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+#save-status.save-saving { color: rgba(255,255,255,.85); }
+#save-status.save-saving::before { animation: save-pulse 1s ease-in-out infinite; }
+#save-status.save-saved { color: rgba(255,255,255,.65); }
+#save-status.save-error { color: #ffd9a0; }
+@keyframes save-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #save-status.save-saving::before { animation: none; }
+}
 #btn-lock.locked { background: #f59e0b; color: #fff; border-color: #f59e0b; }
 .btn-date-arrow {
   font-size: 18px;
@@ -286,18 +308,21 @@ button, input, select, textarea, optgroup {
   border-radius: 8px;
 }
 
-/* stats — one row: summary on the left, service-area counters on the right */
+/* stats — one row: summary on the left, service-area counters on the right.
+   Wraps rather than scrolling at any width — a scrolling stats strip hides
+   counters off-screen with no visual hint (the same problem the board tabs
+   had), so this wraps into a second row instead once boards/areas add up. */
 #stats-row {
   display: flex;
   align-items: center;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 8px 18px;
   padding: 9px 16px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
-  overflow-x: auto;
 }
-#stats-bar { display: flex; gap: 0; flex-wrap: nowrap; align-items: center; flex-shrink: 0; }
-#area-bar  { display: flex; gap: 16px; flex-wrap: nowrap; align-items: center; flex-shrink: 0; margin-left: auto; }
+#stats-bar { display: flex; gap: 0; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; }
+#area-bar  { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; margin-left: auto; }
 #btn-signout { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
 
 .stat-chip {
@@ -511,6 +536,22 @@ button, input, select, textarea, optgroup {
 .zone-pool .zone-label { background: var(--pool-tint); }
 .zone-leave .zone-label { background: var(--leave-tint); font-size: 12.5px; }
 .zone-leave .zone-body { min-height: 44px; }
+
+/* an empty leave zone (see renderZones) collapses to one thin row — still a
+   full-size drop target (data-drop is unchanged), just visually compact */
+.zone-leave.zone-empty { flex-shrink: 0; }
+.zone-leave.zone-empty .zone-label {
+  flex-direction: row;
+  width: auto;
+  min-width: 150px;
+  gap: 6px;
+  padding: 5px 10px;
+  justify-content: flex-start;
+  text-align: left;
+}
+.zone-leave.zone-empty .zone-label small { display: none; }
+.zone-leave.zone-empty .zone-body { min-height: 0; padding: 5px 10px; align-items: center; }
+.zone-empty-hint { font-size: 11.5px; color: var(--muted); font-style: italic; }
 /* on-call being unassigned is normal — deliberately plain/calm, not the pool tint */
 .zone-oncall-pool .zone-label { background: var(--bg-soft); font-size: 12.5px; }
 
@@ -890,13 +931,9 @@ body.board-view #app-root { margin-right: 264px; }
 
 /* ===== Phone layout pass ===== */
 @media (max-width: 640px) {
-  /* stats wrap into compact rows instead of scrolling important counts off-screen */
-  #stats-row { flex-wrap: wrap; gap: 8px 14px; overflow-x: visible; }
-  /* flex-shrink:0 (set above for the desktop scrolling row) would pin these at
-     their max-content width, so wrap never kicks in and 6 boards' chips push
-     the whole page sideways. Re-enable shrinking here — min-width:0 is the part
-     that actually lets a flex item drop below its content width. */
-  #stats-bar, #area-bar { flex-wrap: wrap; flex-shrink: 1; min-width: 0; }
+  /* stats already wrap at every width (see #stats-row above); phone just
+     tightens the spacing so more chips fit per row */
+  #stats-row { gap: 8px 14px; }
   #area-bar { margin-left: 0; gap: 10px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
@@ -1550,4 +1587,60 @@ body.exporting .zone-label { background: var(--bg-soft); }
 
 @media (prefers-reduced-motion: reduce) {
   body { background-attachment: scroll; }   /* fixed bg can jank on some setups */
+}
+
+/* ===== Toasts (replaces window.alert()) =====
+   Bottom-left stack so it never covers the float pool or a modal's own
+   actions. z-index above modals (300) — a duplicate-name warning must still
+   be visible while the mission/employee modal is open. */
+#toast-stack {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 400;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+/* clear the floating touch action bar (bottom:8px, full-width) when it's on screen */
+body.touch-mode.has-selection #toast-stack { bottom: 76px; }
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-left: 4px solid var(--muted);
+  font-size: 13px;
+  color: var(--text);
+  animation: toast-in .18s ease-out;
+}
+.toast-out { animation: toast-out .18s ease-in forwards; }
+.toast-info    { border-left-color: var(--primary-text); }
+.toast-warn    { border-left-color: #d97706; }
+.toast-error   { border-left-color: var(--danger); }
+.toast-msg { flex: 1; line-height: 1.4; }
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.toast-close:hover { color: var(--text); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .toast, .toast-out { animation: none; }
 }
