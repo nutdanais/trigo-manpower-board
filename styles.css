@@ -20,10 +20,13 @@
      so a coloured tint distinguishes nothing and pink isn't in the brand palette */
   --leave-tint: #eef1f5;
 
-  /* fixed dark text for elements colored by DATA (employee area color, engineer
-     color) rather than by theme — these background colors don't change with
-     the theme, so the text on them must not either, or dark mode would produce
-     light-on-light. Never redefined under [data-theme="dark"]. */
+  /* fixed dark text for elements whose background IS a data color at full
+     strength (the service-area pills on employee cards and in the Manpower
+     List) rather than a theme surface — those backgrounds don't change with the
+     theme, so the text on them must not either, or dark mode would produce
+     light-on-light. Never redefined under [data-theme="dark"]. Note the mission
+     header no longer belongs here: its engineer colour is a 15% wash now, so it
+     uses --text like any other surface. */
   --card-ink: #1a1a1a;
   --night: #1c2430;   /* dark pill for the Night stat */
   /* employee card SURFACE — unlike --card-ink above, this one DOES redefine
@@ -644,7 +647,9 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 .mission-card {
   display: flex;
-  border: 1px solid var(--border);
+  /* 2px, because this border carries the engineer's colour (set inline in
+     renderMissions) — at 1px the identity mark is too thin to scan a board by */
+  border: 2px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
@@ -657,10 +662,12 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   padding: 8px;
   font-size: 11.5px;
   cursor: pointer;
-  border-right: 1px solid rgba(0,0,0,.08);
-  /* the background is the engineer's chosen color (data, not theme) — pin the
-     text dark regardless of app theme so it never goes light-on-light */
-  color: var(--card-ink);
+  border-right: 1px solid var(--border);
+  /* The header's background is only a 15% wash of the engineer's colour now
+     (the full-strength colour rides the card's border instead), so this text no
+     longer sits on an arbitrary data colour and can follow the theme — unlike
+     --card-ink, which stays pinned for surfaces that ARE a solid data colour. */
+  color: var(--text);
 }
 .mission-header .m-number { font-family: var(--font-condensed); font-weight: 700; font-size: 14px; letter-spacing: .2px; margin-bottom: 4px; }
 .mission-header div { margin-bottom: 2px; }
