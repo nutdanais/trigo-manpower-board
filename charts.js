@@ -142,7 +142,9 @@ const Charts = (() => {
       grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + w}" y2="${y.toFixed(1)}" class="chart-grid"/>
         <text x="${padL - 6}" y="${(y + 3.5).toFixed(1)}" class="chart-axis-label" text-anchor="end">${Math.round(v)}</text>`;
     }
-    const step = n > 9 ? Math.ceil(n / 6) : 1;
+    // as many date labels as fit without colliding — a wider chart shows more,
+    // rather than being stuck at the 6 that suited the old fixed 640px width
+    const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(w / 64))));
     let xAxis = "";
     xLabels.forEach((lbl, i) => {
       if (i % step !== 0 && i !== n - 1) return;
