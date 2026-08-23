@@ -521,7 +521,10 @@ function renderTabs() {
   el.appendChild(ov);
   const eml = document.createElement("div");
   eml.className = "board-tab tab-emplist" + (isEmployeeList() ? " active" : "");
-  eml.textContent = "🧑‍🤝‍🧑 Manpower List";
+  // "List" is in its own span so the phone bar can drop it (see .tab-trim in
+  // styles.css) — "Manpower" alongside "Overview" and a board picker is
+  // unambiguous, and the two words it saves are what let the bar hold one line
+  eml.innerHTML = '🧑\u200d🤝\u200d🧑 Manpower<span class="tab-trim"> List</span>';
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
   // visual break: the two above are app-wide views; the rest are per-board
@@ -532,7 +535,9 @@ function renderTabs() {
   }
   for (const b of D().boards) {
     const t = document.createElement("div");
-    t.className = "board-tab" + (b.id === D().activeBoardId ? " active" : "");
+    // tab-board marks the per-board tabs specifically: the phone layout hides
+    // these and shows #board-select instead, but keeps Overview / Manpower List
+    t.className = "board-tab tab-board" + (b.id === D().activeBoardId ? " active" : "");
     t.textContent = b.name;
     t.title = "Click to switch. Double-click to rename.";
     t.onclick = () => { clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
@@ -542,6 +547,41 @@ function renderTabs() {
     };
     el.appendChild(t);
   }
+  renderBoardSelect();
+}
+
+/* Phone stand-in for the per-board tabs (CSS decides which of the two is
+   visible; both are always populated, so a rotate or a resize needs no
+   re-render). "+ New board…" rides along as the last option, which is what
+   lets the "+ Board" button be hidden on a phone. */
+const NEW_BOARD_OPT = "__new_board__";
+
+function renderBoardSelect() {
+  const sel = $("#board-select");
+  const onBoard = !isOverview() && !isEmployeeList();
+  sel.innerHTML = "";
+  // Overview and Manpower List are not boards, so no option matches then — a
+  // <select> with no match silently displays its first option, which would read
+  // as "you are on this board" while looking at something else. A disabled
+  // placeholder is what it shows instead.
+  if (!onBoard) {
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = "Board…";
+    ph.disabled = true;
+    sel.appendChild(ph);
+  }
+  for (const b of D().boards) {
+    const o = document.createElement("option");
+    o.value = b.id;
+    o.textContent = b.name;
+    sel.appendChild(o);
+  }
+  const add = document.createElement("option");
+  add.value = NEW_BOARD_OPT;
+  add.textContent = "+ New board…";
+  sel.appendChild(add);
+  sel.value = onBoard ? D().activeBoardId : "";
 }
 
 /* Built from spans rather than one string so the phone header can drop the
@@ -2917,6 +2957,17 @@ function wireApp() {
   };
 
   $("#btn-add-board").onclick = openBoardModal;
+  $("#board-select").onchange = (ev) => {
+    const val = ev.target.value;
+    if (val === NEW_BOARD_OPT) {
+      renderBoardSelect();   // put the picker back on the current board first —
+      openBoardModal();      // cancelling the modal must not leave "+ New board…" showing
+      return;
+    }
+    clearSelection();
+    D().activeBoardId = val;
+    refreshAndRender();
+  };
   $("#form-board").onsubmit = saveBoard;
 
   $("#btn-signout").onclick = () => safely(() => cloud.signOut());

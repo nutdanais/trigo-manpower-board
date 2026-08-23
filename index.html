@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-08-23b">
+<link rel="stylesheet" href="styles.css?v=2026-08-23c">
 </head>
 <body>
 
@@ -77,6 +77,12 @@
 
 <div id="board-bar">
   <div id="board-tabs"></div>
+  <!-- Phone-only stand-in for the per-board tabs and "+ Board" (see #board-select
+       in styles.css). A native <select> is deliberate: it gets the platform's own
+       picker, which is a far better target than a row of tabs, and it collapses
+       any number of boards into one control so the whole bar stays on one line.
+       Above ~640px it is display:none and the tabs are the real thing. -->
+  <select id="board-select" aria-label="Board"></select>
   <button id="btn-add-board" class="btn btn-ghost" title="Create new board">+ Board</button>
 </div>
 </div>
@@ -405,8 +411,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-08-23b"></script>
-<script src="charts.js?v=2026-08-23b"></script>
-<script src="app.js?v=2026-08-23b"></script>
+<script src="cloud.js?v=2026-08-23c"></script>
+<script src="charts.js?v=2026-08-23c"></script>
+<script src="app.js?v=2026-08-23c"></script>
 </body>
 </html>

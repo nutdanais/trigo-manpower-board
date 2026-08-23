@@ -267,6 +267,8 @@ button, input, select, textarea, optgroup {
    board stays visible at a glance (which is the point of the tab strip). */
 #board-tabs { display: flex; gap: 4px; align-items: stretch; flex-wrap: wrap; min-width: 0; }
 #board-bar > .btn { flex: none; }
+/* the phone board picker; the tabs are the real control at this width */
+#board-select { display: none; }
 .board-tab-sep {
   width: 1px;
   align-self: center;
@@ -1078,25 +1080,42 @@ body.board-view #app-root { margin-right: 264px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
 
-  /* nowrap on the BAR, wrap inside the strip — still no sideways-scrolling tab
-     strip on any screen size, but in two rows instead of three. #board-tabs
-     wants its whole max-content width, which on a phone is wider than the
-     screen, so a wrapping bar gave it a flex line of its own and pushed
-     "+ Board" onto a third row. Denying the bar that break makes the strip
-     shrink and wrap internally instead, with "+ Board" beside it. */
-  #board-bar { flex-wrap: nowrap; gap: 3px; padding: 3px 8px 0; }
-  /* flex-end, not the bar's default centring: beside a two-row strip a centred
-     "+ Board" floats out on its own in the middle of the bar — bottom-aligned
-     it reads as the end of the last row of tabs */
-  #btn-add-board { flex-shrink: 0; align-self: flex-end; margin-bottom: 3px; }
-  .board-tab-sep { height: 16px; margin: 0 3px; }
+  /* One line, no wrapping: the bar holds two fixed tabs and a board picker,
+     and the picker is the flexible item that takes what is left. */
+  #board-bar { flex-wrap: nowrap; gap: 4px; padding: 4px 8px; align-items: center; }
+  /* The per-board tabs and "+ Board" become one native <select> (populated by
+     renderBoardSelect in app.js, which carries "+ New board…" as its last
+     option). Any number of boards then costs one control instead of a wrapping
+     strip, so the whole bar holds a single line. Overview / Manpower List stay
+     as tabs — they are two fixed destinations, not a list that grows. */
+  #board-tabs .tab-board,
+  .board-tab-sep,
+  #btn-add-board { display: none; }
+  #board-tabs { flex: 0 0 auto; flex-wrap: nowrap; gap: 2px; }
+  #board-select {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 34px;
+    padding: 6px 8px;
+    border: 1.5px solid var(--primary);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--primary-text);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
 
   /* roomier touch targets for the controls fingers actually hit — except the
-     header's own chrome (tabs, + Board, and the topbar buttons below), which
-     is secondary and trades a few px of target for the vertical space the
-     board needs. Everything there still clears ~32px. */
-  .board-tab { padding: 8px 11px; font-size: 13px; }
-  #board-bar .btn { min-height: 32px; padding: 4px 10px; font-size: 12.5px; }
+     header's own chrome (these two tabs and the topbar buttons below), which is
+     secondary and trades a few px of target for the vertical space the board
+     needs. Everything there still clears ~32px. Pill-shaped rather than
+     tab-shaped now: with the board tabs gone these no longer sit on the bar's
+     bottom rule as the front edge of a strip. */
+  .board-tab { padding: 8px 9px; font-size: 13px; border-radius: 8px; top: 0; }
+  /* " List" — see renderTabs; "Manpower" carries it on a phone */
+  .tab-trim { display: none; }
   .btn { min-height: 40px; }
   .btn-small { min-height: 32px; }
   #topbar .btn-ghost { min-height: 34px; }
@@ -1255,10 +1274,11 @@ body.board-view #app-root { margin-right: 264px; }
   #topbar .btn-date { font-size: 12px; padding: 6px 6px; }
   #topbar .btn-date-arrow { padding: 6px 7px; }
   .topbar-right > .btn:not(.btn-date):not(.btn-date-arrow) { padding: 6px 7px; }
-  /* enough to keep "Overview" and "Manpower List" on one line here too,
-     which is the difference between a two- and a three-row tab strip */
-  #board-bar { padding: 3px 6px 0; }
-  .board-tab { padding: 8px 9px; font-size: 12.5px; }
+  /* the board picker is the flexible item here, so the two fixed tabs give up
+     what they can to leave it a usable width */
+  #board-bar { padding: 4px 6px; }
+  .board-tab { padding: 8px 7px; font-size: 12.5px; }
+  #board-select { font-size: 12.5px; padding: 6px 6px; }
 }
 
 /* ===== Modals ===== */
