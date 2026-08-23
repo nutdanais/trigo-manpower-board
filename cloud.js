@@ -98,7 +98,7 @@ const cloud = {
     const { data, error } = await sb.from("employees").select("*").order("name");
     if (error) throw error;
     // active is carried through as-is (undefined pre-migration, true/false after)
-    // and NOT filtered out here — an archived employee's past mission/zone
+    // and NOT filtered out here — a deactivated employee's past mission/zone
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
@@ -266,8 +266,8 @@ const cloud = {
     // active !== false — a new day's plan is a "current roster" operation,
     // unlike a historical read (ensurePlanLoaded's own boardEmpIds, above,
     // deliberately does NOT filter this way). Employees load unfiltered now
-    // (see _loadEmployees), so an archived employee's old assignment would
-    // otherwise get carried into a brand new day — exactly what archiving
+    // (see _loadEmployees), so a deactivated employee's old assignment would
+    // otherwise get carried into a brand new day — exactly what deactivating
     // them should prevent.
     const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
     const assignInserts = [];
@@ -530,37 +530,19 @@ const cloud = {
     if (error) throw error;
     await this._loadEmployees();
   },
-  /* Soft-delete: flips active off instead of removing the row. A hard DELETE
-     here cascades (assignments.employee_id references employees(id) on
-     delete cascade — schema.sql) and silently wipes every past mission/zone
-     assignment for that person, past and future — exactly the "rewrites
-     finished plans" problem archiving exists to avoid. Pre-migration (no
-     active column yet), falls back to the old hard-delete so the button
-     still works, just without history preserved, same as before. */
-  async archiveEmployee(employeeId) {
-    const { error } = await sb.from("employees").update({ active: false }).eq("id", employeeId);
-    if (!error) { await this._loadEmployees(); return; }
-    if (this._missingColumnFromError(error) !== "active") throw error;
-    const { error: delErr } = await sb.from("employees").delete().eq("id", employeeId);
-    if (delErr) throw delErr;
-    this._invalidatePlans();
-    await this._loadEmployees();
-  },
-  /* bulk-archive one or many employees (Manpower List multi-select) */
-  async archiveEmployees(ids) {
-    if (!ids.length) return;
-    const { error } = await sb.from("employees").update({ active: false }).in("id", ids);
-    if (!error) { await this._loadEmployees(); return; }
-    if (this._missingColumnFromError(error) !== "active") throw error;
-    const { error: delErr } = await sb.from("employees").delete().in("id", ids);
-    if (delErr) throw delErr;
-    this._invalidatePlans();
-    await this._loadEmployees();
-  },
-  /* Activate / deactivate (the Manpower List's Status column). Unlike
-     archiveEmployees above there's no pre-migration fallback to offer — you
-     can't express "active again" as a delete — so this reports the missing
-     migration plainly instead of failing with a raw Postgres error. */
+  /* The single way an employee goes on/off the roster — the Manpower List's
+     Status column, the right-click menu and the Edit Employee modal all land
+     here. Flips `active` rather than deleting the row: a hard DELETE cascades
+     (assignments.employee_id references employees(id) on delete cascade —
+     schema.sql) and silently wipes every past mission/zone assignment for that
+     person, which is exactly the "rewrites finished plans" problem this
+     exists to avoid.
+
+     There is deliberately no pre-migration fallback. The earlier archive
+     helpers (removed) fell back to that hard DELETE when the `active` column was
+     missing, which meant the one path that was supposed to protect history
+     could destroy it instead. Failing with a clear "run the migration"
+     message is strictly better than silently doing the destructive thing. */
   async setEmployeesActive(ids, active) {
     if (!ids.length) return;
     const { error } = await sb.from("employees").update({ active }).in("id", ids);

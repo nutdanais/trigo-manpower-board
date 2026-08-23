@@ -174,7 +174,7 @@ function setSaveStatus(kind) {
 const CLOUD_WRITE_METHODS = [
   "_copyPlanForward", "resetBoardFromLastWorkingDay", "setAssignment",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
-  "lockDay", "unlockDay", "saveEmployee", "archiveEmployee", "archiveEmployees", "setEmployeesActive",
+  "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
@@ -730,10 +730,10 @@ function renderCtxMenu(view) {
         () => guardEdit(() => assignEmployeesTo(ids, null)));
     }
     addSep();
-    addItem(many ? `📦 Archive ${ids.length} employees` : "📦 Archive employee", () => {
-      showConfirm("Archive employee" + (many ? "s" : "") + "?",
-        `Archive ${who}? Removes them from pools and dropdowns; their history stays.`,
-        () => safely(async () => { await cloud.archiveEmployees(ids); clearSelection(); await refreshAndRender(); }));
+    addItem(many ? `🚫 Deactivate ${ids.length} employees` : "🚫 Deactivate employee", () => {
+      showConfirm("Deactivate employee" + (many ? "s" : "") + "?",
+        `Deactivate ${who}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
+        () => safely(async () => { await cloud.setEmployeesActive(ids, false); clearSelection(); await refreshAndRender(); }));
     }, "ctx-danger");
   }
 
@@ -1798,7 +1798,7 @@ function renderEmployeeRows() {
         </label>
       </td>`;
     tr.classList.toggle("row-inactive", !isActive);
-    // No confirm: unlike Archive this is one click to undo. No guardEdit
+    // No confirm: unlike the menu's Deactivate this is one click to undo. No guardEdit
     // either — the roster is employee master data, not the day's plan (the
     // existing bulk actions in this table take the same line).
     tr.querySelector(".el-status input").onchange = (ev) => {
@@ -2046,7 +2046,7 @@ function openEmployeeModal(empId) {
   const form = $("#form-employee");
   form.reset();
   $("#employee-modal-title").textContent = empId ? "Edit Employee" : "New Employee";
-  $("#btn-delete-employee").classList.toggle("hidden", !empId);
+  $("#btn-deactivate-employee").classList.toggle("hidden", !empId);
   form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
   form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
   if (empId) {
@@ -2088,11 +2088,13 @@ function saveEmployee(ev) {
   });
 }
 
-function archiveEmployee() {
+function deactivateEmployee() {
   const e = D().employees.find(x => x.id === state.editingEmployeeId);
-  showConfirm("Archive employee?", `Archive ${e.name}? Removes them from pools and dropdowns; their history stays.`, () => {
+  showConfirm("Deactivate employee?",
+    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`, () => {
     safely(async () => {
-      await cloud.archiveEmployee(state.editingEmployeeId);
+      await cloud.setEmployeesActive([state.editingEmployeeId], false);
+      closeModal();
       await refreshAndRender();
     });
   });
@@ -2662,7 +2664,7 @@ function wireApp() {
   $("#btn-hide-mission").onclick = hideMission;
   $("#btn-hide-missions").onclick = openHideMissionsModal;
   $("#btn-hide-missions-save").onclick = saveHideMissions;
-  $("#btn-delete-employee").onclick = archiveEmployee;
+  $("#btn-deactivate-employee").onclick = deactivateEmployee;
 
   $("#btn-settings").onclick = () => { renderSettings(); openModal("#modal-settings"); };
   for (const btn of $$("#settings-tabs .settings-tab")) {
@@ -2788,12 +2790,12 @@ function wireApp() {
       await refreshAndRender();
     }));
   };
-  $("#emplist-bulk-delete").onclick = () => {
+  $("#emplist-bulk-deactivate").onclick = () => {
     const ids = [...state.selectedEmps];
     if (!ids.length) return;
-    showConfirm("Archive employees?",
-      `Archive ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? Removes them from pools and dropdowns; their history stays.`,
-      () => safely(async () => { await cloud.archiveEmployees(ids); state.selectedEmps = new Set(); await refreshAndRender(); }));
+    showConfirm("Deactivate employees?",
+      `Deactivate ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column.`,
+      () => safely(async () => { await cloud.setEmployeesActive(ids, false); state.selectedEmps = new Set(); await refreshAndRender(); }));
   };
   $("#emplist-bulk-clear").onclick = clearSelection;
 
