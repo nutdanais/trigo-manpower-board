@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-08-23a">
+<link rel="stylesheet" href="styles.css?v=2026-08-23c">
 </head>
 <body>
 
@@ -66,10 +66,10 @@
     </div>
     <button id="btn-lock" class="btn btn-date hidden" title="Lock this board so it's view-only for everyone">🔓 Lock</button>
     <button id="btn-theme" class="btn btn-ghost" title="Toggle dark mode">🌙</button>
-    <button id="btn-settings" class="btn btn-ghost" title="Settings">⚙ Settings</button>
+    <button id="btn-settings" class="btn btn-ghost" title="Settings">⚙<span class="btn-label"> Settings</span></button>
     <button id="btn-signout" class="btn btn-ghost" title="Sign out">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-      Sign out
+      <span class="btn-label">Sign out</span>
     </button>
   </div>
 </header>
@@ -77,6 +77,12 @@
 
 <div id="board-bar">
   <div id="board-tabs"></div>
+  <!-- Phone-only stand-in for the per-board tabs and "+ Board" (see #board-select
+       in styles.css). A native <select> is deliberate: it gets the platform's own
+       picker, which is a far better target than a row of tabs, and it collapses
+       any number of boards into one control so the whole bar stays on one line.
+       Above ~640px it is display:none and the tabs are the real thing. -->
+  <select id="board-select" aria-label="Board"></select>
   <button id="btn-add-board" class="btn btn-ghost" title="Create new board">+ Board</button>
 </div>
 </div>
@@ -405,8 +411,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-08-23a"></script>
-<script src="charts.js?v=2026-08-23a"></script>
-<script src="app.js?v=2026-08-23a"></script>
+<script src="cloud.js?v=2026-08-23c"></script>
+<script src="charts.js?v=2026-08-23c"></script>
+<script src="app.js?v=2026-08-23c"></script>
 </body>
 </html>

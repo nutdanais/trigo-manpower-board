@@ -267,6 +267,8 @@ button, input, select, textarea, optgroup {
    board stays visible at a glance (which is the point of the tab strip). */
 #board-tabs { display: flex; gap: 4px; align-items: stretch; flex-wrap: wrap; min-width: 0; }
 #board-bar > .btn { flex: none; }
+/* the phone board picker; the tabs are the real control at this width */
+#board-select { display: none; }
 .board-tab-sep {
   width: 1px;
   align-self: center;
@@ -846,6 +848,22 @@ body.touch-mode.has-selection .mission-body,
 body.touch-mode.has-selection .zone-body,
 body.touch-mode.has-selection .fp-body { outline: 1.5px dashed var(--brand-green); outline-offset: -4px; }
 
+/* ===== Long-press = right-click (touch) =====
+   attachLongPress (app.js) opens the context menu on a held card. iOS would
+   otherwise claim the same gesture for its selection magnifier / callout
+   bubble, so both are turned off on the elements that listen for it — and the
+   menu those gestures reach gets finger-sized rows, since a 7px-tall target
+   laid out for a mouse cursor is not one you can hit with a thumb. */
+.emp-card { -webkit-touch-callout: none; }
+body.touch-mode #emplist-body tr {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.touch-mode #context-menu { min-width: 232px; }
+body.touch-mode .ctx-item { padding: 11px 14px; font-size: 14px; }
+body.touch-mode .ctx-item.ctx-back, body.touch-mode .ctx-title { font-size: 11.5px; }
+
 /* ===== Floating touch action bar ===== */
 #touch-actions { display: none; }
 body.touch-mode #touch-actions.on {
@@ -1062,16 +1080,45 @@ body.board-view #app-root { margin-right: 264px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
 
-  /* keep tabs on one swipeable row rather than wrapping into two stacked rows */
-  /* wraps here too — no sideways-scrolling tab strip on any screen size */
-  #board-bar { flex-wrap: wrap; gap: 4px; }
-  #btn-add-board { flex-shrink: 0; }
+  /* One line, no wrapping: the bar holds two fixed tabs and a board picker,
+     and the picker is the flexible item that takes what is left. */
+  #board-bar { flex-wrap: nowrap; gap: 4px; padding: 4px 8px; align-items: center; }
+  /* The per-board tabs and "+ Board" become one native <select> (populated by
+     renderBoardSelect in app.js, which carries "+ New board…" as its last
+     option). Any number of boards then costs one control instead of a wrapping
+     strip, so the whole bar holds a single line. Overview / Manpower List stay
+     as tabs — they are two fixed destinations, not a list that grows. */
+  #board-tabs .tab-board,
+  .board-tab-sep,
+  #btn-add-board { display: none; }
+  #board-tabs { flex: 0 0 auto; flex-wrap: nowrap; gap: 2px; }
+  #board-select {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 34px;
+    padding: 6px 8px;
+    border: 1.5px solid var(--primary);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--primary-text);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
 
-  /* roomier touch targets (~44px) for the controls fingers actually hit */
-  .board-tab { padding: 12px 16px; }
+  /* roomier touch targets for the controls fingers actually hit — except the
+     header's own chrome (these two tabs and the topbar buttons below), which is
+     secondary and trades a few px of target for the vertical space the board
+     needs. Everything there still clears ~32px. Pill-shaped rather than
+     tab-shaped now: with the board tabs gone these no longer sit on the bar's
+     bottom rule as the front edge of a strip. */
+  .board-tab { padding: 8px 9px; font-size: 13px; border-radius: 8px; top: 0; }
+  /* " List" — see renderTabs; "Manpower" carries it on a phone */
+  .tab-trim { display: none; }
   .btn { min-height: 40px; }
   .btn-small { min-height: 32px; }
-  #topbar .btn-ghost { min-height: 40px; }
+  #topbar .btn-ghost { min-height: 34px; }
   .ms-btn, #filters select, #sort-by { min-height: 40px; }
   .ms-opt { padding: 9px 8px; }
   #emplist-table td.el-check input, #emplist-table th.el-check input { width: 22px; height: 22px; }
@@ -1147,8 +1194,47 @@ body.board-view #app-root { margin-right: 264px; }
   /* toolbar filters get their own full-width row so they don't crowd the buttons */
   #filters { width: 100%; flex-wrap: wrap; }
 
-  /* the date group can wrap under the title on very narrow screens without clipping */
-  .topbar-right { row-gap: 6px; }
+  /* ===== Compact header =====
+     The header was taking roughly the top half of a phone screen: an oversized
+     brand row, then the date picker, Lock/theme/Settings and Sign out stacked
+     on three separate lines. Everything here tightens it into a brand row plus
+     one controls row. Nothing is dropped — the buttons that lose their text
+     keep their icon and their title. */
+  #topbar { padding: 5px 8px 6px; gap: 4px 8px; }
+  #app-logo { height: 22px; }
+  #app-title { font-size: 13px; padding-left: 9px; margin-left: 4px; }
+  #app-title small { font-size: 8.5px; letter-spacing: .3px; margin-top: 0; }
+  #green-rule { height: 2px; }
+
+  /* One line, always: nowrap is what enforces it, and the date button is the
+     only flexible item, so it absorbs whatever is left over once the arrows
+     and the icon buttons have taken their fixed widths. */
+  .topbar-right { flex: 1 0 100%; flex-wrap: nowrap; gap: 4px; min-width: 0; }
+  .date-nav { flex: 1 1 auto; min-width: 0; gap: 3px; }
+  #topbar .btn-date {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 13.5px;
+    border-width: 1.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* what the date gives up to fit: the calendar glyph (the button reads as a
+     date without it) and the year (the picker it opens still shows one) */
+  #topbar .btn-date .d-ico,
+  #topbar .btn-date .d-yr { display: none; }
+  #topbar .btn-date-arrow { flex: 0 0 auto; padding: 6px 9px; font-size: 16px; border-width: 1.5px; }
+
+  /* Lock / Settings / Sign out drop to icon-only — their labels are what made
+     this row overflow onto lines of its own in the first place. */
+  .topbar-right .btn-label { display: none; }
+  .topbar-right > .btn:not(.btn-date):not(.btn-date-arrow) { flex: 0 0 auto; padding: 6px 8px; }
+  /* the save pill keeps its state dot (colour + pulse, via ::before) but not
+     its wording — "Saved" is not worth the width on a one-line control row */
+  #save-status { flex: 0 0 auto; font-size: 0; gap: 0; }
 
   /* Toolbar: the primary actions (+ New Mission, Export) stay in the main row;
      everything else collapses behind "⋯ More" instead of wrapping into extra
@@ -1179,6 +1265,20 @@ body.board-view #app-root { margin-right: 264px; }
   #toolbar-more #filters { width: 100%; margin: 0; }
   #toolbar-more .btn { width: 100%; }
   #toolbar-more .toggle { width: 100%; justify-content: center; }
+}
+
+/* Below ~380px (an SE-sized screen) the controls row above still fits on one
+   line, but only just — the date is the item being squeezed, so it gives up a
+   little type size rather than being cut off by its own ellipsis. */
+@media (max-width: 380px) {
+  #topbar .btn-date { font-size: 12px; padding: 6px 6px; }
+  #topbar .btn-date-arrow { padding: 6px 7px; }
+  .topbar-right > .btn:not(.btn-date):not(.btn-date-arrow) { padding: 6px 7px; }
+  /* the board picker is the flexible item here, so the two fixed tabs give up
+     what they can to leave it a usable width */
+  #board-bar { padding: 4px 6px; }
+  .board-tab { padding: 8px 7px; font-size: 12.5px; }
+  #board-select { font-size: 12.5px; padding: 6px 6px; }
 }
 
 /* ===== Modals ===== */
