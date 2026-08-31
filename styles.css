@@ -1638,13 +1638,18 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-kpi-meter-track { flex-grow: 1; height: 8px; border-radius: 999px; overflow: hidden; }
 .ov-kpi-meter-val { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
 
-/* Overview's six lower detail cards (By engineer, By service area, Position
-   coverage, Day/night split, Leave today, Host coverage risk) vary too much in
-   height to pair up in fixed rows without leaving a gap under whichever card
-   is shorter, so layoutOverviewMasonry() (app.js) absolutely positions them
-   into a JS masonry pack instead — same technique as the board's mission-card
-   grid. This container just needs to be a positioning root; its height is set
-   inline once the cards are measured and packed. */
+/* By engineer + By service area: a fixed 50/50 row (see renderOverview),
+   wrapping to stacked on a narrow screen. */
+.ov-side-by-side { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.ov-side-by-side > .ov-section { flex: 1 1 340px; min-width: 0; }
+
+/* Position coverage, Day/night split and Leave today vary too much in height
+   to pair up in a fixed row without leaving a gap under whichever card is
+   shorter, so layoutOverviewMasonry() (app.js) absolutely positions them into
+   a JS masonry pack instead (max 3 columns) — same technique as the board's
+   mission-card grid. This container just needs to be a positioning root; its
+   height is set inline once the cards are measured and packed. Host coverage
+   risk is NOT part of this grid — it's always the full-width card after it. */
 #overview-masonry { position: relative; }
 #overview-masonry > .ov-section { position: absolute; }
 
@@ -1774,10 +1779,11 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-shift-chip.day { color: var(--primary-text); background: var(--emp-pos-bg); }
 .ov-shift-chip.night { color: #fff; background: var(--night); }
 
-/* host coverage risk: one row per host, amber when only 1-2 people ever covered it */
-/* flex-wrap so a narrow masonry column (see #overview-masonry) drops "who"
-   onto its own line instead of squeezing the host name into a cramped,
-   overlapping wrap — at full width all three still sit on one line. */
+/* host coverage risk: only 1-2-person-ever hosts are shown (see
+   renderOverview), so every row rendered here is a .risk row — amber. */
+/* flex-wrap so a narrow column drops "who" onto its own line instead of
+   squeezing the host name into a cramped, overlapping wrap — at full width
+   all three still sit on one line. */
 .ov-hostrisk-rows { display: flex; flex-direction: column; gap: 6px; }
 .ov-hostrisk-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 11px; }
 .ov-hostrisk-row.risk { border-color: #f59e0b; background: #fffbeb; }
@@ -1786,7 +1792,6 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-hostrisk-count { font-size: 11.5px; color: var(--muted); flex: 0 0 auto; }
 .ov-hostrisk-row.risk .ov-hostrisk-count { font-weight: 700; color: #92400e; }
 .ov-hostrisk-who { font-size: 11px; color: var(--muted); flex: 1 1 auto; min-width: 84px; text-align: right; }
-.ov-hostrisk-who.ok { color: #15803d; }
 .ov-hostrisk-note { font-size: 11.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
 
 /* trend: title+caption on the left, metric switcher + range switcher on the
