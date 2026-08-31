@@ -757,8 +757,8 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 /* employee card — one calm light grey for everyone. Contract type is told by the
    border (permanent = solid, on-call = dashed) plus an OC chip on on-call only:
    permanent is the common case and gets no mark, so the name keeps the full
-   width. Service area is read from the area code text; its ink is picked from
-   the area colour's luminance by inkOn() in app.js, not pinned. */
+   width. Service area is read from the area code text; its background is the
+   area colour darkened just enough for white ink by pillBg() in app.js. */
 .emp-card {
   width: 114px;
   height: 62px;
@@ -1996,8 +1996,10 @@ body.exporting #app-root { margin-right: 0; }
   letter-spacing: .2px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(0,0,0,.15);
-  color: var(--card-ink);
+  /* background is always darkened to a shade white text can sit on (pillBg()
+     in app.js), so the border only needs to read against dark chips now. */
+  border: 1px solid rgba(255,255,255,.18);
+  color: #fff;
 }
 
 /* ==========================================================================
