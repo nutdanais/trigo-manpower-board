@@ -33,39 +33,39 @@ const Charts = (() => {
      "however many boards/categories" series (leave types, board trend lines) */
   function catColor(i) { return `var(--chart-cat-${(i % 8) + 1})`; }
 
-  /* ---------- donut ---------- */
-  /* `segments`: [{label, value, color}]. Zero-value segments are skipped — an
-     empty sliver is noise, not information. A 2px surface gap (the mark spec's
-     "surface gap" spacer) separates adjacent slices instead of a stroke. */
-  function donut({ segments, centerValue, centerLabel, size = 148, thickness = 22 }) {
-    const r = (size - thickness) / 2;
-    const cx = size / 2, cy = size / 2;
-    const circumference = 2 * Math.PI * r;
-    const total = segments.reduce((s, x) => s + (x.value || 0), 0);
-    const gap = total > 0 ? 2 : 0;
-    let offset = 0;
-    let arcs = "";
-    if (total > 0) {
-      for (const seg of segments) {
-        if (!seg.value) continue;
-        const frac = seg.value / total;
-        const len = Math.max(0, frac * circumference - gap);
-        arcs += `<circle class="chart-mark" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}"
-          stroke-width="${thickness}" stroke-dasharray="${len} ${Math.max(0, circumference - len)}" stroke-dashoffset="${-offset}"
-          data-tip-label="${esc(seg.label)}" data-tip-value="${seg.value}" data-tip-pct="${Math.round(frac * 100)}"
-          tabindex="0"><title>${esc(seg.label)}: ${seg.value} (${Math.round(frac * 100)}%)</title></circle>`;
-        offset += frac * circumference;
+  /* ---------- sparkline ---------- */
+  /* `points`: [number|null, ...], oldest first. A decorative trend indicator
+     for a KPI tile, not a full chart — no axes, no gridlines, no tooltip (the
+     full Trend chart below carries the interaction; this is a glance). Draws
+     one polyline per contiguous run of non-null points (same gap handling as
+     lineChart, minus the parts a tile-sized chart has no room for) and marks
+     only the last real point, since that's the value the tile's own number
+     already states. */
+  function sparkline({ points, width = 92, height = 34, color = "var(--primary)" }) {
+    const vals = points.filter((v) => v != null);
+    if (vals.length < 2) return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"></svg>`;
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = max - min || 1;
+    const n = points.length;
+    const padY = 4;
+    const xAt = (i) => (n <= 1 ? width / 2 : (i / (n - 1)) * width);
+    const yAt = (v) => height - padY - ((v - min) / range) * (height - 2 * padY);
+    let path = "", run = [];
+    const flushRun = () => {
+      if (run.length > 1) {
+        const pts = run.map((i) => `${xAt(i).toFixed(1)},${yAt(points[i]).toFixed(1)}`).join(" ");
+        path += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
       }
-    } else {
-      arcs = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${thickness}"/>`;
-    }
-    const valueText = centerValue != null
-      ? `<text x="${cx}" y="${cy - (centerLabel ? 3 : -6)}" class="chart-donut-value" text-anchor="middle">${esc(centerValue)}</text>` : "";
-    const labelText = centerLabel
-      ? `<text x="${cx}" y="${cy + 16}" class="chart-donut-label" text-anchor="middle">${esc(centerLabel)}</text>` : "";
-    return `<svg class="chart-svg chart-donut" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${esc(centerLabel || "")}: ${esc(String(centerValue ?? ""))}">
-      <g transform="rotate(-90 ${cx} ${cy})">${arcs}</g>${valueText}${labelText}
-    </svg>`;
+      run = [];
+    };
+    points.forEach((v, i) => { if (v == null) { flushRun(); return; } run.push(i); });
+    flushRun();
+    let lastIdx = -1;
+    for (let i = points.length - 1; i >= 0; i--) if (points[i] != null) { lastIdx = i; break; }
+    const dot = lastIdx >= 0
+      ? `<circle cx="${xAt(lastIdx).toFixed(1)}" cy="${yAt(points[lastIdx]).toFixed(1)}" r="3" fill="${color}" stroke="var(--panel)" stroke-width="1.5"/>`
+      : "";
+    return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="trend sparkline, ${vals.length} points">${path}${dot}</svg>`;
   }
 
   /* ---------- 100%-stacked horizontal bar ---------- */
@@ -262,5 +262,5 @@ const Charts = (() => {
     root.addEventListener("focusout", hide);
   }
 
-  return { donut, stackedBarH, barsH, lineChart, legendEl, wireChartTooltips, catColor, esc };
+  return { sparkline, stackedBarH, barsH, lineChart, legendEl, wireChartTooltips, catColor, esc };
 })();

@@ -1,0 +1,61 @@
+{
+  "artboards": [
+    {
+      "file": "CurrentIA.dc.html",
+      "title": "Review — current Overview",
+      "x": 0,
+      "y": 0,
+      "w": 620,
+      "h": 1260
+    },
+    {
+      "file": "Main.dc.html",
+      "title": "Proposed Overview",
+      "x": 760,
+      "y": 0,
+      "w": 1280,
+      "h": 2240
+    },
+    {
+      "file": "Modules.dc.html",
+      "title": "New data modules",
+      "x": 760,
+      "y": 2360,
+      "w": 1280,
+      "h": 1080
+    }
+  ],
+  "annotations": [
+    {
+      "id": "thesis",
+      "x": 0,
+      "y": -230,
+      "w": 620,
+      "text": "THE PROBLEM IN ONE LINE\n\nThe Overview reports the day but never judges it. Eight equal-weight panels, every number absolute, nothing ranked — so \"is today staffed?\" takes a full scroll and some arithmetic.\n\nThe fix isn't more charts. It's a hierarchy: verdict → exceptions → context."
+    },
+    {
+      "id": "proposal",
+      "x": 760,
+      "y": -230,
+      "w": 1280,
+      "text": "PROPOSED — same design system, same data, re-ranked\n\n1. A status bar that states the verdict before any number.\n2. KPI tiles that carry a sparkline + delta, so 89% can be read as good or bad.\n3. Contract-mix donuts folded into the By-board table as one column, now carrying each side's share — 7 donuts become 1 column at 6 boards.\n4. Two new modules: day / night split (per board, not just a chip) and host coverage risk.\n5. The two near-identical trend charts merged into one with a metric switcher; the 600-character caption moves behind an ⓘ.\n\nMissions with no crew are deliberately NOT flagged anywhere — that is normal here, not an exception."
+    },
+    {
+      "id": "priority",
+      "x": 0,
+      "y": 1400,
+      "w": 620,
+      "text": "BUILD ORDER\n\n1. Day / night split — dayMissions / nightMissions are already computed in boardStats(); only the stats bar reads them today. Zero new queries.\n2. Sparkline + delta on the utilization tile — the 14 days are already fetched for the chart below it.\n3. Host coverage risk — one aggregate over deployment_history, the table added this week.\n4. Position coverage — client-side arithmetic on employees.position.\n\nNothing here needs a schema change."
+    },
+    {
+      "id": "datanote",
+      "x": 760,
+      "y": 3500,
+      "w": 1280,
+      "text": "None of the four modules needs a schema change. Three are pure client-side arithmetic on data already in memory; host coverage risk reads the deployment_history table added this week — the same rows as the Host Record tab, aggregated by host instead of by employee.\n\nSample figures throughout are realistic placeholders, not live data: 128 staff, 21 missions, 2 boards."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

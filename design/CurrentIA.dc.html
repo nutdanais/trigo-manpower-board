@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: "Noto Sans", Arial, sans-serif; color: #1f2937; background: #eef1f4; }
+    a { color: #004983; } a:hover { color: #00335c; }
+  </style>
+</helmet>
+
+<div style="background: #eef1f4; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+
+  <div>
+    <div style="font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #6b7280;">Review — today</div>
+    <h2 style="font-size: 19px; margin: 3px 0 4px;">Overview tab as it stands</h2>
+    <p style="font-size: 12.5px; color: #6b7280; margin: 0; line-height: 1.5;">A KPI strip plus eight sections in one column, each in an identical white panel. Nothing is ranked, so the page reads as a list of facts rather than an answer to “is today staffed?”</p>
+  </div>
+
+  <!-- 1 KPI -->
+  <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 8px; padding: 11px 13px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #6b7280; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">1</span>
+      <span style="font-size: 13.5px; font-weight: 700;">KPI strip</span>
+      <span style="font-size: 11px; color: #6b7280; margin-left: auto;">4 tiles</span>
+    </div>
+    <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+      <div style="flex-grow: 1; height: 34px; border-radius: 5px; background: #eef1f5;"></div>
+      <div style="flex-grow: 1; height: 34px; border-radius: 5px; background: #eef1f5;"></div>
+      <div style="flex-grow: 1; height: 34px; border-radius: 5px; background: #eef1f5;"></div>
+      <div style="flex-grow: 1; height: 34px; border-radius: 5px; background: #eef1f5;"></div>
+    </div>
+    <div style="font-size: 11.5px; color: #b45309; line-height: 1.45;"><b>A.</b> Four bare numbers — no delta, no target, no trend. “89% utilization” can’t be read as good or bad. The formula is spent as a subtitle where a sparkline would fit.</div>
+  </div>
+
+  <!-- 2 By board -->
+  <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 8px; padding: 11px 13px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #6b7280; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">2</span>
+      <span style="font-size: 13.5px; font-weight: 700;">By board</span>
+      <span style="font-size: 11px; color: #15803d; margin-left: auto;">✓ works well</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="height: 9px; border-radius: 3px; background: #dfe5ec;"></div>
+      <div style="height: 9px; border-radius: 3px; background: #eef1f5;"></div>
+      <div style="height: 9px; border-radius: 3px; background: #eef1f5;"></div>
+    </div>
+  </div>
+
+  <!-- 3 Needs attention -->
+  <div style="background: #ffffff; border: 1px solid #f59e0b; border-radius: 8px; padding: 11px 13px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #b45309; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">3</span>
+      <span style="font-size: 13.5px; font-weight: 700;">Needs attention</span>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+      <span style="height: 17px; width: 74px; border-radius: 4px; background: #eef1f5;"></span>
+      <span style="height: 17px; width: 88px; border-radius: 4px; background: #eef1f5;"></span>
+      <span style="height: 17px; width: 66px; border-radius: 4px; background: #eef1f5;"></span>
+      <span style="height: 17px; width: 80px; border-radius: 4px; background: #eef1f5;"></span>
+    </div>
+    <div style="font-size: 11.5px; color: #b45309; line-height: 1.45;"><b>B.</b> The one action list on the page gives idle permanent staff and available on-call staff near-equal weight — one wants an assignment, the other is surge capacity working exactly as intended. Nothing separates “do something” from “nothing to do here”.</div>
+  </div>
+
+  <!-- 4 By engineer -->
+  <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 8px; padding: 11px 13px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #6b7280; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">4</span>
+      <span style="font-size: 13.5px; font-weight: 700;">By engineer</span>
+      <span style="font-size: 11px; color: #15803d; margin-left: auto;">✓ works well</span>
+    </div>
+  </div>
+
+  <!-- 5 + 6 side by side -->
+  <div style="display: flex; gap: 10px;">
+    <div style="flex-grow: 1; flex-basis: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 8px; padding: 11px 13px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+        <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #6b7280; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">5</span>
+        <span style="font-size: 13.5px; font-weight: 700;">Contract mix</span>
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+        <div style="width: 38px; height: 38px; border-radius: 50%; border: 7px solid #2a78d6; border-right-color: #eb6834;"></div>
+        <div style="width: 38px; height: 38px; border-radius: 50%; border: 7px solid #2a78d6; border-right-color: #eb6834;"></div>
+        <div style="width: 38px; height: 38px; border-radius: 50%; border: 7px solid #2a78d6; border-right-color: #eb6834;"></div>
+      </div>
+      <div style="font-size: 11.5px; color: #b45309; line-height: 1.45;"><b>C.</b> One donut per board <i>plus</i> an all-boards donut. At 6 boards that’s 7 donuts saying what one column could.</div>
+    </div>
+    <div style="flex-grow: 1; flex-basis: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 8px; padding: 11px 13px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+        <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #6b7280; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">6</span>
+        <span style="font-size: 13.5px; font-weight: 700;">Service area</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div style="height: 10px; border-radius: 3px; background: #2a78d6;"></div>
+        <div style="height: 10px; width: 78%; border-radius: 3px; background: #2a78d6;"></div>
+        <div style="height: 10px; width: 60%; border-radius: 3px; background: #2a78d6;"></div>
+        <div style="height: 10px; width: 44%; border-radius: 3px; background: #2a78d6;"></div>
+      </div>
+      <div style="font-size: 11px; color: #15803d; margin-top: 8px;">✓ works well</div>
+    </div>
+  </div>
+
+  <!-- 7 + 8 duplicated trends -->
+  <div style="background: #ffffff; border: 1px solid #f59e0b; border-radius: 8px; padding: 11px 13px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #b45309; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">7</span>
+      <span style="font-size: 13.5px; font-weight: 700;">Utilization trend</span>
+      <span style="font-size: 11px; color: #6b7280; margin-left: auto;">220px + legend</span>
+    </div>
+    <svg viewBox="0 0 480 46" width="100%" height="46" style="display: block; margin-bottom: 4px;">
+      <polyline points="6,34 66,26 126,32 186,18 246,24 306,14 366,20 426,12 474,16" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+      <polyline points="6,40 66,36 126,30 186,34 246,28 306,26 366,30 426,22 474,20" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+    </svg>
+    <div style="font-size: 9.5px; color: #9aa1a8; line-height: 1.35; margin-bottom: 10px;">Utilized = assigned ÷ (headcount − leave − free on-call), ending today. Free on-call staff are surge capacity, not idle headcount, so an uncalled on-call employee leaves the denominator instead of dragging the day down. Days when every board is off are left off the axis, so the line runs straight across them; a day when only some boards are off keeps its place and those boards’ lines break. Headcount uses each employee’s CURRENT board…</div>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin: 10px 0 8px; padding-top: 10px; border-top: 1px dashed #d8dde4;">
+      <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #b45309; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">8</span>
+      <span style="font-size: 13.5px; font-weight: 700;">On-call availability trend</span>
+      <span style="font-size: 11px; color: #6b7280; margin-left: auto;">220px + same legend</span>
+    </div>
+    <svg viewBox="0 0 480 46" width="100%" height="46" style="display: block; margin-bottom: 8px;">
+      <polyline points="6,30 66,32 126,24 186,28 246,20 306,26 366,18 426,22 474,18" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>
+      <polyline points="6,38 66,34 126,36 186,30 246,32 306,28 366,32 426,26 474,28" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round"/>
+    </svg>
+    <div style="font-size: 11.5px; color: #b45309; line-height: 1.45;"><b>D.</b> Two near-identical 220px charts back to back, sharing a range and a legend that is drawn twice. <b>E.</b> A 600-character caption is a metric that needs a definition — that belongs behind an ⓘ, not in body text.</div>
+  </div>
+
+  <!-- 9 leave -->
+  <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 8px; padding: 11px 13px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <span style="font-size: 10px; font-weight: 700; color: #ffffff; background: #6b7280; border-radius: 999px; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; flex: none;">9</span>
+      <span style="font-size: 13.5px; font-weight: 700;">Leave by type</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="height: 9px; border-radius: 3px; background: #2a78d6;"></div>
+      <div style="height: 9px; width: 60%; border-radius: 3px; background: #2a78d6;"></div>
+      <div style="height: 9px; width: 34%; border-radius: 3px; background: #2a78d6;"></div>
+    </div>
+  </div>
+
+  <!-- cross-cutting -->
+  <div style="background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; padding: 11px 13px;">
+    <div style="font-size: 12px; font-weight: 700; color: #b45309; margin-bottom: 5px;">F. Two clocks on one page</div>
+    <div style="font-size: 11.5px; color: #1f2937; line-height: 1.5;">The KPI strip and both tables are for the <b>planning date</b> you’re viewing. Both trends always end <b>today</b>, whatever date is selected. Nothing on screen says so except prose — so a Friday plan viewed on Monday quietly mixes two time bases.</div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

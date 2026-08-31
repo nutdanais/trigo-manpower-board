@@ -1,0 +1,624 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: "Noto Sans", Arial, sans-serif; color: #1f2937; background: #eef1f4; }
+    a { color: #004983; text-decoration: none; }
+    a:hover { color: #00335c; text-decoration: underline; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="background: #eef1f4; padding: 16px; display: flex; flex-direction: column; gap: 18px;">
+
+  <!-- ============ 1. STATUS BAR — the verdict, before the numbers ============ -->
+  <div style="display: flex; align-items: center; gap: 14px; background: #ffffff; border: 1px solid #d8dde4; border-left: 5px solid #b45309; border-radius: 10px; padding: 12px 18px;">
+    <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1;">
+      <div style="display: flex; align-items: baseline; gap: 10px;">
+        <span style="font-size: 17px; font-weight: 700;">Needs attention today</span>
+        <span style="font-size: 12.5px; color: #6b7280;">Mon 01-Sep-2026 · 2 boards</span>
+      </div>
+      <div style="font-size: 13px; color: #1f2937;">
+        <b>10 permanent staff idle</b> · 24 on-call available (normal)
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+      <span style="font-size: 11px; font-weight: 700; letter-spacing: .3px; color: #004983; background: rgba(0,73,131,.09); border-radius: 999px; padding: 3px 10px;">DAY 61</span>
+      <span style="font-size: 11px; font-weight: 700; letter-spacing: .3px; color: #ffffff; background: #1c2430; border-radius: 999px; padding: 3px 10px;">NIGHT 21</span>
+    </div>
+  </div>
+
+  <!-- ============ 2. KPI STRIP — now with trend, not just a number ============ -->
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;">
+
+    <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px;">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">
+        <div>
+          <div style="font-size: 26px; font-weight: 700; color: #004983;" class="num">89%</div>
+          <div style="font-size: 12.5px; color: #6b7280; margin-top: 2px;">Overall utilization</div>
+        </div>
+        <svg viewBox="0 0 92 34" width="92" height="34" style="flex: none; margin-top: 4px;" role="img" aria-label="14-day utilization trend, ending at 89 percent">
+          <polyline points="2,20 8.9,17 15.8,23 22.7,14 29.6,10 36.5,15 43.4,17 50.3,11 57.2,13 64.1,8 71,11 77.9,14 84.8,9 90,10" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <circle cx="90" cy="10" r="3" fill="#2a78d6" stroke="#ffffff" stroke-width="2"/>
+        </svg>
+      </div>
+      <div style="font-size: 11px; color: #6b7280; margin-top: 6px; line-height: 1.4;">
+        <b style="color: #15803d;">▲ 4 pts</b> vs the prior 7 days · 14-day trend
+      </div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 26px; font-weight: 700; color: #004983;" class="num">82<span style="font-size: 15px; font-weight: 600; color: #6b7280;"> / 128</span></div>
+      <div style="font-size: 12.5px; color: #6b7280; margin-top: 2px;">Deployed on a mission</div>
+      <div style="display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #eef1f5; margin-top: 8px; gap: 2px;">
+        <div style="width: 64%; background: #2a78d6;"></div>
+        <div style="width: 9%; background: #eda100;"></div>
+        <div style="width: 8%; background: #b45309;"></div>
+        <div style="width: 19%; background: #c9d3dd;"></div>
+      </div>
+      <div style="font-size: 11px; color: #6b7280; margin-top: 6px; line-height: 1.4;">
+        82 deployed · 12 leave · 10 idle · 24 on-call free
+      </div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 26px; font-weight: 700; color: #004983;" class="num">21</div>
+      <div style="font-size: 12.5px; color: #6b7280; margin-top: 2px;">Missions today</div>
+      <div style="font-size: 11px; color: #6b7280; margin-top: 6px; line-height: 1.4;">
+        15 day · 6 night · 18 hosts · 7 engineers
+      </div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 26px; font-weight: 700; color: #004983;" class="num">24</div>
+      <div style="font-size: 12.5px; color: #6b7280; margin-top: 2px;">On-call available</div>
+      <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+        <div style="flex-grow: 1; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;">
+          <div style="width: 25%; height: 100%; background: #eb6834; border-radius: 999px;"></div>
+        </div>
+        <span style="font-size: 11px; font-weight: 700; color: #6b7280;" class="num">8/32 called</span>
+      </div>
+      <div style="font-size: 11px; color: #6b7280; margin-top: 6px; line-height: 1.4;">
+        Surge capacity — uncalled is normal, not idle
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 3. ACTION QUEUE — exceptions first, ranked by severity ============ -->
+  <section style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+    <h3 style="font-size: 15px; margin: 0 0 2px;">Action queue</h3>
+    <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px; max-width: 760px;">Permanent staff with no mission today. Click any chip to jump to their board.</p>
+
+    <!-- idle permanent staff — same chips as today, but grouped and counted -->
+    <div style="border: 1px solid #f59e0b; background: #fffbeb; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px;">
+        <span style="font-size: 12.5px; font-weight: 700; color: #b45309;">⚠ 10 permanent staff not assigned yet</span>
+        <span style="font-size: 11px; color: #6b7280;">Non-Rayong 7 · Rayong 3</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Somchai R. · AMATA</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Wannaphatson T329 · Wellgrow</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Janjira P. · RAYONG</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Wipa S. · Wellgrow</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Phrajak M. · NPT</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Kittipong S. · LCB</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Duangjai N. · LCB</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Anucha B. · AMATA</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Pornchai T. · AMATA</span>
+        <span style="font-size: 11.5px; font-weight: 600; background: #ffffff; border: 1px solid #b4bcc4; border-radius: 5px; padding: 3px 8px;">Sirinat K. · AYT</span>
+      </div>
+    </div>
+
+    <!-- 3c. calm, collapsed by default: on-call is not an exception -->
+    <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #d8dde4; background: #eef1f5; border-radius: 8px; padding: 8px 12px;">
+      <span style="font-size: 12.5px; color: #6b7280; flex-grow: 1;">24 on-call staff available and not called — surge capacity, no action needed</span>
+      <span style="font-size: 11.5px; font-weight: 700; color: #004983; flex: none;">Show ▾</span>
+    </div>
+  </section>
+
+  <!-- ============ 4. BY BOARD — contract mix folded in, donuts retired ============ -->
+  <section style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+    <h3 style="font-size: 15px; margin: 0 0 2px;">By board</h3>
+    <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px; max-width: 760px;">Mon 01-Sep-2026 — click a board name to open it. Utilized = assigned ÷ (headcount − leave − holiday − free on-call).</p>
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap;">Board</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 14%;">Utilized</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 10%;">Missions</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 11%;">Headcount</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 10%;">Assigned</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 8%;">Idle</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 24%;">Contract mix</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4; vertical-align: middle; min-width: 130px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 10px; height: 10px; border-radius: 3px; background: #2a78d6; flex: none;"></span>
+              <span style="font-weight: 600; line-height: 1.25;">Non-Rayong</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: rgba(146,148,150,.45); overflow: hidden;"><i style="display: block; width: 89%; height: 100%; border-radius: 999px; background: #2a78d6;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">89%</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #2a78d6;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">14</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #2a78d6;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">96</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #2a78d6;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">62</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <span style="font-weight: 700; color: #b45309;" class="num">7</span>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; display: flex; height: 12px; border-radius: 3px; overflow: hidden; gap: 2px;">
+                <div style="width: 78%; background: #2a78d6;"></div>
+                <div style="width: 22%; background: #eb6834;"></div>
+              </div>
+              <span style="font-size: 11.5px; color: #6b7280; flex: none;" class="num">75 (78%) &nbsp;/&nbsp; 21 (22%)</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4; vertical-align: middle;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 10px; height: 10px; border-radius: 3px; background: #eb6834; flex: none;"></span>
+              <span style="font-weight: 600; line-height: 1.25;">Rayong</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: rgba(146,148,150,.45); overflow: hidden;"><i style="display: block; width: 91%; height: 100%; border-radius: 999px; background: #eb6834;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">91%</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 50%; height: 100%; border-radius: 999px; background: #eb6834;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">7</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 33%; height: 100%; border-radius: 999px; background: #eb6834;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">32</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 32%; height: 100%; border-radius: 999px; background: #eb6834;"></i></div>
+              <span style="flex: none; min-width: 30px; text-align: right; font-weight: 600;" class="num">20</span>
+            </div>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <span style="font-weight: 700; color: #b45309;" class="num">3</span>
+          </td>
+          <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="flex-grow: 1; display: flex; height: 12px; border-radius: 3px; overflow: hidden; gap: 2px;">
+                <div style="width: 66%; background: #2a78d6;"></div>
+                <div style="width: 34%; background: #eb6834;"></div>
+              </div>
+              <span style="font-size: 11.5px; color: #6b7280; flex: none;" class="num">21 (66%) &nbsp;/&nbsp; 11 (34%)</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4; vertical-align: middle;">
+            <span style="font-weight: 700; line-height: 1.25;">All boards</span>
+          </td>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">89%</span></td>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">21</span></td>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">128</span></td>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">82</span></td>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #b45309;" class="num">10</span></td>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">96 (75%) &nbsp;/&nbsp; 32 (25%)</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px;">
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #2a78d6; background: #2a78d6;"></span>Permanent (96)</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #eb6834; background: #eb6834;"></span>On-call (32)</span>
+    </div>
+  </section>
+
+  <!-- ============ 5. DAY / NIGHT SPLIT  |  HOST COVERAGE RISK ============ -->
+  <div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: stretch;">
+
+    <section style="flex-grow: 1; flex-basis: 460px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <h3 style="font-size: 15px; margin: 0 0 2px;">Day / night split</h3>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">Crew and missions by shift — the last thing to check before the night crew goes out.</p>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+        <div style="flex-grow: 1; flex-basis: 0; border: 1px solid #d8dde4; border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; align-items: baseline; gap: 7px;">
+            <span style="font-size: 24px; font-weight: 700; color: #004983;" class="num">61</span>
+            <span style="font-size: 11px; font-weight: 700; letter-spacing: .3px; color: #004983; background: rgba(0,73,131,.09); border-radius: 999px; padding: 2px 8px;">DAY</span>
+          </div>
+          <div style="font-size: 11.5px; color: #6b7280; margin-top: 4px;">15 missions · 74% of crew</div>
+        </div>
+        <div style="flex-grow: 1; flex-basis: 0; border: 1px solid #d8dde4; border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; align-items: baseline; gap: 7px;">
+            <span style="font-size: 24px; font-weight: 700; color: #1f2937;" class="num">21</span>
+            <span style="font-size: 11px; font-weight: 700; letter-spacing: .3px; color: #ffffff; background: #1c2430; border-radius: 999px; padding: 2px 8px;">NIGHT</span>
+          </div>
+          <div style="font-size: 11.5px; color: #6b7280; margin-top: 4px;">6 missions · 26% of crew</div>
+        </div>
+      </div>
+
+      <!-- per board, so this says something the chips in the status bar can't -->
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+        <div style="display: grid; grid-template-columns: 110px 1fr 78px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #2a78d6; flex: none;"></span>Non-Rayong</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px;">
+            <div style="width: 74%; background: #2a78d6;"></div>
+            <div style="width: 26%; background: #1c2430;"></div>
+          </div>
+          <span style="font-size: 12px; color: #6b7280; text-align: right;" class="num">46 / 16</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 110px 1fr 78px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #eb6834; flex: none;"></span>Rayong</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px; width: 32%;">
+            <div style="width: 75%; background: #2a78d6;"></div>
+            <div style="width: 25%; background: #1c2430;"></div>
+          </div>
+          <span style="font-size: 12px; color: #6b7280; text-align: right;" class="num">15 / 5</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 4px 14px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #2a78d6; background: #2a78d6;"></span>Day crew (61)</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #1c2430; background: #1c2430;"></span>Night crew (21)</span>
+      </div>
+    </section>
+
+    <section style="flex-grow: 1; flex-basis: 460px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px;">
+        <h3 style="font-size: 15px; margin: 0;">Host coverage risk</h3>
+        <span style="font-size: 9.5px; font-weight: 700; letter-spacing: .4px; color: #ffffff; background: #a8c855; border-radius: 999px; padding: 1px 7px;">NEW</span>
+      </div>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">Hosts only one or two people have ever worked. If that person is on leave, nobody on the roster knows the site.</p>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 700; flex-grow: 1; min-width: 0;">Aisin Takaoka (AMATA City)</span>
+          <span style="font-size: 11.5px; font-weight: 700; color: #b45309; flex: none;">1 person ever</span>
+          <span style="font-size: 11px; color: #6b7280; flex: none; min-width: 84px; text-align: right;">Sirinat K.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 700; flex-grow: 1; min-width: 0;">GUANGDONG WELLING</span>
+          <span style="font-size: 11.5px; font-weight: 700; color: #b45309; flex: none;">2 people ever</span>
+          <span style="font-size: 11px; color: #6b7280; flex: none; min-width: 84px; text-align: right;">Somchai R. +1</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #d8dde4; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0;">Michelin Siam (Laem Chabang)</span>
+          <span style="font-size: 11.5px; color: #6b7280; flex: none;">3 people ever</span>
+          <span style="font-size: 11px; color: #15803d; flex: none; min-width: 84px; text-align: right;">ok</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #d8dde4; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0;">Toyota Gateway</span>
+          <span style="font-size: 11.5px; color: #6b7280; flex: none;">11 people ever</span>
+          <span style="font-size: 11px; color: #15803d; flex: none; min-width: 84px; text-align: right;">ok</span>
+        </div>
+      </div>
+
+      <p style="font-size: 11.5px; color: #6b7280; margin: 12px 0 0; line-height: 1.5;">Built from <b>deployment_history</b> — the same rows behind the Host Record tab, counted by host instead of by employee.</p>
+    </section>
+  </div>
+
+  <!-- ============ 6. ONE TREND CHART, metric switcher instead of two charts ============ -->
+  <section style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px;">
+      <div style="min-width: 0;">
+        <h3 style="font-size: 15px; margin: 0 0 2px;">Trend</h3>
+        <p style="font-size: 12px; color: #6b7280; margin: 0; max-width: 620px;">Ending today, weekends and shared holidays skipped. <a href="#">How utilization is calculated ⓘ</a></p>
+      </div>
+      <div style="display: flex; gap: 14px; flex: none;">
+        <div style="display: flex; gap: 0; border: 1px solid #d8dde4; border-radius: 7px; overflow: hidden;">
+          <span style="font-size: 12px; font-weight: 700; padding: 5px 12px; background: #004983; color: #ffffff;">Utilization</span>
+          <span style="font-size: 12px; font-weight: 600; padding: 5px 12px; color: #6b7280; border-left: 1px solid #d8dde4;">On-call free</span>
+          <span style="font-size: 12px; font-weight: 600; padding: 5px 12px; color: #6b7280; border-left: 1px solid #d8dde4;">Idle staff</span>
+        </div>
+        <div style="display: flex; gap: 0; border: 1px solid #d8dde4; border-radius: 7px; overflow: hidden;">
+          <span style="font-size: 12px; font-weight: 600; padding: 5px 11px; color: #6b7280;">7d</span>
+          <span style="font-size: 12px; font-weight: 700; padding: 5px 11px; background: #004983; color: #ffffff; border-left: 1px solid #d8dde4;">14d</span>
+          <span style="font-size: 12px; font-weight: 600; padding: 5px 11px; color: #6b7280; border-left: 1px solid #d8dde4;">30d</span>
+        </div>
+      </div>
+    </div>
+
+    <svg viewBox="0 0 1160 232" width="100%" height="232" role="img" aria-label="Utilization trend by board over 14 working days: Non-Rayong ends at 89 percent, Rayong at 91 percent" style="display: block; overflow: visible;">
+      <!-- gridlines + y axis. Plot ends at x=1000; the strip to its right holds the end labels. -->
+      <line x1="34" y1="200" x2="1000" y2="200" stroke="#d8dde4" stroke-width="1"/>
+      <text x="28" y="203.5" font-size="10.5" fill="#6b7280" text-anchor="end">0</text>
+      <line x1="34" y1="152.5" x2="1000" y2="152.5" stroke="#d8dde4" stroke-width="1"/>
+      <text x="28" y="156" font-size="10.5" fill="#6b7280" text-anchor="end">25</text>
+      <line x1="34" y1="105" x2="1000" y2="105" stroke="#d8dde4" stroke-width="1"/>
+      <text x="28" y="108.5" font-size="10.5" fill="#6b7280" text-anchor="end">50</text>
+      <line x1="34" y1="57.5" x2="1000" y2="57.5" stroke="#d8dde4" stroke-width="1"/>
+      <text x="28" y="61" font-size="10.5" fill="#6b7280" text-anchor="end">75</text>
+      <line x1="34" y1="10" x2="1000" y2="10" stroke="#d8dde4" stroke-width="1"/>
+      <text x="28" y="13.5" font-size="10.5" fill="#6b7280" text-anchor="end">100</text>
+
+      <!-- proposed target corridor — a setting the app does not have yet -->
+      <rect x="34" y="10" width="966" height="38" fill="#a8c855" opacity="0.14"/>
+      <text x="42" y="23" font-size="10" fill="#6b7280">suggested target band 85–95%</text>
+
+      <!-- x labels -->
+      <text x="34" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">13/08</text>
+      <text x="182" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">15/08</text>
+      <text x="331" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">19/08</text>
+      <text x="480" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">21/08</text>
+      <text x="628" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">25/08</text>
+      <text x="777" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">27/08</text>
+      <text x="926" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">29/08</text>
+      <text x="1000" y="228" font-size="10.5" fill="#6b7280" text-anchor="middle">01/09</text>
+
+      <!-- Rayong (ends higher, so its label sits on top) -->
+      <polyline points="34,58.9 108,64.6 182,55.1 257,53.2 331,45.6 405,49.4 480,58.9 554,45.6 628,40.9 703,44.7 777,36.2 851,40.9 926,32.4 1000,26.8" fill="none" stroke="#eb6834" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="1000" cy="26.8" r="4" fill="#eb6834" stroke="#ffffff" stroke-width="2"/>
+      <text x="1014" y="26" font-size="11" font-weight="700" fill="#1f2937">Rayong 91%</text>
+
+      <!-- Non-Rayong -->
+      <polyline points="34,45.6 108,40.9 182,50.4 257,35.2 331,28.6 405,36.2 480,40.9 554,29.6 628,32.4 703,25.8 777,29.6 851,35.2 926,26.8 1000,29.1" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="1000" cy="29.1" r="4" fill="#2a78d6" stroke="#ffffff" stroke-width="2"/>
+      <text x="1014" y="52" font-size="11" font-weight="700" fill="#1f2937">Non-Rayong 89%</text>
+    </svg>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px;">
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #2a78d6; background: #2a78d6;"></span>Non-Rayong</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #eb6834; background: #eb6834;"></span>Rayong</span>
+    </div>
+  </section>
+
+  <!-- ============ 6. BY ENGINEER  |  POSITION COVERAGE (new) ============ -->
+  <div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start;">
+
+    <section style="flex-grow: 1; flex-basis: 520px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <h3 style="font-size: 15px; margin: 0 0 2px;">By engineer</h3>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">Missions owned today and crew deployed under them, across all boards.</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr>
+            <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4;">Engineer</th>
+            <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; width: 26%;">Missions</th>
+            <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; width: 30%;">Crew deployed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #a8d98a; flex: none;"></span><span style="font-weight: 600;">Phada</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #a8d98a;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">5</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 100%; height: 100%; border-radius: 999px; background: #a8d98a;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">22</span></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #7fb8ec; flex: none;"></span><span style="font-weight: 600;">Tanakit</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 80%; height: 100%; border-radius: 999px; background: #7fb8ec;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">4</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 77%; height: 100%; border-radius: 999px; background: #7fb8ec;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">17</span></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #e57fb1; flex: none;"></span><span style="font-weight: 600;">Sunicha</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 80%; height: 100%; border-radius: 999px; background: #e57fb1;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">4</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 64%; height: 100%; border-radius: 999px; background: #e57fb1;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">14</span></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #f6a06b; flex: none;"></span><span style="font-weight: 600;">Suriya</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 60%; height: 100%; border-radius: 999px; background: #f6a06b;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">3</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 55%; height: 100%; border-radius: 999px; background: #f6a06b;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">12</span></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #c0c4cb; flex: none;"></span><span style="font-weight: 600;">Janjira</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 40%; height: 100%; border-radius: 999px; background: #c0c4cb;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">2</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 41%; height: 100%; border-radius: 999px; background: #c0c4cb;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">9</span></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #f7dd6c; flex: none;"></span><span style="font-weight: 600;">Phrajak</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 40%; height: 100%; border-radius: 999px; background: #f7dd6c;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">2</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 36%; height: 100%; border-radius: 999px; background: #f7dd6c;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">8</span></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #c0c4cb; flex: none;"></span><span style="font-weight: 600;">Wipa</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 20%; height: 100%; border-radius: 999px; background: #c0c4cb;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">1</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">0</span></div></td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700;">All engineers</span></td>
+            <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">21</span></td>
+            <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">82</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section style="flex-grow: 1; flex-basis: 420px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px;">
+        <h3 style="font-size: 15px; margin: 0;">Position coverage</h3>
+        <span style="font-size: 9.5px; font-weight: 700; letter-spacing: .4px; color: #ffffff; background: #a8c855; border-radius: 999px; padding: 1px 7px;">NEW</span>
+      </div>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">Deployed vs. on the bench, per role. Answers “can we still crew a job that needs a Team Leader?”</p>
+
+      <div style="display: flex; flex-direction: column; gap: 11px; margin-bottom: 10px;">
+
+        <div style="display: grid; grid-template-columns: 132px 1fr 44px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Inspector</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px; background: #eef1f5;">
+            <div style="width: 67%; background: #2a78d6;"></div>
+            <div style="width: 33%; background: #c9d3dd;"></div>
+          </div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">32/48</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 132px 1fr 44px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Technician</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px; background: #eef1f5;">
+            <div style="width: 63%; background: #2a78d6;"></div>
+            <div style="width: 37%; background: #c9d3dd;"></div>
+          </div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">19/30</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 132px 1fr 44px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Senior Inspector</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px; background: #eef1f5;">
+            <div style="width: 68%; background: #2a78d6;"></div>
+            <div style="width: 32%; background: #c9d3dd;"></div>
+          </div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">15/22</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 132px 1fr 44px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Team Leader</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px; background: #eef1f5;">
+            <div style="width: 67%; background: #2a78d6;"></div>
+            <div style="width: 33%; background: #c9d3dd;"></div>
+          </div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">12/18</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 132px 1fr 44px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Asst. Site Engineer<small style="display: block; font-weight: 400; font-size: 10.5px; color: #b45309;">thinnest bench today</small></span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px; background: #eef1f5;">
+            <div style="width: 40%; background: #2a78d6;"></div>
+            <div style="width: 60%; background: #c9d3dd;"></div>
+          </div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">4/10</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 4px 14px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #2a78d6; background: #2a78d6;"></span>Deployed (82)</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #c9d3dd; background: #c9d3dd;"></span>Available / leave (46)</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ 7. SERVICE AREA  |  LEAVE ============ -->
+  <div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start;">
+
+    <section style="flex-grow: 1; flex-basis: 520px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <h3 style="font-size: 15px; margin: 0 0 2px;">By service area</h3>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">Bar length is total headcount; segments split permanent / on-call.</p>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+
+        <div style="display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #f7dd6c; border: 1px solid #d8dde4; flex: none;"></span>AMATA</span>
+          <div style="display: flex; height: 18px; gap: 2px;"><div style="width: 79%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 21%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">34</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #f5c26b; border: 1px solid #d8dde4; flex: none;"></span>Wellgrow</span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 76%;"><div style="width: 77%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 23%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">26</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #f28ba0; border: 1px solid #d8dde4; flex: none;"></span>LCB</span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 62%;"><div style="width: 76%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 24%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">21</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #a8d98a; border: 1px solid #d8dde4; flex: none;"></span>RAYONG</span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 53%;"><div style="width: 72%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 28%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">18</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #7fb8ec; border: 1px solid #d8dde4; flex: none;"></span>NPT</span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 41%;"><div style="width: 71%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 29%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">14</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #f6a06b; border: 1px solid #d8dde4; flex: none;"></span>AYT</span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 26%;"><div style="width: 67%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 33%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">9</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 50%; background: #e8e8e8; border: 1px solid #d8dde4; flex: none;"></span>BENZ</span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 18%;"><div style="width: 67%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 33%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">6</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px 14px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #2a78d6; background: #2a78d6;"></span>Permanent (96)</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #eb6834; background: #eb6834;"></span>On-call (32)</span>
+      </div>
+    </section>
+
+    <section style="flex-grow: 1; flex-basis: 420px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <h3 style="font-size: 15px; margin: 0 0 2px;">Leave today</h3>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">12 people on leave. Segments break each type down by board.</p>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+
+        <div style="display: grid; grid-template-columns: 130px 1fr 32px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Annual<small style="display: block; font-weight: 400; color: #6b7280; font-size: 11px;">ลาพักร้อน</small></span>
+          <div style="display: flex; height: 18px; gap: 2px;"><div style="width: 80%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 20%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">5</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 130px 1fr 32px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Sick<small style="display: block; font-weight: 400; color: #6b7280; font-size: 11px;">ลาป่วย</small></span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 60%;"><div style="width: 67%; background: #2a78d6; border-radius: 3px;"></div><div style="width: 33%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">3</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 130px 1fr 32px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Business<small style="display: block; font-weight: 400; color: #6b7280; font-size: 11px;">ลากิจ</small></span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 40%;"><div style="width: 100%; background: #2a78d6; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">2</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 130px 1fr 32px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Unpaid<small style="display: block; font-weight: 400; color: #6b7280; font-size: 11px;">ลาไม่รับค่าจ้าง</small></span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 20%;"><div style="width: 100%; background: #2a78d6; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">1</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 130px 1fr 32px; align-items: center; gap: 10px;">
+          <span style="font-size: 13px; font-weight: 600;">Exchange<small style="display: block; font-weight: 400; color: #6b7280; font-size: 11px;">แลกวันหยุด</small></span>
+          <div style="display: flex; height: 18px; gap: 2px; width: 20%;"><div style="width: 100%; background: #eb6834; border-radius: 3px;"></div></div>
+          <span style="font-size: 13px; font-weight: 700; text-align: right;" class="num">1</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px 14px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #2a78d6; background: #2a78d6;"></span>Non-Rayong (9)</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #eb6834; background: #eb6834;"></span>Rayong (3)</span>
+      </div>
+    </section>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
