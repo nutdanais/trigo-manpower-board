@@ -1638,20 +1638,11 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-kpi-meter-track { flex-grow: 1; height: 8px; border-radius: 999px; overflow: hidden; }
 .ov-kpi-meter-val { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
 
-/* By engineer + By service area: a fixed 50/50 row (see renderOverview),
-   wrapping to stacked on a narrow screen. */
+/* Overview's four lower-detail pairs — By engineer + By service area,
+   Position coverage + Host coverage risk, Day/night split + Leave today —
+   each a fixed 50/50 row, wrapping to stacked on a narrow screen. */
 .ov-side-by-side { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
 .ov-side-by-side > .ov-section { flex: 1 1 340px; min-width: 0; }
-
-/* Position coverage, Day/night split and Leave today vary too much in height
-   to pair up in a fixed row without leaving a gap under whichever card is
-   shorter, so layoutOverviewMasonry() (app.js) absolutely positions them into
-   a JS masonry pack instead (max 3 columns) — same technique as the board's
-   mission-card grid. This container just needs to be a positioning root; its
-   height is set inline once the cards are measured and packed. Host coverage
-   risk is NOT part of this grid — it's always the full-width card after it. */
-#overview-masonry { position: relative; }
-#overview-masonry > .ov-section { position: absolute; }
 
 .ov-section {
   background: var(--panel);

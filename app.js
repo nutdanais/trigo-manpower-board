@@ -1844,8 +1844,8 @@ function renderOverview() {
   }));
   panel.appendChild(boardSec);
 
-  /* ---------- day/night split (built here, appended into the masonry pack
-     near the bottom of this function) ---------- */
+  /* ---------- day/night split (built here, paired with Leave today in a
+     50/50 row near the bottom of this function) ---------- */
   const daynightSec = ovSection("Day / night split", "Crew and missions by shift — the last thing to check before the night crew goes out.");
   if (!totalMissions) {
     daynightSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
@@ -1887,9 +1887,8 @@ function renderOverview() {
     ]));
   }
 
-  /* ---------- host coverage risk (built here, appended last — always the
-     final, full-width card below the masonry pack near the bottom of this
-     function, so it's always at the very bottom of the page) ----------
+  /* ---------- host coverage risk (built here, paired with Position coverage
+     in a 50/50 row near the bottom of this function) ----------
      Only hosts with exactly 1 or 2 people ever deployed there are shown —
      a host nobody has been to yet, or one with a healthy bench (3+), isn't
      a risk worth a row here. */
@@ -2073,8 +2072,8 @@ function renderOverview() {
       { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
   }
 
-  /* ---------- 7. position coverage (one of three cards masonry-packed
-     further down, max 3 columns — see layoutOverviewMasonry) ----------
+  /* ---------- 7. position coverage  |  host coverage risk (fixed 50/50 row,
+     appended further down) ----------
      Position coverage: deployed vs. on the bench, per role — Overview otherwise
      slices people by board, area and contract, never by what they can actually
      do. Reuses the same global assigned-employee set boardStats() computes
@@ -2164,7 +2163,7 @@ function renderOverview() {
     areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
   }
 
-  /* ---------- 8. leave today (masonry-packed, see above) ----------
+  /* ---------- 8. day/night split  |  leave today (fixed 50/50 row, see above) ----------
      Broken down by board on a shared scale ---------- */
   const leaveSec = ovSection("Leave today", `${totalLeave} people on leave. Segments break each type down by board.`);
   const leaveRows = document.createElement("div");
@@ -2183,66 +2182,30 @@ function renderOverview() {
   leaveSec.appendChild(leaveRows);
   if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
 
-  // By engineer / By service area: always a fixed 50/50 row (both are
-  // similar-height "who's carrying what" cards, so pairing them evenly
-  // doesn't leave the gap a masonry pack is for — that's reserved for the
-  // three cards below, which vary a lot more in height).
+  // By engineer / By service area: fixed 50/50 row.
   const engAreaRow = document.createElement("div");
   engAreaRow.className = "ov-side-by-side";
   engAreaRow.appendChild(engSec);
   engAreaRow.appendChild(areaSec);
   panel.appendChild(engAreaRow);
 
-  // Position coverage / Day-night split / Leave today vary too much in height
-  // to pair up in fixed rows without leaving a gap under whichever card is
-  // shorter, so they're packed as a JS masonry instead (max 3 columns), same
-  // technique as the board's mission-card grid (see layoutOverviewMasonry
-  // below): each card rises into whichever column is currently shortest.
-  const masonry = document.createElement("div");
-  masonry.id = "overview-masonry";
-  for (const sec of [posSec, daynightSec, leaveSec]) masonry.appendChild(sec);
-  panel.appendChild(masonry);
+  // Position coverage / Host coverage risk: fixed 50/50 row.
+  const posHostRow = document.createElement("div");
+  posHostRow.className = "ov-side-by-side";
+  posHostRow.appendChild(posSec);
+  posHostRow.appendChild(hostRiskSec);
+  panel.appendChild(posHostRow);
 
-  // Host coverage risk always comes last and always spans the full width —
-  // it's never part of the masonry pack above, so it never competes with
-  // anything else for a row and always has the space to expand into.
-  panel.appendChild(hostRiskSec);
+  // Day/night split / Leave today: fixed 50/50 row.
+  const daynightLeaveRow = document.createElement("div");
+  daynightLeaveRow.className = "ov-side-by-side";
+  daynightLeaveRow.appendChild(daynightSec);
+  daynightLeaveRow.appendChild(leaveSec);
+  panel.appendChild(daynightLeaveRow);
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(panel);
-  layoutOverviewMasonry();
-}
-
-/* JS masonry for Position coverage / Day-night split / Leave today (see
-   renderOverview above) — absolutely positions each into whichever column is
-   currently shortest, so a short card doesn't leave a gap matching its
-   taller row-mate. Same shortest-column algorithm as layoutMasonry() for the
-   mission grid, just column-count-by-width instead of a fixed card width,
-   and capped at 3 columns since there are only ever 3 cards to pack. */
-const OV_MASONRY_GAP = 18, OV_MASONRY_MIN_COL = 340, OV_MASONRY_MAX_COLS = 3;
-function layoutOverviewMasonry() {
-  const grid = $("#overview-masonry");
-  if (!grid) return;
-  const W = grid.clientWidth;
-  if (!W) return;
-  const cards = [...grid.children];
-  const cols = Math.min(OV_MASONRY_MAX_COLS, Math.max(1, Math.floor((W + OV_MASONRY_GAP) / (OV_MASONRY_MIN_COL + OV_MASONRY_GAP))));
-  const colW = cols === 1 ? W : Math.floor((W - OV_MASONRY_GAP * (cols - 1)) / cols);
-  cards.forEach(c => {
-    c.style.position = "absolute"; c.style.width = colW + "px";
-    c.style.left = "0px"; c.style.top = "0px"; c.style.height = "auto";
-  });
-  if (!cards.length) { grid.style.height = "0px"; return; }
-  void grid.offsetWidth;   // reflow so each card's natural height is final at colW
-  const colH = new Array(cols).fill(0);
-  cards.forEach((c, i) => {
-    const j = i < cols ? i : colH.indexOf(Math.min(...colH));
-    c.style.left = (j * (colW + OV_MASONRY_GAP)) + "px";
-    c.style.top = colH[j] + "px";
-    colH[j] += c.offsetHeight + OV_MASONRY_GAP;
-  });
-  grid.style.height = (Math.max(...colH) - OV_MASONRY_GAP) + "px";
 }
 
 const FILTER_LABELS = { engineer: "Engineer", host: "Host", customer: "Customer", shift: "Shift" };
