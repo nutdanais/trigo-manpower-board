@@ -765,12 +765,24 @@ const cloud = {
       missionBoard.set(m.id, m.board_id);
       if (m.hidden) missionHidden.add(m.id);
     }
+    // A deactivated employee drops out of "today"'s figures everywhere else
+    // on the board (onRoster() in app.js: showsDeactivated() || active !==
+    // false — a PAST date is a record of who was actually there, so it keeps
+    // showing them). This trend is one static current-roster snapshot for
+    // the whole window (already true of board membership below), so it can
+    // only approximate that per-date rule with one flag keyed on `toDate`,
+    // the window's end — but leaving inactive employees in unconditionally
+    // inflated the headcount denominator for every "today" trend point
+    // relative to the KPI/By-board figures for that same date.
+    const includeInactive = toDate < todayStrISO();
+    const activeEmpIds = includeInactive ? null : new Set(this.data.employees.filter((e) => e.active !== false).map((e) => e.id));
+    const isActiveEmp = (id) => includeInactive || activeEmpIds.has(id);
     const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
     const empContract = new Map(this.data.employees.map((e) => [e.id, e.contract]));
     const headcountByBoard = {};
     const oncallHeadcountByBoard = {};
     for (const id of boardIds) {
-      const emps = this.data.employees.filter((e) => e.boardId === id);
+      const emps = this.data.employees.filter((e) => e.boardId === id && isActiveEmp(e.id));
       headcountByBoard[id] = emps.length;
       oncallHeadcountByBoard[id] = emps.filter((e) => e.contract === "oncall").length;
     }
@@ -787,6 +799,7 @@ const cloud = {
       }
     }
     for (const a of assignRows) {
+      if (!isActiveEmp(a.employee_id)) continue;   // keep the numerator consistent with the headcount denominator above
       const isOncall = empContract.get(a.employee_id) === "oncall";
       if (a.mission_id) {
         // Bucket by the MISSION's own board, not the employee's current one —
@@ -821,32 +834,33 @@ const cloud = {
      of by board. Returns { [employeeId]: { workedDates:Set, leaveDates:Set } }
      — raw date sets, not a percentage, because the denominator is each
      employee's own board's working days, and only app.js knows the weekend /
-     holiday rules. Applies the same two exclusions the board figures use: a
-     hidden mission doesn't count as work, and neither does a mission on a
-     board the employee no longer belongs to. */
+     holiday rules. A hidden mission doesn't count as work; that's the only
+     exclusion — this is per-employee, so unlike getUtilizationRange there's
+     no board-level headcount denominator that active status could throw off. */
   async getEmployeeUtilization(fromDate, toDate) {
     const [missionRows, assignRows] = await Promise.all([
-      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden")
+      fetchAllPages(() => sb.from("missions").select("id, plan_date, hidden")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
       fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
     ]);
 
-    const missionBoard = new Map();
     const missionHidden = new Set();
-    for (const m of missionRows) {
-      missionBoard.set(m.id, m.board_id);
-      if (m.hidden) missionHidden.add(m.id);
-    }
+    for (const m of missionRows) if (m.hidden) missionHidden.add(m.id);
     const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
 
     const out = {};
     const rec = (id) => (out[id] = out[id] || { workedDates: new Set(), leaveDates: new Set() });
     for (const a of assignRows) {
-      if (!empBoard.has(a.employee_id)) continue;
+      if (!empBoard.has(a.employee_id)) continue;   // employee record no longer exists at all
       if (a.mission_id) {
+        // A mission worked is a mission worked, whichever board the employee
+        // is on today — same fix as getUtilizationRange above (see its
+        // comment): cross-checking against their CURRENT board here used to
+        // silently drop the day from workedDates for anyone who's since
+        // moved boards, undercounting exactly the person this 30D column
+        // exists to show.
         if (missionHidden.has(a.mission_id)) continue;
-        if (missionBoard.get(a.mission_id) !== empBoard.get(a.employee_id)) continue;
         rec(a.employee_id).workedDates.add(a.plan_date);
       } else if (a.zone && ZONES.includes(a.zone)) {
         rec(a.employee_id).leaveDates.add(a.plan_date);
