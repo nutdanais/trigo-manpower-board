@@ -190,6 +190,15 @@ const cloud = {
       (/plan_days/i.test(msg) && /(does not exist|schema cache|could not find)/i.test(msg));
   },
 
+  /* Same idea as _planDaysMissing, generalized to any table: true when an error
+     means the table itself isn't there yet (migration not run), as opposed to
+     some other failure worth surfacing. */
+  _tableMissing(error) {
+    const code = error && error.code;
+    const msg = (error && error.message) || "";
+    return code === "42P01" || code === "PGRST205" || /(does not exist|schema cache|could not find)/i.test(msg);
+  },
+
   /* upsert mission rows guarding against duplicates (board_id,plan_date,number,shift).
      Requires the missions_unique_number_shift constraint from migration-2026-07-15;
      if that hasn't been run yet, Postgres rejects the ON CONFLICT target (42P10) —
@@ -271,12 +280,19 @@ const cloud = {
     // them should prevent.
     const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
     const assignInserts = [];
+    const historyInserts = [];
+    const srcMissionById = Object.fromEntries((srcMissions || []).map((m) => [m.id, m]));
     for (const a of srcAssignments || []) {
       if (!boardEmpIds.has(a.employee_id)) continue;
       if (a.mission_id) {
         const mapped = idMap[a.mission_id];
         if (!mapped) continue;   // that mission isn't on the destination day → leave the employee on standby
         assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: mapped, zone: null, updated_by: updatedBy });
+        // same content as the source mission (it was just cloned onto destDate),
+        // so no extra lookup needed — see cloud.js's _writeDeploymentHistory for
+        // why this is a plain-text snapshot rather than a mission_id FK
+        const sm = srcMissionById[a.mission_id];
+        if (sm) historyInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_number: sm.number, host: sm.host, customer: sm.customer, board_id: boardId });
       } else if (a.zone) {
         assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: null, zone: a.zone, updated_by: updatedBy });
       }
@@ -291,6 +307,11 @@ const cloud = {
         ({ error } = await sb.from("assignments").upsert(stripped, { onConflict: "employee_id,plan_date", ignoreDuplicates: true }));
       }
       if (error) throw error;
+    }
+    if (historyInserts.length) {
+      // best-effort, same as _writeDeploymentHistory: never block carry-over on this
+      const { error } = await sb.from("deployment_history").upsert(historyInserts, { onConflict: "employee_id,plan_date" });
+      if (error) console.error("deployment_history bulk write failed (Host Record may be missing these entries):", error);
     }
   },
 
@@ -338,8 +359,41 @@ const cloud = {
         ({ error } = await sb.from("assignments").upsert(row, { onConflict: "employee_id,plan_date" }));
       }
       if (error) throw error;
+      if (target.missionId) await this._writeDeploymentHistory(employeeId, date, target.missionId);
     }
     this._invalidatePlans();
+  },
+
+  /* ---------- deployment_history writer (see migration-2026-08-31) ---------- */
+  /* Snapshots a mission's host/number/customer as plain text at the moment an
+     employee is assigned to it — the whole point is that this record must
+     survive the mission later being hidden or deleted, so it can't be a
+     foreign key. Reads the mission from the in-memory plan cache when it's
+     already there (the common case: you can only assign someone to a mission
+     that's rendered on screen) to avoid an extra round trip; falls back to a
+     direct lookup otherwise. Never throws — an audit-log write must not block
+     or error out the actual assignment, including on a DB that hasn't run the
+     migration yet (relation-does-not-exist), so failures are just logged. */
+  async _writeDeploymentHistory(employeeId, date, missionId) {
+    try {
+      const emp = this.data.employees.find((e) => e.id === employeeId);
+      let boardId = emp && emp.boardId;
+      const cachedPlan = boardId && this.data.plans[boardId] && this.data.plans[boardId][date];
+      let mission = cachedPlan && cachedPlan.missions.find((m) => m.id === missionId);
+      if (!mission) {
+        const { data } = await sb.from("missions").select("number, host, customer, board_id").eq("id", missionId).maybeSingle();
+        if (!data) return;   // mission vanished between the assignment write and this lookup
+        mission = data;
+        boardId = boardId || data.board_id;
+      }
+      const { error } = await sb.from("deployment_history").upsert({
+        employee_id: employeeId, plan_date: date, mission_number: mission.number,
+        host: mission.host, customer: mission.customer, board_id: boardId,
+      }, { onConflict: "employee_id,plan_date" });
+      if (error) console.error("deployment_history write failed (Host Record may be missing this entry):", error);
+    } catch (e) {
+      console.error("deployment_history write failed (Host Record may be missing this entry):", e);
+    }
   },
 
   /* Postgres unique_violation (23505) on missions_unique_number_shift → a friendlier message */
@@ -772,24 +826,27 @@ const cloud = {
   },
 
   /* ---------- per-employee host history (Manpower List's Host Record tab) ---------- */
-  /* Every mission this employee has ever been assigned to, read straight off
-     the assignments trail (same rows the utilization queries above read) and
-     joined to each mission's host via the assignments.mission_id FK. Not
+  /* Reads deployment_history (migration-2026-08-31), not assignments/missions
+     directly — a hidden mission deletes its assignment rows outright (see
+     setMissionsHidden) and a deleted mission cascades the same way, so a live
+     join would lose exactly the history this tab exists to preserve.
+     deployment_history is written once per (employee, date) the moment an
+     assignment is made (see _writeDeploymentHistory / _copyPlanForward) and
+     never deleted by the board's normal hide/unassign/delete flows. Not
      date-bounded like the 30D util figure — this answers "which hosts has
-     this person ever worked", so it reads their full history. A hidden
-     mission's assignments are deleted outright (see setMissionsHidden), and a
-     deleted mission cascades the same way, so both naturally drop out here
-     with no extra filtering. */
+     this person ever worked". Degrades to an empty history (instead of
+     throwing) on a database that hasn't run the migration yet, so the tab
+     reads "No mission history yet." rather than a raw Postgres error. */
   async getEmployeeHostHistory(employeeId) {
-    const { data, error } = await sb.from("assignments")
-      .select("plan_date, missions(host, number, customer)")
+    const { data, error } = await sb.from("deployment_history")
+      .select("plan_date, mission_number, host, customer")
       .eq("employee_id", employeeId)
-      .not("mission_id", "is", null)
       .order("plan_date", { ascending: false });
-    if (error) throw error;
-    return (data || [])
-      .filter((r) => r.missions)   // guards a race with an in-flight mission delete
-      .map((r) => ({ date: r.plan_date, host: r.missions.host, number: r.missions.number, customer: r.missions.customer }));
+    if (error) {
+      if (this._tableMissing(error)) return [];
+      throw error;
+    }
+    return (data || []).map((r) => ({ date: r.plan_date, host: r.host, number: r.mission_number, customer: r.customer }));
   },
 
   /* Resolve {boardId, planDate, updatedBy} from a missions/assignments

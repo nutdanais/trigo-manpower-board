@@ -298,8 +298,15 @@
   <div class="modal hidden" id="modal-employee">
     <h3 id="employee-modal-title">New Employee</h3>
     <div id="employee-tabs" class="settings-tabs hidden">
-      <button type="button" class="settings-tab" data-tab="edit">Edit Employee</button>
       <button type="button" class="settings-tab" data-tab="hosts">Host Record</button>
+      <button type="button" class="settings-tab" data-tab="edit">Edit Employee</button>
+    </div>
+    <div class="settings-pane hidden" data-pane="hosts">
+      <p class="import-note">Every host this employee has been deployed to, most recent first.</p>
+      <div id="employee-hosts-list"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Close</button>
+      </div>
     </div>
     <div class="settings-pane" data-pane="edit">
       <form id="form-employee">
@@ -330,13 +337,6 @@
           <button type="submit" class="btn btn-primary">Save</button>
         </div>
       </form>
-    </div>
-    <div class="settings-pane hidden" data-pane="hosts">
-      <p class="import-note">Every host this employee has been deployed to, most recent first.</p>
-      <div id="employee-hosts-list"></div>
-      <div class="modal-actions">
-        <button type="button" class="btn" data-close>Close</button>
-      </div>
     </div>
   </div>
 

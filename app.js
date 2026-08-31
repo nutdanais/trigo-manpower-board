@@ -2349,9 +2349,12 @@ function openEmployeeModal(empId) {
   } else if (!isOverview() && !isEmployeeList()) {
     form.boardId.value = D().activeBoardId;
   }
-  // Host Record only makes sense once the employee has been saved (and thus
-  // could actually have an assignment history) — a brand-new employee has none.
-  state.employeeTab = "edit";
+  // Host Record opens first for an existing employee — it's the more common
+  // reason to double-click a card (checking where someone's worked before),
+  // Edit Employee is one tab away. It only makes sense once the employee has
+  // been saved (and thus could actually have an assignment history) though,
+  // so a brand-new employee skips straight to the edit form with no tab strip.
+  state.employeeTab = empId ? "hosts" : "edit";
   $("#employee-tabs").classList.toggle("hidden", !empId);
   applyEmployeeTab();
   if (empId) loadEmployeeHostRecord(empId);

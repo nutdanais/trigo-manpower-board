@@ -99,6 +99,28 @@ create table if not exists assignments (
 );
 create index if not exists assignments_date_idx on assignments(plan_date);
 
+-- ===== Deployment history: durable log for the employee Host Record tab =====
+-- Independent of assignments' lifecycle on purpose — hiding or deleting a
+-- mission deletes its assignment rows (see the assignments table's own
+-- comment / migration-2026-08-31), but the fact that an employee once worked
+-- a given host should survive that. One row per (employee, date), written the
+-- moment an employee is assigned to a mission, snapshotting host/number/
+-- customer as plain text rather than a foreign key. Never deleted by the
+-- board's hide/unassign/delete flows — see cloud.js's _writeDeploymentHistory.
+
+create table if not exists deployment_history (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references employees(id) on delete cascade,
+  plan_date date not null,
+  mission_number text not null,
+  host text not null,
+  customer text,
+  board_id uuid references boards(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (employee_id, plan_date)
+);
+create index if not exists deployment_history_employee_idx on deployment_history(employee_id);
+
 -- ===== Plan-day marker: "Lock board" state per (board, date) =====
 -- The app no longer auto-seeds a future day from the previous working day (that
 -- was the source of the "adjusted board disappears on login" bug — a load that
@@ -128,6 +150,7 @@ alter table missions enable row level security;
 alter table assignments enable row level security;
 alter table day_overrides enable row level security;
 alter table plan_days enable row level security;
+alter table deployment_history enable row level security;
 
 drop policy if exists "authenticated read/write day_overrides" on day_overrides;
 create policy "authenticated read/write day_overrides" on day_overrides
@@ -161,7 +184,13 @@ drop policy if exists "authenticated read/write plan_days" on plan_days;
 create policy "authenticated read/write plan_days" on plan_days
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
+drop policy if exists "authenticated read/write deployment_history" on deployment_history;
+create policy "authenticated read/write deployment_history" on deployment_history
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
 -- ===== Realtime: broadcast changes to every connected client =====
+-- deployment_history is deliberately NOT added below: nothing renders it live
+-- across clients, the Host Record tab just reads it fresh on every modal open.
 -- Wrapped so re-running doesn't error if a table is already in the publication.
 
 do $$
