@@ -1860,29 +1860,36 @@ function renderOverview() {
     ]));
   }
 
-  /* ---------- host coverage risk (built here, appended last into the masonry
-     pack near the bottom of this function, so it lands at the very bottom of
-     the page) ---------- */
+  /* ---------- host coverage risk (built here, appended last — always the
+     final, full-width card below the masonry pack near the bottom of this
+     function, so it's always at the very bottom of the page) ----------
+     Only hosts with exactly 1 or 2 people ever deployed there are shown —
+     a host nobody has been to yet, or one with a healthy bench (3+), isn't
+     a risk worth a row here. */
   const hostRiskSec = ovSection("Host coverage risk", "Hosts only one or two people have ever worked. If that person is on leave, nobody on the roster knows the site.");
+  const riskyHosts = todaysHosts.length
+    ? todaysHosts
+        .map(host => ({ host, ...(state.overview.hostCoverage || {})[host] || { count: 0, names: [] } }))
+        .filter(r => r.count >= 1 && r.count <= 2)
+        .sort((a, b) => a.count - b.count || a.host.localeCompare(b.host))
+    : [];
   if (!todaysHosts.length) {
     hostRiskSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
+  } else if (!riskyHosts.length) {
+    hostRiskSec.appendChild(Object.assign(document.createElement("p"),
+      { className: "ov-avail ov-avail-ok", textContent: "✓ No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about." }));
   } else {
-    const coverage = state.overview.hostCoverage || {};
-    const hostRows = todaysHosts.map(host => coverage[host] || { count: 0, names: [] })
-      .map((c, i) => ({ host: todaysHosts[i], ...c }))
-      .sort((a, b) => a.count - b.count || a.host.localeCompare(b.host));
     const rowsWrap = document.createElement("div");
     rowsWrap.className = "ov-hostrisk-rows";
-    for (const r of hostRows) {
-      const risk = r.count > 0 && r.count <= 2;
+    for (const r of riskyHosts) {
       const row = document.createElement("div");
-      row.className = "ov-hostrisk-row" + (risk ? " risk" : "");
-      const who = r.count === 0 ? "no history yet" : r.names.join(", ") + (r.count > r.names.length ? ` +${r.count - r.names.length}` : "");
-      const countLabel = r.count === 0 ? "no history" : `${r.count} person${r.count === 1 ? "" : "s"} ever`;
+      row.className = "ov-hostrisk-row risk";
+      const who = r.names.join(", ") + (r.count > r.names.length ? ` +${r.count - r.names.length}` : "");
+      const countLabel = `${r.count} person${r.count === 1 ? "" : "s"} ever`;
       row.innerHTML = `
         <span class="ov-hostrisk-name">${escapeHtml(r.host)}</span>
-        <span class="ov-hostrisk-count">${risk ? "⚠ " : ""}${countLabel}</span>
-        <span class="ov-hostrisk-who${!risk && r.count > 0 ? " ok" : ""}">${escapeHtml(who)}</span>`;
+        <span class="ov-hostrisk-count">⚠ ${countLabel}</span>
+        <span class="ov-hostrisk-who">${escapeHtml(who)}</span>`;
       rowsWrap.appendChild(row);
     }
     hostRiskSec.appendChild(rowsWrap);
@@ -1891,8 +1898,8 @@ function renderOverview() {
       innerHTML: "Built from <b>deployment_history</b> — the same rows behind the Host Record tab, counted by host instead of by employee.",
     }));
   }
-  // daynightSec and hostRiskSec are appended into the masonry pack further
-  // down — see the bottom of this function.
+  // daynightSec and hostRiskSec are appended further down — see the bottom
+  // of this function.
 
   /* ---------- 5. trend: one chart, a metric switcher instead of two near-
      identical 220px charts sharing one legend drawn twice. ---------- */
@@ -1964,8 +1971,8 @@ function renderOverview() {
   ));
   panel.appendChild(trendSec);
 
-  /* ---------- 6. by engineer (one of six cards masonry-packed below —
-     see layoutOverviewMasonry) ----------
+  /* ---------- 6. by engineer  |  by service area (fixed half-half row,
+     appended further down) ----------
      By engineer: workload per responsible engineer, across all boards.
      Missions carry an engineerId, so this is the one view that answers "who is
      carrying how much today" — the board sections all slice by board instead.
@@ -2038,7 +2045,8 @@ function renderOverview() {
       { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
   }
 
-  /* ---------- 7. position coverage (masonry-packed, see above) ----------
+  /* ---------- 7. position coverage (one of three cards masonry-packed
+     further down, max 3 columns — see layoutOverviewMasonry) ----------
      Position coverage: deployed vs. on the bench, per role — Overview otherwise
      slices people by board, area and contract, never by what they can actually
      do. Reuses the same global assigned-employee set boardStats() computes
@@ -2086,7 +2094,7 @@ function renderOverview() {
   } else {
     posSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a position set yet." }));
   }
-  /* ---------- by service area (masonry-packed, see above) ----------
+  /* ---------- by service area (paired half-half with By engineer, see above) ----------
      One row per area on a shared scale, split permanent / on-call: the bar's
      full length is the area's total headcount (so areas stay ranked by size and
      comparable to each other), the two segments are its contract mix, and the
@@ -2147,16 +2155,30 @@ function renderOverview() {
   leaveSec.appendChild(leaveRows);
   if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
 
-  // These six vary too much in height to pair up in fixed rows without leaving
-  // a gap under whichever card is shorter (By service area next to the longer
-  // By engineer table, for one) — so they're packed as a JS masonry instead,
-  // same technique as the board's mission-card grid (see layoutOverviewMasonry
-  // below): each card rises into whichever column is currently shortest. Host
-  // coverage risk is listed last so it lands at the bottom of the pack.
+  // By engineer / By service area: always a fixed 50/50 row (both are
+  // similar-height "who's carrying what" cards, so pairing them evenly
+  // doesn't leave the gap a masonry pack is for — that's reserved for the
+  // three cards below, which vary a lot more in height).
+  const engAreaRow = document.createElement("div");
+  engAreaRow.className = "ov-side-by-side";
+  engAreaRow.appendChild(engSec);
+  engAreaRow.appendChild(areaSec);
+  panel.appendChild(engAreaRow);
+
+  // Position coverage / Day-night split / Leave today vary too much in height
+  // to pair up in fixed rows without leaving a gap under whichever card is
+  // shorter, so they're packed as a JS masonry instead (max 3 columns), same
+  // technique as the board's mission-card grid (see layoutOverviewMasonry
+  // below): each card rises into whichever column is currently shortest.
   const masonry = document.createElement("div");
   masonry.id = "overview-masonry";
-  for (const sec of [engSec, areaSec, posSec, daynightSec, leaveSec, hostRiskSec]) masonry.appendChild(sec);
+  for (const sec of [posSec, daynightSec, leaveSec]) masonry.appendChild(sec);
   panel.appendChild(masonry);
+
+  // Host coverage risk always comes last and always spans the full width —
+  // it's never part of the masonry pack above, so it never competes with
+  // anything else for a row and always has the space to expand into.
+  panel.appendChild(hostRiskSec);
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
@@ -2164,20 +2186,20 @@ function renderOverview() {
   layoutOverviewMasonry();
 }
 
-/* JS masonry for the Overview's lower detail cards (see renderOverview above) —
-   absolutely positions each into whichever column is currently shortest, so a
-   short card (e.g. By service area) doesn't leave a gap matching its taller
-   row-mate. Same shortest-column algorithm as layoutMasonry() for the mission
-   grid, just column-count-by-width instead of a fixed card width, since these
-   cards are meant to fill whatever width they're given rather than repeat. */
-const OV_MASONRY_GAP = 18, OV_MASONRY_MIN_COL = 340;
+/* JS masonry for Position coverage / Day-night split / Leave today (see
+   renderOverview above) — absolutely positions each into whichever column is
+   currently shortest, so a short card doesn't leave a gap matching its
+   taller row-mate. Same shortest-column algorithm as layoutMasonry() for the
+   mission grid, just column-count-by-width instead of a fixed card width,
+   and capped at 3 columns since there are only ever 3 cards to pack. */
+const OV_MASONRY_GAP = 18, OV_MASONRY_MIN_COL = 340, OV_MASONRY_MAX_COLS = 3;
 function layoutOverviewMasonry() {
   const grid = $("#overview-masonry");
   if (!grid) return;
   const W = grid.clientWidth;
   if (!W) return;
   const cards = [...grid.children];
-  const cols = Math.max(1, Math.floor((W + OV_MASONRY_GAP) / (OV_MASONRY_MIN_COL + OV_MASONRY_GAP)));
+  const cols = Math.min(OV_MASONRY_MAX_COLS, Math.max(1, Math.floor((W + OV_MASONRY_GAP) / (OV_MASONRY_MIN_COL + OV_MASONRY_GAP))));
   const colW = cols === 1 ? W : Math.floor((W - OV_MASONRY_GAP * (cols - 1)) / cols);
   cards.forEach(c => {
     c.style.position = "absolute"; c.style.width = colW + "px";
