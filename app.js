@@ -2073,12 +2073,6 @@ function renderOverview() {
   } else {
     posSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a position set yet." }));
   }
-  const engPosRow = document.createElement("div");
-  engPosRow.className = "ov-side-by-side";
-  engPosRow.appendChild(engSec);
-  engPosRow.appendChild(posSec);
-  panel.appendChild(engPosRow);
-
   /* ---------- 9. service-area distribution, all boards ----------
      One row per area on a shared scale, split permanent / on-call: the bar's
      full length is the area's total headcount (so areas stay ranked by size and
@@ -2139,12 +2133,18 @@ function renderOverview() {
   leaveSec.appendChild(leaveRows);
   if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
 
-  // side by side to save vertical space — both are compact enough to share a row
-  const areaLeaveRow = document.createElement("div");
-  areaLeaveRow.className = "ov-side-by-side";
-  areaLeaveRow.appendChild(areaSec);
-  areaLeaveRow.appendChild(leaveSec);
-  panel.appendChild(areaLeaveRow);
+  // side by side to save vertical space — both pairs are compact enough to share a row
+  const engAreaRow = document.createElement("div");
+  engAreaRow.className = "ov-side-by-side";
+  engAreaRow.appendChild(engSec);
+  engAreaRow.appendChild(areaSec);
+  panel.appendChild(engAreaRow);
+
+  const posLeaveRow = document.createElement("div");
+  posLeaveRow.className = "ov-side-by-side";
+  posLeaveRow.appendChild(posSec);
+  posLeaveRow.appendChild(leaveSec);
+  panel.appendChild(posLeaveRow);
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
