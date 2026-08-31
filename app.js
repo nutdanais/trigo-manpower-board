@@ -252,8 +252,8 @@ const state = {
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
   },
   overview: {                 // Overview tab: utilization trend chart controls + its cache
-    trendRange: 14,           // 7 | 14 | 30 days, ending today (not state.date — the trend is
-                               // "recent history", independent of whatever date the rest of Overview is showing)
+    trendRange: 14,           // 7 | 14 | 30 days, ending on state.date — same date as every
+                               // other number on the Overview page (see the comment in renderOverview)
     trendHidden: new Set(),   // board ids toggled off via the trend chart's legend
     trendMetric: "util",      // "util" | "oncallFree" | "idle" — which line the merged Trend chart plots
     util: null,               // cloud.getUtilizationRange() result, keyed by utilCacheKey below
@@ -318,7 +318,7 @@ let utilFetchSeq = 0;
 async function ensureUtilizationLoaded() {
   const boardIds = D().boards.map(b => b.id);
   if (!boardIds.length) { state.overview.util = {}; state.overview.utilCacheKey = "empty"; return; }
-  const toDate = todayStr();   // the trend is "recent history", always ending today
+  const toDate = state.date;   // ends on the date Overview is showing — see state.overview.trendRange
   const fromDate = addDays(toDate, -(state.overview.trendRange - 1));
   const cacheKey = boardIds.slice().sort().join(",") + "|" + fromDate + ".." + toDate;
   if (state.overview.utilCacheKey === cacheKey) return;
@@ -1618,9 +1618,17 @@ function renderOverview() {
   const todaysEngineers = new Set(todaysMissions.filter(m => m.engineerId).map(m => m.engineerId));
 
   /* ---------- trend data, computed once and shared by the KPI sparkline and
-     the merged Trend section further down ---------- */
+     the merged Trend section further down ----------
+     Ends on state.date, not real-world "today" — the KPI headline above it
+     and every other number on this page (By board, Action queue, ...) are
+     already state.date's numbers, so anchoring the trend/sparkline to a
+     DIFFERENT date (real today) made them silently describe two different
+     timelines the moment someone browsed to another day: the headline
+     number and the sparkline sitting right next to it could disagree, and
+     the Trend chart's last point wouldn't be the date its own "Ending
+     today" caption (below) claimed. One date for the whole page. */
   const util = state.overview.util || {};
-  const toDate = todayStr();
+  const toDate = state.date;
   const fromDate = addDays(toDate, -(state.overview.trendRange - 1));
   // A date nobody works — every board's weekend or a shared holiday — is left
   // OUT of the x-axis entirely, so the line runs straight from Friday to Monday
@@ -1926,7 +1934,8 @@ function renderOverview() {
   trendSec.className = "ov-section";
   const trendHead = document.createElement("div");
   trendHead.className = "ov-trend-head";
-  trendHead.innerHTML = `<div class="ov-trend-intro"><h3>Trend</h3><p class="ov-section-sub">Ending today, weekends and shared holidays skipped.</p></div>`;
+  const trendEndLabel = state.date === todayStr() ? "today" : `${fmtDow(state.date)} ${fmtDate(state.date)}`;
+  trendHead.innerHTML = `<div class="ov-trend-intro"><h3>Trend</h3><p class="ov-section-sub">Ending ${trendEndLabel}, weekends and shared holidays skipped.</p></div>`;
   const trendControlsGroup = document.createElement("div");
   trendControlsGroup.className = "ov-trend-controls-group";
   const metricBtns = document.createElement("div");
