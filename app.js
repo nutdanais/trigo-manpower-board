@@ -305,7 +305,16 @@ function peekPlan(boardId) {
    (board list, chosen range, or a new day rolling by) — every other Overview
    redraw (a filter tick, a legend toggle, a realtime ping) reuses the cached
    result. boot()'s cloud.onChange handler resets utilCacheKey to null on any
-   realtime data change, which is what forces a real refetch after an edit. */
+   realtime data change, which is what forces a real refetch after an edit.
+
+   utilFetchSeq guards against an out-of-order response: switching 7d → 14d →
+   30d quickly fires three overlapping fetches, and network timing gives no
+   guarantee the last one issued is the last one to resolve — a smaller,
+   already-superseded range's response can land after a larger one's and
+   silently overwrite it, showing data for a range other than the one
+   currently selected. Each call stamps its own sequence number and only
+   applies its result if nothing newer has started since. */
+let utilFetchSeq = 0;
 async function ensureUtilizationLoaded() {
   const boardIds = D().boards.map(b => b.id);
   if (!boardIds.length) { state.overview.util = {}; state.overview.utilCacheKey = "empty"; return; }
@@ -313,7 +322,10 @@ async function ensureUtilizationLoaded() {
   const fromDate = addDays(toDate, -(state.overview.trendRange - 1));
   const cacheKey = boardIds.slice().sort().join(",") + "|" + fromDate + ".." + toDate;
   if (state.overview.utilCacheKey === cacheKey) return;
-  state.overview.util = await cloud.getUtilizationRange(boardIds, fromDate, toDate);
+  const seq = ++utilFetchSeq;
+  const result = await cloud.getUtilizationRange(boardIds, fromDate, toDate);
+  if (seq !== utilFetchSeq) return;   // a newer request has since superseded this one
+  state.overview.util = result;
   state.overview.utilCacheKey = cacheKey;
 }
 
@@ -327,12 +339,15 @@ async function ensureUtilizationLoaded() {
    exactly the number you're looking for. An on-call person reading low here is
    information, not a bug. */
 const EMPLIST_UTIL_DAYS = 30;
+let emplistUtilFetchSeq = 0;   // guards against an out-of-order response — see utilFetchSeq above
 async function ensureEmplistUtilLoaded() {
   const toDate = todayStr();
   const fromDate = addDays(toDate, -(EMPLIST_UTIL_DAYS - 1));
   const cacheKey = fromDate + ".." + toDate + "|" + D().employees.length;
   if (state.emplist.utilCacheKey === cacheKey) return;
+  const seq = ++emplistUtilFetchSeq;
   const raw = await cloud.getEmployeeUtilization(fromDate, toDate);
+  if (seq !== emplistUtilFetchSeq) return;   // a newer request has since superseded this one
   // working days per board across the window, computed once rather than per employee
   const workingByBoard = {};
   for (const b of D().boards) {
@@ -362,12 +377,16 @@ async function ensureEmplistUtilLoaded() {
    set of today's hosts actually changes — a filter tick or legend toggle
    reuses the cached result, same trick as ensureUtilizationLoaded. Requires
    plans to already be loaded (peekPlan reads the cache, doesn't fetch). */
+let hostCoverageFetchSeq = 0;   // guards against an out-of-order response — see utilFetchSeq above
 async function ensureHostCoverageLoaded() {
   const hosts = [...new Set(D().boards.flatMap(b =>
     peekPlan(b.id).missions.filter(m => !m.hidden).map(m => m.host)))];
   const cacheKey = state.date + "|" + hosts.slice().sort().join(",");
   if (state.overview.hostCoverageCacheKey === cacheKey) return;
-  state.overview.hostCoverage = hosts.length ? await cloud.getHostCoverageForHosts(hosts) : {};
+  const seq = ++hostCoverageFetchSeq;
+  const result = hosts.length ? await cloud.getHostCoverageForHosts(hosts) : {};
+  if (seq !== hostCoverageFetchSeq) return;   // a newer request has since superseded this one
+  state.overview.hostCoverage = result;
   state.overview.hostCoverageCacheKey = cacheKey;
 }
 

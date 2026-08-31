@@ -767,16 +767,28 @@ const cloud = {
       }
     }
     for (const a of assignRows || []) {
-      const boardId = empBoard.get(a.employee_id);
-      const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
-      if (!bucket) continue;
       const isOncall = empContract.get(a.employee_id) === "oncall";
       if (a.mission_id) {
+        // Bucket by the MISSION's own board, not the employee's current one —
+        // a mission that ran on Rayong on this date belongs to Rayong's trend
+        // regardless of which board the employee is on today. Using the
+        // employee's current board here used to require the two to match and
+        // silently dropped the assignment otherwise ("employee has since
+        // moved boards"), which could zero out an entire board's trend if
+        // its whole current roster had since been reassigned.
         if (missionHidden.has(a.mission_id)) continue;
-        if (missionBoard.get(a.mission_id) !== boardId) continue;   // employee has since moved boards
+        const boardId = missionBoard.get(a.mission_id);
+        const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
+        if (!bucket) continue;
         bucket.assigned++;
         if (isOncall) bucket.oncallAssigned++;
       } else if (a.zone && ZONES.includes(a.zone)) {
+        // A leave/zone entry isn't tied to a mission, so its board can only
+        // come from the employee's CURRENT board membership (same caveat as
+        // headcount above — board moves aren't tracked historically here).
+        const boardId = empBoard.get(a.employee_id);
+        const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
+        if (!bucket) continue;
         bucket.leave++;
         if (isOncall) bucket.oncallLeave++;
       }
