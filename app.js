@@ -62,6 +62,20 @@ function tintOf(color, alpha) {
   const n = parseInt(hex, 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
+/* Pick readable ink for a pill whose background IS a data colour (service
+   areas). WCAG relative luminance; the crossover between #1a1a1a and #fff
+   sits at L≈0.2017, so 0.2 is the threshold. Plain arithmetic on purpose —
+   these pills sit inside the export capture area and html2canvas cannot parse
+   color-mix() or relative-colour syntax. */
+function inkOn(bg) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(bg).trim());
+  if (!m) return "var(--card-ink)";
+  const hex = m[1].length === 3 ? m[1].split("").map(c => c + c).join("") : m[1];
+  const n = parseInt(hex, 16);
+  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const L = 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255);
+  return L > 0.2 ? "#1a1a1a" : "#ffffff";
+}
 /* strip everything but digits/+ so the href itself is always a valid,
    injection-safe tel: URI regardless of how the number was typed in */
 function telHref(phone) {
@@ -638,9 +652,13 @@ function empCard(emp) {
   // card by finger goes through tap-to-select then tap-a-mission, as before.
   card.draggable = !IS_TOUCH;
   card.dataset.empId = emp.id;
-  card.innerHTML = `<span class="emp-badge">${emp.contract === "oncall" ? "OC" : "P"}</span><span class="emp-name">${escapeHtml(emp.name)}</span>`
-    + (pos ? `<span class="emp-pos">${pos.short}</span>` : "")
-    + (area ? `<span class="emp-area" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "");
+  card.innerHTML =
+    `<span class="emp-name">${escapeHtml(emp.name)}</span>` +
+    `<span class="emp-meta">` +
+      (pos ? `<span class="emp-pos">${pos.short}</span>` : "") +
+      (emp.contract === "oncall" ? `<span class="emp-oc">OC</span>` : "") +
+      (area ? `<span class="emp-area" style="background:${area.color};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
+    `</span>`;
   card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
   card.addEventListener("click", (ev) => {
@@ -1100,31 +1118,40 @@ function renderMissions() {
     // a full board at a glance — but as a solid header fill it was the loudest
     // thing on screen AND forced the header text to be pinned dark in both
     // themes (it sat on an arbitrary data colour). Full strength on the card's
-    // left edge, a 15% wash behind the header: the edge and the tinted header
-    // sit against each other, so the two together still read as one full-height
-    // colour block from across the room, and the header text can follow the
-    // theme like every other label again.
-    card.style.borderLeftColor = engColor;
+    // top edge, a 15% wash behind the header: the edge and the tinted header
+    // sit against each other, so the two together still read as one colour
+    // block from across the room, and the header text can follow the theme
+    // like every other label again.
+    card.style.borderTopColor = engColor;
+    const memberEmps = m.members
+      .map(empId => D().employees.find(e => e.id === empId))
+      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
     const header = document.createElement("div");
     header.className = "mission-header";
     header.style.background = tintOf(engColor, MISSION_TINT);
     header.title = "Click to edit mission";
     header.innerHTML = `
-      <div class="m-number">${escapeHtml(m.number)}</div>
-      <div>Host: ${escapeHtml(m.host)}</div>
-      <div>${m.shift === "night" ? '<span class="night-badge">🌙 NIGHT</span>' : "☀️ Day"} ${m.startTime}-${m.endTime}</div>
-      <div>Cust: ${escapeHtml(m.customer)}</div>
-      ${m.ppe ? `<div class="m-ppe">PPE: ${escapeHtml(m.ppe)}</div>` : ""}
-      <div class="m-eng">${eng ? escapeHtml(eng.name) : "?"}${eng && eng.phone ? "<br>" + telLink(eng.phone) : ""}</div>`;
+      <div class="m-line1">
+        <span class="m-number">${escapeHtml(m.number)}</span>
+        <span class="m-host">${escapeHtml(m.host)}</span>
+        <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "NIGHT" : "DAY"}</span>
+      </div>
+      <div class="m-line2">
+        <span class="m-cust">${escapeHtml(m.customer)}</span>
+        <span class="m-sep">|</span>
+        <span>${m.startTime}-${m.endTime}</span>
+        <span class="m-sep">|</span>
+        <span class="m-eng">${eng ? escapeHtml(eng.name) : "?"}</span>
+        ${eng && eng.phone ? telLink(eng.phone) : ""}
+        <span class="m-count">${memberEmps.length}</span>
+      </div>
+      ${m.ppe ? `<div class="m-ppe"><b>PPE</b> ${escapeHtml(m.ppe)}</div>` : ""}`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
     const body = document.createElement("div");
     body.className = "mission-body dropzone";
     body.dataset.drop = "mission:" + m.id;
     const empRow = document.createElement("div");
     empRow.className = "mission-emps";
-    const memberEmps = m.members
-      .map(empId => D().employees.find(e => e.id === empId))
-      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
     for (const emp of sortEmployeesDisplay(memberEmps)) empRow.appendChild(empCard(emp));
     body.appendChild(empRow);
     if (m.remark) {
@@ -2051,7 +2078,7 @@ function renderEmployeeRows() {
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color}">${escapeHtml(area.name)}</span>` : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
@@ -2495,21 +2522,20 @@ function buildExportPools() {
    grid's live width, so it adapts to window resizing and to the wider export
    capture alike. Cards that are display:none (e.g. empty missions hidden for the
    export) are skipped. Safe/no-op when the grid is hidden or empty. */
-/* The column floor is not a taste value — it is the width at which two employee
-   cards still fit side by side in a mission body, which is what keeps a crew of
-   four from rendering as a four-storey card (and the exported JPG from doubling
-   in height). Derive it, don't guess it:
+/* The column floor is not a taste value — it is the width at which three
+   employee cards still fit side by side in a mission body, which is what keeps
+   a crew from rendering taller than it needs to (and the exported JPG from
+   growing in height). Derive it, don't guess it:
 
      card width W
-     − 6px coloured left edge − 1px right border          → W −   7
-     − 130px header − its 1px right border                → W − 138
-     − 8px body padding, both sides                       → W − 154
-     must hold 2 × 114px .emp-card + one 6px flex gap = 234
-     → W ≥ 388
+     − 1px left border − 1px right border                 → W −  2
+     − 8px body padding, both sides                        → W − 18
+     must hold 3 × 114px .emp-card + two 6px flex gaps = 354
+     → W ≥ 372
 
-   390 leaves a 2px cushion. If you change .emp-card's width, the header width,
-   or the left edge, redo this sum — the previous value (383) predated the 6px
-   edge and left the export exactly one pixel short, so every crew stacked. */
+   390 leaves an 18px cushion. If .emp-card's width goes above 118px this
+   silently drops back to two per row — the failure is quiet, so re-derive
+   this sum rather than eyeballing the board. */
 const MASONRY_GAP = 12, MASONRY_MIN_CARD = 390;
 function layoutMasonry() {
   const grid = $("#missions-grid");

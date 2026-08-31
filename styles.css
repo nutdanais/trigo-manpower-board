@@ -42,6 +42,7 @@
   --emp-bg: #e6e9ec;
   --emp-perm-border: #b4bcc4;
   --emp-oncall-border: #6b737c;
+  --emp-oncall-bg: #dfe3e7;
   --emp-ink: #1a1a1a;
   --emp-pos-bg: rgba(0,73,131,.09);   /* .emp-pos tint — plain rgba, see its comment for why not color-mix() */
   --charcoal: #59595b;   /* CI guide, 80% black */
@@ -106,6 +107,7 @@
   --emp-bg: #2a3038;
   --emp-perm-border: #4a525c;
   --emp-oncall-border: #7a838d;
+  --emp-oncall-bg: #242a31;   /* one step below --emp-bg */
   --emp-ink: #e8ebed;
   --emp-pos-bg: rgba(111,177,224,.14);
   --pool-tint: #12303f;
@@ -648,40 +650,85 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   min-height: 4px;
 }
 .mission-card {
-  display: flex;
   border: 1px solid var(--border);
-  /* the left edge carries the engineer's colour (set inline in renderMissions),
+  /* the top edge carries the engineer's colour (set inline in renderMissions),
      so it is thick enough to read as a mark rather than as a hairline */
-  border-left-width: 6px;
+  border-top-width: 5px;
   border-radius: 8px;
   background: var(--panel);
   overflow: hidden;
   transition: opacity .15s;
 }
 .mission-card.dimmed { opacity: 0.18; }
+/* full-width top band: a mission's height now tracks its headcount instead of
+   a fixed-width side column forcing every field to wrap (see CARD-REDESIGN-BRIEF) */
 .mission-header {
-  width: 130px;
-  min-width: 130px;
-  padding: 8px;
+  padding: 7px 9px;
   font-size: 11.5px;
   cursor: pointer;
-  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   /* The header's background is only a 15% wash of the engineer's colour now
-     (the full-strength colour rides the card's border instead), so this text no
+     (the full-strength colour rides the card's top edge instead), so this text no
      longer sits on an arbitrary data colour and can follow the theme — unlike
      --card-ink, which stays pinned for surfaces that ARE a solid data colour. */
   color: var(--text);
 }
-.mission-header .m-number { font-family: var(--font-condensed); font-weight: 700; font-size: 14px; letter-spacing: .2px; margin-bottom: 4px; }
-.mission-header div { margin-bottom: 2px; }
-.mission-header .m-eng { margin-top: 6px; font-weight: 600; }
-.mission-header .m-ppe { font-weight: 600; font-style: italic; }
+.mission-header .m-line1 { display: flex; align-items: baseline; gap: 7px; }
+.mission-header .m-number { font-family: var(--font-condensed); font-weight: 700; font-size: 15px; line-height: 1.1; letter-spacing: .2px; flex: none; }
+.mission-header .m-host {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* shift chip sits on a data colour (the engineer tint), so its own surface is a
+   fixed translucent white rather than a theme token — a themed tint would go
+   muddy against some engineer hues. NIGHT stays the loudest thing in the band. */
+.mission-header .m-shift {
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1.7;
+  letter-spacing: .3px;
+  padding: 0 5px;
+  border-radius: 3px;
+  margin-left: auto;
+  flex: none;
+  background: rgba(255,255,255,.72);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 1px rgba(0,73,131,.25);
+}
+.mission-header .m-shift.night { background: var(--night); color: #fff; box-shadow: none; }
+.mission-header .m-line2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.mission-header .m-line2 .m-sep { opacity: .45; }
+.mission-header .m-line2 .m-eng { font-weight: 600; color: var(--text); }
+/* headcount chip: same fixed translucent-white treatment as the shift chip */
+.mission-header .m-count {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1.7;
+  color: var(--card-ink);
+  background: rgba(255,255,255,.72);
+  border-radius: 999px;
+  padding: 0 6px;
+  flex: none;
+}
+.mission-header .m-ppe { margin-top: 3px; font-size: 10px; color: var(--muted); }
+.mission-header .m-ppe b { font-weight: 700; }
 .mission-body {
-  flex: 1;
   display: flex;
   flex-direction: column;
   padding: 8px;
-  min-height: 70px;
 }
 .mission-emps {
   display: flex;
@@ -690,10 +737,10 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   align-items: flex-start;
   align-content: flex-start;
   /* no max-width: the #missions-grid column floor (MASONRY_MIN_CARD in app.js,
-     derived from these exact numbers) guarantees at least 2 employee cards fit
+     derived from these exact numbers) guarantees at least 3 employee cards fit
      per row — this lets a mission box that renders wider (fewer, bigger columns
-     on a normal-width screen) naturally wrap 3+ cards per row instead of
-     capping at 2. Changing .emp-card's width below means redoing that sum. */
+     on a normal-width screen) naturally wrap 4+ cards per row instead of
+     capping at 3. Changing .emp-card's width below means redoing that sum. */
 }
 .m-remark {
   margin-top: auto;
@@ -702,105 +749,82 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   color: var(--muted);
   font-size: 12px;
 }
-.night-badge {
-  display: inline-block;
-  padding: 0 5px;
-  border-radius: 4px;
-  background: var(--night);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-}
 
-/* employee card — one calm light grey for everyone; contract type is told by the
-   border (permanent = solid, on-call = dashed) and the white P/OC badge.
-   Service area is read from the area code text, not colour, so the board stays
-   calm and brand-aligned. The fill is fixed (like --card-ink): a card is a data
-   object with its own identity, not a themed surface, so it won't flip in dark mode. */
+/* employee card — one calm light grey for everyone. Contract type is told by the
+   border (permanent = solid, on-call = dashed) plus an OC chip on on-call only:
+   permanent is the common case and gets no mark, so the name keeps the full
+   width. Service area is read from the area code text; its ink is picked from
+   the area colour's luminance by inkOn() in app.js, not pinned. */
 .emp-card {
   width: 114px;
   height: 62px;
-  border-radius: 5px;
-  padding: 5px 22px 5px 6px;   /* right gutter reserved for the P/OC badge */
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: 6px;
+  padding: 6px;
   cursor: grab;
-  box-shadow: 0 1px 3px rgba(0,0,0,.16);
+  box-shadow: 0 1px 2px rgba(0,0,0,.14);
   background: var(--emp-bg);
   border: 1px solid var(--emp-perm-border);
   position: relative;
-  overflow: hidden;
+  /* no overflow:hidden — .emp-name clamps itself, and the selection tick below
+     hangs outside the card on purpose (it used to be silently clipped here). */
+  display: flex;
+  flex-direction: column;
   user-select: none;
   color: var(--emp-ink);
 }
-/* name wraps up to 2 lines (sized to fit the longest name in the system,
-   "Wannaphatson T329", on two lines) instead of growing the card; a name
-   longer than that clamps with an ellipsis. The card's fixed height already
-   leaves clearance below a max 2-line name for the corner-anchored tags
-   below, so neither can ever overlap it. */
+.emp-card.oncall { border: 1px dashed var(--emp-oncall-border); background: var(--emp-oncall-bg); }
+.emp-card.dragging { opacity: 0.4; }
+
+/* name wraps to 2 lines, then clamps. word-break:normal keeps Thai and long
+   transliterated names from splitting mid-syllable the way break-word did. */
 .emp-card .emp-name {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  word-break: normal;
   overflow-wrap: break-word;
-  line-height: 1.2;
 }
-.emp-card.oncall {
-  border: 1.5px dashed var(--emp-oncall-border);
-}
-/* P / OC badge — white on a solid brand chip so it reads instantly off the grey card */
-.emp-card .emp-badge {
-  position: absolute;
-  top: 2px;
-  right: 3px;
-  font-size: 9px;
-  font-weight: 700;
-  background: var(--primary);
-  color: #fff;
-  border-radius: 3px;
-  padding: 0 4px;
-  letter-spacing: .2px;
-}
-.emp-card.oncall .emp-badge { background: var(--charcoal); }
-.emp-card.dragging { opacity: 0.4; }
 
-/* position tag (bottom-left) + service-area pill (bottom-right) — same
-   corner clearance as the P/OC badge above them (2px/3px), same pill
-   typography/shape as each other so they read as a matched pair. Area
-   color is set inline per-card from the area's own color (same data-driven
-   pattern as .mission-header); each keeps its own text/background so
-   position vs. area are still told apart at a glance. */
+/* meta row: position · (OC) · area, pushed to the card's bottom edge */
+.emp-card .emp-meta { margin-top: auto; display: flex; align-items: center; gap: 3px; min-width: 0; }
 .emp-card .emp-pos,
+.emp-card .emp-oc,
 .emp-card .emp-area {
-  position: absolute;
-  bottom: 2px;
-  font-size: 8px;
+  font-size: 9.5px;
   font-weight: 700;
+  line-height: 1.6;
   letter-spacing: .2px;
-  padding: 1px 5px;
+  padding: 0 5px;
   border-radius: 999px;
-  border: 1px solid rgba(0,0,0,.15);
+  flex: none;
 }
 .emp-card .emp-pos {
-  left: 3px;
   /* --primary-text (not the fixed --primary) — this sits on the card's own
      themed surface, not a data color, so it should lighten in dark mode like
-     any other navy-as-text use. (Left as --primary before the card surface
-     itself could go dark, navy-on-dark-navy was unreadable there.) --emp-pos-bg
-     is a plain rgba (not color-mix()) on purpose — html2canvas (the export)
-     can't parse the color(srgb ...) function Chromium serializes a color-mix()
-     result to, and this sits inside the exported capture area. */
+     any other navy-as-text use. --emp-pos-bg is a plain rgba (not color-mix())
+     on purpose — html2canvas (the export) can't parse the color(srgb ...)
+     function Chromium serializes a color-mix() result to, and this sits inside
+     the exported capture area. */
   color: var(--primary-text);
   background: var(--emp-pos-bg);
 }
+.emp-card .emp-oc { background: var(--charcoal); color: #fff; padding: 0 4px; }
 .emp-card .emp-area {
-  right: 3px;
-  color: var(--card-ink);
+  margin-left: auto;
+  max-width: 66px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* multi-selection highlight */
+/* multi-selection highlight — the tick hangs outside the card (into the 6px
+   flex gap); z-index lifts the whole card so it paints over its neighbour. */
 .emp-card.selected {
+  z-index: 2;
   outline: 2.5px solid var(--primary);
   outline-offset: 1px;
   box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.28);
@@ -808,15 +832,17 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 .emp-card.selected::after {
   content: "✓";
   position: absolute;
-  top: -7px; left: -7px;
+  top: -6px; right: -6px;
   width: 15px; height: 15px;
   background: var(--primary);
   color: #fff;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   border: 1.5px solid #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.3);
+  z-index: 3;
 }
 
 /* search flash — the top-right search box only ever filtered the two
