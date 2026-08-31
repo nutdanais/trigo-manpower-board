@@ -677,7 +677,7 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 .mission-header .m-number { font-family: var(--font-condensed); font-weight: 700; font-size: 15px; line-height: 1.1; letter-spacing: .2px; flex: none; }
 .mission-header .m-host {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -709,7 +709,7 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   line-height: 1.35;
   color: var(--muted);
 }
-.mission-header .m-line2 .m-sep { opacity: .45; }
+.mission-header .m-sep { opacity: .45; }
 .mission-header .m-line2 .m-eng { font-weight: 600; color: var(--text); }
 /* headcount chip: same fixed translucent-white treatment as the shift chip */
 .mission-header .m-count {
@@ -723,7 +723,7 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   padding: 0 6px;
   flex: none;
 }
-.mission-header .m-ppe { margin-top: 3px; font-size: 10px; color: var(--muted); }
+.mission-header .m-ppe { margin-top: 3px; font-size: 11px; color: var(--muted); }
 .mission-header .m-ppe b { font-weight: 700; }
 .mission-body {
   display: flex;

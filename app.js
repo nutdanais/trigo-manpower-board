@@ -1134,6 +1134,7 @@ function renderMissions() {
     header.innerHTML = `
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
+        <span class="m-sep">|</span>
         <span class="m-host">${escapeHtml(m.host)}</span>
         <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "NIGHT" : "DAY"}</span>
       </div>
