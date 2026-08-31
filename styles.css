@@ -1638,12 +1638,15 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-kpi-meter-track { flex-grow: 1; height: 8px; border-radius: 999px; overflow: hidden; }
 .ov-kpi-meter-val { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
 
-/* Several section pairs (By engineer + Position coverage, By service area +
-   Leave today, Day/night split + Host coverage risk) share a row to save
-   vertical space; each keeps a sane minimum before wrapping to stacked on a
-   narrow screen. */
-.ov-side-by-side { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
-.ov-side-by-side > .ov-section { flex: 1 1 340px; min-width: 0; }
+/* Overview's six lower detail cards (By engineer, By service area, Position
+   coverage, Day/night split, Leave today, Host coverage risk) vary too much in
+   height to pair up in fixed rows without leaving a gap under whichever card
+   is shorter, so layoutOverviewMasonry() (app.js) absolutely positions them
+   into a JS masonry pack instead — same technique as the board's mission-card
+   grid. This container just needs to be a positioning root; its height is set
+   inline once the cards are measured and packed. */
+#overview-masonry { position: relative; }
+#overview-masonry > .ov-section { position: absolute; }
 
 .ov-section {
   background: var(--panel);
@@ -1772,14 +1775,17 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-shift-chip.night { color: #fff; background: var(--night); }
 
 /* host coverage risk: one row per host, amber when only 1-2 people ever covered it */
+/* flex-wrap so a narrow masonry column (see #overview-masonry) drops "who"
+   onto its own line instead of squeezing the host name into a cramped,
+   overlapping wrap — at full width all three still sit on one line. */
 .ov-hostrisk-rows { display: flex; flex-direction: column; gap: 6px; }
-.ov-hostrisk-row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 11px; }
+.ov-hostrisk-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 11px; }
 .ov-hostrisk-row.risk { border-color: #f59e0b; background: #fffbeb; }
-.ov-hostrisk-name { font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0; }
+.ov-hostrisk-name { font-size: 13px; font-weight: 600; flex: 1 1 140px; min-width: 0; }
 .ov-hostrisk-row.risk .ov-hostrisk-name { font-weight: 700; }
-.ov-hostrisk-count { font-size: 11.5px; color: var(--muted); flex: none; }
+.ov-hostrisk-count { font-size: 11.5px; color: var(--muted); flex: 0 0 auto; }
 .ov-hostrisk-row.risk .ov-hostrisk-count { font-weight: 700; color: #92400e; }
-.ov-hostrisk-who { font-size: 11px; color: var(--muted); flex: none; min-width: 84px; text-align: right; }
+.ov-hostrisk-who { font-size: 11px; color: var(--muted); flex: 1 1 auto; min-width: 84px; text-align: right; }
 .ov-hostrisk-who.ok { color: #15803d; }
 .ov-hostrisk-note { font-size: 11.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
 
