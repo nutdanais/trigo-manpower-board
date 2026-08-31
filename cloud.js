@@ -40,6 +40,28 @@ const isNonWorkingDate = (iso, boardId = cloud.data.activeBoardId) => {
 };
 const emptyZones = () => Object.fromEntries(ZONES.map((z) => [z, []]));
 
+/* PostgREST caps an unbounded .select() at the project's default row limit
+   (1000, typically) — silently, with NO error, just a truncated result. Any
+   query whose row count scales with headcount × days (utilization trend,
+   host coverage) can exceed that once the org/history is big enough, and
+   only the wider ranges (14D/30D vs. 7D) tend to cross the line — which
+   looks exactly like "the value for the same day changes with the range"
+   even though every date's own bucket is computed correctly from whatever
+   rows actually came back. `buildQuery` is called fresh per page since a
+   query builder can't be re-run once it's fired. */
+const FETCH_PAGE_SIZE = 1000;
+async function fetchAllPages(buildQuery) {
+  let all = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await buildQuery().range(from, from + FETCH_PAGE_SIZE - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < FETCH_PAGE_SIZE) return all;
+    from += FETCH_PAGE_SIZE;
+  }
+}
+
 const cloud = {
   data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], activeBoardId: null },
   _listeners: [],
@@ -730,18 +752,16 @@ const cloud = {
      itself shows today. */
   async getUtilizationRange(boardIds, fromDate, toDate) {
     if (!boardIds.length) return {};
-    const [{ data: missionRows, error: mErr }, { data: assignRows, error: aErr }] = await Promise.all([
-      sb.from("missions").select("id, board_id, plan_date, hidden")
-        .in("board_id", boardIds).gte("plan_date", fromDate).lte("plan_date", toDate),
-      sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
-        .gte("plan_date", fromDate).lte("plan_date", toDate),
+    const [missionRows, assignRows] = await Promise.all([
+      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden")
+        .in("board_id", boardIds).gte("plan_date", fromDate).lte("plan_date", toDate)),
+      fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
+        .gte("plan_date", fromDate).lte("plan_date", toDate)),
     ]);
-    if (mErr) throw mErr;
-    if (aErr) throw aErr;
 
     const missionBoard = new Map();    // mission id -> board id
     const missionHidden = new Set();   // mission ids that are hidden on their date
-    for (const m of missionRows || []) {
+    for (const m of missionRows) {
       missionBoard.set(m.id, m.board_id);
       if (m.hidden) missionHidden.add(m.id);
     }
@@ -766,7 +786,7 @@ const cloud = {
         };
       }
     }
-    for (const a of assignRows || []) {
+    for (const a of assignRows) {
       const isOncall = empContract.get(a.employee_id) === "oncall";
       if (a.mission_id) {
         // Bucket by the MISSION's own board, not the employee's current one —
@@ -805,18 +825,16 @@ const cloud = {
      hidden mission doesn't count as work, and neither does a mission on a
      board the employee no longer belongs to. */
   async getEmployeeUtilization(fromDate, toDate) {
-    const [{ data: missionRows, error: mErr }, { data: assignRows, error: aErr }] = await Promise.all([
-      sb.from("missions").select("id, board_id, plan_date, hidden")
-        .gte("plan_date", fromDate).lte("plan_date", toDate),
-      sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
-        .gte("plan_date", fromDate).lte("plan_date", toDate),
+    const [missionRows, assignRows] = await Promise.all([
+      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden")
+        .gte("plan_date", fromDate).lte("plan_date", toDate)),
+      fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
+        .gte("plan_date", fromDate).lte("plan_date", toDate)),
     ]);
-    if (mErr) throw mErr;
-    if (aErr) throw aErr;
 
     const missionBoard = new Map();
     const missionHidden = new Set();
-    for (const m of missionRows || []) {
+    for (const m of missionRows) {
       missionBoard.set(m.id, m.board_id);
       if (m.hidden) missionHidden.add(m.id);
     }
@@ -824,7 +842,7 @@ const cloud = {
 
     const out = {};
     const rec = (id) => (out[id] = out[id] || { workedDates: new Set(), leaveDates: new Set() });
-    for (const a of assignRows || []) {
+    for (const a of assignRows) {
       if (!empBoard.has(a.employee_id)) continue;
       if (a.mission_id) {
         if (missionHidden.has(a.mission_id)) continue;
@@ -870,10 +888,12 @@ const cloud = {
      getEmployeeHostHistory. */
   async getHostCoverageForHosts(hosts) {
     if (!hosts || !hosts.length) return {};
-    const { data, error } = await sb.from("deployment_history")
-      .select("host, employee_id")
-      .in("host", hosts);
-    if (error) {
+    let data;
+    try {
+      data = await fetchAllPages(() => sb.from("deployment_history")
+        .select("host, employee_id")
+        .in("host", hosts));
+    } catch (error) {
       if (this._tableMissing(error)) return {};
       throw error;
     }
