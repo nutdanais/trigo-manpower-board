@@ -242,6 +242,7 @@ const state = {
   poolAreas: new Set(),       // service-area filter for the floating panel; empty = all
   undoStack: [],              // [{date, entries:[{empId, prior}]}] — inverse of recent assignment changes
   settingsTab: "engineers",   // Settings modal: which sub-menu (Engineer / Service Area / Board) is showing
+  employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
     filters: { contract: [], position: [], areaId: [], boardId: [] },
@@ -2348,6 +2349,12 @@ function openEmployeeModal(empId) {
   } else if (!isOverview() && !isEmployeeList()) {
     form.boardId.value = D().activeBoardId;
   }
+  // Host Record only makes sense once the employee has been saved (and thus
+  // could actually have an assignment history) — a brand-new employee has none.
+  state.employeeTab = "edit";
+  $("#employee-tabs").classList.toggle("hidden", !empId);
+  applyEmployeeTab();
+  if (empId) loadEmployeeHostRecord(empId);
   openModal("#modal-employee");
 }
 
@@ -2386,6 +2393,56 @@ function deactivateEmployee() {
       await refreshAndRender();
     });
   });
+}
+
+/* employee modal — Edit Employee / Host Record sub-menu tabs (same pattern as
+   applySettingsTab, scoped to #modal-employee so the two tab strips don't
+   toggle each other's panes) */
+function applyEmployeeTab() {
+  for (const btn of $$("#employee-tabs .settings-tab")) {
+    btn.classList.toggle("active", btn.dataset.tab === state.employeeTab);
+  }
+  for (const pane of $$("#modal-employee .settings-pane")) {
+    pane.classList.toggle("hidden", pane.dataset.pane !== state.employeeTab);
+  }
+}
+
+/* Host Record tab: every host this employee has ever been deployed to, most
+   recent first. One row per host, not per mission — a host they've visited
+   ten times is one line with a count, not ten. Loaded on modal open (not on
+   first tab click) so switching tabs feels instant; the query is a single
+   indexed read (assignments.employee_id) so this is cheap even for someone
+   with a long history. */
+async function loadEmployeeHostRecord(empId) {
+  const box = $("#employee-hosts-list");
+  box.innerHTML = '<p class="import-note">Loading…</p>';
+  let rows;
+  try {
+    rows = await cloud.getEmployeeHostHistory(empId);
+  } catch (e) {
+    box.innerHTML = `<p class="import-note">Could not load host record: ${e.message || e}</p>`;
+    return;
+  }
+  // bail if the modal moved on to a different employee (or closed) while this was in flight
+  if (state.editingEmployeeId !== empId) return;
+  if (!rows.length) {
+    box.innerHTML = '<p class="import-note">No mission history yet.</p>';
+    return;
+  }
+  const byHost = new Map();   // host name -> { count, lastDate, lastNumber, lastCustomer }
+  for (const r of rows) {
+    const rec = byHost.get(r.host) || { count: 0, lastDate: r.date, lastNumber: r.number, lastCustomer: r.customer };
+    rec.count++;
+    byHost.set(r.host, rec);
+  }
+  // rows arrive most-recent-first, so the first row seen per host is already its most recent
+  const hosts = [...byHost.entries()].sort((a, b) => b[1].lastDate.localeCompare(a[1].lastDate));
+  box.innerHTML = `<div class="host-list">${hosts.map(([host, rec]) => `
+    <div class="host-row">
+      <div class="host-name">${escapeHtml(host)}</div>
+      <div class="host-meta">${rec.count} mission${rec.count === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
+        (${escapeHtml(rec.lastNumber)}${rec.lastCustomer ? " — " + escapeHtml(rec.lastCustomer) : ""})</div>
+    </div>`).join("")}</div>`;
 }
 
 /* settings modal — Engineer / Service Area / Board sub-menu tabs */
@@ -2971,6 +3028,9 @@ function wireApp() {
   $("#btn-settings").onclick = () => { renderSettings(); openModal("#modal-settings"); };
   for (const btn of $$("#settings-tabs .settings-tab")) {
     btn.onclick = () => { state.settingsTab = btn.dataset.tab; applySettingsTab(); };
+  }
+  for (const btn of $$("#employee-tabs .settings-tab")) {
+    btn.onclick = () => { state.employeeTab = btn.dataset.tab; applyEmployeeTab(); };
   }
   $("#btn-add-engineer").onclick = () => safely(async () => { await cloud.addEngineer(); renderSettings(); });
   $("#btn-add-area").onclick = () => safely(async () => { await cloud.addArea(); renderSettings(); });

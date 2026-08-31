@@ -771,6 +771,27 @@ const cloud = {
     return out;
   },
 
+  /* ---------- per-employee host history (Manpower List's Host Record tab) ---------- */
+  /* Every mission this employee has ever been assigned to, read straight off
+     the assignments trail (same rows the utilization queries above read) and
+     joined to each mission's host via the assignments.mission_id FK. Not
+     date-bounded like the 30D util figure — this answers "which hosts has
+     this person ever worked", so it reads their full history. A hidden
+     mission's assignments are deleted outright (see setMissionsHidden), and a
+     deleted mission cascades the same way, so both naturally drop out here
+     with no extra filtering. */
+  async getEmployeeHostHistory(employeeId) {
+    const { data, error } = await sb.from("assignments")
+      .select("plan_date, missions(host, number, customer)")
+      .eq("employee_id", employeeId)
+      .not("mission_id", "is", null)
+      .order("plan_date", { ascending: false });
+    if (error) throw error;
+    return (data || [])
+      .filter((r) => r.missions)   // guards a race with an in-flight mission delete
+      .map((r) => ({ date: r.plan_date, host: r.missions.host, number: r.missions.number, customer: r.missions.customer }));
+  },
+
   /* Resolve {boardId, planDate, updatedBy} from a missions/assignments
      realtime payload — app.js compares updatedBy to the viewing user's own
      email, and boardId+planDate to what's currently on screen, to decide

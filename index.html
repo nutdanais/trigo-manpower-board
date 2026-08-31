@@ -297,34 +297,47 @@
 
   <div class="modal hidden" id="modal-employee">
     <h3 id="employee-modal-title">New Employee</h3>
-    <form id="form-employee">
-      <label>Employee name <input name="name" required placeholder="e.g. สุริยา"></label>
-      <label>Contract type
-        <select name="contract">
-          <option value="permanent">Permanent</option>
-          <option value="oncall">On-call</option>
-        </select>
-      </label>
-      <label>Position
-        <select name="position">
-          <option value="">— none —</option>
-          <option value="inspector">Inspector</option>
-          <option value="senior_inspector">Senior Inspector</option>
-          <option value="technician">Technician</option>
-          <option value="team_leader">Team Leader</option>
-          <option value="assistant_site_engineer">Assistant Site Engineer</option>
-        </select>
-      </label>
-      <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
-      <label>Service area <select name="areaId" required></select></label>
-      <label>Board <select name="boardId" required></select></label>
+    <div id="employee-tabs" class="settings-tabs hidden">
+      <button type="button" class="settings-tab" data-tab="edit">Edit Employee</button>
+      <button type="button" class="settings-tab" data-tab="hosts">Host Record</button>
+    </div>
+    <div class="settings-pane" data-pane="edit">
+      <form id="form-employee">
+        <label>Employee name <input name="name" required placeholder="e.g. สุริยา"></label>
+        <label>Contract type
+          <select name="contract">
+            <option value="permanent">Permanent</option>
+            <option value="oncall">On-call</option>
+          </select>
+        </label>
+        <label>Position
+          <select name="position">
+            <option value="">— none —</option>
+            <option value="inspector">Inspector</option>
+            <option value="senior_inspector">Senior Inspector</option>
+            <option value="technician">Technician</option>
+            <option value="team_leader">Team Leader</option>
+            <option value="assistant_site_engineer">Assistant Site Engineer</option>
+          </select>
+        </label>
+        <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+        <label>Service area <select name="areaId" required></select></label>
+        <label>Board <select name="boardId" required></select></label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee">🚫 Deactivate</button>
+          <span class="toolbar-spacer"></span>
+          <button type="button" class="btn" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+    <div class="settings-pane hidden" data-pane="hosts">
+      <p class="import-note">Every host this employee has been deployed to, most recent first.</p>
+      <div id="employee-hosts-list"></div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee">🚫 Deactivate</button>
-        <span class="toolbar-spacer"></span>
-        <button type="button" class="btn" data-close>Cancel</button>
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="button" class="btn" data-close>Close</button>
       </div>
-    </form>
+    </div>
   </div>
 
   <div class="modal hidden" id="modal-settings">
