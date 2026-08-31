@@ -1638,11 +1638,17 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-kpi-meter-track { flex-grow: 1; height: 8px; border-radius: 999px; overflow: hidden; }
 .ov-kpi-meter-val { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
 
-/* Overview's four lower-detail pairs — By engineer + By service area,
-   Position coverage + Host coverage risk, Day/night split + Leave today —
-   each a fixed 50/50 row, wrapping to stacked on a narrow screen. */
-.ov-side-by-side { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
-.ov-side-by-side > .ov-section { flex: 1 1 340px; min-width: 0; }
+/* Overview's six lower detail cards (By engineer, By service area, Position
+   coverage, Host coverage risk, Day/night split, Leave today) read as three
+   pairs, but a fixed 50/50 row forces each pair's row to its taller card's
+   height, stranding the shorter card above a block of dead space — so
+   layoutOverviewMasonry() (app.js) absolutely positions them into a JS
+   masonry pack instead (max 2 columns, so the common case still reads as
+   side-by-side pairs): each card rises into whichever column is currently
+   shortest. This container just needs to be a positioning root; its height
+   is set inline once the cards are measured and packed. */
+#overview-masonry { position: relative; }
+#overview-masonry > .ov-section { position: absolute; }
 
 .ov-section {
   background: var(--panel);
