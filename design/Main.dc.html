@@ -27,7 +27,7 @@
         <span style="font-size: 12.5px; color: #6b7280;">Mon 01-Sep-2026 · 2 boards</span>
       </div>
       <div style="font-size: 13px; color: #1f2937;">
-        <b>3 missions have no crew</b> · <b>10 permanent staff idle</b> · 24 on-call available (normal)
+        <b>10 permanent staff idle</b> · 24 on-call available (normal)
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
@@ -70,10 +70,7 @@
     </div>
 
     <div style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px;">
-      <div style="display: flex; align-items: baseline; gap: 8px;">
-        <div style="font-size: 26px; font-weight: 700; color: #004983;" class="num">21</div>
-        <span style="font-size: 11px; font-weight: 700; color: #b45309; background: #fffbeb; border: 1px solid #f59e0b; border-radius: 999px; padding: 1px 8px;">3 unstaffed</span>
-      </div>
+      <div style="font-size: 26px; font-weight: 700; color: #004983;" class="num">21</div>
       <div style="font-size: 12.5px; color: #6b7280; margin-top: 2px;">Missions today</div>
       <div style="font-size: 11px; color: #6b7280; margin-top: 6px; line-height: 1.4;">
         15 day · 6 night · 18 hosts · 7 engineers
@@ -98,43 +95,9 @@
   <!-- ============ 3. ACTION QUEUE — exceptions first, ranked by severity ============ -->
   <section style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
     <h3 style="font-size: 15px; margin: 0 0 2px;">Action queue</h3>
-    <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px; max-width: 760px;">Ranked by what blocks the day: a mission with no crew first, then people with no mission. Click any row to jump to its board.</p>
+    <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px; max-width: 760px;">Permanent staff with no mission today. Click any chip to jump to their board.</p>
 
-    <!-- 3a. unstaffed missions — NEW: the count already exists, the list never did -->
-    <div style="border: 1px solid #f59e0b; background: #fffbeb; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;">
-      <div style="font-size: 12.5px; font-weight: 700; color: #b45309; margin-bottom: 8px;">⚠ 3 missions have no crew assigned</div>
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-
-        <div style="display: flex; align-items: center; gap: 10px; background: #ffffff; border: 1px solid #f3d8a6; border-radius: 6px; padding: 7px 10px;">
-          <span style="font-size: 13px; font-weight: 700; flex: none; min-width: 128px;" class="num">AMATA.26.0011</span>
-          <span style="font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0;">GUANGDONG WELLING</span>
-          <span style="font-size: 11px; color: #6b7280; flex: none;">08:00–17:00</span>
-          <span style="font-size: 9px; font-weight: 700; letter-spacing: .3px; color: #004983; background: rgba(0,73,131,.10); border-radius: 3px; padding: 1px 6px; flex: none;">DAY</span>
-          <span style="font-size: 11.5px; color: #6b7280; flex: none; min-width: 92px;">Wipa R.</span>
-          <span style="font-size: 11px; font-weight: 700; color: #004983; flex: none;">Assign →</span>
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 10px; background: #ffffff; border: 1px solid #f3d8a6; border-radius: 6px; padding: 7px 10px;">
-          <span style="font-size: 13px; font-weight: 700; flex: none; min-width: 128px;" class="num">MS-2418</span>
-          <span style="font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0;">Michelin Siam (Laem Chabang)</span>
-          <span style="font-size: 11px; color: #6b7280; flex: none;">19:00–04:00</span>
-          <span style="font-size: 9px; font-weight: 700; letter-spacing: .3px; color: #ffffff; background: #1c2430; border-radius: 3px; padding: 1px 6px; flex: none;">NIGHT</span>
-          <span style="font-size: 11.5px; color: #6b7280; flex: none; min-width: 92px;">Suriya P.</span>
-          <span style="font-size: 11px; font-weight: 700; color: #004983; flex: none;">Assign →</span>
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 10px; background: #ffffff; border: 1px solid #f3d8a6; border-radius: 6px; padding: 7px 10px;">
-          <span style="font-size: 13px; font-weight: 700; flex: none; min-width: 128px;" class="num">RY-26.0442</span>
-          <span style="font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0;">Toyota Gateway</span>
-          <span style="font-size: 11px; color: #6b7280; flex: none;">08:00–17:00</span>
-          <span style="font-size: 9px; font-weight: 700; letter-spacing: .3px; color: #004983; background: rgba(0,73,131,.10); border-radius: 3px; padding: 1px 6px; flex: none;">DAY</span>
-          <span style="font-size: 11.5px; color: #6b7280; flex: none; min-width: 92px;">Janjira K.</span>
-          <span style="font-size: 11px; font-weight: 700; color: #004983; flex: none;">Assign →</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3b. idle permanent staff — same chips as today, but grouped and counted -->
+    <!-- idle permanent staff — same chips as today, but grouped and counted -->
     <div style="border: 1px solid #f59e0b; background: #fffbeb; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;">
       <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px;">
         <span style="font-size: 12.5px; font-weight: 700; color: #b45309;">⚠ 10 permanent staff not assigned yet</span>
@@ -170,12 +133,12 @@
       <thead>
         <tr>
           <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap;">Board</th>
-          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 16%;">Utilized</th>
-          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 11%;">Missions</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 14%;">Utilized</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 10%;">Missions</th>
           <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 11%;">Headcount</th>
-          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 11%;">Assigned</th>
-          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 10%;">Idle</th>
-          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 18%;">Contract mix</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 10%;">Assigned</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 8%;">Idle</th>
+          <th style="text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: #6b7280; padding: 0 10px 7px 0; border-bottom: 1px solid #d8dde4; white-space: nowrap; width: 24%;">Contract mix</th>
         </tr>
       </thead>
       <tbody>
@@ -219,7 +182,7 @@
                 <div style="width: 78%; background: #2a78d6;"></div>
                 <div style="width: 22%; background: #eb6834;"></div>
               </div>
-              <span style="font-size: 11.5px; color: #6b7280; flex: none;" class="num">75 / 21</span>
+              <span style="font-size: 11.5px; color: #6b7280; flex: none;" class="num">75 (78%) &nbsp;/&nbsp; 21 (22%)</span>
             </div>
           </td>
         </tr>
@@ -263,7 +226,7 @@
                 <div style="width: 66%; background: #2a78d6;"></div>
                 <div style="width: 34%; background: #eb6834;"></div>
               </div>
-              <span style="font-size: 11.5px; color: #6b7280; flex: none;" class="num">21 / 11</span>
+              <span style="font-size: 11.5px; color: #6b7280; flex: none;" class="num">21 (66%) &nbsp;/&nbsp; 11 (34%)</span>
             </div>
           </td>
         </tr>
@@ -276,7 +239,7 @@
           <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">128</span></td>
           <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">82</span></td>
           <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #b45309;" class="num">10</span></td>
-          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">96 / 32</span></td>
+          <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700; color: #004983;" class="num">96 (75%) &nbsp;/&nbsp; 32 (25%)</span></td>
         </tr>
       </tbody>
     </table>
@@ -287,7 +250,91 @@
     </div>
   </section>
 
-  <!-- ============ 5. ONE TREND CHART, metric switcher instead of two charts ============ -->
+  <!-- ============ 5. DAY / NIGHT SPLIT  |  HOST COVERAGE RISK ============ -->
+  <div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: stretch;">
+
+    <section style="flex-grow: 1; flex-basis: 460px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <h3 style="font-size: 15px; margin: 0 0 2px;">Day / night split</h3>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">Crew and missions by shift — the last thing to check before the night crew goes out.</p>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+        <div style="flex-grow: 1; flex-basis: 0; border: 1px solid #d8dde4; border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; align-items: baseline; gap: 7px;">
+            <span style="font-size: 24px; font-weight: 700; color: #004983;" class="num">61</span>
+            <span style="font-size: 11px; font-weight: 700; letter-spacing: .3px; color: #004983; background: rgba(0,73,131,.09); border-radius: 999px; padding: 2px 8px;">DAY</span>
+          </div>
+          <div style="font-size: 11.5px; color: #6b7280; margin-top: 4px;">15 missions · 74% of crew</div>
+        </div>
+        <div style="flex-grow: 1; flex-basis: 0; border: 1px solid #d8dde4; border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; align-items: baseline; gap: 7px;">
+            <span style="font-size: 24px; font-weight: 700; color: #1f2937;" class="num">21</span>
+            <span style="font-size: 11px; font-weight: 700; letter-spacing: .3px; color: #ffffff; background: #1c2430; border-radius: 999px; padding: 2px 8px;">NIGHT</span>
+          </div>
+          <div style="font-size: 11.5px; color: #6b7280; margin-top: 4px;">6 missions · 26% of crew</div>
+        </div>
+      </div>
+
+      <!-- per board, so this says something the chips in the status bar can't -->
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+        <div style="display: grid; grid-template-columns: 110px 1fr 78px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #2a78d6; flex: none;"></span>Non-Rayong</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px;">
+            <div style="width: 74%; background: #2a78d6;"></div>
+            <div style="width: 26%; background: #1c2430;"></div>
+          </div>
+          <span style="font-size: 12px; color: #6b7280; text-align: right;" class="num">46 / 16</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 110px 1fr 78px; align-items: center; gap: 10px;">
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #eb6834; flex: none;"></span>Rayong</span>
+          <div style="display: flex; height: 18px; border-radius: 3px; overflow: hidden; gap: 2px; width: 32%;">
+            <div style="width: 75%; background: #2a78d6;"></div>
+            <div style="width: 25%; background: #1c2430;"></div>
+          </div>
+          <span style="font-size: 12px; color: #6b7280; text-align: right;" class="num">15 / 5</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 4px 14px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #2a78d6; background: #2a78d6;"></span>Day crew (61)</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;"><span style="width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid #1c2430; background: #1c2430;"></span>Night crew (21)</span>
+      </div>
+    </section>
+
+    <section style="flex-grow: 1; flex-basis: 460px; min-width: 0; background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px;">
+        <h3 style="font-size: 15px; margin: 0;">Host coverage risk</h3>
+        <span style="font-size: 9.5px; font-weight: 700; letter-spacing: .4px; color: #ffffff; background: #a8c855; border-radius: 999px; padding: 1px 7px;">NEW</span>
+      </div>
+      <p style="font-size: 12px; color: #6b7280; margin: 0 0 14px;">Hosts only one or two people have ever worked. If that person is on leave, nobody on the roster knows the site.</p>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 700; flex-grow: 1; min-width: 0;">Aisin Takaoka (AMATA City)</span>
+          <span style="font-size: 11.5px; font-weight: 700; color: #b45309; flex: none;">1 person ever</span>
+          <span style="font-size: 11px; color: #6b7280; flex: none; min-width: 84px; text-align: right;">Sirinat K.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #f59e0b; background: #fffbeb; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 700; flex-grow: 1; min-width: 0;">GUANGDONG WELLING</span>
+          <span style="font-size: 11.5px; font-weight: 700; color: #b45309; flex: none;">2 people ever</span>
+          <span style="font-size: 11px; color: #6b7280; flex: none; min-width: 84px; text-align: right;">Somchai R. +1</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #d8dde4; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0;">Michelin Siam (Laem Chabang)</span>
+          <span style="font-size: 11.5px; color: #6b7280; flex: none;">3 people ever</span>
+          <span style="font-size: 11px; color: #15803d; flex: none; min-width: 84px; text-align: right;">ok</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; border: 1px solid #d8dde4; border-radius: 6px; padding: 8px 11px;">
+          <span style="font-size: 13px; font-weight: 600; flex-grow: 1; min-width: 0;">Toyota Gateway</span>
+          <span style="font-size: 11.5px; color: #6b7280; flex: none;">11 people ever</span>
+          <span style="font-size: 11px; color: #15803d; flex: none; min-width: 84px; text-align: right;">ok</span>
+        </div>
+      </div>
+
+      <p style="font-size: 11.5px; color: #6b7280; margin: 12px 0 0; line-height: 1.5;">Built from <b>deployment_history</b> — the same rows behind the Host Record tab, counted by host instead of by employee.</p>
+    </section>
+  </div>
+
+  <!-- ============ 6. ONE TREND CHART, metric switcher instead of two charts ============ -->
   <section style="background: #ffffff; border: 1px solid #d8dde4; border-radius: 10px; padding: 18px 20px;">
     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px;">
       <div style="min-width: 0;">
@@ -398,9 +445,9 @@
             <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 36%; height: 100%; border-radius: 999px; background: #f7dd6c;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">8</span></div></td>
           </tr>
           <tr>
-            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #c0c4cb; flex: none;"></span><span style="font-weight: 600;">Wipa<small style="display: block; font-weight: 400; font-size: 10.5px; color: #b45309;">1 mission with no crew</small></span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: #c0c4cb; flex: none;"></span><span style="font-weight: 600;">Wipa</span></div></td>
             <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"><i style="display: block; width: 20%; height: 100%; border-radius: 999px; background: #c0c4cb;"></i></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">1</span></div></td>
-            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 700; color: #b45309;" class="num">0</span></div></td>
+            <td style="padding: 8px 10px 8px 0; border-bottom: 1px solid #d8dde4;"><div style="display: flex; align-items: center; gap: 8px;"><div style="flex-grow: 1; min-width: 34px; height: 8px; border-radius: 999px; background: #eef1f5; overflow: hidden;"></div><span style="flex: none; min-width: 24px; text-align: right; font-weight: 600;" class="num">0</span></div></td>
           </tr>
           <tr>
             <td style="padding: 10px 10px 8px 0; border-top: 2px solid #d8dde4;"><span style="font-weight: 700;">All engineers</span></td>
