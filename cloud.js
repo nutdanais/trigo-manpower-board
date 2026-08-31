@@ -849,6 +849,36 @@ const cloud = {
     return (data || []).map((r) => ({ date: r.plan_date, host: r.host, number: r.mission_number, customer: r.customer }));
   },
 
+  /* ---------- host coverage (Overview's "Host coverage risk" module) ---------- */
+  /* The inverse of getEmployeeHostHistory: for each host in the given list,
+     how many distinct employees have ever been deployed there, and who (up to
+     2 names — enough to answer "who do I ask", not a full roster). Reads the
+     same deployment_history rows, grouped by host instead of by employee.
+     Degrades to an empty coverage map (not an error) pre-migration, same as
+     getEmployeeHostHistory. */
+  async getHostCoverageForHosts(hosts) {
+    if (!hosts || !hosts.length) return {};
+    const { data, error } = await sb.from("deployment_history")
+      .select("host, employee_id")
+      .in("host", hosts);
+    if (error) {
+      if (this._tableMissing(error)) return {};
+      throw error;
+    }
+    const setsByHost = {};
+    for (const row of data || []) {
+      (setsByHost[row.host] || (setsByHost[row.host] = new Set())).add(row.employee_id);
+    }
+    const nameOf = new Map(this.data.employees.map((e) => [e.id, e.name]));
+    const out = {};
+    for (const host of hosts) {
+      const ids = setsByHost[host];
+      if (!ids) { out[host] = { count: 0, names: [] }; continue; }
+      out[host] = { count: ids.size, names: [...ids].map((id) => nameOf.get(id)).filter(Boolean).slice(0, 2) };
+    }
+    return out;
+  },
+
   /* Resolve {boardId, planDate, updatedBy} from a missions/assignments
      realtime payload — app.js compares updatedBy to the viewing user's own
      email, and boardId+planDate to what's currently on screen, to decide
