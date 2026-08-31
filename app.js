@@ -1817,7 +1817,8 @@ function renderOverview() {
   }));
   panel.appendChild(boardSec);
 
-  /* ---------- 5. day/night split  |  host coverage risk ---------- */
+  /* ---------- day/night split (built here, appended near the bottom paired
+     with Leave today — see the end of this function) ---------- */
   const daynightSec = ovSection("Day / night split", "Crew and missions by shift — the last thing to check before the night crew goes out.");
   if (!totalMissions) {
     daynightSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
@@ -1859,6 +1860,8 @@ function renderOverview() {
     ]));
   }
 
+  /* ---------- host coverage risk (built here, appended near the bottom paired
+     with Position coverage — see the end of this function) ---------- */
   const hostRiskSec = ovSection("Host coverage risk", "Hosts only one or two people have ever worked. If that person is on leave, nobody on the roster knows the site.");
   if (!todaysHosts.length) {
     hostRiskSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
@@ -1887,13 +1890,10 @@ function renderOverview() {
       innerHTML: "Built from <b>deployment_history</b> — the same rows behind the Host Record tab, counted by host instead of by employee.",
     }));
   }
-  const daynightHostRow = document.createElement("div");
-  daynightHostRow.className = "ov-side-by-side";
-  daynightHostRow.appendChild(daynightSec);
-  daynightHostRow.appendChild(hostRiskSec);
-  panel.appendChild(daynightHostRow);
+  // daynightSec and hostRiskSec are appended further down, paired with Leave
+  // today and Position coverage respectively — see the bottom of this function.
 
-  /* ---------- 6. trend: one chart, a metric switcher instead of two near-
+  /* ---------- 5. trend: one chart, a metric switcher instead of two near-
      identical 220px charts sharing one legend drawn twice. ---------- */
   const trendSec = document.createElement("section");
   trendSec.className = "ov-section";
@@ -1963,7 +1963,8 @@ function renderOverview() {
   ));
   panel.appendChild(trendSec);
 
-  /* ---------- 7. by engineer: workload per responsible engineer, across all boards ----------
+  /* ---------- 6. by engineer  |  by service area ----------
+     By engineer: workload per responsible engineer, across all boards.
      Missions carry an engineerId, so this is the one view that answers "who is
      carrying how much today" — the board sections all slice by board instead.
      Crew counts only members who still belong to the board the mission is on,
@@ -2035,10 +2036,11 @@ function renderOverview() {
       { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
   }
 
-  /* ---------- 8. position coverage: deployed vs. on the bench, per role —
-     Overview otherwise slices people by board, area and contract, never by
-     what they can actually do. Reuses the same global assigned-employee set
-     boardStats() computes internally, just not exposed as a set there. ---------- */
+  /* ---------- 7. position coverage  |  host coverage risk ----------
+     Position coverage: deployed vs. on the bench, per role — Overview otherwise
+     slices people by board, area and contract, never by what they can actually
+     do. Reuses the same global assigned-employee set boardStats() computes
+     internally, just not exposed as a set there. ---------- */
   const posSec = ovSection("Position coverage", "Deployed vs. on the bench, per role. Answers “can we still crew a job that needs a Team Leader?”");
   const assignedIdsGlobal = new Set();
   for (const b of boards) {
@@ -2082,7 +2084,7 @@ function renderOverview() {
   } else {
     posSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a position set yet." }));
   }
-  /* ---------- 9. service-area distribution, all boards ----------
+  /* ---------- by service area: paired with By engineer above ----------
      One row per area on a shared scale, split permanent / on-call: the bar's
      full length is the area's total headcount (so areas stay ranked by size and
      comparable to each other), the two segments are its contract mix, and the
@@ -2124,7 +2126,8 @@ function renderOverview() {
     areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
   }
 
-  /* ---------- 10. leave today, broken down by board on a shared scale ---------- */
+  /* ---------- 8. day/night split  |  leave today ----------
+     Leave today: broken down by board on a shared scale ---------- */
   const leaveSec = ovSection("Leave today", `${totalLeave} people on leave. Segments break each type down by board.`);
   const leaveRows = document.createElement("div");
   leaveRows.className = "ov-leave-rows";
@@ -2142,18 +2145,24 @@ function renderOverview() {
   leaveSec.appendChild(leaveRows);
   if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
 
-  // side by side to save vertical space — both pairs are compact enough to share a row
+  // side by side to save vertical space — each pair is compact enough to share a row
   const engAreaRow = document.createElement("div");
   engAreaRow.className = "ov-side-by-side";
   engAreaRow.appendChild(engSec);
   engAreaRow.appendChild(areaSec);
   panel.appendChild(engAreaRow);
 
-  const posLeaveRow = document.createElement("div");
-  posLeaveRow.className = "ov-side-by-side";
-  posLeaveRow.appendChild(posSec);
-  posLeaveRow.appendChild(leaveSec);
-  panel.appendChild(posLeaveRow);
+  const posHostRow = document.createElement("div");
+  posHostRow.className = "ov-side-by-side";
+  posHostRow.appendChild(posSec);
+  posHostRow.appendChild(hostRiskSec);
+  panel.appendChild(posHostRow);
+
+  const daynightLeaveRow = document.createElement("div");
+  daynightLeaveRow.className = "ov-side-by-side";
+  daynightLeaveRow.appendChild(daynightSec);
+  daynightLeaveRow.appendChild(leaveSec);
+  panel.appendChild(daynightLeaveRow);
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
