@@ -399,6 +399,10 @@ button, input, select, textarea, optgroup {
 .stat-chip-night b { color: #fff; }
 #stats-bar .stat-chip-night::before { display: none; }
 #area-bar .stat-chip { gap: 6px; }
+/* Manpower List's per-area counts, on the same toolbar row as "+ New Employee",
+   pushed to the right edge by .toolbar-spacer like #area-bar is on a board. */
+#emplist-area-bar { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+#emplist-area-bar .stat-chip { gap: 6px; }
 
 /* ===== Toolbar ===== */
 #toolbar {

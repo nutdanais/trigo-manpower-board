@@ -458,6 +458,7 @@ function render() {
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   $("#filters").classList.toggle("hidden", ov || eml);
+  $("#emplist-area-bar").classList.toggle("hidden", !eml);
   $("#btn-export").classList.toggle("hidden", eml);
   $("#btn-reset-board").classList.toggle("hidden", ov || eml);
   renderStats();
@@ -1268,6 +1269,14 @@ function renderStats() {
     bar.appendChild(statChip("Total employees", D().employees.length));
     bar.appendChild(statChip("Permanent", permN));
     bar.appendChild(statChip("On-call", D().employees.length - permN));
+    // per-service-area counts, same idea as a board's #area-bar — shown on the
+    // toolbar row (next to "+ New Employee") since Manpower List has no stats row of its own
+    const emplistAreaBar = $("#emplist-area-bar");
+    emplistAreaBar.innerHTML = "";
+    for (const a of D().areas) {
+      const n = D().employees.filter(e => e.areaId === a.id).length;
+      if (n) emplistAreaBar.appendChild(statChip(a.name, n));
+    }
     return;
   }
   const s = boardStats(D().activeBoardId);
