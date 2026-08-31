@@ -62,25 +62,24 @@ function tintOf(color, alpha) {
   const n = parseInt(hex, 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
-/* Darken a data colour (service area) just enough that white text stays
-   readable on it, so area pills read as one consistent "dark chip, white
-   text" style instead of flipping text colour per area. WCAG relative
-   luminance; the crossover between #1a1a1a and #fff sits at L≈0.2017, so 0.2
-   is the threshold — scale RGB down in steps until the background is dark
-   enough for white ink. Plain arithmetic on purpose — these pills sit inside
+/* Pick readable ink for a pill whose background IS a data colour (service
+   areas): white on a dark pill, near-black on a light one. Uses perceived
+   brightness (ITU-R BT.601 luma weights on raw sRGB) rather than WCAG
+   relative luminance — WCAG's gamma-corrected formula weights green so
+   heavily that a saturated pink/magenta (e.g. a "dark pink" area colour)
+   scores as "light" and gets black text, even though it reads as dark to
+   the eye. Threshold 128 on the 0-255 scale is the standard perceived-
+   brightness cutoff. Plain arithmetic on purpose — these pills sit inside
    the export capture area and html2canvas cannot parse color-mix() or
    relative-colour syntax. */
-function pillBg(bg) {
+function inkOn(bg) {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(bg).trim());
-  if (!m) return bg;
+  if (!m) return "var(--card-ink)";
   const hex = m[1].length === 3 ? m[1].split("").map(c => c + c).join("") : m[1];
   const n = parseInt(hex, 16);
-  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-  const lum = (r, g, b) => 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  while (lum(r, g, b) > 0.2) { r = Math.floor(r * 0.9); g = Math.floor(g * 0.9); b = Math.floor(b * 0.9); }
-  const h = (v) => v.toString(16).padStart(2, "0");
-  return `#${h(r)}${h(g)}${h(b)}`;
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 128 ? "#1a1a1a" : "#ffffff";
 }
 /* strip everything but digits/+ so the href itself is always a valid,
    injection-safe tel: URI regardless of how the number was typed in */
@@ -703,7 +702,7 @@ function empCard(emp) {
     `<span class="emp-meta">` +
       (pos ? `<span class="emp-pos">${pos.short}</span>` : "") +
       (emp.contract === "oncall" ? `<span class="emp-oc">OC</span>` : "") +
-      (area ? `<span class="emp-area" style="background:${pillBg(area.color)};color:#fff">${escapeHtml(area.name)}</span>` : "") +
+      (area ? `<span class="emp-area" style="background:${area.color};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
@@ -2456,7 +2455,7 @@ function renderEmployeeRows() {
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${pillBg(area.color)};color:#fff">${escapeHtml(area.name)}</span>` : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
