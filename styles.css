@@ -2268,7 +2268,12 @@ body.touch-mode .hl-edit { opacity: 1; }
 /* an archived host is still readable, just visibly off the active roster —
    same treatment (and same reasoning) as an inactive employee's row */
 #hostlist-table tbody tr.row-archived td { opacity: .55; }
-#hostlist-table tbody tr.row-archived td.hl-name { opacity: 1; }
+/* the name and the switch stay at full strength — dimming the control you
+   came to click would be self-defeating (same call as the Manpower List's
+   Status column) */
+#hostlist-table tbody tr.row-archived td.hl-name,
+#hostlist-table tbody tr.row-archived td.hl-status { opacity: 1; }
+#hostlist-table td.hl-status { white-space: nowrap; }
 
 /* merge panel at the foot of the Host modal */
 #host-merge {

@@ -3351,6 +3351,7 @@ function hostlistFilteredSorted() {
   const val = (r) => {
     if (sortKey === "location") return r.location || safeHttpUrl(r.mapUrl) || "";
     if (sortKey === "area") return r.area ? r.area.name : "";
+    if (sortKey === "status") return r.archived ? "Archived" : "Active";
     return r.name;
   };
   rows.sort((a, b) => val(a).localeCompare(val(b)) * sortDir || a.name.localeCompare(b.name));
@@ -3424,7 +3425,14 @@ function renderHostRows() {
         ? areaPillHtml(r.area, "area-pill")
         : `<button type="button" class="hl-add-loc hl-add-area">+ Set area</button>`}</td>
       <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
-      <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>`;
+      <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>
+      <td data-label="Status" class="hl-status">
+        <label class="toggle toggle-active">
+          <input type="checkbox" ${r.archived ? "" : "checked"}>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">${r.archived ? "Archived" : "Active"}</span>
+        </label>
+      </td>`;
     const lastLine = r.lastDate ? ` · last seen ${fmtDate(r.lastDate)}` : "";
     tr.querySelector(".hl-host").title =
       `${r.name} — ${r.missionCount} mission${r.missionCount === 1 ? "" : "s"}, `
@@ -3439,6 +3447,28 @@ function renderHostRows() {
         ? state.hostlist.expanded.delete(r.name)
         : state.hostlist.expanded.add(r.name);
       renderHostRows();
+    };
+    /* Same one-click, no-confirm treatment as the Manpower List's Status
+       column: archiving is reversible from the same switch, and a host record
+       is master data rather than a day's plan, so no guardEdit either. The
+       rest of the record is passed back through because saveHost upserts the
+       whole row — sending only `archived` would blank the location. */
+    tr.querySelector(".hl-status input").onchange = (ev) => {
+      const active = ev.target.checked;
+      safely(async () => {
+        const res = await cloud.saveHost({
+          name: r.name, location: r.location, mapUrl: r.mapUrl,
+          areaId: r.area ? r.area.id : "", archived: !active, note: r.note,
+        });
+        await refreshAndRender();
+        if (res && res.skipped && res.skipped.includes("archived")) {
+          toast(`Archiving needs a one-time database update (migration-2026-09-04-host-archive.sql) before it can be used.`, "warn");
+          return;
+        }
+        toast(active
+          ? `${r.name} is active again — offered when creating a mission.`
+          : `${r.name} archived — kept here with its history, but no longer offered on new missions.`, "info");
+      });
     };
     tr.addEventListener("dblclick", () => openHostModal(r.name));
     body.appendChild(tr);
