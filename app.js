@@ -315,13 +315,14 @@ const state = {
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
-    filters: { boardId: [], empId: [], location: [] },
+    filters: { areaId: [], boardId: [], empId: [], location: [] },
     sortKey: "name",
     sortDir: 1,
     dir: null,           // cloud.getHostDirectory() result; null = not fetched yet
     dirCacheKey: null,   // same "fetch once, reuse across redraws" trick as emplist below
     expanded: new Set(), // host names whose full inspector list is shown (the rest are capped)
     editingHost: null,   // host name the Host modal is editing; null = adding a new one
+    returnToMission: false,   // Host modal was opened from the New Mission form — go back to it when done
   },
   overview: {                 // Overview tab: utilization trend chart controls + its cache
     trendRange: 14,           // 7 | 14 | 30 days, ending on state.date — same date as every
@@ -1357,12 +1358,19 @@ function renderMissions() {
     header.className = "mission-header";
     header.style.background = tintOf(engColor, MISSION_TINT);
     header.title = "Click to edit mission";
+    // the host's service area (from its Host List record) rides with the shift
+    // chip: the two together answer "when and where" without reading the
+    // address, and a host with no area set simply shows no pill
+    const hostArea = hostAreaOf(m.host);
     header.innerHTML = `
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>
         <span class="m-host">${escapeHtml(m.host)}</span>
-        <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "🌙 NIGHT" : "DAY"}</span>
+        <span class="m-pills">
+          ${areaPillHtml(hostArea, "m-area")}
+          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "🌙 NIGHT" : "DAY"}</span>
+        </span>
       </div>
       <div class="m-line2">
         <span class="m-cust">${escapeHtml(m.customer)}</span>
@@ -3050,11 +3058,33 @@ function renderEmployeeList() {
    only a person can supply, its location. That ordering matters: a host with
    no location record still gets a row, because the board already knows the
    name. */
-const HOSTLIST_FILTER_LABELS = { boardId: "Board", empId: "Inspector", location: "Location" };
+const HOSTLIST_FILTER_LABELS = { areaId: "Service area", boardId: "Board", empId: "Inspector", location: "Location" };
 /* how many inspector chips a row shows before collapsing behind "+N more" —
    enough to answer "who knows this site" without one busy host stretching the
    table to a screen per row */
 const HOSTLIST_INSPECTOR_CAP = 8;
+
+/* The host master records double as the app's list of hosts: the New Mission
+   form only accepts a host that has one (see missionHostMatch), and a mission
+   card reads its host's service area through here. Matched case-insensitively
+   on a trimmed name — "fortune" and "Fortune " are the same site to a person
+   typing in a hurry, and the record's own spelling is the canonical one. */
+function hostRecordOf(name) {
+  const key = String(name || "").trim().toLowerCase();
+  if (!key) return null;
+  return D().hosts.find(h => h.name.trim().toLowerCase() === key) || null;
+}
+function hostAreaOf(name) {
+  const rec = hostRecordOf(name);
+  return rec && rec.areaId ? D().areas.find(a => a.id === rec.areaId) || null : null;
+}
+/* the area pill markup shared by the Host List column and the mission card —
+   same shape and ink rule as the pill on every employee card */
+function areaPillHtml(area, cls) {
+  if (!area) return "";
+  return `<span class="${cls}" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">`
+    + `${escapeHtml(area.name)}</span>`;
+}
 
 /* Only ever build an href from a link we've confirmed is http(s): the field is
    free text, and `javascript:` in an href is a script that runs on click. */
@@ -3075,6 +3105,7 @@ function allHostRows() {
   for (const name of names) {
     const d = dir[name] || { boards: {}, employees: {}, missionCount: 0, firstDate: null, lastDate: null };
     const rec = recByName.get(name) || null;
+    const area = rec && rec.areaId ? D().areas.find(a => a.id === rec.areaId) || null : null;
     // most days first: "who knows this site best" is the question the column answers
     const inspectors = Object.entries(d.employees)
       .map(([id, days]) => ({ id, name: empName.get(id) || "", days }))
@@ -3091,6 +3122,7 @@ function allHostRows() {
       location: rec ? rec.location : "",
       mapUrl: rec ? rec.mapUrl : "",
       note: rec ? rec.note : "",
+      area,
       hasRecord: !!rec,
       inspectors,
       boards,
@@ -3104,6 +3136,9 @@ function allHostRows() {
 }
 
 function hostlistFilterOptions(key) {
+  if (key === "areaId") {
+    return [...D().areas.map(a => ({ value: a.id, label: a.name })), { value: "__none__", label: "— none —" }];
+  }
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
   if (key === "location") {
     return [{ value: "has", label: "Has location" }, { value: "missing", label: "No location yet" }];
@@ -3159,14 +3194,15 @@ function hostlistFilteredSorted() {
   const f = state.hostlist.filters;
   const q = state.hostlist.search.trim().toLowerCase();
   const rows = allHostRows().filter(r => {
+    if (f.areaId.length && !f.areaId.includes(r.area ? r.area.id : "__none__")) return false;
     if (f.boardId.length && !r.boards.some(b => f.boardId.includes(b.id))) return false;
     if (f.empId.length && !r.inspectors.some(i => f.empId.includes(i.id))) return false;
     if (f.location.length && !f.location.includes((r.location || r.mapUrl) ? "has" : "missing")) return false;
     if (q) {
       // search covers everything the row shows, so typing an inspector's name
       // answers "where has this person been" from the host side too
-      const hay = [r.name, r.location, r.note, ...r.inspectors.map(i => i.name), ...r.boards.map(b => b.name)]
-        .join(" ").toLowerCase();
+      const hay = [r.name, r.location, r.note, r.area ? r.area.name : "",
+        ...r.inspectors.map(i => i.name), ...r.boards.map(b => b.name)].join(" ").toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -3179,8 +3215,12 @@ function hostlistFilteredSorted() {
     rows.sort((a, b) => (n(a) - n(b)) * sortDir || a.name.localeCompare(b.name));
     return rows;
   }
-  // hosts with no location sort together at one end rather than scattered
-  const val = (r) => (sortKey === "location" ? (r.location || safeHttpUrl(r.mapUrl) || "") : r.name);
+  // hosts with no location / no area sort together at one end rather than scattered
+  const val = (r) => {
+    if (sortKey === "location") return r.location || safeHttpUrl(r.mapUrl) || "";
+    if (sortKey === "area") return r.area ? r.area.name : "";
+    return r.name;
+  };
   rows.sort((a, b) => val(a).localeCompare(val(b)) * sortDir || a.name.localeCompare(b.name));
   return rows;
 }
@@ -3238,6 +3278,9 @@ function renderHostRows() {
         <button type="button" class="hl-edit" title="Edit location, map link and note">✎</button>
       </td>
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
+      <td data-label="Service area" class="hl-area-cell">${r.area
+        ? areaPillHtml(r.area, "area-pill")
+        : `<button type="button" class="hl-add-loc hl-add-area">+ Set area</button>`}</td>
       <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
       <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>`;
     const lastLine = r.lastDate ? ` · last seen ${fmtDate(r.lastDate)}` : "";
@@ -3245,8 +3288,9 @@ function renderHostRows() {
       `${r.name} — ${r.missionCount} mission${r.missionCount === 1 ? "" : "s"}, `
       + `${r.deployedDays} deployment day${r.deployedDays === 1 ? "" : "s"}${lastLine}`;
     tr.querySelector(".hl-edit").onclick = () => openHostModal(r.name);
-    const addLoc = tr.querySelector(".hl-add-loc");
-    if (addLoc) addLoc.onclick = () => openHostModal(r.name);
+    // both "+ Add location" and "+ Set area" open the same record, which is the
+    // one place all of a host's details are edited
+    for (const add of tr.querySelectorAll(".hl-add-loc")) add.onclick = () => openHostModal(r.name);
     const more = tr.querySelector(".hl-more");
     if (more) more.onclick = () => {
       state.hostlist.expanded.has(r.name)
@@ -3278,10 +3322,10 @@ function exportHostlistCsv() {
   const rows = hostlistFilteredSorted();   // same rows the table is showing right now
   // "seen" covers both sources the dates come from — a mission planned for the
   // host and a deployment recorded against it
-  const header = ["Host name", "Location", "Google Maps link", "Inspectors", "Inspector count",
+  const header = ["Host name", "Location", "Google Maps link", "Service area", "Inspectors", "Inspector count",
     "Deployment days", "Appear on board", "Missions", "First seen", "Last seen"];
   const out = rows.map(r => [
-    r.name, r.location, r.mapUrl,
+    r.name, r.location, r.mapUrl, r.area ? r.area.name : "",
     r.inspectors.map(i => `${i.name} (${i.days}d)`).join("; "),
     r.inspectors.length, r.deployedDays,
     r.boards.map(b => b.name).join("; "),
@@ -3300,19 +3344,35 @@ function exportHostlistCsv() {
    already knows, the name is fixed: it's the key tying this record to the
    mission and deployment rows carrying the same text (see cloud.saveHost), so
    editing it here would quietly orphan the record from its own history. */
-function openHostModal(name) {
+/* `name` names an existing host (its name is then fixed). opts.prefillName
+   seeds a NEW host's name — that's the New Mission hand-off, where the planner
+   has already typed a host that isn't in the list yet; opts.returnToMission
+   sends them back to the mission form afterwards with the host filled in. */
+function openHostModal(name, opts = {}) {
   const rec = name ? D().hosts.find(h => h.name === name) : null;
   state.hostlist.editingHost = name || null;
+  state.hostlist.returnToMission = !!opts.returnToMission;
   const form = $("#form-host");
   form.reset();
   $("#host-modal-title").textContent = name ? `Host — ${name}` : "New Host";
-  form.name.value = name || "";
+  form.name.value = name || opts.prefillName || "";
   form.name.readOnly = !!name;
   $("#host-name-note").classList.toggle("hidden", !name);
   form.location.value = rec ? rec.location : "";
   form.mapUrl.value = rec ? rec.mapUrl : "";
   form.note.value = rec ? rec.note : "";
+  form.areaId.innerHTML = `<option value="">— none —</option>`
+    + D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+  form.areaId.value = rec ? (rec.areaId || "") : "";
   $("#btn-delete-host").classList.toggle("hidden", !rec);
+  // Cancel out of the hand-off and the half-finished mission is still waiting —
+  // its form keeps its values, nothing has reset it
+  $("#modal-host [data-close]").onclick = () => {
+    const back = state.hostlist.returnToMission;
+    state.hostlist.returnToMission = false;
+    closeModal();
+    if (back) openModal("#modal-mission");
+  };
   openModal("#modal-host");
 }
 
@@ -3331,28 +3391,47 @@ function saveHostForm(ev) {
     return;
   }
   const note = form.note.value.trim();
-  if (!state.hostlist.editingHost
-      && allHostRows().some(r => r.name.toLowerCase() === name.toLowerCase())) {
+  const areaId = form.areaId.value;
+  if (!state.hostlist.editingHost && hostRecordOf(name)) {
     toast(`${name} is already in the host list — edit that row instead.`, "error");
     return;
   }
+  const back = state.hostlist.returnToMission;
+  state.hostlist.returnToMission = false;
   safely(async () => {
-    await cloud.saveHost({ name, location, mapUrl, note });
+    const res = await cloud.saveHost({ name, location, mapUrl, areaId, note });
     closeModal();
     await refreshAndRender();
-    toast(`Saved ${name}.`, "info");
+    if (back) {
+      // straight back to the mission the planner was in the middle of writing,
+      // with the host they just created now filled in and recognised
+      const mf = $("#form-mission");
+      mf.host.value = name;
+      updateMissionHostNote();
+      openModal("#modal-mission");
+    }
+    // the host itself saved; only its area couldn't, on a database that hasn't
+    // run the service-area migration yet (see cloud.saveHost)
+    if (res && res.areaSkipped) {
+      toast(`Saved ${name}, but its service area needs a one-time database update (migration-2026-09-03-host-service-area.sql) before it can be stored.`, "warn");
+    } else {
+      toast(`Saved ${name}.`, "info");
+    }
   });
 }
 
-/* "Clear record" drops the location/link only. The host itself lives on its
-   mission and deployment rows as plain text, so it keeps its place in this
-   list — it just goes back to having no location. */
+/* "Clear record" drops the location / area / link only. The host itself lives
+   on its mission and deployment rows as plain text, so it keeps its place in
+   this list — it just goes back to having no details. The one real
+   consequence is the New Mission form, which offers the hosts that HAVE a
+   record: clearing one takes it out of that list until it's added again, so
+   the confirmation says so. */
 function deleteHostRecord() {
   const name = state.hostlist.editingHost;
   const rec = name ? D().hosts.find(h => h.name === name) : null;
   if (!rec) return;
   showConfirm("Clear host record?",
-    `Remove the saved location and map link for ${name}? ${name} stays in the Host List with its missions and inspector history — only the location record is cleared.`,
+    `Remove the saved location, map link and service area for ${name}? ${name} stays in the Host List with its missions and inspector history, but it will no longer be offered when creating a mission until you add it again.`,
     () => safely(async () => {
       await cloud.deleteHost(rec.id);
       closeModal();
@@ -3467,10 +3546,46 @@ function showConfirm(title, message, onYes, onCancel) {
 }
 
 /* mission modal */
+/* The Host box is a search over the Host List: a <datalist> so the browser's
+   own type-ahead does the filtering (it works on a phone keyboard too, which a
+   hand-rolled popover inside a scrolling modal does not), each entry labelled
+   with its service area. Typing is still free — the check happens on save (see
+   saveMission), so an unknown host becomes an offer to create it rather than a
+   field that fights you while you type. */
+function renderMissionHostOptions() {
+  const list = $("#host-options");
+  list.innerHTML = D().hosts
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(h => {
+      const area = h.areaId ? D().areas.find(a => a.id === h.areaId) : null;
+      const detail = [area ? area.name : "", h.location].filter(Boolean).join(" · ");
+      return `<option value="${escapeHtml(h.name)}">${escapeHtml(detail)}</option>`;
+    }).join("");
+}
+/* live feedback under the Host box: known host (with its area), or a heads-up
+   that saving will offer to create it */
+function updateMissionHostNote() {
+  const note = $("#mission-host-note");
+  const typed = $("#form-mission").host.value.trim();
+  if (!typed) { note.classList.add("hidden"); return; }
+  note.classList.remove("hidden");
+  const rec = hostRecordOf(typed);
+  if (rec) {
+    const area = rec.areaId ? D().areas.find(a => a.id === rec.areaId) : null;
+    note.className = "import-note host-note-ok";
+    note.textContent = `✓ ${rec.name}${area ? " — " + area.name : " — no service area set yet"}`;
+  } else {
+    note.className = "import-note host-note-new";
+    note.textContent = `⚠ "${typed}" is not in the Host list yet — saving will offer to create it.`;
+  }
+}
+
 function openMissionModal(missionId) {
   state.editingMissionId = missionId || null;
   const form = $("#form-mission");
   form.reset();
+  renderMissionHostOptions();
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
   $("#btn-hide-mission").classList.toggle("hidden", !missionId);
@@ -3487,6 +3602,7 @@ function openMissionModal(missionId) {
     form.engineerId.value = m.engineerId;
     form.remark.value = m.remark || "";
   }
+  updateMissionHostNote();
   openModal("#modal-mission");
 }
 
@@ -3504,6 +3620,21 @@ function saveMission(ev) {
     endTime: form.endTime.value || "17:00",
     engineerId: form.engineerId.value,
   };
+  /* The host has to be one from the Host List. That list is what carries a
+     host's location and service area, and a mission naming a host that isn't
+     on it would show neither — so instead of quietly accepting a new spelling
+     (which is how "Fortune", "fortune " and "Frotune" become three sites), an
+     unknown host becomes an offer to create it, and the mission is saved after
+     that. A known host is normalised to the record's own spelling. */
+  const hostRec = hostRecordOf(vals.host);
+  if (!hostRec) {
+    showConfirm("Create this host first?",
+      `"${vals.host}" is not in the Host list yet. A mission's host has to come from that list — it's what carries the site's location and service area. Create it now and come back to this mission?`,
+      () => openHostModal(null, { prefillName: vals.host, returnToMission: true }),
+      () => openModal("#modal-mission"));   // "Cancel" → back to the form, still filled in
+    return;
+  }
+  vals.host = hostRec.name;
   // instant client-side check (same number + shift, excluding the mission being edited);
   // scans hidden missions too — the DB unique constraint covers them regardless —
   // this just avoids a round trip and points at the hidden one if that's the clash
@@ -4422,6 +4553,12 @@ function wireApp() {
   }
   $("#form-host").addEventListener("submit", saveHostForm);
   $("#btn-delete-host").onclick = deleteHostRecord;
+  // Host box on the mission form: say live whether what's typed is a host the
+  // board knows ("change" as well as "input" — picking a datalist suggestion
+  // with the mouse doesn't always fire input on every browser)
+  for (const ev of ["input", "change"]) {
+    $("#form-mission").host.addEventListener(ev, updateMissionHostNote);
+  }
 
   // Long-press bookkeeping (see attachLongPress). Capture phase on both: the
   // swallowed click must die before it reaches the card's own handler AND

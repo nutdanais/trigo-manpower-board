@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-03">
+<link rel="stylesheet" href="styles.css?v=2026-09-03b">
 </head>
 <body>
 
@@ -239,6 +239,7 @@
     <div id="hostlist-toolbar">
       <input id="hostlist-search" type="search" placeholder="Search host, location, inspector…" autocomplete="off">
       <div id="hostlist-filters">
+        <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
         <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
         <div class="ms" data-filter="empId"><button type="button" class="ms-btn">Inspector: All</button><div class="ms-pop hidden"></div></div>
         <div class="ms" data-filter="location"><button type="button" class="ms-btn">Location: All</button><div class="ms-pop hidden"></div></div>
@@ -254,6 +255,7 @@
           <tr>
             <th data-sort="name">Host name</th>
             <th data-sort="location">Location</th>
+            <th data-sort="area" title="Which service area this host sits in. The same pill shows on every mission card for the host.">Service area</th>
             <th data-sort="inspectors" title="Every inspector ever deployed to this host, with how many days each has worked there. Sorts by how many inspectors know the site.">Inspectors deployed</th>
             <th data-sort="boards" title="Which boards this host's missions belong to.">Appear on board</th>
           </tr>
@@ -304,7 +306,14 @@
     <h3 id="mission-modal-title">New Mission</h3>
     <form id="form-mission">
       <label>Mission number <input name="number" required placeholder="e.g. BANGN.26.0007"></label>
-      <label>Host (company) <input name="host" required placeholder="e.g. Fortune"></label>
+      <!-- Host is a search over the Host list: the datalist is filled by
+           renderMissionHostOptions() so the browser's own type-ahead filters
+           it, and #mission-host-note says live whether what's typed is a known
+           host. A host that isn't on the list is caught on save, which offers
+           to create it (see saveMission). -->
+      <label>Host (company) <input name="host" required list="host-options" autocomplete="off" placeholder="Search the Host list…"></label>
+      <datalist id="host-options"></datalist>
+      <p id="mission-host-note" class="import-note hidden"></p>
       <label>Customer (company) <input name="customer" required placeholder="e.g. Hayashi"></label>
       <label>PPE (required equipment) <input name="ppe" placeholder="e.g. Safety shoes, helmet, glasses"></label>
       <div class="form-row">
@@ -379,6 +388,7 @@
       <label>Host name <input name="name" required placeholder="e.g. Fortune"></label>
       <p id="host-name-note" class="import-note hidden">The name is how this record is tied to the host's missions and deployment history, so it can't be changed here.</p>
       <label>Location <input name="location" placeholder="e.g. Amata City Chonburi, Plant 2"></label>
+      <label>Service area <select name="areaId"></select></label>
       <label>Google Maps link <input name="mapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
       <p class="import-note">Paste the link from Google Maps (Share → Copy link). Location shows as a 📍 link on the Host List when a link is saved.</p>
       <label>Note <textarea name="note" rows="2" placeholder="Optional — gate, contact, PPE reminder…"></textarea></label>
@@ -475,8 +485,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-03"></script>
+<script src="cloud.js?v=2026-09-03b"></script>
 <script src="charts.js?v=2026-09-03"></script>
-<script src="app.js?v=2026-09-03"></script>
+<script src="app.js?v=2026-09-03b"></script>
 </body>
 </html>

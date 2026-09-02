@@ -704,6 +704,28 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   box-shadow: inset 0 0 0 1px rgba(0,73,131,.25);
 }
 .mission-header .m-shift.night { background: var(--night); color: #fff; box-shadow: none; }
+/* the host's service area travels with the shift chip: one group, pushed to
+   the right of the band together, so the pair reads as "when and where" and a
+   host with no area set just leaves the shift chip where it always was */
+.mission-header .m-pills { margin-left: auto; flex: none; display: flex; align-items: center; gap: 4px; }
+.mission-header .m-pills .m-shift { margin-left: 0; }
+/* the area pill IS a data colour at full strength (like the pill on an
+   employee card), so its ink is picked by inkOn() in app.js, not by a theme
+   token — the surface doesn't change with the theme, so the text must not */
+.mission-header .m-area {
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1.7;
+  letter-spacing: .3px;
+  padding: 0 5px;
+  border-radius: 3px;
+  flex: none;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+}
 .mission-header .m-line2 {
   display: flex;
   align-items: center;
@@ -2192,6 +2214,12 @@ body.touch-mode .hl-edit { opacity: 1; }
   cursor: pointer;
 }
 .hl-add-loc:hover { color: var(--primary-text); border-color: var(--primary-text); }
+
+#hostlist-table td.hl-area-cell { white-space: nowrap; }
+/* live verdict under the New Mission host box (see updateMissionHostNote) */
+.host-note-ok { color: var(--primary-text); font-weight: 600; }
+.host-note-new { color: #b45309; font-weight: 600; }
+:root[data-theme="dark"] .host-note-new { color: #f0b45c; }
 
 .hl-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: center; }
 .hl-count {

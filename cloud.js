@@ -158,10 +158,14 @@ const cloud = {
      a location until the migration + redeploy. */
   async _loadHosts() {
     try {
-      const { data, error } = await sb.from("hosts").select("id, name, location, map_url, note").order("name");
+      // select * rather than a column list so a database that hasn't run the
+      // area_id migration yet simply reads back no area, instead of failing the
+      // whole query on the one column it doesn't have
+      const { data, error } = await sb.from("hosts").select("*").order("name");
       if (error) throw error;
       this.data.hosts = (data || []).map((h) => ({
-        id: h.id, name: h.name, location: h.location || "", mapUrl: h.map_url || "", note: h.note || "",
+        id: h.id, name: h.name, location: h.location || "", mapUrl: h.map_url || "",
+        areaId: h.area_id || "", note: h.note || "",
       }));
     } catch (e) {
       if (!this._tableMissing(e)) console.warn("hosts table unavailable (run migration-2026-09-02-hosts.sql):", e.message || e);
@@ -994,23 +998,40 @@ const cloud = {
      that carry the same text, so it is never rewritten by an edit here: the
      modal keeps it read-only for a host that already exists on the board.
      Renaming one would silently orphan it from its own history. */
-  async saveHost({ name, location, mapUrl, note }) {
+  /* Returns { areaSkipped } — true when the row saved but the service area
+     couldn't, because this database has the hosts table (migration-2026-09-02)
+     without the area_id column (migration-2026-09-03). Shedding the one column
+     Postgres reports missing and retrying is the same guarded pattern
+     saveMission uses: an un-migrated column must never block the rest of the
+     save, but silently dropping something the user typed would be worse than
+     saying so — hence the flag, which app.js turns into a warning toast. */
+  async saveHost({ name, location, mapUrl, areaId, note }) {
     const clean = String(name || "").trim();
     if (!clean) throw new Error("A host needs a name.");
-    const { error } = await sb.from("hosts").upsert({
+    const row = {
       name: clean,
       location: String(location || "").trim() || null,
       map_url: String(mapUrl || "").trim() || null,
+      area_id: areaId || null,
       note: String(note || "").trim() || null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: "name" });
+    };
+    const upsert = (r) => sb.from("hosts").upsert(r, { onConflict: "name" });
+    let areaSkipped = false;
+    let { error } = await upsert(row);
+    if (error && this._missingColumnFromError(error) === "area_id") {
+      const { area_id: wantedArea, ...rest } = row;
+      ({ error } = await upsert(rest));
+      areaSkipped = !error && !!wantedArea;
+    }
     if (error) {
       if (this._tableMissing(error)) {
-        throw new Error("Saving a host's location needs a one-time database update (migration-2026-09-02-hosts.sql) before it can be used.");
+        throw new Error("Saving a host needs a one-time database update (migration-2026-09-02-hosts.sql) before it can be used.");
       }
       throw error;
     }
     await this._loadHosts();
+    return { areaSkipped };
   },
   /* Deletes only the master record (location / map link), never the host's
      mission or deployment history — the name lives on those rows as plain

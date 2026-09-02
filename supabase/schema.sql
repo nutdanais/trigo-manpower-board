@@ -134,6 +134,9 @@ create table if not exists hosts (
   name text not null unique,
   location text,
   map_url text,
+  -- which service area the host sits in; drives the Host List's Service area
+  -- column and the area pill on every mission card for that host
+  area_id uuid references service_areas(id) on delete set null,
   note text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
