@@ -1282,7 +1282,8 @@ function renderMissions() {
     const eng = D().engineers.find(e => e.id === m.engineerId);
     const engColor = eng ? eng.color : "#ccc";
     const card = document.createElement("div");
-    card.className = "mission-card" + (missionMatchesFilters(m) ? "" : " dimmed");
+    card.className = "mission-card" + (m.shift === "night" ? " night" : "") +
+      (missionMatchesFilters(m) ? "" : " dimmed");
     // The engineer's colour is what lets you pick one engineer's missions out of
     // a full board at a glance — but as a solid header fill it was the loudest
     // thing on screen AND forced the header text to be pinned dark in both
@@ -1304,7 +1305,7 @@ function renderMissions() {
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>
         <span class="m-host">${escapeHtml(m.host)}</span>
-        <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "NIGHT" : "DAY"}</span>
+        <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "🌙 NIGHT" : "DAY"}</span>
       </div>
       <div class="m-line2">
         <span class="m-cust">${escapeHtml(m.customer)}</span>
