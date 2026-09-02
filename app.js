@@ -37,6 +37,18 @@ function addDays(iso, n) {
   d.setDate(d.getDate() + n);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* Calendar-boundary helpers for the Overview History range presets. Built by
+   string surgery on the ISO date rather than via Date arithmetic: an ISO date
+   here is always a local wall-clock day (see addDays' "T00:00:00"), and
+   month-end is the one case where going through Date and back is genuinely
+   easier to get wrong than right. Day 0 of month m+1 IS the last day of m. */
+function monthStart(iso) { return iso.slice(0, 7) + "-01"; }
+function monthEnd(iso) {
+  const [y, m] = iso.split("-").map(Number);
+  const d = new Date(y, m, 0);   // day 0 of the NEXT month = last day of this one
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function yearStart(iso) { return iso.slice(0, 4) + "-01-01"; }
 /* Bounded pass, not a rewrite of every innerHTML site in this file: applied
    where markup is built from a free-typed field (employee/area names,
    mission number/host/customer/PPE, phone). Most other innerHTML call sites
@@ -63,24 +75,42 @@ function tintOf(color, alpha) {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 /* Pick readable ink for a pill whose background IS a data colour (service
-   areas): white on a dark pill, near-black on a light one. Uses perceived
-   brightness (ITU-R BT.601 luma weights on raw sRGB) rather than WCAG
+   areas): white on a dark pill, near-black on a light one.
+
+   Base is perceived brightness (ITU-R BT.601 luma on raw sRGB), not WCAG
    relative luminance — WCAG's gamma-corrected formula weights green so
-   heavily that a saturated pink/magenta (e.g. a "dark pink" area colour)
-   scores as "light" and gets black text, even though it reads as dark to
-   the eye. Threshold 128 on the 0-255 scale is the standard perceived-
-   brightness cutoff. Plain arithmetic on purpose — these pills sit inside
-   the export capture area and html2canvas cannot parse color-mix() or
-   relative-colour syntax. */
+   heavily that a saturated pink/magenta scores as "light" and gets black
+   text even though it reads as dark. But luma ALONE isn't a readability
+   rule either: BT.601 weights red at only 0.299, so a mid-tone saturated
+   red (#e05a5a → 130) lands just over the 128 cutoff and gets black ink,
+   which looks wrong. Saturated colours read heavier than their luma says
+   (Helmholtz–Kohlrausch), so subtract a chroma term before the test. The
+   penalty is deliberately proportional to saturation and nothing else: a
+   NEUTRAL mid-grey at the same luma genuinely does want black ink, and
+   simply raising the flat threshold would have flipped it to white too.
+
+   Plain integer arithmetic on purpose — these pills sit inside the export
+   capture area and html2canvas cannot parse color-mix() or relative-colour
+   syntax. Checked against every seeded area colour (schema.sql): LCB 151,
+   AYT 152, NPT 150, Wellgrow 171, AMATA 188, BENZ 232 and the #9ca3af
+   new-area default 157 all stay black; reds #e05a5a → 100 and #f87171 →
+   126 go white. */
 function inkOn(bg) {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(bg).trim());
   if (!m) return "var(--card-ink)";
   const hex = m[1].length === 3 ? m[1].split("").map(c => c + c).join("") : m[1];
   const n = parseInt(hex, 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 128 ? "#1a1a1a" : "#ffffff";
+  const luma = (r * 299 + g * 587 + b * 114) / 1000;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const sat = max ? (max - min) / max : 0;          // HSV saturation, 0..1
+  return (luma - sat * INK_CHROMA_PENALTY) > 128 ? "#1a1a1a" : "#ffffff";
 }
+/* How much a fully saturated colour is discounted before the 128 brightness
+   test above. 50 is the value that puts a soft red (#f87171, luma 153) on
+   white ink while leaving the lightest saturated pastel in use (Wellgrow
+   #f5c26b, luma 199) comfortably on black. */
+const INK_CHROMA_PENALTY = 50;
 /* strip everything but digits/+ so the href itself is always a valid,
    injection-safe tel: URI regardless of how the number was typed in */
 function telHref(phone) {
@@ -148,6 +178,31 @@ const POSITIONS = {
   team_leader: { label: "Team Leader", short: "TL" },
   assistant_site_engineer: { label: "Assistant Site Engineer", short: "AE" },
 };
+/* ---------- Overview History: the two range charts below Trend ----------
+   Trend answers "how has ONE measure moved across the boards over the last
+   few weeks". History answers the other half: "what did a whole month, or
+   the year so far, look like" — so it flips the axes. One line per MEASURE
+   over an arbitrary date range, with the board dimension moved into a
+   <select>, because six measures on six boards is 36 lines and no chart.
+
+   Colours are anchored to what they already mean elsewhere on this page
+   rather than handed out by index: idle is the standby red the Action queue
+   and KPI tile use, on-call deployment is the same orange as every contract
+   split, deployed-total is the assigned blue. Only the two series with no
+   prior meaning (permanent split, missions) take a categorical slot. */
+const HISTORY_MEASURES = [
+  { key: "deployed",       label: "Deployed (total)",     color: "var(--chart-assigned)", value: (r) => r.assigned },
+  { key: "deployedPerm",   label: "Deployed — permanent", color: "var(--chart-cat-7)",    value: (r) => r.assigned - r.oncallAssigned },
+  { key: "deployedOncall", label: "Deployed — on-call",   color: "var(--chart-oncall)",   value: (r) => r.oncallAssigned },
+  { key: "oncallFree",     label: "On-call free",         color: "var(--chart-cat-3)",    value: (r) => trendMetricValue("oncallFree", r) },
+  { key: "idle",           label: "Idle staff",           color: "var(--chart-standby)",  value: (r) => trendMetricValue("idle", r) },
+  { key: "missions",       label: "Missions staffed",     color: "var(--chart-cat-5)",    value: (r) => r.staffedMissions },
+];
+/* The two deployment splits start hidden: they add up to "Deployed (total)",
+   so showing all six by default draws the same people twice and makes the
+   chart look busier than the data is. */
+const HISTORY_DEFAULT_HIDDEN = ["deployedPerm", "deployedOncall"];
+const HISTORY_SUM_KEYS = ["assigned", "headcount", "leave", "oncallAssigned", "oncallHeadcount", "oncallLeave", "staffedMissions"];
 async function safely(fn) {
   try { await fn(); } catch (e) { toast("Something went wrong: " + (e.message || e), "error"); }
 }
@@ -266,6 +321,20 @@ const state = {
     hostCoverage: null,       // cloud.getHostCoverageForHosts() result, keyed by hostCoverageCacheKey below
     hostCoverageCacheKey: null,
     oncallQueueOpen: false,   // Action queue: the on-call-free list is collapsed by default (calm, not urgent)
+
+    /* History + Engineer workload: one date range, one fetch, two charts.
+       Deliberately NOT sharing state.overview.util above — Trend is 7/14/30
+       days and History can be a whole year, and one shared cache would drag
+       a year of rows in every time somebody clicked "7d". */
+    historyPreset: "thisMonth",   // thisMonth | lastMonth | last30 | last90 | ytd | custom
+    historyFrom: null,            // resolved by resolveHistoryRange() on first render
+    historyTo: null,
+    historyBoardId: "",           // "" = all boards summed; otherwise one board id
+    historyHidden: new Set(HISTORY_DEFAULT_HIDDEN),   // measure keys toggled off via the History legend
+    engMetric: "missions",        // "missions" | "crew" — Engineer workload chart
+    engHidden: new Set(),         // engineer ids toggled off via that chart's legend
+    history: null,                // cloud.getUtilizationRange() over the History range
+    historyCacheKey: null,
   },
 };
 
@@ -332,6 +401,61 @@ async function ensureUtilizationLoaded() {
   if (seq !== utilFetchSeq) return;   // a newer request has since superseded this one
   state.overview.util = result;
   state.overview.utilCacheKey = cacheKey;
+}
+
+/* ---------- Overview History: date range + its own fetch ---------- */
+/* The presets, resolved against `anchor` (state.date — same date the rest of
+   the Overview page describes, see the comment in renderOverview). Every
+   preset is capped at today: a range whose second half hasn't happened yet
+   would drag every average down with empty days. */
+const HISTORY_PRESETS = [
+  { key: "thisMonth", label: "This month", range: (a) => [monthStart(a), monthEnd(a)] },
+  { key: "lastMonth", label: "Last month", range: (a) => { const p = addDays(monthStart(a), -1); return [monthStart(p), monthEnd(p)]; } },
+  { key: "last30",    label: "Last 30d",   range: (a) => [addDays(a, -29), a] },
+  { key: "last90",    label: "Last 90d",   range: (a) => [addDays(a, -89), a] },
+  { key: "ytd",       label: "YTD",        range: (a) => [yearStart(a), a] },
+];
+/* Writes historyFrom/historyTo for the current preset. "custom" is left alone
+   — its dates came from the two date inputs. Called at the top of every
+   Overview refresh so a preset follows state.date as the user browses days. */
+function resolveHistoryRange() {
+  const ov = state.overview;
+  const today = todayStr();
+  /* Anchored at state.date like the rest of the page, but never past today:
+     state.date is a PLANNING date and routinely sits in the future (that's
+     what the Carry over button is for). Anchoring "This month" on a future
+     day and then capping the end at today would collapse the range to a
+     single day, so the anchor itself is capped instead — browsing forward
+     leaves History showing the current month rather than an empty sliver. */
+  const anchor = state.date > today ? today : state.date;
+  if (ov.historyPreset !== "custom") {
+    const preset = HISTORY_PRESETS.find(p => p.key === ov.historyPreset) || HISTORY_PRESETS[0];
+    const [from, to] = preset.range(anchor);
+    ov.historyFrom = from;
+    ov.historyTo = to;
+  }
+  if (ov.historyTo > today) ov.historyTo = today;               // nothing to show past today
+  if (ov.historyFrom > ov.historyTo) ov.historyFrom = ov.historyTo;
+}
+
+/* Same shape as ensureUtilizationLoaded above, including the out-of-order
+   guard — clicking YTD → This month → Last 90d fires three overlapping
+   fetches and the network gives no promise the last one issued lands last.
+   Always fetches ALL boards: the History board <select> filters at render
+   time, so switching boards costs a redraw, not a round trip. */
+let historyFetchSeq = 0;
+async function ensureHistoryLoaded() {
+  const ov = state.overview;
+  const boardIds = D().boards.map(b => b.id);
+  if (!boardIds.length) { ov.history = {}; ov.historyCacheKey = "empty"; return; }
+  resolveHistoryRange();
+  const cacheKey = boardIds.slice().sort().join(",") + "|" + ov.historyFrom + ".." + ov.historyTo;
+  if (ov.historyCacheKey === cacheKey) return;
+  const seq = ++historyFetchSeq;
+  const result = await cloud.getUtilizationRange(boardIds, ov.historyFrom, ov.historyTo);
+  if (seq !== historyFetchSeq) return;   // a newer request has since superseded this one
+  ov.history = result;
+  ov.historyCacheKey = cacheKey;
 }
 
 /* Manpower List's 30D column. Per employee: days actually deployed on a mission
@@ -402,7 +526,7 @@ async function ensureHostCoverageLoaded() {
 async function refreshData() {
   if (isOverview()) {
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
-    await Promise.all([ensureUtilizationLoaded(), ensureHostCoverageLoaded()]);
+    await Promise.all([ensureUtilizationLoaded(), ensureHostCoverageLoaded(), ensureHistoryLoaded()]);
   } else if (isEmployeeList()) {
     // employee master data is already warm in the cache; the 30D column is the
     // one thing here that needs a fetch, and it's cached across redraws so
@@ -702,7 +826,7 @@ function empCard(emp) {
     `<span class="emp-meta">` +
       (pos ? `<span class="emp-pos">${pos.short}</span>` : "") +
       (emp.contract === "oncall" ? `<span class="emp-oc">OC</span>` : "") +
-      (area ? `<span class="emp-area" style="background:${area.color};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
+      (area ? `<span class="emp-area" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
@@ -1571,6 +1695,357 @@ function trendWindowDelta(series) {
   return { delta: Math.round(avg(vals.slice(-k)) - avg(vals.slice(-2 * k, -k))), k };
 }
 
+
+/* "" = every board summed. A board id that no longer exists (deleted in
+   another tab mid-session) falls back to all boards rather than an empty
+   chart. */
+function historyBoardsInScope(boards) {
+  const pick = state.overview.historyBoardId;
+  if (!pick) return boards;
+  const one = boards.filter(b => b.id === pick);
+  return one.length ? one : boards;
+}
+/* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
+   works carries no information, so it's dropped from the axis entirely
+   rather than plotted as a zero that would drag every average down. */
+function historyDates(boards) {
+  const ov = state.overview;
+  const out = [];
+  if (!ov.historyFrom || !ov.historyTo) return out;
+  for (let d = ov.historyFrom; d <= ov.historyTo; d = addDays(d, 1)) {
+    if (boards.every(b => isNonWorkingDate(d, b.id))) continue;
+    out.push(d);
+  }
+  return out;
+}
+/* One day's record for the boards in scope, summed the way
+   aggregateMetricPoint does it — raw numerators and denominators added
+   BEFORE any metric is computed, so a small board can't swing a percentage
+   as hard as a large one. Boards that are off that date drop out (they have
+   no headcount to contribute to a day they aren't working). */
+function historyDayRec(d, boards, hist) {
+  const sum = { staffedMissions: 0, byEngineer: {} };
+  for (const k of HISTORY_SUM_KEYS) sum[k] = 0;
+  let any = false;
+  for (const b of boards) {
+    if (isNonWorkingDate(d, b.id)) continue;
+    const rec = hist[b.id] && hist[b.id][d];
+    if (!rec) continue;
+    any = true;
+    for (const k of HISTORY_SUM_KEYS) sum[k] += rec[k] || 0;
+    for (const engId in (rec.byEngineer || {})) {
+      const src = rec.byEngineer[engId];
+      const acc = sum.byEngineer[engId] || (sum.byEngineer[engId] = { missions: 0, crew: 0 });
+      acc.missions += src.missions;
+      acc.crew += src.crew;
+    }
+  }
+  return any ? sum : null;
+}
+/* Averages are over PLOTTED days only — the non-working days already left off
+   the axis are left out of the denominator too, otherwise a month with eight
+   weekend days reads ~25% quieter than it was. One decimal: these are counts
+   of people, and "12" would hide the difference between 11.6 and 12.4. */
+function historyMean(values) {
+  const v = values.filter(x => x != null);
+  if (!v.length) return null;
+  return Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10;
+}
+
+/* The range control shared by BOTH new sections — presets, two native date
+   inputs, and the board scope. Rendered once, in the History header; the
+   Engineer workload section below reads the same state.
+   A native <input type="date"> rather than a range mode bolted onto the
+   board's own date popover (toggleDatePicker): that popover exists to pick a
+   PLANNING day and highlights weekends and holiday overrides to do it, none
+   of which means anything for an analysis window. */
+function historyControls() {
+  const ov = state.overview;
+  const wrap = document.createElement("div");
+  wrap.className = "ov-history-controls";
+
+  const presets = document.createElement("div");
+  presets.className = "ov-trend-btns";
+  for (const p of HISTORY_PRESETS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-small" + (ov.historyPreset === p.key ? " active" : "");
+    btn.textContent = p.label;
+    btn.onclick = () => {
+      if (ov.historyPreset === p.key) return;
+      ov.historyPreset = p.key;
+      ov.historyCacheKey = null;
+      refreshAndRender();
+    };
+    presets.appendChild(btn);
+  }
+  wrap.appendChild(presets);
+
+  const dates = document.createElement("div");
+  dates.className = "ov-history-dates";
+  const mkDate = (which, value) => {
+    const input = document.createElement("input");
+    input.type = "date";
+    input.className = "ov-history-date";
+    input.value = value || "";
+    input.max = todayStr();          // there is no history after today
+    input.setAttribute("aria-label", which === "from" ? "History range start" : "History range end");
+    input.onchange = () => {
+      if (!input.value) { input.value = value || ""; return; }
+      // editing either end is what "custom" means — the preset buttons all
+      // deselect, and resolveHistoryRange() stops overwriting these two
+      ov.historyPreset = "custom";
+      if (which === "from") ov.historyFrom = input.value; else ov.historyTo = input.value;
+      if (ov.historyFrom > ov.historyTo) {
+        // dragging one end past the other collapses the range to a single
+        // day rather than fetching an empty one
+        if (which === "from") ov.historyTo = ov.historyFrom; else ov.historyFrom = ov.historyTo;
+      }
+      ov.historyCacheKey = null;
+      refreshAndRender();
+    };
+    return input;
+  };
+  dates.appendChild(mkDate("from", ov.historyFrom));
+  dates.appendChild(Object.assign(document.createElement("span"), { className: "ov-history-dash", textContent: "→" }));
+  dates.appendChild(mkDate("to", ov.historyTo));
+  wrap.appendChild(dates);
+
+  const sel = document.createElement("select");
+  sel.className = "ov-history-board";
+  sel.setAttribute("aria-label", "History board scope");
+  const all = document.createElement("option");
+  all.value = ""; all.textContent = "All boards";
+  sel.appendChild(all);
+  for (const b of D().boards) {
+    const opt = document.createElement("option");
+    opt.value = b.id;
+    opt.textContent = b.name;      // board names are user data — textContent, never innerHTML
+    sel.appendChild(opt);
+  }
+  sel.value = ov.historyBoardId;
+  // no cache reset: ensureHistoryLoaded always fetches every board for the
+  // range, so narrowing the scope is a redraw, not a round trip
+  sel.onchange = () => { ov.historyBoardId = sel.value; render(); };
+  wrap.appendChild(sel);
+  return wrap;
+}
+
+/* Caption naming the window actually plotted, shared by both sections. */
+function historyRangeCaption(dates) {
+  const ov = state.overview;
+  const span = `${fmtDate(ov.historyFrom)} → ${fmtDate(ov.historyTo)}`;
+  const scope = ov.historyBoardId
+    ? (D().boards.find(b => b.id === ov.historyBoardId) || {}).name || "one board"
+    : "all boards";
+  return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${scope}`;
+}
+
+/* ---------- History chart (measures + colours: HISTORY_MEASURES, top of file) ---------- */
+function historySection(dates, recs, pendingCharts) {
+  const ov = state.overview;
+  const sec = document.createElement("section");
+  sec.className = "ov-section";
+  const head = document.createElement("div");
+  head.className = "ov-trend-head";
+  head.innerHTML = `<div class="ov-trend-intro"><h3>History</h3>` +
+    `<p class="ov-section-sub">Daily deployment over a chosen range. ${escapeHtml(historyRangeCaption(dates))}. ` +
+    `Weekends and holidays are left off the axis and out of the averages.</p></div>`;
+  head.appendChild(historyControls());
+  sec.appendChild(head);
+
+  const wrap = document.createElement("div");
+  wrap.className = "ov-trend-chart";
+  sec.appendChild(wrap);
+
+  if (!dates.length) {
+    wrap.innerHTML = `<p class="import-note">No working days in this range — every date was a weekend or a holiday.</p>`;
+    return sec;
+  }
+
+  const visibleMeasures = HISTORY_MEASURES.filter(m => !ov.historyHidden.has(m.key));
+  const valuesOf = (m) => recs.map(r => (r ? m.value(r) : null));
+  const series = HISTORY_MEASURES.map(m => ({
+    key: m.key, label: m.label, color: m.color,
+    visible: !ov.historyHidden.has(m.key),
+    points: valuesOf(m).map(y => ({ y })),
+  }));
+  const yMax = Charts.niceMax(series.filter(s => s.visible).flatMap(s => s.points.map(p => p.y)));
+  // A dashed mean rule only when ONE measure is on screen: with four lines up,
+  // four dashed rules is another four lines to read. The chips below carry
+  // every visible measure's average either way.
+  const refLines = visibleMeasures.length === 1
+    ? [{ y: historyMean(valuesOf(visibleMeasures[0])), color: visibleMeasures[0].color, label: "avg" }]
+    : [];
+  pendingCharts.push(() => fillLineChart(wrap, {
+    series, xLabels: dates.map(shortDateLabel), yMax, height: 240, refLines,
+    emptyLabel: "No measures selected — click a legend entry to show one",
+  }));
+
+  sec.appendChild(Charts.legendEl(
+    HISTORY_MEASURES.map(m => ({ key: m.key, label: m.label, color: m.color, muted: ov.historyHidden.has(m.key) })),
+    (key) => {
+      ov.historyHidden.has(key) ? ov.historyHidden.delete(key) : ov.historyHidden.add(key);
+      render();
+    }
+  ));
+
+  const avgs = document.createElement("div");
+  avgs.className = "ov-history-avgs";
+  avgs.appendChild(Object.assign(document.createElement("span"),
+    { className: "ov-history-avgs-label", textContent: "Daily average" }));
+  for (const m of visibleMeasures) {
+    const mean = historyMean(valuesOf(m));
+    avgs.appendChild(statChip(m.label, mean == null ? "—" : mean, m.color));
+  }
+  if (visibleMeasures.length) sec.appendChild(avgs);
+  return sec;
+}
+
+/* ---------- Engineer workload chart ----------
+   Deliberately its OWN chart rather than more series on History above: the
+   question is different (how load is spread BETWEEN people, not how the
+   operation moved as a whole), and merging them would put six org measures
+   and every engineer on one axis. It shares History's range control and
+   History's single fetch, so the two still read as one block.
+   This is also the only genuinely historical breakdown on the page: an
+   engineer_id lives on the mission row for its own date, so these are the
+   people who actually ran those jobs — unlike headcount, which
+   getUtilizationRange can only reconstruct from today's board membership. */
+const ENG_METRICS = { missions: "Missions", crew: "Crew deployed" };
+function engineerHistorySection(dates, recs, pendingCharts) {
+  const ov = state.overview;
+  const sec = document.createElement("section");
+  sec.className = "ov-section";
+  const head = document.createElement("div");
+  head.className = "ov-trend-head";
+  head.innerHTML = `<div class="ov-trend-intro"><h3>Engineer workload</h3>` +
+    `<p class="ov-section-sub">Same range as History above. A mission counts on the day it ran, ` +
+    `for the engineer it was assigned to at the time.</p></div>`;
+  const metricBtns = document.createElement("div");
+  metricBtns.className = "ov-trend-btns";
+  for (const key of Object.keys(ENG_METRICS)) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-small" + (ov.engMetric === key ? " active" : "");
+    btn.textContent = ENG_METRICS[key];
+    btn.onclick = () => { if (ov.engMetric === key) return; ov.engMetric = key; render(); };
+    metricBtns.appendChild(btn);
+  }
+  head.appendChild(metricBtns);
+  sec.appendChild(head);
+
+  // every engineer gets a line, including a flat zero — "who was free all
+  // month" is the other half of "who was loaded". The no-engineer entry
+  // appears only if some staffed mission in the range genuinely had none.
+  const entities = D().engineers.map(e => ({ id: e.id, label: e.name, color: e.color }));
+  if (recs.some(r => r && r.byEngineer[""])) {
+    entities.push({ id: "", label: "— no engineer set —", color: "var(--muted)" });
+  }
+  if (!entities.length) {
+    sec.appendChild(Object.assign(document.createElement("p"),
+      { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
+    return sec;
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "ov-trend-chart";
+  sec.appendChild(wrap);
+  if (!dates.length) {
+    wrap.innerHTML = `<p class="import-note">No working days in this range — every date was a weekend or a holiday.</p>`;
+    return sec;
+  }
+
+  // one pass: per-engineer daily series for the chart, and the totals the
+  // summary table needs, rather than walking `recs` once per column
+  const daily = {};      // engineer id -> number[] aligned to `dates`
+  const totals = {};     // engineer id -> {missions, crew, activeDays, peak, peakDate}
+  for (const ent of entities) {
+    daily[ent.id] = [];
+    totals[ent.id] = { missions: 0, crew: 0, activeDays: 0, peak: 0, peakDate: null };
+  }
+  dates.forEach((d, i) => {
+    for (const ent of entities) {
+      const rec = recs[i];
+      const v = (rec && rec.byEngineer[ent.id]) || { missions: 0, crew: 0 };
+      daily[ent.id].push(rec ? v[ov.engMetric] : null);
+      const t = totals[ent.id];
+      t.missions += v.missions;
+      t.crew += v.crew;
+      if (v.missions > 0) t.activeDays++;
+      if (v.missions > t.peak) { t.peak = v.missions; t.peakDate = d; }
+    }
+  });
+
+  const series = entities.map(ent => ({
+    key: ent.id, label: ent.label, color: ent.color,
+    visible: !ov.engHidden.has(ent.id),
+    points: daily[ent.id].map(y => ({ y })),
+  }));
+  const yMax = Charts.niceMax(series.filter(s => s.visible).flatMap(s => s.points.map(p => p.y)));
+  pendingCharts.push(() => fillLineChart(wrap, {
+    series, xLabels: dates.map(shortDateLabel), yMax, height: 240,
+    emptyLabel: "No engineers selected — click a legend entry to show one",
+  }));
+  sec.appendChild(Charts.legendEl(
+    entities.map(ent => ({ key: ent.id, label: ent.label, color: ent.color, muted: ov.engHidden.has(ent.id) })),
+    (key) => {
+      ov.engHidden.has(key) ? ov.engHidden.delete(key) : ov.engHidden.add(key);
+      render();
+    }
+  ));
+
+  /* Summary table. Averages alone rank people; the other three columns say
+     what the ranking is made of — crew/mission separates "many small jobs"
+     from "a few big ones" (two engineers on the same mission count can be
+     carrying very different loads), active days separates steady from
+     spiky, and share is the load-balance read. */
+  const n = dates.length;
+  const grandMissions = Object.values(totals).reduce((a, t) => a + t.missions, 0);
+  const round1 = (x) => Math.round(x * 10) / 10;
+  const engRows = entities.map(ent => {
+    const t = totals[ent.id];
+    return {
+      key: ent.id, label: ent.label, color: ent.color,
+      sub: t.peakDate ? `peak ${t.peak} mission${t.peak === 1 ? "" : "s"} on ${shortDateLabel(t.peakDate)}` : "no missions in range",
+      values: {
+        avgMissions: round1(t.missions / n),
+        avgCrew: round1(t.crew / n),
+        crewPer: t.missions ? round1(t.crew / t.missions) : 0,
+        activeDays: t.activeDays,
+        share: grandMissions ? Math.round((t.missions / grandMissions) * 100) : 0,
+      },
+      _sort: t.missions,
+    };
+  });
+  engRows.sort((a, b) => b._sort - a._sort || b.values.avgCrew - a.values.avgCrew || a.label.localeCompare(b.label));
+  const grandCrew = Object.values(totals).reduce((a, t) => a + t.crew, 0);
+  engRows.push({
+    key: "__total__", label: "All engineers", isTotal: true,
+    sub: `${n} working day${n === 1 ? "" : "s"}`,
+    values: {
+      avgMissions: round1(grandMissions / n),
+      avgCrew: round1(grandCrew / n),
+      crewPer: grandMissions ? round1(grandCrew / grandMissions) : 0,
+      activeDays: dates.filter((d, i) => recs[i] && recs[i].staffedMissions > 0).length,
+      share: grandMissions ? 100 : 0,
+    },
+  });
+  sec.appendChild(ovCompareTable({
+    cols: Object.assign([
+      { key: "avgMissions", label: "Avg missions/day" },
+      { key: "avgCrew", label: "Avg crew/day" },
+      { key: "crewPer", label: "Crew / mission" },
+      // a count, not a rate: a bar scaled to the column max would draw the
+      // busiest engineer full-width whatever the real numbers were
+      { key: "activeDays", label: "Active days", plain: true },
+      { key: "share", label: "Share", meter: true },
+    ], { nameLabel: "Engineer" }),
+    rows: engRows,
+  }));
+  return sec;
+}
+
 function renderOverview() {
   const panel = $("#overview-panel");
   panel.innerHTML = "";
@@ -2003,6 +2478,18 @@ function renderOverview() {
   ));
   panel.appendChild(trendSec);
 
+  /* ---------- 5b. History + Engineer workload ----------
+     Both read one fetch (state.overview.history) over one user-chosen range,
+     computed here once and handed to both so the day records aren't summed
+     twice. Full-width sections like Trend, not masonry cards: a 240px chart
+     over a month of dates needs the whole row. */
+  resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
+  const histBoards = historyBoardsInScope(boards);
+  const histDates = historyDates(histBoards);
+  const histRecs = histDates.map(d => historyDayRec(d, histBoards, state.overview.history || {}));
+  panel.appendChild(historySection(histDates, histRecs, pendingCharts));
+  panel.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
+
   /* ---------- 6. by engineer (first of six cards masonry-packed further
      down — see layoutOverviewMasonry) ----------
      By engineer: workload per responsible engineer, across all boards.
@@ -2077,55 +2564,6 @@ function renderOverview() {
       { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
   }
 
-  /* ---------- 7. position coverage (one of six cards masonry-packed
-     further down — see layoutOverviewMasonry) ----------
-     Position coverage: deployed vs. on the bench, per role — Overview otherwise
-     slices people by board, area and contract, never by what they can actually
-     do. Reuses the same global assigned-employee set boardStats() computes
-     internally, just not exposed as a set there. ---------- */
-  const posSec = ovSection("Position coverage", "Deployed vs. on the bench, per role. Answers “can we still crew a job that needs a Team Leader?”");
-  const assignedIdsGlobal = new Set();
-  for (const b of boards) {
-    const ids = new Set(boardEmployees(b.id).map(e => e.id));
-    for (const m of peekPlan(b.id).missions) {
-      if (m.hidden) continue;
-      for (const empId of m.members) if (ids.has(empId)) assignedIdsGlobal.add(empId);
-    }
-  }
-  const positionRows = Object.entries(POSITIONS).map(([key, pos]) => {
-    const emps = rosterAll.filter(e => e.position === key);
-    const deployed = emps.filter(e => assignedIdsGlobal.has(e.id)).length;
-    return { key, label: pos.label, deployed, total: emps.length };
-  }).filter(r => r.total > 0);
-  if (positionRows.length) {
-    const thinnestKey = positionRows.reduce((min, r) => (r.deployed / r.total < min.deployed / min.total ? r : min)).key;
-    const rowsWrap = document.createElement("div");
-    rowsWrap.className = "ov-position-rows";
-    for (const r of positionRows) {
-      const row = document.createElement("div");
-      row.className = "ov-position-row";
-      row.innerHTML = `
-        <span class="ov-position-label">${escapeHtml(r.label)}${r.key === thinnestKey && positionRows.length > 1 ? '<small>thinnest bench today</small>' : ""}</span>
-        <div class="ov-position-bar"></div>
-        <span class="ov-position-val">${r.deployed}/${r.total}</span>`;
-      row.querySelector(".ov-position-bar").innerHTML = Charts.stackedBarH({
-        segments: [
-          { label: "Deployed", value: r.deployed, color: "var(--chart-assigned)" },
-          { label: "Available / leave", value: r.total - r.deployed, color: "var(--border)" },
-        ], scaleMax: r.total, height: 18,
-      });
-      rowsWrap.appendChild(row);
-    }
-    posSec.appendChild(rowsWrap);
-    const deployedTotal = positionRows.reduce((s, r) => s + r.deployed, 0);
-    const benchTotal = positionRows.reduce((s, r) => s + (r.total - r.deployed), 0);
-    posSec.appendChild(Charts.legendEl([
-      { key: "deployed", label: `Deployed (${deployedTotal})`, color: "var(--chart-assigned)" },
-      { key: "bench", label: `Available / leave (${benchTotal})`, color: "var(--border)" },
-    ]));
-  } else {
-    posSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a position set yet." }));
-  }
   /* ---------- by service area (masonry-packed, see above) ----------
      One row per area on a shared scale, split permanent / on-call: the bar's
      full length is the area's total headcount (so areas stay ranked by size and
@@ -2187,9 +2625,9 @@ function renderOverview() {
   leaveSec.appendChild(leaveRows);
   if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
 
-  // These six cards are still meant to read as three pairs — By engineer +
-  // By service area, Position coverage + Host coverage risk, Day/night
-  // split + Leave today — but a FIXED 50/50 row forces each pair's row to
+  // These five cards are still meant to read as pairs — By engineer + By
+  // service area, Host coverage risk + Day/night split, then Leave today —
+  // but a FIXED 50/50 row forces each pair's row to
   // the height of its taller card, leaving the shorter card sitting in a
   // block of dead space before the next row can start (e.g. a short By
   // service area under a long By engineer). A 2-column masonry keeps the
@@ -2199,7 +2637,7 @@ function renderOverview() {
   // reserving it.
   const masonry = document.createElement("div");
   masonry.id = "overview-masonry";
-  for (const sec of [engSec, areaSec, posSec, hostRiskSec, daynightSec, leaveSec]) masonry.appendChild(sec);
+  for (const sec of [engSec, areaSec, hostRiskSec, daynightSec, leaveSec]) masonry.appendChild(sec);
   panel.appendChild(masonry);
 
   // every section is in the document now, so containers have a real width
@@ -2208,7 +2646,7 @@ function renderOverview() {
   layoutOverviewMasonry();
 }
 
-/* JS masonry for Overview's six lower detail cards (see renderOverview
+/* JS masonry for Overview's five lower detail cards (see renderOverview
    above) — absolutely positions each into whichever column is currently
    shortest, so a short card doesn't leave a gap matching its taller
    row-mate. Same shortest-column algorithm as layoutMasonry() for the
@@ -2455,7 +2893,7 @@ function renderEmployeeRows() {
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${area.color};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
@@ -3638,6 +4076,7 @@ async function boot() {
   restoreViewState();
   cloud.onChange((payload) => {
     state.overview.utilCacheKey = null;
+    state.overview.historyCacheKey = null;
     // {boardId, planDate, updatedBy} from a missions/assignments write (see
     // cloud.js's _attributionFromPayload) — undefined for every other kind of
     // change, and for a write from before the updated-by migration was run.

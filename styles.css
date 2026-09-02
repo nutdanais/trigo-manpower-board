@@ -1750,13 +1750,6 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-area-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border); }
 .ov-area-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 
-/* position coverage: one row per role, deployed vs. bench on that role's own scale */
-.ov-position-rows { display: flex; flex-direction: column; gap: 11px; margin-bottom: 10px; }
-.ov-position-row { display: grid; grid-template-columns: 132px 1fr 44px; align-items: center; gap: 10px; }
-.ov-position-label { font-size: 13px; font-weight: 600; }
-.ov-position-label small { display: block; font-weight: 400; font-size: 10.5px; color: #92400e; }
-.ov-position-bar { display: flex; height: 18px; border-radius: 3px; overflow: hidden; }
-.ov-position-val { font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* day/night split: two headline tiles, then a per-board breakdown row */
 .ov-daynight-tiles { display: flex; gap: 10px; margin-bottom: 14px; }
@@ -1803,6 +1796,45 @@ body.board-view #app-root { margin-right: 264px; }
 /* no max-width: the chart is drawn at the container's measured width
    (fillLineChart in app.js), and 6 boards over 30 days needs the whole row */
 .ov-trend-chart { margin-bottom: 10px; }
+
+/* ===== Overview History + Engineer workload =====
+   The range control reuses .ov-trend-btns for its preset row so the two
+   header control strips read as the same kind of thing, and adds a native
+   date pair and a board <select> beside it. Wraps onto its own line on a
+   narrow panel rather than squeezing the heading — it's five presets plus
+   two date fields, not the two small groups the Trend header carries. */
+.ov-history-controls { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.ov-history-dates { display: flex; align-items: center; gap: 6px; }
+.ov-history-dash { color: var(--muted); font-size: 12px; }
+/* matched to .btn-small so the whole strip sits on one baseline; the native
+   picker indicator is left alone (it is the affordance) but recoloured for
+   dark mode, where the default black glyph disappears into the field */
+.ov-history-date, .ov-history-board {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 26px;
+}
+.ov-history-board { max-width: 180px; }
+.ov-history-date:focus-visible, .ov-history-board:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+[data-theme="dark"] .ov-history-date::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.7); }
+/* the range averages, under the legend: one chip per VISIBLE measure, so the
+   chip row and the chart always describe the same set of lines */
+.ov-history-avgs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.ov-history-avgs-label { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+/* The Overview is exportable too (see the isOverview() branch in exportBoard),
+   and #board-capture takes the whole panel with it. A native date input and a
+   <select> are the two controls html2canvas reproduces least predictably, and
+   they carry nothing the export needs: the section subtitle already prints the
+   resolved range, working-day count and board scope as plain text. */
+body.exporting .ov-history-controls { display: none; }
+/* Engineer workload is the first section to put a chart legend directly above
+   a table; without this the legend row collides with the table's column heads. */
+.ov-section .chart-legend + .ov-table-wrap { margin-top: 14px; }
 
 /* ===== chart marks (SVG, shared by every Overview chart) ===== */
 .chart-svg { display: block; overflow: visible; }

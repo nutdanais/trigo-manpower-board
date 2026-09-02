@@ -128,7 +128,8 @@ const Charts = (() => {
      series are skipped entirely — legend-toggle lives in app.js, this just obeys
      it. Gridlines are hairline and recessive; every point is a real hit target
      (see wireChartTooltips), not just the line itself. */
-  function lineChart({ series, xLabels, yMax = 100, width = 640, height = 220 }) {
+  function lineChart({ series, xLabels, yMax = 100, width = 640, height = 220,
+                       refLines = [], emptyLabel = "No boards selected — click a legend entry to show it" }) {
     const padL = 32, padR = 16, padT = 10, padB = 22;
     const w = width - padL - padR, h = height - padT - padB;
     const n = xLabels.length;
@@ -151,8 +152,24 @@ const Charts = (() => {
       xAxis += `<text x="${xAt(i).toFixed(1)}" y="${height - 4}" class="chart-axis-label" text-anchor="middle">${esc(lbl)}</text>`;
     });
 
+    /* Reference rules (the History charts' range average) sit UNDER the data
+       so a dashed line never cuts across a dot. Dashed rather than a fainter
+       solid: a solid rule at chart width reads as another series. */
+    let refs = "";
+    for (const rl of refLines) {
+      if (rl.y == null) continue;
+      const y = yAt(rl.y).toFixed(1);
+      refs += `<line x1="${padL}" y1="${y}" x2="${padL + w}" y2="${y}" stroke="${rl.color}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".75"/>`;
+      if (rl.label) refs += `<text x="${padL + w - 2}" y="${(yAt(rl.y) - 4).toFixed(1)}" class="chart-axis-label" text-anchor="end" fill="${rl.color}">${esc(rl.label)}</text>`;
+    }
+
     let marks = "";
     const visible = series.filter(s => s.visible !== false);
+    /* Past roughly a quarter's worth of points the dots stop being separable
+       hit targets and just thicken the line into a smear — a YTD range is
+       ~250 points PER series. The polyline still carries the shape, and the
+       shorter ranges people actually hover keep their dots. */
+    const showDots = n <= 70;
     for (const s of visible) {
       // a point with y == null is a deliberate gap (a skipped date — weekend,
       // holiday, whatever the caller excluded) — draw one polyline per
@@ -172,6 +189,7 @@ const Charts = (() => {
         run.push(i);
       });
       flushRun();
+      if (!showDots) continue;
       s.points.forEach((p, i) => {
         if (p.y == null) return;   // no dot, no tooltip, no "null" text — the date simply isn't plotted
         marks += `<circle class="chart-mark chart-dot" cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--panel)" stroke-width="2"
@@ -180,10 +198,10 @@ const Charts = (() => {
       });
     }
     if (!visible.length) {
-      marks = `<text x="${width / 2}" y="${height / 2}" text-anchor="middle" class="chart-axis-label">No boards selected — click a legend entry to show it</text>`;
+      marks = `<text x="${width / 2}" y="${height / 2}" text-anchor="middle" class="chart-axis-label">${esc(emptyLabel)}</text>`;
     }
     return `<svg class="chart-svg chart-line-chart" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Trend chart">
-      ${grid}${xAxis}${marks}
+      ${grid}${xAxis}${refs}${marks}
     </svg>`;
   }
 
@@ -191,6 +209,14 @@ const Charts = (() => {
   /* `items`: [{key, label, color, muted}]. `onToggle`, if given, makes every
      entry clickable (used by the trend chart to show/hide a board's line);
      omit it for a plain read-only legend. */
+  /* Y-axis top for a COUNT chart. lineChart draws 4 gridlines, so rounding up
+     to a multiple of 4 keeps every axis label a whole number instead of
+     "3.75". Floor of 4 so a flat-zero day still gets a real axis. */
+  function niceMax(values) {
+    const max = Math.max(0, ...values.filter(v => v != null));
+    return Math.max(4, Math.ceil(max / 4) * 4);
+  }
+
   function legendEl(items, onToggle) {
     const el = document.createElement("div");
     el.className = "chart-legend";
@@ -262,5 +288,5 @@ const Charts = (() => {
     root.addEventListener("focusout", hide);
   }
 
-  return { sparkline, stackedBarH, barsH, lineChart, legendEl, wireChartTooltips, catColor, esc };
+  return { sparkline, stackedBarH, barsH, lineChart, niceMax, legendEl, wireChartTooltips, catColor, esc };
 })();
