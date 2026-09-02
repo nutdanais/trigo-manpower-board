@@ -1641,6 +1641,38 @@ function contractMixCell(perm, oncall, isTotal) {
   return wrap;
 }
 
+/* "By service area"'s pattern, generalised for a table column: bar length ~
+   total value, comparable across rows via a shared `scaleMax` (same
+   convention ovCompareTable's own plain numeric columns use — the column's
+   own max, computed by the caller since a custom `render` column bypasses
+   ovCompareTable's built-in maxOf pass). Segments split permanent/on-call;
+   the printed number is the plain TOTAL only — the per-type count and share
+   live in the bar's hover tooltip (Charts.stackedBarH already wires
+   data-tip-* into the shared #chart-tip panel), not as always-on text, so a
+   dense table doesn't repeat the same split as text in every row. */
+function splitCell(perm, oncall, scaleMax, isTotal, decimals) {
+  const total = perm + oncall;
+  const wrap = document.createElement("div");
+  wrap.className = "ov-cell" + (isTotal ? " plain" : "");
+  if (!isTotal) {
+    const bar = document.createElement("div");
+    bar.className = "ov-cell-bar";
+    bar.innerHTML = Charts.stackedBarH({
+      segments: [
+        { label: "Permanent", value: perm, color: "var(--chart-permanent)" },
+        { label: "On-call", value: oncall, color: "var(--chart-oncall)" },
+      ],
+      scaleMax, height: 8,
+    });
+    wrap.appendChild(bar);
+  }
+  const val = document.createElement("span");
+  val.className = "ov-cell-val";
+  val.textContent = decimals ? total.toFixed(decimals) : String(Math.round(total));
+  wrap.appendChild(val);
+  return wrap;
+}
+
 /* ---------- Overview trend metrics: shared by the KPI sparkline and the
    merged Trend chart, both reading the same cloud.getUtilizationRange() cache
    (state.overview.util) so adding "Idle staff" as a third line costs nothing
@@ -2057,6 +2089,10 @@ function engineerHistorySection(dates, recs, pendingCharts) {
       _sort: t.missions,
     };
   });
+  // shared scale for the Avg crew/day bar — computed BEFORE the total row is
+  // pushed below, same convention ovCompareTable's own numeric columns use
+  // (a total's bar would be full-width by definition, so it's excluded)
+  const avgCrewMax = Math.max(1, ...engRows.map(r => r.values.avgCrew));
   engRows.sort((a, b) => b._sort - a._sort || b.values.avgCrew - a.values.avgCrew || a.label.localeCompare(b.label));
   const grandCrew = Object.values(totals).reduce((a, t) => a + t.crew, 0);
   const grandPermCrew = Object.values(totals).reduce((a, t) => a + t.permCrew, 0);
@@ -2079,9 +2115,11 @@ function engineerHistorySection(dates, recs, pendingCharts) {
       { key: "avgMissions", label: "Avg missions/day" },
       // Permanent/on-call split, not a bare average: two engineers with the
       // same crew/day can be leaning on very different mixes of their own
-      // people vs. surge on-call — reuses the same split cell as "By board"'s
-      // Contract mix column, so the visual language matches across the page.
-      { key: "avgCrew", label: "Avg crew/day", render: (r) => contractMixCell(r.values.avgPermCrew, r.values.avgOncallCrew, r.isTotal) },
+      // people vs. surge on-call. Bar length ~ avg crew (comparable across
+      // engineers, same convention "By service area" uses below); the count
+      // and share per type live in the bar's hover tooltip rather than as
+      // always-on text, so this stays a glanceable table, not a denser one.
+      { key: "avgCrew", label: "Avg crew/day", render: (r) => splitCell(r.values.avgPermCrew, r.values.avgOncallCrew, avgCrewMax, r.isTotal, 1) },
       { key: "crewPer", label: "Crew / mission" },
       // a count, not a rate: a bar scaled to the column max would draw the
       // busiest engineer full-width whatever the real numbers were
@@ -2514,6 +2552,9 @@ function renderOverview() {
       values: { missions: noEng.missions, crew: noEng.crew, permCrew: noEng.permCrew, oncallCrew: noEng.oncallCrew },
     });
   }
+  // shared scale for the Crew deployed bar, computed before the total row
+  // below joins the array — same convention as Engineer workload's avgCrewMax
+  const crewMax = Math.max(1, ...engRows.map(r => r.values.crew));
   engRows.sort((a, b) => b.values.missions - a.values.missions || b.values.crew - a.values.crew
     || a.label.localeCompare(b.label));
   if (engRows.length) {
@@ -2533,9 +2574,11 @@ function renderOverview() {
     engSec.appendChild(ovCompareTable({
       cols: Object.assign(
         [{ key: "missions", label: "Missions" },
-         // same permanent/on-call split cell as History's Avg crew/day and
-         // "By board"'s Contract mix, so the visual language matches
-         { key: "crew", label: "Crew deployed", render: (r) => contractMixCell(r.values.permCrew, r.values.oncallCrew, r.isTotal) }],
+         // Permanent/on-call split — same splitCell as Engineer workload's
+         // Avg crew/day and "By service area" below: bar length ~ total crew,
+         // segments split by contract, the count and share per type live in
+         // the bar's hover tooltip rather than as always-on text.
+         { key: "crew", label: "Crew deployed", render: (r) => splitCell(r.values.permCrew, r.values.oncallCrew, crewMax, r.isTotal, 0) }],
         { nameLabel: "Engineer" }
       ),
       rows: engRows,
