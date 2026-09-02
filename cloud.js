@@ -735,34 +735,48 @@ const cloud = {
     await this._loadAreas();
   },
 
-  /* ---------- utilization trend (Overview 7/14/30-day chart) ---------- */
+  /* ---------- daily stats range (Overview Trend + History charts) ---------- */
   /* Two bulk queries (not one per day) covering `boardIds` over
      [fromDate, toDate] inclusive. Returns { [boardId]: { [date]: { assigned,
-     leave, headcount, oncallAssigned, oncallLeave, oncallHeadcount } } } with
+     leave, headcount, oncallAssigned, oncallLeave, oncallHeadcount,
+     staffedMissions, byEngineer } } } with
      an entry for EVERY calendar date in range — working day, weekend, and
      holiday alike. Different charts need different subsets of dates (the
      utilization trend skips non-working days; the on-call availability trend
      skips only each board's weekly weekend, deliberately keeping holidays —
      see renderOverview() in app.js), so the "which dates count" decision is
      made by each chart at render time, not baked in here.
+     `staffedMissions` counts the missions on that board+date that have at
+     least one (active, non-hidden) person on them, and `byEngineer` breaks
+     those same missions down as { [engineerId|""]: { missions, crew,
+     permCrew, oncallCrew } } — "" being missions with no engineer set,
+     permCrew+oncallCrew always summing to crew. Both feed the History
+     charts; an EMPTY mission counts for neither, since "a mission nobody
+     was sent to" is not deployment.
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
      use each employee's CURRENT board membership for the whole window - board
      moves aren't tracked historically - and hidden missions on that date are
      excluded from `assigned`/`oncallAssigned`, matching what the board
-     itself shows today. */
+     itself shows today. `byEngineer` is the one genuinely historical
+     dimension in here: engineer_id lives on the mission row for that date,
+     so it is who actually ran the job, not who runs it now. */
   async getUtilizationRange(boardIds, fromDate, toDate) {
     if (!boardIds.length) return {};
     const [missionRows, assignRows] = await Promise.all([
-      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden")
+      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden, engineer_id")
         .in("board_id", boardIds).gte("plan_date", fromDate).lte("plan_date", toDate)),
       fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
     ]);
 
-    const missionBoard = new Map();    // mission id -> board id
-    const missionHidden = new Set();   // mission ids that are hidden on their date
+    const missionBoard = new Map();      // mission id -> board id
+    const missionDate = new Map();       // mission id -> plan date
+    const missionEngineer = new Map();   // mission id -> engineer id ("" = none set)
+    const missionHidden = new Set();     // mission ids that are hidden on their date
     for (const m of missionRows) {
       missionBoard.set(m.id, m.board_id);
+      missionDate.set(m.id, m.plan_date);
+      missionEngineer.set(m.id, m.engineer_id || "");
       if (m.hidden) missionHidden.add(m.id);
     }
     // A deactivated employee drops out of "today"'s figures everywhere else
@@ -795,6 +809,7 @@ const cloud = {
         result[boardId][d] = {
           assigned: 0, leave: 0, headcount: headcountByBoard[boardId],
           oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: oncallHeadcountByBoard[boardId],
+          staffedMissions: 0, byEngineer: {},
         };
       }
     }
@@ -825,6 +840,37 @@ const cloud = {
         bucket.leave++;
         if (isOncall) bucket.oncallLeave++;
       }
+    }
+
+    /* Second pass, per MISSION rather than per person: how many missions
+       actually had someone on them, and how that splits by responsible
+       engineer. Counted here and not in the loop above because the unit is
+       the mission — incrementing per assignment would count a 5-person
+       mission five times. A mission row is one card on one board on one
+       date, so a mission NUMBER that runs both a day and a night shift is
+       two missions here, exactly as the board and the single-day "By
+       engineer" table already show it. */
+    const crewByMission = new Map();   // mission id -> {crew, permCrew, oncallCrew}
+    for (const a of assignRows) {
+      if (!a.mission_id || !isActiveEmp(a.employee_id)) continue;
+      if (missionHidden.has(a.mission_id)) continue;
+      const m = crewByMission.get(a.mission_id) || { crew: 0, permCrew: 0, oncallCrew: 0 };
+      m.crew++;
+      if (empContract.get(a.employee_id) === "oncall") m.oncallCrew++; else m.permCrew++;
+      crewByMission.set(a.mission_id, m);
+    }
+    for (const [missionId, m] of crewByMission) {
+      const boardId = missionBoard.get(missionId);
+      const bucket = boardId && result[boardId] && result[boardId][missionDate.get(missionId)];
+      if (!bucket) continue;
+      bucket.staffedMissions++;
+      const engId = missionEngineer.get(missionId) || "";
+      const rec = bucket.byEngineer[engId] ||
+        (bucket.byEngineer[engId] = { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0 });
+      rec.missions++;
+      rec.crew += m.crew;
+      rec.permCrew += m.permCrew;
+      rec.oncallCrew += m.oncallCrew;
     }
     return result;
   },
