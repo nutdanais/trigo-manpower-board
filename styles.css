@@ -1805,7 +1805,6 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
 .ov-trend-intro h3 { font-size: 15px; margin: 0 0 2px; }
 .ov-trend-intro .ov-section-sub { margin: 0; }
-.ov-trend-controls-group { display: flex; gap: 14px; flex: none; }
 .ov-trend-btns { display: flex; gap: 6px; }
 .ov-trend-btns .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 /* no max-width: the chart is drawn at the container's measured width
@@ -1819,6 +1818,10 @@ body.board-view #app-root { margin-right: 264px; }
    narrow panel rather than squeezing the heading — it's five presets plus
    two date fields, not the two small groups the Trend header carries. */
 .ov-history-controls { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+/* Utilization is a MODE switch, not another preset — visually separated from
+   the range controls by pushing it to the far right of the row (wraps onto
+   its own line first on a narrow panel, same as everything else here). */
+.ov-history-util-toggle { margin-left: auto; }
 .ov-history-dates { display: flex; align-items: center; gap: 6px; }
 .ov-history-dash { color: var(--muted); font-size: 12px; }
 /* matched to .btn-small so the whole strip sits on one baseline; the native
@@ -1850,6 +1853,21 @@ body.exporting .ov-history-controls { display: none; }
 /* Engineer workload is the first section to put a chart legend directly above
    a table; without this the legend row collides with the table's column heads. */
 .ov-section .chart-legend + .ov-table-wrap { margin-top: 14px; }
+
+/* History + Engineer workload read as one connected block (they already
+   share this one range/board control): one rounded, shadowed box instead of
+   two, with a single hairline seam where Engineer workload's own top border
+   sits. overflow:hidden lets the group's radius clip both children instead
+   of each section needing its own corner rules. */
+.ov-history-group {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--glass-shadow);
+}
+.ov-history-group > .ov-section { border-radius: 0; box-shadow: none; }
+.ov-history-group > .ov-section:first-child { border-bottom: none; }
 
 /* ===== chart marks (SVG, shared by every Overview chart) ===== */
 .chart-svg { display: block; overflow: visible; }

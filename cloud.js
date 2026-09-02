@@ -748,10 +748,11 @@ const cloud = {
      made by each chart at render time, not baked in here.
      `staffedMissions` counts the missions on that board+date that have at
      least one (active, non-hidden) person on them, and `byEngineer` breaks
-     those same missions down as { [engineerId|""]: { missions, crew } } —
-     "" being missions with no engineer set. Both feed the History charts;
-     an EMPTY mission counts for neither, since "a mission nobody was sent
-     to" is not deployment.
+     those same missions down as { [engineerId|""]: { missions, crew,
+     permCrew, oncallCrew } } — "" being missions with no engineer set,
+     permCrew+oncallCrew always summing to crew. Both feed the History
+     charts; an EMPTY mission counts for neither, since "a mission nobody
+     was sent to" is not deployment.
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
      use each employee's CURRENT board membership for the whole window - board
      moves aren't tracked historically - and hidden missions on that date are
@@ -849,21 +850,27 @@ const cloud = {
        date, so a mission NUMBER that runs both a day and a night shift is
        two missions here, exactly as the board and the single-day "By
        engineer" table already show it. */
-    const crewByMission = new Map();
+    const crewByMission = new Map();   // mission id -> {crew, permCrew, oncallCrew}
     for (const a of assignRows) {
       if (!a.mission_id || !isActiveEmp(a.employee_id)) continue;
       if (missionHidden.has(a.mission_id)) continue;
-      crewByMission.set(a.mission_id, (crewByMission.get(a.mission_id) || 0) + 1);
+      const m = crewByMission.get(a.mission_id) || { crew: 0, permCrew: 0, oncallCrew: 0 };
+      m.crew++;
+      if (empContract.get(a.employee_id) === "oncall") m.oncallCrew++; else m.permCrew++;
+      crewByMission.set(a.mission_id, m);
     }
-    for (const [missionId, crew] of crewByMission) {
+    for (const [missionId, m] of crewByMission) {
       const boardId = missionBoard.get(missionId);
       const bucket = boardId && result[boardId] && result[boardId][missionDate.get(missionId)];
       if (!bucket) continue;
       bucket.staffedMissions++;
       const engId = missionEngineer.get(missionId) || "";
-      const rec = bucket.byEngineer[engId] || (bucket.byEngineer[engId] = { missions: 0, crew: 0 });
+      const rec = bucket.byEngineer[engId] ||
+        (bucket.byEngineer[engId] = { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0 });
       rec.missions++;
-      rec.crew += crew;
+      rec.crew += m.crew;
+      rec.permCrew += m.permCrew;
+      rec.oncallCrew += m.oncallCrew;
     }
     return result;
   },
