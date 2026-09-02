@@ -152,7 +152,8 @@ function saveViewState() {
 function restoreViewState() {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY));
-    if (v && (v.boardId === OVERVIEW_ID || v.boardId === EMPLIST_ID || D().boards.some(b => b.id === v.boardId))) {
+    if (v && (v.boardId === OVERVIEW_ID || v.boardId === EMPLIST_ID || v.boardId === HOSTLIST_ID
+        || D().boards.some(b => b.id === v.boardId))) {
       D().activeBoardId = v.boardId;
     }
   } catch { /* no saved view, or it's corrupt — just keep the default board */ }
@@ -266,6 +267,7 @@ const CLOUD_WRITE_METHODS = [
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
+  "saveHost", "deleteHost",
 ];
 function wireSaveStatus() {
   for (const name of CLOUD_WRITE_METHODS) {
@@ -311,6 +313,16 @@ const state = {
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
   },
+  hostlist: {                 // Host List tab: search/filter/sort over the host directory
+    search: "",
+    filters: { boardId: [], empId: [], location: [] },
+    sortKey: "name",
+    sortDir: 1,
+    dir: null,           // cloud.getHostDirectory() result; null = not fetched yet
+    dirCacheKey: null,   // same "fetch once, reuse across redraws" trick as emplist below
+    expanded: new Set(), // host names whose full inspector list is shown (the rest are capped)
+    editingHost: null,   // host name the Host modal is editing; null = adding a new one
+  },
   overview: {                 // Overview tab: utilization trend chart controls + its cache
     trendRange: 14,           // 7 | 14 | 30 days, ending on state.date — same date as every
                                // other number on the Overview page (see the comment in renderOverview).
@@ -342,8 +354,12 @@ const state = {
 const D = () => cloud.data;
 const OVERVIEW_ID = "__overview__";
 const EMPLIST_ID = "__emplist__";
+const HOSTLIST_ID = "__hostlist__";
 const isOverview = () => D().activeBoardId === OVERVIEW_ID;
 const isEmployeeList = () => D().activeBoardId === EMPLIST_ID;
+const isHostList = () => D().activeBoardId === HOSTLIST_ID;
+/* the three app-wide tabs: not a board, so nothing date- or plan-scoped applies */
+const isNonBoardView = () => isOverview() || isEmployeeList() || isHostList();
 const isPast = () => state.date < todayStr();
 /* ---------- lock (finalized board, view-only for everyone) ---------- */
 const lockInfo = (boardId, date) => D().locks.find(l => l.boardId === boardId && l.date === date) || null;
@@ -501,6 +517,25 @@ async function ensureEmplistUtilLoaded() {
   state.emplist.utilCacheKey = cacheKey;
 }
 
+/* Host List's one fetch: the whole host directory (who worked where, on which
+   boards, how many days). Cached across redraws exactly like the Manpower
+   List's 30D column, so typing in the search box, ticking a filter or clicking
+   a column header costs a redraw, not a round trip. boot()'s cloud.onChange
+   handler clears dirCacheKey on any realtime data change, which is what forces
+   a real refetch after somebody edits a mission or an assignment. The employee
+   roster is part of the key because the directory resolves employee ids
+   through it (see getHostDirectory). */
+let hostDirFetchSeq = 0;   // guards against an out-of-order response — see utilFetchSeq above
+async function ensureHostDirectoryLoaded() {
+  const cacheKey = D().employees.length + "|" + D().boards.length + "|" + D().hosts.length;
+  if (state.hostlist.dirCacheKey === cacheKey && state.hostlist.dir) return;
+  const seq = ++hostDirFetchSeq;
+  const result = await cloud.getHostDirectory();
+  if (seq !== hostDirFetchSeq) return;   // a newer request has since superseded this one
+  state.hostlist.dir = result;
+  state.hostlist.dirCacheKey = cacheKey;
+}
+
 /* Overview's "Host coverage risk" module: for every host with a mission on
    the date on screen, how many distinct employees have ever been deployed
    there (across all history, not just this window). Refetches only when the
@@ -533,6 +568,10 @@ async function refreshData() {
     // one thing here that needs a fetch, and it's cached across redraws so
     // typing in the search box doesn't re-query
     await ensureEmplistUtilLoaded();
+  } else if (isHostList()) {
+    // one bulk read of the host directory; host master records (location / map
+    // link) are already warm in the cache alongside boards and employees
+    await ensureHostDirectoryLoaded();
   } else if (D().activeBoardId) {
     await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
   }
@@ -593,32 +632,42 @@ function render() {
   renderLockButton();
   const ov = isOverview();
   const eml = isEmployeeList();
-  $("#status-zones").classList.toggle("hidden", ov || eml);
-  $("#missions-grid").classList.toggle("hidden", ov || eml);
+  const hl = isHostList();
+  const board = !ov && !eml && !hl;   // an actual board is on screen
+  $("#status-zones").classList.toggle("hidden", !board);
+  $("#missions-grid").classList.toggle("hidden", !board);
   $("#overview-panel").classList.toggle("hidden", !ov);
   $("#emplist-panel").classList.toggle("hidden", !eml);
-  $("#btn-new-mission").classList.toggle("hidden", ov || eml);
-  $("#btn-hide-missions").classList.toggle("hidden", ov || eml);
-  $("#btn-new-employee").classList.toggle("hidden", ov);
-  $("#btn-import-mission").classList.toggle("hidden", ov || eml || !isNonWorkingDate(state.date));
+  $("#hostlist-panel").classList.toggle("hidden", !hl);
+  $("#btn-new-mission").classList.toggle("hidden", !board);
+  $("#btn-hide-missions").classList.toggle("hidden", !board);
+  $("#btn-new-employee").classList.toggle("hidden", ov || hl);
+  $("#btn-import-mission").classList.toggle("hidden", !board || !isNonWorkingDate(state.date));
   // Holiday toggle: ON = this date is non-working. Any editable future date
-  // (weekday or weekend); hidden on read-only past/today, overview and the employee list.
-  const showHoliday = !ov && !eml && !isReadOnly();
+  // (weekday or weekend); hidden on read-only past/today and on the app-wide tabs.
+  const showHoliday = board && !isReadOnly();
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
-  $("#filters").classList.toggle("hidden", ov || eml);
+  $("#filters").classList.toggle("hidden", !board);
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
-  $("#btn-export").classList.toggle("hidden", eml);
-  $("#btn-reset-board").classList.toggle("hidden", ov || eml);
+  $("#btn-export").classList.toggle("hidden", eml || hl);
+  $("#btn-reset-board").classList.toggle("hidden", !board);
+  // Every control in the main toolbar belongs to a board or to the employee
+  // roster, so on the Host List the row would be empty furniture (and on a
+  // phone, a "⋯ More" button opening an empty menu) — the tab carries its own
+  // toolbar inside the panel instead.
+  $("#toolbar").classList.toggle("hidden", hl);
   renderStats();
-  // floating available panel: only on an actual board (hidden in Overview / Manpower List)
-  $("#float-pool").classList.toggle("hidden", ov || eml);
-  document.body.classList.toggle("board-view", !ov && !eml);
-  $("#btn-undo").classList.toggle("hidden", ov || eml);
+  // floating available panel: only on an actual board (hidden on the app-wide tabs)
+  $("#float-pool").classList.toggle("hidden", !board);
+  document.body.classList.toggle("board-view", board);
+  $("#btn-undo").classList.toggle("hidden", !board);
   if (ov) {
     renderOverview();
   } else if (eml) {
     renderEmployeeList();
+  } else if (hl) {
+    renderHostList();
   } else {
     renderZones();
     renderMissions();
@@ -627,8 +676,8 @@ function render() {
     updateResetButton();
   }
   renderBoardEmptyState();
-  const lock = !ov && !eml ? lockInfo(D().activeBoardId, state.date) : null;
-  $("#readonly-badge").classList.toggle("hidden", ov || eml || !isReadOnly());
+  const lock = board ? lockInfo(D().activeBoardId, state.date) : null;
+  $("#readonly-badge").classList.toggle("hidden", !board || !isReadOnly());
   $("#readonly-badge").textContent = lock ? `🔒 Locked by ${lock.lockedBy}` : "🔒 Read-only (past date)";
   updateSelectionUI();
   updateUndoButton();
@@ -674,7 +723,7 @@ function updateResetButton() {
 function renderBoardEmptyState() {
   const box = $("#board-empty");
   if (!box) return;
-  const show = !isOverview() && !isEmployeeList() && !isReadOnly()
+  const show = !isNonBoardView() && !isReadOnly()
     && !isNonWorkingDate(state.date) && planIsEmpty(getPlan());
   box.classList.toggle("hidden", !show);
   box.innerHTML = "";
@@ -711,7 +760,14 @@ function renderTabs() {
   eml.innerHTML = '🧑\u200d🤝\u200d🧑 Manpower<span class="tab-trim"> List</span>';
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
-  // visual break: the two above are app-wide views; the rest are per-board
+  const hl = document.createElement("div");
+  hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
+  // same .tab-trim trick as Manpower List: on a phone the bar keeps "Host" and
+  // drops " list", which is unambiguous next to Overview / Manpower
+  hl.innerHTML = '🏭 Host<span class="tab-trim"> list</span>';
+  hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
+  el.appendChild(hl);
+  // visual break: the three above are app-wide views; the rest are per-board
   if (D().boards.length) {
     const sep = document.createElement("div");
     sep.className = "board-tab-sep";
@@ -742,9 +798,9 @@ const NEW_BOARD_OPT = "__new_board__";
 
 function renderBoardSelect() {
   const sel = $("#board-select");
-  const onBoard = !isOverview() && !isEmployeeList();
+  const onBoard = !isNonBoardView();
   sel.innerHTML = "";
-  // Overview and Manpower List are not boards, so no option matches then — a
+  // Overview / Manpower List / Host List are not boards, so no option matches then — a
   // <select> with no match silently displays its first option, which would read
   // as "you are on this board" while looking at something else. A disabled
   // placeholder is what it shows instead.
@@ -783,10 +839,10 @@ function renderDateButton() {
   btn.title = `${dow} ${full} — click to pick a date`;
 }
 
-/* lock button: only on an actual board (hidden on Overview / Manpower List) */
+/* lock button: only on an actual board (hidden on the app-wide tabs) */
 function renderLockButton() {
   const btn = $("#btn-lock");
-  const hide = isOverview() || isEmployeeList();
+  const hide = isNonBoardView();
   btn.classList.toggle("hidden", hide);
   if (hide) return;
   const lock = lockInfo(D().activeBoardId, state.date);
@@ -901,7 +957,7 @@ function clearSelection() {
 }
 
 function closeFilterPops() {
-  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop")) p.classList.add("hidden");
+  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop")) p.classList.add("hidden");
 }
 
 /* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
@@ -1427,6 +1483,19 @@ function renderStats() {
       const n = D().employees.filter(e => e.areaId === a.id).length;
       if (n) emplistAreaBar.appendChild(statChip(a.name, n));
     }
+    return;
+  }
+  if (isHostList()) {
+    // the directory is still in flight on the very first paint of this tab —
+    // the chips then describe the host records alone and correct themselves on
+    // the redraw that follows the fetch
+    const rows = allHostRows();
+    const withLoc = rows.filter(r => r.location || r.mapUrl).length;
+    const staffed = rows.filter(r => r.inspectors.length).length;
+    bar.appendChild(statChip("Hosts", rows.length));
+    bar.appendChild(statChip("With location", withLoc));
+    bar.appendChild(statChip("No location", rows.length - withLoc));
+    bar.appendChild(statChip("Ever staffed", staffed));
     return;
   }
   const s = boardStats(D().activeBoardId);
@@ -2972,6 +3041,325 @@ function renderEmployeeList() {
   renderEmployeeRows();
 }
 
+/* ---------- Host List tab (every host, every board, no date scope) ----------
+   The Manpower List's counterpart for sites instead of people. A "host" has
+   never been a record in this app — it's free text on a mission — so a row
+   here is assembled rather than read: mission rows say which boards a host
+   appears on, deployment_history says who has worked there and for how many
+   days (see cloud.getHostDirectory), and the `hosts` table adds the one thing
+   only a person can supply, its location. That ordering matters: a host with
+   no location record still gets a row, because the board already knows the
+   name. */
+const HOSTLIST_FILTER_LABELS = { boardId: "Board", empId: "Inspector", location: "Location" };
+/* how many inspector chips a row shows before collapsing behind "+N more" —
+   enough to answer "who knows this site" without one busy host stretching the
+   table to a screen per row */
+const HOSTLIST_INSPECTOR_CAP = 8;
+
+/* Only ever build an href from a link we've confirmed is http(s): the field is
+   free text, and `javascript:` in an href is a script that runs on click. */
+function safeHttpUrl(u) {
+  const s = String(u || "").trim();
+  return /^https?:\/\//i.test(s) ? s : "";
+}
+
+/* One row per host, merging the fetched directory with the host master records
+   (which carry the location) — either source alone is enough to list a host. */
+function allHostRows() {
+  const dir = state.hostlist.dir || {};
+  const recByName = new Map(D().hosts.map(h => [h.name, h]));
+  const empName = new Map(D().employees.map(e => [e.id, e.name]));
+  const boardName = new Map(D().boards.map(b => [b.id, b.name]));
+  const names = new Set([...Object.keys(dir), ...recByName.keys()]);
+  const rows = [];
+  for (const name of names) {
+    const d = dir[name] || { boards: {}, employees: {}, missionCount: 0, firstDate: null, lastDate: null };
+    const rec = recByName.get(name) || null;
+    // most days first: "who knows this site best" is the question the column answers
+    const inspectors = Object.entries(d.employees)
+      .map(([id, days]) => ({ id, name: empName.get(id) || "", days }))
+      .filter(i => i.name)
+      .sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
+    // a board deleted since the mission was planned can't be named — skip it
+    // rather than render a blank pill
+    const boards = Object.entries(d.boards)
+      .map(([id, missions]) => ({ id, name: boardName.get(id) || "", missions }))
+      .filter(b => b.name)
+      .sort((a, b) => b.missions - a.missions || a.name.localeCompare(b.name));
+    rows.push({
+      name,
+      location: rec ? rec.location : "",
+      mapUrl: rec ? rec.mapUrl : "",
+      note: rec ? rec.note : "",
+      hasRecord: !!rec,
+      inspectors,
+      boards,
+      missionCount: d.missionCount,
+      deployedDays: inspectors.reduce((n, i) => n + i.days, 0),
+      firstDate: d.firstDate,
+      lastDate: d.lastDate,
+    });
+  }
+  return rows;
+}
+
+function hostlistFilterOptions(key) {
+  if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
+  if (key === "location") {
+    return [{ value: "has", label: "Has location" }, { value: "missing", label: "No location yet" }];
+  }
+  if (key === "empId") {
+    // only people who actually have a deployment somewhere — a filter listing
+    // the whole roster would mostly be entries that match nothing
+    const dir = state.hostlist.dir;
+    const seen = new Set();
+    if (dir) for (const rec of Object.values(dir)) for (const id of Object.keys(rec.employees)) seen.add(id);
+    return D().employees
+      .filter(e => (dir ? seen.has(e.id) : true))
+      .map(e => ({ value: e.id, label: e.name }));
+  }
+  return [];
+}
+function hostlistMsLabel(key) {
+  const sel = state.hostlist.filters[key];
+  return `${HOSTLIST_FILTER_LABELS[key]}: ${sel.length ? sel.length + " selected" : "All"}`;
+}
+
+/* same contract as renderEmplistFilterOptions: rebuild on tab entry / data
+   change, never on a checkbox tick (that would close the popup mid-use) */
+function renderHostlistFilterOptions() {
+  for (const ms of $$("#hostlist-filters .ms")) {
+    const key = ms.dataset.filter;
+    ms.querySelector(".ms-btn").textContent = hostlistMsLabel(key);
+    const pop = ms.querySelector(".ms-pop");
+    pop.innerHTML = "";
+    const clear = document.createElement("div");
+    clear.className = "ms-clear";
+    clear.textContent = "Clear";
+    clear.onclick = () => { state.hostlist.filters[key] = []; renderHostlistFilterOptions(); renderHostRows(); };
+    pop.appendChild(clear);
+    for (const o of hostlistFilterOptions(key)) {
+      const row = document.createElement("label");
+      row.className = "ms-opt";
+      const checked = state.hostlist.filters[key].includes(o.value) ? "checked" : "";
+      row.innerHTML = `<input type="checkbox" value="${escapeHtml(o.value)}" ${checked}><span>${escapeHtml(o.label)}</span>`;
+      row.querySelector("input").onchange = (e) => {
+        const set = new Set(state.hostlist.filters[key]);
+        e.target.checked ? set.add(o.value) : set.delete(o.value);
+        state.hostlist.filters[key] = [...set];
+        ms.querySelector(".ms-btn").textContent = hostlistMsLabel(key);   // keep dropdown open
+        renderHostRows();
+      };
+      pop.appendChild(row);
+    }
+  }
+}
+
+function hostlistFilteredSorted() {
+  const f = state.hostlist.filters;
+  const q = state.hostlist.search.trim().toLowerCase();
+  const rows = allHostRows().filter(r => {
+    if (f.boardId.length && !r.boards.some(b => f.boardId.includes(b.id))) return false;
+    if (f.empId.length && !r.inspectors.some(i => f.empId.includes(i.id))) return false;
+    if (f.location.length && !f.location.includes((r.location || r.mapUrl) ? "has" : "missing")) return false;
+    if (q) {
+      // search covers everything the row shows, so typing an inspector's name
+      // answers "where has this person been" from the host side too
+      const hay = [r.name, r.location, r.note, ...r.inspectors.map(i => i.name), ...r.boards.map(b => b.name)]
+        .join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const { sortKey, sortDir } = state.hostlist;
+  // the two list columns sort by how many entries they hold (the useful
+  // question: best-known site, most-shared host), not alphabetically
+  if (sortKey === "inspectors" || sortKey === "boards") {
+    const n = (r) => (sortKey === "inspectors" ? r.inspectors.length : r.boards.length);
+    rows.sort((a, b) => (n(a) - n(b)) * sortDir || a.name.localeCompare(b.name));
+    return rows;
+  }
+  // hosts with no location sort together at one end rather than scattered
+  const val = (r) => (sortKey === "location" ? (r.location || safeHttpUrl(r.mapUrl) || "") : r.name);
+  rows.sort((a, b) => val(a).localeCompare(val(b)) * sortDir || a.name.localeCompare(b.name));
+  return rows;
+}
+
+function hostLocationCell(r) {
+  const href = safeHttpUrl(r.mapUrl);
+  const text = r.location || (href ? "Open in Google Maps" : "");
+  if (!text) return `<button type="button" class="hl-add-loc">+ Add location</button>`;
+  const body = href
+    ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
+         title="Open in Google Maps" onclick="event.stopPropagation()">📍 ${escapeHtml(text)}</a>`
+    : `<span class="hl-loc">${escapeHtml(text)}</span>`;
+  return body + (r.note ? ` <span class="hl-note" title="${escapeHtml(r.note)}">📝</span>` : "");
+}
+
+function hostInspectorCell(r) {
+  if (!state.hostlist.dir) return `<span class="hl-empty">…</span>`;
+  if (!r.inspectors.length) return `<span class="hl-empty">No one deployed yet</span>`;
+  const expanded = state.hostlist.expanded.has(r.name);
+  const shown = expanded ? r.inspectors : r.inspectors.slice(0, HOSTLIST_INSPECTOR_CAP);
+  const chips = shown.map(i =>
+    `<span class="hl-insp" title="${escapeHtml(i.name)} — ${i.days} day${i.days === 1 ? "" : "s"} at ${escapeHtml(r.name)}">`
+    + `${escapeHtml(i.name)}<b>${i.days}d</b></span>`).join("");
+  const rest = r.inspectors.length - shown.length;
+  const more = rest > 0
+    ? `<button type="button" class="hl-more">+${rest} more</button>`
+    : (expanded && r.inspectors.length > HOSTLIST_INSPECTOR_CAP ? `<button type="button" class="hl-more">Show less</button>` : "");
+  return `<span class="hl-chips">`
+    + `<span class="hl-count" title="${r.inspectors.length} inspector${r.inspectors.length === 1 ? "" : "s"} ever deployed here">`
+    + `${r.inspectors.length}</span>${chips}${more}</span>`;
+}
+
+function hostBoardCell(r) {
+  if (!state.hostlist.dir) return `<span class="hl-empty">…</span>`;
+  if (!r.boards.length) return `<span class="hl-empty">Not on a board yet</span>`;
+  return `<span class="hl-chips">` + r.boards.map(b =>
+    `<span class="hl-board" title="${escapeHtml(b.name)} — ${b.missions} mission${b.missions === 1 ? "" : "s"} for this host">`
+    + `${escapeHtml(b.name)}</span>`).join("") + `</span>`;
+}
+
+/* redraws just the table body + count — cheap enough for every keystroke,
+   filter tick, sort click or "+N more" toggle */
+function renderHostRows() {
+  const rows = hostlistFilteredSorted();
+  const body = $("#hostlist-body");
+  body.innerHTML = "";
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.dataset.host = r.name;
+    // data-label feeds the phone breakpoint's ::before, same responsive-table
+    // pattern the Manpower List uses (see renderEmployeeRows)
+    tr.innerHTML = `
+      <td data-label="Host name" class="hl-name">
+        <span class="hl-host">${escapeHtml(r.name)}</span>
+        <button type="button" class="hl-edit" title="Edit location, map link and note">✎</button>
+      </td>
+      <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
+      <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
+      <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>`;
+    const lastLine = r.lastDate ? ` · last seen ${fmtDate(r.lastDate)}` : "";
+    tr.querySelector(".hl-host").title =
+      `${r.name} — ${r.missionCount} mission${r.missionCount === 1 ? "" : "s"}, `
+      + `${r.deployedDays} deployment day${r.deployedDays === 1 ? "" : "s"}${lastLine}`;
+    tr.querySelector(".hl-edit").onclick = () => openHostModal(r.name);
+    const addLoc = tr.querySelector(".hl-add-loc");
+    if (addLoc) addLoc.onclick = () => openHostModal(r.name);
+    const more = tr.querySelector(".hl-more");
+    if (more) more.onclick = () => {
+      state.hostlist.expanded.has(r.name)
+        ? state.hostlist.expanded.delete(r.name)
+        : state.hostlist.expanded.add(r.name);
+      renderHostRows();
+    };
+    tr.addEventListener("dblclick", () => openHostModal(r.name));
+    body.appendChild(tr);
+  }
+  const total = allHostRows().length;
+  const noLoc = rows.filter(r => !r.location && !r.mapUrl).length;
+  $("#hostlist-count").textContent = `${rows.length} of ${total}`
+    + (noLoc ? ` · ${noLoc} without a location` : "");
+  for (const th of $$("#hostlist-table th[data-sort]")) {
+    th.classList.toggle("sorted-asc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === 1);
+    th.classList.toggle("sorted-desc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === -1);
+  }
+}
+
+/* full (re)build on tab entry: filter dropdown options + search box + rows */
+function renderHostList() {
+  $("#hostlist-search").value = state.hostlist.search;
+  renderHostlistFilterOptions();
+  renderHostRows();
+}
+
+function exportHostlistCsv() {
+  const rows = hostlistFilteredSorted();   // same rows the table is showing right now
+  // "seen" covers both sources the dates come from — a mission planned for the
+  // host and a deployment recorded against it
+  const header = ["Host name", "Location", "Google Maps link", "Inspectors", "Inspector count",
+    "Deployment days", "Appear on board", "Missions", "First seen", "Last seen"];
+  const out = rows.map(r => [
+    r.name, r.location, r.mapUrl,
+    r.inspectors.map(i => `${i.name} (${i.days}d)`).join("; "),
+    r.inspectors.length, r.deployedDays,
+    r.boards.map(b => b.name).join("; "),
+    r.missionCount, r.firstDate || "", r.lastDate || "",
+  ]);
+  const csv = [header, ...out].map(r => r.map(csvField).join(",")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `host_list_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* Host modal — the location/map-link record for one host. For a host the board
+   already knows, the name is fixed: it's the key tying this record to the
+   mission and deployment rows carrying the same text (see cloud.saveHost), so
+   editing it here would quietly orphan the record from its own history. */
+function openHostModal(name) {
+  const rec = name ? D().hosts.find(h => h.name === name) : null;
+  state.hostlist.editingHost = name || null;
+  const form = $("#form-host");
+  form.reset();
+  $("#host-modal-title").textContent = name ? `Host — ${name}` : "New Host";
+  form.name.value = name || "";
+  form.name.readOnly = !!name;
+  $("#host-name-note").classList.toggle("hidden", !name);
+  form.location.value = rec ? rec.location : "";
+  form.mapUrl.value = rec ? rec.mapUrl : "";
+  form.note.value = rec ? rec.note : "";
+  $("#btn-delete-host").classList.toggle("hidden", !rec);
+  openModal("#modal-host");
+}
+
+function saveHostForm(ev) {
+  ev.preventDefault();
+  const form = $("#form-host");
+  const name = form.name.value.trim();
+  if (!name) { toast("A host needs a name.", "error"); return; }
+  let location = form.location.value.trim();
+  let mapUrl = form.mapUrl.value.trim();
+  // Pasting the Maps link straight into Location is what people actually do —
+  // file it as the link rather than storing a URL where an address goes.
+  if (!mapUrl && /^https?:\/\//i.test(location)) { mapUrl = location; location = ""; }
+  if (mapUrl && !safeHttpUrl(mapUrl)) {
+    toast("The Google Maps link must start with http:// or https://", "error");
+    return;
+  }
+  const note = form.note.value.trim();
+  if (!state.hostlist.editingHost
+      && allHostRows().some(r => r.name.toLowerCase() === name.toLowerCase())) {
+    toast(`${name} is already in the host list — edit that row instead.`, "error");
+    return;
+  }
+  safely(async () => {
+    await cloud.saveHost({ name, location, mapUrl, note });
+    closeModal();
+    await refreshAndRender();
+    toast(`Saved ${name}.`, "info");
+  });
+}
+
+/* "Clear record" drops the location/link only. The host itself lives on its
+   mission and deployment rows as plain text, so it keeps its place in this
+   list — it just goes back to having no location. */
+function deleteHostRecord() {
+  const name = state.hostlist.editingHost;
+  const rec = name ? D().hosts.find(h => h.name === name) : null;
+  if (!rec) return;
+  showConfirm("Clear host record?",
+    `Remove the saved location and map link for ${name}? ${name} stays in the Host List with its missions and inspector history — only the location record is cleared.`,
+    () => safely(async () => {
+      await cloud.deleteHost(rec.id);
+      closeModal();
+      await refreshAndRender();
+    }));
+}
+
 /* where is this employee assigned right now on the current plan?
    returns the payload shape setAssignment expects: {missionId} | {zone} | null */
 function currentAssignmentOfIn(plan, empId) {
@@ -3184,7 +3572,7 @@ function openEmployeeModal(empId) {
     form.phone.value = e.phone || "";
     form.areaId.value = e.areaId;
     form.boardId.value = e.boardId;
-  } else if (!isOverview() && !isEmployeeList()) {
+  } else if (!isNonBoardView()) {
     form.boardId.value = D().activeBoardId;
   }
   // Host Record opens first for an existing employee — it's the more common
@@ -3931,7 +4319,7 @@ function wireApp() {
   };
 
   // multi-select filter dropdowns: toggle open on button click
-  for (const ms of $$("#filters .ms, #emplist-filters .ms")) {
+  for (const ms of $$("#filters .ms, #emplist-filters .ms, #hostlist-filters .ms")) {
     ms.querySelector(".ms-btn").onclick = (ev) => {
       ev.stopPropagation();
       const pop = ms.querySelector(".ms-pop");
@@ -4020,6 +4408,21 @@ function wireApp() {
   };
   $("#emplist-bulk-clear").onclick = clearSelection;
 
+  // ---------- Host List tab ----------
+  $("#btn-hostlist-csv").onclick = exportHostlistCsv;
+  $("#btn-add-host").onclick = () => openHostModal(null);
+  $("#hostlist-search").addEventListener("input", (e) => { state.hostlist.search = e.target.value; renderHostRows(); });
+  for (const th of $$("#hostlist-table th[data-sort]")) {
+    th.onclick = () => {
+      const key = th.dataset.sort;
+      if (state.hostlist.sortKey === key) state.hostlist.sortDir *= -1;
+      else { state.hostlist.sortKey = key; state.hostlist.sortDir = 1; }
+      renderHostRows();
+    };
+  }
+  $("#form-host").addEventListener("submit", saveHostForm);
+  $("#btn-delete-host").onclick = deleteHostRecord;
+
   // Long-press bookkeeping (see attachLongPress). Capture phase on both: the
   // swallowed click must die before it reaches the card's own handler AND
   // before the outside-click handler right below closes the menu we just
@@ -4040,7 +4443,8 @@ function wireApp() {
     // close it themselves (addItem), submenu rows deliberately don't.
     if (!ev.target.closest("#context-menu")) hideContextMenu();
     if (!ev.target.closest("#datepicker-pop") && !ev.target.closest("#btn-date")) hideDatePicker();
-    if (!ev.target.closest("#filters .ms") && !ev.target.closest("#emplist-filters .ms")) closeFilterPops();
+    if (!ev.target.closest("#filters .ms") && !ev.target.closest("#emplist-filters .ms")
+        && !ev.target.closest("#hostlist-filters .ms")) closeFilterPops();
     if (!ev.target.closest("#toolbar-more")) hideToolbarMore();
   });
   document.addEventListener("keydown", (ev) => {
@@ -4101,6 +4505,9 @@ async function boot() {
   cloud.onChange((payload) => {
     state.overview.utilCacheKey = null;
     state.overview.historyCacheKey = null;
+    // a mission or an assignment anywhere can change who has worked where —
+    // refreshData only re-reads the directory when the Host List is on screen
+    state.hostlist.dirCacheKey = null;
     // {boardId, planDate, updatedBy} from a missions/assignments write (see
     // cloud.js's _attributionFromPayload) — undefined for every other kind of
     // change, and for a write from before the updated-by migration was run.

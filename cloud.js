@@ -63,7 +63,7 @@ async function fetchAllPages(buildQuery) {
 }
 
 const cloud = {
-  data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], activeBoardId: null },
+  data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], hosts: [], activeBoardId: null },
   _listeners: [],
   _currentDate: () => todayStrISO(),
 
@@ -96,7 +96,7 @@ const cloud = {
   /* ---------- initial load ---------- */
   async init(getCurrentDate) {
     this._currentDate = getCurrentDate;
-    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks()]);
+    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts()]);
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
   },
@@ -149,6 +149,23 @@ const cloud = {
     } catch (e) {
       if (!this._planDaysMissing(e)) console.warn("plan_days locking unavailable (run the locking migration):", e.message || e);
       this.data.locks = [];
+    }
+  },
+  /* Host master records (location + map link) for the Host List tab. Tolerates
+     the table not existing yet (before migration-2026-09-02-hosts is run), the
+     same way _loadOverrides does: the tab still lists every host the board
+     knows about from missions/deployment history, those hosts just can't carry
+     a location until the migration + redeploy. */
+  async _loadHosts() {
+    try {
+      const { data, error } = await sb.from("hosts").select("id, name, location, map_url, note").order("name");
+      if (error) throw error;
+      this.data.hosts = (data || []).map((h) => ({
+        id: h.id, name: h.name, location: h.location || "", mapUrl: h.map_url || "", note: h.note || "",
+      }));
+    } catch (e) {
+      if (!this._tableMissing(e)) console.warn("hosts table unavailable (run migration-2026-09-02-hosts.sql):", e.message || e);
+      this.data.hosts = [];
     }
   },
 
@@ -971,6 +988,100 @@ const cloud = {
     return out;
   },
 
+  /* ---------- host master records (Host List tab) ---------- */
+  /* Upsert by NAME, which is this table's key — see migration-2026-09-02-hosts.
+     `name` is what ties the row to the missions and deployment_history rows
+     that carry the same text, so it is never rewritten by an edit here: the
+     modal keeps it read-only for a host that already exists on the board.
+     Renaming one would silently orphan it from its own history. */
+  async saveHost({ name, location, mapUrl, note }) {
+    const clean = String(name || "").trim();
+    if (!clean) throw new Error("A host needs a name.");
+    const { error } = await sb.from("hosts").upsert({
+      name: clean,
+      location: String(location || "").trim() || null,
+      map_url: String(mapUrl || "").trim() || null,
+      note: String(note || "").trim() || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "name" });
+    if (error) {
+      if (this._tableMissing(error)) {
+        throw new Error("Saving a host's location needs a one-time database update (migration-2026-09-02-hosts.sql) before it can be used.");
+      }
+      throw error;
+    }
+    await this._loadHosts();
+  },
+  /* Deletes only the master record (location / map link), never the host's
+     mission or deployment history — the name lives on those rows as plain
+     text, so the Host List keeps listing it, just without a location. */
+  async deleteHost(id) {
+    const { error } = await sb.from("hosts").delete().eq("id", id);
+    if (error) throw error;
+    await this._loadHosts();
+  },
+
+  /* ---------- host directory (Host List tab) ---------- */
+  /* One pass over the two tables that know about hosts, aggregated by host name:
+       - deployment_history: who worked there and on how many days. One row per
+         (employee, date) by construction, so counting rows IS counting days —
+         and it survives a mission being hidden or deleted, which is the whole
+         reason the Host Record tab reads it instead of assignments/missions.
+       - missions: which boards the host appears on, how many missions, and the
+         hosts that exist on the board but have never been staffed (those have
+         no deployment_history rows at all, and would otherwise be missing from
+         a list whose job is to be the full roster of sites).
+     Returns { [host]: { boards: {[boardId]: missions}, employees: {[empId]: days},
+     missionCount, firstDate, lastDate } } — raw counts, not display strings:
+     app.js owns resolving ids to names and formatting.
+     Both reads degrade to empty (not an error) on a database that hasn't run
+     the deployment-history migration, same as getEmployeeHostHistory. */
+  async getHostDirectory() {
+    const [histRows, missionRows] = await Promise.all([
+      (async () => {
+        try {
+          return await fetchAllPages(() => sb.from("deployment_history")
+            .select("host, employee_id, plan_date, board_id"));
+        } catch (error) {
+          if (this._tableMissing(error)) return [];
+          throw error;
+        }
+      })(),
+      fetchAllPages(() => sb.from("missions").select("host, board_id, plan_date, hidden")),
+    ]);
+
+    const out = {};
+    const rec = (host) => (out[host] = out[host] ||
+      { boards: {}, employees: {}, missionCount: 0, firstDate: null, lastDate: null });
+    const stamp = (r, date) => {
+      if (!date) return;
+      if (!r.firstDate || date < r.firstDate) r.firstDate = date;
+      if (!r.lastDate || date > r.lastDate) r.lastDate = date;
+    };
+    // A hidden mission still proves the host is on that board — hiding takes a
+    // mission off one day's board, it doesn't unmake the relationship.
+    for (const m of missionRows || []) {
+      if (!m.host) continue;
+      const r = rec(m.host);
+      r.missionCount++;
+      if (m.board_id) r.boards[m.board_id] = (r.boards[m.board_id] || 0) + 1;
+      stamp(r, m.plan_date);
+    }
+    const empExists = new Set(this.data.employees.map((e) => e.id));
+    for (const h of histRows || []) {
+      if (!h.host) continue;
+      const r = rec(h.host);
+      // an employee record that no longer exists can't be named, so it would
+      // render as a blank chip — count the day only where there's a person
+      if (empExists.has(h.employee_id)) {
+        r.employees[h.employee_id] = (r.employees[h.employee_id] || 0) + 1;
+      }
+      if (h.board_id && !r.boards[h.board_id]) r.boards[h.board_id] = 0;   // board known, mission row gone
+      stamp(r, h.plan_date);
+    }
+    return out;
+  },
+
   /* Resolve {boardId, planDate, updatedBy} from a missions/assignments
      realtime payload — app.js compares updatedBy to the viewing user's own
      email, and boardId+planDate to what's currently on screen, to decide
@@ -1001,6 +1112,7 @@ const cloud = {
       .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, async () => { await this._loadBoards(); this.notify(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "engineers" }, async () => { await this._loadEngineers(); this.notify(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "service_areas" }, async () => { await this._loadAreas(); this.notify(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "hosts" }, async () => { await this._loadHosts(); this.notify(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "missions" }, refreshPlanAndNotify)
       .on("postgres_changes", { event: "*", schema: "public", table: "assignments" }, refreshPlanAndNotify)
       .on("postgres_changes", { event: "*", schema: "public", table: "day_overrides" }, async () => { await this._loadOverrides(); this.data.plans = {}; this.notify(); })

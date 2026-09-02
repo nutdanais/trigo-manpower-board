@@ -1125,14 +1125,15 @@ body.board-view #app-root { margin-right: 264px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
 
-  /* One line, no wrapping: the bar holds two fixed tabs and a board picker,
-     and the picker is the flexible item that takes what is left. */
+  /* One line, no wrapping: the bar holds the three fixed tabs and a board
+     picker, and the picker is the flexible item that takes what is left.
+     (Below 380px it wraps instead — see that breakpoint.) */
   #board-bar { flex-wrap: nowrap; gap: 4px; padding: 4px 8px; align-items: center; }
   /* The per-board tabs and "+ Board" become one native <select> (populated by
      renderBoardSelect in app.js, which carries "+ New board…" as its last
      option). Any number of boards then costs one control instead of a wrapping
-     strip, so the whole bar holds a single line. Overview / Manpower List stay
-     as tabs — they are two fixed destinations, not a list that grows. */
+     strip, so the whole bar holds a single line. Overview / Manpower List /
+     Host List stay as tabs — fixed destinations, not a list that grows. */
   #board-tabs .tab-board,
   .board-tab-sep,
   #btn-add-board { display: none; }
@@ -1236,6 +1237,48 @@ body.board-view #app-root { margin-right: 264px; }
     border: none;
   }
 
+  /* Host List: same table -> cards treatment, driven by the same data-label
+     attributes (see renderHostRows). The two list columns keep their chips
+     left-aligned and wrapping — a right-aligned wrap of eight inspector chips
+     reads as a ragged column, not a list. */
+  #hostlist-table thead { display: none; }
+  #hostlist-table, #hostlist-table tbody, #hostlist-table tr, #hostlist-table td { display: block; width: auto; }
+  #hostlist-table tbody tr {
+    margin-bottom: 10px;
+    padding: 12px 14px 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  #hostlist-table td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #hostlist-table td:last-child { border-bottom: none; }
+  #hostlist-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  /* the host name is the card's title, with its edit button on the same line */
+  #hostlist-table td.hl-name {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 15px;
+    border-bottom: none;
+    padding-bottom: 4px;
+    white-space: normal;
+  }
+  #hostlist-table td.hl-name::before { content: none; }
+
   /* toolbar filters get their own full-width row so they don't crowd the buttons */
   #filters { width: 100%; flex-wrap: wrap; }
 
@@ -1319,11 +1362,13 @@ body.board-view #app-root { margin-right: 264px; }
   #topbar .btn-date { font-size: 12px; padding: 6px 6px; }
   #topbar .btn-date-arrow { padding: 6px 7px; }
   .topbar-right > .btn:not(.btn-date):not(.btn-date-arrow) { padding: 6px 7px; }
-  /* the board picker is the flexible item here, so the two fixed tabs give up
-     what they can to leave it a usable width */
-  #board-bar { padding: 4px 6px; }
+  /* Three fixed tabs (Overview / Manpower / Host) plus the board picker no
+     longer fit one line at this width, so the bar wraps: the tabs keep their
+     own row and the picker takes a full-width one below, rather than every
+     control being squeezed to an ellipsis. */
+  #board-bar { padding: 4px 6px; flex-wrap: wrap; }
   .board-tab { padding: 8px 7px; font-size: 12.5px; }
-  #board-select { font-size: 12.5px; padding: 6px 6px; }
+  #board-select { font-size: 12.5px; padding: 6px 6px; flex: 1 0 100%; }
 }
 
 /* ===== Modals ===== */
@@ -2064,6 +2109,141 @@ body.exporting #app-root { margin-right: 0; }
   border: 1px solid rgba(0,0,0,.15);
   color: var(--card-ink);
 }
+
+/* ===== Host List tab =====
+   Same furniture as the Manpower List above (toolbar + one sortable table in a
+   .table-wrap), with one structural difference: two of its four columns hold
+   LISTS — every inspector who has worked the host, every board it shows up on
+   — so cells wrap and align to the top instead of staying on one line. */
+#hostlist-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+#hostlist-search {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  min-width: 220px;
+}
+#hostlist-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+#hostlist-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+#hostlist-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+#hostlist-table th, #hostlist-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+#hostlist-table th {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  background: var(--bg-soft);
+  position: sticky;
+  top: 0;
+}
+#hostlist-table th:hover { color: var(--primary-text); }
+#hostlist-table th.sorted-asc::after { content: " \25B2"; }
+#hostlist-table th.sorted-desc::after { content: " \25BC"; }
+#hostlist-table tbody tr:hover { background: var(--hover-tint); }
+#hostlist-table td.hl-name { white-space: nowrap; }
+.hl-host { font-weight: 700; }
+/* the edit affordance rides the row's hover on a mouse; on touch there is no
+   hover to reveal it, so it stays visible there */
+.hl-edit {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0 3px;
+  margin-left: 6px;
+  opacity: 0;
+}
+#hostlist-table tr:hover .hl-edit, .hl-edit:focus-visible { opacity: 1; }
+.hl-edit:hover { color: var(--primary-text); }
+body.touch-mode .hl-edit { opacity: 1; }
+
+.hl-map { color: var(--primary-text); text-decoration: none; border-bottom: 1px dotted currentColor; }
+.hl-map:hover { border-bottom-style: solid; }
+.hl-note { cursor: help; }
+/* an empty Location is the one thing on this tab a person is meant to fix, so
+   it's an invitation rather than a dash */
+.hl-add-loc {
+  border: 1px dashed var(--border);
+  background: none;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.hl-add-loc:hover { color: var(--primary-text); border-color: var(--primary-text); }
+
+.hl-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: center; }
+.hl-count {
+  display: inline-block;
+  min-width: 22px;
+  text-align: center;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hl-insp {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.hl-insp b { font-size: 10.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Square-ish, tinted and navy-inked so a board reads differently from a
+   (pill-shaped, neutral) inspector chip at a glance. Both tokens flip with the
+   theme — pairing the tint with the fixed --card-ink used elsewhere would put
+   near-black text on a dark navy pill in dark mode. */
+.hl-board {
+  display: inline-block;
+  background: var(--pool-tint);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+.hl-more {
+  border: none;
+  background: none;
+  color: var(--primary-text);
+  font: inherit;
+  font-size: 11.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.hl-empty { color: var(--muted); font-size: 12.5px; }
 
 /* ==========================================================================
    Glassmorphism — frosted translucent surfaces over the body gradient.
