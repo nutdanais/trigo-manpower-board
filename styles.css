@@ -2216,6 +2216,76 @@ body.touch-mode .hl-edit { opacity: 1; }
 .hl-add-loc:hover { color: var(--primary-text); border-color: var(--primary-text); }
 
 #hostlist-table td.hl-area-cell { white-space: nowrap; }
+/* duplicate-finder banner: amber like every other "worth a look, nothing is
+   broken" surface in the app, never red — it's a suggestion to review */
+#hostlist-dupbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid #e5b980;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: rgba(237,161,0,.10);
+  font-size: 13px;
+}
+#hostlist-dupbar .dupbar-icon { color: #b45309; font-weight: 700; }
+#hostlist-dup-text { flex: 1; min-width: 200px; }
+:root[data-theme="dark"] #hostlist-dupbar { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
+:root[data-theme="dark"] #hostlist-dupbar .dupbar-icon { color: #f0b45c; }
+
+/* small tags beside a host name: archived state, and the duplicate hint */
+.hl-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.hl-tag-arch { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+.hl-tag-dup { background: rgba(237,161,0,.18); color: #b45309; border: 1px solid #e5b980; }
+:root[data-theme="dark"] .hl-tag-dup { color: #f0b45c; border-color: #7a5a1f; }
+/* an archived host is still readable, just visibly off the active roster —
+   same treatment (and same reasoning) as an inactive employee's row */
+#hostlist-table tbody tr.row-archived td { opacity: .55; }
+#hostlist-table tbody tr.row-archived td.hl-name { opacity: 1; }
+
+/* merge panel at the foot of the Host modal */
+#host-merge {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+#host-merge h4 { font-size: 13px; margin-bottom: 6px; color: var(--primary-text); }
+.host-merge-row { display: flex; gap: 8px; align-items: center; }
+/* .modal select (further up) makes every select a full-width block — inside
+   this row it has to share the line with the Merge button instead */
+.modal .host-merge-row select {
+  display: block;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+  font-size: 12.5px;
+}
+.modal .host-merge-row .btn { flex: none; }
+/* The switch sits among the modal's form labels, which are display:block with
+   a visible input — this restores the toggle component's own layout (and
+   hides the raw checkbox) inside that context. */
+.modal .toggle-archived {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.modal .toggle-archived input { display: none; }
+.modal .toggle-archived .toggle-text { font-weight: 600; font-size: 12px; }
 /* live verdict under the New Mission host box (see updateMissionHostNote) */
 .host-note-ok { color: var(--primary-text); font-weight: 600; }
 .host-note-new { color: #b45309; font-weight: 600; }

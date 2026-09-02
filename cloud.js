@@ -165,7 +165,7 @@ const cloud = {
       if (error) throw error;
       this.data.hosts = (data || []).map((h) => ({
         id: h.id, name: h.name, location: h.location || "", mapUrl: h.map_url || "",
-        areaId: h.area_id || "", note: h.note || "",
+        areaId: h.area_id || "", archived: !!h.archived, note: h.note || "",
       }));
     } catch (e) {
       if (!this._tableMissing(e)) console.warn("hosts table unavailable (run migration-2026-09-02-hosts.sql):", e.message || e);
@@ -998,31 +998,38 @@ const cloud = {
      that carry the same text, so it is never rewritten by an edit here: the
      modal keeps it read-only for a host that already exists on the board.
      Renaming one would silently orphan it from its own history. */
-  /* Returns { areaSkipped } — true when the row saved but the service area
-     couldn't, because this database has the hosts table (migration-2026-09-02)
-     without the area_id column (migration-2026-09-03). Shedding the one column
-     Postgres reports missing and retrying is the same guarded pattern
-     saveMission uses: an un-migrated column must never block the rest of the
-     save, but silently dropping something the user typed would be worse than
-     saying so — hence the flag, which app.js turns into a warning toast. */
-  async saveHost({ name, location, mapUrl, areaId, note }) {
+  /* Returns { skipped: [column, ...] } — columns whose value was dropped
+     because this database hasn't run the migration that adds them (area_id →
+     2026-09-03, archived → 2026-09-04). Shedding the column Postgres reports
+     missing and retrying is the same guarded pattern saveMission uses: an
+     un-migrated column must never block the rest of the save. Only a column
+     the user actually set is reported — dropping a null nobody asked for is
+     not worth a warning — and app.js turns what is left into a warning toast,
+     because silently losing something they typed would be worse. */
+  async saveHost({ name, location, mapUrl, areaId, archived, note }) {
     const clean = String(name || "").trim();
     if (!clean) throw new Error("A host needs a name.");
-    const row = {
+    let row = {
       name: clean,
       location: String(location || "").trim() || null,
       map_url: String(mapUrl || "").trim() || null,
       area_id: areaId || null,
+      archived: !!archived,
       note: String(note || "").trim() || null,
       updated_at: new Date().toISOString(),
     };
-    const upsert = (r) => sb.from("hosts").upsert(r, { onConflict: "name" });
-    let areaSkipped = false;
-    let { error } = await upsert(row);
-    if (error && this._missingColumnFromError(error) === "area_id") {
-      const { area_id: wantedArea, ...rest } = row;
-      ({ error } = await upsert(rest));
-      areaSkipped = !error && !!wantedArea;
+    // a dropped column only matters to the user if it carried a real value
+    const meaningful = { area_id: !!areaId, archived: !!archived };
+    const skipped = [];
+    let error;
+    for (let i = 0; i < 3; i++) {
+      ({ error } = await sb.from("hosts").upsert(row, { onConflict: "name" }));
+      if (!error) break;
+      const missing = this._missingColumnFromError(error);
+      if (!missing || !(missing in row)) break;
+      if (meaningful[missing]) skipped.push(missing);
+      const { [missing]: _drop, ...rest } = row;
+      row = rest;
     }
     if (error) {
       if (this._tableMissing(error)) {
@@ -1031,7 +1038,76 @@ const cloud = {
       throw error;
     }
     await this._loadHosts();
-    return { areaSkipped };
+    return { skipped };
+  },
+
+  /* Fold a duplicate or misspelled host into the real one. The host name lives
+     as plain snapshot text on missions and deployment_history (that's what
+     keeps history intact when a mission is hidden or deleted), so a merge is a
+     rewrite of that text plus the removal of the losing master record — after
+     which the wrong spelling is gone from the Host List, from every past and
+     future mission card, and the two hosts' inspector day counts are one
+     host's again.
+
+     Safe as a plain UPDATE: `host` is part of no unique constraint on either
+     table (deployment_history is keyed on employee+date, missions on
+     board+date+number+shift), so rewriting it can't collide with an existing
+     row. Not wrapped in a transaction — PostgREST has no client-side one — but
+     each step is idempotent, so a failure halfway leaves a partial merge that
+     re-running completes.
+
+     Details the loser carries and the winner lacks (location, map link, area,
+     note) move across rather than being thrown away: somebody typed them
+     about this site, and which of the two spellings they typed them under is
+     an accident. */
+  /* NOTE both names are used VERBATIM, never trimmed: the whole point is to
+     fold names like "Fortune " into "Fortune", and trimming the source would
+     turn exactly that case into a merge-into-itself. These strings are the
+     literal text stored on the rows being rewritten. */
+  async mergeHost(fromName, toName) {
+    const from = String(fromName == null ? "" : fromName);
+    const to = String(toName == null ? "" : toName);
+    if (!from.trim() || !to.trim()) throw new Error("Merging needs two hosts.");
+    if (from === to) throw new Error("A host can't be merged into itself.");
+
+    const fromRec = this.data.hosts.find((h) => h.name === from) || null;
+    const toRec = this.data.hosts.find((h) => h.name === to) || null;
+
+    // 1. the board's own rows first — this is what's on screen
+    const { error: mErr } = await sb.from("missions").update({ host: to }).eq("host", from);
+    if (mErr) throw mErr;
+    // 2. the durable history (absent on a database that never ran that migration)
+    const { error: hErr } = await sb.from("deployment_history").update({ host: to }).eq("host", from);
+    if (hErr && !this._tableMissing(hErr)) throw hErr;
+
+    // 3. carry over anything only the losing record knows, then drop it
+    if (fromRec) {
+      const carry = {};
+      if (fromRec.location && !(toRec && toRec.location)) carry.location = fromRec.location;
+      if (fromRec.mapUrl && !(toRec && toRec.mapUrl)) carry.map_url = fromRec.mapUrl;
+      if (fromRec.areaId && !(toRec && toRec.areaId)) carry.area_id = fromRec.areaId;
+      if (fromRec.note && !(toRec && toRec.note)) carry.note = fromRec.note;
+      // the winner may have no record at all yet (a host known only from its
+      // missions) — then the merge creates one out of the loser's details
+      if (!toRec || Object.keys(carry).length) {
+        let row = { name: to, ...carry, updated_at: new Date().toISOString() };
+        let error;
+        for (let i = 0; i < 3; i++) {
+          ({ error } = await sb.from("hosts").upsert(row, { onConflict: "name" }));
+          if (!error) break;
+          const missing = this._missingColumnFromError(error);
+          if (!missing || !(missing in row)) break;
+          const { [missing]: _drop, ...rest } = row;
+          row = rest;
+        }
+        if (error && !this._tableMissing(error)) throw error;
+      }
+      const { error: dErr } = await sb.from("hosts").delete().eq("name", from);
+      if (dErr && !this._tableMissing(dErr)) throw dErr;
+    }
+
+    this._invalidatePlans();
+    await this._loadHosts();
   },
   /* Deletes only the master record (location / map link), never the host's
      mission or deployment history — the name lives on those rows as plain

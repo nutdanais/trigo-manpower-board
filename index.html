@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-03b">
+<link rel="stylesheet" href="styles.css?v=2026-09-04">
 </head>
 <body>
 
@@ -243,11 +243,20 @@
         <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
         <div class="ms" data-filter="empId"><button type="button" class="ms-btn">Inspector: All</button><div class="ms-pop hidden"></div></div>
         <div class="ms" data-filter="location"><button type="button" class="ms-btn">Location: All</button><div class="ms-pop hidden"></div></div>
+        <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
       </div>
       <div class="toolbar-spacer"></div>
       <span id="hostlist-count"></span>
       <button type="button" class="btn btn-small btn-primary" id="btn-add-host" title="Record a host that isn't on any mission yet">+ Host</button>
       <button type="button" class="btn btn-small" id="btn-hostlist-csv" title="Export the rows below as a CSV file">⬇ CSV</button>
+    </div>
+    <!-- Duplicate finder: hosts whose names look like each other (see
+         hostDuplicateGroups in app.js). It only ever suggests — merging is a
+         deliberate action taken one group at a time from the host's own row. -->
+    <div id="hostlist-dupbar" class="hidden">
+      <span class="dupbar-icon" aria-hidden="true">⚠</span>
+      <span id="hostlist-dup-text"></span>
+      <button type="button" class="btn btn-small" id="btn-hostlist-dups">Review duplicates</button>
     </div>
     <div class="table-wrap">
       <table id="hostlist-table">
@@ -392,13 +401,30 @@
       <label>Google Maps link <input name="mapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
       <p class="import-note">Paste the link from Google Maps (Share → Copy link). Location shows as a 📍 link on the Host List when a link is saved.</p>
       <label>Note <textarea name="note" rows="2" placeholder="Optional — gate, contact, PPE reminder…"></textarea></label>
+      <label class="toggle toggle-archived" title="A site the team no longer serves: kept here with all of its history, but not offered when creating a mission">
+        <input type="checkbox" name="archived">
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        <span class="toggle-text">Archived — keep the history, stop offering it on new missions</span>
+      </label>
       <div class="modal-actions">
-        <button type="button" class="btn btn-danger hidden" id="btn-delete-host" title="Remove the location/link record — the host itself and its history are kept">Clear record</button>
+        <button type="button" class="btn btn-danger hidden" id="btn-delete-host" title="Remove the saved details — the host itself and its history are kept">Clear record</button>
         <span class="toolbar-spacer"></span>
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
+    <!-- Merge: the fix for a duplicate or a misspelled host. It rewrites the
+         name on this host's mission and deployment rows, so the wrong spelling
+         disappears everywhere and the two hosts' day counts join up — unlike
+         "Clear record", which only drops the details and leaves the row. -->
+    <div id="host-merge" class="hidden">
+      <h4>Merge into another host</h4>
+      <p id="host-merge-note" class="import-note"></p>
+      <div class="host-merge-row">
+        <select id="host-merge-target"></select>
+        <button type="button" class="btn btn-danger btn-small" id="btn-host-merge">Merge</button>
+      </div>
+    </div>
   </div>
 
   <div class="modal hidden" id="modal-settings">
@@ -485,8 +511,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-03b"></script>
+<script src="cloud.js?v=2026-09-04"></script>
 <script src="charts.js?v=2026-09-03"></script>
-<script src="app.js?v=2026-09-03b"></script>
+<script src="app.js?v=2026-09-04"></script>
 </body>
 </html>

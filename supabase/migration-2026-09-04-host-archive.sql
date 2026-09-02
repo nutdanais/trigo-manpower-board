@@ -1,0 +1,23 @@
+-- Migration 2026-09-04: hosts.archived — retire a host without erasing it
+-- Run once in the Supabase SQL Editor (safe to re-run). Then redeploy the app.
+--
+-- Three different things can be wrong with a host in the list, and they need
+-- three different answers:
+--
+--   * a duplicate or a typo ("Frotune" for "Fortune") — MERGE it into the real
+--     one. That rewrites the name on the mission and deployment rows carrying
+--     it, so the wrong spelling disappears everywhere and the two hosts'
+--     inspector day counts combine. No schema change; see cloud.mergeHost.
+--   * a record created by mistake, with no missions and no history — DELETE
+--     the record ("Clear record"), which was already possible.
+--   * a REAL site the team no longer serves — neither of the above. Its
+--     missions and its deployment history are true and must stay exactly as
+--     they are; it just shouldn't be offered when writing a new mission any
+--     more. That is what this column is for.
+--
+-- Archived hosts stay in the Host List (dimmed, filterable, still carrying
+-- their history) — the same treatment employees.active gives a deactivated
+-- employee in the Manpower List. They are only removed from the New Mission
+-- host picker.
+
+alter table hosts add column if not exists archived boolean not null default false;

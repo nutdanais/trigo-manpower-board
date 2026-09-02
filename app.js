@@ -267,7 +267,7 @@ const CLOUD_WRITE_METHODS = [
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
-  "saveHost", "deleteHost",
+  "saveHost", "deleteHost", "mergeHost",
 ];
 function wireSaveStatus() {
   for (const name of CLOUD_WRITE_METHODS) {
@@ -315,7 +315,8 @@ const state = {
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
-    filters: { areaId: [], boardId: [], empId: [], location: [] },
+    filters: { areaId: [], boardId: [], empId: [], location: [], status: [] },
+    dupOnly: false,      // "Review duplicates" — show only names that look like duplicates of each other
     sortKey: "name",
     sortDir: 1,
     dir: null,           // cloud.getHostDirectory() result; null = not fetched yet
@@ -3058,11 +3059,17 @@ function renderEmployeeList() {
    only a person can supply, its location. That ordering matters: a host with
    no location record still gets a row, because the board already knows the
    name. */
-const HOSTLIST_FILTER_LABELS = { areaId: "Service area", boardId: "Board", empId: "Inspector", location: "Location" };
+const HOSTLIST_FILTER_LABELS = { areaId: "Service area", boardId: "Board", empId: "Inspector", location: "Location", status: "Status" };
 /* how many inspector chips a row shows before collapsing behind "+N more" —
    enough to answer "who knows this site" without one busy host stretching the
    table to a screen per row */
 const HOSTLIST_INSPECTOR_CAP = 8;
+/* which one-time database update a host field needs, for the message shown
+   when a save had to drop it (see cloud.saveHost's `skipped`) */
+const HOST_COLUMN_MIGRATIONS = {
+  area_id: "its service area needs a one-time database update (migration-2026-09-03-host-service-area.sql)",
+  archived: "archiving needs a one-time database update (migration-2026-09-04-host-archive.sql)",
+};
 
 /* The host master records double as the app's list of hosts: the New Mission
    form only accepts a host that has one (see missionHostMatch), and a mission
@@ -3123,6 +3130,7 @@ function allHostRows() {
       mapUrl: rec ? rec.mapUrl : "",
       note: rec ? rec.note : "",
       area,
+      archived: !!(rec && rec.archived),
       hasRecord: !!rec,
       inspectors,
       boards,
@@ -3135,6 +3143,100 @@ function allHostRows() {
   return rows;
 }
 
+/* ---------- duplicate detection ----------
+   Two names are "the same host, typed twice" in two ways, and the finder only
+   claims the ones it can claim safely:
+
+   1. They normalise to the same string — case, spaces and punctuation removed.
+      "FORTUNE", "Fortune " and "Fortune-Co" vs "Fortune Co". No judgement call
+      here, these are always the same site.
+   2. They are one edit apart — an inserted, dropped, swapped or mistyped
+      character ("Frotune" / "Fortune"). This one CAN be wrong, which is why
+      any pair whose digits differ is excluded: "Plant 1" and "Plant 2" are one
+      edit apart and are emphatically not duplicates. Short names are skipped
+      for the same reason — at four characters an edit is more likely to be a
+      different site than a typo.
+
+   The result is a suggestion the planner reviews and merges by hand, never an
+   automatic merge. */
+const hostDupKey = (name) => String(name || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+const hostDigits = (name) => (String(name || "").match(/\d/g) || []).join("");
+const DUP_FUZZY_MIN_LEN = 5;
+
+/* One edit apart: a substitution, an inserted or dropped character, OR two
+   adjacent characters swapped. The swap is the case that matters most — the
+   commonest typo of all is "Frotune" for "Fortune", and plain edit distance
+   scores that 2, which is exactly how it slipped past the first version of
+   this finder. */
+function oneEditApart(a, b) {
+  if (a === b) return false;
+  const d = a.length - b.length;
+  if (d > 1 || d < -1) return false;
+  if (d === 0) {
+    let i = 0;
+    while (i < a.length && a[i] === b[i]) i++;
+    if (a.slice(i + 1) === b.slice(i + 1)) return true;                     // substitution
+    return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);   // swap
+  }
+  const [long, short] = d === 1 ? [a, b] : [b, a];
+  let i = 0;
+  while (i < short.length && long[i] === short[i]) i++;
+  return long.slice(i + 1) === short.slice(i);                              // insert / delete
+}
+
+/* Groups of host names that look like each other, returned with a name→group
+   index so a row can ask "am I in a group, and which one" in constant time.
+
+   Built as clusters over the NORMALISED names, not over the rows: normalising
+   ("FORTUNE", "Fortune ", "Fortune-Co") already collapses the certain cases,
+   and the fuzzy pass then links whole clusters rather than individual rows —
+   otherwise a typo can never be matched against a name that already has an
+   exact duplicate of its own, which is precisely the messy case this exists
+   for. Cached against the list of names, because the pairwise pass runs on
+   every redraw, including every search keystroke. */
+let _dupCache = { key: null, value: null };
+function hostDuplicateGroups(rows) {
+  const cacheKey = rows.map(r => r.name).join(" ");
+  if (_dupCache.key === cacheKey) return _dupCache.value;
+
+  const byNorm = new Map();
+  for (const r of rows) {
+    const k = hostDupKey(r.name);
+    if (!k) continue;
+    if (!byNorm.has(k)) byNorm.set(k, []);
+    byNorm.get(k).push(r);
+  }
+  const keys = [...byNorm.keys()];
+  // union-find over the normalised keys: a chain of near-misses ends up as one
+  // group rather than three overlapping pairs
+  const parent = keys.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const union = (i, j) => { const a = find(i), b = find(j); if (a !== b) parent[a] = b; };
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i].length < DUP_FUZZY_MIN_LEN) continue;
+    for (let j = i + 1; j < keys.length; j++) {
+      if (keys[j].length < DUP_FUZZY_MIN_LEN) continue;
+      // "Plant 1" and "Plant 2" are one edit apart and are not duplicates —
+      // a differing number is a different site, every time
+      if (hostDigits(keys[i]) !== hostDigits(keys[j])) continue;
+      if (oneEditApart(keys[i], keys[j])) union(i, j);
+    }
+  }
+  const clusters = new Map();
+  keys.forEach((k, i) => {
+    const root = find(i);
+    if (!clusters.has(root)) clusters.set(root, []);
+    clusters.get(root).push(...byNorm.get(k));
+  });
+  const groups = [...clusters.values()].filter(members => members.length > 1);
+  const byName = new Map();
+  groups.forEach((members, gi) => { for (const m of members) byName.set(m.name, gi); });
+
+  const value = { groups, byName };
+  _dupCache = { key: cacheKey, value };
+  return value;
+}
+
 function hostlistFilterOptions(key) {
   if (key === "areaId") {
     return [...D().areas.map(a => ({ value: a.id, label: a.name })), { value: "__none__", label: "— none —" }];
@@ -3142,6 +3244,9 @@ function hostlistFilterOptions(key) {
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
   if (key === "location") {
     return [{ value: "has", label: "Has location" }, { value: "missing", label: "No location yet" }];
+  }
+  if (key === "status") {
+    return [{ value: "active", label: "Active" }, { value: "archived", label: "Archived" }];
   }
   if (key === "empId") {
     // only people who actually have a deployment somewhere — a filter listing
@@ -3193,11 +3298,17 @@ function renderHostlistFilterOptions() {
 function hostlistFilteredSorted() {
   const f = state.hostlist.filters;
   const q = state.hostlist.search.trim().toLowerCase();
+  // duplicates are found across the WHOLE list, then used as a filter — a
+  // group whose other half is filtered out by a search or a board tick isn't
+  // a pair you could act on
+  const dups = hostDuplicateGroups(allHostRows());
   const rows = allHostRows().filter(r => {
+    if (state.hostlist.dupOnly && !dups.byName.has(r.name)) return false;
     if (f.areaId.length && !f.areaId.includes(r.area ? r.area.id : "__none__")) return false;
     if (f.boardId.length && !r.boards.some(b => f.boardId.includes(b.id))) return false;
     if (f.empId.length && !r.inspectors.some(i => f.empId.includes(i.id))) return false;
     if (f.location.length && !f.location.includes((r.location || r.mapUrl) ? "has" : "missing")) return false;
+    if (f.status.length && !f.status.includes(r.archived ? "archived" : "active")) return false;
     if (q) {
       // search covers everything the row shows, so typing an inspector's name
       // answers "where has this person been" from the host side too
@@ -3207,6 +3318,16 @@ function hostlistFilteredSorted() {
     }
     return true;
   });
+  // In duplicate-review mode the sort that matters is "keep each pair
+  // together, busiest member first" — you merge into the row with the history,
+  // and comparing two candidates means seeing them on adjacent lines.
+  if (state.hostlist.dupOnly) {
+    rows.sort((a, b) =>
+      (dups.byName.get(a.name) - dups.byName.get(b.name))
+      || (b.missionCount + b.deployedDays) - (a.missionCount + a.deployedDays)
+      || a.name.localeCompare(b.name));
+    return rows;
+  }
   const { sortKey, sortDir } = state.hostlist;
   // the two list columns sort by how many entries they hold (the useful
   // question: best-known site, most-shared host), not alphabetically
@@ -3265,17 +3386,22 @@ function hostBoardCell(r) {
    filter tick, sort click or "+N more" toggle */
 function renderHostRows() {
   const rows = hostlistFilteredSorted();
+  const all = allHostRows();
+  const dups = hostDuplicateGroups(all);
   const body = $("#hostlist-body");
   body.innerHTML = "";
   for (const r of rows) {
     const tr = document.createElement("tr");
     tr.dataset.host = r.name;
+    if (r.archived) tr.classList.add("row-archived");
     // data-label feeds the phone breakpoint's ::before, same responsive-table
     // pattern the Manpower List uses (see renderEmployeeRows)
     tr.innerHTML = `
       <td data-label="Host name" class="hl-name">
         <span class="hl-host">${escapeHtml(r.name)}</span>
-        <button type="button" class="hl-edit" title="Edit location, map link and note">✎</button>
+        ${r.archived ? `<span class="hl-tag hl-tag-arch" title="Archived — kept with its history, but not offered when creating a mission">archived</span>` : ""}
+        ${dups.byName.has(r.name) ? `<span class="hl-tag hl-tag-dup" title="Another host has a very similar name — open this row to merge them">similar</span>` : ""}
+        <button type="button" class="hl-edit" title="Edit location, area, note — or merge this host into another">✎</button>
       </td>
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
       <td data-label="Service area" class="hl-area-cell">${r.area
@@ -3301,10 +3427,27 @@ function renderHostRows() {
     tr.addEventListener("dblclick", () => openHostModal(r.name));
     body.appendChild(tr);
   }
-  const total = allHostRows().length;
   const noLoc = rows.filter(r => !r.location && !r.mapUrl).length;
-  $("#hostlist-count").textContent = `${rows.length} of ${total}`
-    + (noLoc ? ` · ${noLoc} without a location` : "");
+  const archived = rows.filter(r => r.archived).length;
+  $("#hostlist-count").textContent = `${rows.length} of ${all.length}`
+    + (noLoc ? ` · ${noLoc} without a location` : "")
+    + (archived ? ` · ${archived} archived` : "");
+  // the duplicate banner counts across the whole list, not the filtered view —
+  // it's what tells you there is cleaning up to do in the first place
+  const banner = $("#hostlist-dupbar");
+  const n = dups.groups.length;
+  banner.classList.toggle("hidden", !n && !state.hostlist.dupOnly);
+  if (n || state.hostlist.dupOnly) {
+    const names = dups.groups.reduce((sum, g) => sum + g.length, 0);
+    $("#hostlist-dup-text").textContent = !n
+      ? "No look-alike names left."
+      : n === 1
+        ? `${names} host names look like the same site — merge them into the real one so their missions and inspector day counts join up.`
+        : `${names} host names fall into ${n} look-alike groups — merge each group into its real host so their missions and inspector day counts join up.`;
+    const btn = $("#btn-hostlist-dups");
+    btn.textContent = state.hostlist.dupOnly ? "Show all hosts" : "Review duplicates";
+    btn.classList.toggle("hidden", !n && !state.hostlist.dupOnly);
+  }
   for (const th of $$("#hostlist-table th[data-sort]")) {
     th.classList.toggle("sorted-asc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === 1);
     th.classList.toggle("sorted-desc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === -1);
@@ -3322,10 +3465,10 @@ function exportHostlistCsv() {
   const rows = hostlistFilteredSorted();   // same rows the table is showing right now
   // "seen" covers both sources the dates come from — a mission planned for the
   // host and a deployment recorded against it
-  const header = ["Host name", "Location", "Google Maps link", "Service area", "Inspectors", "Inspector count",
+  const header = ["Host name", "Status", "Location", "Google Maps link", "Service area", "Inspectors", "Inspector count",
     "Deployment days", "Appear on board", "Missions", "First seen", "Last seen"];
   const out = rows.map(r => [
-    r.name, r.location, r.mapUrl, r.area ? r.area.name : "",
+    r.name, r.archived ? "Archived" : "Active", r.location, r.mapUrl, r.area ? r.area.name : "",
     r.inspectors.map(i => `${i.name} (${i.days}d)`).join("; "),
     r.inspectors.length, r.deployedDays,
     r.boards.map(b => b.name).join("; "),
@@ -3364,7 +3507,9 @@ function openHostModal(name, opts = {}) {
   form.areaId.innerHTML = `<option value="">— none —</option>`
     + D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
   form.areaId.value = rec ? (rec.areaId || "") : "";
+  form.archived.checked = !!(rec && rec.archived);
   $("#btn-delete-host").classList.toggle("hidden", !rec);
+  renderHostMergeSection(name);
   // Cancel out of the hand-off and the half-finished mission is still waiting —
   // its form keeps its values, nothing has reset it
   $("#modal-host [data-close]").onclick = () => {
@@ -3374,6 +3519,66 @@ function openHostModal(name, opts = {}) {
     if (back) openModal("#modal-mission");
   };
   openModal("#modal-host");
+}
+
+/* The merge half of the Host modal: fold this host into another one. Only
+   offered for a host that exists on the board — there is nothing to move out
+   of a host being created — and the picker is ordered so a look-alike name
+   comes first, since a merge almost always follows the duplicate finder. */
+function renderHostMergeSection(name) {
+  const box = $("#host-merge");
+  box.classList.toggle("hidden", !name);
+  if (!name) return;
+  const rows = allHostRows();
+  const me = rows.find(r => r.name === name);
+  const dups = hostDuplicateGroups(rows);
+  const myGroup = dups.byName.get(name);
+  const others = rows
+    .filter(r => r.name !== name)
+    .sort((a, b) => {
+      // look-alikes first, then the hosts with the most history behind them
+      const na = dups.byName.get(a.name) === myGroup && myGroup !== undefined ? 0 : 1;
+      const nb = dups.byName.get(b.name) === myGroup && myGroup !== undefined ? 0 : 1;
+      return na - nb
+        || (b.missionCount + b.deployedDays) - (a.missionCount + a.deployedDays)
+        || a.name.localeCompare(b.name);
+    });
+  const sel = $("#host-merge-target");
+  sel.innerHTML = `<option value="">Choose the host to keep…</option>`
+    + others.map(r => {
+      const bits = [r.area ? r.area.name : "", `${r.missionCount} mission${r.missionCount === 1 ? "" : "s"}`,
+        `${r.inspectors.length} inspector${r.inspectors.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+      const flag = dups.byName.get(r.name) === myGroup && myGroup !== undefined ? "★ " : "";
+      return `<option value="${escapeHtml(r.name)}">${flag}${escapeHtml(r.name)} — ${escapeHtml(bits)}</option>`;
+    }).join("");
+  sel.value = "";
+  const moving = me
+    ? `${me.missionCount} mission${me.missionCount === 1 ? "" : "s"} and ${me.deployedDays} deployment day${me.deployedDays === 1 ? "" : "s"}`
+    : "its missions and deployment history";
+  $("#host-merge-note").textContent =
+    `${moving} move to the host you pick, and "${name}" disappears from this list — including from past mission cards, which will show the kept name. Use this for a duplicate or a misspelling, not for a site you simply stopped serving (archive that instead).`;
+}
+
+function mergeHostFromModal() {
+  const from = state.hostlist.editingHost;
+  const to = $("#host-merge-target").value;
+  if (!from) return;
+  if (!to) { toast("Pick the host to merge into first.", "warn"); return; }
+  const me = allHostRows().find(r => r.name === from);
+  const impact = me
+    ? `${me.missionCount} mission${me.missionCount === 1 ? "" : "s"} and ${me.deployedDays} deployment day${me.deployedDays === 1 ? "" : "s"} move across`
+    : "its missions and deployment history move across";
+  showConfirm("Merge hosts?",
+    `Merge "${from}" into "${to}"? ${impact}, and "${from}" is removed from the Host list — past mission cards for it will read "${to}". Anything only "${from}" knows (location, map link, service area, note) is carried over if "${to}" doesn't have it. This can't be undone automatically.`,
+    () => safely(async () => {
+      await cloud.mergeHost(from, to);
+      closeModal();
+      state.hostlist.dirCacheKey = null;   // the directory itself changed, not just a record
+      state.hostlist.expanded.delete(from);
+      await refreshAndRender();
+      toast(`Merged ${from} into ${to}.`, "info");
+    }),
+    () => openModal("#modal-host"));   // "Cancel" → back to the host they were editing
 }
 
 function saveHostForm(ev) {
@@ -3392,6 +3597,7 @@ function saveHostForm(ev) {
   }
   const note = form.note.value.trim();
   const areaId = form.areaId.value;
+  const archived = form.archived.checked;
   if (!state.hostlist.editingHost && hostRecordOf(name)) {
     toast(`${name} is already in the host list — edit that row instead.`, "error");
     return;
@@ -3399,7 +3605,7 @@ function saveHostForm(ev) {
   const back = state.hostlist.returnToMission;
   state.hostlist.returnToMission = false;
   safely(async () => {
-    const res = await cloud.saveHost({ name, location, mapUrl, areaId, note });
+    const res = await cloud.saveHost({ name, location, mapUrl, areaId, archived, note });
     closeModal();
     await refreshAndRender();
     if (back) {
@@ -3410,10 +3616,12 @@ function saveHostForm(ev) {
       updateMissionHostNote();
       openModal("#modal-mission");
     }
-    // the host itself saved; only its area couldn't, on a database that hasn't
-    // run the service-area migration yet (see cloud.saveHost)
-    if (res && res.areaSkipped) {
-      toast(`Saved ${name}, but its service area needs a one-time database update (migration-2026-09-03-host-service-area.sql) before it can be stored.`, "warn");
+    // the host itself saved; a field it couldn't store means this database
+    // hasn't run that field's migration yet (see cloud.saveHost)
+    const skipped = (res && res.skipped) || [];
+    if (skipped.length) {
+      const what = skipped.map(c => HOST_COLUMN_MIGRATIONS[c] || c).join(" and ");
+      toast(`Saved ${name}, but ${what} — the rest of the record was saved.`, "warn");
     } else {
       toast(`Saved ${name}.`, "info");
     }
@@ -3555,6 +3763,11 @@ function showConfirm(title, message, onYes, onCancel) {
 function renderMissionHostOptions() {
   const list = $("#host-options");
   list.innerHTML = D().hosts
+    // an archived host is a site the team no longer serves — it keeps its
+    // history and its row in the Host List, it just isn't suggested here.
+    // hostRecordOf() still matches it, so editing an old mission that names
+    // one saves without being asked to re-create the host.
+    .filter(h => !h.archived)
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .map(h => {
@@ -3574,7 +3787,8 @@ function updateMissionHostNote() {
   if (rec) {
     const area = rec.areaId ? D().areas.find(a => a.id === rec.areaId) : null;
     note.className = "import-note host-note-ok";
-    note.textContent = `✓ ${rec.name}${area ? " — " + area.name : " — no service area set yet"}`;
+    note.textContent = `✓ ${rec.name}${area ? " — " + area.name : " — no service area set yet"}`
+      + (rec.archived ? " · archived host" : "");
   } else {
     note.className = "import-note host-note-new";
     note.textContent = `⚠ "${typed}" is not in the Host list yet — saving will offer to create it.`;
@@ -4553,6 +4767,11 @@ function wireApp() {
   }
   $("#form-host").addEventListener("submit", saveHostForm);
   $("#btn-delete-host").onclick = deleteHostRecord;
+  $("#btn-host-merge").onclick = mergeHostFromModal;
+  $("#btn-hostlist-dups").onclick = () => {
+    state.hostlist.dupOnly = !state.hostlist.dupOnly;
+    renderHostRows();
+  };
   // Host box on the mission form: say live whether what's typed is a host the
   // board knows ("change" as well as "input" — picking a datalist suggestion
   // with the mouse doesn't always fire input on every browser)
