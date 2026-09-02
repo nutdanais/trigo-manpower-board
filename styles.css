@@ -726,6 +726,10 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   white-space: nowrap;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
 }
+/* the host-note half of the PPE line: same size and colour as the mission's
+   own PPE (it is read as one instruction), just italic so it's visible which
+   half comes from the host record rather than from this mission */
+.mission-header .m-ppe-host { font-style: italic; }
 .mission-header .m-line2 {
   display: flex;
   align-items: center;
@@ -2200,7 +2204,17 @@ body.touch-mode .hl-edit { opacity: 1; }
 
 .hl-map { color: var(--primary-text); text-decoration: none; border-bottom: 1px dotted currentColor; }
 .hl-map:hover { border-bottom-style: solid; }
-.hl-note { cursor: help; }
+/* the host's note, printed under its location rather than hidden in a
+   tooltip — see hostLocationCell */
+.hl-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+  white-space: normal;
+  max-width: 280px;
+}
 /* an empty Location is the one thing on this tab a person is meant to fix, so
    it's an invitation rather than a dash */
 .hl-add-loc {

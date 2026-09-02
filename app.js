@@ -1363,6 +1363,17 @@ function renderMissions() {
     // chip: the two together answer "when and where" without reading the
     // address, and a host with no area set simply shows no pill
     const hostArea = hostAreaOf(m.host);
+    /* The PPE line carries the host's own note first, then this mission's PPE
+       — one line for "everything the crew has to know before they go", rather
+       than a site note that only lives in the Host List where nobody reading
+       the board would see it. Either part alone still renders the line; with
+       neither, there's no line, exactly as before. */
+    const hostNote = (hostRecordOf(m.host) || {}).note || "";
+    const ppeParts = [];
+    if (hostNote) ppeParts.push(`<span class="m-ppe-host" title="From this host's record in the Host list">${escapeHtml(hostNote)}</span>`);
+    if (m.ppe) ppeParts.push(escapeHtml(m.ppe));
+    const ppeLine = ppeParts.length
+      ? `<div class="m-ppe"><b>PPE</b> ${ppeParts.join(" + ")}</div>` : "";
     header.innerHTML = `
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
@@ -1382,7 +1393,7 @@ function renderMissions() {
         ${eng && eng.phone ? telLink(eng.phone) : ""}
         <span class="m-count">${memberEmps.length}</span>
       </div>
-      ${m.ppe ? `<div class="m-ppe"><b>PPE</b> ${escapeHtml(m.ppe)}</div>` : ""}`;
+      ${ppeLine}`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
     const body = document.createElement("div");
     body.className = "mission-body dropzone";
@@ -3349,12 +3360,17 @@ function hostlistFilteredSorted() {
 function hostLocationCell(r) {
   const href = safeHttpUrl(r.mapUrl);
   const text = r.location || (href ? "Open in Google Maps" : "");
-  if (!text) return `<button type="button" class="hl-add-loc">+ Add location</button>`;
-  const body = href
-    ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
-         title="Open in Google Maps" onclick="event.stopPropagation()">📍 ${escapeHtml(text)}</a>`
-    : `<span class="hl-loc">${escapeHtml(text)}</span>`;
-  return body + (r.note ? ` <span class="hl-note" title="${escapeHtml(r.note)}">📝</span>` : "");
+  const head = !text
+    ? `<button type="button" class="hl-add-loc">+ Add location</button>`
+    : href
+      ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
+           title="Open in Google Maps" onclick="event.stopPropagation()">📍 ${escapeHtml(text)}</a>`
+      : `<span class="hl-loc">${escapeHtml(text)}</span>`;
+  /* The note is printed, not hidden behind a hover marker: this board is read
+     on factory-floor tablets, where there is no hover at all — and it used to
+     be dropped entirely for a host with no location yet, which is exactly the
+     host somebody is most likely to have left a note about. */
+  return head + (r.note ? `<div class="hl-note">📝 ${escapeHtml(r.note)}</div>` : "");
 }
 
 function hostInspectorCell(r) {
@@ -3465,10 +3481,11 @@ function exportHostlistCsv() {
   const rows = hostlistFilteredSorted();   // same rows the table is showing right now
   // "seen" covers both sources the dates come from — a mission planned for the
   // host and a deployment recorded against it
-  const header = ["Host name", "Status", "Location", "Google Maps link", "Service area", "Inspectors", "Inspector count",
+  const header = ["Host name", "Status", "Location", "Google Maps link", "Service area", "Note",
+    "Inspectors", "Inspector count",
     "Deployment days", "Appear on board", "Missions", "First seen", "Last seen"];
   const out = rows.map(r => [
-    r.name, r.archived ? "Archived" : "Active", r.location, r.mapUrl, r.area ? r.area.name : "",
+    r.name, r.archived ? "Archived" : "Active", r.location, r.mapUrl, r.area ? r.area.name : "", r.note,
     r.inspectors.map(i => `${i.name} (${i.days}d)`).join("; "),
     r.inspectors.length, r.deployedDays,
     r.boards.map(b => b.name).join("; "),
