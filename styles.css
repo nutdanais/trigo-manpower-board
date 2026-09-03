@@ -704,6 +704,32 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   box-shadow: inset 0 0 0 1px rgba(0,73,131,.25);
 }
 .mission-header .m-shift.night { background: var(--night); color: #fff; box-shadow: none; }
+/* the host's service area travels with the shift chip: one group, pushed to
+   the right of the band together, so the pair reads as "when and where" and a
+   host with no area set just leaves the shift chip where it always was */
+.mission-header .m-pills { margin-left: auto; flex: none; display: flex; align-items: center; gap: 4px; }
+.mission-header .m-pills .m-shift { margin-left: 0; }
+/* the area pill IS a data colour at full strength (like the pill on an
+   employee card), so its ink is picked by inkOn() in app.js, not by a theme
+   token — the surface doesn't change with the theme, so the text must not */
+.mission-header .m-area {
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1.7;
+  letter-spacing: .3px;
+  padding: 0 5px;
+  border-radius: 3px;
+  flex: none;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.15);
+}
+/* the host-note half of the PPE line: same size and colour as the mission's
+   own PPE (it is read as one instruction), just italic so it's visible which
+   half comes from the host record rather than from this mission */
+.mission-header .m-ppe-host { font-style: italic; }
 .mission-header .m-line2 {
   display: flex;
   align-items: center;
@@ -1125,14 +1151,15 @@ body.board-view #app-root { margin-right: 264px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
 
-  /* One line, no wrapping: the bar holds two fixed tabs and a board picker,
-     and the picker is the flexible item that takes what is left. */
+  /* One line, no wrapping: the bar holds the three fixed tabs and a board
+     picker, and the picker is the flexible item that takes what is left.
+     (Below 380px it wraps instead — see that breakpoint.) */
   #board-bar { flex-wrap: nowrap; gap: 4px; padding: 4px 8px; align-items: center; }
   /* The per-board tabs and "+ Board" become one native <select> (populated by
      renderBoardSelect in app.js, which carries "+ New board…" as its last
      option). Any number of boards then costs one control instead of a wrapping
-     strip, so the whole bar holds a single line. Overview / Manpower List stay
-     as tabs — they are two fixed destinations, not a list that grows. */
+     strip, so the whole bar holds a single line. Overview / Manpower List /
+     Host List stay as tabs — fixed destinations, not a list that grows. */
   #board-tabs .tab-board,
   .board-tab-sep,
   #btn-add-board { display: none; }
@@ -1236,6 +1263,48 @@ body.board-view #app-root { margin-right: 264px; }
     border: none;
   }
 
+  /* Host List: same table -> cards treatment, driven by the same data-label
+     attributes (see renderHostRows). The two list columns keep their chips
+     left-aligned and wrapping — a right-aligned wrap of eight inspector chips
+     reads as a ragged column, not a list. */
+  #hostlist-table thead { display: none; }
+  #hostlist-table, #hostlist-table tbody, #hostlist-table tr, #hostlist-table td { display: block; width: auto; }
+  #hostlist-table tbody tr {
+    margin-bottom: 10px;
+    padding: 12px 14px 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  #hostlist-table td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  #hostlist-table td:last-child { border-bottom: none; }
+  #hostlist-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  /* the host name is the card's title, with its edit button on the same line */
+  #hostlist-table td.hl-name {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 15px;
+    border-bottom: none;
+    padding-bottom: 4px;
+    white-space: normal;
+  }
+  #hostlist-table td.hl-name::before { content: none; }
+
   /* toolbar filters get their own full-width row so they don't crowd the buttons */
   #filters { width: 100%; flex-wrap: wrap; }
 
@@ -1319,11 +1388,13 @@ body.board-view #app-root { margin-right: 264px; }
   #topbar .btn-date { font-size: 12px; padding: 6px 6px; }
   #topbar .btn-date-arrow { padding: 6px 7px; }
   .topbar-right > .btn:not(.btn-date):not(.btn-date-arrow) { padding: 6px 7px; }
-  /* the board picker is the flexible item here, so the two fixed tabs give up
-     what they can to leave it a usable width */
-  #board-bar { padding: 4px 6px; }
+  /* Three fixed tabs (Overview / Manpower / Host) plus the board picker no
+     longer fit one line at this width, so the bar wraps: the tabs keep their
+     own row and the picker takes a full-width one below, rather than every
+     control being squeezed to an ellipsis. */
+  #board-bar { padding: 4px 6px; flex-wrap: wrap; }
   .board-tab { padding: 8px 7px; font-size: 12.5px; }
-  #board-select { font-size: 12.5px; padding: 6px 6px; }
+  #board-select { font-size: 12.5px; padding: 6px 6px; flex: 1 0 100%; }
 }
 
 /* ===== Modals ===== */
@@ -2064,6 +2135,231 @@ body.exporting #app-root { margin-right: 0; }
   border: 1px solid rgba(0,0,0,.15);
   color: var(--card-ink);
 }
+
+/* ===== Host List tab =====
+   Same furniture as the Manpower List above (toolbar + one sortable table in a
+   .table-wrap), with one structural difference: two of its four columns hold
+   LISTS — every inspector who has worked the host, every board it shows up on
+   — so cells wrap and align to the top instead of staying on one line. */
+#hostlist-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+#hostlist-search {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  min-width: 220px;
+}
+#hostlist-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+#hostlist-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+
+#hostlist-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+#hostlist-table th, #hostlist-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+#hostlist-table th {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  background: var(--bg-soft);
+  position: sticky;
+  top: 0;
+}
+#hostlist-table th:hover { color: var(--primary-text); }
+#hostlist-table th.sorted-asc::after { content: " \25B2"; }
+#hostlist-table th.sorted-desc::after { content: " \25BC"; }
+#hostlist-table tbody tr:hover { background: var(--hover-tint); }
+#hostlist-table td.hl-name { white-space: nowrap; }
+.hl-host { font-weight: 700; }
+/* the edit affordance rides the row's hover on a mouse; on touch there is no
+   hover to reveal it, so it stays visible there */
+.hl-edit {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0 3px;
+  margin-left: 6px;
+  opacity: 0;
+}
+#hostlist-table tr:hover .hl-edit, .hl-edit:focus-visible { opacity: 1; }
+.hl-edit:hover { color: var(--primary-text); }
+body.touch-mode .hl-edit { opacity: 1; }
+
+.hl-map { color: var(--primary-text); text-decoration: none; border-bottom: 1px dotted currentColor; }
+.hl-map:hover { border-bottom-style: solid; }
+/* the host's note: its own column, printed rather than hidden behind a hover
+   marker — this board is read on tablets, where there is no hover at all */
+#hostlist-table td.hl-note-cell { max-width: 260px; }
+.hl-note {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text);
+  white-space: normal;
+}
+/* an empty Location is the one thing on this tab a person is meant to fix, so
+   it's an invitation rather than a dash */
+.hl-add-loc {
+  border: 1px dashed var(--border);
+  background: none;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.hl-add-loc:hover { color: var(--primary-text); border-color: var(--primary-text); }
+
+#hostlist-table td.hl-area-cell { white-space: nowrap; }
+/* duplicate-finder banner: amber like every other "worth a look, nothing is
+   broken" surface in the app, never red — it's a suggestion to review */
+#hostlist-dupbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid #e5b980;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: rgba(237,161,0,.10);
+  font-size: 13px;
+}
+#hostlist-dupbar .dupbar-icon { color: #b45309; font-weight: 700; }
+#hostlist-dup-text { flex: 1; min-width: 200px; }
+:root[data-theme="dark"] #hostlist-dupbar { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
+:root[data-theme="dark"] #hostlist-dupbar .dupbar-icon { color: #f0b45c; }
+
+/* small tags beside a host name: archived state, and the duplicate hint */
+.hl-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.hl-tag-arch { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+.hl-tag-dup { background: rgba(237,161,0,.18); color: #b45309; border: 1px solid #e5b980; }
+:root[data-theme="dark"] .hl-tag-dup { color: #f0b45c; border-color: #7a5a1f; }
+/* an archived host is still readable, just visibly off the active roster —
+   same treatment (and same reasoning) as an inactive employee's row */
+#hostlist-table tbody tr.row-archived td { opacity: .55; }
+/* the name and the switch stay at full strength — dimming the control you
+   came to click would be self-defeating (same call as the Manpower List's
+   Status column) */
+#hostlist-table tbody tr.row-archived td.hl-name,
+#hostlist-table tbody tr.row-archived td.hl-status { opacity: 1; }
+#hostlist-table td.hl-status { white-space: nowrap; }
+
+/* merge panel at the foot of the Host modal */
+#host-merge {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+#host-merge h4 { font-size: 13px; margin-bottom: 6px; color: var(--primary-text); }
+.host-merge-row { display: flex; gap: 8px; align-items: center; }
+/* .modal select (further up) makes every select a full-width block — inside
+   this row it has to share the line with the Merge button instead */
+.modal .host-merge-row select {
+  display: block;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+  font-size: 12.5px;
+}
+.modal .host-merge-row .btn { flex: none; }
+/* The switch sits among the modal's form labels, which are display:block with
+   a visible input — this restores the toggle component's own layout (and
+   hides the raw checkbox) inside that context. */
+.modal .toggle-archived {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.modal .toggle-archived input { display: none; }
+.modal .toggle-archived .toggle-text { font-weight: 600; font-size: 12px; }
+/* live verdict under the New Mission host box (see updateMissionHostNote) */
+.host-note-ok { color: var(--primary-text); font-weight: 600; }
+.host-note-new { color: #b45309; font-weight: 600; }
+:root[data-theme="dark"] .host-note-new { color: #f0b45c; }
+
+.hl-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: center; }
+.hl-count {
+  display: inline-block;
+  min-width: 22px;
+  text-align: center;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hl-insp {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.hl-insp b { font-size: 10.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Square-ish, tinted and navy-inked so a board reads differently from a
+   (pill-shaped, neutral) inspector chip at a glance. Both tokens flip with the
+   theme — pairing the tint with the fixed --card-ink used elsewhere would put
+   near-black text on a dark navy pill in dark mode. */
+.hl-board {
+  display: inline-block;
+  background: var(--pool-tint);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+.hl-more {
+  border: none;
+  background: none;
+  color: var(--primary-text);
+  font: inherit;
+  font-size: 11.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.hl-empty { color: var(--muted); font-size: 12.5px; }
 
 /* ==========================================================================
    Glassmorphism — frosted translucent surfaces over the body gradient.

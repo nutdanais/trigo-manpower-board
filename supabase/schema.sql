@@ -121,6 +121,32 @@ create table if not exists deployment_history (
 );
 create index if not exists deployment_history_employee_idx on deployment_history(employee_id);
 
+-- ===== Hosts: the master record behind the Host List tab =====
+-- A host exists on the board as free text (missions.host, and the snapshot in
+-- deployment_history.host); this table is where anything ABOUT that host is
+-- stored — its location and a Google Maps link. Keyed by the name rather than
+-- by an id on purpose, so it stays purely additive: a host with no row here
+-- still appears in the Host List, assembled from mission/deployment rows
+-- alone. See migration-2026-09-02-hosts.sql for the full reasoning.
+
+create table if not exists hosts (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  location text,
+  map_url text,
+  -- which service area the host sits in; drives the Host List's Service area
+  -- column and the area pill on every mission card for that host
+  area_id uuid references service_areas(id) on delete set null,
+  -- a real site the team no longer serves: kept in the Host List with all of
+  -- its history, only dropped from the New Mission host picker. A duplicate or
+  -- a typo is NOT archived — it is merged into the real host (cloud.mergeHost),
+  -- which rewrites the name on its mission and deployment rows.
+  archived boolean not null default false,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- ===== Plan-day marker: "Lock board" state per (board, date) =====
 -- The app no longer auto-seeds a future day from the previous working day (that
 -- was the source of the "adjusted board disappears on login" bug — a load that
@@ -151,6 +177,7 @@ alter table assignments enable row level security;
 alter table day_overrides enable row level security;
 alter table plan_days enable row level security;
 alter table deployment_history enable row level security;
+alter table hosts enable row level security;
 
 drop policy if exists "authenticated read/write day_overrides" on day_overrides;
 create policy "authenticated read/write day_overrides" on day_overrides
@@ -186,6 +213,10 @@ create policy "authenticated read/write plan_days" on plan_days
 
 drop policy if exists "authenticated read/write deployment_history" on deployment_history;
 create policy "authenticated read/write deployment_history" on deployment_history
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+drop policy if exists "authenticated read/write hosts" on hosts;
+create policy "authenticated read/write hosts" on hosts
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ===== Realtime: broadcast changes to every connected client =====
@@ -231,6 +262,11 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table plan_days;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table hosts;
 exception when duplicate_object then null;
 end $$;
 
