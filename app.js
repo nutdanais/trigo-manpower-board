@@ -3351,6 +3351,7 @@ function hostlistFilteredSorted() {
   const val = (r) => {
     if (sortKey === "location") return r.location || safeHttpUrl(r.mapUrl) || "";
     if (sortKey === "area") return r.area ? r.area.name : "";
+    if (sortKey === "note") return r.note || "";
     if (sortKey === "status") return r.archived ? "Archived" : "Active";
     return r.name;
   };
@@ -3361,17 +3362,20 @@ function hostlistFilteredSorted() {
 function hostLocationCell(r) {
   const href = safeHttpUrl(r.mapUrl);
   const text = r.location || (href ? "Open in Google Maps" : "");
-  const head = !text
-    ? `<button type="button" class="hl-add-loc">+ Add location</button>`
-    : href
-      ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
-           title="Open in Google Maps" onclick="event.stopPropagation()">📍 ${escapeHtml(text)}</a>`
-      : `<span class="hl-loc">${escapeHtml(text)}</span>`;
-  /* The note is printed, not hidden behind a hover marker: this board is read
-     on factory-floor tablets, where there is no hover at all — and it used to
-     be dropped entirely for a host with no location yet, which is exactly the
-     host somebody is most likely to have left a note about. */
-  return head + (r.note ? `<div class="hl-note">📝 ${escapeHtml(r.note)}</div>` : "");
+  if (!text) return `<button type="button" class="hl-add-loc">+ Add location</button>`;
+  return href
+    ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
+         title="Open in Google Maps" onclick="event.stopPropagation()">📍 ${escapeHtml(text)}</a>`
+    : `<span class="hl-loc">${escapeHtml(text)}</span>`;
+}
+
+/* The note gets its own column rather than riding under the location: it is
+   its own fact about the site (and the one that reaches the board, at the
+   front of every mission card's PPE line), so it sorts, reads and gets filled
+   in on its own terms — including for a host that has no location yet. */
+function hostNoteCell(r) {
+  if (!r.note) return `<button type="button" class="hl-add-loc hl-add-note">+ Add note</button>`;
+  return `<span class="hl-note">${escapeHtml(r.note)}</span>`;
 }
 
 function hostInspectorCell(r) {
@@ -3424,6 +3428,7 @@ function renderHostRows() {
       <td data-label="Service area" class="hl-area-cell">${r.area
         ? areaPillHtml(r.area, "area-pill")
         : `<button type="button" class="hl-add-loc hl-add-area">+ Set area</button>`}</td>
+      <td data-label="Note" class="hl-note-cell">${hostNoteCell(r)}</td>
       <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
       <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>
       <td data-label="Status" class="hl-status">
