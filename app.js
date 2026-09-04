@@ -653,6 +653,7 @@ function render() {
   $("#filters").classList.toggle("hidden", !board);
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
   $("#btn-export").classList.toggle("hidden", eml || hl);
+  $("#btn-print").classList.toggle("hidden", eml || hl);
   $("#btn-reset-board").classList.toggle("hidden", !board);
   // Every control in the main toolbar belongs to a board or to the employee
   // roster, so on the Host List the row would be empty furniture (and on a
@@ -1363,12 +1364,19 @@ function renderMissions() {
     // chip: the two together answer "when and where" without reading the
     // address, and a host with no area set simply shows no pill
     const hostArea = hostAreaOf(m.host);
+    const hostRec = hostRecordOf(m.host);
+    /* Where the job is, on the card itself. It was only ever in the Host List
+       tab — a planner's screen — so the one question the crew reading a shared
+       board actually has ("where do I go?") was the one thing the board did not
+       answer. Sits above the PPE line because that is the reading order: where
+       am I going, then what do I need when I get there. See hostLocHtml. */
+    const locLine = hostLocHtml(hostRec);
     /* The PPE line carries the host's own note first, then this mission's PPE
        — one line for "everything the crew has to know before they go", rather
        than a site note that only lives in the Host List where nobody reading
        the board would see it. Either part alone still renders the line; with
        neither, there's no line, exactly as before. */
-    const hostNote = (hostRecordOf(m.host) || {}).note || "";
+    const hostNote = (hostRec || {}).note || "";
     const ppeParts = [];
     if (hostNote) ppeParts.push(`<span class="m-ppe-host" title="From this host's record in the Host list">${escapeHtml(hostNote)}</span>`);
     if (m.ppe) ppeParts.push(escapeHtml(m.ppe));
@@ -1393,6 +1401,7 @@ function renderMissions() {
         ${eng && eng.phone ? telLink(eng.phone) : ""}
         <span class="m-count">${memberEmps.length}</span>
       </div>
+      ${locLine}
       ${ppeLine}`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
     const body = document.createElement("div");
@@ -3111,6 +3120,36 @@ function safeHttpUrl(u) {
   return /^https?:\/\//i.test(s) ? s : "";
 }
 
+/* The host's location line on a mission card — the Host List's 📍 cell, in the
+   place the crew actually reads. Same precedence as that cell (hostLocCell):
+   the address is the label when there is one, because that is what a person
+   recognises; a host with only a map link gets the generic label instead; a
+   host with neither gets no line at all, which is most of them until the Host
+   List is filled in.
+
+   Three details that are not free choices:
+   - escapeHtml on the href, not just the text. safeHttpUrl only vouches for the
+     scheme, and the rest of the field is free text a planner typed — a bare
+     quote in it would otherwise close the attribute.
+   - stopPropagation, exactly as telLink does: this sits inside .mission-header,
+     whose click handler opens the edit modal. Without it, tapping the address
+     on a phone opens the mission editor instead of the map.
+   - a real <a>, not a click handler. It has to survive being printed: Chrome
+     writes <a href> out as a PDF link annotation, so the address stays tappable
+     inside the file that gets posted to the LINE group. That is the whole point
+     of the PDF path (printBoard) — an image can never carry a link. */
+function hostLocHtml(rec) {
+  if (!rec) return "";
+  const href = safeHttpUrl(rec.mapUrl);
+  const text = rec.location || (href ? "Open in Google Maps" : "");
+  if (!text) return "";
+  const label = href
+    ? `<a class="m-loc-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"`
+      + ` onclick="event.stopPropagation()">${escapeHtml(text)}</a>`
+    : escapeHtml(text);
+  return `<div class="m-loc"><span class="m-loc-pin" aria-hidden="true">📍</span>${label}</div>`;
+}
+
 /* One row per host, merging the fetched directory with the host master records
    (which carry the location) — either source alone is enough to list a host. */
 function allHostRows() {
@@ -4350,6 +4389,92 @@ async function exportBoard() {
   }
 }
 
+/* ---------- print / PDF ----------
+
+   The JPG export above exists for the places that only take an image. This is
+   the same board as a VECTOR page, and it is the answer to the two things a
+   JPG in a chat group cannot do:
+
+   - It does not go blurry. A messenger re-encodes and downsizes an image on
+     send, so board text arrives at a fraction of the pixels it left with. A PDF
+     is sent as a file, and its text is drawn from outlines at whatever zoom the
+     reader picks — pinching in stays sharp all the way down.
+   - It keeps its links. The host location (hostLocHtml) and the engineer's
+     phone (telLink) are real <a> elements, and Chrome writes them into the PDF
+     as link annotations, so they are still tappable in the file itself.
+
+   The DOM prep deliberately makes the same calls exportBoard makes — capture
+   header on, empty missions and empty leave zones dropped, the two unassigned
+   pools folded in, light theme forced — so the printed page and the exported
+   image are one artifact in two formats, and a change to what belongs on a
+   shared board only has to be made once (below, and in exportBoard).
+
+   It hangs off beforeprint/afterprint rather than off the button alone so that
+   Ctrl+P produces the same page as clicking 🖨 — a print stylesheet that only
+   works via one button is a trap for whoever hits the keyboard shortcut. */
+
+let printRestore = null;   // set while the DOM is in its printable state
+
+function prepareForPrint() {
+  if (printRestore) return;   // beforeprint can fire more than once per dialog
+  const board = D().boards.find(b => b.id === D().activeBoardId);
+  const boardName = board ? board.name : "Overview";
+  $("#capture-title").textContent = boardName + " Manpower Board";
+  $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
+  $("#capture-header").classList.remove("hidden");
+  // `exporting` is what swaps the glass tokens for opaque surfaces; a printer
+  // (and a PDF) has no backdrop-filter, so without it every glass panel prints
+  // as a flat nothing. `printing` is this path's own hook.
+  document.body.classList.add("exporting", "printing");
+  // Same reasoning as the export: a shared artifact must not carry the viewer's
+  // own dark-mode preference — and a dark board wastes a cartridge besides.
+  const wasDark = document.documentElement.getAttribute("data-theme") === "dark";
+  if (wasDark) document.documentElement.removeAttribute("data-theme");
+
+  let pools = null;
+  if (!isOverview() && !isNonWorkingDate(state.date)) {
+    const built = buildExportPools();
+    if (built.children.length) {
+      pools = built;
+      $("#status-zones").insertAdjacentElement("afterend", pools);
+    }
+  }
+  let restoreEmptyMissions = null;
+  let restoreLeaveZones = null;
+  if (!isOverview()) {
+    restoreEmptyMissions = hideEmptyMissionsForExport();
+    restoreLeaveZones = hideEmptyLeaveZonesForExport();
+    // NB: no layoutMasonry() here. The masonry writes absolute pixel positions
+    // sized to the screen, and the paper width isn't knowable until the print
+    // media has already applied — so @media print puts the cards back into
+    // normal flow with !important instead (a stylesheet !important outranks
+    // those inline styles). layoutMasonry() runs again on restore below.
+  }
+
+  printRestore = () => {
+    if (restoreEmptyMissions) restoreEmptyMissions();
+    if (restoreLeaveZones) restoreLeaveZones();
+    if (pools) pools.remove();
+    $("#capture-header").classList.add("hidden");
+    document.body.classList.remove("exporting", "printing");
+    if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
+    if (!isOverview()) layoutMasonry();
+  };
+}
+
+function restoreAfterPrint() {
+  if (!printRestore) return;
+  const done = printRestore;
+  printRestore = null;   // cleared first, so a throw below can't wedge the board
+  done();
+}
+
+function printBoard() {
+  // beforeprint does the work; this is only the trigger, so that the button and
+  // the keyboard shortcut go down exactly the same path.
+  window.print();
+}
+
 /* ---------- custom date picker (weekend columns highlighted) ---------- */
 let dpMonth = null; // "YYYY-MM" currently displayed
 
@@ -4728,6 +4853,10 @@ function wireApp() {
   $("#sort-by").onchange = (e) => { state.sort = e.target.value; render(); };
 
   $("#btn-export").onclick = exportBoard;
+  $("#btn-print").onclick = printBoard;
+  // on the window, not the button: Ctrl+P has to get the same page as the click
+  window.addEventListener("beforeprint", prepareForPrint);
+  window.addEventListener("afterprint", restoreAfterPrint);
   $("#btn-reset-board").onclick = () => guardEdit(() => resetBoard());
 
   // employee search (floating panel) — filter as you type, keep selection

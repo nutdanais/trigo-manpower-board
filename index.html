@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-04d">
+<link rel="stylesheet" href="styles.css?v=2026-09-04e">
 </head>
 <body>
 
@@ -137,6 +137,11 @@
     <button id="btn-undo" class="btn" title="Undo last assignment change (Ctrl+Z)" disabled>↩ Undo</button>
   </div>
   <button id="btn-export" class="btn">📷 Export</button>
+  <!-- The sharp half of "share the plan": a JPG is re-encoded and downsized by
+       whatever chat app carries it, and it cannot hold a link. This prints the
+       same board as vector text (sharp at any zoom) with the host location and
+       engineer phone still tappable inside the PDF. See printBoard in app.js. -->
+  <button id="btn-print" class="btn" title="Save as PDF — stays sharp at any zoom, and the location links stay tappable">🖨 PDF</button>
   <span id="readonly-badge" class="hidden">🔒 Read-only (past date)</span>
 </div>
 
@@ -513,8 +518,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-04d"></script>
-<script src="charts.js?v=2026-09-03"></script>
-<script src="app.js?v=2026-09-04d"></script>
+<script src="cloud.js?v=2026-09-04e"></script>
+<script src="charts.js?v=2026-09-04e"></script>
+<script src="app.js?v=2026-09-04e"></script>
 </body>
 </html>

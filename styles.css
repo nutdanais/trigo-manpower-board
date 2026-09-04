@@ -755,6 +755,33 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 .mission-header .m-ppe { margin-top: 3px; font-size: 11px; color: var(--muted); }
 .mission-header .m-ppe b { font-weight: 700; }
+/* the host's location — same weight as the PPE line (both are "what you need
+   before you go", read after the who/when line above), with the pin held on its
+   own baseline-aligned column so a long address wraps under itself rather than
+   under the icon. Deliberately allowed to wrap: an address that is ellipsised
+   is an address nobody can use, and there is no hover on the tablet this is
+   read from. */
+.mission-header .m-loc {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.mission-header .m-loc-pin { flex: none; font-size: 10px; }
+/* underlined at rest, unlike .tel-link: this is the affordance the shared board
+   is being redesigned around, and the phone and the printed PDF that carry it
+   have no hover state to discover it with. */
+.mission-header .m-loc-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.mission-header .m-loc-link:hover,
+.mission-header .m-loc-link:focus-visible { color: var(--text); }
 .mission-body {
   display: flex;
   flex-direction: column;
@@ -2505,4 +2532,90 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .toast, .toast-out { animation: none; }
+}
+
+/* ===== PRINT / PDF =================================================
+   Paired with printBoard / prepareForPrint in app.js, which puts the DOM into
+   the same state the JPG export uses (capture header on, empty missions and
+   empty leave zones dropped, unassigned pools folded in, light theme forced)
+   from the beforeprint event — so Ctrl+P and the 🖨 button both land here.
+
+   Why a print path exists at all: a JPG posted into a chat group is re-encoded
+   and downsized on the way, which is what makes it unreadable when you zoom in,
+   and an image cannot carry a link. A PDF is sent as a file, its text is drawn
+   from outlines (sharp at any zoom), and Chrome writes every <a href> out as a
+   link annotation — so the host location and the engineer's phone stay tappable
+   inside the file itself. ================================================== */
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media print {
+  /* Every colour on this board carries meaning: the engineer's colour on a
+     card's top edge, the service-area pill, the NIGHT chip, the dashed border
+     that says on-call. Browsers drop backgrounds when printing unless told
+     otherwise, which would strip all of it and leave a flat wall of text. */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* the app's furniture — none of it is part of the plan */
+  #sticky-header,
+  #stats-row,
+  #toolbar,
+  #float-pool,
+  #context-menu,
+  #touch-actions,
+  #modal-backdrop,
+  #datepicker-pop,
+  #chart-tip,
+  #toast-stack { display: none !important; }
+
+  html, body { background: #fff !important; }
+  body { margin: 0 !important; }
+  #app-root { margin: 0 !important; }
+
+  /* body.exporting pins this to the JPG capture's 1600px width (see the rule
+     near #board-capture above). On paper the page width IS the width, and
+     1600px of layout would simply be cropped at the margin. */
+  body.exporting #board-capture,
+  #board-capture {
+    min-width: 0 !important;
+    width: auto !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  /* its negative margins exist to bleed past #board-capture's 14px padding,
+     which is 0 here */
+  #capture-header { margin: 0 0 6mm !important; }
+
+  /* The masonry positions every card absolutely, at pixel offsets computed for
+     the screen — on paper that would stack the whole board in the top-left
+     corner of page one. These !important rules outrank those inline styles
+     (a stylesheet !important beats a non-important inline style) and hand the
+     cards back to normal flow, one per row. That is also the right shape for
+     the phone the PDF is mostly read on: scroll down, one mission at a time,
+     instead of panning sideways across a board built for a desk monitor. */
+  #missions-grid { height: auto !important; }
+  #missions-grid > .mission-card {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    margin: 0 0 5mm !important;
+  }
+
+  /* nothing that reads as a single block should be split across a page break */
+  .mission-card, .zone, .emp-card {
+    break-inside: avoid;
+    page-break-inside: avoid;   /* the older property, for engines that want it */
+  }
+
+  /* links keep the board's own ink rather than the UA's blue, and are NOT
+     annotated with their href in the margin — the point is a live tap target,
+     not a printed URL nobody is going to type in */
+  a { color: inherit !important; }
 }
