@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-04d">
+<link rel="stylesheet" href="styles.css?v=2026-09-04e">
 </head>
 <body>
 
@@ -36,12 +36,66 @@
       <img src="logo.png" alt="TRIGO Global Quality Solutions" onerror="this.onerror=null;this.src='logo.svg'">
     </div>
     <h2>Manpower Board</h2>
-    <p class="login-sub">Sign in with the account your admin created for you.</p>
     <form id="form-login">
+      <p class="login-sub">Sign in with your TRIGO account.</p>
       <label>Email <input name="email" type="email" required autocomplete="username"></label>
       <label>Password <input name="password" type="password" required autocomplete="current-password"></label>
       <p id="login-error" class="login-error hidden"></p>
+      <p id="login-note" class="login-note hidden"></p>
       <button type="submit" class="btn btn-primary login-submit">Sign in</button>
+      <div class="login-links">
+        <button type="button" class="login-link" id="btn-forgot">Forgot password?</button>
+        <button type="button" class="login-link" id="btn-request-access">Request access</button>
+      </div>
+    </form>
+
+    <!-- Request access: anyone with a company address can ask; a trigger on
+         auth.users is what actually enforces the domain, this form only
+         explains it before they type. -->
+    <form id="form-request" class="hidden">
+      <p class="login-sub">Ask for an account. Only <span class="invite-domain">@trigo-group.com</span> addresses can be used, and an admin approves the request before you can sign in.</p>
+      <label>Your name <input name="fullName" type="text" required autocomplete="name"></label>
+      <label>Work email <input name="email" type="email" required autocomplete="username" placeholder="name@trigo-group.com"></label>
+      <label>Choose a password <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+      <p id="request-error" class="login-error hidden"></p>
+      <p id="request-note" class="login-note hidden"></p>
+      <button type="submit" class="btn btn-primary login-submit">Send request</button>
+      <div class="login-links"><button type="button" class="login-link" data-login-back>Back to sign in</button></div>
+    </form>
+
+    <form id="form-forgot" class="hidden">
+      <p class="login-sub">We'll email you a link to set a new password.</p>
+      <label>Email <input name="email" type="email" required autocomplete="username"></label>
+      <p id="forgot-error" class="login-error hidden"></p>
+      <p id="forgot-note" class="login-note hidden"></p>
+      <button type="submit" class="btn btn-primary login-submit">Send reset link</button>
+      <div class="login-links"><button type="button" class="login-link" data-login-back>Back to sign in</button></div>
+    </form>
+
+    <!-- Shown instead of the board when someone signs in whose account is not
+         active yet: RLS would hand them empty tables, and a blank board
+         explains nothing. -->
+    <div id="login-blocked" class="hidden">
+      <p class="login-sub" id="login-blocked-text"></p>
+      <button type="button" class="btn btn-primary login-submit" id="btn-blocked-signout">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password recovery lands here: Supabase puts a recovery session in place
+     from the emailed link, and this is the only thing that session is for. -->
+<div id="reset-screen" class="hidden">
+  <div class="login-box">
+    <div class="login-brand">
+      <img src="logo.png" alt="TRIGO Global Quality Solutions" onerror="this.onerror=null;this.src='logo.svg'">
+    </div>
+    <h2>Set a new password</h2>
+    <p class="login-sub" id="reset-for"></p>
+    <form id="form-reset">
+      <label>New password <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+      <label>Repeat it <input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label>
+      <p id="reset-error" class="login-error hidden"></p>
+      <button type="submit" class="btn btn-primary login-submit">Save password</button>
     </form>
   </div>
 </div>
@@ -432,9 +486,31 @@
   <div class="modal hidden" id="modal-settings">
     <h3>Settings</h3>
     <div id="settings-tabs" class="settings-tabs">
-      <button type="button" class="settings-tab" data-tab="engineers">Engineer</button>
-      <button type="button" class="settings-tab" data-tab="areas">Service Area</button>
-      <button type="button" class="settings-tab" data-tab="boards">Board</button>
+      <button type="button" class="settings-tab" data-tab="account" data-area="account">My account</button>
+      <button type="button" class="settings-tab" data-tab="engineers" data-area="settings">Engineer</button>
+      <button type="button" class="settings-tab" data-tab="areas" data-area="settings">Service Area</button>
+      <button type="button" class="settings-tab" data-tab="boards" data-area="settings">Board</button>
+      <button type="button" class="settings-tab" data-tab="users" data-area="users">Users</button>
+      <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit">Roles</button>
+    </div>
+    <!-- My account: the one pane every role can open, which is why user
+         management lives in Settings rather than as a tab of its own. -->
+    <div class="settings-pane" data-pane="account">
+      <div class="settings-section">
+        <h4>My account</h4>
+        <div id="account-identity" class="account-identity"></div>
+        <form id="form-account-name" class="account-form">
+          <label>Display name <input name="fullName" type="text" maxlength="80" placeholder="e.g. Somchai P." autocomplete="name"></label>
+          <button type="submit" class="btn btn-small btn-primary">Save name</button>
+        </form>
+        <h4>Change password</h4>
+        <form id="form-account-password" class="account-form">
+          <label>New password <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+          <label>Repeat it <input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label>
+          <p class="import-note">At least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
+          <button type="submit" class="btn btn-small btn-primary">Change password</button>
+        </form>
+      </div>
     </div>
     <div class="settings-pane" data-pane="engineers">
       <div class="settings-section">
@@ -454,9 +530,96 @@
         <div id="settings-boards"></div>
       </div>
     </div>
+
+    <!-- Users: the same table shape as the Host list, so it inherits that
+         tab's toolbar / filter / sort / CSV styling rather than inventing any. -->
+    <div class="settings-pane" data-pane="users">
+      <div class="settings-section">
+        <div id="users-pending" class="hidden">
+          <span class="dupbar-icon" aria-hidden="true">⚠</span>
+          <span id="users-pending-text"></span>
+          <button type="button" class="btn btn-small" id="btn-users-pending">Review requests</button>
+        </div>
+        <div id="users-toolbar">
+          <input id="users-search" type="search" placeholder="Search name or email…" autocomplete="off">
+          <div id="users-filters">
+            <div class="ms" data-filter="roleKey"><button type="button" class="ms-btn">Role: All</button><div class="ms-pop hidden"></div></div>
+            <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <span id="users-count"></span>
+          <button type="button" class="btn btn-small btn-primary" id="btn-invite-user" title="Send someone an invitation email">+ Invite</button>
+          <button type="button" class="btn btn-small" id="btn-users-csv" title="Export the rows below as a CSV file">⬇ CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table id="users-table">
+            <thead>
+              <tr>
+                <th data-sort="name">Name</th>
+                <th data-sort="email">Email</th>
+                <th data-sort="role" title="What this person may see and change. The rules behind each role are on the Roles &amp; permissions tab.">Role</th>
+                <th data-sort="status" title="Pending = waiting for approval. Disabled keeps the record and all of their attribution, and only stops them signing in.">Status</th>
+                <th data-sort="lastSeen" title="When this person last opened the app.">Last seen</th>
+                <th data-sort="requested" title="When they asked for access, or were invited.">Requested</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roles & permissions: the matrix itself. Admin's column is rendered
+         read-only, and database triggers back that up. -->
+    <div class="settings-pane" data-pane="roles">
+      <div class="settings-section">
+        <h4>Roles &amp; permissions</h4>
+        <p class="import-note">What each role may see and change. <b>Edit</b> also grants view. Changes apply to everyone with that role straight away — including anyone with the app open right now. Admin always keeps full access, so nobody can lock themselves out of this screen.</p>
+        <div class="table-wrap">
+          <table id="roles-matrix"><tbody id="roles-matrix-body"></tbody></table>
+        </div>
+        <p class="import-note">Hiding an Overview section keeps it off the page and skips its query. It is not a data barrier: those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
+      </div>
+    </div>
     <div class="modal-actions">
       <button type="button" class="btn btn-primary" data-close>Done</button>
     </div>
+  </div>
+
+  <div class="modal hidden" id="modal-user">
+    <h3 id="user-modal-title">User</h3>
+    <form id="form-user">
+      <p id="user-modal-email" class="import-note"></p>
+      <label>Display name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
+      <label>Role <select name="roleKey" required></select></label>
+      <p id="user-role-hint" class="import-note"></p>
+      <label>Status <select name="status" required>
+        <option value="pending">Pending — waiting for approval</option>
+        <option value="active">Active — can sign in</option>
+        <option value="disabled">Disabled — kept on record, cannot sign in</option>
+      </select></label>
+      <p id="user-modal-note" class="import-note hidden"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger" id="btn-delete-user">Delete permanently</button>
+        <div class="toolbar-spacer"></div>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal hidden" id="modal-invite">
+    <h3>Invite someone</h3>
+    <form id="form-invite">
+      <label>Email <input name="email" type="email" required autocomplete="off" placeholder="name@trigo-group.com"></label>
+      <label>Role <select name="roleKey" required></select></label>
+      <p class="import-note">They get an email with a link that sets their password and signs them straight in. Only <span class="invite-domain">@trigo-group.com</span> addresses can be invited.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Send invitation</button>
+      </div>
+    </form>
   </div>
 
   <div class="modal hidden" id="modal-board">
@@ -513,8 +676,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-04d"></script>
+<script src="cloud.js?v=2026-09-04e"></script>
 <script src="charts.js?v=2026-09-03"></script>
-<script src="app.js?v=2026-09-04d"></script>
+<script src="app.js?v=2026-09-04e"></script>
 </body>
 </html>

@@ -131,7 +131,7 @@ const cloud = {
 
   /* ---------- identity: who am I, and what may I do ---------- */
   /* Loads the caller's profile, the role list and the permission matrix in one
-     round trip. Before migration-2026-09-05 has been run none of those tables
+     round trip. Before migration-2026-09-04b has been run none of those tables
      exist; rather than break, we fall back to `legacy` — app.js reads that as
      "allow everything", which is exactly how the app behaved before roles
      existed. The fallback is deliberately narrow: only a missing TABLE takes

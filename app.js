@@ -306,7 +306,8 @@ const state = {
   empSearch: "",              // name filter for the floating available panel
   poolAreas: new Set(),       // service-area filter for the floating panel; empty = all
   undoStack: [],              // [{date, entries:[{empId, prior}]}] — inverse of recent assignment changes
-  settingsTab: "engineers",   // Settings modal: which sub-menu (Engineer / Service Area / Board) is showing
+  settingsTab: "engineers",   // Settings modal: which sub-menu is showing. applySettingsTab falls
+                              // back to the first pane this role may open (My account, at worst)
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
@@ -315,6 +316,14 @@ const state = {
     sortDir: 1,
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
+  },
+  users: {                    // Settings > Users: search/filter/sort over the people list
+    search: "",
+    filters: { roleKey: [], status: [] },
+    pendingOnly: false,       // "Review requests" — show only accounts waiting for approval
+    sortKey: "email",
+    sortDir: 1,
+    editingId: null,          // profile id the User modal is editing
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
@@ -366,7 +375,7 @@ const isHostList = () => D().activeBoardId === HOSTLIST_ID;
 
 /* ---------- permissions ----------
    The JS twin of public.can() in the database (see
-   migration-2026-09-05-user-management.sql). Both read the same role x area
+   migration-2026-09-04b-user-management.sql). Both read the same role x area
    matrix off the same ladder, so the UI and Postgres can never disagree about
    what a role means — the UI decides what to draw, RLS decides what a write is
    allowed to do, and neither is trusted to do the other's job.
@@ -1063,7 +1072,7 @@ function clearSelection() {
 }
 
 function closeFilterPops() {
-  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop")) p.classList.add("hidden");
+  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop, #users-filters .ms-pop")) p.classList.add("hidden");
 }
 
 /* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
@@ -4194,17 +4203,45 @@ async function loadEmployeeHostRecord(empId) {
     </div>`).join("")}</div>`;
 }
 
-/* settings modal — Engineer / Service Area / Board sub-menu tabs */
+/* settings modal — My account / Engineer / Service Area / Board / Users / Roles */
+/* Each button declares the permission area it needs (data-area in index.html).
+   "account" is everybody's, so the modal always has at least one pane and the
+   ⚙ button is never a dead end. */
+function settingsTabAllowed(btn) {
+  const area = btn.dataset.area;
+  if (area === "account") return true;
+  if (area === "users-edit") return can("users", "edit");
+  return can(area, "edit") || (area === "users" && can("users"));
+}
+
 function applySettingsTab() {
-  for (const btn of $$("#settings-tabs .settings-tab")) {
+  const buttons = $$("#settings-tabs .settings-tab");
+  let firstAllowed = null;
+  for (const btn of buttons) {
+    const ok = settingsTabAllowed(btn);
+    btn.classList.toggle("hidden", !ok);
+    if (ok && !firstAllowed) firstAllowed = btn.dataset.tab;
+  }
+  // A role that has just lost a pane (or a Viewer opening Settings for the
+  // first time) would otherwise land on a hidden one and see nothing.
+  const current = buttons.find(b => b.dataset.tab === state.settingsTab);
+  if (!current || !settingsTabAllowed(current)) state.settingsTab = firstAllowed;
+  for (const btn of buttons) {
     btn.classList.toggle("active", btn.dataset.tab === state.settingsTab);
   }
   for (const pane of $$(".settings-pane")) {
     pane.classList.toggle("hidden", pane.dataset.pane !== state.settingsTab);
   }
+  // the Users and Roles tables are far wider than the rest of this modal
+  $("#modal-settings").classList.toggle("settings-wide",
+    state.settingsTab === "users" || state.settingsTab === "roles");
+  if (state.settingsTab === "account") renderAccountPane();
+  if (state.settingsTab === "users") renderUsersPane();
+  if (state.settingsTab === "roles") renderRolesMatrix();
 }
 
 function renderSettings() {
+  applySettingsTab();
   const engBox = $("#settings-engineers");
   engBox.innerHTML = "";
   for (const e of D().engineers) {
@@ -4710,10 +4747,485 @@ function initTheme() {
   applyTheme(localStorage.getItem("mpm-theme") || "light");
 }
 
+/* ================= Settings > My account / Users / Roles =================
+   User management lives in the Settings modal rather than as a tab of its own:
+   every role has something to do here (their own name and password), and only
+   an admin has the rest. A tab that most people could not open would be a tab
+   that mostly is not there. */
+
+const USER_STATUS = {
+  pending:  { label: "Pending",  hint: "Waiting for an admin to approve" },
+  active:   { label: "Active",   hint: "Can sign in" },
+  disabled: { label: "Disabled", hint: "Kept on record, cannot sign in" },
+};
+const roleLabel = (key) => {
+  const r = D().roles.find(x => x.key === key);
+  return r ? r.label : (key || "—");
+};
+/* A person cannot demote, disable or delete themselves, and the last active
+   admin cannot be demoted, disabled or deleted by anyone. Both rules are
+   enforced by triggers in the database as well — this is the courtesy half,
+   so the button explains itself instead of failing on save. */
+function userLockReason(u) {
+  const me = D().me;
+  if (me && u.id === me.id) return "You can't change your own role or status — ask another admin.";
+  const activeAdmins = (D().users || []).filter(x => x.roleKey === "admin" && x.status === "active");
+  if (u.roleKey === "admin" && u.status === "active" && activeAdmins.length <= 1) {
+    return "This is the only active admin. Promote someone else first.";
+  }
+  return null;
+}
+
+/* ---------- My account ---------- */
+function renderAccountPane() {
+  const me = D().me;
+  const box = $("#account-identity");
+  if (!me) { box.textContent = ""; return; }
+  const status = USER_STATUS[me.status];
+  box.innerHTML =
+    `<div class="account-email">${escapeHtml(me.email || "")}</div>` +
+    (me.legacy
+      ? `<p class="import-note">Roles aren't set up on this database yet — everyone has full access until <code>migration-2026-09-04b-user-management.sql</code> is run.</p>`
+      : `<div class="account-meta">` +
+          `<span class="role-pill role-${escapeHtml(me.roleKey || "none")}">${escapeHtml(roleLabel(me.roleKey))}</span>` +
+          `<span class="status-pill status-${escapeHtml(me.status)}">${escapeHtml(status ? status.label : me.status)}</span>` +
+        `</div>` +
+        `<p class="import-note">Your role decides which tabs you see and what you can change. Only an admin can alter it.</p>`);
+  $("#form-account-name").fullName.value = me.fullName || "";
+}
+
+function wireAccountPane() {
+  $("#form-account-name").onsubmit = (ev) => {
+    ev.preventDefault();
+    const name = ev.target.fullName.value;
+    safely(async () => {
+      await cloud.updateMyProfile(name);
+      toast("Name saved.", "info");
+      renderAccountPane();
+      if (D().users) renderUserRows();
+    });
+  };
+  $("#form-account-password").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    if (form.password.value !== form.confirm.value) { toast("The two passwords don't match.", "error"); return; }
+    safely(async () => {
+      await cloud.updatePassword(form.password.value);
+      form.reset();
+      toast("Password changed.", "info");
+    });
+  };
+}
+
+/* ---------- Users ---------- */
+function usersFilteredSorted() {
+  const st = state.users;
+  const f = st.filters;
+  const q = st.search.trim().toLowerCase();
+  const rows = (D().users || []).filter(u => {
+    if (st.pendingOnly && u.status !== "pending") return false;
+    if (f.roleKey.length && !f.roleKey.includes(u.roleKey)) return false;
+    if (f.status.length && !f.status.includes(u.status)) return false;
+    if (!q) return true;
+    return (u.email || "").toLowerCase().includes(q) || (u.fullName || "").toLowerCase().includes(q);
+  });
+  const val = (u) => ({
+    name: (u.fullName || "").toLowerCase(),
+    email: (u.email || "").toLowerCase(),
+    role: roleLabel(u.roleKey).toLowerCase(),
+    status: u.status,
+    lastSeen: u.lastSeenAt || "",
+    requested: u.requestedAt || "",
+  })[st.sortKey];
+  return rows.sort((a, b) => {
+    const av = val(a), bv = val(b);
+    if (av === bv) return (a.email || "").localeCompare(b.email || "");
+    // blanks last whichever way the column is pointing — an empty "last seen"
+    // is "never", not "earliest"
+    if (av === "") return 1;
+    if (bv === "") return -1;
+    return (av < bv ? -1 : 1) * st.sortDir;
+  });
+}
+
+function usersMsLabel(key) {
+  const picked = state.users.filters[key];
+  const noun = key === "roleKey" ? "Role" : "Status";
+  if (!picked.length) return `${noun}: All`;
+  if (picked.length === 1) return `${noun}: ${key === "roleKey" ? roleLabel(picked[0]) : (USER_STATUS[picked[0]] || {}).label || picked[0]}`;
+  return `${noun}: ${picked.length}`;
+}
+
+function renderUsersFilterOptions() {
+  for (const ms of $$("#users-filters .ms")) {
+    const key = ms.dataset.filter;
+    ms.querySelector(".ms-btn").textContent = usersMsLabel(key);
+    const pop = ms.querySelector(".ms-pop");
+    pop.innerHTML = "";
+    const clear = document.createElement("div");
+    clear.className = "ms-clear";
+    clear.textContent = "Clear";
+    clear.onclick = () => { state.users.filters[key] = []; renderUsersFilterOptions(); renderUserRows(); };
+    pop.appendChild(clear);
+    const opts = key === "roleKey"
+      ? D().roles.map(r => ({ value: r.key, label: r.label }))
+      : Object.keys(USER_STATUS).map(k => ({ value: k, label: USER_STATUS[k].label }));
+    for (const o of opts) {
+      const row = document.createElement("label");
+      row.className = "ms-opt";
+      const checked = state.users.filters[key].includes(o.value) ? "checked" : "";
+      row.innerHTML = `<input type="checkbox" value="${escapeHtml(o.value)}" ${checked}><span>${escapeHtml(o.label)}</span>`;
+      row.querySelector("input").onchange = (e) => {
+        const set = new Set(state.users.filters[key]);
+        e.target.checked ? set.add(o.value) : set.delete(o.value);
+        state.users.filters[key] = [...set];
+        ms.querySelector(".ms-btn").textContent = usersMsLabel(key);   // keep the dropdown open
+        renderUserRows();
+      };
+      pop.appendChild(row);
+    }
+  }
+}
+
+/* Loads the people list on first entry to the pane, then redraws. Everything
+   after that comes over Realtime (see cloud._subscribeRealtime). */
+function renderUsersPane() {
+  if (!can("users")) return;
+  $("#users-search").value = state.users.search;
+  if (D().users === null) {
+    safely(async () => { await cloud.loadUsers(); renderUsersFilterOptions(); renderUserRows(); });
+    return;
+  }
+  renderUsersFilterOptions();
+  renderUserRows();
+}
+
+function renderUserRows() {
+  const body = $("#users-body");
+  if (!body) return;
+  const rows = usersFilteredSorted();
+  const all = D().users || [];
+  const mayEdit = can("users", "edit");
+
+  const pending = all.filter(u => u.status === "pending");
+  const bar = $("#users-pending");
+  bar.classList.toggle("hidden", !pending.length);
+  if (pending.length) {
+    $("#users-pending-text").textContent = pending.length === 1
+      ? "1 person is waiting for access."
+      : `${pending.length} people are waiting for access.`;
+    $("#btn-users-pending").textContent = state.users.pendingOnly ? "Show everyone" : "Review requests";
+  }
+
+  $("#users-count").textContent = rows.length === all.length
+    ? `${all.length} ${all.length === 1 ? "person" : "people"}`
+    : `${rows.length} of ${all.length}`;
+  $("#btn-invite-user").classList.toggle("hidden", !mayEdit);
+
+  for (const th of $$("#users-table th[data-sort]")) {
+    th.classList.toggle("sorted", th.dataset.sort === state.users.sortKey);
+    th.classList.toggle("desc", th.dataset.sort === state.users.sortKey && state.users.sortDir < 0);
+  }
+
+  body.innerHTML = "";
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7" class="import-note">${all.length ? "No one matches those filters." : "No accounts yet."}</td></tr>`;
+    return;
+  }
+  for (const u of rows) {
+    const tr = document.createElement("tr");
+    const st = USER_STATUS[u.status] || { label: u.status };
+    const isMe = D().me && u.id === D().me.id;
+    tr.className = "user-row status-" + u.status + (isMe ? " user-row-me" : "");
+    tr.innerHTML = `
+      <td data-label="Name">${escapeHtml(u.fullName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}</td>
+      <td data-label="Email">${escapeHtml(u.email || "")}</td>
+      <td data-label="Role"><span class="role-pill role-${escapeHtml(u.roleKey || "none")}">${escapeHtml(roleLabel(u.roleKey))}</span></td>
+      <td data-label="Status"><span class="status-pill status-${escapeHtml(u.status)}" title="${escapeHtml(st.hint || "")}">${escapeHtml(st.label)}</span></td>
+      <td data-label="Last seen">${u.lastSeenAt ? escapeHtml(fmtDate(u.lastSeenAt.slice(0, 10))) : "—"}</td>
+      <td data-label="Requested">${u.requestedAt ? escapeHtml(fmtDate(u.requestedAt.slice(0, 10))) : "—"}</td>
+      <td data-label="" class="user-actions"></td>`;
+    const actions = tr.querySelector(".user-actions");
+    if (mayEdit) {
+      if (u.status === "pending") {
+        // The two things an admin actually wants to do to a request, without
+        // opening anything: approve at the default role, or turn it down.
+        const ok = document.createElement("button");
+        ok.type = "button";
+        ok.className = "btn btn-small btn-primary";
+        ok.textContent = "Approve";
+        ok.onclick = () => approveUser(u);
+        actions.appendChild(ok);
+        const no = document.createElement("button");
+        no.type = "button";
+        no.className = "btn btn-small";
+        no.textContent = "Reject";
+        no.onclick = () => rejectUser(u);
+        actions.appendChild(no);
+      }
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn btn-small";
+      edit.textContent = "✎";
+      edit.title = "Edit this person";
+      edit.onclick = () => openUserModal(u.id);
+      actions.appendChild(edit);
+    }
+    body.appendChild(tr);
+  }
+}
+
+function approveUser(u) {
+  const fallback = D().roles.some(r => r.key === "viewer") ? "viewer" : (D().roles[0] || {}).key;
+  const roleKey = u.roleKey || fallback;
+  safely(async () => {
+    await cloud.saveUser(u.id, { status: "active", roleKey });
+    renderUserRows();
+    const mailed = await cloud.notifyUser(u.id, "approved");
+    toast(`${u.fullName || u.email} can now sign in as ${roleLabel(roleKey)}.` +
+      (mailed ? " They've been emailed." : ""), "info");
+  });
+}
+
+function rejectUser(u) {
+  showConfirm("Turn down this request?",
+    `${u.fullName || u.email} will not be able to sign in. Their record is kept, so you can approve them later without them asking again.`,
+    () => safely(async () => {
+      await cloud.saveUser(u.id, { status: "disabled" });
+      renderUserRows();
+      await cloud.notifyUser(u.id, "rejected");
+      toast("Request turned down.", "info");
+    }));
+}
+
+function fillRoleSelect(sel, value) {
+  sel.innerHTML = D().roles.map(r => `<option value="${escapeHtml(r.key)}">${escapeHtml(r.label)}</option>`).join("");
+  if (value) sel.value = value;
+}
+
+/* The modal opens over the Settings modal — openModal hides every other .modal,
+   so closing it comes back to Settings via reopenSettings() rather than
+   stacking two dialogs. */
+function openUserModal(id) {
+  const u = (D().users || []).find(x => x.id === id);
+  if (!u || !can("users", "edit")) return;
+  state.users.editingId = id;
+  const form = $("#form-user");
+  $("#user-modal-title").textContent = u.fullName || u.email;
+  $("#user-modal-email").textContent = u.email;
+  form.fullName.value = u.fullName || "";
+  fillRoleSelect(form.roleKey, u.roleKey || "viewer");
+  form.status.value = u.status;
+  const locked = userLockReason(u);
+  form.roleKey.disabled = !!locked;
+  form.status.disabled = !!locked;
+  $("#btn-delete-user").classList.toggle("hidden", !!locked);
+  $("#user-modal-note").textContent = locked || "";
+  $("#user-modal-note").classList.toggle("hidden", !locked);
+  $("#user-role-hint").textContent = "What each role may do is on the Roles & permissions tab.";
+  openModal("#modal-user");
+}
+
+function reopenSettings() {
+  closeModal();
+  renderSettings();
+  openModal("#modal-settings");
+}
+
+function saveUserModal(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const id = state.users.editingId;
+  const before = (D().users || []).find(x => x.id === id);
+  if (!before) return;
+  const vals = { fullName: form.fullName.value };
+  if (!form.roleKey.disabled) { vals.roleKey = form.roleKey.value; vals.status = form.status.value; }
+  safely(async () => {
+    await cloud.saveUser(id, vals);
+    reopenSettings();
+    renderUserRows();
+    if (vals.roleKey && vals.roleKey !== before.roleKey) await cloud.notifyUser(id, "role-changed");
+    toast("Saved.", "info");
+  });
+}
+
+function deleteUserFromModal() {
+  const id = state.users.editingId;
+  const u = (D().users || []).find(x => x.id === id);
+  if (!u) return;
+  showConfirm("Delete this account permanently?",
+    `${u.fullName || u.email} will be removed from the sign-in system entirely and cannot be brought back. ` +
+    `To take someone's access away while keeping their record — and the "locked by" and "updated by" history that names them — set their status to Disabled instead.`,
+    () => safely(async () => {
+      await cloud.deleteUser(id);
+      reopenSettings();
+      renderUserRows();
+      toast("Account deleted.", "info");
+    }));
+}
+
+function openInviteModal() {
+  if (!can("users", "edit")) return;
+  const form = $("#form-invite");
+  form.reset();
+  fillRoleSelect(form.roleKey, "viewer");
+  openModal("#modal-invite");
+}
+
+function sendInvite(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const email = form.email.value.trim().toLowerCase();
+  safely(async () => {
+    await cloud.inviteUser(email, form.roleKey.value);
+    reopenSettings();
+    renderUserRows();
+    toast(`Invitation sent to ${email}.`, "info");
+  });
+}
+
+function exportUsersCsv() {
+  const rows = usersFilteredSorted();   // the same rows the table is showing right now
+  const header = ["Name", "Email", "Role", "Status", "Last seen", "Requested", "Approved", "Approved by"];
+  const out = rows.map(u => [
+    u.fullName || "", u.email || "", roleLabel(u.roleKey),
+    (USER_STATUS[u.status] || {}).label || u.status,
+    u.lastSeenAt || "", u.requestedAt || "", u.approvedAt || "", u.approvedBy || "",
+  ]);
+  const csv = [header, ...out].map(r => r.map(csvField).join(",")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `users_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- Roles & permissions ---------- */
+/* The matrix, drawn as one table: rows are areas grouped into "Tabs & menus"
+   and "Overview sections", columns are the roles. Admin's column is disabled
+   here and guarded by a trigger in the database, so this screen can never be
+   used to lock everyone out of this screen. */
+function renderRolesMatrix() {
+  const body = $("#roles-matrix-body");
+  if (!body || !can("users", "edit")) return;
+  const roles = D().roles;
+  body.innerHTML = "";
+
+  const head = document.createElement("tr");
+  head.className = "rm-head";
+  head.innerHTML = "<th>Area</th>" + roles.map(r =>
+    `<th>${escapeHtml(r.label)}${r.protected ? '<br><small>always full access</small>' : ""}</th>`).join("");
+  body.appendChild(head);
+
+  for (const group of PERM_AREAS) {
+    const gr = document.createElement("tr");
+    gr.className = "rm-group";
+    gr.innerHTML = `<td colspan="${roles.length + 1}">${escapeHtml(group.group)}</td>`;
+    body.appendChild(gr);
+
+    for (const item of group.items) {
+      const viewOnly = group.viewOnly || item.viewOnly;
+      const tr = document.createElement("tr");
+      const hint = item.hint ? `<small>${escapeHtml(item.hint)}</small>` : "";
+      tr.innerHTML = `<td class="rm-area">${escapeHtml(item.label)}${hint}</td>`;
+      for (const role of roles) {
+        const td = document.createElement("td");
+        const cur = (D().perms[role.key] || {})[item.key] || "none";
+        const sel = document.createElement("select");
+        sel.className = "rm-level";
+        // A section that nothing can "edit" only offers off/on — a third state
+        // that means nothing would just be a way to get it wrong.
+        const levels = viewOnly ? ["none", "view"] : ["none", "view", "edit"];
+        sel.innerHTML = levels.map(l =>
+          `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : "Edit"}</option>`).join("");
+        sel.value = levels.includes(cur) ? cur : "view";
+        sel.disabled = !!role.protected;
+        if (role.protected) sel.title = "Admin always keeps full access.";
+        sel.onchange = () => {
+          const level = sel.value;
+          safely(async () => {
+            await cloud.setRolePermission(role.key, item.key, level);
+            renderRolesMatrix();
+            // the change may have been to our own role — redraw the whole app
+            await refreshAndRender();
+          });
+        };
+        td.appendChild(sel);
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    }
+  }
+}
+
+function wireUserManagement() {
+  $("#users-search").addEventListener("input", (e) => { state.users.search = e.target.value; renderUserRows(); });
+  $("#btn-users-pending").onclick = () => { state.users.pendingOnly = !state.users.pendingOnly; renderUserRows(); };
+  $("#btn-users-csv").onclick = exportUsersCsv;
+  $("#btn-invite-user").onclick = openInviteModal;
+  $("#form-invite").onsubmit = sendInvite;
+  $("#form-user").onsubmit = saveUserModal;
+  $("#btn-delete-user").onclick = deleteUserFromModal;
+  for (const ms of $$("#users-filters .ms")) {
+    ms.querySelector(".ms-btn").onclick = (ev) => {
+      ev.stopPropagation();
+      const pop = ms.querySelector(".ms-pop");
+      const wasOpen = !pop.classList.contains("hidden");
+      closeFilterPops();
+      if (!wasOpen) pop.classList.remove("hidden");
+    };
+  }
+  for (const th of $$("#users-table th[data-sort]")) {
+    th.onclick = () => {
+      const key = th.dataset.sort;
+      if (state.users.sortKey === key) state.users.sortDir *= -1;
+      else { state.users.sortKey = key; state.users.sortDir = 1; }
+      renderUserRows();
+    };
+  }
+  wireAccountPane();
+}
+
 /* ---------- login ---------- */
-function showLogin() {
+/* The sign-in box holds four forms in one card — sign in, request access,
+   forgot password, and the "you can't come in yet" message — because they are
+   the same conversation and swapping them in place keeps the person on one
+   screen instead of navigating them around. */
+const LOGIN_FORMS = ["#form-login", "#form-request", "#form-forgot", "#login-blocked"];
+
+function showLogin(which = "#form-login") {
   $("#login-screen").classList.remove("hidden");
+  $("#reset-screen").classList.add("hidden");
   $("#app-root").classList.add("hidden");
+  for (const id of LOGIN_FORMS) $(id).classList.toggle("hidden", id !== which);
+}
+
+/* Shown when someone signs in successfully but their account isn't active.
+   Without this they would land on a board with every table empty (RLS is doing
+   its job) and no idea why. */
+function showAccountBlocked(status) {
+  const msg = status === "pending"
+    ? "Your request is in. An admin still has to approve it — you'll get an email when they do."
+    : status === "missing"
+      ? "Your sign-in works, but there's no profile record for it yet. An admin needs to run the user-management migration, or add you from Settings → Users."
+      : "Your access to this app has been switched off. Ask an admin if you think that's a mistake.";
+  $("#login-blocked-text").textContent = msg;
+  showLogin("#login-blocked");
+}
+
+/* A submit button that says what it is doing, and puts itself back afterwards. */
+function withBusy(form, label, run) {
+  const btn = form.querySelector("button[type=submit]");
+  const was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = label;
+  return run().finally(() => { btn.disabled = false; btn.textContent = was; });
+}
+function loginMessage(sel, text, isError) {
+  const box = $(sel);
+  box.textContent = text;
+  box.classList.toggle("hidden", !text);
 }
 
 function wireLogin() {
@@ -4733,6 +5245,82 @@ function wireLogin() {
         btn.disabled = false;
         btn.textContent = "Sign in";
       });
+  };
+
+  $("#btn-request-access").onclick = () => showLogin("#form-request");
+  $("#btn-forgot").onclick = () => {
+    $("#form-forgot").email.value = $("#form-login").email.value;
+    showLogin("#form-forgot");
+  };
+  for (const b of $$("[data-login-back]")) b.onclick = () => showLogin("#form-login");
+  $("#btn-blocked-signout").onclick = () => cloud.signOut().then(() => location.reload());
+
+  $("#form-request").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    loginMessage("#request-error", "");
+    loginMessage("#request-note", "");
+    withBusy(form, "Sending…", () =>
+      cloud.requestAccess(form.email.value, form.password.value, form.fullName.value)
+        .then(() => {
+          form.reset();
+          loginMessage("#request-note",
+            "Request sent. Confirm your email address if we've sent you a link, then wait for an admin to approve you — you'll get an email either way.");
+        })
+        .catch((e) => {
+          // The domain rule lives in a trigger on auth.users, and a trigger
+          // exception comes back from the auth service as an opaque 500 — so
+          // say the useful thing rather than passing that through.
+          const raw = (e && e.message) || "";
+          const domainish = /database error|unexpected_failure|limited to|500/i.test(raw);
+          loginMessage("#request-error", domainish
+            ? "That address can't be used. Access is limited to @trigo-group.com addresses."
+            : raw || "Could not send the request.", true);
+        }));
+  };
+
+  $("#form-forgot").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    loginMessage("#forgot-error", "");
+    loginMessage("#forgot-note", "");
+    withBusy(form, "Sending…", () =>
+      cloud.resetPassword(form.email.value)
+        // Deliberately the same answer whether or not the address is one we
+        // know: this form must not become a way to find out who has an account.
+        .then(() => loginMessage("#forgot-note", "If that address has an account, a reset link is on its way."))
+        .catch(() => loginMessage("#forgot-note", "If that address has an account, a reset link is on its way.")));
+  };
+}
+
+/* ---------- password recovery ---------- */
+/* Supabase turns the emailed link into a recovery session before this runs, so
+   there is nothing to verify here — the session IS the proof. */
+function showResetScreen(session) {
+  $("#login-screen").classList.add("hidden");
+  $("#app-root").classList.add("hidden");
+  $("#reset-screen").classList.remove("hidden");
+  const email = session && session.user && session.user.email;
+  $("#reset-for").textContent = email ? `For ${email}.` : "";
+}
+
+function wireReset() {
+  $("#form-reset").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    loginMessage("#reset-error", "");
+    if (form.password.value !== form.confirm.value) {
+      loginMessage("#reset-error", "The two passwords don't match.", true);
+      return;
+    }
+    withBusy(form, "Saving…", () =>
+      cloud.updatePassword(form.password.value)
+        .then(() => {
+          // straight into the app: the recovery session is a real session
+          window.location.hash = "";
+          location.reload();
+        })
+        .catch((e) => loginMessage("#reset-error", (e && e.message) || "Could not set the password.", true)));
   };
 }
 
@@ -4781,6 +5369,7 @@ function wireApp() {
   for (const btn of $$("#employee-tabs .settings-tab")) {
     btn.onclick = () => { state.employeeTab = btn.dataset.tab; applyEmployeeTab(); };
   }
+  wireUserManagement();
   $("#btn-add-engineer").onclick = () => safely(async () => { await cloud.addEngineer(); renderSettings(); });
   $("#btn-add-area").onclick = () => safely(async () => { await cloud.addArea(); renderSettings(); });
 
@@ -5030,6 +5619,15 @@ async function boot() {
   wireApp();
   try { const session = await cloud.getSession(); state.myEmail = session && session.user && session.user.email; } catch (e) { /* toast attribution just won't fire */ }
   await cloud.init(() => state.date);
+  // Signed in, but not allowed in yet. RLS would hand them empty tables, so
+  // stop here with an explanation instead of a board with nothing on it.
+  const me = D().me;
+  if (me && !me.legacy && me.status !== "active") {
+    $("#app-root").classList.add("hidden");
+    showAccountBlocked(me.status);
+    return;
+  }
+  cloud.touchLastSeen();   // best-effort; "last seen" in Settings → Users
   // holidays are known now — restore the last board/date the user was on, falling
   // back to the next working day if there's nothing saved (or it's stale/invalid)
   restoreViewState();
@@ -5056,12 +5654,26 @@ async function boot() {
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);
 }
 
+/* A recovery link arrives as #access_token=...&type=recovery. Supabase's client
+   consumes that hash and raises PASSWORD_RECOVERY, but the hash is readable
+   before it does — and reading it first is what stops the app booting the board
+   for a split second on the way to the reset form. */
+function isRecoveryLink() {
+  const h = window.location.hash || "";
+  return /(^|[#&])type=recovery(&|$)/.test(h);
+}
+
 async function main() {
   wireLogin();
+  wireReset();
   let session = null;
   try { session = await cloud.getSession(); } catch (e) { console.error(e); }
   let hadSession = !!session;
-  if (session) {
+  let recovering = isRecoveryLink();
+
+  if (recovering) {
+    showResetScreen(session);
+  } else if (session) {
     await boot();
   } else {
     showLogin();
@@ -5069,7 +5681,13 @@ async function main() {
   // onAuthStateChange always fires once on load (even with no session ever set) —
   // only reload on a genuine sign-out transition, not that initial null event.
   cloud.onAuthChange((s) => {
-    if (s) { hadSession = true; return; }
+    if (s) {
+      hadSession = true;
+      // The recovery session can land after this handler is attached, when the
+      // link's hash is parsed asynchronously.
+      if (isRecoveryLink() && !recovering) { recovering = true; showResetScreen(s); }
+      return;
+    }
     if (hadSession) location.reload();
   });
 }

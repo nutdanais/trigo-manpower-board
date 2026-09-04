@@ -170,7 +170,7 @@ create table if not exists plan_days (
 
 -- ===== Users, roles and permissions =====
 -- Everything below to the RLS section is also shipped as
--- migration-2026-09-05-user-management.sql, for a project that already
+-- migration-2026-09-04b-user-management.sql, for a project that already
 -- has data. The two files are kept identical on purpose.
 
 -- ===== Roles =====

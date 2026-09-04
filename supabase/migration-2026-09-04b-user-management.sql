@@ -471,7 +471,7 @@ select u.id,
        'manager',
        'active',
        now(),
-       'migration-2026-09-05'
+       'migration-2026-09-04b'
 from auth.users u
 where u.email is not null
 on conflict (id) do nothing;
