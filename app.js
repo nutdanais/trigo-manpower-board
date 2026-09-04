@@ -3481,7 +3481,7 @@ function renderHostRows() {
         <span class="hl-host">${escapeHtml(r.name)}</span>
         ${r.archived ? `<span class="hl-tag hl-tag-arch" title="Archived — kept with its history, but not offered when creating a mission">archived</span>` : ""}
         ${dups.byName.has(r.name) ? `<span class="hl-tag hl-tag-dup" title="Another host has a very similar name — open this row to merge them">similar</span>` : ""}
-        <button type="button" class="hl-edit" title="Edit location, area, note — or merge this host into another">✎</button>
+        <button type="button" class="hl-edit" title="Edit name, location, area, note — or merge this host into another">✎</button>
       </td>
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
       <td data-label="Service area" class="hl-area-cell">${r.area
@@ -3594,11 +3594,12 @@ function exportHostlistCsv() {
   URL.revokeObjectURL(a.href);
 }
 
-/* Host modal — the location/map-link record for one host. For a host the board
-   already knows, the name is fixed: it's the key tying this record to the
-   mission and deployment rows carrying the same text (see cloud.saveHost), so
-   editing it here would quietly orphan the record from its own history. */
-/* `name` names an existing host (its name is then fixed). opts.prefillName
+/* Host modal — the location/map-link record for one host. The name is editable
+   like everything else here, but it is not an ordinary field: it is the key
+   tying this record to the mission and deployment rows carrying the same text,
+   so changing it goes through cloud.renameHost, which rewrites those rows too.
+   That is why saveHostForm always confirms a rename before it runs. */
+/* `name` names an existing host. opts.prefillName
    seeds a NEW host's name — that's the New Mission hand-off, where the planner
    has already typed a host that isn't in the list yet; opts.returnToMission
    sends them back to the mission form afterwards with the host filled in. */
@@ -3610,7 +3611,6 @@ function openHostModal(name, opts = {}) {
   form.reset();
   $("#host-modal-title").textContent = name ? `Host — ${name}` : "New Host";
   form.name.value = name || opts.prefillName || "";
-  form.name.readOnly = !!name;
   $("#host-name-note").classList.toggle("hidden", !name);
   form.location.value = rec ? rec.location : "";
   form.mapUrl.value = rec ? rec.mapUrl : "";
@@ -3709,14 +3709,62 @@ function saveHostForm(ev) {
   const note = form.note.value.trim();
   const areaId = form.areaId.value;
   const archived = form.archived.checked;
-  if (!state.hostlist.editingHost && hostRecordOf(name)) {
+  const from = state.hostlist.editingHost;
+  if (!from && hostRecordOf(name)) {
     toast(`${name} is already in the host list — edit that row instead.`, "error");
     return;
   }
+  const vals = { name, location, mapUrl, areaId, archived, note };
+  if (!from || name === from) { runHostSave(vals, null); return; }
+
+  /* A rename from here on. Two things it is deliberately NOT allowed to be:
+
+     Silent — it rewrites this host's name on every mission and deployment row
+     it has ever appeared on, which changes what past mission cards say. That
+     is the right behaviour (the history belongs to the host, not to the
+     spelling) but it is far too wide to happen without being spelled out.
+
+     A merge — landing on a name that already exists would join two histories
+     for good. That has its own tool in this same modal, its own confirmation,
+     and its own rules about whose location and note survive; arriving there by
+     mistyping a rename would be the worst possible way to trigger it. So it is
+     refused and pointed at Merge rather than guessed at. */
+  const rows = allHostRows();
+  if (rows.some(r => r.name === name)) {
+    toast(`"${name}" is already a host — use "Merge into another host" below to combine them.`, "error");
+    return;
+  }
+  const me = rows.find(r => r.name === from);
+  const impact = me
+    ? `Its ${me.missionCount} mission${me.missionCount === 1 ? "" : "s"} and ${me.deployedDays} deployment day${me.deployedDays === 1 ? "" : "s"} are`
+    : "Its missions and deployment history are";
+  showConfirm("Rename this host?",
+    `Rename "${from}" to "${name}"? ${impact} rewritten to the new name, so this host keeps its whole history instead of starting fresh — but past mission cards for it will read "${name}" too. Nothing else about the host changes.`,
+    () => runHostSave(vals, from),
+    () => openModal("#modal-host"));   // "Cancel" → back to the form, edits intact
+}
+
+/* The save itself, once any rename has been confirmed. `from` is the old name
+   when this is a rename, null otherwise.
+
+   Order matters: the rename has to land BEFORE saveHost. saveHost upserts on
+   the name, so saving first and renaming after would write a second record
+   under the new name and leave the original sitting under the old one. */
+function runHostSave(vals, from) {
+  const { name } = vals;
+  const renamed = !!from;
   const back = state.hostlist.returnToMission;
   state.hostlist.returnToMission = false;
   safely(async () => {
-    const res = await cloud.saveHost({ name, location, mapUrl, areaId, archived, note });
+    if (renamed) {
+      await cloud.renameHost(from, name);
+      // the directory itself changed, not just one record — same bookkeeping
+      // the merge path does, since both rewrite mission rows
+      state.hostlist.dirCacheKey = null;
+      if (state.hostlist.expanded.delete(from)) state.hostlist.expanded.add(name);
+      state.hostlist.editingHost = name;
+    }
+    const res = await cloud.saveHost(vals);
     closeModal();
     await refreshAndRender();
     if (back) {
@@ -3734,7 +3782,7 @@ function saveHostForm(ev) {
       const what = skipped.map(c => HOST_COLUMN_MIGRATIONS[c] || c).join(" and ");
       toast(`Saved ${name}, but ${what} — the rest of the record was saved.`, "warn");
     } else {
-      toast(`Saved ${name}.`, "info");
+      toast(renamed ? `Renamed ${from} to ${name}.` : `Saved ${name}.`, "info");
     }
   });
 }
