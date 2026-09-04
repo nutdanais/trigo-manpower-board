@@ -5628,6 +5628,16 @@ async function boot() {
     return;
   }
   cloud.touchLastSeen();   // best-effort; "last seen" in Settings → Users
+  // A matrix can be edited down to a role with no tab at all. Rendering the
+  // board view with no board would be a stack of empty furniture, so say what
+  // has happened instead. (Admin can never reach this — its column is locked.)
+  if (me && !me.legacy && !firstAllowedView()) {
+    $("#app-root").classList.add("hidden");
+    $("#login-blocked-text").textContent =
+      "Your role doesn't have access to any part of the app yet. Ask an admin to give it something in Settings → Roles.";
+    showLogin("#login-blocked");
+    return;
+  }
   // holidays are known now — restore the last board/date the user was on, falling
   // back to the next working day if there's nothing saved (or it's stale/invalid)
   restoreViewState();
@@ -5647,6 +5657,9 @@ async function boot() {
       const board = D().boards.find(b => b.id === payload.boardId);
       toast(`${board ? board.name : "This board"} was just updated by ${payload.updatedBy}.`, "info");
     }
+    // render() never touches the Settings modal, so an approval or a role change
+    // arriving over Realtime would otherwise sit stale on an open Users pane.
+    if (!$("#modal-settings").classList.contains("hidden")) applySettingsTab();
     refreshAndRender();
   });
   await refreshAndRender();
