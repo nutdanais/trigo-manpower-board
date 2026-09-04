@@ -1,10 +1,24 @@
 # Publishing the board to a shareable link (Netlify)
 
+> **⚠️ The manual drag-and-drop process below has been superseded.** The Netlify
+> site is now connected to this GitHub repository and rebuilds on push, and
+> `config.js` is generated at build time from environment variables rather than
+> being copied out of the working folder (which is why `.gitignore` excludes it).
+> So the release chore is just: **push to the branch Netlify builds from, having
+> bumped the `?v=` strings in `index.html`** (see "Releasing a change" in the
+> README). `build-deploy.ps1` and the `deploy/` folder are only needed for a
+> hand-upload, which nothing normally requires any more.
+>
+> The rest of this file is kept as the record of the original setup and as the
+> fallback if the Git connection is ever removed. Someone with access to the
+> Netlify dashboard should fill in the real build command and the environment
+> variable names here — they aren't recorded anywhere in this repo.
+
 The app is a set of static files that talk to Supabase. Netlify hosts those files
 for free and gives you one HTTPS link the whole team can open.
 
-The folder to publish is **`deploy/`** — it contains only the 6 files the app needs.
-(Re-create it any time with `build-deploy.ps1` after a change.)
+The folder to publish (for a hand-upload) is **`deploy/`** — it contains only the
+6 files the app needs. (Re-create it any time with `build-deploy.ps1` after a change.)
 
 ## Recommended: free account → stable link you can update
 

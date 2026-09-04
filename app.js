@@ -749,6 +749,8 @@ function render() {
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
   $("#btn-add-host").classList.toggle("hidden", !can("hostlist", "edit"));
   $("#btn-export").classList.toggle("hidden", eml || hl);
+  // Print, like Export, is a read: a Viewer may take the board away with them.
+  $("#btn-print").classList.toggle("hidden", eml || hl);
   $("#btn-reset-board").classList.toggle("hidden", !boardEdit);
   // Every control in the main toolbar belongs to a board or to the employee
   // roster, so on the Host List the row would be empty furniture (and on a
@@ -1476,12 +1478,19 @@ function renderMissions() {
     // chip: the two together answer "when and where" without reading the
     // address, and a host with no area set simply shows no pill
     const hostArea = hostAreaOf(m.host);
+    const hostRec = hostRecordOf(m.host);
+    /* Where the job is, answered by the host name itself: it becomes the map
+       link, with a pin after it. It was only ever in the Host List tab — a
+       planner's screen — so the one question the crew reading a shared board
+       actually has ("where do I go?") was the one thing the board did not
+       answer. See hostNameHtml. */
+    const hostHtml = hostNameHtml(m.host, hostRec);
     /* The PPE line carries the host's own note first, then this mission's PPE
        — one line for "everything the crew has to know before they go", rather
        than a site note that only lives in the Host List where nobody reading
        the board would see it. Either part alone still renders the line; with
        neither, there's no line, exactly as before. */
-    const hostNote = (hostRecordOf(m.host) || {}).note || "";
+    const hostNote = (hostRec || {}).note || "";
     const ppeParts = [];
     if (hostNote) ppeParts.push(`<span class="m-ppe-host" title="From this host's record in the Host list">${escapeHtml(hostNote)}</span>`);
     if (m.ppe) ppeParts.push(escapeHtml(m.ppe));
@@ -1491,7 +1500,7 @@ function renderMissions() {
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>
-        <span class="m-host">${escapeHtml(m.host)}</span>
+        ${hostHtml}
         <span class="m-pills">
           ${areaPillHtml(hostArea, "m-area")}
           <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "🌙 NIGHT" : "DAY"}</span>
@@ -3241,6 +3250,57 @@ function safeHttpUrl(u) {
   return /^https?:\/\//i.test(s) ? s : "";
 }
 
+/* Where a host's map link comes from, in preference order:
+   1. the map_url a planner pasted into the Host record — always wins, because
+      somebody chose that exact pin;
+   2. failing that, a Maps SEARCH built from the host's written address. Without
+      this, only hosts whose record has a pasted URL would be reachable, and the
+      Host List is mostly addresses — the tap-to-navigate the board is being
+      redesigned around would simply not appear for most sites.
+   A host with neither is not a link, and gets no pin: a pin that opens nothing
+   is worse than no pin at all. */
+function hostMapHref(rec) {
+  if (!rec) return "";
+  const pasted = safeHttpUrl(rec.mapUrl);
+  if (pasted) return pasted;
+  const addr = String(rec.location || "").trim();
+  return addr
+    ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr)
+    : "";
+}
+
+/* The host name on a mission card, as the map link itself — name followed by a
+   pin, the two together one tap target. The address used to sit on its own line
+   below; folding it into the name costs a line of card height on every mission,
+   which is what decides how much of a board fits in one exported page.
+
+   Four details that are not free choices:
+   - the pin renders ONLY when there is a link behind it (see hostMapHref), so
+     it always means "this opens a map".
+   - escapeHtml on the href, not just the text. safeHttpUrl only vouches for the
+     scheme, and the rest of that field is free text a planner typed — a bare
+     quote in it would otherwise close the attribute.
+   - stopPropagation, exactly as telLink does: this sits inside .mission-header,
+     whose click handler opens the edit modal. Without it, tapping the host name
+     on a phone opens the mission editor instead of the map.
+   - a real <a>, not a click handler. It has to survive being printed: Chrome
+     writes <a href> out as a PDF link annotation, so the host name stays
+     tappable inside the file that gets posted to the LINE group. That is the
+     whole point of the PDF path (printBoard) — an image can never carry a link.
+
+   The name is kept in its own span so .m-host-name kicks in and a long host
+   ellipsises there, leaving the pin (flex:none) visible rather than being the
+   first thing clipped off the end. */
+function hostNameHtml(name, rec) {
+  const href = hostMapHref(rec);
+  if (!href) return `<span class="m-host">${escapeHtml(name)}</span>`;
+  return `<a class="m-host m-host-link" href="${escapeHtml(href)}"`
+    + ` target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"`
+    + ` title="Open ${escapeHtml(name)} in Google Maps">`
+    + `<span class="m-host-name">${escapeHtml(name)}</span>`
+    + `<span class="m-host-pin" aria-hidden="true">📍</span></a>`;
+}
+
 /* One row per host, merging the fetched directory with the host master records
    (which carry the location) — either source alone is enough to list a host. */
 function allHostRows() {
@@ -3552,7 +3612,7 @@ function renderHostRows() {
         <span class="hl-host">${escapeHtml(r.name)}</span>
         ${r.archived ? `<span class="hl-tag hl-tag-arch" title="Archived — kept with its history, but not offered when creating a mission">archived</span>` : ""}
         ${dups.byName.has(r.name) ? `<span class="hl-tag hl-tag-dup" title="Another host has a very similar name — open this row to merge them">similar</span>` : ""}
-        <button type="button" class="hl-edit" title="Edit location, area, note — or merge this host into another">✎</button>
+        <button type="button" class="hl-edit" title="Edit name, location, area, note — or merge this host into another">✎</button>
       </td>
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
       <td data-label="Service area" class="hl-area-cell">${r.area
@@ -3665,11 +3725,12 @@ function exportHostlistCsv() {
   URL.revokeObjectURL(a.href);
 }
 
-/* Host modal — the location/map-link record for one host. For a host the board
-   already knows, the name is fixed: it's the key tying this record to the
-   mission and deployment rows carrying the same text (see cloud.saveHost), so
-   editing it here would quietly orphan the record from its own history. */
-/* `name` names an existing host (its name is then fixed). opts.prefillName
+/* Host modal — the location/map-link record for one host. The name is editable
+   like everything else here, but it is not an ordinary field: it is the key
+   tying this record to the mission and deployment rows carrying the same text,
+   so changing it goes through cloud.renameHost, which rewrites those rows too.
+   That is why saveHostForm always confirms a rename before it runs. */
+/* `name` names an existing host. opts.prefillName
    seeds a NEW host's name — that's the New Mission hand-off, where the planner
    has already typed a host that isn't in the list yet; opts.returnToMission
    sends them back to the mission form afterwards with the host filled in. */
@@ -3682,7 +3743,6 @@ function openHostModal(name, opts = {}) {
   form.reset();
   $("#host-modal-title").textContent = name ? `Host — ${name}` : "New Host";
   form.name.value = name || opts.prefillName || "";
-  form.name.readOnly = !!name;
   $("#host-name-note").classList.toggle("hidden", !name);
   form.location.value = rec ? rec.location : "";
   form.mapUrl.value = rec ? rec.mapUrl : "";
@@ -3781,14 +3841,62 @@ function saveHostForm(ev) {
   const note = form.note.value.trim();
   const areaId = form.areaId.value;
   const archived = form.archived.checked;
-  if (!state.hostlist.editingHost && hostRecordOf(name)) {
+  const from = state.hostlist.editingHost;
+  if (!from && hostRecordOf(name)) {
     toast(`${name} is already in the host list — edit that row instead.`, "error");
     return;
   }
+  const vals = { name, location, mapUrl, areaId, archived, note };
+  if (!from || name === from) { runHostSave(vals, null); return; }
+
+  /* A rename from here on. Two things it is deliberately NOT allowed to be:
+
+     Silent — it rewrites this host's name on every mission and deployment row
+     it has ever appeared on, which changes what past mission cards say. That
+     is the right behaviour (the history belongs to the host, not to the
+     spelling) but it is far too wide to happen without being spelled out.
+
+     A merge — landing on a name that already exists would join two histories
+     for good. That has its own tool in this same modal, its own confirmation,
+     and its own rules about whose location and note survive; arriving there by
+     mistyping a rename would be the worst possible way to trigger it. So it is
+     refused and pointed at Merge rather than guessed at. */
+  const rows = allHostRows();
+  if (rows.some(r => r.name === name)) {
+    toast(`"${name}" is already a host — use "Merge into another host" below to combine them.`, "error");
+    return;
+  }
+  const me = rows.find(r => r.name === from);
+  const impact = me
+    ? `Its ${me.missionCount} mission${me.missionCount === 1 ? "" : "s"} and ${me.deployedDays} deployment day${me.deployedDays === 1 ? "" : "s"} are`
+    : "Its missions and deployment history are";
+  showConfirm("Rename this host?",
+    `Rename "${from}" to "${name}"? ${impact} rewritten to the new name, so this host keeps its whole history instead of starting fresh — but past mission cards for it will read "${name}" too. Nothing else about the host changes.`,
+    () => runHostSave(vals, from),
+    () => openModal("#modal-host"));   // "Cancel" → back to the form, edits intact
+}
+
+/* The save itself, once any rename has been confirmed. `from` is the old name
+   when this is a rename, null otherwise.
+
+   Order matters: the rename has to land BEFORE saveHost. saveHost upserts on
+   the name, so saving first and renaming after would write a second record
+   under the new name and leave the original sitting under the old one. */
+function runHostSave(vals, from) {
+  const { name } = vals;
+  const renamed = !!from;
   const back = state.hostlist.returnToMission;
   state.hostlist.returnToMission = false;
   safely(async () => {
-    const res = await cloud.saveHost({ name, location, mapUrl, areaId, archived, note });
+    if (renamed) {
+      await cloud.renameHost(from, name);
+      // the directory itself changed, not just one record — same bookkeeping
+      // the merge path does, since both rewrite mission rows
+      state.hostlist.dirCacheKey = null;
+      if (state.hostlist.expanded.delete(from)) state.hostlist.expanded.add(name);
+      state.hostlist.editingHost = name;
+    }
+    const res = await cloud.saveHost(vals);
     closeModal();
     await refreshAndRender();
     if (back) {
@@ -3806,7 +3914,7 @@ function saveHostForm(ev) {
       const what = skipped.map(c => HOST_COLUMN_MIGRATIONS[c] || c).join(" and ");
       toast(`Saved ${name}, but ${what} — the rest of the record was saved.`, "warn");
     } else {
-      toast(`Saved ${name}.`, "info");
+      toast(renamed ? `Renamed ${from} to ${name}.` : `Saved ${name}.`, "info");
     }
   });
 }
@@ -4380,14 +4488,27 @@ function buildExportPools() {
    silently drops back to two per row — the failure is quiet, so re-derive
    this sum rather than eyeballing the board. */
 const MASONRY_GAP = 12, MASONRY_MIN_CARD = 390;
-function layoutMasonry() {
+/* A shared board must not depend on whose desk it was exported from. On screen
+   the column count is derived from the available width, so a 1920px monitor was
+   producing a 4-column JPG and a 1600px one a 3-column JPG of the same day —
+   the same plan arriving in the LINE group in two different shapes. The export
+   pins both numbers instead: EXPORT_WIDTH is forced onto #board-capture (see
+   body.exporting in styles.css) AND handed to html2canvas, so the geometry
+   layoutMasonry computes and the geometry html2canvas renders cannot drift
+   apart, and EXPORT_COLS overrides the derived column count. The print path
+   fixes the same 3 columns its own way — see @media print. */
+const EXPORT_WIDTH = 1600, EXPORT_COLS = 3;
+/* forceCols pins the column count instead of deriving it from the width — the
+   export passes EXPORT_COLS so every JPG of a given day comes out the same
+   shape whatever monitor made it. On screen it is always omitted. */
+function layoutMasonry(forceCols) {
   const grid = $("#missions-grid");
   if (!grid || grid.classList.contains("hidden")) return;
   const W = grid.clientWidth;
   if (!W) return;
   const cards = [...grid.children].filter(
     c => c.classList && c.classList.contains("mission-card") && c.style.display !== "none");
-  const cols = Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
+  const cols = forceCols || Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
   const colW = Math.floor((W - MASONRY_GAP * (cols - 1)) / cols);
   cards.forEach(c => {
     c.style.position = "absolute"; c.style.width = colW + "px";
@@ -4480,10 +4601,14 @@ async function exportBoard() {
     if (!isOverview()) {
       restoreEmptyMissions = hideEmptyMissionsForExport();
       restoreLeaveZones = hideEmptyLeaveZonesForExport();
-      layoutMasonry();
+      layoutMasonry(EXPORT_COLS);
     }
     const el = $("#board-capture");
-    const windowWidth = Math.max(document.documentElement.scrollWidth, 1600);
+    // Deliberately a constant, not max(scrollWidth, 1600): body.exporting has
+    // already forced #board-capture to exactly EXPORT_WIDTH, so measuring the
+    // real document here would hand html2canvas a different width than the one
+    // the cards were just laid out at. See EXPORT_WIDTH.
+    const windowWidth = EXPORT_WIDTH;
     // Many mobile GPUs (Android especially) silently return a blank/black canvas
     // once its pixel dimensions pass roughly 4096px on a side or ~16.7M px total,
     // instead of erroring — that's the "export sometimes comes out all black" bug.
@@ -4508,6 +4633,138 @@ async function exportBoard() {
     btn.textContent = "📷 Export";
     if (!isOverview()) layoutMasonry();   // re-pack at the normal on-screen width
   }
+}
+
+/* ---------- print / PDF ----------
+
+   The JPG export above exists for the places that only take an image. This is
+   the same board as a VECTOR page, and it is the answer to the two things a
+   JPG in a chat group cannot do:
+
+   - It does not go blurry. A messenger re-encodes and downsizes an image on
+     send, so board text arrives at a fraction of the pixels it left with. A PDF
+     is sent as a file, and its text is drawn from outlines at whatever zoom the
+     reader picks — pinching in stays sharp all the way down.
+   - It keeps its links. The host name (hostNameHtml) and the engineer's
+     phone (telLink) are real <a> elements, and Chrome writes them into the PDF
+     as link annotations, so they are still tappable in the file itself.
+
+   The DOM prep deliberately makes the same calls exportBoard makes — capture
+   header on, empty missions and empty leave zones dropped, the two unassigned
+   pools folded in, light theme forced — so the printed page and the exported
+   image are one artifact in two formats, and a change to what belongs on a
+   shared board only has to be made once (below, and in exportBoard).
+
+   It hangs off beforeprint/afterprint rather than off the button alone so that
+   Ctrl+P produces the same page as clicking 🖨 — a print stylesheet that only
+   works via one button is a trap for whoever hits the keyboard shortcut. */
+
+let printRestore = null;   // set while the DOM is in its printable state
+
+function prepareForPrint() {
+  if (printRestore) return;   // beforeprint can fire more than once per dialog
+  const board = D().boards.find(b => b.id === D().activeBoardId);
+  const boardName = board ? board.name : "Overview";
+  $("#capture-title").textContent = boardName + " Manpower Board";
+  $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
+  $("#capture-header").classList.remove("hidden");
+  // `exporting` is what swaps the glass tokens for opaque surfaces; a printer
+  // (and a PDF) has no backdrop-filter, so without it every glass panel prints
+  // as a flat nothing. `printing` is this path's own hook.
+  document.body.classList.add("exporting", "printing");
+  // Same reasoning as the export: a shared artifact must not carry the viewer's
+  // own dark-mode preference — and a dark board wastes a cartridge besides.
+  const wasDark = document.documentElement.getAttribute("data-theme") === "dark";
+  if (wasDark) document.documentElement.removeAttribute("data-theme");
+
+  let pools = null;
+  if (!isOverview() && !isNonWorkingDate(state.date)) {
+    const built = buildExportPools();
+    if (built.children.length) {
+      pools = built;
+      $("#status-zones").insertAdjacentElement("afterend", pools);
+    }
+  }
+  let restoreEmptyMissions = null;
+  let restoreLeaveZones = null;
+  if (!isOverview()) {
+    restoreEmptyMissions = hideEmptyMissionsForExport();
+    restoreLeaveZones = hideEmptyLeaveZonesForExport();
+    // The masonry lays out at exactly the width body.exporting has just pinned
+    // #board-capture to, which is the same width setPrintPageSize then makes the
+    // page — so these absolute positions are already right on paper and nothing
+    // has to be re-flowed. (This is why the print CSS no longer rebuilds the
+    // grid: it only had to when the paper width was unknowable.)
+    layoutMasonry(EXPORT_COLS);
+  }
+  // Measured last, after every other decision above has changed the height.
+  setPrintPageSize($("#board-capture").getBoundingClientRect());
+
+  printRestore = () => {
+    if (restoreEmptyMissions) restoreEmptyMissions();
+    if (restoreLeaveZones) restoreLeaveZones();
+    if (pools) pools.remove();
+    $("#capture-header").classList.add("hidden");
+    document.body.classList.remove("exporting", "printing");
+    if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
+    clearPrintPageSize();
+    if (!isOverview()) layoutMasonry();
+  };
+}
+
+/* One page, exactly the size of the board — the whole point of the PDF.
+
+   Paginating a board is destructive in a way paginating prose is not: a page
+   break falls between two mission cards that belong to the same day, and the
+   masonry has to be given up for a rigid grid because nothing can know how much
+   height is left on the current sheet. Sizing the PAGE to the CONTENT instead
+   removes the question. There is one page, so there are no breaks; the width is
+   one we chose rather than one the paper imposed, so the masonry's own geometry
+   is correct; and since a PDF's text is vector, a page far larger than any real
+   sheet costs nothing — the reader zooms into it exactly as they would zoom into
+   a photo of the board, only without it turning to mush.
+
+   Injected as a <style> rather than written into styles.css because the height
+   is only known at print time, and appended to <head> after the stylesheet so it
+   wins the cascade. Chrome applies style changes made during beforeprint to the
+   print that follows, which is what makes this work at all.
+
+   mm rather than px: both are valid <length> in @page, but print plumbing is
+   built around physical units, and mm is what a print dialog can show back to a
+   person. A 4000px-tall board becomes a ~1058mm page — nothing a printer would
+   accept as a sheet, and irrelevant, since this is read on a phone. Printing it
+   to real A4 still works: the driver scales it to fit one sheet.
+
+   There is a ceiling, far above anything this app will meet: a PDF page maxes
+   out at 200in (5080mm) a side. A 200-mission board measures ~111in, so the
+   limit is roughly 360 missions on a single day — hence no guard here. */
+function setPrintPageSize(rect) {
+  const mm = (px) => (px / 96 * 25.4).toFixed(1);
+  let el = document.getElementById("print-page-size");
+  if (!el) {
+    el = document.createElement("style");
+    el.id = "print-page-size";
+    document.head.appendChild(el);
+  }
+  el.textContent = `@page { size: ${mm(Math.ceil(rect.width))}mm ${mm(Math.ceil(rect.height))}mm; margin: 0; }`;
+}
+
+function clearPrintPageSize() {
+  const el = document.getElementById("print-page-size");
+  if (el) el.remove();
+}
+
+function restoreAfterPrint() {
+  if (!printRestore) return;
+  const done = printRestore;
+  printRestore = null;   // cleared first, so a throw below can't wedge the board
+  done();
+}
+
+function printBoard() {
+  // beforeprint does the work; this is only the trigger, so that the button and
+  // the keyboard shortcut go down exactly the same path.
+  window.print();
 }
 
 /* ---------- custom date picker (weekend columns highlighted) ---------- */
@@ -5440,6 +5697,10 @@ function wireApp() {
   $("#sort-by").onchange = (e) => { state.sort = e.target.value; render(); };
 
   $("#btn-export").onclick = exportBoard;
+  $("#btn-print").onclick = printBoard;
+  // on the window, not the button: Ctrl+P has to get the same page as the click
+  window.addEventListener("beforeprint", prepareForPrint);
+  window.addEventListener("afterprint", restoreAfterPrint);
   $("#btn-reset-board").onclick = () => guardEdit(() => resetBoard());
 
   // employee search (floating panel) — filter as you type, keep selection
