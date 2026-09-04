@@ -480,7 +480,7 @@ on conflict (id) do nothing;
 --   the permission matrix can never be changed from inside the app again.
 --   Replace the address below with your own, then run this file.
 update profiles set role_key = 'admin', updated_at = now()
-where email = lower('YOUR-EMAIL@trigo-group.com');
+where email = lower('nutdanai.sirinapanont@trigo-group.com');
 
 do $$
 begin
