@@ -1365,12 +1365,12 @@ function renderMissions() {
     // address, and a host with no area set simply shows no pill
     const hostArea = hostAreaOf(m.host);
     const hostRec = hostRecordOf(m.host);
-    /* Where the job is, on the card itself. It was only ever in the Host List
-       tab — a planner's screen — so the one question the crew reading a shared
-       board actually has ("where do I go?") was the one thing the board did not
-       answer. Sits above the PPE line because that is the reading order: where
-       am I going, then what do I need when I get there. See hostLocHtml. */
-    const locLine = hostLocHtml(hostRec);
+    /* Where the job is, answered by the host name itself: it becomes the map
+       link, with a pin after it. It was only ever in the Host List tab — a
+       planner's screen — so the one question the crew reading a shared board
+       actually has ("where do I go?") was the one thing the board did not
+       answer. See hostNameHtml. */
+    const hostHtml = hostNameHtml(m.host, hostRec);
     /* The PPE line carries the host's own note first, then this mission's PPE
        — one line for "everything the crew has to know before they go", rather
        than a site note that only lives in the Host List where nobody reading
@@ -1386,7 +1386,7 @@ function renderMissions() {
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>
-        <span class="m-host">${escapeHtml(m.host)}</span>
+        ${hostHtml}
         <span class="m-pills">
           ${areaPillHtml(hostArea, "m-area")}
           <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "🌙 NIGHT" : "DAY"}</span>
@@ -1401,7 +1401,6 @@ function renderMissions() {
         ${eng && eng.phone ? telLink(eng.phone) : ""}
         <span class="m-count">${memberEmps.length}</span>
       </div>
-      ${locLine}
       ${ppeLine}`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
     const body = document.createElement("div");
@@ -3120,34 +3119,55 @@ function safeHttpUrl(u) {
   return /^https?:\/\//i.test(s) ? s : "";
 }
 
-/* The host's location line on a mission card — the Host List's 📍 cell, in the
-   place the crew actually reads. Same precedence as that cell (hostLocCell):
-   the address is the label when there is one, because that is what a person
-   recognises; a host with only a map link gets the generic label instead; a
-   host with neither gets no line at all, which is most of them until the Host
-   List is filled in.
+/* Where a host's map link comes from, in preference order:
+   1. the map_url a planner pasted into the Host record — always wins, because
+      somebody chose that exact pin;
+   2. failing that, a Maps SEARCH built from the host's written address. Without
+      this, only hosts whose record has a pasted URL would be reachable, and the
+      Host List is mostly addresses — the tap-to-navigate the board is being
+      redesigned around would simply not appear for most sites.
+   A host with neither is not a link, and gets no pin: a pin that opens nothing
+   is worse than no pin at all. */
+function hostMapHref(rec) {
+  if (!rec) return "";
+  const pasted = safeHttpUrl(rec.mapUrl);
+  if (pasted) return pasted;
+  const addr = String(rec.location || "").trim();
+  return addr
+    ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(addr)
+    : "";
+}
 
-   Three details that are not free choices:
+/* The host name on a mission card, as the map link itself — name followed by a
+   pin, the two together one tap target. The address used to sit on its own line
+   below; folding it into the name costs a line of card height on every mission,
+   which is what decides how much of a board fits in one exported page.
+
+   Four details that are not free choices:
+   - the pin renders ONLY when there is a link behind it (see hostMapHref), so
+     it always means "this opens a map".
    - escapeHtml on the href, not just the text. safeHttpUrl only vouches for the
-     scheme, and the rest of the field is free text a planner typed — a bare
+     scheme, and the rest of that field is free text a planner typed — a bare
      quote in it would otherwise close the attribute.
    - stopPropagation, exactly as telLink does: this sits inside .mission-header,
-     whose click handler opens the edit modal. Without it, tapping the address
+     whose click handler opens the edit modal. Without it, tapping the host name
      on a phone opens the mission editor instead of the map.
    - a real <a>, not a click handler. It has to survive being printed: Chrome
-     writes <a href> out as a PDF link annotation, so the address stays tappable
-     inside the file that gets posted to the LINE group. That is the whole point
-     of the PDF path (printBoard) — an image can never carry a link. */
-function hostLocHtml(rec) {
-  if (!rec) return "";
-  const href = safeHttpUrl(rec.mapUrl);
-  const text = rec.location || (href ? "Open in Google Maps" : "");
-  if (!text) return "";
-  const label = href
-    ? `<a class="m-loc-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"`
-      + ` onclick="event.stopPropagation()">${escapeHtml(text)}</a>`
-    : escapeHtml(text);
-  return `<div class="m-loc"><span class="m-loc-pin" aria-hidden="true">📍</span>${label}</div>`;
+     writes <a href> out as a PDF link annotation, so the host name stays
+     tappable inside the file that gets posted to the LINE group. That is the
+     whole point of the PDF path (printBoard) — an image can never carry a link.
+
+   The name is kept in its own span so .m-host-name kicks in and a long host
+   ellipsises there, leaving the pin (flex:none) visible rather than being the
+   first thing clipped off the end. */
+function hostNameHtml(name, rec) {
+  const href = hostMapHref(rec);
+  if (!href) return `<span class="m-host">${escapeHtml(name)}</span>`;
+  return `<a class="m-host m-host-link" href="${escapeHtml(href)}"`
+    + ` target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"`
+    + ` title="Open ${escapeHtml(name)} in Google Maps">`
+    + `<span class="m-host-name">${escapeHtml(name)}</span>`
+    + `<span class="m-host-pin" aria-hidden="true">📍</span></a>`;
 }
 
 /* One row per host, merging the fetched directory with the host master records
@@ -4259,14 +4279,27 @@ function buildExportPools() {
    silently drops back to two per row — the failure is quiet, so re-derive
    this sum rather than eyeballing the board. */
 const MASONRY_GAP = 12, MASONRY_MIN_CARD = 390;
-function layoutMasonry() {
+/* A shared board must not depend on whose desk it was exported from. On screen
+   the column count is derived from the available width, so a 1920px monitor was
+   producing a 4-column JPG and a 1600px one a 3-column JPG of the same day —
+   the same plan arriving in the LINE group in two different shapes. The export
+   pins both numbers instead: EXPORT_WIDTH is forced onto #board-capture (see
+   body.exporting in styles.css) AND handed to html2canvas, so the geometry
+   layoutMasonry computes and the geometry html2canvas renders cannot drift
+   apart, and EXPORT_COLS overrides the derived column count. The print path
+   fixes the same 3 columns its own way — see @media print. */
+const EXPORT_WIDTH = 1600, EXPORT_COLS = 3;
+/* forceCols pins the column count instead of deriving it from the width — the
+   export passes EXPORT_COLS so every JPG of a given day comes out the same
+   shape whatever monitor made it. On screen it is always omitted. */
+function layoutMasonry(forceCols) {
   const grid = $("#missions-grid");
   if (!grid || grid.classList.contains("hidden")) return;
   const W = grid.clientWidth;
   if (!W) return;
   const cards = [...grid.children].filter(
     c => c.classList && c.classList.contains("mission-card") && c.style.display !== "none");
-  const cols = Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
+  const cols = forceCols || Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
   const colW = Math.floor((W - MASONRY_GAP * (cols - 1)) / cols);
   cards.forEach(c => {
     c.style.position = "absolute"; c.style.width = colW + "px";
@@ -4359,10 +4392,14 @@ async function exportBoard() {
     if (!isOverview()) {
       restoreEmptyMissions = hideEmptyMissionsForExport();
       restoreLeaveZones = hideEmptyLeaveZonesForExport();
-      layoutMasonry();
+      layoutMasonry(EXPORT_COLS);
     }
     const el = $("#board-capture");
-    const windowWidth = Math.max(document.documentElement.scrollWidth, 1600);
+    // Deliberately a constant, not max(scrollWidth, 1600): body.exporting has
+    // already forced #board-capture to exactly EXPORT_WIDTH, so measuring the
+    // real document here would hand html2canvas a different width than the one
+    // the cards were just laid out at. See EXPORT_WIDTH.
+    const windowWidth = EXPORT_WIDTH;
     // Many mobile GPUs (Android especially) silently return a blank/black canvas
     // once its pixel dimensions pass roughly 4096px on a side or ~16.7M px total,
     // instead of erroring — that's the "export sometimes comes out all black" bug.
@@ -4399,7 +4436,7 @@ async function exportBoard() {
      send, so board text arrives at a fraction of the pixels it left with. A PDF
      is sent as a file, and its text is drawn from outlines at whatever zoom the
      reader picks — pinching in stays sharp all the way down.
-   - It keeps its links. The host location (hostLocHtml) and the engineer's
+   - It keeps its links. The host name (hostNameHtml) and the engineer's
      phone (telLink) are real <a> elements, and Chrome writes them into the PDF
      as link annotations, so they are still tappable in the file itself.
 

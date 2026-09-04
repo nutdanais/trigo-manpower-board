@@ -755,33 +755,40 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 .mission-header .m-ppe { margin-top: 3px; font-size: 11px; color: var(--muted); }
 .mission-header .m-ppe b { font-weight: 700; }
-/* the host's location — same weight as the PPE line (both are "what you need
-   before you go", read after the who/when line above), with the pin held on its
-   own baseline-aligned column so a long address wraps under itself rather than
-   under the icon. Deliberately allowed to wrap: an address that is ellipsised
-   is an address nobody can use, and there is no hover on the tablet this is
-   read from. */
-.mission-header .m-loc {
-  margin-top: 3px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--muted);
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.mission-header .m-loc-pin { flex: none; font-size: 10px; }
-/* underlined at rest, unlike .tel-link: this is the affordance the shared board
+/* The host name IS the map link (hostNameHtml), so it keeps every bit of
+   .m-host's type and truncation above and only adds the pin and the underline.
+   inline-flex + min-width:0 is what lets the nested .m-host-name still shrink
+   and ellipsise inside a flex row; without the min-width override a flex item
+   refuses to go below its content size and a long host name would push the
+   area pill and shift chip off the end of the band instead of truncating.
+   Underlined at rest, unlike .tel-link: this is the affordance the shared board
    is being redesigned around, and the phone and the printed PDF that carry it
    have no hover state to discover it with. */
-.mission-header .m-loc-link {
+.mission-header .m-host-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 0;
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
 }
-.mission-header .m-loc-link:hover,
-.mission-header .m-loc-link:focus-visible { color: var(--text); }
+.mission-header .m-host-link .m-host-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* flex:none so the pin is never the first thing clipped off a long host name —
+   the name ellipsises, the pin stays. text-decoration:none keeps the underline
+   under the words rather than dragging through the emoji. */
+.mission-header .m-host-pin {
+  flex: none;
+  font-size: 11px;
+  text-decoration: none;
+}
+.mission-header .m-host-link:hover,
+.mission-header .m-host-link:focus-visible { color: var(--text); }
 .mission-body {
   display: flex;
   flex-direction: column;
@@ -2056,7 +2063,13 @@ button.chart-legend-item:hover { text-decoration: underline; }
 .board-tab.tab-overview.active { background: var(--brand-green); color: #fff; font-weight: 700; }
 
 /* export mode: freeze layout width for consistent capture; drop the panel margin */
-body.exporting #board-capture { min-width: 1600px; }
+/* Pinned, not just floored: with only a min-width, a 1920px monitor laid the
+   board out at 1920 and got a 4-column JPG while a 1600px one got 3 — the same
+   plan reaching the LINE group in two shapes. An exact width makes the export
+   the same everywhere, and it is the same number app.js hands html2canvas
+   (EXPORT_WIDTH), so the layout it measures and the frame it renders agree.
+   The print path overrides this back to auto — see @media print. */
+body.exporting #board-capture { width: 1600px; min-width: 1600px; max-width: 1600px; }
 body.exporting #app-root { margin-right: 0; }
 
 /* ===== Manpower List tab ===== */
@@ -2547,9 +2560,14 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
    link annotation — so the host location and the engineer's phone stay tappable
    inside the file itself. ================================================== */
 
+/* Landscape because the board is 3 cards wide (matching the JPG — see
+   EXPORT_COLS in app.js). Three columns inside A4 portrait would be about 60mm
+   each, well under the width a mission card is drawn for; landscape gives about
+   90mm per column, which fits two employee cards per row the way the screen
+   does. Narrow margins for the same reason: every millimetre is card width. */
 @page {
-  size: A4 portrait;
-  margin: 10mm;
+  size: A4 landscape;
+  margin: 8mm;
 }
 
 @media print {
@@ -2585,6 +2603,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   #board-capture {
     min-width: 0 !important;
     width: auto !important;
+    max-width: none !important;
     padding: 0 !important;
     background: #fff !important;
   }
@@ -2596,16 +2615,28 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
      the screen — on paper that would stack the whole board in the top-left
      corner of page one. These !important rules outrank those inline styles
      (a stylesheet !important beats a non-important inline style) and hand the
-     cards back to normal flow, one per row. That is also the right shape for
-     the phone the PDF is mostly read on: scroll down, one mission at a time,
-     instead of panning sideways across a board built for a desk monitor. */
-  #missions-grid { height: auto !important; }
+     cards to a real 3-column grid, matching the JPG's EXPORT_COLS.
+
+     Grid rather than `column-count`: multicol fills top-to-bottom down column
+     one before starting column two, so mission 2 would land underneath mission
+     1 instead of beside it. Grid is row-major — three missions across, then the
+     next three — which is what "3 cards in a row" has to mean if the printed
+     board is to read in the same order as the screen. align-items:start keeps
+     each card at its natural height instead of stretching every card in a row
+     to match the tallest. */
+  #missions-grid {
+    height: auto !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4mm;
+    align-items: start;
+  }
   #missions-grid > .mission-card {
     position: static !important;
     left: auto !important;
     top: auto !important;
     width: auto !important;
-    margin: 0 0 5mm !important;
+    margin: 0 !important;
   }
 
   /* nothing that reads as a single block should be split across a page break */
