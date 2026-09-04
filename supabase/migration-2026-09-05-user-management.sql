@@ -62,10 +62,15 @@ create table if not exists profiles (
   requested_at timestamptz not null default now(),
   approved_at  timestamptz,
   approved_by  text,
+  -- stamped by the app at boot (touch_last_seen). auth.users.last_sign_in_at is
+  -- the real thing but it is not readable from the browser, and an admin
+  -- deciding who to disable needs "when was this person last here".
+  last_seen_at timestamptz,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
 create index if not exists profiles_status_idx on profiles(status);
+alter table profiles add column if not exists last_seen_at timestamptz;
 
 -- ===== Who may request access =====
 -- Empty table = no restriction, which is what keeps this from bricking a
@@ -149,10 +154,19 @@ returns void language sql security definer set search_path = public, pg_temp as 
    where id = auth.uid();
 $fn$;
 
+/* One column, stamped once per sign-in. Deliberately not part of
+   update_my_profile: it is written on every boot, and keeping it separate
+   means the display-name path stays a deliberate user action. */
+create or replace function public.touch_last_seen()
+returns void language sql security definer set search_path = public, pg_temp as $fn$
+  update profiles set last_seen_at = now() where id = auth.uid();
+$fn$;
+
 grant execute on function public.is_active()               to authenticated;
 grant execute on function public.my_role()                 to authenticated;
 grant execute on function public.can(text, text)           to authenticated;
 grant execute on function public.update_my_profile(text)   to authenticated;
+grant execute on function public.touch_last_seen()         to authenticated;
 
 -- ===== auth.users triggers =====
 

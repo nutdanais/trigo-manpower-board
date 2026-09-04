@@ -152,11 +152,14 @@ function saveViewState() {
 function restoreViewState() {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY));
-    if (v && (v.boardId === OVERVIEW_ID || v.boardId === EMPLIST_ID || v.boardId === HOSTLIST_ID
-        || D().boards.some(b => b.id === v.boardId))) {
+    if (v && v.boardId && mayOpenView(v.boardId)) {
       D().activeBoardId = v.boardId;
     }
   } catch { /* no saved view, or it's corrupt — just keep the default board */ }
+  // A role change can take away the tab we were last on (or the default board,
+  // for a role with no board access at all) — land somewhere they can actually
+  // open rather than on an empty screen.
+  if (!mayOpenView(D().activeBoardId)) D().activeBoardId = firstAllowedView();
   state.date = defaultPlanningDate();
 }
 
@@ -360,6 +363,68 @@ const HOSTLIST_ID = "__hostlist__";
 const isOverview = () => D().activeBoardId === OVERVIEW_ID;
 const isEmployeeList = () => D().activeBoardId === EMPLIST_ID;
 const isHostList = () => D().activeBoardId === HOSTLIST_ID;
+
+/* ---------- permissions ----------
+   The JS twin of public.can() in the database (see
+   migration-2026-09-05-user-management.sql). Both read the same role x area
+   matrix off the same ladder, so the UI and Postgres can never disagree about
+   what a role means — the UI decides what to draw, RLS decides what a write is
+   allowed to do, and neither is trusted to do the other's job.
+
+   `me.legacy` is set by cloud._loadIdentity when the user-management migration
+   has not been run yet: allow everything, which is exactly how the app behaved
+   before roles existed. */
+const LEVELS = { none: 0, view: 1, edit: 2 };
+function can(area, need = "view") {
+  const me = D().me;
+  if (!me) return false;
+  if (me.legacy) return true;
+  if (me.status !== "active") return false;
+  const row = D().perms[me.roleKey] || {};
+  return (LEVELS[row[area]] || 0) >= (LEVELS[need] || 0);
+}
+/* The areas the permission matrix covers, in the order they are shown in
+   Settings -> Roles & permissions. Labels are the ones already used on the tabs
+   and on each Overview section's own heading, so the grid reads like the app. */
+const PERM_AREAS = [
+  { group: "Tabs & menus", items: [
+    { key: "board",    label: "Board",          hint: "Missions, assignments, the day lock" },
+    { key: "overview", label: "Overview tab",   hint: "The dashboard as a whole", viewOnly: true },
+    { key: "emplist",  label: "Manpower list",  hint: "The employee roster" },
+    { key: "hostlist", label: "Host list",      hint: "Sites and their records" },
+    { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
+    { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
+  ]},
+  { group: "Overview sections", viewOnly: true, items: [
+    { key: "ov.status",      label: "Status bar" },
+    { key: "ov.kpi",         label: "KPI strip" },
+    { key: "ov.actionQueue", label: "Action queue" },
+    { key: "ov.byBoard",     label: "By board" },
+    { key: "ov.history",     label: "History + Engineer workload" },
+    { key: "ov.byEngineer",  label: "By engineer" },
+    { key: "ov.dayNight",    label: "Day / night split" },
+    { key: "ov.hostRisk",    label: "Host coverage risk" },
+    { key: "ov.byArea",      label: "By service area" },
+    { key: "ov.leave",       label: "Leave today" },
+  ]},
+];
+/* The first tab this user is actually allowed to open — used when a saved view
+   points somewhere they have since lost, and as the landing tab for a role that
+   cannot see the board. */
+function firstAllowedView() {
+  if (can("board") && D().boards.length) return D().boards[0].id;
+  if (can("overview")) return OVERVIEW_ID;
+  if (can("emplist")) return EMPLIST_ID;
+  if (can("hostlist")) return HOSTLIST_ID;
+  return null;
+}
+/* True when the view is one this user may still open. */
+function mayOpenView(id) {
+  if (id === OVERVIEW_ID) return can("overview");
+  if (id === EMPLIST_ID) return can("emplist");
+  if (id === HOSTLIST_ID) return can("hostlist");
+  return can("board") && D().boards.some(b => b.id === id);
+}
 /* the three app-wide tabs: not a board, so nothing date- or plan-scoped applies */
 const isNonBoardView = () => isOverview() || isEmployeeList() || isHostList();
 const isPast = () => state.date < todayStr();
@@ -564,7 +629,13 @@ async function ensureHostCoverageLoaded() {
 async function refreshData() {
   if (isOverview()) {
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
-    await Promise.all([ensureUtilizationLoaded(), ensureHostCoverageLoaded(), ensureHistoryLoaded()]);
+    // A section the role cannot see is not fetched either — hiding History from
+    // an Engineer should not still cost them the range query on every redraw.
+    await Promise.all([
+      ensureUtilizationLoaded(),
+      can("ov.hostRisk") ? ensureHostCoverageLoaded() : Promise.resolve(),
+      can("ov.history") ? ensureHistoryLoaded() : Promise.resolve(),
+    ]);
   } else if (isEmployeeList()) {
     // employee master data is already warm in the cache; the 30D column is the
     // one thing here that needs a fetch, and it's cached across redraws so
@@ -602,6 +673,14 @@ function confirmUnlock(boardId, date, then) {
   );
 }
 function guardEdit(action) {
+  // Permission comes first, before the read-only / lock prompts: a Viewer must
+  // not even be offered "edit a past date anyway?", because the write behind it
+  // would be refused by RLS. Every board mutation passes through here, so this
+  // one check is what makes the board genuinely read-only for them.
+  if (!can("board", "edit")) {
+    toast("Your role can view this board but not change it.", "info");
+    return;
+  }
   if (!isReadOnly()) { action(); return; }
   const boardId = D().activeBoardId;
   if (lockInfo(boardId, state.date)) { confirmUnlock(boardId, state.date, action); return; }
@@ -636,24 +715,32 @@ function render() {
   const eml = isEmployeeList();
   const hl = isHostList();
   const board = !ov && !eml && !hl;   // an actual board is on screen
+  // Everything below asks "may this role edit here?" as well as "is this view on
+  // screen?". The board's own mutations are stopped at guardEdit() rather than
+  // here — hiding a button is a courtesy, guardEdit is the rule.
+  const boardEdit = board && can("board", "edit");
   $("#status-zones").classList.toggle("hidden", !board);
   $("#missions-grid").classList.toggle("hidden", !board);
   $("#overview-panel").classList.toggle("hidden", !ov);
   $("#emplist-panel").classList.toggle("hidden", !eml);
   $("#hostlist-panel").classList.toggle("hidden", !hl);
-  $("#btn-new-mission").classList.toggle("hidden", !board);
-  $("#btn-hide-missions").classList.toggle("hidden", !board);
-  $("#btn-new-employee").classList.toggle("hidden", ov || hl);
-  $("#btn-import-mission").classList.toggle("hidden", !board || !isNonWorkingDate(state.date));
+  $("#btn-new-mission").classList.toggle("hidden", !boardEdit);
+  $("#btn-hide-missions").classList.toggle("hidden", !boardEdit);
+  $("#btn-new-employee").classList.toggle("hidden", ov || hl || !can("emplist", "edit"));
+  $("#btn-import-mission").classList.toggle("hidden", !boardEdit || !isNonWorkingDate(state.date));
   // Holiday toggle: ON = this date is non-working. Any editable future date
   // (weekday or weekend); hidden on read-only past/today and on the app-wide tabs.
-  const showHoliday = board && !isReadOnly();
+  const showHoliday = boardEdit && !isReadOnly();
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   $("#filters").classList.toggle("hidden", !board);
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
+  // The two lists and the board bar carry their own create buttons; RLS would
+  // refuse the write anyway, so hiding them is about not offering a dead end.
+  $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
+  $("#btn-add-host").classList.toggle("hidden", !can("hostlist", "edit"));
   $("#btn-export").classList.toggle("hidden", eml || hl);
-  $("#btn-reset-board").classList.toggle("hidden", !board);
+  $("#btn-reset-board").classList.toggle("hidden", !boardEdit);
   // Every control in the main toolbar belongs to a board or to the employee
   // roster, so on the Host List the row would be empty furniture (and on a
   // phone, a "⋯ More" button opening an empty menu) — the tab carries its own
@@ -663,7 +750,7 @@ function render() {
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
   $("#float-pool").classList.toggle("hidden", !board);
   document.body.classList.toggle("board-view", board);
-  $("#btn-undo").classList.toggle("hidden", !board);
+  $("#btn-undo").classList.toggle("hidden", !boardEdit);
   if (ov) {
     renderOverview();
   } else if (eml) {
@@ -749,11 +836,14 @@ function renderBoardEmptyState() {
 function renderTabs() {
   const el = $("#board-tabs");
   el.innerHTML = "";
+  if (can("overview")) {
   const ov = document.createElement("div");
   ov.className = "board-tab tab-overview" + (isOverview() ? " active" : "");
   ov.textContent = "📊 Overview";
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
+  }
+  if (can("emplist")) {
   const eml = document.createElement("div");
   eml.className = "board-tab tab-emplist" + (isEmployeeList() ? " active" : "");
   // "List" is in its own span so the phone bar can drop it (see .tab-trim in
@@ -762,6 +852,8 @@ function renderTabs() {
   eml.innerHTML = '🧑\u200d🤝\u200d🧑 Manpower<span class="tab-trim"> List</span>';
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
+  }
+  if (can("hostlist")) {
   const hl = document.createElement("div");
   hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
   // same .tab-trim trick as Manpower List: on a phone the bar keeps "Host" and
@@ -769,21 +861,24 @@ function renderTabs() {
   hl.innerHTML = '🏭 Host<span class="tab-trim"> list</span>';
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
-  // visual break: the three above are app-wide views; the rest are per-board
-  if (D().boards.length) {
+  }
+  // visual break: the three above are app-wide views; the rest are per-board.
+  // Only worth drawing when there is something on both sides of it.
+  if (D().boards.length && can("board") && el.children.length) {
     const sep = document.createElement("div");
     sep.className = "board-tab-sep";
     el.appendChild(sep);
   }
-  for (const b of D().boards) {
+  for (const b of (can("board") ? D().boards : [])) {
     const t = document.createElement("div");
     // tab-board marks the per-board tabs specifically: the phone layout hides
     // these and shows #board-select instead, but keeps Overview / Manpower List
     t.className = "board-tab tab-board" + (b.id === D().activeBoardId ? " active" : "");
     t.textContent = b.name;
-    t.title = "Click to switch. Double-click to rename.";
+    t.title = can("settings", "edit") ? "Click to switch. Double-click to rename." : "Click to switch.";
     t.onclick = () => { clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
     t.ondblclick = () => {
+      if (!can("settings", "edit")) return;
       const name = prompt("Rename board:", b.name);
       if (name && name.trim()) safely(async () => { await cloud.renameBoard(b.id, name.trim()); render(); });
     };
@@ -813,16 +908,18 @@ function renderBoardSelect() {
     ph.disabled = true;
     sel.appendChild(ph);
   }
-  for (const b of D().boards) {
+  for (const b of (can("board") ? D().boards : [])) {
     const o = document.createElement("option");
     o.value = b.id;
     o.textContent = b.name;
     sel.appendChild(o);
   }
-  const add = document.createElement("option");
-  add.value = NEW_BOARD_OPT;
-  add.textContent = "+ New board…";
-  sel.appendChild(add);
+  if (can("settings", "edit")) {
+    const add = document.createElement("option");
+    add.value = NEW_BOARD_OPT;
+    add.textContent = "+ New board…";
+    sel.appendChild(add);
+  }
   sel.value = onBoard ? D().activeBoardId : "";
 }
 
@@ -844,18 +941,25 @@ function renderDateButton() {
 /* lock button: only on an actual board (hidden on the app-wide tabs) */
 function renderLockButton() {
   const btn = $("#btn-lock");
+  // A Viewer still needs to SEE that a day is locked — that is why the plan on
+  // screen cannot be edited — so the button is hidden only when there is no
+  // board on screen, and disabled rather than removed when they may not toggle it.
   const hide = isNonBoardView();
   btn.classList.toggle("hidden", hide);
   if (hide) return;
+  const mayLock = can("board", "edit");
+  btn.disabled = !mayLock;
+  btn.classList.toggle("btn-inert", !mayLock);
   const lock = lockInfo(D().activeBoardId, state.date);
   btn.classList.toggle("locked", !!lock);
   if (lock) {
     const when = lock.lockedAt ? new Date(lock.lockedAt).toLocaleString() : "";
     btn.innerHTML = '🔒<span class="btn-label"> Locked</span>';
-    btn.title = `Locked by ${lock.lockedBy}${when ? " on " + when : ""} — click to unlock for everyone`;
+    btn.title = `Locked by ${lock.lockedBy}${when ? " on " + when : ""}` +
+      (mayLock ? " — click to unlock for everyone" : "");
   } else {
     btn.innerHTML = '🔓<span class="btn-label"> Lock</span>';
-    btn.title = "Lock this board so it's view-only for everyone";
+    btn.title = mayLock ? "Lock this board so it's view-only for everyone" : "This board's plan is unlocked";
   }
 }
 
@@ -2320,7 +2424,7 @@ function renderOverview() {
   statusShifts.appendChild(statChip("☀️ Day", todaysDayCount));
   statusShifts.appendChild(statChip("🌙 Night", todaysNightCount, null, "stat-chip-night"));
   statusBar.appendChild(statusShifts);
-  panel.appendChild(statusBar);
+  if (can("ov.status")) panel.appendChild(statusBar);
 
   /* ---------- 2. KPI strip: four numbers, each with something to judge it
      against — a sparkline+delta, a segmented bar, or a plain breakdown line.
@@ -2401,7 +2505,7 @@ function renderOverview() {
     ], height: 8,
   });
   kpiRow.appendChild(oncallTile);
-  panel.appendChild(kpiRow);
+  if (can("ov.kpi")) panel.appendChild(kpiRow);
 
   /* ---------- 3. action queue: permanent staff with no mission today. On-call
      free is surge capacity working as intended, not an exception — it stays
@@ -2451,7 +2555,7 @@ function renderOverview() {
     }
     actionSec.appendChild(calmBox);
   }
-  panel.appendChild(actionSec);
+  if (can("ov.actionQueue")) panel.appendChild(actionSec);
 
   /* ---------- 4. by board: the per-board comparison, as rows not a sentence.
      Contract mix folded in as one column (was a donut per board plus an
@@ -2492,7 +2596,7 @@ function renderOverview() {
     ),
     rows: boardRows,
   }));
-  panel.appendChild(boardSec);
+  if (can("ov.byBoard")) panel.appendChild(boardSec);
 
   /* ---------- day/night split (built here, masonry-packed near the bottom
      of this function — see layoutOverviewMasonry) ---------- */
@@ -2583,15 +2687,20 @@ function renderOverview() {
      twice. Wrapped in one .ov-history-group with no gap between them (see
      styles.css) so the two read as a single connected block — they already
      share this one range/board control, rendered once in History's header. */
-  resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
-  const histBoards = historyBoardsInScope(boards);
-  const histDates = historyDates(histBoards);
-  const histRecs = histDates.map(d => historyDayRec(d, histBoards, state.overview.history || {}));
-  const historyGroup = document.createElement("div");
-  historyGroup.className = "ov-history-group";
-  historyGroup.appendChild(historySection(histDates, histRecs, pendingCharts));
-  historyGroup.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
-  panel.appendChild(historyGroup);
+  // Built only when it is going to be shown: refreshData skips the range fetch
+  // for a role without ov.history, so state.overview.history would be stale or
+  // empty here anyway.
+  if (can("ov.history")) {
+    resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
+    const histBoards = historyBoardsInScope(boards);
+    const histDates = historyDates(histBoards);
+    const histRecs = histDates.map(d => historyDayRec(d, histBoards, state.overview.history || {}));
+    const historyGroup = document.createElement("div");
+    historyGroup.className = "ov-history-group";
+    historyGroup.appendChild(historySection(histDates, histRecs, pendingCharts));
+    historyGroup.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
+    panel.appendChild(historyGroup);
+  }
 
   /* ---------- 6. by engineer (first of six cards masonry-packed further
      down — see layoutOverviewMasonry) ----------
@@ -2750,8 +2859,18 @@ function renderOverview() {
   // reserving it.
   const masonry = document.createElement("div");
   masonry.id = "overview-masonry";
-  for (const sec of [engSec, areaSec, hostRiskSec, daynightSec, leaveSec]) masonry.appendChild(sec);
-  panel.appendChild(masonry);
+  const masonryCards = [
+    ["ov.byEngineer", engSec], ["ov.byArea", areaSec], ["ov.hostRisk", hostRiskSec],
+    ["ov.dayNight", daynightSec], ["ov.leave", leaveSec],
+  ].filter(([area]) => can(area)).map(([, sec]) => sec);
+  for (const sec of masonryCards) masonry.appendChild(sec);
+  if (masonryCards.length) panel.appendChild(masonry);
+  // A role with every section switched off would otherwise get a blank tab with
+  // no explanation.
+  if (!panel.children.length) {
+    panel.innerHTML = '<p class="import-note">Your role doesn\'t have access to any of the Overview sections. Ask an admin if you think that\'s wrong.</p>';
+    return;
+  }
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
@@ -2977,7 +3096,9 @@ function updateEmplistBulkBar() {
   const bar = $("#emplist-bulkbar");
   if (!bar) return;
   const n = state.selectedEmps.size;
-  bar.classList.toggle("hidden", n === 0);
+  // every action on this bar is a write, so it has nothing to offer a role that
+  // can only read the roster
+  bar.classList.toggle("hidden", n === 0 || !can("emplist", "edit"));
   $("#emplist-bulk-count").textContent = n === 1 ? "1 selected" : `${n} selected`;
 }
 
@@ -3011,7 +3132,7 @@ function renderEmployeeRows() {
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
         <label class="toggle toggle-active">
-          <input type="checkbox" ${isActive ? "checked" : ""}>
+          <input type="checkbox" ${isActive ? "checked" : ""} ${can("emplist", "edit") ? "" : "disabled"}>
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-text">${isActive ? "Active" : "Inactive"}</span>
         </label>
@@ -3433,7 +3554,7 @@ function renderHostRows() {
       <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>
       <td data-label="Status" class="hl-status">
         <label class="toggle toggle-active">
-          <input type="checkbox" ${r.archived ? "" : "checked"}>
+          <input type="checkbox" ${r.archived ? "" : "checked"} ${can("hostlist", "edit") ? "" : "disabled"}>
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-text">${r.archived ? "Archived" : "Active"}</span>
         </label>
@@ -3544,6 +3665,7 @@ function exportHostlistCsv() {
    has already typed a host that isn't in the list yet; opts.returnToMission
    sends them back to the mission form afterwards with the host filled in. */
 function openHostModal(name, opts = {}) {
+  if (!can("hostlist", "edit")) { toast("Your role can view the host list but not change it.", "info"); return; }
   const rec = name ? D().hosts.find(h => h.name === name) : null;
   state.hostlist.editingHost = name || null;
   state.hostlist.returnToMission = !!opts.returnToMission;
@@ -3954,6 +4076,7 @@ function hideMission() {
 
 /* employee modal */
 function openEmployeeModal(empId) {
+  if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
   state.editingEmployeeId = empId || null;
   const form = $("#form-employee");
   form.reset();
