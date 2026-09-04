@@ -755,6 +755,40 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 }
 .mission-header .m-ppe { margin-top: 3px; font-size: 11px; color: var(--muted); }
 .mission-header .m-ppe b { font-weight: 700; }
+/* The host name IS the map link (hostNameHtml), so it keeps every bit of
+   .m-host's type and truncation above and only adds the pin and the underline.
+   inline-flex + min-width:0 is what lets the nested .m-host-name still shrink
+   and ellipsise inside a flex row; without the min-width override a flex item
+   refuses to go below its content size and a long host name would push the
+   area pill and shift chip off the end of the band instead of truncating.
+   Underlined at rest, unlike .tel-link: this is the affordance the shared board
+   is being redesigned around, and the phone and the printed PDF that carry it
+   have no hover state to discover it with. */
+.mission-header .m-host-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.mission-header .m-host-link .m-host-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* flex:none so the pin is never the first thing clipped off a long host name —
+   the name ellipsises, the pin stays. text-decoration:none keeps the underline
+   under the words rather than dragging through the emoji. */
+.mission-header .m-host-pin {
+  flex: none;
+  font-size: 11px;
+  text-decoration: none;
+}
+.mission-header .m-host-link:hover,
+.mission-header .m-host-link:focus-visible { color: var(--text); }
 .mission-body {
   display: flex;
   flex-direction: column;
@@ -2029,7 +2063,13 @@ button.chart-legend-item:hover { text-decoration: underline; }
 .board-tab.tab-overview.active { background: var(--brand-green); color: #fff; font-weight: 700; }
 
 /* export mode: freeze layout width for consistent capture; drop the panel margin */
-body.exporting #board-capture { min-width: 1600px; }
+/* Pinned, not just floored: with only a min-width, a 1920px monitor laid the
+   board out at 1920 and got a 4-column JPG while a 1600px one got 3 — the same
+   plan reaching the LINE group in two shapes. An exact width makes the export
+   the same everywhere, and it is the same number app.js hands html2canvas
+   (EXPORT_WIDTH), so the layout it measures and the frame it renders agree.
+   The print path overrides this back to auto — see @media print. */
+body.exporting #board-capture { width: 1600px; min-width: 1600px; max-width: 1600px; }
 body.exporting #app-root { margin-right: 0; }
 
 /* ===== Manpower List tab ===== */
@@ -2505,4 +2545,73 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .toast, .toast-out { animation: none; }
+}
+
+/* ===== PRINT / PDF =================================================
+   Paired with printBoard / prepareForPrint in app.js, which puts the DOM into
+   the same state the JPG export uses (capture header on, empty missions and
+   empty leave zones dropped, unassigned pools folded in, light theme forced)
+   from the beforeprint event — so Ctrl+P and the 🖨 button both land here.
+
+   Why a print path exists at all: a JPG posted into a chat group is re-encoded
+   and downsized on the way, which is what makes it unreadable when you zoom in,
+   and an image cannot carry a link. A PDF is sent as a file, its text is drawn
+   from outlines (sharp at any zoom), and Chrome writes every <a href> out as a
+   link annotation — so the host location and the engineer's phone stay tappable
+   inside the file itself. ================================================== */
+
+/* No paper size here on purpose. app.js measures the laid-out board at print
+   time and injects `@page { size: <board width>mm <board height>mm }` from
+   setPrintPageSize, so the sheet is exactly the board: ONE page, no breaks
+   falling between two missions of the same day, and no need to rebuild the
+   layout for a width the paper chose. This rule is only the floor under that —
+   zero margins, so the injected size is the board and nothing else. */
+@page {
+  margin: 0;
+}
+
+@media print {
+  /* Every colour on this board carries meaning: the engineer's colour on a
+     card's top edge, the service-area pill, the NIGHT chip, the dashed border
+     that says on-call. Browsers drop backgrounds when printing unless told
+     otherwise, which would strip all of it and leave a flat wall of text. */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* the app's furniture — none of it is part of the plan */
+  #sticky-header,
+  #stats-row,
+  #toolbar,
+  #float-pool,
+  #context-menu,
+  #touch-actions,
+  #modal-backdrop,
+  #datepicker-pop,
+  #chart-tip,
+  #toast-stack { display: none !important; }
+
+  html, body { background: #fff !important; }
+  body { margin: 0 !important; }
+  #app-root { margin: 0 !important; }
+
+  /* Deliberately does NOT touch the width. body.exporting has pinned this to
+     EXPORT_WIDTH, prepareForPrint laid the masonry out at that width, and
+     setPrintPageSize then made the page that same width — so the board is
+     already the right size for the sheet, and the masonry's absolute pixel
+     positions are already where they belong. An earlier version forced these
+     cards back into a static 3-column grid, which is what a print stylesheet
+     has to do when the paper width is imposed on it; sizing the page to the
+     board removes the need, and with it the ragged rows a grid leaves behind
+     wherever one card in a row is shorter than its neighbours. */
+  #board-capture { background: #fff !important; }
+
+  /* Nothing here about page breaks, break-inside or orphans, for the same
+     reason: there is exactly one page. */
+
+  /* links keep the board's own ink rather than the UA's blue, and are NOT
+     annotated with their href in the margin — the point is a live tap target,
+     not a printed URL nobody is going to type in */
+  a { color: inherit !important; }
 }

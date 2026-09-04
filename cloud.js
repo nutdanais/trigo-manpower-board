@@ -1064,6 +1064,59 @@ const cloud = {
      fold names like "Fortune " into "Fortune", and trimming the source would
      turn exactly that case into a merge-into-itself. These strings are the
      literal text stored on the rows being rewritten. */
+  /* Rename a host everywhere it appears.
+
+     hosts.name is not just a label — it is the key tying this record to the
+     mission and deployment rows carrying the same text, which is why the name
+     was read-only until now. So a rename is not an UPDATE of one column: it is
+     the same rewrite mergeHost performs, minus the joining of two histories.
+     Do it in the same order mergeHost uses — the rows the board reads first,
+     then the record — so a failure part-way leaves missions under a name with
+     no record (harmless: the Host List assembles those rows anyway) rather
+     than a record pointing at nothing.
+
+     Landing on a name that is already in use is refused rather than merged.
+     That case IS a merge — two histories joining for good, with its own
+     confirmation and its own rules about which record's details survive — and
+     silently doing it because someone mistyped a rename would be the worst
+     possible way to trigger it. */
+  async renameHost(fromName, toName) {
+    const from = String(fromName == null ? "" : fromName);
+    const to = String(toName == null ? "" : toName).trim();
+    if (!from.trim() || !to) throw new Error("A rename needs both the old and the new name.");
+    if (from === to) return;
+
+    // Checked against the database rather than this browser's cache: another
+    // planner may have created that host since this list was last loaded.
+    const { data: recClash, error: rErr } = await sb.from("hosts").select("id").eq("name", to).limit(1);
+    if (rErr && !this._tableMissing(rErr)) throw rErr;
+    // ...and a host can exist on mission rows alone, with no record at all —
+    // renaming onto one of those would join two sets of missions just as
+    // quietly, so it counts as taken too.
+    const { data: misClash, error: mcErr } = await sb.from("missions").select("id").eq("host", to).limit(1);
+    if (mcErr) throw mcErr;
+    if ((recClash && recClash.length) || (misClash && misClash.length)) {
+      throw new Error(`"${to}" is already a host. To combine them, use "Merge into another host" instead.`);
+    }
+
+    const { error: mErr } = await sb.from("missions").update({ host: to }).eq("host", from);
+    if (mErr) throw mErr;
+    const { error: dErr } = await sb.from("deployment_history").update({ host: to }).eq("host", from);
+    if (dErr && !this._tableMissing(dErr)) throw dErr;
+
+    // A host known only from its missions has no row here to rename; the
+    // caller's saveHost then creates one under the new name.
+    const rec = this.data.hosts.find((h) => h.name === from);
+    if (rec) {
+      const { error } = await sb.from("hosts")
+        .update({ name: to, updated_at: new Date().toISOString() }).eq("id", rec.id);
+      if (error && !this._tableMissing(error)) throw error;
+    }
+
+    this._invalidatePlans();
+    await this._loadHosts();
+  },
+
   async mergeHost(fromName, toName) {
     const from = String(fromName == null ? "" : fromName);
     const to = String(toName == null ? "" : toName);
