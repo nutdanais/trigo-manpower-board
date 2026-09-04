@@ -6,7 +6,7 @@ A drag-and-drop daily manpower planning board (replacement for Microsoft Whitebo
 
 This app is now backed by **Supabase** (cloud database + auth + realtime sync), so it needs one-time setup — see [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md).
 
-Once `config.js` has real Supabase credentials, double-click **index.html** to open the app, or serve the folder with any static web server. Sign in with an account created for you in the Supabase dashboard (Authentication → Users) — there's no self-signup.
+Once `config.js` has real Supabase credentials, double-click **index.html** to open the app, or serve the folder with any static web server. Sign in with your `@trigo-group.com` account — or use **Request access** on the sign-in screen and wait for an admin to approve you.
 
 ## How to use
 
@@ -41,6 +41,23 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
   - The **Note** column (after Service area) carries anything the crew needs to know about the site — gate, contact, a PPE reminder. It's printed, not hidden behind a hover (there is none on a tablet), it sorts and searches like every other column, it's in the CSV, and it rides along on every mission card for that host as the first half of the PPE line.
   - **Location, service area and note** are the parts a person types — click ✎ (or "+ Add location" / "+ Set area" / "+ Add note") to set the address, the Maps link, the area and the note. A host's **name is fixed**: it's what ties the record to that host's missions and deployment history, and it's the name the New Mission form matches against. Needs the one-time `supabase/migration-2026-09-02-hosts.sql` (plus `migration-2026-09-03-host-service-area.sql` for the area); until those are run the tab still lists everything, it just can't save the details.
 - **Export**: saves a high-resolution JPG of the current board.
+- **👤 Users and roles** (Settings ⚙ → **My account** / **Users** / **Roles**): who can sign in, and what each of them may see and change.
+  - **My account** is everyone's — set your display name and change your own password. It also shows your role and status, so you can see what you have without asking anyone.
+  - **Signing in**: only `@trigo-group.com` addresses can be used. Someone new either gets **invited** by an admin (Settings → Users → **+ Invite** — they get an email with a link that sets their password), or uses **Request access** on the sign-in screen and waits in a **Pending** queue an admin approves. Both ends work; use whichever suits. **Forgot password?** on the sign-in screen emails a reset link.
+  - **Four roles** ship as defaults, and an admin can change what any of them means:
+
+    | | Admin | Manager | Engineer | Viewer |
+    |---|---|---|---|---|
+    | Board, Manpower list, Host list | edit | edit | edit | **view only** |
+    | Settings — engineers / areas / boards | edit | edit | edit | — |
+    | Users & roles | **edit** | — | — | — |
+    | Overview — *History + Engineer workload*, *By engineer* | view | view | — | — |
+    | Overview — everything else | view | view | view | view |
+
+  - **Roles** (the matrix) is where those rules live — sixteen areas by four roles, each cell off / View / Edit. "Sensitive" is a business judgement that changes, so it is a setting rather than something that needs a code change and a redeploy. The **Admin column is locked**: it always keeps full access, so nobody can lock everyone out of this screen. Changes reach anyone with the app open straight away.
+  - **Taking access away**: use **Disable**, not Delete. Disable keeps the person's record and the "locked by" / "updated by" history that names them, and only stops them signing in — the same thinking as deactivating an employee or archiving a host. **Delete permanently** really does destroy the account, and says so. Neither can be done to yourself, and the last remaining admin cannot be demoted, disabled or deleted by anyone — those rules are enforced in the database, not just hidden in the UI.
+  - **What is really enforced**: reading anything needs an active account; every *write* additionally needs `edit` on that area, checked by Postgres — so a Viewer genuinely cannot change the board, whatever they try. Hiding an individual **Overview section** is different: those sections are worked out from the same mission and assignment rows the board itself needs, so it keeps the section off the page (and skips its query) rather than putting the numbers out of reach. Tidying the dashboard, not protecting a secret.
+  - Needs the one-time `supabase/migration-2026-09-04b-user-management.sql` — **edit the "REQUIRED: name the first admin" line at the bottom before running it**. Until it's run the app behaves exactly as it did before: everyone signed in has full access.
 - **Settings** ⚙: manage engineers (name, phone, color), service areas (name, color), and each board's weekly weekend days (checkboxes, save instantly) — this drives the holiday toggle, weekend "Add Mission" import, the date picker's weekend highlighting, and both Overview trend charts, so it's worth checking a new board's checkboxes match its real schedule.
 
 ## Releasing a change
@@ -71,6 +88,7 @@ within a second or two via Supabase Realtime.
 - `config.js` — your Supabase Project URL + anon key (see `SUPABASE_SETUP.md`)
 - `supabase/schema.sql` — database schema, security rules, and seed data — run once in the Supabase SQL editor
 - `supabase/migration-*.sql` — incremental schema changes; run any you haven't yet in the Supabase SQL editor (each is safe to run more than once)
+- `supabase/functions/admin-users/index.ts` — the one server-side function: inviting and deleting sign-in accounts, plus the notification emails. Optional — the Users screen works without it, minus those three things.
 - `_headers` — Netlify caching rules. Everything is set to revalidate on every load; nothing is cached hard.
 - `vendor/html2canvas.min.js` — library used for JPG export
 - `serve.ps1` — optional local web server for development, not needed for normal use

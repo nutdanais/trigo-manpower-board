@@ -19,7 +19,8 @@ Using a free account (rather than the anonymous "Drop" page) means you get a
 5. (Optional) **Site configuration → Change site name** to something tidy, e.g.
    `trigo-manpower` → your link becomes `https://trigo-manpower.netlify.app`.
 6. Open the link, sign in with a Supabase account, and confirm the board loads.
-7. Share the link + each person's login with your team.
+7. Share the link with your team. They sign in with their `@trigo-group.com` account,
+   or use **Request access** and wait for you to approve them in Settings → Users.
 
 ### To update later (new features, fixes, or config changes)
 
@@ -36,12 +37,15 @@ so use this only for a quick look, not as the real team link.
 
 ## Notes
 
-- **No Supabase changes needed.** Email/password sign-in works from any domain; there's
-  no redirect URL or CORS setting to configure. (Only if you later add magic-link or
-  Microsoft SSO would you register the Netlify URL in Supabase.)
+- **One Supabase setting does need your Netlify URL.** Go to **Authentication** →
+  **URL Configuration** and add the site's address (e.g. `https://trigo-manpower.netlify.app`)
+  to **Redirect URLs**. Password-reset and invitation links land there, and without it
+  they will not work. Everything else — ordinary email/password sign-in — needs no
+  configuration.
 - **The anon key in `config.js` is fine to publish** — Row Level Security is the real
   guard, and it requires a valid sign-in for any data access.
-- **Access control:** anyone with the link reaches the *login page*, but only people you
-  created accounts for in Supabase can get in. If you ever need to also hide the login
-  page itself behind your company identity, that's the Entra ID / Azure route we can
-  revisit later.
+- **Access control:** anyone with the link reaches the *sign-in page*, but only people
+  with an approved `@trigo-group.com` account can get in, and what they can do once in
+  depends on their role (Settings → Users). If you ever need to hide the sign-in page
+  itself behind your company identity, that's the Entra ID / Azure route we can revisit
+  later.
