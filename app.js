@@ -4481,12 +4481,15 @@ function prepareForPrint() {
   if (!isOverview()) {
     restoreEmptyMissions = hideEmptyMissionsForExport();
     restoreLeaveZones = hideEmptyLeaveZonesForExport();
-    // NB: no layoutMasonry() here. The masonry writes absolute pixel positions
-    // sized to the screen, and the paper width isn't knowable until the print
-    // media has already applied — so @media print puts the cards back into
-    // normal flow with !important instead (a stylesheet !important outranks
-    // those inline styles). layoutMasonry() runs again on restore below.
+    // The masonry lays out at exactly the width body.exporting has just pinned
+    // #board-capture to, which is the same width setPrintPageSize then makes the
+    // page — so these absolute positions are already right on paper and nothing
+    // has to be re-flowed. (This is why the print CSS no longer rebuilds the
+    // grid: it only had to when the paper width was unknowable.)
+    layoutMasonry(EXPORT_COLS);
   }
+  // Measured last, after every other decision above has changed the height.
+  setPrintPageSize($("#board-capture").getBoundingClientRect());
 
   printRestore = () => {
     if (restoreEmptyMissions) restoreEmptyMissions();
@@ -4495,8 +4498,51 @@ function prepareForPrint() {
     $("#capture-header").classList.add("hidden");
     document.body.classList.remove("exporting", "printing");
     if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
+    clearPrintPageSize();
     if (!isOverview()) layoutMasonry();
   };
+}
+
+/* One page, exactly the size of the board — the whole point of the PDF.
+
+   Paginating a board is destructive in a way paginating prose is not: a page
+   break falls between two mission cards that belong to the same day, and the
+   masonry has to be given up for a rigid grid because nothing can know how much
+   height is left on the current sheet. Sizing the PAGE to the CONTENT instead
+   removes the question. There is one page, so there are no breaks; the width is
+   one we chose rather than one the paper imposed, so the masonry's own geometry
+   is correct; and since a PDF's text is vector, a page far larger than any real
+   sheet costs nothing — the reader zooms into it exactly as they would zoom into
+   a photo of the board, only without it turning to mush.
+
+   Injected as a <style> rather than written into styles.css because the height
+   is only known at print time, and appended to <head> after the stylesheet so it
+   wins the cascade. Chrome applies style changes made during beforeprint to the
+   print that follows, which is what makes this work at all.
+
+   mm rather than px: both are valid <length> in @page, but print plumbing is
+   built around physical units, and mm is what a print dialog can show back to a
+   person. A 4000px-tall board becomes a ~1058mm page — nothing a printer would
+   accept as a sheet, and irrelevant, since this is read on a phone. Printing it
+   to real A4 still works: the driver scales it to fit one sheet.
+
+   There is a ceiling, far above anything this app will meet: a PDF page maxes
+   out at 200in (5080mm) a side. A 200-mission board measures ~111in, so the
+   limit is roughly 360 missions on a single day — hence no guard here. */
+function setPrintPageSize(rect) {
+  const mm = (px) => (px / 96 * 25.4).toFixed(1);
+  let el = document.getElementById("print-page-size");
+  if (!el) {
+    el = document.createElement("style");
+    el.id = "print-page-size";
+    document.head.appendChild(el);
+  }
+  el.textContent = `@page { size: ${mm(Math.ceil(rect.width))}mm ${mm(Math.ceil(rect.height))}mm; margin: 0; }`;
+}
+
+function clearPrintPageSize() {
+  const el = document.getElementById("print-page-size");
+  if (el) el.remove();
 }
 
 function restoreAfterPrint() {

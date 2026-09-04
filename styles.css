@@ -2560,14 +2560,14 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
    link annotation — so the host location and the engineer's phone stay tappable
    inside the file itself. ================================================== */
 
-/* Landscape because the board is 3 cards wide (matching the JPG — see
-   EXPORT_COLS in app.js). Three columns inside A4 portrait would be about 60mm
-   each, well under the width a mission card is drawn for; landscape gives about
-   90mm per column, which fits two employee cards per row the way the screen
-   does. Narrow margins for the same reason: every millimetre is card width. */
+/* No paper size here on purpose. app.js measures the laid-out board at print
+   time and injects `@page { size: <board width>mm <board height>mm }` from
+   setPrintPageSize, so the sheet is exactly the board: ONE page, no breaks
+   falling between two missions of the same day, and no need to rebuild the
+   layout for a width the paper chose. This rule is only the floor under that —
+   zero margins, so the injected size is the board and nothing else. */
 @page {
-  size: A4 landscape;
-  margin: 8mm;
+  margin: 0;
 }
 
 @media print {
@@ -2596,54 +2596,19 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   body { margin: 0 !important; }
   #app-root { margin: 0 !important; }
 
-  /* body.exporting pins this to the JPG capture's 1600px width (see the rule
-     near #board-capture above). On paper the page width IS the width, and
-     1600px of layout would simply be cropped at the margin. */
-  body.exporting #board-capture,
-  #board-capture {
-    min-width: 0 !important;
-    width: auto !important;
-    max-width: none !important;
-    padding: 0 !important;
-    background: #fff !important;
-  }
-  /* its negative margins exist to bleed past #board-capture's 14px padding,
-     which is 0 here */
-  #capture-header { margin: 0 0 6mm !important; }
+  /* Deliberately does NOT touch the width. body.exporting has pinned this to
+     EXPORT_WIDTH, prepareForPrint laid the masonry out at that width, and
+     setPrintPageSize then made the page that same width — so the board is
+     already the right size for the sheet, and the masonry's absolute pixel
+     positions are already where they belong. An earlier version forced these
+     cards back into a static 3-column grid, which is what a print stylesheet
+     has to do when the paper width is imposed on it; sizing the page to the
+     board removes the need, and with it the ragged rows a grid leaves behind
+     wherever one card in a row is shorter than its neighbours. */
+  #board-capture { background: #fff !important; }
 
-  /* The masonry positions every card absolutely, at pixel offsets computed for
-     the screen — on paper that would stack the whole board in the top-left
-     corner of page one. These !important rules outrank those inline styles
-     (a stylesheet !important beats a non-important inline style) and hand the
-     cards to a real 3-column grid, matching the JPG's EXPORT_COLS.
-
-     Grid rather than `column-count`: multicol fills top-to-bottom down column
-     one before starting column two, so mission 2 would land underneath mission
-     1 instead of beside it. Grid is row-major — three missions across, then the
-     next three — which is what "3 cards in a row" has to mean if the printed
-     board is to read in the same order as the screen. align-items:start keeps
-     each card at its natural height instead of stretching every card in a row
-     to match the tallest. */
-  #missions-grid {
-    height: auto !important;
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4mm;
-    align-items: start;
-  }
-  #missions-grid > .mission-card {
-    position: static !important;
-    left: auto !important;
-    top: auto !important;
-    width: auto !important;
-    margin: 0 !important;
-  }
-
-  /* nothing that reads as a single block should be split across a page break */
-  .mission-card, .zone, .emp-card {
-    break-inside: avoid;
-    page-break-inside: avoid;   /* the older property, for engines that want it */
-  }
+  /* Nothing here about page breaks, break-inside or orphans, for the same
+     reason: there is exactly one page. */
 
   /* links keep the board's own ink rather than the UA's blue, and are NOT
      annotated with their href in the margin — the point is a live tap target,
