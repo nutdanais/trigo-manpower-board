@@ -479,13 +479,29 @@ on conflict (id) do nothing;
 -- ⚠ REQUIRED: name the first admin, or nobody can open Settings → Users and
 --   the permission matrix can never be changed from inside the app again.
 --   Replace the address below with your own, then run this file.
-update profiles set role_key = 'admin', updated_at = now()
-where email = lower('nutdanai.sirinapanont@trigo-group.com');
+--   status is set here too, not just the role. An account created AFTER this
+--   file first ran already has a profile, so the backfill above skips it and it
+--   is still 'pending' — naming it admin without activating it produces an
+--   admin who cannot sign in, and no other admin to approve them.
+update profiles
+   set role_key = 'admin', status = 'active', approved_at = now(), updated_at = now()
+ where email = lower('nutdanai.sirinapanont@trigo-group.com');
 
+/* The one way this file can appear to succeed and leave you stuck: the address
+   above matching no account, so the update above touches nothing. Rather than
+   just say "no admin", print the accounts that DO exist — the right address is
+   almost always one of them, and then it is a one-line fix and a re-run. */
 do $$
+declare
+  found text;
 begin
   if not exists (select 1 from profiles where role_key = 'admin' and status = 'active') then
-    raise warning 'No active admin exists. Edit the "REQUIRED: name the first admin" line near the bottom of this file and run it again.';
+    select string_agg(email, ', ' order by email) into found from profiles;
+    if found is null then
+      raise warning 'No admin was set: there are no accounts yet. Create yours under Authentication > Users, then run this file again.';
+    else
+      raise warning 'No admin was set. The "REQUIRED: name the first admin" line near the bottom of this file has to match one of these existing accounts exactly: %', found;
+    end if;
   end if;
 end $$;
 
