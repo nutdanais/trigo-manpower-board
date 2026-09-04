@@ -1,177 +1,21 @@
--- Manpower Management Board — Supabase schema
+-- Manpower Management Board — user management, roles & permissions
 -- Run this in the Supabase SQL editor (Project > SQL Editor > New query > paste > Run).
 -- Safe to run more than once — every statement below skips anything already in place.
+--
+-- ⚠ BEFORE YOU RUN: scroll to the very bottom and put your own email address in
+--   the "REQUIRED: name the first admin" line. Without it nobody can open
+--   Settings → Users and the permission matrix can never be changed again from
+--   inside the app.
+--
+-- What this adds:
+--   * profiles              — one row per sign-in account: display name, role, status
+--   * roles                 — Admin / Manager / Engineer / Viewer
+--   * role_permissions      — the editable matrix: role × area → none | view | edit
+--   * allowed_email_domains — who may request access at all (@trigo-group.com)
+--   * a rewrite of every table's RLS policy, from "any signed-in user can do
+--     anything" to "read if active, write if your role allows this area"
 
 create extension if not exists "pgcrypto";
-
--- ===== Reference tables =====
-
-create table if not exists boards (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  weekend_days int[] not null default '{0,6}',   -- days of week that are weekend (0=Sun..6=Sat)
-  created_at timestamptz not null default now()
-);
-
-create table if not exists engineers (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  phone text,
-  color text not null default '#9ca3af'
-);
-
-create table if not exists service_areas (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  color text not null default '#9ca3af'
-);
-
--- ===== Per-board, per-date overrides (force a date working or non-working) =====
--- is_working=false: a normally-working day taken off (holiday)
--- is_working=true:  a normally-weekend day that is worked (special occasion)
-
-create table if not exists day_overrides (
-  board_id uuid not null references boards(id) on delete cascade,
-  override_date date not null,
-  is_working boolean not null,
-  note text,
-  created_at timestamptz not null default now(),
-  primary key (board_id, override_date)
-);
-
--- ===== Employees: one board at a time (enforces "one card, one place") =====
-
-create table if not exists employees (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  contract text not null check (contract in ('permanent', 'oncall')),
-  position text check (position in ('inspector', 'senior_inspector', 'technician', 'team_leader', 'assistant_site_engineer')),
-  phone text,
-  area_id uuid references service_areas(id) on delete restrict,
-  board_id uuid not null references boards(id) on delete cascade,
-  created_at timestamptz not null default now()
-);
-
--- ===== Missions: scoped to one board + one date =====
-
-create table if not exists missions (
-  id uuid primary key default gen_random_uuid(),
-  board_id uuid not null references boards(id) on delete cascade,
-  plan_date date not null,
-  number text not null,
-  host text not null,
-  customer text not null,
-  shift text not null check (shift in ('day', 'night')),
-  start_time time not null default '08:00',
-  end_time time not null default '17:00',
-  ppe text,
-  remark text,
-  hidden boolean not null default false,
-  engineer_id uuid references engineers(id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index if not exists missions_board_date_idx on missions(board_id, plan_date);
--- one mission number per board + date + shift (Day and Night can coexist)
-do $$
-begin
-  alter table missions add constraint missions_unique_number_shift unique (board_id, plan_date, number, shift);
--- an existing constraint reports duplicate_table (its backing index), not
--- duplicate_object — catching only the latter broke this file's promise to be
--- safe to run more than once
-exception when duplicate_object or duplicate_table then null;
-end $$;
-
--- ===== Assignments: where an employee is on a given date =====
--- Exactly one row per employee per date (their mission OR their zone).
--- Because employees.board_id is the single source of truth for which board
--- an employee belongs to, this table can never place one card on two boards.
-
-create table if not exists assignments (
-  id uuid primary key default gen_random_uuid(),
-  employee_id uuid not null references employees(id) on delete cascade,
-  plan_date date not null,
-  mission_id uuid references missions(id) on delete cascade,
-  zone text check (zone in ('annual', 'sick', 'business', 'unpaid', 'exchange')),  -- standby is computed, not a stored zone
-  updated_at timestamptz not null default now(),
-  unique (employee_id, plan_date),
-  check (
-    (mission_id is not null and zone is null) or
-    (mission_id is null and zone is not null)
-  )
-);
-create index if not exists assignments_date_idx on assignments(plan_date);
-
--- ===== Deployment history: durable log for the employee Host Record tab =====
--- Independent of assignments' lifecycle on purpose — hiding or deleting a
--- mission deletes its assignment rows (see the assignments table's own
--- comment / migration-2026-08-31), but the fact that an employee once worked
--- a given host should survive that. One row per (employee, date), written the
--- moment an employee is assigned to a mission, snapshotting host/number/
--- customer as plain text rather than a foreign key. Never deleted by the
--- board's hide/unassign/delete flows — see cloud.js's _writeDeploymentHistory.
-
-create table if not exists deployment_history (
-  id uuid primary key default gen_random_uuid(),
-  employee_id uuid not null references employees(id) on delete cascade,
-  plan_date date not null,
-  mission_number text not null,
-  host text not null,
-  customer text,
-  board_id uuid references boards(id) on delete set null,
-  created_at timestamptz not null default now(),
-  unique (employee_id, plan_date)
-);
-create index if not exists deployment_history_employee_idx on deployment_history(employee_id);
-
--- ===== Hosts: the master record behind the Host List tab =====
--- A host exists on the board as free text (missions.host, and the snapshot in
--- deployment_history.host); this table is where anything ABOUT that host is
--- stored — its location and a Google Maps link. Keyed by the name rather than
--- by an id on purpose, so it stays purely additive: a host with no row here
--- still appears in the Host List, assembled from mission/deployment rows
--- alone. See migration-2026-09-02-hosts.sql for the full reasoning.
-
-create table if not exists hosts (
-  id uuid primary key default gen_random_uuid(),
-  name text not null unique,
-  location text,
-  map_url text,
-  -- which service area the host sits in; drives the Host List's Service area
-  -- column and the area pill on every mission card for that host
-  area_id uuid references service_areas(id) on delete set null,
-  -- a real site the team no longer serves: kept in the Host List with all of
-  -- its history, only dropped from the New Mission host picker. A duplicate or
-  -- a typo is NOT archived — it is merged into the real host (cloud.mergeHost),
-  -- which rewrites the name on its mission and deployment rows.
-  archived boolean not null default false,
-  note text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
--- ===== Plan-day marker: "Lock board" state per (board, date) =====
--- The app no longer auto-seeds a future day from the previous working day (that
--- was the source of the "adjusted board disappears on login" bug — a load that
--- wrote to the database). Carry-forward is now an explicit user action only
--- (Carry over / Reset Board). This table's sole remaining job is the board lock:
--- locked_by/locked_at are set when a planner locks a finished day (view-only for
--- everyone) and cleared on unlock. (initialized_at is a harmless leftover column;
--- rows are created only by locking now.)
-
-create table if not exists plan_days (
-  board_id  uuid not null references boards(id) on delete cascade,
-  plan_date date not null,
-  initialized_at timestamptz not null default now(),
-  locked_by text,
-  locked_at timestamptz,
-  primary key (board_id, plan_date)
-);
-
--- ===== Users, roles and permissions =====
--- Everything below to the RLS section is also shipped as
--- migration-2026-09-05-user-management.sql, for a project that already
--- has data. The two files are kept identical on purpose.
 
 -- ===== Roles =====
 -- `protected` marks the row the app refuses to weaken (admin). It is a data
@@ -483,28 +327,6 @@ create trigger guard_protected_roles
   before update or delete on roles
   for each row execute function public.guard_protected_roles();
 
-
--- ===== Row Level Security =====
--- The rule is: read if your account is active, write only if your role has
--- `edit` on the area that table belongs to (see role_permissions above).
---
--- Reads stay wide on purpose. The board cannot render without missions,
--- assignments and employees, so a Viewer must be able to read them; what a
--- Viewer loses is the ability to change anything. Hiding individual Overview
--- SECTIONS is a presentation choice made in app.js — those sections are
--- computed from these same rows, so it is not, and cannot be, a data barrier.
-
-alter table boards             enable row level security;
-alter table engineers          enable row level security;
-alter table service_areas      enable row level security;
-alter table employees          enable row level security;
-alter table missions           enable row level security;
-alter table assignments        enable row level security;
-alter table day_overrides      enable row level security;
-alter table plan_days          enable row level security;
-alter table deployment_history enable row level security;
-alter table hosts              enable row level security;
-
 -- ===== Row Level Security on the new tables =====
 
 alter table roles                 enable row level security;
@@ -603,56 +425,10 @@ begin
   end loop;
 end $$;
 
--- ===== Realtime: broadcast changes to every connected client =====
--- deployment_history is deliberately NOT added below: nothing renders it live
--- across clients, the Host Record tab just reads it fresh on every modal open.
--- Wrapped so re-running doesn't error if a table is already in the publication.
+-- ===== Realtime =====
+-- So a role change, an approval or a matrix edit reaches an open browser
+-- without a refresh. Same wrapper as schema.sql — re-running must not error.
 
-do $$
-begin
-  alter publication supabase_realtime add table boards;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table engineers;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table service_areas;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table employees;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table missions;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table assignments;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table day_overrides;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table plan_days;
-exception when duplicate_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table hosts;
-exception when duplicate_object then null;
-end $$;
 do $$
 begin
   alter publication supabase_realtime add table profiles;
@@ -669,44 +445,56 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- ===== Seed data (matches the current app defaults) =====
--- Only seeds each table the first time it's empty, so re-running never duplicates rows.
+-- ===== Backfill: everyone who could already sign in keeps working =====
+-- Existing accounts become active Managers — full use of the app, minus user
+-- management. Nothing is downgraded on a re-run (`do nothing`), so an admin
+-- demoted on purpose does not get promoted back by running this file again.
 
-insert into boards (name)
-select v.name from (values ('Non-Rayong'), ('Rayong')) as v(name)
-where not exists (select 1 from boards);
+insert into profiles (id, email, full_name, role_key, status, approved_at, approved_by)
+select u.id,
+       lower(u.email),
+       nullif(btrim(coalesce(u.raw_user_meta_data ->> 'full_name', '')), ''),
+       'manager',
+       'active',
+       now(),
+       'migration-2026-09-05'
+from auth.users u
+where u.email is not null
+on conflict (id) do nothing;
 
-insert into service_areas (name, color)
-select v.name, v.color from (values
-  ('LCB', '#f28ba0'), ('AYT', '#f6a06b'), ('NPT', '#7fb8ec'), ('Wellgrow', '#f5c26b'),
-  ('AMATA', '#f7dd6c'), ('BENZ', '#e8e8e8'), ('RAYONG', '#a8d98a')
-) as v(name, color)
-where not exists (select 1 from service_areas);
+-- ⚠ REQUIRED: name the first admin, or nobody can open Settings → Users and
+--   the permission matrix can never be changed from inside the app again.
+--   Replace the address below with your own, then run this file.
+update profiles set role_key = 'admin', updated_at = now()
+where email = lower('YOUR-EMAIL@trigo-group.com');
 
-insert into engineers (name, phone, color)
-select v.name, v.phone, v.color from (values
-  ('Phada', '063-206-7730', '#a8d98a'),
-  ('Tanakit', '065-945-6413', '#7fb8ec'),
-  ('Sunicha', '063-023-8939', '#e57fb1'),
-  ('Suriya', '081-175-5147', '#f6a06b'),
-  ('Phrajak', '', '#f7dd6c'),
-  ('Janjira', '062-743-0920', '#c0c4cb'),
-  ('Wipa', '065-205-1752', '#c0c4cb')
-) as v(name, phone, color)
-where not exists (select 1 from engineers);
+do $$
+begin
+  if not exists (select 1 from profiles where role_key = 'admin' and status = 'active') then
+    raise warning 'No active admin exists. Edit the "REQUIRED: name the first admin" line near the bottom of this file and run it again.';
+  end if;
+end $$;
 
--- ===== Bootstrap: make yourself the first admin =====
--- A fresh project has no accounts yet, so this cannot be seeded. After running
--- this file:
---   1. create your own account — Authentication → Users → Add user, or sign up
---      through the app's "Request access" form with your @trigo-group.com address;
---   2. run the two lines below with your address filled in.
--- Without an admin nobody can open Settings → Users, and no pending request can
--- ever be approved.
+-- ===== Rollback =====
+-- If this change needs to be undone, the app's original security model was
+-- "any signed-in user can read and write everything". To restore it, run:
 --
---   update profiles
---      set role_key = 'admin', status = 'active', approved_at = now()
---    where email = lower('YOUR-EMAIL@trigo-group.com');
+--   do $$
+--   declare t text;
+--   begin
+--     foreach t in array array['missions','assignments','plan_days','day_overrides',
+--                              'deployment_history','employees','hosts','engineers',
+--                              'service_areas','boards']
+--     loop
+--       execute format('drop policy if exists %I on public.%I', t || ' read', t);
+--       execute format('drop policy if exists %I on public.%I', t || ' insert', t);
+--       execute format('drop policy if exists %I on public.%I', t || ' update', t);
+--       execute format('drop policy if exists %I on public.%I', t || ' delete', t);
+--       execute format(
+--         'create policy %I on public.%I for all using (auth.role() = ''authenticated'') with check (auth.role() = ''authenticated'')',
+--         'authenticated read/write ' || t, t);
+--     end loop;
+--   end $$;
 --
--- Check it worked:
---   select email, role_key, status from profiles;
+-- The profiles/roles/role_permissions tables can be left in place — with the
+-- policies above restored they no longer gate anything.
