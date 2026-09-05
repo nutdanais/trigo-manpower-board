@@ -222,9 +222,15 @@ create table if not exists profiles (
   -- the real thing but it is not readable from the browser, and an admin
   -- deciding who to disable needs "when was this person last here".
   last_seen_at timestamptz,
+  -- set whenever an admin issues a password (there is no email here, so every
+  -- password starts life known to the admin who handed it over). The app sends
+  -- the person to the "set a new password" screen until they clear it.
+  must_change_password boolean not null default false,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
+-- for a database created before 2026-09-05
+alter table profiles add column if not exists must_change_password boolean not null default false;
 create index if not exists profiles_status_idx on profiles(status);
 alter table profiles add column if not exists last_seen_at timestamptz;
 
@@ -318,11 +324,22 @@ returns void language sql security definer set search_path = public, pg_temp as 
   update profiles set last_seen_at = now() where id = auth.uid();
 $fn$;
 
+/* Cleared once the person has chosen their own password. Takes no arguments
+   and reads auth.uid() itself, so it can only ever clear the caller's flag. */
+create or replace function public.clear_must_change_password()
+returns void language sql security definer set search_path = public, pg_temp as $fn$
+  update profiles
+     set must_change_password = false,
+         updated_at = now()
+   where id = auth.uid();
+$fn$;
+
 grant execute on function public.is_active()               to authenticated;
 grant execute on function public.my_role()                 to authenticated;
 grant execute on function public.can(text, text)           to authenticated;
 grant execute on function public.update_my_profile(text)   to authenticated;
 grant execute on function public.touch_last_seen()         to authenticated;
+grant execute on function public.clear_must_change_password() to authenticated;
 
 -- ===== auth.users triggers =====
 

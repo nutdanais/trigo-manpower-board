@@ -5193,7 +5193,7 @@ function renderUserRows() {
   $("#users-count").textContent = rows.length === all.length
     ? `${all.length} ${all.length === 1 ? "person" : "people"}`
     : `${rows.length} of ${all.length}`;
-  $("#btn-invite-user").classList.toggle("hidden", !mayEdit);
+  $("#btn-add-user").classList.toggle("hidden", !mayEdit);
 
   for (const th of $$("#users-table th[data-sort]")) {
     th.classList.toggle("sorted", th.dataset.sort === state.users.sortKey);
@@ -5254,9 +5254,9 @@ function approveUser(u) {
   safely(async () => {
     await cloud.saveUser(u.id, { status: "active", roleKey });
     renderUserRows();
-    const mailed = await cloud.notifyUser(u.id, "approved");
-    toast(`${u.fullName || u.email} can now sign in as ${roleLabel(roleKey)}.` +
-      (mailed ? " They've been emailed." : ""), "info");
+    // Nothing is emailed — tell them yourself, with the password they chose
+    // when they asked for access.
+    toast(`${u.fullName || u.email} can now sign in as ${roleLabel(roleKey)}. Let them know.`, "info");
   });
 }
 
@@ -5266,7 +5266,6 @@ function rejectUser(u) {
     () => safely(async () => {
       await cloud.saveUser(u.id, { status: "disabled" });
       renderUserRows();
-      await cloud.notifyUser(u.id, "rejected");
       toast("Request turned down.", "info");
     }));
 }
@@ -5293,6 +5292,14 @@ function openUserModal(id) {
   form.roleKey.disabled = !!locked;
   form.status.disabled = !!locked;
   $("#btn-delete-user").classList.toggle("hidden", !!locked);
+  // Not the same condition as `locked`: reissuing the only admin's password
+  // locks nobody out, so that case is allowed. Your own is not — you change it
+  // in My account, where you type it yourself rather than read it off a screen.
+  const isMe = !!(D().me && u.id === D().me.id);
+  $("#btn-reset-password").classList.toggle("hidden", isMe);
+  // On your own row both are gone; without this the divider above them is left
+  // ruling off nothing.
+  $("#user-admin-actions").classList.toggle("hidden", isMe && !!locked);
   $("#user-modal-note").textContent = locked || "";
   $("#user-modal-note").classList.toggle("hidden", !locked);
   $("#user-role-hint").textContent = "What each role may do is on the Roles & permissions tab.";
@@ -5317,8 +5324,12 @@ function saveUserModal(ev) {
     await cloud.saveUser(id, vals);
     reopenSettings();
     renderUserRows();
-    if (vals.roleKey && vals.roleKey !== before.roleKey) await cloud.notifyUser(id, "role-changed");
-    toast("Saved.", "info");
+    // A role change takes effect on their next load, but nothing tells them —
+    // there is no email here — so say so while the admin is still looking.
+    const rerolled = vals.roleKey && vals.roleKey !== before.roleKey;
+    toast(rerolled
+      ? `Saved. ${before.fullName || before.email} is now ${roleLabel(vals.roleKey)} — tell them, it changes what they can see.`
+      : "Saved.", "info");
   });
 }
 
@@ -5337,24 +5348,55 @@ function deleteUserFromModal() {
     }));
 }
 
-function openInviteModal() {
+function openAddUserModal() {
   if (!can("users", "edit")) return;
-  const form = $("#form-invite");
+  const form = $("#form-add-user");
   form.reset();
   fillRoleSelect(form.roleKey, "viewer");
-  openModal("#modal-invite");
+  openModal("#modal-add-user");
 }
 
-function sendInvite(ev) {
+function addUser(ev) {
   ev.preventDefault();
   const form = ev.target;
   const email = form.email.value.trim().toLowerCase();
   safely(async () => {
-    await cloud.inviteUser(email, form.roleKey.value);
-    reopenSettings();
+    const res = await cloud.createUser(email, form.fullName.value, form.roleKey.value);
     renderUserRows();
-    toast(`Invitation sent to ${email}.`, "info");
+    showTempPassword(email, res.password, "Account created.");
   });
+}
+
+function resetUserPassword() {
+  const id = state.users.editingId;
+  const u = (D().users || []).find(x => x.id === id);
+  if (!u) return;
+  showConfirm("Issue a new password?",
+    `${u.fullName || u.email} will not be able to sign in with their current password once you do. ` +
+    `You'll see the new one on the next screen — it is shown once, so pass it on before you close it. ` +
+    `They'll be asked to choose their own the first time they use it.`,
+    () => safely(async () => {
+      const res = await cloud.setUserPassword(id);
+      renderUserRows();
+      showTempPassword(u.email, res.password, "New password issued.");
+    }));
+}
+
+/* The one moment this password is visible. It is generated in the Edge Function
+   and never stored anywhere the app can read back, so if the admin closes this
+   without passing it on, the only way forward is to issue another one. */
+function showTempPassword(email, password, headline) {
+  $("#temp-password-title").textContent = headline;
+  $("#temp-password-for").textContent = `For ${email}.`;
+  $("#temp-password-value").textContent = password;
+  const copy = $("#btn-copy-temp-password");
+  copy.textContent = "Copy";
+  copy.onclick = () => {
+    navigator.clipboard.writeText(password)
+      .then(() => { copy.textContent = "Copied"; })
+      .catch(() => { copy.textContent = "Select it and copy"; });
+  };
+  openModal("#modal-temp-password");
 }
 
 function exportUsersCsv() {
@@ -5436,10 +5478,14 @@ function wireUserManagement() {
   $("#users-search").addEventListener("input", (e) => { state.users.search = e.target.value; renderUserRows(); });
   $("#btn-users-pending").onclick = () => { state.users.pendingOnly = !state.users.pendingOnly; renderUserRows(); };
   $("#btn-users-csv").onclick = exportUsersCsv;
-  $("#btn-invite-user").onclick = openInviteModal;
-  $("#form-invite").onsubmit = sendInvite;
+  $("#btn-add-user").onclick = openAddUserModal;
+  $("#form-add-user").onsubmit = addUser;
   $("#form-user").onsubmit = saveUserModal;
   $("#btn-delete-user").onclick = deleteUserFromModal;
+  $("#btn-reset-password").onclick = resetUserPassword;
+  // Back to the Users list rather than the board: the admin has just changed
+  // something there and the new row is what they want to see.
+  $("#btn-temp-password-done").onclick = reopenSettings;
   for (const ms of $$("#users-filters .ms")) {
     ms.querySelector(".ms-btn").onclick = (ev) => {
       ev.stopPropagation();
@@ -5461,11 +5507,13 @@ function wireUserManagement() {
 }
 
 /* ---------- login ---------- */
-/* The sign-in box holds four forms in one card — sign in, request access,
-   forgot password, and the "you can't come in yet" message — because they are
-   the same conversation and swapping them in place keeps the person on one
-   screen instead of navigating them around. */
-const LOGIN_FORMS = ["#form-login", "#form-request", "#form-forgot", "#login-blocked"];
+/* The sign-in box holds three forms in one card — sign in, request access, and
+   the "you can't come in yet" message — because they are the same conversation
+   and swapping them in place keeps the person on one screen instead of
+   navigating them around. There is no forgot-password form: that needs email,
+   which this deployment has none of, so an admin reissues the password from
+   Settings → Users instead. */
+const LOGIN_FORMS = ["#form-login", "#form-request", "#login-blocked"];
 
 function showLogin(which = "#form-login") {
   $("#login-screen").classList.remove("hidden");
@@ -5479,7 +5527,7 @@ function showLogin(which = "#form-login") {
    its job) and no idea why. */
 function showAccountBlocked(status) {
   const msg = status === "pending"
-    ? "Your request is in. An admin still has to approve it — you'll get an email when they do."
+    ? "Your request is in. An admin still has to approve it. There's no email from this app, so tell them you've asked, then try signing in again."
     : status === "missing"
       ? "Your sign-in works, but there's no profile record for it yet. An admin needs to run the user-management migration, or add you from Settings → Users."
       : "Your access to this app has been switched off. Ask an admin if you think that's a mistake.";
@@ -5521,10 +5569,6 @@ function wireLogin() {
   };
 
   $("#btn-request-access").onclick = () => showLogin("#form-request");
-  $("#btn-forgot").onclick = () => {
-    $("#form-forgot").email.value = $("#form-login").email.value;
-    showLogin("#form-forgot");
-  };
   for (const b of $$("[data-login-back]")) b.onclick = () => showLogin("#form-login");
   $("#btn-blocked-signout").onclick = () => cloud.signOut().then(() => location.reload());
 
@@ -5538,7 +5582,7 @@ function wireLogin() {
         .then(() => {
           form.reset();
           loginMessage("#request-note",
-            "Request sent. Confirm your email address if we've sent you a link, then wait for an admin to approve you — you'll get an email either way.");
+            "Request sent. An admin has to approve it before you can sign in — this app sends no email, so tell them you've asked, then try signing in again.");
         })
         .catch((e) => {
           // The domain rule lives in a trigger on auth.users, and a trigger
@@ -5552,29 +5596,21 @@ function wireLogin() {
         }));
   };
 
-  $("#form-forgot").onsubmit = (ev) => {
-    ev.preventDefault();
-    const form = ev.target;
-    loginMessage("#forgot-error", "");
-    loginMessage("#forgot-note", "");
-    withBusy(form, "Sending…", () =>
-      cloud.resetPassword(form.email.value)
-        // Deliberately the same answer whether or not the address is one we
-        // know: this form must not become a way to find out who has an account.
-        .then(() => loginMessage("#forgot-note", "If that address has an account, a reset link is on its way."))
-        .catch(() => loginMessage("#forgot-note", "If that address has an account, a reset link is on its way.")));
-  };
 }
 
-/* ---------- password recovery ---------- */
-/* Supabase turns the emailed link into a recovery session before this runs, so
-   there is nothing to verify here — the session IS the proof. */
-function showResetScreen(session) {
+/* ---------- setting a new password ---------- */
+/* Two callers. boot() sends anyone here whose profile carries
+   must_change_password — the session they just signed in with is the proof, and
+   the flag is what they have to clear to get past it. The rarer caller is a
+   recovery link triggered from the Supabase dashboard, where Supabase has
+   already turned the link into a recovery session before this runs; there too
+   the session IS the proof, so there is nothing to verify here either way. */
+function showResetScreen(session, why) {
   $("#login-screen").classList.add("hidden");
   $("#app-root").classList.add("hidden");
   $("#reset-screen").classList.remove("hidden");
   const email = session && session.user && session.user.email;
-  $("#reset-for").textContent = email ? `For ${email}.` : "";
+  $("#reset-for").textContent = [why, email ? `For ${email}.` : ""].filter(Boolean).join(" ");
 }
 
 function wireReset() {
@@ -5894,7 +5930,8 @@ async function boot() {
   $("#app-root").classList.remove("hidden");
   wireSaveStatus();
   wireApp();
-  try { const session = await cloud.getSession(); state.myEmail = session && session.user && session.user.email; } catch (e) { /* toast attribution just won't fire */ }
+  let session = null;
+  try { session = await cloud.getSession(); state.myEmail = session && session.user && session.user.email; } catch (e) { /* toast attribution just won't fire */ }
   await cloud.init(() => state.date);
   // Signed in, but not allowed in yet. RLS would hand them empty tables, so
   // stop here with an explanation instead of a board with nothing on it.
@@ -5902,6 +5939,13 @@ async function boot() {
   if (me && !me.legacy && me.status !== "active") {
     $("#app-root").classList.add("hidden");
     showAccountBlocked(me.status);
+    return;
+  }
+  // Signing in with a password an admin issued and read out. Nobody gets past
+  // this screen still using it — which is what stops a handed-over password
+  // becoming a permanent shared one.
+  if (me && me.mustChangePassword) {
+    showResetScreen(session, "An admin set this password for you. Choose your own to carry on.");
     return;
   }
   cloud.touchLastSeen();   // best-effort; "last seen" in Settings → Users

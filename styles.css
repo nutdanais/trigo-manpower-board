@@ -1472,6 +1472,17 @@ body.board-view #app-root { margin-right: 264px; }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
 .modal-actions .btn-primary { min-width: 90px; }
 
+/* Account-level actions in the user dialog. Set apart from Cancel/Save above a
+   rule, because they act on the account rather than on the form. */
+.user-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
 /* Settings modal sub-menu tabs (Engineer / Service Area / Board) */
 .settings-tabs { display: flex; gap: 6px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
 .settings-tab {
@@ -1644,6 +1655,32 @@ body.board-view #app-root { margin-right: 264px; }
   font-weight: 400;
 }
 .login-submit { width: 100%; margin-top: 6px; padding: 9px; }
+.login-hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 12px; }
+
+/* The handed-over password, shown once. Big and monospaced because it gets read
+   out loud as often as it gets copied, and the alphabet deliberately excludes
+   I/O/0/1 so there is nothing to mishear. */
+.temp-password {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+.temp-password code {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  word-break: break-all;
+  user-select: all;
+  color: var(--text);
+}
 .login-error {
   background: #fef2f2;
   border: 1px solid #fca5a5;

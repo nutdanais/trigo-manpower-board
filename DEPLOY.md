@@ -51,11 +51,13 @@ so use this only for a quick look, not as the real team link.
 
 ## Notes
 
-- **One Supabase setting does need your Netlify URL.** Go to **Authentication** →
-  **URL Configuration** and add the site's address (e.g. `https://trigo-manpower.netlify.app`)
-  to **Redirect URLs**. Password-reset and invitation links land there, and without it
-  they will not work. Everything else — ordinary email/password sign-in — needs no
-  configuration.
+- **Worth setting your Netlify URL as the Supabase Site URL.** Go to
+  **Authentication** → **URL Configuration** and put the site's address
+  (e.g. `https://trigo-manpower.netlify.app`) in **Site URL**. Nothing in the app
+  depends on it any more — this deployment sends no email, so there are no reset or
+  invitation links to land anywhere — but it is what a password-recovery link
+  triggered from the Supabase dashboard would use, which is the project owner's one
+  way back in if they lock themselves out.
 - **The anon key in `config.js` is fine to publish** — Row Level Security is the real
   guard, and it requires a valid sign-in for any data access.
 - **Access control:** anyone with the link reaches the *sign-in page*, but only people

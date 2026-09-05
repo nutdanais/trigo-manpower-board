@@ -54,52 +54,84 @@ ever be approved. Everyone else you add from inside the app from here on.
 > the bottom before running it.** It backfills every account you already have as an
 > active **Manager** — full use of the app, minus user management — so nobody loses
 > access, and re-running it never re-promotes someone you have since demoted.
+> Then run
+> [`supabase/migration-2026-09-05-admin-passwords.sql`](supabase/migration-2026-09-05-admin-passwords.sql),
+> which adds the flag behind "choose your own password the first time you sign in".
+> No editing needed on that one.
 
-## 4b. Email (needed for invitations and password resets)
+## 4b. Turn off email confirmation
 
-Supabase's built-in email sender is capped at **2 messages an hour** and is not
-meant for production, so it needs a real SMTP provider behind it. The app is
-written against plain SMTP, so any provider works; these instructions use
-[Resend](https://resend.com), whose free tier (3,000 emails a month) is far more
-than this app will ever send.
+**This app sends no email at all**, by design. Sending any would need DNS records
+on a domain we control, and Supabase's own sender is no help: it delivers only to
+members of the Supabase project and is capped at 2 messages an hour. So the app
+never relies on a message arriving. Instead an admin creates the account, hands
+the temporary password over in person (or on Teams/LINE), and the person is made
+to choose their own the first time they sign in.
 
-1. Sign up at resend.com and add a **domain**. Use a subdomain —
-   `mail.trigo-group.com` — not the bare `trigo-group.com`. The bare domain
-   carries the company's real mail, and adding sending records there risks
-   colliding with what IT already has set up.
-2. Resend shows a few DNS records (SPF, DKIM). Ask IT to add them to
-   `mail.trigo-group.com`, then click **Verify**.
-3. Create an **API key**.
-4. In Supabase: **Authentication** → **Emails** → **SMTP Settings** → enable custom
-   SMTP:
-   - Host `smtp.resend.com`, Port `465`
-   - Username `resend`, Password: the API key
-   - Sender `no-reply@mail.trigo-group.com`
-5. **Authentication** → **Rate Limits**: custom SMTP starts at 30 emails/hour.
-   Raise it (100/hour is plenty).
-6. **Authentication** → **URL Configuration**: add your Netlify URL to **Redirect
-   URLs**. Password-reset and invitation links will not work without this.
+One setting has to match that:
 
-Until this is done the app is still usable — people can be added from Settings →
-Users and sign in — they just will not receive invitation or reset emails.
+11. **Authentication** → **Sign In / Providers** → **Email** → turn **Confirm
+    email** OFF, and Save.
 
-## 4c. Invitations and notification emails (optional)
+This one is load-bearing. Left on, "Request access" queues a confirmation email
+that can never arrive, and the account can never sign in. Off, the request
+completes immediately and waits for an admin to approve it in Settings → Users.
 
-"Invite" and "Delete permanently" in Settings → Users need a small server-side
-function, because creating and destroying a sign-in account is not something a
-browser is ever allowed to do. Everything else on that screen works without it.
+Leave **custom SMTP** disabled — there is nothing to send.
 
-1. **Edge Functions** → **Deploy a new function** → name it `admin-users`, and paste
-   [`supabase/functions/admin-users/index.ts`](supabase/functions/admin-users/index.ts).
-2. Under its **Secrets**, add:
-   - `RESEND_API_KEY` — the same key as above
-   - `MAIL_FROM` — e.g. `TRIGO Manpower Board <no-reply@mail.trigo-group.com>`
-   - `APP_URL` — your Netlify URL
+## 4c. The admin-users function (required)
+
+Three things in Settings → Users happen inside `auth.users`, which a browser is
+never allowed to touch: **creating** an account, **reissuing** its password, and
+**deleting** it. They live in a small server-side function. Everything else on
+that screen — approve, reject, change role, disable — is a plain database write
+and works without it.
+
+12. **Edge Functions** → **Deploy a new function** → name it exactly
+    `admin-users`, and paste
+    [`supabase/functions/admin-users/index.ts`](supabase/functions/admin-users/index.ts).
+13. Leave **Verify JWT** on (the default) and deploy.
+
+**There are no secrets to set.** `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY` are all provided by the platform.
+
+### How adding someone works
+
+1. Settings → **Users** → **+ Add user**: their name, their `@trigo-group.com`
+   address, and a role.
+2. You get a **temporary password on screen, once**. It is not stored anywhere you
+   can look it up again — pass it on before you close the dialog. If it gets lost,
+   just issue another with **Reset password**.
+3. They sign in with it and are taken straight to "Set a new password". They
+   cannot reach the board until they have chosen one, so the password you read out
+   never becomes a permanent shared secret.
+
+Someone who uses **Request access** instead picks their own password up front, so
+there is nothing to hand over — you only have to approve them, and tell them you
+have.
+
+### Forgotten passwords
+
+There is no "Forgot password?" — it would send an email. Open the person's row in
+Settings → Users and click **Reset password**, then pass the new one on the same
+way. **This makes you the password help desk**, which is the price of having no
+mail service at all.
+
+Two consequences worth planning for:
+
+- **Keep at least two admins.** An admin cannot reset their own password from
+  inside the app (deliberately — you would be typing a password you had just read
+  off a screen), so a second one is your only in-app recovery.
+- **The one exception is the Supabase project owner.** Supabase's built-in sender
+  *does* deliver to members of the project, so whoever owns the project can always
+  use **Authentication → Users → Send password recovery** on their own account from
+  the dashboard. Worth making sure the main admin's app account uses the same
+  address as their Supabase login.
 
 ## 5. Get your API credentials
 
-11. Go to **Project Settings** (gear icon) → **API**.
-12. Copy the **Project URL** and the **anon public** key.
+14. Go to **Project Settings** (gear icon) → **API**.
+15. Copy the **Project URL** and the **anon public** key.
 
 ## 6. Tell me these two values
 
