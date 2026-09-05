@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-04n">
+<link rel="stylesheet" href="styles.css?v=2026-09-05a">
 </head>
 <body>
 
@@ -43,8 +43,8 @@
       <p id="login-error" class="login-error hidden"></p>
       <p id="login-note" class="login-note hidden"></p>
       <button type="submit" class="btn btn-primary login-submit">Sign in</button>
+      <p class="login-hint">Forgotten your password? This app sends no email — ask an admin to issue you a new one.</p>
       <div class="login-links">
-        <button type="button" class="login-link" id="btn-forgot">Forgot password?</button>
         <button type="button" class="login-link" id="btn-request-access">Request access</button>
       </div>
     </form>
@@ -63,15 +63,6 @@
       <div class="login-links"><button type="button" class="login-link" data-login-back>Back to sign in</button></div>
     </form>
 
-    <form id="form-forgot" class="hidden">
-      <p class="login-sub">We'll email you a link to set a new password.</p>
-      <label>Email <input name="email" type="email" required autocomplete="username"></label>
-      <p id="forgot-error" class="login-error hidden"></p>
-      <p id="forgot-note" class="login-note hidden"></p>
-      <button type="submit" class="btn btn-primary login-submit">Send reset link</button>
-      <div class="login-links"><button type="button" class="login-link" data-login-back>Back to sign in</button></div>
-    </form>
-
     <!-- Shown instead of the board when someone signs in whose account is not
          active yet: RLS would hand them empty tables, and a blank board
          explains nothing. -->
@@ -82,8 +73,10 @@
   </div>
 </div>
 
-<!-- Password recovery lands here: Supabase puts a recovery session in place
-     from the emailed link, and this is the only thing that session is for. -->
+<!-- Two ways in. Ordinarily: someone signing in with a password an admin issued
+     is sent here and cannot get past it until they choose their own. Rarely: a
+     recovery link triggered from the Supabase dashboard puts a recovery session
+     in place, and this is the only thing that session is for. -->
 <div id="reset-screen" class="hidden">
   <div class="login-box">
     <div class="login-brand">
@@ -603,7 +596,7 @@
             </div>
             <div class="toolbar-spacer"></div>
             <span id="users-count"></span>
-            <button type="button" class="btn btn-small btn-primary" id="btn-invite-user" title="Send someone an invitation email">+ Invite</button>
+            <button type="button" class="btn btn-small btn-primary" id="btn-add-user" title="Create an account and get a temporary password to hand over">+ Add user</button>
             <button type="button" class="btn btn-small" id="btn-users-csv" title="Export the rows below as a CSV file">⬇ CSV</button>
           </div>
           <div class="table-wrap">
@@ -657,8 +650,14 @@
         <option value="disabled">Disabled — kept on record, cannot sign in</option>
       </select></label>
       <p id="user-modal-note" class="import-note hidden"></p>
+      <!-- Things you do TO the account, kept apart from saving the form above:
+           four buttons on one row wrapped even on a desktop, and these two are
+           the ones you least want to hit by accident. -->
+      <div class="user-admin-actions" id="user-admin-actions">
+        <button type="button" class="btn btn-small" id="btn-reset-password" title="Issue a new temporary password for someone who has forgotten theirs">Reset password</button>
+        <button type="button" class="btn btn-small btn-danger" id="btn-delete-user">Delete permanently</button>
+      </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-danger" id="btn-delete-user">Delete permanently</button>
         <div class="toolbar-spacer"></div>
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -666,17 +665,36 @@
     </form>
   </div>
 
-  <div class="modal hidden" id="modal-invite">
-    <h3>Invite someone</h3>
-    <form id="form-invite">
+  <!-- No invitation email is possible here, so the account is made outright and
+       the admin carries the password over by hand. -->
+  <div class="modal hidden" id="modal-add-user">
+    <h3>Add someone</h3>
+    <form id="form-add-user">
+      <label>Their name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
       <label>Email <input name="email" type="email" required autocomplete="off" placeholder="name@trigo-group.com"></label>
       <label>Role <select name="roleKey" required></select></label>
-      <p class="import-note">They get an email with a link that sets their password and signs them straight in. Only <span class="invite-domain">@trigo-group.com</span> addresses can be invited.</p>
+      <p class="import-note">The account is created straight away, already approved. You'll get a temporary password to pass on — they choose their own the first time they sign in. Only <span class="invite-domain">@trigo-group.com</span> addresses can be added.</p>
       <div class="modal-actions">
         <button type="button" class="btn" data-close>Cancel</button>
-        <button type="submit" class="btn btn-primary">Send invitation</button>
+        <button type="submit" class="btn btn-primary">Create account</button>
       </div>
     </form>
+  </div>
+
+  <!-- The only place a temporary password is ever visible. It is generated in
+       the Edge Function and never stored anywhere readable, so closing this
+       without passing it on means issuing another one. -->
+  <div class="modal hidden" id="modal-temp-password">
+    <h3 id="temp-password-title">Account created.</h3>
+    <p id="temp-password-for" class="import-note"></p>
+    <div class="temp-password">
+      <code id="temp-password-value"></code>
+      <button type="button" class="btn btn-small" id="btn-copy-temp-password">Copy</button>
+    </div>
+    <p class="import-note">Shown once — it is not stored anywhere you can look it up again. Send it to them however you normally talk, and they'll be asked to choose their own password the first time they sign in. If it gets lost, use <b>Reset password</b> to issue another.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" id="btn-temp-password-done">Done</button>
+    </div>
   </div>
 
   <div class="modal hidden" id="modal-board">
@@ -733,8 +751,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-04n"></script>
-<script src="charts.js?v=2026-09-04n"></script>
-<script src="app.js?v=2026-09-04n"></script>
+<script src="cloud.js?v=2026-09-05a"></script>
+<script src="charts.js?v=2026-09-05a"></script>
+<script src="app.js?v=2026-09-05a"></script>
 </body>
 </html>

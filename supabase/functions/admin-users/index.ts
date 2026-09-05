@@ -1,23 +1,25 @@
 // admin-users — the only place the service-role key is used.
 //
-// Everything else the Users pane does is a plain table write under RLS. Two
-// things are not: creating an account (invite) and destroying one (delete),
-// because both live in auth.users, which the browser can never be given access
-// to. This function is that narrow bridge, plus the notification emails.
+// This deployment sends no email at all: there is no DNS access for a sending
+// domain, and Supabase's built-in sender only delivers to members of the
+// Supabase project. So accounts are created with a temporary password that an
+// admin hands over in person, and the app makes the person choose their own the
+// first time they sign in.
+//
+// Three things here need the service-role key, because all three live in
+// auth.users, which a browser can never be given access to:
+//   create        make an account with a password, no email sent
+//   set-password  reissue a password for someone who has forgotten theirs
+//   delete        destroy an account
+// Everything else the Users pane does — approve, reject, change role, disable —
+// is a plain table write under RLS and needs nothing from this file.
 //
 // Deploy it from the Supabase dashboard (Edge Functions → Deploy a new
 // function → paste this file) or with `supabase functions deploy admin-users`.
 // The CLI is not required.
 //
-// Secrets to set on the function (Edge Functions → admin-users → Secrets):
-//   RESEND_API_KEY  re_...          from resend.com → API Keys
-//   MAIL_FROM       "TRIGO Manpower Board <no-reply@mail.trigo-group.com>"
-//   APP_URL         https://your-site.netlify.app   (where invite links land)
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by the platform.
-//
-// Without RESEND_API_KEY the function still invites and deletes — it just
-// reports that no email went out, which is why the Users pane is usable before
-// the mail side is set up.
+// There are no secrets to configure. SUPABASE_URL, SUPABASE_ANON_KEY and
+// SUPABASE_SERVICE_ROLE_KEY are all provided by the platform.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -33,53 +35,20 @@ const json = (body: unknown, status = 200) =>
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-const MAIL_FROM = Deno.env.get("MAIL_FROM") ?? "";
-const APP_URL = Deno.env.get("APP_URL") ?? "";
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
-/* ---------- email ---------- */
+/* ---------- temporary passwords ----------
+   Generated here rather than typed by the admin: it is one less weak password,
+   and it means the value is never something the admin might reuse elsewhere.
+   The alphabet is 32 characters, so 256 % 32 === 0 and the modulo introduces no
+   bias. I, O, 0 and 1 are left out — these get read out over the phone. */
 
-type MailKind = "invited" | "approved" | "rejected" | "role-changed";
+const ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789#$";
 
-function mailFor(kind: MailKind, name: string, roleLabel: string) {
-  const who = name || "there";
-  const link = APP_URL ? `\n\nOpen the board: ${APP_URL}` : "";
-  switch (kind) {
-    case "approved":
-      return {
-        subject: "Your Manpower Board access is approved",
-        text: `Hi ${who},\n\nYour access to the TRIGO Manpower Board has been approved. You're set up as ${roleLabel}.${link}\n\nIf you don't remember your password, use "Forgot password?" on the sign-in screen.`,
-      };
-    case "rejected":
-      return {
-        subject: "About your Manpower Board request",
-        text: `Hi ${who},\n\nYour request for access to the TRIGO Manpower Board hasn't been approved. If you think that's a mistake, reply to the person who manages the board.`,
-      };
-    case "role-changed":
-      return {
-        subject: "Your Manpower Board role has changed",
-        text: `Hi ${who},\n\nYour role on the TRIGO Manpower Board is now ${roleLabel}. That changes which tabs you see and what you can edit.${link}`,
-      };
-    case "invited":
-      return {
-        subject: "You've been invited to the Manpower Board",
-        text: `Hi ${who},\n\nYou've been invited to the TRIGO Manpower Board as ${roleLabel}. Check your inbox for the invitation link — it sets your password and signs you in.${link}`,
-      };
-  }
-}
-
-async function sendMail(to: string, kind: MailKind, name: string, roleLabel: string) {
-  if (!RESEND_API_KEY || !MAIL_FROM) return { sent: false, reason: "mail not configured" };
-  const body = mailFor(kind, name, roleLabel);
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: MAIL_FROM, to: [to], subject: body.subject, text: body.text }),
-  });
-  if (!res.ok) return { sent: false, reason: `resend ${res.status}: ${await res.text()}` };
-  return { sent: true };
+function tempPassword(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(14));
+  return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("");
 }
 
 /* ---------- guards ----------
@@ -87,7 +56,7 @@ async function sendMail(to: string, kind: MailKind, name: string, roleLabel: str
    Checked here as well because this function bypasses RLS: a rule that only
    holds in two of the three places is not a rule. */
 
-async function assertNotSelf(callerId: string, targetId: string) {
+function assertNotSelf(callerId: string, targetId: string) {
   if (callerId === targetId) throw new Error("You can't change your own account here — ask another admin.");
 }
 
@@ -102,11 +71,6 @@ async function assertNotLastAdmin(targetId: string) {
 async function allowedDomains(): Promise<string[]> {
   const { data } = await admin.from("allowed_email_domains").select("domain");
   return (data ?? []).map((d: { domain: string }) => d.domain.toLowerCase());
-}
-
-async function roleLabelFor(key: string) {
-  const { data } = await admin.from("roles").select("label").eq("key", key).maybeSingle();
-  return data?.label ?? key;
 }
 
 /* ---------- handler ---------- */
@@ -138,51 +102,70 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const action = String(body.action ?? "");
 
-    if (action === "invite") {
+    if (action === "create") {
       const email = String(body.email ?? "").trim().toLowerCase();
+      const fullName = String(body.fullName ?? "").trim();
       const roleKey = String(body.roleKey ?? "viewer");
       if (!email.includes("@")) return json({ error: "That doesn't look like an email address." }, 400);
+      // The domain rule is a trigger on auth.users, so this check is not what
+      // enforces it — it is what turns an opaque trigger 500 into a sentence.
       const domains = await allowedDomains();
       if (domains.length && !domains.includes(email.split("@")[1])) {
-        return json({ error: `Only ${domains.map((d) => "@" + d).join(" or ")} addresses can be invited.` }, 400);
+        return json({ error: `Only ${domains.map((d) => "@" + d).join(" or ")} addresses can be added.` }, 400);
       }
-      const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: APP_URL || undefined,
+
+      const password = tempPassword();
+      // email_confirm: true is what stops Supabase trying to send a
+      // confirmation message that could never be delivered here.
+      const { data, error } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName },
       });
       if (error) return json({ error: error.message }, 400);
-      // The invite arrives already approved at the role the admin picked —
-      // making them accept and then wait for approval would be silly.
+
+      // The account arrives already approved at the role the admin picked —
+      // making them wait for an approval the same admin would give is silly.
       await admin.from("profiles").update({
+        full_name: fullName || null,
         role_key: roleKey,
         status: "active",
         approved_at: new Date().toISOString(),
         approved_by: user.email,
+        must_change_password: true,
         updated_at: new Date().toISOString(),
       }).eq("id", data.user.id);
-      return json({ ok: true, id: data.user.id });
+
+      return json({ ok: true, id: data.user.id, password });
+    }
+
+    if (action === "set-password") {
+      const id = String(body.id ?? "");
+      // An admin changes their own password in Settings → My account. Keeping
+      // it out of here means they cannot replace it with a value they only saw
+      // once and then close the dialog.
+      assertNotSelf(user.id, id);
+
+      const password = tempPassword();
+      const { error } = await admin.auth.admin.updateUserById(id, { password });
+      if (error) return json({ error: error.message }, 400);
+      await admin.from("profiles").update({
+        must_change_password: true,
+        updated_at: new Date().toISOString(),
+      }).eq("id", id);
+
+      return json({ ok: true, password });
     }
 
     if (action === "delete") {
       const id = String(body.id ?? "");
-      await assertNotSelf(user.id, id);
+      assertNotSelf(user.id, id);
       await assertNotLastAdmin(id);
       const { error } = await admin.auth.admin.deleteUser(id);
       if (error) return json({ error: error.message }, 400);
       // profiles.id references auth.users on delete cascade, so the row goes too
       return json({ ok: true });
-    }
-
-    if (action === "notify") {
-      const id = String(body.id ?? "");
-      const kind = String(body.kind ?? "") as MailKind;
-      if (!["invited", "approved", "rejected", "role-changed"].includes(kind)) {
-        return json({ error: "Unknown notification." }, 400);
-      }
-      const { data: target } = await admin.from("profiles")
-        .select("email, full_name, role_key").eq("id", id).maybeSingle();
-      if (!target) return json({ error: "No such user." }, 404);
-      const result = await sendMail(target.email, kind, target.full_name ?? "", await roleLabelFor(target.role_key));
-      return json({ ok: true, ...result });
     }
 
     return json({ error: "Unknown action." }, 400);
