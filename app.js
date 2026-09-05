@@ -4347,9 +4347,6 @@ function applySettingsTab() {
   for (const pane of $$(".settings-pane")) {
     pane.classList.toggle("hidden", pane.dataset.pane !== state.settingsTab);
   }
-  // the Users and Roles tables are far wider than the rest of this modal
-  $("#modal-settings").classList.toggle("settings-wide",
-    state.settingsTab === "users" || state.settingsTab === "roles");
   if (state.settingsTab === "account") renderAccountPane();
   if (state.settingsTab === "users") renderUsersPane();
   if (state.settingsTab === "roles") renderRolesMatrix();

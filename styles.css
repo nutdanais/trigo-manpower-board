@@ -2571,15 +2571,24 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
    pane at a time on the right, and only that pane scrolling. Six sections is
    past what a horizontal tab strip carries, which is why the strip needed a
    scroller in the first place; a rail never needs one. */
+/* One box, whatever you click. The panes used to size themselves — 820x315 for
+   Engineer against 1320x828 for Roles — so the frame, the footer and the rail
+   items all jumped on every click down the rail. Content varies inside; the
+   dialog does not.
+
+   1120 is measured, not guessed: below 1080 the Users table can no longer lay
+   out its seven columns without a horizontal scroll (it needs 793px against 758
+   available at a 1000px modal), and 1120 leaves ~80px of slack for addresses
+   longer than today's. A real `height` rather than a max-height is what makes
+   the short panes stop shrink-wrapping. */
 #modal-settings {
-  width: min(820px, 94vw);
-  max-height: 92vh;
+  width: min(1120px, 94vw);
+  height: min(720px, 86vh);
   display: flex;
   flex-direction: row;
   padding: 0;                /* the rail and the body carry their own */
   overflow: hidden;          /* the pane scrolls, not the card */
 }
-#modal-settings.settings-wide { width: min(1320px, 96vw); }
 
 #settings-rail {
   flex: 0 0 200px;
@@ -2667,6 +2676,12 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   min-height: 0;
   overflow: auto;
   padding-right: 2px;        /* room for the scrollbar beside the last column */
+}
+/* The tables want the whole body; the forms do not — an unconstrained name
+   field would stretch the full ~880px. Capped near the width these forms
+   already laid out at, so they keep their proportions inside the wider frame. */
+#modal-settings .settings-pane:not([data-pane="users"]):not([data-pane="roles"]) .settings-section {
+  max-width: 640px;
 }
 #modal-settings .modal-actions {
   flex: 0 0 auto;
@@ -2894,7 +2909,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 
 @media (max-width: 720px) {
   /* on a phone these two panes want the whole screen */
-  #modal-settings, #modal-settings.settings-wide { width: 96vw; max-height: 94vh; }
+  #modal-settings { width: 96vw; height: min(720px, 90vh); }
   /* the rail becomes a strip above the body — a 200px column would leave the
      tables nothing on a phone */
   #modal-settings { flex-direction: column; }
