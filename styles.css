@@ -2430,12 +2430,22 @@ body.touch-mode .hl-edit { opacity: 1; }
 /* denser surfaces that hold a lot of text get the stronger (more opaque) glass */
 .mission-card,
 #float-pool,
-.modal,
 .ov-section {
   background: var(--glass-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+/* Modals are deliberately NOT frosted. They sit over a busy board and hold the
+   densest text in the app — a settings form, a 15-row user list, a 16 x 4
+   permission grid — and translucency over a moving background is exactly what
+   makes that hard to read. The board's own surfaces above keep the glass. */
+.modal {
+  background: var(--panel);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--border);
   box-shadow: var(--glass-shadow);
 }
 .mission-card, .zone { border-radius: 12px; }
@@ -2455,9 +2465,12 @@ body.touch-mode .hl-edit { opacity: 1; }
 }
 
 /* a soft blur behind an open modal lifts it off the board */
+/* a plain scrim rather than a blur: the modals above are opaque now, so the
+   blur only cost the page behind its legibility without buying any separation */
 #modal-backdrop {
-  -webkit-backdrop-filter: saturate(1.1) blur(3px);
-  backdrop-filter: saturate(1.1) blur(3px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(15,23,42,.55);
 }
 
 /* plain toolbar buttons become frosted chips; the coloured variants below keep
@@ -2553,46 +2566,111 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
    Users and Roles panes hold real tables, so the modal widens for those two
    and stays its normal 440px everywhere else. */
 /* This modal is the only one holding real tables — a row per account on Users,
-   a 16 x 4 grid on Roles — so it is built as a proper dialog rather than as the
-   short form the shared .modal rules assume:
-     * a flex column, so the heading, the tab row and Done stay put and ONLY the
-       active pane scrolls. The shared .modal scrolls as a whole (overflow-y on
-       .modal above), which on a long pane carried the tabs and the Done button
-       off the top and bottom of the screen;
-     * sized with min(), so a large monitor gets a large dialog instead of the
-       same fixed pixel count a laptop gets. */
+   a 16 x 4 grid on Roles — so it is built as a two-column dialog rather than as
+   the short form the shared .modal rules assume: a nav rail on the left, one
+   pane at a time on the right, and only that pane scrolling. Six sections is
+   past what a horizontal tab strip carries, which is why the strip needed a
+   scroller in the first place; a rail never needs one. */
 #modal-settings {
-  width: min(760px, 94vw);
+  width: min(820px, 94vw);
   max-height: 92vh;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  padding: 0;                /* the rail and the body carry their own */
   overflow: hidden;          /* the pane scrolls, not the card */
 }
-/* ID-scoped deliberately: #modal-settings above is an ID selector and would
-   otherwise outrank a two-class rule, which is exactly why the previous
-   .modal.settings-wide never actually widened anything. */
 #modal-settings.settings-wide { width: min(1320px, 96vw); }
-#modal-settings > h3 { flex: 0 0 auto; }
-#settings-tabs {
-  flex: 0 0 auto;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: thin;
+
+#settings-rail {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  /* a fraction of --bg-soft mixed back toward the panel: a whisper of grey in
+     light mode, and it still darkens correctly in dark. A hex here would only
+     have been right in one of the two. */
+  background: color-mix(in srgb, var(--bg-soft) 45%, var(--panel));
+  border-right: 1px solid var(--border);
+  padding: 18px 0;
+  /* overflow-x is pinned on purpose: `overflow-x: auto` alone makes the OTHER
+     axis compute to auto too, and the old tab strip's 1px of overflow was
+     enough for the browser to offer a vertical scrollbar for it. */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
-#settings-tabs .settings-tab { flex: 0 0 auto; white-space: nowrap; }
+#settings-rail > h3 { margin: 0 0 14px 18px; flex: 0 0 auto; }
+
+#settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  border-bottom: none;
+  overflow: visible;
+}
+/* Drawn as a divider rule rather than a label. Keeping it an element (instead of
+   a border on the first button of each group) is what lets applySettingsTab drop
+   the divider together with the items under it — a Viewer with only My account
+   gets a clean single entry, not an orphan rule. Restoring the text labels is a
+   matter of undoing this one block. */
+.settings-group {
+  margin: 8px 18px;
+  border-top: 1px solid var(--border);
+  height: 0;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+.settings-group:first-child { display: none; }   /* nothing to divide above the first */
+
+#settings-tabs .settings-tab {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 0;
+  padding: 10px 18px;
+  padding-left: 15px;
+  border: none;
+  /* the accent bar's width is always reserved, so selecting an item doesn't
+     nudge every label sideways */
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+#settings-tabs .settings-tab:hover { background: rgba(0,0,0,.035); }
+/* the selected row is the panel colour and runs flush to the rail's right edge,
+   so it reads as continuous with the content beside it */
+#settings-tabs .settings-tab.active {
+  background: var(--panel);
+  border-left-color: var(--primary-text);
+  color: var(--primary-text);
+  font-weight: 700;
+}
+
+#settings-body {
+  flex: 1 1 auto;
+  /* without min-width:0 a wide table refuses to shrink and shoves the rail off */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+}
 /* The scroll region. min-height:0 is what actually lets a flex child scroll
-   instead of growing to fit its content and pushing the footer off-screen.
-   Height stays a max, not a fixed value, so My account still shrinks to a
-   compact dialog and only the tall panes reach the cap. */
+   instead of growing to fit and pushing the footer off-screen. Height stays a
+   max, not a fixed value, so My account is still a compact dialog and only the
+   tall panes reach the cap. */
 #modal-settings .settings-pane {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  /* room for the scrollbar so it doesn't sit on top of the last column */
-  padding-right: 2px;
+  padding-right: 2px;        /* room for the scrollbar beside the last column */
 }
 #modal-settings .modal-actions {
   flex: 0 0 auto;
+  justify-content: flex-end;
   margin-top: 0;
   padding-top: 14px;
   border-top: 1px solid var(--border);
@@ -2756,6 +2834,9 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 #roles-matrix .rm-area { font-weight: 600; }
 #roles-matrix .rm-area small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 #roles-matrix td:not(.rm-area) { text-align: center; }
+/* ...but a group row's <td> isn't .rm-area either, and that rule has the same
+   specificity while coming later — which left the section labels centred. */
+#roles-matrix .rm-group td { text-align: left; padding-left: 9px; }
 .rm-level {
   padding: 3px 6px;
   border: 1px solid var(--border);
@@ -2814,6 +2895,28 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 @media (max-width: 720px) {
   /* on a phone these two panes want the whole screen */
   #modal-settings, #modal-settings.settings-wide { width: 96vw; max-height: 94vh; }
+  /* the rail becomes a strip above the body — a 200px column would leave the
+     tables nothing on a phone */
+  #modal-settings { flex-direction: column; }
+  #settings-rail {
+    flex: 0 0 auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 0 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  #settings-rail > h3 { margin-bottom: 8px; }
+  #settings-tabs { flex-direction: row; }
+  #settings-tabs .settings-tab {
+    width: auto;
+    white-space: nowrap;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    padding: 8px 14px;
+  }
+  #settings-tabs .settings-tab.active { border-bottom-color: var(--primary-text); }
+  .settings-group { display: none; }
 }
 
 /* ===== PRINT / PDF =================================================

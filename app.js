@@ -4337,6 +4337,13 @@ function applySettingsTab() {
   for (const btn of buttons) {
     btn.classList.toggle("active", btn.dataset.tab === state.settingsTab);
   }
+  // The dividers between rail groups are .settings-group elements, so one goes
+  // when everything under it does — otherwise a Viewer (My account only) would
+  // be left looking at rules with nothing between them.
+  for (const g of $$("#settings-tabs .settings-group")) {
+    const anyVisible = buttons.some(b => b.dataset.group === g.dataset.group && !b.classList.contains("hidden"));
+    g.classList.toggle("hidden", !anyVisible);
+  }
   for (const pane of $$(".settings-pane")) {
     pane.classList.toggle("hidden", pane.dataset.pane !== state.settingsTab);
   }

@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-04j">
+<link rel="stylesheet" href="styles.css?v=2026-09-04k">
 </head>
 <body>
 
@@ -488,107 +488,124 @@
     </div>
   </div>
 
+  <!-- Settings is a two-column dialog: a nav rail on the left, one pane at a
+       time on the right. Six sections is past what a horizontal tab strip
+       carries, and the panes here include two real tables. The ids and classes
+       are the ones app.js reads (#settings-tabs, .settings-tab, data-tab,
+       data-area) — only the box around them changed. -->
   <div class="modal hidden" id="modal-settings">
-    <h3>Settings</h3>
-    <div id="settings-tabs" class="settings-tabs">
-      <button type="button" class="settings-tab" data-tab="account" data-area="account">My account</button>
-      <button type="button" class="settings-tab" data-tab="engineers" data-area="settings">Engineer</button>
-      <button type="button" class="settings-tab" data-tab="areas" data-area="settings">Service Area</button>
-      <button type="button" class="settings-tab" data-tab="boards" data-area="settings">Board</button>
-      <button type="button" class="settings-tab" data-tab="users" data-area="users">Users</button>
-      <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit">Roles</button>
-    </div>
-    <!-- My account: the one pane every role can open, which is why user
-         management lives in Settings rather than as a tab of its own. -->
-    <div class="settings-pane" data-pane="account">
-      <div class="settings-section">
-        <h4>My account</h4>
-        <div id="account-identity" class="account-identity"></div>
-        <form id="form-account-name" class="account-form">
-          <label>Display name <input name="fullName" type="text" maxlength="80" placeholder="e.g. Somchai P." autocomplete="name"></label>
-          <button type="submit" class="btn btn-small btn-primary">Save name</button>
-        </form>
-        <h4>Change password</h4>
-        <form id="form-account-password" class="account-form">
-          <label>New password <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
-          <label>Repeat it <input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label>
-          <p class="import-note">At least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
-          <button type="submit" class="btn btn-small btn-primary">Change password</button>
-        </form>
-      </div>
-    </div>
-    <div class="settings-pane" data-pane="engineers">
-      <div class="settings-section">
-        <h4>Engineers <button class="btn btn-small" id="btn-add-engineer">+ Add</button></h4>
-        <div id="settings-engineers"></div>
-      </div>
-    </div>
-    <div class="settings-pane" data-pane="areas">
-      <div class="settings-section">
-        <h4>Service areas <button class="btn btn-small" id="btn-add-area">+ Add</button></h4>
-        <div id="settings-areas"></div>
-      </div>
-    </div>
-    <div class="settings-pane" data-pane="boards">
-      <div class="settings-section">
-        <h4>Boards — weekly weekend days</h4>
-        <div id="settings-boards"></div>
-      </div>
-    </div>
-
-    <!-- Users: the same table shape as the Host list, so it inherits that
-         tab's toolbar / filter / sort / CSV styling rather than inventing any. -->
-    <div class="settings-pane" data-pane="users">
-      <div class="settings-section">
-        <div id="users-pending" class="hidden">
-          <span class="dupbar-icon" aria-hidden="true">⚠</span>
-          <span id="users-pending-text"></span>
-          <button type="button" class="btn btn-small" id="btn-users-pending">Review requests</button>
+    <aside id="settings-rail">
+      <h3>Settings</h3>
+      <nav id="settings-tabs" class="settings-tabs">
+        <!-- .settings-group is drawn as a divider rule, not a heading (see
+             styles.css). It stays an element rather than a border on the button
+             so applySettingsTab can drop the divider along with the last item
+             above it, and so the text labels are one CSS rule away. -->
+        <div class="settings-group" data-group="account">Account</div>
+        <button type="button" class="settings-tab" data-tab="account" data-area="account" data-group="account">My account</button>
+        <div class="settings-group" data-group="board">Board setup</div>
+        <button type="button" class="settings-tab" data-tab="engineers" data-area="settings" data-group="board">Engineer</button>
+        <button type="button" class="settings-tab" data-tab="areas" data-area="settings" data-group="board">Service Area</button>
+        <button type="button" class="settings-tab" data-tab="boards" data-area="settings" data-group="board">Board</button>
+        <div class="settings-group" data-group="admin">Administration</div>
+        <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin">Users</button>
+        <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit" data-group="admin">Roles</button>
+      </nav>
+    </aside>
+    <div id="settings-body">
+      <!-- My account: the one pane every role can open, which is why user
+           management lives in Settings rather than as a tab of its own. -->
+      <div class="settings-pane" data-pane="account">
+        <div class="settings-section">
+          <h4>My account</h4>
+          <div id="account-identity" class="account-identity"></div>
+          <form id="form-account-name" class="account-form">
+            <label>Display name <input name="fullName" type="text" maxlength="80" placeholder="e.g. Somchai P." autocomplete="name"></label>
+            <button type="submit" class="btn btn-small btn-primary">Save name</button>
+          </form>
+          <h4>Change password</h4>
+          <form id="form-account-password" class="account-form">
+            <label>New password <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+            <label>Repeat it <input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label>
+            <p class="import-note">At least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
+            <button type="submit" class="btn btn-small btn-primary">Change password</button>
+          </form>
         </div>
-        <div id="users-toolbar">
-          <input id="users-search" type="search" placeholder="Search name or email…" autocomplete="off">
-          <div id="users-filters">
-            <div class="ms" data-filter="roleKey"><button type="button" class="ms-btn">Role: All</button><div class="ms-pop hidden"></div></div>
-            <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+      </div>
+      <div class="settings-pane" data-pane="engineers">
+        <div class="settings-section">
+          <h4>Engineers <button class="btn btn-small" id="btn-add-engineer">+ Add</button></h4>
+          <div id="settings-engineers"></div>
+        </div>
+      </div>
+      <div class="settings-pane" data-pane="areas">
+        <div class="settings-section">
+          <h4>Service areas <button class="btn btn-small" id="btn-add-area">+ Add</button></h4>
+          <div id="settings-areas"></div>
+        </div>
+      </div>
+      <div class="settings-pane" data-pane="boards">
+        <div class="settings-section">
+          <h4>Boards — weekly weekend days</h4>
+          <div id="settings-boards"></div>
+        </div>
+      </div>
+
+      <!-- Users: the same table shape as the Host list, so it inherits that
+           tab's toolbar / filter / sort / CSV styling rather than inventing any. -->
+      <div class="settings-pane" data-pane="users">
+        <div class="settings-section">
+          <div id="users-pending" class="hidden">
+            <span class="dupbar-icon" aria-hidden="true">⚠</span>
+            <span id="users-pending-text"></span>
+            <button type="button" class="btn btn-small" id="btn-users-pending">Review requests</button>
           </div>
-          <div class="toolbar-spacer"></div>
-          <span id="users-count"></span>
-          <button type="button" class="btn btn-small btn-primary" id="btn-invite-user" title="Send someone an invitation email">+ Invite</button>
-          <button type="button" class="btn btn-small" id="btn-users-csv" title="Export the rows below as a CSV file">⬇ CSV</button>
-        </div>
-        <div class="table-wrap">
-          <table id="users-table">
-            <thead>
-              <tr>
-                <th data-sort="name">Name</th>
-                <th data-sort="email">Email</th>
-                <th data-sort="role" title="What this person may see and change. The rules behind each role are on the Roles &amp; permissions tab.">Role</th>
-                <th data-sort="status" title="Pending = waiting for approval. Disabled keeps the record and all of their attribution, and only stops them signing in.">Status</th>
-                <th data-sort="lastSeen" title="When this person last opened the app.">Last seen</th>
-                <th data-sort="requested" title="When they asked for access, or were invited.">Requested</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="users-body"></tbody>
-          </table>
+          <div id="users-toolbar">
+            <input id="users-search" type="search" placeholder="Search name or email…" autocomplete="off">
+            <div id="users-filters">
+              <div class="ms" data-filter="roleKey"><button type="button" class="ms-btn">Role: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+            </div>
+            <div class="toolbar-spacer"></div>
+            <span id="users-count"></span>
+            <button type="button" class="btn btn-small btn-primary" id="btn-invite-user" title="Send someone an invitation email">+ Invite</button>
+            <button type="button" class="btn btn-small" id="btn-users-csv" title="Export the rows below as a CSV file">⬇ CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table id="users-table">
+              <thead>
+                <tr>
+                  <th data-sort="name">Name</th>
+                  <th data-sort="email">Email</th>
+                  <th data-sort="role" title="What this person may see and change. The rules behind each role are on the Roles &amp; permissions tab.">Role</th>
+                  <th data-sort="status" title="Pending = waiting for approval. Disabled keeps the record and all of their attribution, and only stops them signing in.">Status</th>
+                  <th data-sort="lastSeen" title="When this person last opened the app.">Last seen</th>
+                  <th data-sort="requested" title="When they asked for access, or were invited.">Requested</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="users-body"></tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Roles & permissions: the matrix itself. Admin's column is rendered
-         read-only, and database triggers back that up. -->
-    <div class="settings-pane" data-pane="roles">
-      <div class="settings-section">
-        <h4>Roles &amp; permissions</h4>
-        <p class="import-note">What each role may see and change. <b>Edit</b> also grants view. Changes apply to everyone with that role straight away — including anyone with the app open right now. Admin always keeps full access, so nobody can lock themselves out of this screen.</p>
-        <div class="table-wrap">
-          <table id="roles-matrix"><tbody id="roles-matrix-body"></tbody></table>
+      <!-- Roles & permissions: the matrix itself. Admin's column is rendered
+           read-only, and database triggers back that up. -->
+      <div class="settings-pane" data-pane="roles">
+        <div class="settings-section">
+          <h4>Roles &amp; permissions</h4>
+          <p class="import-note">What each role may see and change. <b>Edit</b> also grants view. Changes apply to everyone with that role straight away — including anyone with the app open right now. Admin always keeps full access, so nobody can lock themselves out of this screen.</p>
+          <div class="table-wrap">
+            <table id="roles-matrix"><tbody id="roles-matrix-body"></tbody></table>
+          </div>
+          <p class="import-note">Hiding an Overview section keeps it off the page and skips its query. It is not a data barrier: those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
         </div>
-        <p class="import-note">Hiding an Overview section keeps it off the page and skips its query. It is not a data barrier: those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
       </div>
-    </div>
-    <div class="modal-actions">
-      <button type="button" class="btn btn-primary" data-close>Done</button>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-primary" data-close>Done</button>
+      </div>
+  
     </div>
   </div>
 
@@ -681,8 +698,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-04j"></script>
-<script src="charts.js?v=2026-09-04j"></script>
-<script src="app.js?v=2026-09-04j"></script>
+<script src="cloud.js?v=2026-09-04k"></script>
+<script src="charts.js?v=2026-09-04k"></script>
+<script src="app.js?v=2026-09-04k"></script>
 </body>
 </html>
