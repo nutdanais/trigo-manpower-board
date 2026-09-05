@@ -2582,8 +2582,14 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
    longer than today's. A real `height` rather than a max-height is what makes
    the short panes stop shrink-wrapping. */
 #modal-settings {
-  width: min(1120px, 94vw);
-  height: min(720px, 86vh);
+  /* 1180, not less: at 1120 the Users table stops overflowing by WRAPPING every
+     name and email onto a second line (45px rows against 35px), which a
+     "does it overflow horizontally" check happily passes. Row height is the
+     honest test, and 1180 is where it goes back to one line.
+     600: the tallest form pane (My account) needs 489, so this clears every form
+     without scrolling while cutting the empty space the uniform height cost. */
+  width: min(1180px, 94vw);
+  height: min(600px, 84vh);
   display: flex;
   flex-direction: row;
   padding: 0;                /* the rail and the body carry their own */
@@ -2909,7 +2915,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 
 @media (max-width: 720px) {
   /* on a phone these two panes want the whole screen */
-  #modal-settings { width: 96vw; height: min(720px, 90vh); }
+  #modal-settings { width: 96vw; height: min(600px, 90vh); }
   /* the rail becomes a strip above the body — a 200px column would leave the
      tables nothing on a phone */
   #modal-settings { flex-direction: column; }
