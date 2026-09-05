@@ -6,7 +6,7 @@ A drag-and-drop daily manpower planning board (replacement for Microsoft Whitebo
 
 This app is now backed by **Supabase** (cloud database + auth + realtime sync), so it needs one-time setup — see [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md).
 
-Once `config.js` has real Supabase credentials, double-click **index.html** to open the app, or serve the folder with any static web server. Sign in with an account created for you in the Supabase dashboard (Authentication → Users) — there's no self-signup.
+Once `config.js` has real Supabase credentials, double-click **index.html** to open the app, or serve the folder with any static web server. Sign in with your `@trigo-group.com` account — or use **Request access** on the sign-in screen and wait for an admin to approve you.
 
 ## How to use
 
@@ -48,6 +48,23 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
   - **🖨 PDF** opens the browser's print dialog — choose **Save as PDF**. Prefer this for sharing with the crew. It is *vector*: the text is drawn from outlines, so it stays sharp however far anyone zooms in, the file is a fraction of the size, and — the part an image can never do — **the host and phone links stay tappable inside the PDF**. It also matters how you then send it: a chat app re-encodes and downsizes anything sent down its *photo* lane, which is what makes a shared board blurry, so send the PDF (or the JPG) as a **file/document attachment** instead. Ctrl+P gives the same page as the button.
   - **Three columns, whatever screen you export from.** The board used to take its column count from the window, so the same day exported as 4 columns from a 1920px monitor and 3 from a 1600px one. Both paths now pin it: they lay the board out at exactly `EXPORT_WIDTH` with `EXPORT_COLS` columns (`app.js`), so the JPG and the PDF are the same board in two formats, down to the card positions.
   - **The PDF is one single page, sized to the board** — no A4, no pagination. `setPrintPageSize` measures the laid-out board at print time and injects an `@page` rule making the sheet exactly that big (a 24-mission board comes out around 423 × 388mm; even 200 missions stays one page, at about 111 inches, against a 200-inch PDF ceiling). Two things follow from that, and they are the reason it's done this way: no page break ever falls between two missions of the same day, and because the page width is one we chose rather than one the paper imposed, the **masonry survives** — a short card still lets the one below it rise into the gap, exactly as on screen. Paper size costs nothing here because PDF text is vector: the reader zooms in as far as they like without it turning to mush. Printing it onto real A4 still works — the driver scales it to fit a sheet.
+- **👤 Users and roles** (Settings ⚙ → **My account** / **Users** / **Roles**): who can sign in, and what each of them may see and change.
+  - **My account** is everyone's — set your display name and change your own password. It also shows your role and status, so you can see what you have without asking anyone.
+  - **Signing in**: only `@trigo-group.com` addresses can be used. Someone new either gets **invited** by an admin (Settings → Users → **+ Invite** — they get an email with a link that sets their password), or uses **Request access** on the sign-in screen and waits in a **Pending** queue an admin approves. Both ends work; use whichever suits. **Forgot password?** on the sign-in screen emails a reset link.
+  - **Four roles** ship as defaults, and an admin can change what any of them means:
+
+    | | Admin | Manager | Engineer | Viewer |
+    |---|---|---|---|---|
+    | Board, Manpower list, Host list | edit | edit | edit | **view only** |
+    | Settings — engineers / areas / boards | edit | edit | edit | — |
+    | Users & roles | **edit** | — | — | — |
+    | Overview — *History + Engineer workload*, *By engineer* | view | view | — | — |
+    | Overview — everything else | view | view | view | view |
+
+  - **Roles** (the matrix) is where those rules live — sixteen areas by four roles, each cell off / View / Edit. "Sensitive" is a business judgement that changes, so it is a setting rather than something that needs a code change and a redeploy. The **Admin column is locked**: it always keeps full access, so nobody can lock everyone out of this screen. Changes reach anyone with the app open straight away.
+  - **Taking access away**: use **Disable**, not Delete. Disable keeps the person's record and the "locked by" / "updated by" history that names them, and only stops them signing in — the same thinking as deactivating an employee or archiving a host. **Delete permanently** really does destroy the account, and says so. Neither can be done to yourself, and the last remaining admin cannot be demoted, disabled or deleted by anyone — those rules are enforced in the database, not just hidden in the UI.
+  - **What is really enforced**: reading anything needs an active account; every *write* additionally needs `edit` on that area, checked by Postgres — so a Viewer genuinely cannot change the board, whatever they try. Hiding an individual **Overview section** is different: those sections are worked out from the same mission and assignment rows the board itself needs, so it keeps the section off the page (and skips its query) rather than putting the numbers out of reach. Tidying the dashboard, not protecting a secret.
+  - Needs the one-time `supabase/migration-2026-09-04b-user-management.sql` — **edit the "REQUIRED: name the first admin" line at the bottom before running it**. Until it's run the app behaves exactly as it did before: everyone signed in has full access.
 - **Settings** ⚙: manage engineers (name, phone, color), service areas (name, color), and each board's weekly weekend days (checkboxes, save instantly) — this drives the holiday toggle, weekend "Add Mission" import, the date picker's weekend highlighting, and both Overview trend charts, so it's worth checking a new board's checkboxes match its real schedule.
 
 ## Releasing a change
@@ -78,6 +95,7 @@ within a second or two via Supabase Realtime.
 - `config.js` — your Supabase Project URL + anon key (see `SUPABASE_SETUP.md`)
 - `supabase/schema.sql` — database schema, security rules, and seed data — run once in the Supabase SQL editor
 - `supabase/migration-*.sql` — incremental schema changes; run any you haven't yet in the Supabase SQL editor (each is safe to run more than once)
+- `supabase/functions/admin-users/index.ts` — the one server-side function: inviting and deleting sign-in accounts, plus the notification emails. Optional — the Users screen works without it, minus those three things.
 - `_headers` — Netlify caching rules. Everything is set to revalidate on every load; nothing is cached hard.
 - `vendor/html2canvas.min.js` — library used for JPG export
 - `serve.ps1` — optional local web server for development, not needed for normal use

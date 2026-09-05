@@ -152,11 +152,14 @@ function saveViewState() {
 function restoreViewState() {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY));
-    if (v && (v.boardId === OVERVIEW_ID || v.boardId === EMPLIST_ID || v.boardId === HOSTLIST_ID
-        || D().boards.some(b => b.id === v.boardId))) {
+    if (v && v.boardId && mayOpenView(v.boardId)) {
       D().activeBoardId = v.boardId;
     }
   } catch { /* no saved view, or it's corrupt — just keep the default board */ }
+  // A role change can take away the tab we were last on (or the default board,
+  // for a role with no board access at all) — land somewhere they can actually
+  // open rather than on an empty screen.
+  if (!mayOpenView(D().activeBoardId)) D().activeBoardId = firstAllowedView();
   state.date = defaultPlanningDate();
 }
 
@@ -303,7 +306,8 @@ const state = {
   empSearch: "",              // name filter for the floating available panel
   poolAreas: new Set(),       // service-area filter for the floating panel; empty = all
   undoStack: [],              // [{date, entries:[{empId, prior}]}] — inverse of recent assignment changes
-  settingsTab: "engineers",   // Settings modal: which sub-menu (Engineer / Service Area / Board) is showing
+  settingsTab: "engineers",   // Settings modal: which sub-menu is showing. applySettingsTab falls
+                              // back to the first pane this role may open (My account, at worst)
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
@@ -312,6 +316,14 @@ const state = {
     sortDir: 1,
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
+  },
+  users: {                    // Settings > Users: search/filter/sort over the people list
+    search: "",
+    filters: { roleKey: [], status: [] },
+    pendingOnly: false,       // "Review requests" — show only accounts waiting for approval
+    sortKey: "email",
+    sortDir: 1,
+    editingId: null,          // profile id the User modal is editing
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
@@ -360,6 +372,68 @@ const HOSTLIST_ID = "__hostlist__";
 const isOverview = () => D().activeBoardId === OVERVIEW_ID;
 const isEmployeeList = () => D().activeBoardId === EMPLIST_ID;
 const isHostList = () => D().activeBoardId === HOSTLIST_ID;
+
+/* ---------- permissions ----------
+   The JS twin of public.can() in the database (see
+   migration-2026-09-04b-user-management.sql). Both read the same role x area
+   matrix off the same ladder, so the UI and Postgres can never disagree about
+   what a role means — the UI decides what to draw, RLS decides what a write is
+   allowed to do, and neither is trusted to do the other's job.
+
+   `me.legacy` is set by cloud._loadIdentity when the user-management migration
+   has not been run yet: allow everything, which is exactly how the app behaved
+   before roles existed. */
+const LEVELS = { none: 0, view: 1, edit: 2 };
+function can(area, need = "view") {
+  const me = D().me;
+  if (!me) return false;
+  if (me.legacy) return true;
+  if (me.status !== "active") return false;
+  const row = D().perms[me.roleKey] || {};
+  return (LEVELS[row[area]] || 0) >= (LEVELS[need] || 0);
+}
+/* The areas the permission matrix covers, in the order they are shown in
+   Settings -> Roles & permissions. Labels are the ones already used on the tabs
+   and on each Overview section's own heading, so the grid reads like the app. */
+const PERM_AREAS = [
+  { group: "Tabs & menus", items: [
+    { key: "board",    label: "Board",          hint: "Missions, assignments, the day lock" },
+    { key: "overview", label: "Overview tab",   hint: "The dashboard as a whole", viewOnly: true },
+    { key: "emplist",  label: "Manpower list",  hint: "The employee roster" },
+    { key: "hostlist", label: "Host list",      hint: "Sites and their records" },
+    { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
+    { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
+  ]},
+  { group: "Overview sections", viewOnly: true, items: [
+    { key: "ov.status",      label: "Status bar" },
+    { key: "ov.kpi",         label: "KPI strip" },
+    { key: "ov.actionQueue", label: "Action queue" },
+    { key: "ov.byBoard",     label: "By board" },
+    { key: "ov.history",     label: "History + Engineer workload" },
+    { key: "ov.byEngineer",  label: "By engineer" },
+    { key: "ov.dayNight",    label: "Day / night split" },
+    { key: "ov.hostRisk",    label: "Host coverage risk" },
+    { key: "ov.byArea",      label: "By service area" },
+    { key: "ov.leave",       label: "Leave today" },
+  ]},
+];
+/* The first tab this user is actually allowed to open — used when a saved view
+   points somewhere they have since lost, and as the landing tab for a role that
+   cannot see the board. */
+function firstAllowedView() {
+  if (can("board") && D().boards.length) return D().boards[0].id;
+  if (can("overview")) return OVERVIEW_ID;
+  if (can("emplist")) return EMPLIST_ID;
+  if (can("hostlist")) return HOSTLIST_ID;
+  return null;
+}
+/* True when the view is one this user may still open. */
+function mayOpenView(id) {
+  if (id === OVERVIEW_ID) return can("overview");
+  if (id === EMPLIST_ID) return can("emplist");
+  if (id === HOSTLIST_ID) return can("hostlist");
+  return can("board") && D().boards.some(b => b.id === id);
+}
 /* the three app-wide tabs: not a board, so nothing date- or plan-scoped applies */
 const isNonBoardView = () => isOverview() || isEmployeeList() || isHostList();
 const isPast = () => state.date < todayStr();
@@ -564,7 +638,13 @@ async function ensureHostCoverageLoaded() {
 async function refreshData() {
   if (isOverview()) {
     await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
-    await Promise.all([ensureUtilizationLoaded(), ensureHostCoverageLoaded(), ensureHistoryLoaded()]);
+    // A section the role cannot see is not fetched either — hiding History from
+    // an Engineer should not still cost them the range query on every redraw.
+    await Promise.all([
+      ensureUtilizationLoaded(),
+      can("ov.hostRisk") ? ensureHostCoverageLoaded() : Promise.resolve(),
+      can("ov.history") ? ensureHistoryLoaded() : Promise.resolve(),
+    ]);
   } else if (isEmployeeList()) {
     // employee master data is already warm in the cache; the 30D column is the
     // one thing here that needs a fetch, and it's cached across redraws so
@@ -602,6 +682,14 @@ function confirmUnlock(boardId, date, then) {
   );
 }
 function guardEdit(action) {
+  // Permission comes first, before the read-only / lock prompts: a Viewer must
+  // not even be offered "edit a past date anyway?", because the write behind it
+  // would be refused by RLS. Every board mutation passes through here, so this
+  // one check is what makes the board genuinely read-only for them.
+  if (!can("board", "edit")) {
+    toast("Your role can view this board but not change it.", "info");
+    return;
+  }
   if (!isReadOnly()) { action(); return; }
   const boardId = D().activeBoardId;
   if (lockInfo(boardId, state.date)) { confirmUnlock(boardId, state.date, action); return; }
@@ -636,25 +724,34 @@ function render() {
   const eml = isEmployeeList();
   const hl = isHostList();
   const board = !ov && !eml && !hl;   // an actual board is on screen
+  // Everything below asks "may this role edit here?" as well as "is this view on
+  // screen?". The board's own mutations are stopped at guardEdit() rather than
+  // here — hiding a button is a courtesy, guardEdit is the rule.
+  const boardEdit = board && can("board", "edit");
   $("#status-zones").classList.toggle("hidden", !board);
   $("#missions-grid").classList.toggle("hidden", !board);
   $("#overview-panel").classList.toggle("hidden", !ov);
   $("#emplist-panel").classList.toggle("hidden", !eml);
   $("#hostlist-panel").classList.toggle("hidden", !hl);
-  $("#btn-new-mission").classList.toggle("hidden", !board);
-  $("#btn-hide-missions").classList.toggle("hidden", !board);
-  $("#btn-new-employee").classList.toggle("hidden", ov || hl);
-  $("#btn-import-mission").classList.toggle("hidden", !board || !isNonWorkingDate(state.date));
+  $("#btn-new-mission").classList.toggle("hidden", !boardEdit);
+  $("#btn-hide-missions").classList.toggle("hidden", !boardEdit);
+  $("#btn-new-employee").classList.toggle("hidden", ov || hl || !can("emplist", "edit"));
+  $("#btn-import-mission").classList.toggle("hidden", !boardEdit || !isNonWorkingDate(state.date));
   // Holiday toggle: ON = this date is non-working. Any editable future date
   // (weekday or weekend); hidden on read-only past/today and on the app-wide tabs.
-  const showHoliday = board && !isReadOnly();
+  const showHoliday = boardEdit && !isReadOnly();
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   $("#filters").classList.toggle("hidden", !board);
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
+  // The two lists and the board bar carry their own create buttons; RLS would
+  // refuse the write anyway, so hiding them is about not offering a dead end.
+  $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
+  $("#btn-add-host").classList.toggle("hidden", !can("hostlist", "edit"));
   $("#btn-export").classList.toggle("hidden", eml || hl);
+  // Print, like Export, is a read: a Viewer may take the board away with them.
   $("#btn-print").classList.toggle("hidden", eml || hl);
-  $("#btn-reset-board").classList.toggle("hidden", !board);
+  $("#btn-reset-board").classList.toggle("hidden", !boardEdit);
   // Every control in the main toolbar belongs to a board or to the employee
   // roster, so on the Host List the row would be empty furniture (and on a
   // phone, a "⋯ More" button opening an empty menu) — the tab carries its own
@@ -664,7 +761,7 @@ function render() {
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
   $("#float-pool").classList.toggle("hidden", !board);
   document.body.classList.toggle("board-view", board);
-  $("#btn-undo").classList.toggle("hidden", !board);
+  $("#btn-undo").classList.toggle("hidden", !boardEdit);
   if (ov) {
     renderOverview();
   } else if (eml) {
@@ -750,11 +847,14 @@ function renderBoardEmptyState() {
 function renderTabs() {
   const el = $("#board-tabs");
   el.innerHTML = "";
+  if (can("overview")) {
   const ov = document.createElement("div");
   ov.className = "board-tab tab-overview" + (isOverview() ? " active" : "");
   ov.textContent = "📊 Overview";
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
+  }
+  if (can("emplist")) {
   const eml = document.createElement("div");
   eml.className = "board-tab tab-emplist" + (isEmployeeList() ? " active" : "");
   // "List" is in its own span so the phone bar can drop it (see .tab-trim in
@@ -763,6 +863,8 @@ function renderTabs() {
   eml.innerHTML = '🧑\u200d🤝\u200d🧑 Manpower<span class="tab-trim"> List</span>';
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
+  }
+  if (can("hostlist")) {
   const hl = document.createElement("div");
   hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
   // same .tab-trim trick as Manpower List: on a phone the bar keeps "Host" and
@@ -770,21 +872,24 @@ function renderTabs() {
   hl.innerHTML = '🏭 Host<span class="tab-trim"> list</span>';
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
-  // visual break: the three above are app-wide views; the rest are per-board
-  if (D().boards.length) {
+  }
+  // visual break: the three above are app-wide views; the rest are per-board.
+  // Only worth drawing when there is something on both sides of it.
+  if (D().boards.length && can("board") && el.children.length) {
     const sep = document.createElement("div");
     sep.className = "board-tab-sep";
     el.appendChild(sep);
   }
-  for (const b of D().boards) {
+  for (const b of (can("board") ? D().boards : [])) {
     const t = document.createElement("div");
     // tab-board marks the per-board tabs specifically: the phone layout hides
     // these and shows #board-select instead, but keeps Overview / Manpower List
     t.className = "board-tab tab-board" + (b.id === D().activeBoardId ? " active" : "");
     t.textContent = b.name;
-    t.title = "Click to switch. Double-click to rename.";
+    t.title = can("settings", "edit") ? "Click to switch. Double-click to rename." : "Click to switch.";
     t.onclick = () => { clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
     t.ondblclick = () => {
+      if (!can("settings", "edit")) return;
       const name = prompt("Rename board:", b.name);
       if (name && name.trim()) safely(async () => { await cloud.renameBoard(b.id, name.trim()); render(); });
     };
@@ -814,16 +919,18 @@ function renderBoardSelect() {
     ph.disabled = true;
     sel.appendChild(ph);
   }
-  for (const b of D().boards) {
+  for (const b of (can("board") ? D().boards : [])) {
     const o = document.createElement("option");
     o.value = b.id;
     o.textContent = b.name;
     sel.appendChild(o);
   }
-  const add = document.createElement("option");
-  add.value = NEW_BOARD_OPT;
-  add.textContent = "+ New board…";
-  sel.appendChild(add);
+  if (can("settings", "edit")) {
+    const add = document.createElement("option");
+    add.value = NEW_BOARD_OPT;
+    add.textContent = "+ New board…";
+    sel.appendChild(add);
+  }
   sel.value = onBoard ? D().activeBoardId : "";
 }
 
@@ -845,18 +952,25 @@ function renderDateButton() {
 /* lock button: only on an actual board (hidden on the app-wide tabs) */
 function renderLockButton() {
   const btn = $("#btn-lock");
+  // A Viewer still needs to SEE that a day is locked — that is why the plan on
+  // screen cannot be edited — so the button is hidden only when there is no
+  // board on screen, and disabled rather than removed when they may not toggle it.
   const hide = isNonBoardView();
   btn.classList.toggle("hidden", hide);
   if (hide) return;
+  const mayLock = can("board", "edit");
+  btn.disabled = !mayLock;
+  btn.classList.toggle("btn-inert", !mayLock);
   const lock = lockInfo(D().activeBoardId, state.date);
   btn.classList.toggle("locked", !!lock);
   if (lock) {
     const when = lock.lockedAt ? new Date(lock.lockedAt).toLocaleString() : "";
     btn.innerHTML = '🔒<span class="btn-label"> Locked</span>';
-    btn.title = `Locked by ${lock.lockedBy}${when ? " on " + when : ""} — click to unlock for everyone`;
+    btn.title = `Locked by ${lock.lockedBy}${when ? " on " + when : ""}` +
+      (mayLock ? " — click to unlock for everyone" : "");
   } else {
     btn.innerHTML = '🔓<span class="btn-label"> Lock</span>';
-    btn.title = "Lock this board so it's view-only for everyone";
+    btn.title = mayLock ? "Lock this board so it's view-only for everyone" : "This board's plan is unlocked";
   }
 }
 
@@ -960,7 +1074,7 @@ function clearSelection() {
 }
 
 function closeFilterPops() {
-  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop")) p.classList.add("hidden");
+  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop, #users-filters .ms-pop")) p.classList.add("hidden");
 }
 
 /* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
@@ -2328,7 +2442,7 @@ function renderOverview() {
   statusShifts.appendChild(statChip("☀️ Day", todaysDayCount));
   statusShifts.appendChild(statChip("🌙 Night", todaysNightCount, null, "stat-chip-night"));
   statusBar.appendChild(statusShifts);
-  panel.appendChild(statusBar);
+  if (can("ov.status")) panel.appendChild(statusBar);
 
   /* ---------- 2. KPI strip: four numbers, each with something to judge it
      against — a sparkline+delta, a segmented bar, or a plain breakdown line.
@@ -2409,7 +2523,7 @@ function renderOverview() {
     ], height: 8,
   });
   kpiRow.appendChild(oncallTile);
-  panel.appendChild(kpiRow);
+  if (can("ov.kpi")) panel.appendChild(kpiRow);
 
   /* ---------- 3. action queue: permanent staff with no mission today. On-call
      free is surge capacity working as intended, not an exception — it stays
@@ -2459,7 +2573,7 @@ function renderOverview() {
     }
     actionSec.appendChild(calmBox);
   }
-  panel.appendChild(actionSec);
+  if (can("ov.actionQueue")) panel.appendChild(actionSec);
 
   /* ---------- 4. by board: the per-board comparison, as rows not a sentence.
      Contract mix folded in as one column (was a donut per board plus an
@@ -2500,7 +2614,7 @@ function renderOverview() {
     ),
     rows: boardRows,
   }));
-  panel.appendChild(boardSec);
+  if (can("ov.byBoard")) panel.appendChild(boardSec);
 
   /* ---------- day/night split (built here, masonry-packed near the bottom
      of this function — see layoutOverviewMasonry) ---------- */
@@ -2591,15 +2705,20 @@ function renderOverview() {
      twice. Wrapped in one .ov-history-group with no gap between them (see
      styles.css) so the two read as a single connected block — they already
      share this one range/board control, rendered once in History's header. */
-  resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
-  const histBoards = historyBoardsInScope(boards);
-  const histDates = historyDates(histBoards);
-  const histRecs = histDates.map(d => historyDayRec(d, histBoards, state.overview.history || {}));
-  const historyGroup = document.createElement("div");
-  historyGroup.className = "ov-history-group";
-  historyGroup.appendChild(historySection(histDates, histRecs, pendingCharts));
-  historyGroup.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
-  panel.appendChild(historyGroup);
+  // Built only when it is going to be shown: refreshData skips the range fetch
+  // for a role without ov.history, so state.overview.history would be stale or
+  // empty here anyway.
+  if (can("ov.history")) {
+    resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
+    const histBoards = historyBoardsInScope(boards);
+    const histDates = historyDates(histBoards);
+    const histRecs = histDates.map(d => historyDayRec(d, histBoards, state.overview.history || {}));
+    const historyGroup = document.createElement("div");
+    historyGroup.className = "ov-history-group";
+    historyGroup.appendChild(historySection(histDates, histRecs, pendingCharts));
+    historyGroup.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
+    panel.appendChild(historyGroup);
+  }
 
   /* ---------- 6. by engineer (first of six cards masonry-packed further
      down — see layoutOverviewMasonry) ----------
@@ -2758,8 +2877,18 @@ function renderOverview() {
   // reserving it.
   const masonry = document.createElement("div");
   masonry.id = "overview-masonry";
-  for (const sec of [engSec, areaSec, hostRiskSec, daynightSec, leaveSec]) masonry.appendChild(sec);
-  panel.appendChild(masonry);
+  const masonryCards = [
+    ["ov.byEngineer", engSec], ["ov.byArea", areaSec], ["ov.hostRisk", hostRiskSec],
+    ["ov.dayNight", daynightSec], ["ov.leave", leaveSec],
+  ].filter(([area]) => can(area)).map(([, sec]) => sec);
+  for (const sec of masonryCards) masonry.appendChild(sec);
+  if (masonryCards.length) panel.appendChild(masonry);
+  // A role with every section switched off would otherwise get a blank tab with
+  // no explanation.
+  if (!panel.children.length) {
+    panel.innerHTML = '<p class="import-note">Your role doesn\'t have access to any of the Overview sections. Ask an admin if you think that\'s wrong.</p>';
+    return;
+  }
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
@@ -2985,7 +3114,9 @@ function updateEmplistBulkBar() {
   const bar = $("#emplist-bulkbar");
   if (!bar) return;
   const n = state.selectedEmps.size;
-  bar.classList.toggle("hidden", n === 0);
+  // every action on this bar is a write, so it has nothing to offer a role that
+  // can only read the roster
+  bar.classList.toggle("hidden", n === 0 || !can("emplist", "edit"));
   $("#emplist-bulk-count").textContent = n === 1 ? "1 selected" : `${n} selected`;
 }
 
@@ -3019,7 +3150,7 @@ function renderEmployeeRows() {
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
         <label class="toggle toggle-active">
-          <input type="checkbox" ${isActive ? "checked" : ""}>
+          <input type="checkbox" ${isActive ? "checked" : ""} ${can("emplist", "edit") ? "" : "disabled"}>
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-text">${isActive ? "Active" : "Inactive"}</span>
         </label>
@@ -3492,7 +3623,7 @@ function renderHostRows() {
       <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>
       <td data-label="Status" class="hl-status">
         <label class="toggle toggle-active">
-          <input type="checkbox" ${r.archived ? "" : "checked"}>
+          <input type="checkbox" ${r.archived ? "" : "checked"} ${can("hostlist", "edit") ? "" : "disabled"}>
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
           <span class="toggle-text">${r.archived ? "Archived" : "Active"}</span>
         </label>
@@ -3604,6 +3735,7 @@ function exportHostlistCsv() {
    has already typed a host that isn't in the list yet; opts.returnToMission
    sends them back to the mission form afterwards with the host filled in. */
 function openHostModal(name, opts = {}) {
+  if (!can("hostlist", "edit")) { toast("Your role can view the host list but not change it.", "info"); return; }
   const rec = name ? D().hosts.find(h => h.name === name) : null;
   state.hostlist.editingHost = name || null;
   state.hostlist.returnToMission = !!opts.returnToMission;
@@ -4061,6 +4193,7 @@ function hideMission() {
 
 /* employee modal */
 function openEmployeeModal(empId) {
+  if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
   state.editingEmployeeId = empId || null;
   const form = $("#form-employee");
   form.reset();
@@ -4178,28 +4311,60 @@ async function loadEmployeeHostRecord(empId) {
     </div>`).join("")}</div>`;
 }
 
-/* settings modal — Engineer / Service Area / Board sub-menu tabs */
+/* settings modal — My account / Engineer / Service Area / Board / Users / Roles */
+/* Each button declares the permission area it needs (data-area in index.html).
+   "account" is everybody's, so the modal always has at least one pane and the
+   ⚙ button is never a dead end. */
+function settingsTabAllowed(btn) {
+  const area = btn.dataset.area;
+  if (area === "account") return true;
+  if (area === "users-edit") return can("users", "edit");
+  return can(area, "edit") || (area === "users" && can("users"));
+}
+
 function applySettingsTab() {
-  for (const btn of $$("#settings-tabs .settings-tab")) {
+  const buttons = $$("#settings-tabs .settings-tab");
+  let firstAllowed = null;
+  for (const btn of buttons) {
+    const ok = settingsTabAllowed(btn);
+    btn.classList.toggle("hidden", !ok);
+    if (ok && !firstAllowed) firstAllowed = btn.dataset.tab;
+  }
+  // A role that has just lost a pane (or a Viewer opening Settings for the
+  // first time) would otherwise land on a hidden one and see nothing.
+  const current = buttons.find(b => b.dataset.tab === state.settingsTab);
+  if (!current || !settingsTabAllowed(current)) state.settingsTab = firstAllowed;
+  for (const btn of buttons) {
     btn.classList.toggle("active", btn.dataset.tab === state.settingsTab);
+  }
+  // The dividers between rail groups are .settings-group elements, so one goes
+  // when everything under it does — otherwise a Viewer (My account only) would
+  // be left looking at rules with nothing between them.
+  for (const g of $$("#settings-tabs .settings-group")) {
+    const anyVisible = buttons.some(b => b.dataset.group === g.dataset.group && !b.classList.contains("hidden"));
+    g.classList.toggle("hidden", !anyVisible);
   }
   for (const pane of $$(".settings-pane")) {
     pane.classList.toggle("hidden", pane.dataset.pane !== state.settingsTab);
   }
+  if (state.settingsTab === "account") renderAccountPane();
+  if (state.settingsTab === "users") renderUsersPane();
+  if (state.settingsTab === "roles") renderRolesMatrix();
 }
 
 function renderSettings() {
+  applySettingsTab();
   const engBox = $("#settings-engineers");
   engBox.innerHTML = "";
   for (const e of D().engineers) {
-    const row = document.createElement("div");
-    row.className = "settings-row";
+    const row = document.createElement("tr");
+    row.className = "st-row";
     row.innerHTML = `
-      <input type="color" value="${e.color}" title="Engineer color">
-      <input type="text" value="${e.name}" placeholder="Name">
-      <input type="tel" value="${e.phone || ""}" placeholder="Phone">
-      <button class="btn btn-danger btn-small">✕</button>`;
-    const [color, name, phone, del] = row.children;
+      <td class="st-swatch"><input type="color" value="${e.color}" title="Engineer colour" aria-label="Engineer colour"></td>
+      <td><input type="text" value="${escapeHtml(e.name)}" placeholder="Name" aria-label="Engineer name"></td>
+      <td><input type="tel" value="${escapeHtml(e.phone || "")}" placeholder="Phone" aria-label="Engineer phone"></td>
+      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(e.name)}" aria-label="Delete ${escapeHtml(e.name)}">✕</button></td>`;
+    const [color, name, phone, del] = [...row.querySelectorAll("input, button")];
     color.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "color", color.value); render(); });
     name.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "name", name.value.trim() || e.name); render(); });
     phone.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "phone", phone.value.trim()); render(); });
@@ -4212,13 +4377,13 @@ function renderSettings() {
   const areaBox = $("#settings-areas");
   areaBox.innerHTML = "";
   for (const a of D().areas) {
-    const row = document.createElement("div");
-    row.className = "settings-row";
+    const row = document.createElement("tr");
+    row.className = "st-row";
     row.innerHTML = `
-      <input type="color" value="${a.color}" title="Area color">
-      <input type="text" value="${a.name}" placeholder="Area name">
-      <button class="btn btn-danger btn-small">✕</button>`;
-    const [color, name, del] = row.children;
+      <td class="st-swatch"><input type="color" value="${a.color}" title="Area colour" aria-label="Area colour"></td>
+      <td><input type="text" value="${escapeHtml(a.name)}" placeholder="Area name" aria-label="Area name"></td>
+      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(a.name)}" aria-label="Delete ${escapeHtml(a.name)}">✕</button></td>`;
+    const [color, name, del] = [...row.querySelectorAll("input, button")];
     color.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "color", color.value); render(); });
     name.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "name", name.value.trim() || a.name); render(); });
     del.onclick = () => {
@@ -4238,11 +4403,14 @@ function renderSettings() {
   const boardsBox = $("#settings-boards");
   boardsBox.innerHTML = "";
   for (const b of D().boards) {
-    const row = document.createElement("div");
-    row.className = "settings-board-row";
+    const row = document.createElement("tr");
+    row.className = "st-row";
+    const nameCell = document.createElement("td");
+    nameCell.className = "st-board";
     const nameEl = document.createElement("div");
     nameEl.className = "settings-board-name";
     nameEl.textContent = b.name;
+    const daysCell = document.createElement("td");
     const picker = document.createElement("div");
     picker.className = "weekday-picker settings-board-days";
     for (let i = 0; i < DOW_LABELS.length; i++) {
@@ -4259,10 +4427,19 @@ function renderSettings() {
       };
       picker.appendChild(lab);
     }
-    row.appendChild(nameEl);
-    row.appendChild(picker);
+    nameCell.appendChild(nameEl);
+    daysCell.appendChild(picker);
+    row.appendChild(nameCell);
+    row.appendChild(daysCell);
     boardsBox.appendChild(row);
   }
+
+  // the counts under each table — cheap orientation, and they make an empty
+  // list say so rather than showing a bare frame
+  const n = (one, many, count) => `${count} ${count === 1 ? one : many}`;
+  $("#engineers-count").textContent = n("engineer", "engineers", D().engineers.length);
+  $("#areas-count").textContent = n("service area", "service areas", D().areas.length);
+  $("#boards-count").textContent = n("board", "boards", D().boards.length);
 
   applySettingsTab();
 }
@@ -4843,10 +5020,485 @@ function initTheme() {
   applyTheme(localStorage.getItem("mpm-theme") || "light");
 }
 
+/* ================= Settings > My account / Users / Roles =================
+   User management lives in the Settings modal rather than as a tab of its own:
+   every role has something to do here (their own name and password), and only
+   an admin has the rest. A tab that most people could not open would be a tab
+   that mostly is not there. */
+
+const USER_STATUS = {
+  pending:  { label: "Pending",  hint: "Waiting for an admin to approve" },
+  active:   { label: "Active",   hint: "Can sign in" },
+  disabled: { label: "Disabled", hint: "Kept on record, cannot sign in" },
+};
+const roleLabel = (key) => {
+  const r = D().roles.find(x => x.key === key);
+  return r ? r.label : (key || "—");
+};
+/* A person cannot demote, disable or delete themselves, and the last active
+   admin cannot be demoted, disabled or deleted by anyone. Both rules are
+   enforced by triggers in the database as well — this is the courtesy half,
+   so the button explains itself instead of failing on save. */
+function userLockReason(u) {
+  const me = D().me;
+  if (me && u.id === me.id) return "You can't change your own role or status — ask another admin.";
+  const activeAdmins = (D().users || []).filter(x => x.roleKey === "admin" && x.status === "active");
+  if (u.roleKey === "admin" && u.status === "active" && activeAdmins.length <= 1) {
+    return "This is the only active admin. Promote someone else first.";
+  }
+  return null;
+}
+
+/* ---------- My account ---------- */
+function renderAccountPane() {
+  const me = D().me;
+  const box = $("#account-identity");
+  if (!me) { box.textContent = ""; return; }
+  const status = USER_STATUS[me.status];
+  box.innerHTML =
+    `<div class="account-email">${escapeHtml(me.email || "")}</div>` +
+    (me.legacy
+      ? `<p class="import-note">Roles aren't set up on this database yet — everyone has full access until <code>migration-2026-09-04b-user-management.sql</code> is run.</p>`
+      : `<div class="account-meta">` +
+          `<span class="role-pill role-${escapeHtml(me.roleKey || "none")}">${escapeHtml(roleLabel(me.roleKey))}</span>` +
+          `<span class="status-pill status-${escapeHtml(me.status)}">${escapeHtml(status ? status.label : me.status)}</span>` +
+        `</div>` +
+        `<p class="import-note">Your role decides which tabs you see and what you can change. Only an admin can alter it.</p>`);
+  $("#form-account-name").fullName.value = me.fullName || "";
+}
+
+function wireAccountPane() {
+  $("#form-account-name").onsubmit = (ev) => {
+    ev.preventDefault();
+    const name = ev.target.fullName.value;
+    safely(async () => {
+      await cloud.updateMyProfile(name);
+      toast("Name saved.", "info");
+      renderAccountPane();
+      if (D().users) renderUserRows();
+    });
+  };
+  $("#form-account-password").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    if (form.password.value !== form.confirm.value) { toast("The two passwords don't match.", "error"); return; }
+    safely(async () => {
+      await cloud.updatePassword(form.password.value);
+      form.reset();
+      toast("Password changed.", "info");
+    });
+  };
+}
+
+/* ---------- Users ---------- */
+function usersFilteredSorted() {
+  const st = state.users;
+  const f = st.filters;
+  const q = st.search.trim().toLowerCase();
+  const rows = (D().users || []).filter(u => {
+    if (st.pendingOnly && u.status !== "pending") return false;
+    if (f.roleKey.length && !f.roleKey.includes(u.roleKey)) return false;
+    if (f.status.length && !f.status.includes(u.status)) return false;
+    if (!q) return true;
+    return (u.email || "").toLowerCase().includes(q) || (u.fullName || "").toLowerCase().includes(q);
+  });
+  const val = (u) => ({
+    name: (u.fullName || "").toLowerCase(),
+    email: (u.email || "").toLowerCase(),
+    role: roleLabel(u.roleKey).toLowerCase(),
+    status: u.status,
+    lastSeen: u.lastSeenAt || "",
+    requested: u.requestedAt || "",
+  })[st.sortKey];
+  return rows.sort((a, b) => {
+    const av = val(a), bv = val(b);
+    if (av === bv) return (a.email || "").localeCompare(b.email || "");
+    // blanks last whichever way the column is pointing — an empty "last seen"
+    // is "never", not "earliest"
+    if (av === "") return 1;
+    if (bv === "") return -1;
+    return (av < bv ? -1 : 1) * st.sortDir;
+  });
+}
+
+function usersMsLabel(key) {
+  const picked = state.users.filters[key];
+  const noun = key === "roleKey" ? "Role" : "Status";
+  if (!picked.length) return `${noun}: All`;
+  if (picked.length === 1) return `${noun}: ${key === "roleKey" ? roleLabel(picked[0]) : (USER_STATUS[picked[0]] || {}).label || picked[0]}`;
+  return `${noun}: ${picked.length}`;
+}
+
+function renderUsersFilterOptions() {
+  for (const ms of $$("#users-filters .ms")) {
+    const key = ms.dataset.filter;
+    ms.querySelector(".ms-btn").textContent = usersMsLabel(key);
+    const pop = ms.querySelector(".ms-pop");
+    pop.innerHTML = "";
+    const clear = document.createElement("div");
+    clear.className = "ms-clear";
+    clear.textContent = "Clear";
+    clear.onclick = () => { state.users.filters[key] = []; renderUsersFilterOptions(); renderUserRows(); };
+    pop.appendChild(clear);
+    const opts = key === "roleKey"
+      ? D().roles.map(r => ({ value: r.key, label: r.label }))
+      : Object.keys(USER_STATUS).map(k => ({ value: k, label: USER_STATUS[k].label }));
+    for (const o of opts) {
+      const row = document.createElement("label");
+      row.className = "ms-opt";
+      const checked = state.users.filters[key].includes(o.value) ? "checked" : "";
+      row.innerHTML = `<input type="checkbox" value="${escapeHtml(o.value)}" ${checked}><span>${escapeHtml(o.label)}</span>`;
+      row.querySelector("input").onchange = (e) => {
+        const set = new Set(state.users.filters[key]);
+        e.target.checked ? set.add(o.value) : set.delete(o.value);
+        state.users.filters[key] = [...set];
+        ms.querySelector(".ms-btn").textContent = usersMsLabel(key);   // keep the dropdown open
+        renderUserRows();
+      };
+      pop.appendChild(row);
+    }
+  }
+}
+
+/* Loads the people list on first entry to the pane, then redraws. Everything
+   after that comes over Realtime (see cloud._subscribeRealtime). */
+function renderUsersPane() {
+  if (!can("users")) return;
+  $("#users-search").value = state.users.search;
+  if (D().users === null) {
+    safely(async () => { await cloud.loadUsers(); renderUsersFilterOptions(); renderUserRows(); });
+    return;
+  }
+  renderUsersFilterOptions();
+  renderUserRows();
+}
+
+function renderUserRows() {
+  const body = $("#users-body");
+  if (!body) return;
+  const rows = usersFilteredSorted();
+  const all = D().users || [];
+  const mayEdit = can("users", "edit");
+
+  const pending = all.filter(u => u.status === "pending");
+  const bar = $("#users-pending");
+  bar.classList.toggle("hidden", !pending.length);
+  if (pending.length) {
+    $("#users-pending-text").textContent = pending.length === 1
+      ? "1 person is waiting for access."
+      : `${pending.length} people are waiting for access.`;
+    $("#btn-users-pending").textContent = state.users.pendingOnly ? "Show everyone" : "Review requests";
+  }
+
+  $("#users-count").textContent = rows.length === all.length
+    ? `${all.length} ${all.length === 1 ? "person" : "people"}`
+    : `${rows.length} of ${all.length}`;
+  $("#btn-invite-user").classList.toggle("hidden", !mayEdit);
+
+  for (const th of $$("#users-table th[data-sort]")) {
+    th.classList.toggle("sorted", th.dataset.sort === state.users.sortKey);
+    th.classList.toggle("desc", th.dataset.sort === state.users.sortKey && state.users.sortDir < 0);
+  }
+
+  body.innerHTML = "";
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7" class="import-note">${all.length ? "No one matches those filters." : "No accounts yet."}</td></tr>`;
+    return;
+  }
+  for (const u of rows) {
+    const tr = document.createElement("tr");
+    const st = USER_STATUS[u.status] || { label: u.status };
+    const isMe = D().me && u.id === D().me.id;
+    tr.className = "user-row status-" + u.status + (isMe ? " user-row-me" : "");
+    tr.innerHTML = `
+      <td data-label="Name">${escapeHtml(u.fullName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}</td>
+      <td data-label="Email">${escapeHtml(u.email || "")}</td>
+      <td data-label="Role"><span class="role-pill role-${escapeHtml(u.roleKey || "none")}">${escapeHtml(roleLabel(u.roleKey))}</span></td>
+      <td data-label="Status"><span class="status-pill status-${escapeHtml(u.status)}" title="${escapeHtml(st.hint || "")}">${escapeHtml(st.label)}</span></td>
+      <td data-label="Last seen">${u.lastSeenAt ? escapeHtml(fmtDate(u.lastSeenAt.slice(0, 10))) : "—"}</td>
+      <td data-label="Requested">${u.requestedAt ? escapeHtml(fmtDate(u.requestedAt.slice(0, 10))) : "—"}</td>
+      <td data-label="" class="user-actions"></td>`;
+    const actions = tr.querySelector(".user-actions");
+    if (mayEdit) {
+      if (u.status === "pending") {
+        // The two things an admin actually wants to do to a request, without
+        // opening anything: approve at the default role, or turn it down.
+        const ok = document.createElement("button");
+        ok.type = "button";
+        ok.className = "btn btn-small btn-primary";
+        ok.textContent = "Approve";
+        ok.onclick = () => approveUser(u);
+        actions.appendChild(ok);
+        const no = document.createElement("button");
+        no.type = "button";
+        no.className = "btn btn-small";
+        no.textContent = "Reject";
+        no.onclick = () => rejectUser(u);
+        actions.appendChild(no);
+      }
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "btn btn-small";
+      edit.textContent = "✎";
+      edit.title = "Edit this person";
+      edit.onclick = () => openUserModal(u.id);
+      actions.appendChild(edit);
+    }
+    body.appendChild(tr);
+  }
+}
+
+function approveUser(u) {
+  const fallback = D().roles.some(r => r.key === "viewer") ? "viewer" : (D().roles[0] || {}).key;
+  const roleKey = u.roleKey || fallback;
+  safely(async () => {
+    await cloud.saveUser(u.id, { status: "active", roleKey });
+    renderUserRows();
+    const mailed = await cloud.notifyUser(u.id, "approved");
+    toast(`${u.fullName || u.email} can now sign in as ${roleLabel(roleKey)}.` +
+      (mailed ? " They've been emailed." : ""), "info");
+  });
+}
+
+function rejectUser(u) {
+  showConfirm("Turn down this request?",
+    `${u.fullName || u.email} will not be able to sign in. Their record is kept, so you can approve them later without them asking again.`,
+    () => safely(async () => {
+      await cloud.saveUser(u.id, { status: "disabled" });
+      renderUserRows();
+      await cloud.notifyUser(u.id, "rejected");
+      toast("Request turned down.", "info");
+    }));
+}
+
+function fillRoleSelect(sel, value) {
+  sel.innerHTML = D().roles.map(r => `<option value="${escapeHtml(r.key)}">${escapeHtml(r.label)}</option>`).join("");
+  if (value) sel.value = value;
+}
+
+/* The modal opens over the Settings modal — openModal hides every other .modal,
+   so closing it comes back to Settings via reopenSettings() rather than
+   stacking two dialogs. */
+function openUserModal(id) {
+  const u = (D().users || []).find(x => x.id === id);
+  if (!u || !can("users", "edit")) return;
+  state.users.editingId = id;
+  const form = $("#form-user");
+  $("#user-modal-title").textContent = u.fullName || u.email;
+  $("#user-modal-email").textContent = u.email;
+  form.fullName.value = u.fullName || "";
+  fillRoleSelect(form.roleKey, u.roleKey || "viewer");
+  form.status.value = u.status;
+  const locked = userLockReason(u);
+  form.roleKey.disabled = !!locked;
+  form.status.disabled = !!locked;
+  $("#btn-delete-user").classList.toggle("hidden", !!locked);
+  $("#user-modal-note").textContent = locked || "";
+  $("#user-modal-note").classList.toggle("hidden", !locked);
+  $("#user-role-hint").textContent = "What each role may do is on the Roles & permissions tab.";
+  openModal("#modal-user");
+}
+
+function reopenSettings() {
+  closeModal();
+  renderSettings();
+  openModal("#modal-settings");
+}
+
+function saveUserModal(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const id = state.users.editingId;
+  const before = (D().users || []).find(x => x.id === id);
+  if (!before) return;
+  const vals = { fullName: form.fullName.value };
+  if (!form.roleKey.disabled) { vals.roleKey = form.roleKey.value; vals.status = form.status.value; }
+  safely(async () => {
+    await cloud.saveUser(id, vals);
+    reopenSettings();
+    renderUserRows();
+    if (vals.roleKey && vals.roleKey !== before.roleKey) await cloud.notifyUser(id, "role-changed");
+    toast("Saved.", "info");
+  });
+}
+
+function deleteUserFromModal() {
+  const id = state.users.editingId;
+  const u = (D().users || []).find(x => x.id === id);
+  if (!u) return;
+  showConfirm("Delete this account permanently?",
+    `${u.fullName || u.email} will be removed from the sign-in system entirely and cannot be brought back. ` +
+    `To take someone's access away while keeping their record — and the "locked by" and "updated by" history that names them — set their status to Disabled instead.`,
+    () => safely(async () => {
+      await cloud.deleteUser(id);
+      reopenSettings();
+      renderUserRows();
+      toast("Account deleted.", "info");
+    }));
+}
+
+function openInviteModal() {
+  if (!can("users", "edit")) return;
+  const form = $("#form-invite");
+  form.reset();
+  fillRoleSelect(form.roleKey, "viewer");
+  openModal("#modal-invite");
+}
+
+function sendInvite(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const email = form.email.value.trim().toLowerCase();
+  safely(async () => {
+    await cloud.inviteUser(email, form.roleKey.value);
+    reopenSettings();
+    renderUserRows();
+    toast(`Invitation sent to ${email}.`, "info");
+  });
+}
+
+function exportUsersCsv() {
+  const rows = usersFilteredSorted();   // the same rows the table is showing right now
+  const header = ["Name", "Email", "Role", "Status", "Last seen", "Requested", "Approved", "Approved by"];
+  const out = rows.map(u => [
+    u.fullName || "", u.email || "", roleLabel(u.roleKey),
+    (USER_STATUS[u.status] || {}).label || u.status,
+    u.lastSeenAt || "", u.requestedAt || "", u.approvedAt || "", u.approvedBy || "",
+  ]);
+  const csv = [header, ...out].map(r => r.map(csvField).join(",")).join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `users_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- Roles & permissions ---------- */
+/* The matrix, drawn as one table: rows are areas grouped into "Tabs & menus"
+   and "Overview sections", columns are the roles. Admin's column is disabled
+   here and guarded by a trigger in the database, so this screen can never be
+   used to lock everyone out of this screen. */
+function renderRolesMatrix() {
+  const body = $("#roles-matrix-body");
+  if (!body || !can("users", "edit")) return;
+  const roles = D().roles;
+  body.innerHTML = "";
+
+  const head = document.createElement("tr");
+  head.className = "rm-head";
+  head.innerHTML = "<th>Area</th>" + roles.map(r =>
+    `<th>${escapeHtml(r.label)}${r.protected ? '<br><small>always full access</small>' : ""}</th>`).join("");
+  body.appendChild(head);
+
+  for (const group of PERM_AREAS) {
+    const gr = document.createElement("tr");
+    gr.className = "rm-group";
+    gr.innerHTML = `<td colspan="${roles.length + 1}">${escapeHtml(group.group)}</td>`;
+    body.appendChild(gr);
+
+    for (const item of group.items) {
+      const viewOnly = group.viewOnly || item.viewOnly;
+      const tr = document.createElement("tr");
+      const hint = item.hint ? `<small>${escapeHtml(item.hint)}</small>` : "";
+      tr.innerHTML = `<td class="rm-area">${escapeHtml(item.label)}${hint}</td>`;
+      for (const role of roles) {
+        const td = document.createElement("td");
+        const cur = (D().perms[role.key] || {})[item.key] || "none";
+        const sel = document.createElement("select");
+        sel.className = "rm-level";
+        // A section that nothing can "edit" only offers off/on — a third state
+        // that means nothing would just be a way to get it wrong.
+        const levels = viewOnly ? ["none", "view"] : ["none", "view", "edit"];
+        sel.innerHTML = levels.map(l =>
+          `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : "Edit"}</option>`).join("");
+        sel.value = levels.includes(cur) ? cur : "view";
+        sel.disabled = !!role.protected;
+        if (role.protected) sel.title = "Admin always keeps full access.";
+        sel.onchange = () => {
+          const level = sel.value;
+          safely(async () => {
+            await cloud.setRolePermission(role.key, item.key, level);
+            renderRolesMatrix();
+            // the change may have been to our own role — redraw the whole app
+            await refreshAndRender();
+          });
+        };
+        td.appendChild(sel);
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    }
+  }
+}
+
+function wireUserManagement() {
+  $("#users-search").addEventListener("input", (e) => { state.users.search = e.target.value; renderUserRows(); });
+  $("#btn-users-pending").onclick = () => { state.users.pendingOnly = !state.users.pendingOnly; renderUserRows(); };
+  $("#btn-users-csv").onclick = exportUsersCsv;
+  $("#btn-invite-user").onclick = openInviteModal;
+  $("#form-invite").onsubmit = sendInvite;
+  $("#form-user").onsubmit = saveUserModal;
+  $("#btn-delete-user").onclick = deleteUserFromModal;
+  for (const ms of $$("#users-filters .ms")) {
+    ms.querySelector(".ms-btn").onclick = (ev) => {
+      ev.stopPropagation();
+      const pop = ms.querySelector(".ms-pop");
+      const wasOpen = !pop.classList.contains("hidden");
+      closeFilterPops();
+      if (!wasOpen) pop.classList.remove("hidden");
+    };
+  }
+  for (const th of $$("#users-table th[data-sort]")) {
+    th.onclick = () => {
+      const key = th.dataset.sort;
+      if (state.users.sortKey === key) state.users.sortDir *= -1;
+      else { state.users.sortKey = key; state.users.sortDir = 1; }
+      renderUserRows();
+    };
+  }
+  wireAccountPane();
+}
+
 /* ---------- login ---------- */
-function showLogin() {
+/* The sign-in box holds four forms in one card — sign in, request access,
+   forgot password, and the "you can't come in yet" message — because they are
+   the same conversation and swapping them in place keeps the person on one
+   screen instead of navigating them around. */
+const LOGIN_FORMS = ["#form-login", "#form-request", "#form-forgot", "#login-blocked"];
+
+function showLogin(which = "#form-login") {
   $("#login-screen").classList.remove("hidden");
+  $("#reset-screen").classList.add("hidden");
   $("#app-root").classList.add("hidden");
+  for (const id of LOGIN_FORMS) $(id).classList.toggle("hidden", id !== which);
+}
+
+/* Shown when someone signs in successfully but their account isn't active.
+   Without this they would land on a board with every table empty (RLS is doing
+   its job) and no idea why. */
+function showAccountBlocked(status) {
+  const msg = status === "pending"
+    ? "Your request is in. An admin still has to approve it — you'll get an email when they do."
+    : status === "missing"
+      ? "Your sign-in works, but there's no profile record for it yet. An admin needs to run the user-management migration, or add you from Settings → Users."
+      : "Your access to this app has been switched off. Ask an admin if you think that's a mistake.";
+  $("#login-blocked-text").textContent = msg;
+  showLogin("#login-blocked");
+}
+
+/* A submit button that says what it is doing, and puts itself back afterwards. */
+function withBusy(form, label, run) {
+  const btn = form.querySelector("button[type=submit]");
+  const was = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = label;
+  return run().finally(() => { btn.disabled = false; btn.textContent = was; });
+}
+function loginMessage(sel, text, isError) {
+  const box = $(sel);
+  box.textContent = text;
+  box.classList.toggle("hidden", !text);
 }
 
 function wireLogin() {
@@ -4866,6 +5518,82 @@ function wireLogin() {
         btn.disabled = false;
         btn.textContent = "Sign in";
       });
+  };
+
+  $("#btn-request-access").onclick = () => showLogin("#form-request");
+  $("#btn-forgot").onclick = () => {
+    $("#form-forgot").email.value = $("#form-login").email.value;
+    showLogin("#form-forgot");
+  };
+  for (const b of $$("[data-login-back]")) b.onclick = () => showLogin("#form-login");
+  $("#btn-blocked-signout").onclick = () => cloud.signOut().then(() => location.reload());
+
+  $("#form-request").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    loginMessage("#request-error", "");
+    loginMessage("#request-note", "");
+    withBusy(form, "Sending…", () =>
+      cloud.requestAccess(form.email.value, form.password.value, form.fullName.value)
+        .then(() => {
+          form.reset();
+          loginMessage("#request-note",
+            "Request sent. Confirm your email address if we've sent you a link, then wait for an admin to approve you — you'll get an email either way.");
+        })
+        .catch((e) => {
+          // The domain rule lives in a trigger on auth.users, and a trigger
+          // exception comes back from the auth service as an opaque 500 — so
+          // say the useful thing rather than passing that through.
+          const raw = (e && e.message) || "";
+          const domainish = /database error|unexpected_failure|limited to|500/i.test(raw);
+          loginMessage("#request-error", domainish
+            ? "That address can't be used. Access is limited to @trigo-group.com addresses."
+            : raw || "Could not send the request.", true);
+        }));
+  };
+
+  $("#form-forgot").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    loginMessage("#forgot-error", "");
+    loginMessage("#forgot-note", "");
+    withBusy(form, "Sending…", () =>
+      cloud.resetPassword(form.email.value)
+        // Deliberately the same answer whether or not the address is one we
+        // know: this form must not become a way to find out who has an account.
+        .then(() => loginMessage("#forgot-note", "If that address has an account, a reset link is on its way."))
+        .catch(() => loginMessage("#forgot-note", "If that address has an account, a reset link is on its way.")));
+  };
+}
+
+/* ---------- password recovery ---------- */
+/* Supabase turns the emailed link into a recovery session before this runs, so
+   there is nothing to verify here — the session IS the proof. */
+function showResetScreen(session) {
+  $("#login-screen").classList.add("hidden");
+  $("#app-root").classList.add("hidden");
+  $("#reset-screen").classList.remove("hidden");
+  const email = session && session.user && session.user.email;
+  $("#reset-for").textContent = email ? `For ${email}.` : "";
+}
+
+function wireReset() {
+  $("#form-reset").onsubmit = (ev) => {
+    ev.preventDefault();
+    const form = ev.target;
+    loginMessage("#reset-error", "");
+    if (form.password.value !== form.confirm.value) {
+      loginMessage("#reset-error", "The two passwords don't match.", true);
+      return;
+    }
+    withBusy(form, "Saving…", () =>
+      cloud.updatePassword(form.password.value)
+        .then(() => {
+          // straight into the app: the recovery session is a real session
+          window.location.hash = "";
+          location.reload();
+        })
+        .catch((e) => loginMessage("#reset-error", (e && e.message) || "Could not set the password.", true)));
   };
 }
 
@@ -4914,6 +5642,7 @@ function wireApp() {
   for (const btn of $$("#employee-tabs .settings-tab")) {
     btn.onclick = () => { state.employeeTab = btn.dataset.tab; applyEmployeeTab(); };
   }
+  wireUserManagement();
   $("#btn-add-engineer").onclick = () => safely(async () => { await cloud.addEngineer(); renderSettings(); });
   $("#btn-add-area").onclick = () => safely(async () => { await cloud.addArea(); renderSettings(); });
 
@@ -5167,6 +5896,25 @@ async function boot() {
   wireApp();
   try { const session = await cloud.getSession(); state.myEmail = session && session.user && session.user.email; } catch (e) { /* toast attribution just won't fire */ }
   await cloud.init(() => state.date);
+  // Signed in, but not allowed in yet. RLS would hand them empty tables, so
+  // stop here with an explanation instead of a board with nothing on it.
+  const me = D().me;
+  if (me && !me.legacy && me.status !== "active") {
+    $("#app-root").classList.add("hidden");
+    showAccountBlocked(me.status);
+    return;
+  }
+  cloud.touchLastSeen();   // best-effort; "last seen" in Settings → Users
+  // A matrix can be edited down to a role with no tab at all. Rendering the
+  // board view with no board would be a stack of empty furniture, so say what
+  // has happened instead. (Admin can never reach this — its column is locked.)
+  if (me && !me.legacy && !firstAllowedView()) {
+    $("#app-root").classList.add("hidden");
+    $("#login-blocked-text").textContent =
+      "Your role doesn't have access to any part of the app yet. Ask an admin to give it something in Settings → Roles.";
+    showLogin("#login-blocked");
+    return;
+  }
   // holidays are known now — restore the last board/date the user was on, falling
   // back to the next working day if there's nothing saved (or it's stale/invalid)
   restoreViewState();
@@ -5186,6 +5934,9 @@ async function boot() {
       const board = D().boards.find(b => b.id === payload.boardId);
       toast(`${board ? board.name : "This board"} was just updated by ${payload.updatedBy}.`, "info");
     }
+    // render() never touches the Settings modal, so an approval or a role change
+    // arriving over Realtime would otherwise sit stale on an open Users pane.
+    if (!$("#modal-settings").classList.contains("hidden")) applySettingsTab();
     refreshAndRender();
   });
   await refreshAndRender();
@@ -5193,12 +5944,26 @@ async function boot() {
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);
 }
 
+/* A recovery link arrives as #access_token=...&type=recovery. Supabase's client
+   consumes that hash and raises PASSWORD_RECOVERY, but the hash is readable
+   before it does — and reading it first is what stops the app booting the board
+   for a split second on the way to the reset form. */
+function isRecoveryLink() {
+  const h = window.location.hash || "";
+  return /(^|[#&])type=recovery(&|$)/.test(h);
+}
+
 async function main() {
   wireLogin();
+  wireReset();
   let session = null;
   try { session = await cloud.getSession(); } catch (e) { console.error(e); }
   let hadSession = !!session;
-  if (session) {
+  let recovering = isRecoveryLink();
+
+  if (recovering) {
+    showResetScreen(session);
+  } else if (session) {
     await boot();
   } else {
     showLogin();
@@ -5206,7 +5971,13 @@ async function main() {
   // onAuthStateChange always fires once on load (even with no session ever set) —
   // only reload on a genuine sign-out transition, not that initial null event.
   cloud.onAuthChange((s) => {
-    if (s) { hadSession = true; return; }
+    if (s) {
+      hadSession = true;
+      // The recovery session can land after this handler is attached, when the
+      // link's hash is parsed asynchronously.
+      if (isRecoveryLink() && !recovering) { recovering = true; showResetScreen(s); }
+      return;
+    }
     if (hadSession) location.reload();
   });
 }

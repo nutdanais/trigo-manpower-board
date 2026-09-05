@@ -63,7 +63,14 @@ async function fetchAllPages(buildQuery) {
 }
 
 const cloud = {
-  data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], hosts: [], activeBoardId: null },
+  data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], hosts: [],
+          /* who is signed in, what the roles are, and the role x area matrix.
+             `me.legacy` is set when the user-management migration has not been
+             run yet — see _loadIdentity. `users` stays null until something
+             actually asks for the people list (the Users pane), so a Viewer
+             never fetches rows RLS would refuse anyway. */
+          me: null, roles: [], perms: {}, users: null,
+          activeBoardId: null },
   _listeners: [],
   _currentDate: () => todayStrISO(),
 
@@ -93,9 +100,154 @@ const cloud = {
   },
   async signOut() { await sb.auth.signOut(); },
 
+  /* Self-service sign-up. The @trigo-group.com rule is enforced by a trigger on
+     auth.users, not here — this only passes the display name along so the
+     admin approving the request sees a name rather than just an address. */
+  async requestAccess(email, password, fullName) {
+    const { error } = await sb.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: { data: { full_name: (fullName || "").trim() }, emailRedirectTo: window.location.origin },
+    });
+    if (error) throw error;
+  },
+  async resetPassword(email) {
+    const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: window.location.origin,
+    });
+    if (error) throw error;
+  },
+  async updatePassword(password) {
+    const { error } = await sb.auth.updateUser({ password });
+    if (error) throw error;
+  },
+  /* Display name only — the RPC takes no role or status argument, so this
+     cannot be turned into a way to promote yourself. */
+  async updateMyProfile(fullName) {
+    const { error } = await sb.rpc("update_my_profile", { p_full_name: fullName });
+    if (error) throw error;
+    if (this.data.me) this.data.me.fullName = (fullName || "").trim() || null;
+  },
+
+  /* ---------- identity: who am I, and what may I do ---------- */
+  /* Loads the caller's profile, the role list and the permission matrix in one
+     round trip. Before migration-2026-09-04b has been run none of those tables
+     exist; rather than break, we fall back to `legacy` — app.js reads that as
+     "allow everything", which is exactly how the app behaved before roles
+     existed. The fallback is deliberately narrow: only a missing TABLE takes
+     it, any other error is thrown. */
+  async _loadIdentity() {
+    const { data: { session } } = await sb.auth.getSession();
+    const user = session && session.user;
+    if (!user) { this.data.me = null; this.data.roles = []; this.data.perms = {}; return; }
+
+    const [prof, roles, perms] = await Promise.all([
+      sb.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+      sb.from("roles").select("*").order("rank"),
+      sb.from("role_permissions").select("*"),
+    ]);
+    const errs = [prof.error, roles.error, perms.error].filter(Boolean);
+    if (errs.some((e) => this._tableMissing(e))) {
+      this.data.me = { id: user.id, email: user.email, fullName: null, roleKey: null, status: "active", legacy: true };
+      this.data.roles = [];
+      this.data.perms = {};
+      return;
+    }
+    if (errs.length) throw errs[0];
+
+    this.data.roles = (roles.data || []).map((r) => ({ key: r.key, label: r.label, rank: r.rank, protected: r.protected }));
+    this.data.perms = {};
+    for (const row of perms.data || []) {
+      (this.data.perms[row.role_key] || (this.data.perms[row.role_key] = {}))[row.area] = row.level;
+    }
+    // No row means the migration ran but this account predates it (or the
+    // backfill was skipped). "missing" is its own state so the sign-in screen
+    // can say something true rather than showing an empty board.
+    this.data.me = prof.data
+      ? this._toProfile(prof.data)
+      : { id: user.id, email: user.email, fullName: null, roleKey: null, status: "missing" };
+  },
+
+  _toProfile(r) {
+    return {
+      id: r.id, email: r.email, fullName: r.full_name, roleKey: r.role_key, status: r.status,
+      requestedAt: r.requested_at, approvedAt: r.approved_at, approvedBy: r.approved_by,
+      lastSeenAt: r.last_seen_at, createdAt: r.created_at,
+    };
+  },
+
+  /* Best-effort: a failure here must never stop a sign-in. */
+  async touchLastSeen() {
+    try { await sb.rpc("touch_last_seen"); } catch (e) { /* pre-migration, or offline */ }
+  },
+
+  /* ---------- the people list (Settings -> Users) ---------- */
+  /* Only ever called from the Users pane. RLS returns just the caller's own row
+     to anyone without the Users area, so this cannot leak the roster. */
+  async loadUsers() {
+    const { data, error } = await sb.from("profiles").select("*").order("email");
+    if (error) { if (this._tableMissing(error)) { this.data.users = []; return; } throw error; }
+    this.data.users = data.map((r) => this._toProfile(r));
+  },
+
+  async saveUser(id, vals) {
+    const patch = { updated_at: new Date().toISOString() };
+    if (vals.fullName !== undefined) patch.full_name = (vals.fullName || "").trim() || null;
+    if (vals.roleKey !== undefined) patch.role_key = vals.roleKey;
+    if (vals.status !== undefined) {
+      patch.status = vals.status;
+      if (vals.status === "active") {
+        patch.approved_at = new Date().toISOString();
+        patch.approved_by = await this._currentEmail();
+      }
+    }
+    const { error } = await sb.from("profiles").update(patch).eq("id", id);
+    if (error) throw error;
+    await this.loadUsers();
+  },
+
+  async setRolePermission(roleKey, area, level) {
+    const { error } = await sb.from("role_permissions")
+      .upsert({ role_key: roleKey, area, level }, { onConflict: "role_key,area" });
+    if (error) throw error;
+    await this._loadIdentity();
+  },
+
+  /* Invite and delete are the only two operations that need the service_role
+     key, so they live in the admin-users Edge Function. Everything else on this
+     page is a plain table write under RLS — which is why the Users pane keeps
+     working (minus the notification email) before the function is deployed. */
+  async _invokeAdmin(action, payload) {
+    const { data, error } = await sb.functions.invoke("admin-users", { body: { action, ...payload } });
+    if (error) {
+      let detail = "";
+      try { detail = (await error.context.json()).error || ""; } catch (e) { /* not a JSON body */ }
+      throw new Error(detail || error.message || "The admin-users function is not available.");
+    }
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  },
+
+  async inviteUser(email, roleKey) {
+    const res = await this._invokeAdmin("invite", { email: email.trim().toLowerCase(), roleKey });
+    await this.loadUsers();
+    return res;
+  },
+  async deleteUser(id) {
+    await this._invokeAdmin("delete", { id });
+    await this.loadUsers();
+  },
+  /* Fire-and-forget: an approval must not fail because the mail hop did. */
+  async notifyUser(id, kind) {
+    try { await this._invokeAdmin("notify", { id, kind }); return true; } catch (e) { return false; }
+  },
+
   /* ---------- initial load ---------- */
   async init(getCurrentDate) {
     this._currentDate = getCurrentDate;
+    // identity first: everything below is read under RLS, and app.js needs to
+    // know the caller's role before it decides what to render
+    await this._loadIdentity();
     await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts()]);
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
@@ -1267,6 +1419,17 @@ const cloud = {
       .on("postgres_changes", { event: "*", schema: "public", table: "assignments" }, refreshPlanAndNotify)
       .on("postgres_changes", { event: "*", schema: "public", table: "day_overrides" }, async () => { await this._loadOverrides(); this.data.plans = {}; this.notify(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "plan_days" }, async () => { await this._loadLocks(); this.notify(); })
+      // A role change, an approval or a matrix edit has to reach an open
+      // browser: someone demoted mid-session should lose the tab there and
+      // then, not at their next refresh. The people list is only reloaded if
+      // something has already asked for it (the Users pane is open).
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, async () => {
+        await this._loadIdentity();
+        if (this.data.users) await this.loadUsers();
+        this.notify();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "role_permissions" }, async () => { await this._loadIdentity(); this.notify(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "roles" }, async () => { await this._loadIdentity(); this.notify(); })
       .subscribe();
   },
 };

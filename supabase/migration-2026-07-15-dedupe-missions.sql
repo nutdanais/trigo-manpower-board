@@ -47,5 +47,8 @@ where m.id = r.id and r.rn > 1;
 do $$
 begin
   alter table missions add constraint missions_unique_number_shift unique (board_id, plan_date, number, shift);
-exception when duplicate_object then null;
+-- an existing constraint reports duplicate_table (its backing index), not
+-- duplicate_object — catching only the latter broke this file's promise to be
+-- safe to run more than once
+exception when duplicate_object or duplicate_table then null;
 end $$;

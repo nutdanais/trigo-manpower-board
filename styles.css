@@ -1491,24 +1491,11 @@ body.board-view #app-root { margin-right: 264px; }
 
 .settings-section { margin-bottom: 18px; }
 .settings-section h4 { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-.settings-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin-bottom: 6px;
-}
-.settings-row input[type="text"], .settings-row input[type="tel"] { flex: 1; margin-top: 0; }
-.settings-row input[type="color"] {
-  width: 40px;
-  height: 32px;
-  padding: 1px;
-  margin-top: 0;
-  cursor: pointer;
-}
-.settings-row .btn-danger { padding: 4px 8px; }
-.settings-board-row { margin-bottom: 12px; }
-.settings-board-name { font-size: 13px; font-weight: 600; margin-bottom: 5px; }
-.settings-board-days { margin-bottom: 0; }
+/* The engineer / area / board rows used to be flex divs; they are table rows now
+   (see .settings-table below), so the flex rules that shaped them are gone. They
+   are not merely unused: `display: flex` on a <tr> overrides display:table-row
+   and collapses every cell to its content width, which is exactly what it did
+   when the class was carried over by name. */
 
 /* ===== Custom date picker ===== */
 #datepicker-pop {
@@ -2430,12 +2417,22 @@ body.touch-mode .hl-edit { opacity: 1; }
 /* denser surfaces that hold a lot of text get the stronger (more opaque) glass */
 .mission-card,
 #float-pool,
-.modal,
 .ov-section {
   background: var(--glass-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+/* Modals are deliberately NOT frosted. They sit over a busy board and hold the
+   densest text in the app — a settings form, a 15-row user list, a 16 x 4
+   permission grid — and translucency over a moving background is exactly what
+   makes that hard to read. The board's own surfaces above keep the glass. */
+.modal {
+  background: var(--panel);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--border);
   box-shadow: var(--glass-shadow);
 }
 .mission-card, .zone { border-radius: 12px; }
@@ -2455,9 +2452,12 @@ body.touch-mode .hl-edit { opacity: 1; }
 }
 
 /* a soft blur behind an open modal lifts it off the board */
+/* a plain scrim rather than a blur: the modals above are opaque now, so the
+   blur only cost the page behind its legibility without buying any separation */
 #modal-backdrop {
-  -webkit-backdrop-filter: saturate(1.1) blur(3px);
-  backdrop-filter: saturate(1.1) blur(3px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(15,23,42,.55);
 }
 
 /* plain toolbar buttons become frosted chips; the coloured variants below keep
@@ -2545,6 +2545,493 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .toast, .toast-out { animation: none; }
+}
+
+/* ===== Users, roles & permissions (Settings modal) =====
+   User management lives in Settings rather than as a tab of its own — every
+   role has something to do here (My account), only an admin has the rest. The
+   Users and Roles panes hold real tables, so the modal widens for those two
+   and stays its normal 440px everywhere else. */
+/* This modal is the only one holding real tables — a row per account on Users,
+   a 16 x 4 grid on Roles — so it is built as a two-column dialog rather than as
+   the short form the shared .modal rules assume: a nav rail on the left, one
+   pane at a time on the right, and only that pane scrolling. Six sections is
+   past what a horizontal tab strip carries, which is why the strip needed a
+   scroller in the first place; a rail never needs one. */
+/* One box, whatever you click. The panes used to size themselves — 820x315 for
+   Engineer against 1320x828 for Roles — so the frame, the footer and the rail
+   items all jumped on every click down the rail. Content varies inside; the
+   dialog does not.
+
+   1120 is measured, not guessed: below 1080 the Users table can no longer lay
+   out its seven columns without a horizontal scroll (it needs 793px against 758
+   available at a 1000px modal), and 1120 leaves ~80px of slack for addresses
+   longer than today's. A real `height` rather than a max-height is what makes
+   the short panes stop shrink-wrapping. */
+#modal-settings {
+  /* 1180, not less: at 1120 the Users table stops overflowing by WRAPPING every
+     name and email onto a second line (45px rows against 35px), which a
+     "does it overflow horizontally" check happily passes. Row height is the
+     honest test, and 1180 is where it goes back to one line.
+     600: the tallest form pane (My account) needs 489, so this clears every form
+     without scrolling while cutting the empty space the uniform height cost. */
+  width: min(1180px, 94vw);
+  height: min(600px, 84vh);
+  display: flex;
+  flex-direction: row;
+  padding: 0;                /* the rail and the body carry their own */
+  overflow: hidden;          /* the pane scrolls, not the card */
+}
+
+#settings-rail {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  /* a fraction of --bg-soft mixed back toward the panel: a whisper of grey in
+     light mode, and it still darkens correctly in dark. A hex here would only
+     have been right in one of the two. */
+  background: color-mix(in srgb, var(--bg-soft) 45%, var(--panel));
+  border-right: 1px solid var(--border);
+  padding: 18px 0;
+  /* overflow-x is pinned on purpose: `overflow-x: auto` alone makes the OTHER
+     axis compute to auto too, and the old tab strip's 1px of overflow was
+     enough for the browser to offer a vertical scrollbar for it. */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+#settings-rail > h3 { margin: 0 0 14px 18px; flex: 0 0 auto; }
+
+#settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  border-bottom: none;
+  overflow: visible;
+}
+/* Drawn as a divider rule rather than a label. Keeping it an element (instead of
+   a border on the first button of each group) is what lets applySettingsTab drop
+   the divider together with the items under it — a Viewer with only My account
+   gets a clean single entry, not an orphan rule. Restoring the text labels is a
+   matter of undoing this one block. */
+.settings-group {
+  margin: 8px 18px;
+  border-top: 1px solid var(--border);
+  height: 0;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+.settings-group:first-child { display: none; }   /* nothing to divide above the first */
+
+#settings-tabs .settings-tab {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 0;
+  padding: 10px 18px;
+  padding-left: 15px;
+  border: none;
+  /* the accent bar's width is always reserved, so selecting an item doesn't
+     nudge every label sideways */
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+#settings-tabs .settings-tab:hover { background: rgba(0,0,0,.035); }
+/* the selected row is the panel colour and runs flush to the rail's right edge,
+   so it reads as continuous with the content beside it */
+#settings-tabs .settings-tab.active {
+  background: var(--panel);
+  border-left-color: var(--primary-text);
+  color: var(--primary-text);
+  font-weight: 700;
+}
+
+#settings-body {
+  flex: 1 1 auto;
+  /* without min-width:0 a wide table refuses to shrink and shoves the rail off */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+}
+/* The scroll region. min-height:0 is what actually lets a flex child scroll
+   instead of growing to fit and pushing the footer off-screen. Height stays a
+   max, not a fixed value, so My account is still a compact dialog and only the
+   tall panes reach the cap. */
+#modal-settings .settings-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;        /* room for the scrollbar beside the last column */
+}
+/* The tables want the whole body; the forms do not — an unconstrained name
+   field would stretch the full ~880px. Capped near the width these forms
+   already laid out at, so they keep their proportions inside the wider frame. */
+/* Only My account is a form, and a form wants a readable measure rather than the
+   full 940px. The list panes are tables now and use the whole width. */
+#modal-settings .settings-pane[data-pane="account"] .settings-section { max-width: 640px; }
+
+/* ----- the three list panes: Engineer, Service Area, Board -----
+   Same table language as the Users and Roles panes one click away. The section
+   is a flex column filling the pane, so the heading, its Add button, the hint
+   and the count all stay put and ONLY the rows scroll — a growing engineer list
+   lengthens the scroll box, never the dialog. */
+#modal-settings .settings-pane[data-pane="engineers"],
+#modal-settings .settings-pane[data-pane="areas"],
+#modal-settings .settings-pane[data-pane="boards"] {
+  overflow: hidden;          /* the list inside does the scrolling */
+  display: flex;
+}
+#modal-settings .settings-pane[data-pane="engineers"] .settings-section,
+#modal-settings .settings-pane[data-pane="areas"] .settings-section,
+#modal-settings .settings-pane[data-pane="boards"] .settings-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+.settings-hint {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: -2px 0 10px;
+}
+.settings-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.settings-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 2px 0;
+}
+
+/* table-layout: fixed is load-bearing, not a tidy-up. The cells hold inputs at
+   width:100%, and a percentage width contributes NO intrinsic width — so under
+   the default auto layout the browser collapsed Name and Phone to their minimum
+   and left the header spread out above them. Fixed layout takes the widths
+   declared below and splits the rest evenly. */
+.settings-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+.settings-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;   /* same as the Users and Roles headers in this modal */
+  background: var(--bg-soft);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.settings-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.settings-table tr:last-child td { border-bottom: none; }
+.settings-table tbody tr:hover { background: var(--hover-tint, rgba(0,0,0,.02)); }
+/* the fields fill their column instead of being loose flex children */
+.settings-table td input[type="text"],
+.settings-table td input[type="tel"] { width: 100%; margin-top: 0; }
+.settings-table .st-swatch { width: 74px; }
+.settings-table .st-act { width: 52px; text-align: right; }
+.settings-table .st-board { width: 200px; font-weight: 600; }
+.settings-table td input[type="color"] {
+  width: 38px;
+  height: 30px;
+  padding: 1px;
+  margin-top: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+/* A row of solid red blocks down the page shouted louder than deleting an
+   engineer deserves. Quiet until you reach for it. */
+.st-del {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.st-del:hover, .st-del:focus-visible {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+:root[data-theme="dark"] .st-del:hover,
+:root[data-theme="dark"] .st-del:focus-visible {
+  background: rgba(185,28,28,.18);
+  border-color: #7f2222;
+  color: #fca5a5;
+}
+/* the weekday chips sit on one line beside the board name */
+.settings-table .settings-board-days { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.settings-table .settings-board-name { margin: 0; font-size: 13px; }
+#modal-settings .modal-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin-top: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+/* Inside the modal the PANE is the scroll container, so the table must not open
+   a second one — a nested scroller is what stops a sticky header from ever
+   leaving the top of its own table. */
+#modal-settings .table-wrap { overflow: visible; border: none; }
+
+/* Column headers stay put while the rows move under them, the same treatment
+   #emplist-table th and #hostlist-table th already get on the two list tabs. */
+#users-table thead th,
+#roles-matrix .rm-head th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-soft);
+}
+/* the group rows ("Tabs & menus", "Overview sections") pass underneath */
+#roles-matrix .rm-group td { z-index: 1; }
+
+#users-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+#users-search {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  min-width: 200px;
+}
+#users-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+#users-count { color: var(--muted); font-size: 12.5px; }
+
+/* same amber "something needs your attention" bar as the Host list's duplicate
+   finder — one pattern for "there is a queue here", wherever it appears */
+#users-pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid #e5b980;
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: rgba(237,161,0,.10);
+  font-size: 13px;
+}
+#users-pending .dupbar-icon { color: #b45309; font-weight: 700; }
+#users-pending-text { flex: 1; min-width: 180px; }
+:root[data-theme="dark"] #users-pending { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
+:root[data-theme="dark"] #users-pending .dupbar-icon { color: #f0b45c; }
+
+#users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#users-table th, #users-table td {
+  text-align: left;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+#users-table th { font-size: 12px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+#users-table th[data-sort] { cursor: pointer; user-select: none; }
+#users-table th[data-sort]:hover { color: var(--text); }
+#users-table th.sorted::after { content: " ▲"; font-size: 9px; }
+#users-table th.sorted.desc::after { content: " ▼"; }
+#users-table tr.status-disabled { opacity: .6; }
+/* the one row state worth marking: a request still waiting on somebody */
+#users-table tr.status-pending { background: rgba(237,161,0,.08); }
+:root[data-theme="dark"] #users-table tr.status-pending { background: rgba(237,161,0,.10); }
+#users-table tr.user-row-me { background: rgba(0,0,0,.03); }
+:root[data-theme="dark"] #users-table tr.user-row-me { background: rgba(255,255,255,.04); }
+.user-you {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.user-actions { white-space: nowrap; text-align: right; }
+.user-actions .btn { margin-left: 4px; }
+
+/* Role and status read as pills, the same shape the service-area pill already
+   uses everywhere else in the app, so "a coloured pill is a category" stays
+   one idea rather than two. */
+.role-pill, .status-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.15);
+  white-space: nowrap;
+}
+/* Scoped to the pill itself: the same class also rides on the <tr> so the row
+   can be dimmed by status, and an unscoped background here would tint the whole
+   row instead of the badge. */
+.role-pill { background: #eef2f7; color: #1f2937; }
+.role-pill.role-admin    { background: #dbeafe; color: #1e3a8a; }
+.role-pill.role-manager  { background: #ede9fe; color: #4c1d95; }
+.role-pill.role-engineer { background: #dcfce7; color: #14532d; }
+.role-pill.role-viewer   { background: #f1f5f9; color: #334155; }
+.status-pill.status-active   { background: #dcfce7; color: #14532d; }
+.status-pill.status-pending  { background: #fef3c7; color: #92400e; }
+.status-pill.status-disabled { background: #f1f5f9; color: #64748b; }
+/* the pills carry their own ink, so dark mode only softens the plate */
+:root[data-theme="dark"] .role-pill,
+:root[data-theme="dark"] .status-pill { border-color: rgba(255,255,255,.16); filter: brightness(.92); }
+
+/* ----- My account ----- */
+.account-identity { margin-bottom: 14px; }
+.account-email { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.account-meta { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.account-form { margin-bottom: 18px; }
+.account-form label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
+.account-form input {
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* ----- the permission matrix -----
+   One select per cell: three states (—, View, Edit) is more than a checkbox can
+   carry, and a segmented control of three buttons across four roles and sixteen
+   rows would be 192 tap targets fighting for the same width. */
+#roles-matrix { width: 100%; border-collapse: collapse; font-size: 13px; }
+#roles-matrix th, #roles-matrix td {
+  text-align: left;
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+#roles-matrix .rm-head th { font-size: 12px; color: var(--muted); font-weight: 700; text-align: center; }
+#roles-matrix .rm-head th:first-child { text-align: left; }
+#roles-matrix .rm-head small { font-weight: 400; font-size: 10px; }
+#roles-matrix .rm-group td {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(0,0,0,.03);
+  padding-top: 10px;
+}
+:root[data-theme="dark"] #roles-matrix .rm-group td { background: rgba(255,255,255,.04); }
+#roles-matrix .rm-area { font-weight: 600; }
+#roles-matrix .rm-area small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
+#roles-matrix td:not(.rm-area) { text-align: center; }
+/* ...but a group row's <td> isn't .rm-area either, and that rule has the same
+   specificity while coming later — which left the section labels centred. */
+#roles-matrix .rm-group td { text-align: left; padding-left: 9px; }
+.rm-level {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  min-width: 74px;
+}
+.rm-level:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ----- login screen additions ----- */
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+.login-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--primary-text);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.login-link:hover { opacity: .8; }
+.login-note {
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+  padding: 6px 9px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  margin-bottom: 10px;
+}
+:root[data-theme="dark"] .login-note { background: rgba(16,185,129,.12); border-color: #2f6f57; color: #86efac; }
+.invite-domain { font-weight: 700; white-space: nowrap; }
+
+/* the recovery screen reuses the sign-in card wholesale */
+#reset-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 300;
+}
+
+/* a control that is present so its state can be read, but not operated */
+.btn-inert { opacity: .55; cursor: default; }
+
+@media (max-width: 720px) {
+  /* on a phone these two panes want the whole screen */
+  #modal-settings { width: 96vw; height: min(600px, 90vh); }
+  /* the rail becomes a strip above the body — a 200px column would leave the
+     tables nothing on a phone */
+  #modal-settings { flex-direction: column; }
+  #settings-rail {
+    flex: 0 0 auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 0 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  #settings-rail > h3 { margin-bottom: 8px; }
+  #settings-tabs { flex-direction: row; }
+  #settings-tabs .settings-tab {
+    width: auto;
+    white-space: nowrap;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    padding: 8px 14px;
+  }
+  #settings-tabs .settings-tab.active { border-bottom-color: var(--primary-text); }
+  .settings-group { display: none; }
 }
 
 /* ===== PRINT / PDF =================================================
