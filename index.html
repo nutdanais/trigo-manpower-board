@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-04m">
+<link rel="stylesheet" href="styles.css?v=2026-09-04n">
 </head>
 <body>
 
@@ -532,22 +532,57 @@
           </form>
         </div>
       </div>
+      <!-- The three list panes are tables rather than loose rows: it is the same
+           language the Users and Roles panes already use one click away, it gives
+           each field a column heading, and it fills the dialog's width instead of
+           leaving a third of it empty. The heading and its Add button sit outside
+           the scroll box, so a long list scrolls under a fixed header rather than
+           carrying the controls off the top. -->
       <div class="settings-pane" data-pane="engineers">
         <div class="settings-section">
-          <h4>Engineers <button class="btn btn-small" id="btn-add-engineer">+ Add</button></h4>
-          <div id="settings-engineers"></div>
+          <h4>Engineers
+            <button class="btn btn-small btn-primary" id="btn-add-engineer">+ Add engineer</button>
+          </h4>
+          <p class="settings-hint">The colour marks every mission card this engineer is responsible for.</p>
+          <div class="settings-list">
+            <table class="settings-table">
+              <thead><tr>
+                <th class="st-swatch">Colour</th><th>Name</th><th>Phone</th><th class="st-act"></th>
+              </tr></thead>
+              <tbody id="settings-engineers"></tbody>
+            </table>
+          </div>
+          <p class="settings-count" id="engineers-count"></p>
         </div>
       </div>
       <div class="settings-pane" data-pane="areas">
         <div class="settings-section">
-          <h4>Service areas <button class="btn btn-small" id="btn-add-area">+ Add</button></h4>
-          <div id="settings-areas"></div>
+          <h4>Service areas
+            <button class="btn btn-small btn-primary" id="btn-add-area">+ Add area</button>
+          </h4>
+          <p class="settings-hint">The colour is the pill shown on employee cards, mission cards and both lists.</p>
+          <div class="settings-list">
+            <table class="settings-table">
+              <thead><tr>
+                <th class="st-swatch">Colour</th><th>Name</th><th class="st-act"></th>
+              </tr></thead>
+              <tbody id="settings-areas"></tbody>
+            </table>
+          </div>
+          <p class="settings-count" id="areas-count"></p>
         </div>
       </div>
       <div class="settings-pane" data-pane="boards">
         <div class="settings-section">
-          <h4>Boards — weekly weekend days</h4>
-          <div id="settings-boards"></div>
+          <h4>Boards</h4>
+          <p class="settings-hint">Ticked days are that board's weekend. This drives the holiday toggle, the weekend "Add Mission" import, the date picker's highlighting and both Overview trend charts.</p>
+          <div class="settings-list">
+            <table class="settings-table">
+              <thead><tr><th class="st-board">Board</th><th>Weekend days</th></tr></thead>
+              <tbody id="settings-boards"></tbody>
+            </table>
+          </div>
+          <p class="settings-count" id="boards-count"></p>
         </div>
       </div>
 
@@ -698,8 +733,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-04m"></script>
-<script src="charts.js?v=2026-09-04m"></script>
-<script src="app.js?v=2026-09-04m"></script>
+<script src="cloud.js?v=2026-09-04n"></script>
+<script src="charts.js?v=2026-09-04n"></script>
+<script src="app.js?v=2026-09-04n"></script>
 </body>
 </html>

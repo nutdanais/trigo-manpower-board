@@ -4357,14 +4357,14 @@ function renderSettings() {
   const engBox = $("#settings-engineers");
   engBox.innerHTML = "";
   for (const e of D().engineers) {
-    const row = document.createElement("div");
-    row.className = "settings-row";
+    const row = document.createElement("tr");
+    row.className = "st-row";
     row.innerHTML = `
-      <input type="color" value="${e.color}" title="Engineer color">
-      <input type="text" value="${e.name}" placeholder="Name">
-      <input type="tel" value="${e.phone || ""}" placeholder="Phone">
-      <button class="btn btn-danger btn-small">✕</button>`;
-    const [color, name, phone, del] = row.children;
+      <td class="st-swatch"><input type="color" value="${e.color}" title="Engineer colour" aria-label="Engineer colour"></td>
+      <td><input type="text" value="${escapeHtml(e.name)}" placeholder="Name" aria-label="Engineer name"></td>
+      <td><input type="tel" value="${escapeHtml(e.phone || "")}" placeholder="Phone" aria-label="Engineer phone"></td>
+      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(e.name)}" aria-label="Delete ${escapeHtml(e.name)}">✕</button></td>`;
+    const [color, name, phone, del] = [...row.querySelectorAll("input, button")];
     color.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "color", color.value); render(); });
     name.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "name", name.value.trim() || e.name); render(); });
     phone.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "phone", phone.value.trim()); render(); });
@@ -4377,13 +4377,13 @@ function renderSettings() {
   const areaBox = $("#settings-areas");
   areaBox.innerHTML = "";
   for (const a of D().areas) {
-    const row = document.createElement("div");
-    row.className = "settings-row";
+    const row = document.createElement("tr");
+    row.className = "st-row";
     row.innerHTML = `
-      <input type="color" value="${a.color}" title="Area color">
-      <input type="text" value="${a.name}" placeholder="Area name">
-      <button class="btn btn-danger btn-small">✕</button>`;
-    const [color, name, del] = row.children;
+      <td class="st-swatch"><input type="color" value="${a.color}" title="Area colour" aria-label="Area colour"></td>
+      <td><input type="text" value="${escapeHtml(a.name)}" placeholder="Area name" aria-label="Area name"></td>
+      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(a.name)}" aria-label="Delete ${escapeHtml(a.name)}">✕</button></td>`;
+    const [color, name, del] = [...row.querySelectorAll("input, button")];
     color.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "color", color.value); render(); });
     name.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "name", name.value.trim() || a.name); render(); });
     del.onclick = () => {
@@ -4403,11 +4403,14 @@ function renderSettings() {
   const boardsBox = $("#settings-boards");
   boardsBox.innerHTML = "";
   for (const b of D().boards) {
-    const row = document.createElement("div");
-    row.className = "settings-board-row";
+    const row = document.createElement("tr");
+    row.className = "st-row";
+    const nameCell = document.createElement("td");
+    nameCell.className = "st-board";
     const nameEl = document.createElement("div");
     nameEl.className = "settings-board-name";
     nameEl.textContent = b.name;
+    const daysCell = document.createElement("td");
     const picker = document.createElement("div");
     picker.className = "weekday-picker settings-board-days";
     for (let i = 0; i < DOW_LABELS.length; i++) {
@@ -4424,10 +4427,19 @@ function renderSettings() {
       };
       picker.appendChild(lab);
     }
-    row.appendChild(nameEl);
-    row.appendChild(picker);
+    nameCell.appendChild(nameEl);
+    daysCell.appendChild(picker);
+    row.appendChild(nameCell);
+    row.appendChild(daysCell);
     boardsBox.appendChild(row);
   }
+
+  // the counts under each table — cheap orientation, and they make an empty
+  // list say so rather than showing a bare frame
+  const n = (one, many, count) => `${count} ${count === 1 ? one : many}`;
+  $("#engineers-count").textContent = n("engineer", "engineers", D().engineers.length);
+  $("#areas-count").textContent = n("service area", "service areas", D().areas.length);
+  $("#boards-count").textContent = n("board", "boards", D().boards.length);
 
   applySettingsTab();
 }

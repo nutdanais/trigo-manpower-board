@@ -1491,24 +1491,11 @@ body.board-view #app-root { margin-right: 264px; }
 
 .settings-section { margin-bottom: 18px; }
 .settings-section h4 { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-.settings-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin-bottom: 6px;
-}
-.settings-row input[type="text"], .settings-row input[type="tel"] { flex: 1; margin-top: 0; }
-.settings-row input[type="color"] {
-  width: 40px;
-  height: 32px;
-  padding: 1px;
-  margin-top: 0;
-  cursor: pointer;
-}
-.settings-row .btn-danger { padding: 4px 8px; }
-.settings-board-row { margin-bottom: 12px; }
-.settings-board-name { font-size: 13px; font-weight: 600; margin-bottom: 5px; }
-.settings-board-days { margin-bottom: 0; }
+/* The engineer / area / board rows used to be flex divs; they are table rows now
+   (see .settings-table below), so the flex rules that shaped them are gone. They
+   are not merely unused: `display: flex` on a <tr> overrides display:table-row
+   and collapses every cell to its content width, which is exactly what it did
+   when the class was carried over by name. */
 
 /* ===== Custom date picker ===== */
 #datepicker-pop {
@@ -2686,9 +2673,116 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 /* The tables want the whole body; the forms do not — an unconstrained name
    field would stretch the full ~880px. Capped near the width these forms
    already laid out at, so they keep their proportions inside the wider frame. */
-#modal-settings .settings-pane:not([data-pane="users"]):not([data-pane="roles"]) .settings-section {
-  max-width: 640px;
+/* Only My account is a form, and a form wants a readable measure rather than the
+   full 940px. The list panes are tables now and use the whole width. */
+#modal-settings .settings-pane[data-pane="account"] .settings-section { max-width: 640px; }
+
+/* ----- the three list panes: Engineer, Service Area, Board -----
+   Same table language as the Users and Roles panes one click away. The section
+   is a flex column filling the pane, so the heading, its Add button, the hint
+   and the count all stay put and ONLY the rows scroll — a growing engineer list
+   lengthens the scroll box, never the dialog. */
+#modal-settings .settings-pane[data-pane="engineers"],
+#modal-settings .settings-pane[data-pane="areas"],
+#modal-settings .settings-pane[data-pane="boards"] {
+  overflow: hidden;          /* the list inside does the scrolling */
+  display: flex;
 }
+#modal-settings .settings-pane[data-pane="engineers"] .settings-section,
+#modal-settings .settings-pane[data-pane="areas"] .settings-section,
+#modal-settings .settings-pane[data-pane="boards"] .settings-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+.settings-hint {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: -2px 0 10px;
+}
+.settings-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.settings-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 2px 0;
+}
+
+/* table-layout: fixed is load-bearing, not a tidy-up. The cells hold inputs at
+   width:100%, and a percentage width contributes NO intrinsic width — so under
+   the default auto layout the browser collapsed Name and Phone to their minimum
+   and left the header spread out above them. Fixed layout takes the widths
+   declared below and splits the rest evenly. */
+.settings-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+.settings-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;   /* same as the Users and Roles headers in this modal */
+  background: var(--bg-soft);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.settings-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.settings-table tr:last-child td { border-bottom: none; }
+.settings-table tbody tr:hover { background: var(--hover-tint, rgba(0,0,0,.02)); }
+/* the fields fill their column instead of being loose flex children */
+.settings-table td input[type="text"],
+.settings-table td input[type="tel"] { width: 100%; margin-top: 0; }
+.settings-table .st-swatch { width: 74px; }
+.settings-table .st-act { width: 52px; text-align: right; }
+.settings-table .st-board { width: 200px; font-weight: 600; }
+.settings-table td input[type="color"] {
+  width: 38px;
+  height: 30px;
+  padding: 1px;
+  margin-top: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+/* A row of solid red blocks down the page shouted louder than deleting an
+   engineer deserves. Quiet until you reach for it. */
+.st-del {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.st-del:hover, .st-del:focus-visible {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+:root[data-theme="dark"] .st-del:hover,
+:root[data-theme="dark"] .st-del:focus-visible {
+  background: rgba(185,28,28,.18);
+  border-color: #7f2222;
+  color: #fca5a5;
+}
+/* the weekday chips sit on one line beside the board name */
+.settings-table .settings-board-days { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.settings-table .settings-board-name { margin: 0; font-size: 13px; }
 #modal-settings .modal-actions {
   flex: 0 0 auto;
   justify-content: flex-end;
