@@ -2552,14 +2552,67 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
    role has something to do here (My account), only an admin has the rest. The
    Users and Roles panes hold real tables, so the modal widens for those two
    and stays its normal 440px everywhere else. */
-/* Six sub-tabs no longer fit the modal's default 440px — they wrapped onto two
-   lines and the last one ran past the edge. The card gets a little wider for
-   all panes, the tab row scrolls rather than wraps, and the two panes that hold
-   a real table widen further still. */
-#modal-settings { width: 580px; }
-.modal.settings-wide { width: 940px; }
-#settings-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+/* This modal is the only one holding real tables — a row per account on Users,
+   a 16 x 4 grid on Roles — so it is built as a proper dialog rather than as the
+   short form the shared .modal rules assume:
+     * a flex column, so the heading, the tab row and Done stay put and ONLY the
+       active pane scrolls. The shared .modal scrolls as a whole (overflow-y on
+       .modal above), which on a long pane carried the tabs and the Done button
+       off the top and bottom of the screen;
+     * sized with min(), so a large monitor gets a large dialog instead of the
+       same fixed pixel count a laptop gets. */
+#modal-settings {
+  width: min(760px, 94vw);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;          /* the pane scrolls, not the card */
+}
+/* ID-scoped deliberately: #modal-settings above is an ID selector and would
+   otherwise outrank a two-class rule, which is exactly why the previous
+   .modal.settings-wide never actually widened anything. */
+#modal-settings.settings-wide { width: min(1320px, 96vw); }
+#modal-settings > h3 { flex: 0 0 auto; }
+#settings-tabs {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
 #settings-tabs .settings-tab { flex: 0 0 auto; white-space: nowrap; }
+/* The scroll region. min-height:0 is what actually lets a flex child scroll
+   instead of growing to fit its content and pushing the footer off-screen.
+   Height stays a max, not a fixed value, so My account still shrinks to a
+   compact dialog and only the tall panes reach the cap. */
+#modal-settings .settings-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  /* room for the scrollbar so it doesn't sit on top of the last column */
+  padding-right: 2px;
+}
+#modal-settings .modal-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+/* Inside the modal the PANE is the scroll container, so the table must not open
+   a second one — a nested scroller is what stops a sticky header from ever
+   leaving the top of its own table. */
+#modal-settings .table-wrap { overflow: visible; border: none; }
+
+/* Column headers stay put while the rows move under them, the same treatment
+   #emplist-table th and #hostlist-table th already get on the two list tabs. */
+#users-table thead th,
+#roles-matrix .rm-head th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-soft);
+}
+/* the group rows ("Tabs & menus", "Overview sections") pass underneath */
+#roles-matrix .rm-group td { z-index: 1; }
 
 #users-toolbar {
   display: flex;
@@ -2759,7 +2812,8 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .btn-inert { opacity: .55; cursor: default; }
 
 @media (max-width: 720px) {
-  #modal-settings, .modal.settings-wide { width: 94vw; }
+  /* on a phone these two panes want the whole screen */
+  #modal-settings, #modal-settings.settings-wide { width: 96vw; max-height: 94vh; }
 }
 
 /* ===== PRINT / PDF =================================================
