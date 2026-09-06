@@ -73,9 +73,22 @@ One setting has to match that:
 11. **Authentication** → **Sign In / Providers** → **Email** → turn **Confirm
     email** OFF, and Save.
 
-This one is load-bearing. Left on, "Request access" queues a confirmation email
-that can never arrive, and the account can never sign in. Off, the request
-completes immediately and waits for an admin to approve it in Settings → Users.
+⚠ **There are two switches in that panel and only one of them is this one.**
+
+| Setting | Should be | What it does |
+|---|---|---|
+| **Enable Email provider** | **ON** — do not touch | Whether email + password sign-in works at all |
+| **Confirm email** | **OFF** — this is the one | Whether a new sign-up must click a link before they can sign in |
+
+Turning off the provider instead of the option takes sign-in down for
+**everyone, immediately**, with the error **"Email logins are disabled"** on the
+sign-in screen. The fix is to switch it back on; nothing is lost, and no accounts
+are affected.
+
+Confirm email itself is load-bearing the other way. Left on, "Request access"
+queues a confirmation email that can never arrive, and the account can never sign
+in. Off, the request completes immediately and waits for an admin to approve it in
+Settings → Users.
 
 Leave **custom SMTP** disabled — there is nothing to send.
 

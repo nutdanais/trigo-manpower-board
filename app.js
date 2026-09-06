@@ -5378,17 +5378,27 @@ function resetUserPassword() {
     () => safely(async () => {
       const res = await cloud.setUserPassword(id);
       renderUserRows();
-      showTempPassword(u.email, res.password, "New password issued.");
+      // res.warning is set when the password changed but the "must choose their
+      // own" flag did not — the password is still the thing to hand over, so
+      // this shows rather than throws.
+      showTempPassword(u.email, res.password, "New password issued.", res.warning);
     }));
 }
 
 /* The one moment this password is visible. It is generated in the Edge Function
    and never stored anywhere the app can read back, so if the admin closes this
    without passing it on, the only way forward is to issue another one. */
-function showTempPassword(email, password, headline) {
+function showTempPassword(email, password, headline, warning) {
   $("#temp-password-title").textContent = headline;
   $("#temp-password-for").textContent = `For ${email}.`;
   $("#temp-password-value").textContent = password;
+  // Only ever set on a partial success, and never by "+ Add user" — that one
+  // rolls itself back rather than half-finishing. When it is set, the standing
+  // promise below it ("they'll be asked to choose their own") is exactly what
+  // failed, so that sentence goes with it.
+  $("#temp-password-warn").textContent = warning || "";
+  $("#temp-password-warn").classList.toggle("hidden", !warning);
+  $("#temp-password-forced").classList.toggle("hidden", !!warning);
   const copy = $("#btn-copy-temp-password");
   copy.textContent = "Copy";
   copy.onclick = () => {

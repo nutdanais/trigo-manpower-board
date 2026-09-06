@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-05a">
+<link rel="stylesheet" href="styles.css?v=2026-09-05b">
 </head>
 <body>
 
@@ -691,7 +691,10 @@
       <code id="temp-password-value"></code>
       <button type="button" class="btn btn-small" id="btn-copy-temp-password">Copy</button>
     </div>
-    <p class="import-note">Shown once — it is not stored anywhere you can look it up again. Send it to them however you normally talk, and they'll be asked to choose their own password the first time they sign in. If it gets lost, use <b>Reset password</b> to issue another.</p>
+    <p id="temp-password-warn" class="modal-warn hidden"></p>
+    <!-- The middle sentence is the one the warning above contradicts, so it is
+         its own element and gets hidden when there is a warning to show. -->
+    <p class="import-note">Shown once — it is not stored anywhere you can look it up again. Send it to them however you normally talk.<span id="temp-password-forced"> They'll be asked to choose their own password the first time they sign in.</span> If it gets lost, use <b>Reset password</b> to issue another.</p>
     <div class="modal-actions">
       <button type="button" class="btn btn-primary" id="btn-temp-password-done">Done</button>
     </div>
@@ -751,8 +754,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-05a"></script>
-<script src="charts.js?v=2026-09-05a"></script>
-<script src="app.js?v=2026-09-05a"></script>
+<script src="cloud.js?v=2026-09-05b"></script>
+<script src="charts.js?v=2026-09-05b"></script>
+<script src="app.js?v=2026-09-05b"></script>
 </body>
 </html>

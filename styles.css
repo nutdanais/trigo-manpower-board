@@ -1670,6 +1670,25 @@ body.board-view #app-root { margin-right: 264px; }
   border-radius: 8px;
   background: var(--bg-soft);
 }
+/* Amber rather than red: the thing the admin came for still worked, something
+   secondary did not. .import-note next to it is too quiet for that, and
+   .login-error too alarming. */
+.modal-warn {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+:root[data-theme="dark"] .modal-warn {
+  background: rgba(217,119,6,.12);
+  border-color: #8a6127;
+  color: #f0c674;
+}
+
 .temp-password code {
   flex: 1 1 auto;
   min-width: 0;

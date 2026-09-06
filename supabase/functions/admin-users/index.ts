@@ -14,6 +14,13 @@
 // Everything else the Users pane does — approve, reject, change role, disable —
 // is a plain table write under RLS and needs nothing from this file.
 //
+// Each of create and set-password is two writes that can fail independently —
+// auth.users, then profiles — and they resolve that in opposite directions.
+// create fails closed: without the profile row the account cannot sign in, so a
+// failure rolls the whole thing back. set-password fails open: the password has
+// already changed by then and the old one is gone, so it returns the new one
+// with a warning rather than stranding someone. See both sites below.
+//
 // Deploy it from the Supabase dashboard (Edge Functions → Deploy a new
 // function → paste this file) or with `supabase functions deploy admin-users`.
 // The CLI is not required.
@@ -127,7 +134,7 @@ Deno.serve(async (req: Request) => {
 
       // The account arrives already approved at the role the admin picked —
       // making them wait for an approval the same admin would give is silly.
-      await admin.from("profiles").update({
+      const { error: profileErr } = await admin.from("profiles").update({
         full_name: fullName || null,
         role_key: roleKey,
         status: "active",
@@ -136,6 +143,21 @@ Deno.serve(async (req: Request) => {
         must_change_password: true,
         updated_at: new Date().toISOString(),
       }).eq("id", data.user.id);
+
+      // Without this row the account is still 'pending' — the password we just
+      // generated would not sign anyone in. Handing it over anyway is worse than
+      // failing, so undo the whole thing: deleting the auth user cascades the
+      // profile row away and leaves the system as it was.
+      if (profileErr) {
+        const { error: undoErr } = await admin.auth.admin.deleteUser(data.user.id);
+        return json({
+          error: undoErr
+            // Both halves failed, so the orphan this branch exists to prevent is
+            // real. Say where it is rather than leaving it to be discovered.
+            ? `Could not set up the account (${profileErr.message}), and could not remove the half-made sign-in for ${email} either (${undoErr.message}). Delete it under Authentication → Users.`
+            : `Could not set up the account: ${profileErr.message}`,
+        }, 400);
+      }
 
       return json({ ok: true, id: data.user.id, password });
     }
@@ -150,12 +172,21 @@ Deno.serve(async (req: Request) => {
       const password = tempPassword();
       const { error } = await admin.auth.admin.updateUserById(id, { password });
       if (error) return json({ error: error.message }, 400);
-      await admin.from("profiles").update({
+
+      // The opposite call to the one in `create`. By this point the password has
+      // already changed and there is no way back — the old one is gone. Refusing
+      // to return the new one would lock the person out with nobody able to tell
+      // them what it is, so report the flag failure as a warning alongside it.
+      const { error: flagErr } = await admin.from("profiles").update({
         must_change_password: true,
         updated_at: new Date().toISOString(),
       }).eq("id", id);
 
-      return json({ ok: true, password });
+      const out: { ok: true; password: string; warning?: string } = { ok: true, password };
+      if (flagErr) {
+        out.warning = `The password is changed, but they won't be asked to choose their own: ${flagErr.message}`;
+      }
+      return json(out);
     }
 
     if (action === "delete") {
