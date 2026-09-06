@@ -111,15 +111,20 @@ const cloud = {
     });
     if (error) throw error;
   },
-  async resetPassword(email) {
-    const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: window.location.origin,
-    });
-    if (error) throw error;
-  },
+  /* There is no "forgot password" here — that needs email, and this deployment
+     has none. An admin reissues a password instead (setUserPassword below).
+     Changing your own password, though, only needs the session you are already
+     signed in with, so it keeps working. */
   async updatePassword(password) {
     const { error } = await sb.auth.updateUser({ password });
     if (error) throw error;
+    // If this was an admin-issued password being replaced, the person has now
+    // done what the flag was asking for. Best-effort: the password is changed
+    // either way, and the flag would only cost them one extra prompt.
+    try {
+      await sb.rpc("clear_must_change_password");
+      if (this.data.me) this.data.me.mustChangePassword = false;
+    } catch (e) { /* pre-migration, or offline */ }
   },
   /* Display name only — the RPC takes no role or status argument, so this
      cannot be turned into a way to promote yourself. */
@@ -173,6 +178,7 @@ const cloud = {
       id: r.id, email: r.email, fullName: r.full_name, roleKey: r.role_key, status: r.status,
       requestedAt: r.requested_at, approvedAt: r.approved_at, approvedBy: r.approved_by,
       lastSeenAt: r.last_seen_at, createdAt: r.created_at,
+      mustChangePassword: !!r.must_change_password,
     };
   },
 
@@ -213,10 +219,11 @@ const cloud = {
     await this._loadIdentity();
   },
 
-  /* Invite and delete are the only two operations that need the service_role
-     key, so they live in the admin-users Edge Function. Everything else on this
-     page is a plain table write under RLS — which is why the Users pane keeps
-     working (minus the notification email) before the function is deployed. */
+  /* Creating an account, reissuing its password and destroying it all happen in
+     auth.users, which the browser can never touch, so all three go through the
+     admin-users Edge Function and its service_role key. Everything else on this
+     page — approve, reject, change role, disable — is a plain table write under
+     RLS, which is why the Users pane still half-works before it is deployed. */
   async _invokeAdmin(action, payload) {
     const { data, error } = await sb.functions.invoke("admin-users", { body: { action, ...payload } });
     if (error) {
@@ -228,18 +235,21 @@ const cloud = {
     return data;
   },
 
-  async inviteUser(email, roleKey) {
-    const res = await this._invokeAdmin("invite", { email: email.trim().toLowerCase(), roleKey });
+  /* Both of these come back with a password the caller must show once and then
+     forget: it is never stored anywhere the app can read it again. */
+  async createUser(email, fullName, roleKey) {
+    const res = await this._invokeAdmin("create", { email: email.trim().toLowerCase(), fullName, roleKey });
+    await this.loadUsers();
+    return res;
+  },
+  async setUserPassword(id) {
+    const res = await this._invokeAdmin("set-password", { id });
     await this.loadUsers();
     return res;
   },
   async deleteUser(id) {
     await this._invokeAdmin("delete", { id });
     await this.loadUsers();
-  },
-  /* Fire-and-forget: an approval must not fail because the mail hop did. */
-  async notifyUser(id, kind) {
-    try { await this._invokeAdmin("notify", { id, kind }); return true; } catch (e) { return false; }
   },
 
   /* ---------- initial load ---------- */
