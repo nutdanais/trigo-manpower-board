@@ -13,6 +13,11 @@ create table if not exists boards (
   created_at timestamptz not null default now()
 );
 
+-- One row per engineer a mission can be assigned to. Since 2026-09-06 these
+-- belong to sign-in accounts (profile_id, added further down once profiles
+-- exists) and the name and phone come from there; the columns here stay as the
+-- fallback for an engineer record made before accounts existed, or for one
+-- nobody has linked to an account yet.
 create table if not exists engineers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -213,6 +218,13 @@ create table if not exists profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
   email        text not null unique,
   full_name    text,
+  -- the short name the board shows: "Somchai.P". Filled in and kept in step
+  -- with full_name by fill_display_name() below, but editable — clear it and
+  -- the automatic name comes back.
+  display_name text,
+  -- the number a mission card dials for this person. Theirs to keep up to date
+  -- under Settings → My account, which is why it is here and not on engineers.
+  phone        text,
   role_key     text not null default 'viewer' references roles(key) on delete restrict,
   status       text not null default 'pending' check (status in ('pending','active','disabled')),
   requested_at timestamptz not null default now(),
@@ -231,8 +243,20 @@ create table if not exists profiles (
 );
 -- for a database created before 2026-09-05
 alter table profiles add column if not exists must_change_password boolean not null default false;
+-- for a database created before 2026-09-06
+alter table profiles add column if not exists display_name text;
+alter table profiles add column if not exists phone text;
 create index if not exists profiles_status_idx on profiles(status);
 alter table profiles add column if not exists last_seen_at timestamptz;
+
+-- The link between an engineer record — the colour on every mission card, the
+-- name the Overview counts by — and the account of the person it belongs to.
+-- Once linked, the name and phone shown for that engineer come from the
+-- account. Declared here rather than on the create table near the top of
+-- this file, because profiles does not exist that early. The unique index is
+-- partial so the engineers who have no account yet are not fighting over null.
+alter table engineers add column if not exists profile_id uuid references profiles(id) on delete set null;
+create unique index if not exists engineers_profile_id_key on engineers(profile_id) where profile_id is not null;
 
 -- ===== Who may request access =====
 -- Empty table = no restriction, which is what keeps this from bricking a
@@ -305,14 +329,23 @@ returns boolean language sql stable security definer set search_path = public, p
   ), false);
 $fn$;
 
-/* Self-service, and deliberately narrow: a person may set their own display
-   name and nothing else. Role and status are not parameters, so this cannot be
-   turned into a way to promote yourself. */
-create or replace function public.update_my_profile(p_full_name text)
+/* Self-service, and deliberately narrow: a person may set their own name and
+   nothing else. Role and status are not parameters, so this cannot be turned
+   into a way to promote yourself. A blank display name is not an error — it
+   hands the field back to fill_display_name() below, which is how somebody
+   resets to the automatic "Somchai.P". */
+drop function if exists public.update_my_profile(text);
+-- Writes the whole form every time — a null or blank argument clears that
+-- field rather than leaving it as it was, which is what makes "empty the
+-- display name to get the automatic one back" work.
+create or replace function public.update_my_profile(
+  p_full_name text, p_display_name text default null, p_phone text default null)
 returns void language sql security definer set search_path = public, pg_temp as $fn$
   update profiles
-     set full_name = nullif(btrim(coalesce(p_full_name, '')), ''),
-         updated_at = now()
+     set full_name    = nullif(btrim(coalesce(p_full_name, '')), ''),
+         display_name = nullif(btrim(coalesce(p_display_name, '')), ''),
+         phone        = nullif(btrim(coalesce(p_phone, '')), ''),
+         updated_at   = now()
    where id = auth.uid();
 $fn$;
 
@@ -337,9 +370,177 @@ $fn$;
 grant execute on function public.is_active()               to authenticated;
 grant execute on function public.my_role()                 to authenticated;
 grant execute on function public.can(text, text)           to authenticated;
-grant execute on function public.update_my_profile(text)   to authenticated;
+grant execute on function public.update_my_profile(text, text, text) to authenticated;
 grant execute on function public.touch_last_seen()         to authenticated;
 grant execute on function public.clear_must_change_password() to authenticated;
+
+-- ===== Display names, and engineers linked to accounts =====
+
+/* "Somchai Prasert" -> "Somchai.P". The rules, in order:
+     * a full name of two or more words -> first word + "." + initial of the last
+     * a one-word full name -> that word, unchanged (many Thai accounts have one)
+     * no full name at all -> the same treatment applied to the email's local
+       part, where "somchai.prasert@…" is already first.last. Capitalised on
+       the way through, because an address is written in lower case and a name
+       is not — a full name the person typed is left exactly as they typed it,
+       so "McDonald" does not come back as "Mcdonald".
+   left() counts characters rather than bytes, so a Thai initial survives. */
+create or replace function public.derive_display_name(p_full_name text, p_email text default null)
+returns text language plpgsql immutable set search_path = public, pg_temp as $fn$
+declare
+  src        text;
+  from_email boolean := false;
+  parts      text[];
+  n          int;
+begin
+  src := regexp_replace(btrim(coalesce(p_full_name, '')), '\s+', ' ', 'g');
+  if src = '' then
+    from_email := true;
+    src := btrim(regexp_replace(
+             translate(split_part(coalesce(p_email, ''), '@', 1), '._-', '   '),
+             '\s+', ' ', 'g'));
+  end if;
+  if src = '' then return null; end if;
+
+  parts := string_to_array(src, ' ');
+  n := array_length(parts, 1);
+  if from_email then
+    parts := array(select initcap(p) from unnest(parts) p);
+  end if;
+  if n = 1 then return parts[1]; end if;
+  return parts[1] || '.' || upper(left(parts[n], 1));
+end;
+$fn$;
+
+/* Keeps display_name automatic without making it read-only.
+     * blank (or blanked) -> derive it. This is how a person resets to the
+       automatic name: clear the box and save.
+     * still holding the automatic value while the full name changes -> follow
+       the full name. Somebody correcting their spelling should not be left
+       with a display name built from the typo.
+     * anything else -> leave it alone. A name typed on purpose is not
+       overwritten, which is the whole point of the column being editable. */
+create or replace function public.fill_display_name()
+returns trigger language plpgsql set search_path = public, pg_temp as $fn$
+begin
+  new.display_name := nullif(btrim(coalesce(new.display_name, '')), '');
+
+  if tg_op = 'UPDATE'
+     and new.display_name is not distinct from old.display_name
+     and old.display_name is not distinct from public.derive_display_name(old.full_name, old.email)
+     and (new.full_name is distinct from old.full_name or new.email is distinct from old.email) then
+    new.display_name := null;
+  end if;
+
+  if new.display_name is null then
+    new.display_name := public.derive_display_name(new.full_name, new.email);
+  end if;
+  return new;
+end;
+$fn$;
+
+drop trigger if exists fill_display_name on profiles;
+create trigger fill_display_name
+  before insert or update on profiles
+  for each row execute function public.fill_display_name();
+
+/* Who the Engineer box offers, and the only way a browser can read anyone
+   else's profile: name and role, never the email or the status of an account.
+   "From Engineer upwards" is read off roles.rank — the same ladder the Users
+   pane sorts by — so a role added later sits where its rank puts it instead of
+   having to be named here. Viewer (rank 40) falls below the line. */
+create or replace function public.engineer_directory()
+returns table (id uuid, display_name text, full_name text, phone text, role_key text, rank int, engineer_id uuid)
+language sql stable security definer set search_path = public, pg_temp as $fn$
+  select p.id,
+         coalesce(nullif(btrim(p.display_name), ''), public.derive_display_name(p.full_name, p.email)),
+         p.full_name,
+         p.phone,
+         p.role_key,
+         r.rank,
+         (select e.id from engineers e where e.profile_id = p.id)
+    from profiles p
+    join roles r on r.key = p.role_key
+   where (select public.is_active())
+     and p.status = 'active'
+     and r.rank <= coalesce((select r2.rank from roles r2 where r2.key = 'engineer'), 30)
+   order by 2;
+$fn$;
+
+/* Picking somebody from that list on a mission has to end in an engineers row,
+   because engineer_id is what a mission stores and what the colour, the
+   filters and the Overview all read. Rather than make every planner visit
+   Settings first, the first mission for a new engineer creates their record
+   here: named after their display name, with the first unused colour from the
+   board's own palette so two engineers do not arrive the same grey.
+
+   security definer, because it is called from two places with different
+   permissions — the mission form (Board-edit) and Settings → Engineer
+   (Settings-edit) — so both are accepted explicitly, and the account has to be
+   one the directory above would have offered either way. */
+create or replace function public.ensure_engineer_for_profile(p_profile_id uuid)
+returns uuid language plpgsql security definer set search_path = public, pg_temp as $fn$
+declare
+  v_id    uuid;
+  v_name  text;
+  v_color text;
+  palette text[] := array['#a8d98a','#7fb8ec','#e57fb1','#f6a06b','#f7dd6c',
+                          '#f28ba0','#8fd4c8','#b8a6e8','#e8c39e','#9ec5a8'];
+begin
+  if not ((select public.can('board', 'edit')) or (select public.can('settings', 'edit'))) then
+    raise exception 'Your role cannot add engineers.' using errcode = 'insufficient_privilege';
+  end if;
+
+  select e.id into v_id from engineers e where e.profile_id = p_profile_id;
+  if v_id is not null then return v_id; end if;
+
+  select coalesce(nullif(btrim(p.display_name), ''), public.derive_display_name(p.full_name, p.email))
+    into v_name
+    from profiles p
+    join roles r on r.key = p.role_key
+   where p.id = p_profile_id
+     and p.status = 'active'
+     and r.rank <= coalesce((select r2.rank from roles r2 where r2.key = 'engineer'), 30);
+  if v_name is null then
+    raise exception 'That account is not an active engineer.' using errcode = 'check_violation';
+  end if;
+
+  select c into v_color from unnest(palette) c
+   where not exists (select 1 from engineers e where lower(e.color) = lower(c))
+   limit 1;
+
+  insert into engineers (name, phone, color, profile_id)
+  values (v_name, '', coalesce(v_color, '#9ca3af'), p_profile_id)
+  returning id into v_id;
+  return v_id;
+end;
+$fn$;
+
+/* A linked engineer record follows the account's display name, on the same
+   "only while it was still the automatic answer" rule as display_name itself —
+   so renaming an engineer by hand in Settings sticks, and a person changing
+   their own display name does not leave the board showing the old one. */
+create or replace function public.sync_engineer_name()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $fn$
+begin
+  if new.display_name is distinct from old.display_name then
+    update engineers
+       set name = new.display_name
+     where profile_id = new.id
+       and name = old.display_name;
+  end if;
+  return new;
+end;
+$fn$;
+
+drop trigger if exists sync_engineer_name on profiles;
+create trigger sync_engineer_name
+  after update of display_name on profiles
+  for each row execute function public.sync_engineer_name();
+
+grant execute on function public.derive_display_name(text, text)      to authenticated;
+grant execute on function public.engineer_directory()                 to authenticated;
+grant execute on function public.ensure_engineer_for_profile(uuid)    to authenticated;
 
 -- ===== auth.users triggers =====
 

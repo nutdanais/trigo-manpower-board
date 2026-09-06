@@ -70,6 +70,12 @@ const cloud = {
              actually asks for the people list (the Users pane), so a Viewer
              never fetches rows RLS would refuse anyway. */
           me: null, roles: [], perms: {}, users: null,
+          /* everyone from Engineer upwards, by display name — what the Engineer
+             box on a mission searches. Read through the engineer_directory()
+             function rather than the profiles table: RLS shows a browser only
+             its own profile row, and this deliberately carries no email or
+             account status with it. Empty before migration-2026-09-06. */
+          directory: [],
           activeBoardId: null },
   _listeners: [],
   _currentDate: () => todayStrISO(),
@@ -126,12 +132,27 @@ const cloud = {
       if (this.data.me) this.data.me.mustChangePassword = false;
     } catch (e) { /* pre-migration, or offline */ }
   },
-  /* Display name only — the RPC takes no role or status argument, so this
-     cannot be turned into a way to promote yourself. */
-  async updateMyProfile(fullName) {
-    const { error } = await sb.rpc("update_my_profile", { p_full_name: fullName });
+  /* Names only — the RPC takes no role or status argument, so this cannot be
+     turned into a way to promote yourself. A blank display name is not an
+     error: the database fills it back in from the full name, which is how
+     somebody resets to the automatic "Somchai.P". Because of that the caller
+     cannot know the new value, so the profile is re-read rather than patched
+     in place. */
+  async updateMyProfile(fullName, displayName, phone) {
+    let { error } = await sb.rpc("update_my_profile", {
+      p_full_name: fullName,
+      p_display_name: displayName == null ? null : displayName,
+      p_phone: phone == null ? null : phone,
+    });
+    // before migration-2026-09-06 the function only took a name. Saving one is
+    // still the useful half of this form, so fall back to it rather than
+    // failing the whole save on a database that hasn't been updated yet.
+    if (error && this._tableMissing(error)) {
+      ({ error } = await sb.rpc("update_my_profile", { p_full_name: fullName }));
+    }
     if (error) throw error;
-    if (this.data.me) this.data.me.fullName = (fullName || "").trim() || null;
+    await this._loadIdentity();
+    await this._loadDirectory();
   },
 
   /* ---------- identity: who am I, and what may I do ---------- */
@@ -153,7 +174,7 @@ const cloud = {
     ]);
     const errs = [prof.error, roles.error, perms.error].filter(Boolean);
     if (errs.some((e) => this._tableMissing(e))) {
-      this.data.me = { id: user.id, email: user.email, fullName: null, roleKey: null, status: "active", legacy: true };
+      this.data.me = { id: user.id, email: user.email, fullName: null, displayName: null, roleKey: null, status: "active", legacy: true };
       this.data.roles = [];
       this.data.perms = {};
       return;
@@ -170,12 +191,13 @@ const cloud = {
     // can say something true rather than showing an empty board.
     this.data.me = prof.data
       ? this._toProfile(prof.data)
-      : { id: user.id, email: user.email, fullName: null, roleKey: null, status: "missing" };
+      : { id: user.id, email: user.email, fullName: null, displayName: null, roleKey: null, status: "missing" };
   },
 
   _toProfile(r) {
     return {
-      id: r.id, email: r.email, fullName: r.full_name, roleKey: r.role_key, status: r.status,
+      id: r.id, email: r.email, fullName: r.full_name, displayName: r.display_name || null,
+      phone: r.phone || "", roleKey: r.role_key, status: r.status,
       requestedAt: r.requested_at, approvedAt: r.approved_at, approvedBy: r.approved_by,
       lastSeenAt: r.last_seen_at, createdAt: r.created_at,
       mustChangePassword: !!r.must_change_password,
@@ -199,6 +221,9 @@ const cloud = {
   async saveUser(id, vals) {
     const patch = { updated_at: new Date().toISOString() };
     if (vals.fullName !== undefined) patch.full_name = (vals.fullName || "").trim() || null;
+    // null, not skipped: blanking the box is how an admin hands the name back
+    // to the database's own "Somchai.P" rule
+    if (vals.displayName !== undefined) patch.display_name = (vals.displayName || "").trim() || null;
     if (vals.roleKey !== undefined) patch.role_key = vals.roleKey;
     if (vals.status !== undefined) {
       patch.status = vals.status;
@@ -207,9 +232,17 @@ const cloud = {
         patch.approved_by = await this._currentEmail();
       }
     }
-    const { error } = await sb.from("profiles").update(patch).eq("id", id);
+    let { error } = await sb.from("profiles").update(patch).eq("id", id);
+    // same fallback as updateMyProfile: no display_name column yet means the
+    // rest of the row (role, status, name) should still save
+    if (error && this._tableMissing(error) && patch.display_name !== undefined) {
+      delete patch.display_name;
+      ({ error } = await sb.from("profiles").update(patch).eq("id", id));
+    }
     if (error) throw error;
     await this.loadUsers();
+    // a role change or a renamed person changes who the Engineer box offers
+    await this._loadDirectory();
   },
 
   async setRolePermission(roleKey, area, level) {
@@ -237,9 +270,10 @@ const cloud = {
 
   /* Both of these come back with a password the caller must show once and then
      forget: it is never stored anywhere the app can read it again. */
-  async createUser(email, fullName, roleKey) {
-    const res = await this._invokeAdmin("create", { email: email.trim().toLowerCase(), fullName, roleKey });
+  async createUser(email, fullName, displayName, roleKey) {
+    const res = await this._invokeAdmin("create", { email: email.trim().toLowerCase(), fullName, displayName, roleKey });
     await this.loadUsers();
+    await this._loadDirectory();
     return res;
   },
   async setUserPassword(id) {
@@ -250,6 +284,7 @@ const cloud = {
   async deleteUser(id) {
     await this._invokeAdmin("delete", { id });
     await this.loadUsers();
+    await this._loadDirectory();
   },
 
   /* ---------- initial load ---------- */
@@ -258,7 +293,7 @@ const cloud = {
     // identity first: everything below is read under RLS, and app.js needs to
     // know the caller's role before it decides what to render
     await this._loadIdentity();
-    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts()]);
+    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts(), this._loadDirectory()]);
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
   },
@@ -271,7 +306,65 @@ const cloud = {
   async _loadEngineers() {
     const { data, error } = await sb.from("engineers").select("*").order("name");
     if (error) throw error;
-    this.data.engineers = data.map((e) => ({ id: e.id, name: e.name, phone: e.phone, color: e.color }));
+    this.data.engineers = data.map((e) => ({
+      id: e.id, color: e.color, profileId: e.profile_id || null,
+      // what the record itself says. For a linked engineer these are the
+      // fallback only — _mergeEngineerAccounts below puts the account's own
+      // name and phone on `name`/`phone`, so every reader keeps working
+      // without knowing accounts exist.
+      ownName: e.name, ownPhone: e.phone || "",
+      name: e.name, phone: e.phone || "",
+    }));
+    this._mergeEngineerAccounts();
+  },
+
+  /* Everyone the Engineer box may offer: active accounts from Engineer upwards,
+     by display name. Read through the engineer_directory() function because RLS
+     shows a browser only its own profiles row — and the function deliberately
+     returns no email or account status, just what a name picker needs.
+     Tolerates the function not existing yet (before migration-2026-09-06), in
+     which case the app falls back to the engineers table alone. */
+  async _loadDirectory() {
+    try {
+      const { data, error } = await sb.rpc("engineer_directory");
+      if (error) throw error;
+      this.data.directory = (data || []).map((d) => ({
+        id: d.id, displayName: d.display_name || "", fullName: d.full_name || "",
+        phone: d.phone || "", roleKey: d.role_key, rank: d.rank,
+        engineerId: d.engineer_id || null,
+      }));
+    } catch (e) {
+      if (!this._tableMissing(e)) {
+        console.warn("engineer_directory unavailable (run migration-2026-09-06-display-names.sql):", e.message || e);
+      }
+      this.data.directory = [];
+    }
+    this._mergeEngineerAccounts();
+  },
+
+  /* A linked engineer answers with their account's display name and phone —
+     the mission card, the Overview and the print sheet all read `name`/`phone`
+     and none of them need to know where it came from. An engineer with no
+     account (or a directory that hasn't loaded) keeps the record's own values. */
+  _mergeEngineerAccounts() {
+    const byProfile = new Map((this.data.directory || []).map((d) => [d.id, d]));
+    for (const e of this.data.engineers) {
+      const acct = e.profileId ? byProfile.get(e.profileId) : null;
+      e.account = acct || null;
+      e.name = (acct && acct.displayName) || e.ownName;
+      e.phone = (acct && acct.phone) || e.ownPhone;
+    }
+  },
+
+  /* The engineers table stores a person's mission colour, so somebody picked on
+     a mission (or added in Settings → Engineer) who has no record yet gets one
+     here. The RPC does the permission check and picks an unused colour. */
+  async ensureEngineerForProfile(profileId) {
+    const { data, error } = await sb.rpc("ensure_engineer_for_profile", { p_profile_id: profileId });
+    if (error) throw error;
+    await this._loadEngineers();
+    await this._loadDirectory();
+    return data;
   },
   async _loadBoards() {
     const { data, error } = await sb.from("boards").select("*").order("created_at");
@@ -890,16 +983,21 @@ const cloud = {
     const { error } = await sb.from("engineers").update({ [field]: value }).eq("id", id);
     if (error) throw error;
     await this._loadEngineers();
+    await this._loadDirectory();
   },
-  async addEngineer() {
-    const { error } = await sb.from("engineers").insert({ name: "New Engineer", phone: "", color: "#9ca3af" });
-    if (error) throw error;
-    await this._loadEngineers();
+  /* Adding an engineer means naming an account: everyone with the Engineer role
+     is on the list already, and this is for the manager or admin who also runs
+     missions of their own. ensureEngineerForProfile is idempotent, so adding
+     somebody who is already there is a no-op rather than a duplicate. */
+  async addEngineer(profileId) {
+    if (!profileId) throw new Error("Pick the person to add.");
+    return this.ensureEngineerForProfile(profileId);
   },
   async deleteEngineer(id) {
     const { error } = await sb.from("engineers").delete().eq("id", id);
     if (error) throw error;
     await this._loadEngineers();
+    await this._loadDirectory();
   },
 
   async saveAreaField(id, field, value) {
@@ -1435,6 +1533,9 @@ const cloud = {
       // something has already asked for it (the Users pane is open).
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, async () => {
         await this._loadIdentity();
+        // a renamed person, a new engineer or a role change all move the
+        // Engineer box's list — and a linked engineer's name and phone with it
+        await this._loadDirectory();
         if (this.data.users) await this.loadUsers();
         this.notify();
       })

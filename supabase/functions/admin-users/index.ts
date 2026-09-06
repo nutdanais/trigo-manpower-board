@@ -112,6 +112,9 @@ Deno.serve(async (req: Request) => {
     if (action === "create") {
       const email = String(body.email ?? "").trim().toLowerCase();
       const fullName = String(body.fullName ?? "").trim();
+      // Optional: left blank, the database fills in "Somchai.P" from the full
+      // name (fill_display_name), which is what the Add-user form expects.
+      const displayName = String(body.displayName ?? "").trim();
       const roleKey = String(body.roleKey ?? "viewer");
       if (!email.includes("@")) return json({ error: "That doesn't look like an email address." }, 400);
       // The domain rule is a trigger on auth.users, so this check is not what
@@ -136,6 +139,7 @@ Deno.serve(async (req: Request) => {
       // making them wait for an approval the same admin would give is silly.
       const { error: profileErr } = await admin.from("profiles").update({
         full_name: fullName || null,
+        display_name: displayName || null,
         role_key: roleKey,
         status: "active",
         approved_at: new Date().toISOString(),

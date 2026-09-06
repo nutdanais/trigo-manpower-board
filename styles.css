@@ -2804,6 +2804,13 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .settings-table .st-swatch { width: 74px; }
 .settings-table .st-act { width: 52px; text-align: right; }
 .settings-table .st-board { width: 200px; font-weight: 600; }
+/* Engineer pane: name and phone are the account's, shown rather than edited,
+   so they read as text in a table of inputs instead of as disabled boxes. */
+.settings-table .st-name { font-weight: 600; }
+.settings-table .st-phone { color: var(--muted); white-space: nowrap; }
+.settings-table .st-account { white-space: nowrap; }
+.settings-table .st-account select { width: 100%; margin-top: 0; }
+.st-hint { font-size: 11px; color: var(--muted); font-style: italic; }
 .settings-table td input[type="color"] {
   width: 38px;
   height: 30px;
@@ -2927,6 +2934,16 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 1px 6px;
+}
+/* The short name the board shows, next to the full name it was made from. */
+.user-display-name {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
 }
 .user-actions { white-space: nowrap; text-align: right; }
 .user-actions .btn { margin-left: 4px; }
