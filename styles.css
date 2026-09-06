@@ -11,6 +11,11 @@
   --primary-text: #004983;   /* navy used AS TEXT/BORDER on a page surface — this one lightens in dark mode for contrast */
   --brand-green: #a8c855;    /* TRIGO green, PMS 367C */
   --danger: #dc2626;
+  --danger-line: #e6c2be;    /* outlined destructive edge — the fill was too loud for the action */
+  --danger-tint: #fef2f2;
+  --warn: #f59e0b;
+  --warn-text: #8a4f10;
+  --warn-tint: rgba(245,158,11,.12);
 
   --bg-soft: #eef1f5;        /* subtle fills: inactive tabs, stat chips, zone labels */
   --hover-tint: #eef3fb;     /* hover highlight for menu/dropdown rows */
@@ -77,6 +82,33 @@
   --font-ui: "Noto Sans", "Noto Sans Thai", Arial, sans-serif;
   --font-condensed: "Noto Sans", "Noto Sans Thai", Arial, sans-serif;
 
+  /* ==== Control system ====
+     One height, one hairline, one radius scale, one shadow. Before this, the
+     app drew buttons at 26-39px across four radii (6/8/10/20px) with six
+     different fills, so no two rows of controls lined up and nothing said
+     which action was the main one. Everything that is a control now takes its
+     size from here.
+
+     The two exceptions are deliberate: .mission-card and .emp-card keep their
+     own geometry and colour, because those encode data (engineer colour,
+     contract type, service area) rather than chrome. */
+  --ctl-h: 32px;        /* every control on a page surface */
+  --ctl-h-top: 34px;    /* controls on the navy top bar — the reference height */
+  --ctl-h-sm: 26px;     /* .btn-small: inside tables and dense toolbars */
+  --r-sm: 4px;          /* inner marks: colour swatches, chips */
+  --r: 7px;             /* controls, inputs, boxes */
+  --r-box: 8px;         /* panels and zones */
+  --r-top: 10px;        /* top-bar controls */
+  /* The ONE shadow. It means "this floats above the page" — modals, popovers,
+     the context menu — and nothing else may use it. A resting surface gets a
+     border instead; spending both on the same element is what flattened the
+     hierarchy before. */
+  --shadow: 0 12px 32px rgba(16, 32, 52, .16);
+  /* control edges on the navy top bar */
+  --on-navy-line: rgba(255, 255, 255, .42);
+  --on-navy-line-strong: rgba(255, 255, 255, .62);
+  --on-navy-fill: rgba(255, 255, 255, .14);
+
   /* ---- Glassmorphism: frosted translucent surfaces over the body gradient.
      Kept as tokens so body.exporting can swap them for opaque equivalents —
      html2canvas cannot render backdrop-filter, and the JPG must stay crisp. ---- */
@@ -97,6 +129,10 @@
   --text: #e8ebed;
   --muted: #9aa1a8;
   --primary-text: #6fb1e0;
+  --danger-line: #7f2222;
+  --danger-tint: rgba(185,28,28,.16);
+  --warn-text: #e0b070;
+  --warn-tint: rgba(245,158,11,.16);
   --bg-soft: #232a33;
   --hover-tint: #232c38;
   --track-off: #3a424b;
@@ -129,6 +165,8 @@
   --chart-cat-6: #008300;
   --chart-cat-7: #9085e9;
   --chart-cat-8: #e66767;
+
+  --shadow: 0 14px 36px rgba(0, 0, 0, .52);
 
   /* darker, lower-key glass so text stays legible on the dark ground */
   --glass: rgba(28, 34, 42, 0.52);
@@ -233,32 +271,51 @@ button, input, select, textarea, optgroup {
   background: var(--brand-green);
 }
 
-/* date button + ghost buttons living on the navy header need a light variant */
-#topbar .btn-date,
-#topbar .btn-date-arrow {
-  border: 1.5px solid rgba(255,255,255,.5);
-  background: rgba(255,255,255,.1);
-  color: #fff;
-}
-#topbar .btn-date:hover,
-#topbar .btn-date-arrow:hover { background: rgba(255,255,255,.18); }
-/* ghost buttons on the navy header: transparent fill is essential — the base
-   .btn sets background:var(--panel), which is WHITE in light mode and would
-   render this white label invisible. */
-.topbar-right .btn-ghost {
+/* ===== Top-bar controls =====
+   Every control on the navy bar is the same 34px hairline outline with no
+   fill; a fill is reserved for the ONE state that is on (a locked board).
+   Transparent background is load-bearing: the base .btn sets
+   background:var(--panel), which is white in light mode and would swallow
+   these white labels. */
+.btn-top {
+  height: var(--ctl-h-top);
+  padding: 0 13px;
+  border: 1px solid var(--on-navy-line);
+  border-radius: var(--r-top);
   background: transparent;
   color: #fff;
-  border-color: rgba(255,255,255,.45);
-  border-style: solid;
+  font-size: 13.5px;
+  font-weight: 500;
 }
-.topbar-right .btn-ghost:hover { background: rgba(255,255,255,.16); }
+.btn-top:hover { background: var(--on-navy-fill); }
+.btn-top:disabled { opacity: .5; }
+.btn-top:disabled:hover { background: transparent; }
+/* icon-only controls are square, so the row keeps one rhythm */
+.btn-top.btn-icon { width: var(--ctl-h-top); padding: 0; }
+
+/* The date controls read as one instrument rather than three floating buttons:
+   a single outline with hairlines between the cells. */
+.date-nav {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--on-navy-line);
+  border-radius: var(--r-top);
+  overflow: hidden;
+}
+.date-nav .btn-top {
+  border: none;
+  border-left: 1px solid rgba(255,255,255,.26);
+  border-radius: 0;
+}
+.date-nav .btn-top:first-child { border-left: none; }
+.date-nav .btn-top.btn-icon { width: 38px; }
 
 /* board tabs row (below the logo/title header) */
 #board-bar {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px 0;
+  padding: 0 14px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
@@ -267,7 +324,7 @@ button, input, select, textarea, optgroup {
 /* Six boards' worth of tabs is wider than a narrow window, so the strip WRAPS
    onto another line rather than scrolling — no scrollbar to hunt for, and every
    board stays visible at a glance (which is the point of the tab strip). */
-#board-tabs { display: flex; gap: 4px; align-items: stretch; flex-wrap: wrap; min-width: 0; }
+#board-tabs { display: flex; gap: 2px; align-items: stretch; flex-wrap: wrap; min-width: 0; }
 #board-bar > .btn { flex: none; }
 /* the phone board picker; the tabs are the real control at this width */
 #board-select { display: none; }
@@ -279,47 +336,110 @@ button, input, select, textarea, optgroup {
   background: var(--border);
   flex-shrink: 0;
 }
+/* An underline marks the active tab, not a solid fill. Green is the app's
+   "do this" colour (see the design system) — spending it on a label that
+   marks WHERE YOU ARE rather than an action was the loudest mark on the
+   screen doing the least work. The active tab is navy, the same ink as the
+   rest of the chrome, and the weight change carries the rest. */
 .board-tab {
-  padding: 9px 18px;
+  display: inline-flex;
+  align-items: center;
+  /* gap:0 and a margin on the icon instead — "Manpower" and its trimmable
+     " List" are separate elements, and a gap would put a space between the
+     two halves of one word-pair as well as after the icon */
+  gap: 0;
+  padding: 11px 13px;
   border: none;
-  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   background: transparent;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 13.5px;
   color: var(--muted);
-  position: relative;
-  top: 1px;
 }
-.board-tab:hover { color: var(--text); background: var(--bg-soft); }
-.board-tab.active { background: var(--brand-green); color: #fff; font-weight: 700; }
-.board-tab.active:hover { background: var(--brand-green); }
+.board-tab .ic { margin-right: 7px; }
+/* the leading space in " List" is inside its own flex item, where HTML would
+   collapse it away (see renderTabs); pre keeps it */
+.tab-trim { white-space: pre; }
+.board-tab:hover { color: var(--text); }
+.board-tab.active {
+  color: var(--primary-text);
+  font-weight: 700;
+  border-bottom-color: var(--primary-text);
+}
 
+/* ===== Buttons =====
+   Four treatments, not six, and only ONE of them is filled. A view has a single
+   primary action; everything else is outlined or quiet, so the eye can find the
+   main thing without reading the labels. Height/radius come from the control
+   tokens, and every button is inline-flex so an icon and its label share a
+   centre line instead of the icon riding the baseline. */
 .btn {
-  padding: 6px 12px;
+  height: var(--ctl-h);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r);
   background: var(--panel);
   cursor: pointer;
-  font-size: 13px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   color: var(--text);
 }
-.btn:hover { filter: brightness(0.95); }
-.btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-.btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
-.btn-ghost { border-style: dashed; color: var(--muted); }
-.btn-holiday { background: #f59e0b; color: #fff; border-color: #f59e0b; }
-.btn-reset { border-color: #f59e0b; color: #d97706; }
-.btn-reset:hover { background: rgba(245,158,11,.12); filter: none; }
-.btn-small { padding: 2px 8px; font-size: 12px; }
-.btn-date {
-  font-size: 17px;
-  font-weight: 700;
-  padding: 8px 16px;
-  border: 2px solid var(--primary-text);
-  color: var(--primary-text);
-  border-radius: 8px;
+.btn:hover { background: var(--hover-tint); }
+.btn:disabled, .btn.btn-inert { opacity: .45; cursor: default; }
+.btn:disabled:hover, .btn.btn-inert:hover { background: var(--panel); }
+
+/* the one filled action per view */
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  font-weight: 600;
 }
-.date-nav { display: flex; align-items: center; gap: 4px; }
+.btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+/* Destructive and attention-getting actions are outlined, not filled. A row of
+   solid red blocks shouted louder than the actions deserved — the same reason
+   .st-del was quietened earlier. */
+.btn-danger { background: var(--panel); color: var(--danger); border-color: var(--danger-line); }
+.btn-danger:hover { background: var(--danger-tint); }
+
+/* quiet: no border at all, for secondary actions that share a row with a
+   primary one (Undo, Hide/Unhide, + Board) */
+.btn-ghost, .btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
+.btn-ghost:hover, .btn-quiet:hover { background: var(--hover-tint); color: var(--text); }
+
+/* Reset carries its warning on hover, where the warning is actually needed —
+   an always-amber button spends a warning colour on a button nobody is
+   pressing yet. */
+.btn-reset { border-color: transparent; background: transparent; color: var(--muted); }
+.btn-reset:hover { background: var(--warn-tint); color: var(--warn-text); }
+
+.btn-holiday { background: var(--warn); color: #fff; border-color: var(--warn); }
+
+.btn-small { height: var(--ctl-h-sm); padding: 0 10px; font-size: 12.5px; border-radius: 6px; gap: 5px; }
+.btn-small .ic { width: 13px; height: 13px; }
+/* an icon-only button is square, so it keeps the row's rhythm */
+.btn-icon { width: var(--ctl-h); padding: 0; }
+.btn-small.btn-icon { width: var(--ctl-h-sm); }
+
+.btn-date { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .1px; }
+
+/* ===== Icons =====
+   One monochrome stroke set (sprite at the top of index.html), sized here and
+   nowhere else. currentColor is the whole point: an icon dims with its own
+   label when a control is disabled, which the emoji these replaced could not
+   do. */
+.ic { width: 16px; height: 16px; flex: none; display: block; }
+.ic-sm { width: 13px; height: 13px; }
 
 /* save/sync status pill — plain text on the navy topbar, same treatment as
    #app-title's subtitle. Hidden until the first write of the session so it
@@ -342,17 +462,10 @@ button, input, select, textarea, optgroup {
 @media (prefers-reduced-motion: reduce) {
   #save-status.save-saving::before { animation: none; }
 }
-#btn-lock.locked { background: #f59e0b; color: #fff; border-color: #f59e0b; }
-.btn-date-arrow {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 8px 12px;
-  border: 2px solid var(--primary-text);
-  color: var(--primary-text);
-  border-radius: 8px;
-}
-
+/* A locked board is an ON state, so it reads as a filled version of the same
+   control — the reference's treatment — rather than switching to a colour
+   that appears nowhere else on the bar. */
+#btn-lock.locked { background: var(--on-navy-fill); border-color: var(--on-navy-line-strong); color: #fff; }
 /* stats — one row: summary on the left, service-area counters on the right.
    Wraps rather than scrolling at any width — a scrolling stats strip hides
    counters off-screen with no visual hint (the same problem the board tabs
@@ -394,10 +507,20 @@ button, input, select, textarea, optgroup {
   content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   width: 1px; height: 14px; background: var(--border);
 }
-/* Night is a dark pill; no separator hugging it */
-.stat-chip-night { background: var(--night); border-radius: 20px; color: #fff; padding: 3px 12px !important; margin-left: 6px; }
-.stat-chip-night b { color: #fff; }
-#stats-bar .stat-chip-night::before { display: none; }
+/* Night keeps a mark so it still reads at a glance, but a small dark dot
+   rather than a filled black pill — a pill in the middle of a row of plain
+   counters drew the eye to a label, not to anything that needed attention.
+   --night is untouched: the mission card still uses it at full strength. */
+.stat-chip-night::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--night);
+  align-self: center;
+  flex: none;
+}
+:root[data-theme="dark"] .stat-chip-night::after { background: var(--text); }
 #area-bar .stat-chip { gap: 6px; }
 /* Manpower List's per-area counts, on the same toolbar row as "+ New Employee",
    pushed to the right edge by .toolbar-spacer like #area-bar is on a board. */
@@ -424,24 +547,34 @@ button, input, select, textarea, optgroup {
 .toolbar-more-toggle { display: none; }
 #filters { display: flex; gap: 6px; align-items: center; }
 #filters select {
-  padding: 5px 8px;
+  height: var(--ctl-h);
+  padding: 0 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r);
   background: var(--panel);
   color: var(--text);
-  font-size: 13px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
   max-width: 160px;
 }
 
 /* multi-select filter dropdowns */
 .ms { position: relative; }
 .ms-btn {
-  padding: 5px 10px;
+  height: var(--ctl-h);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r);
   background: var(--panel);
   color: var(--text);
-  font-size: 13px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1219,12 +1352,12 @@ body.board-view #app-root { margin-right: 264px; }
      needs. Everything there still clears ~32px. Pill-shaped rather than
      tab-shaped now: with the board tabs gone these no longer sit on the bar's
      bottom rule as the front edge of a strip. */
-  .board-tab { padding: 8px 9px; font-size: 13px; border-radius: 8px; top: 0; }
+  .board-tab { padding: 9px; font-size: 13px; }
   /* " List" — see renderTabs; "Manpower" carries it on a phone */
   .tab-trim { display: none; }
   .btn { min-height: 40px; }
   .btn-small { min-height: 32px; }
-  #topbar .btn-ghost { min-height: 34px; }
+  #topbar .btn-top { min-height: 34px; }
   .ms-btn, #filters select, #sort-by { min-height: 40px; }
   .ms-opt { padding: 9px 8px; }
   #emplist-table td.el-check input, #emplist-table th.el-check input { width: 22px; height: 22px; }
@@ -1358,14 +1491,13 @@ body.board-view #app-root { margin-right: 264px; }
      only flexible item, so it absorbs whatever is left over once the arrows
      and the icon buttons have taken their fixed widths. */
   .topbar-right { flex: 1 0 100%; flex-wrap: nowrap; gap: 4px; min-width: 0; }
-  .date-nav { flex: 1 1 auto; min-width: 0; gap: 3px; }
+  .date-nav { flex: 1 1 auto; min-width: 0; }
   #topbar .btn-date {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 34px;
-    padding: 6px 8px;
+    padding: 0 8px;
     font-size: 13.5px;
-    border-width: 1.5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1374,12 +1506,12 @@ body.board-view #app-root { margin-right: 264px; }
      date without it) and the year (the picker it opens still shows one) */
   #topbar .btn-date .d-ico,
   #topbar .btn-date .d-yr { display: none; }
-  #topbar .btn-date-arrow { flex: 0 0 auto; padding: 6px 9px; font-size: 16px; border-width: 1.5px; }
+  .date-nav .btn-top.btn-icon { flex: 0 0 auto; width: 34px; }
 
   /* Lock / Settings / Sign out drop to icon-only — their labels are what made
      this row overflow onto lines of its own in the first place. */
   .topbar-right .btn-label { display: none; }
-  .topbar-right > .btn:not(.btn-date):not(.btn-date-arrow) { flex: 0 0 auto; padding: 6px 8px; }
+  .topbar-right > .btn-top { flex: 0 0 auto; width: 34px; padding: 0; }
   /* the save pill keeps its state dot (colour + pulse, via ::before) but not
      its wording — "Saved" is not worth the width on a one-line control row */
   #save-status { flex: 0 0 auto; font-size: 0; gap: 0; }
@@ -1400,12 +1532,10 @@ body.board-view #app-root { margin-right: 264px; }
     align-items: stretch;
     gap: 8px;
     padding: 10px;
-    background: var(--glass-strong);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    border-radius: 10px;
-    box-shadow: var(--glass-shadow);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--r-box);
+    box-shadow: var(--shadow);
     z-index: 90;
   }
   #toolbar-more.open { display: flex; }
@@ -1419,9 +1549,9 @@ body.board-view #app-root { margin-right: 264px; }
    line, but only just — the date is the item being squeezed, so it gives up a
    little type size rather than being cut off by its own ellipsis. */
 @media (max-width: 380px) {
-  #topbar .btn-date { font-size: 12px; padding: 6px 6px; }
-  #topbar .btn-date-arrow { padding: 6px 7px; }
-  .topbar-right > .btn:not(.btn-date):not(.btn-date-arrow) { padding: 6px 7px; }
+  #topbar .btn-date { font-size: 12px; padding: 0 6px; }
+  .date-nav .btn-top.btn-icon { width: 30px; }
+  .topbar-right > .btn-top { width: 30px; }
   /* Three fixed tabs (Overview / Manpower / Host) plus the board picker no
      longer fit one line at this width, so the bar wraps: the tabs keep their
      own row and the picker takes a full-width one below, rather than every
@@ -1443,7 +1573,7 @@ body.board-view #app-root { margin-right: 264px; }
 }
 .modal {
   background: var(--panel);
-  border-radius: 10px;
+  border-radius: var(--r-box);
   padding: 20px;
   width: 440px;
   max-width: 94vw;
@@ -1451,7 +1581,23 @@ body.board-view #app-root { margin-right: 264px; }
   overflow-y: auto;
   box-shadow: 0 20px 50px rgba(0,0,0,.3);
 }
-.modal h3 { margin-bottom: 14px; }
+/* Every dialog gets the same anatomy — what you are doing, what you are
+   filling in, what you are about to commit to — out of the markup that is
+   already there: the <h3> becomes the header and .modal-actions the footer,
+   each separated by a hairline, so no dialog needed rewriting to gain it.
+   .modal's own padding moves onto these three bands (see .modal below). */
+.modal h3 {
+  margin: -20px -20px 16px;
+  padding: 15px 20px 13px;
+  border-bottom: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  position: sticky;
+  top: -20px;
+  background: var(--panel);
+  z-index: 3;
+}
 .modal label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
 .modal input, .modal select, .modal textarea {
   display: block;
@@ -1469,8 +1615,23 @@ body.board-view #app-root { margin-right: 264px; }
 }
 .form-row { display: flex; gap: 8px; }
 .form-row label { flex: 1; }
-.modal-actions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
+/* The committing action sits LAST, on the right — the position the platform
+   dialogs put it in, and the one a reader's eye lands on after the form. */
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-direction: row-reverse;
+  margin: 20px -20px -20px;
+  padding: 13px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-soft);
+}
 .modal-actions .btn-primary { min-width: 90px; }
+/* anything that is not a button (a hint, a checkbox) keeps reading order and
+   is pushed away from the action pair */
+.modal-actions > :not(.btn) { margin-right: auto; order: 1; }
 
 /* Account-level actions in the user dialog. Set apart from Cancel/Save above a
    rule, because they act on the account rather than on the form. */
@@ -1599,20 +1760,64 @@ body.board-view #app-root { margin-right: 264px; }
 
 /* weekday picker (new board modal) */
 .field-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-.weekday-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+/* A week is a sequence of seven equal things, so it is ONE control with seven
+   cells — not seven pills. Each pill used to wrap a native checkbox that
+   painted itself in the browser's own blue; at the width this gets inside the
+   Settings table the box and its label stacked and the 20px radius rounded
+   each pill into a circle, which is why a week read as a row of bubbles.
+
+   The checkbox stays in the DOM and stays focusable — it is only moved out of
+   sight, so keyboard and screen-reader users still get a real checkbox. The
+   .on class (set in app.js) rather than :has(:checked) keeps the selected day
+   readable on the older browsers some of the factory PCs run. */
+.weekday-picker {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--panel);
+}
 .weekday-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  font-size: 13px;
+  justify-content: center;
+  min-width: 48px;
+  height: var(--ctl-h);
+  padding: 0 10px;
+  border: none;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 12.5px;
   font-weight: 600;
+  color: var(--muted);
   cursor: pointer;
   margin: 0;
+  user-select: none;
 }
-.weekday-chip input { width: auto; margin: 0; }
+.weekday-chip:first-child { border-left: none; }
+/* .modal label is display:block (it wraps the form fields), which would break
+   these cells out of their row — they are labels too, but they are cells first */
+.modal .weekday-chip { display: inline-flex; margin-bottom: 0; }
+.weekday-chip:hover { background: var(--hover-tint); color: var(--text); }
+.weekday-chip.on { background: var(--primary); color: #fff; }
+.weekday-chip.on:hover { background: var(--primary-dark); color: #fff; }
+/* clipped, not display:none — a display:none checkbox is not focusable */
+.weekday-chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* the cell shows focus on behalf of the input it hides */
+.weekday-chip:focus-within { outline: 2px solid var(--primary-text); outline-offset: -2px; }
 
 /* ===== Login ===== */
 #login-screen {
@@ -2010,9 +2215,8 @@ body.exporting .ov-history-controls { display: none; }
 .ov-history-group {
   display: flex;
   flex-direction: column;
-  border-radius: 10px;
+  border-radius: var(--r-box);
   overflow: hidden;
-  box-shadow: var(--glass-shadow);
 }
 .ov-history-group > .ov-section { border-radius: 0; box-shadow: none; }
 .ov-history-group > .ov-section:first-child { border-bottom: none; }
@@ -2461,24 +2665,38 @@ body.touch-mode .hl-edit { opacity: 1; }
    popover, filter dropdowns, modals, the context menu — gets the glass
    treatment below instead. */
 
-/* lighter frosted panels */
+/* Frosted surfaces are gone everywhere except the mission card. Blur over a
+   moving background cost legibility on the densest screens, produced a
+   different drawing in the exported JPG than on screen (html2canvas cannot
+   render backdrop-filter, hence the token swap at the bottom of this block),
+   and gave every surface the same soft edge, so nothing read as nearer than
+   anything else. Panels are opaque now and separate with a border.
+
+   .mission-card keeps its glass deliberately: its surface is part of the card
+   design, which is out of scope for this refresh. That is also why the
+   body.exporting token swap below has to stay. */
 .zone,
 #board-empty {
-  background: var(--glass);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: var(--panel);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: var(--border);
+  box-shadow: none;
 }
-/* denser surfaces that hold a lot of text get the stronger (more opaque) glass */
-.mission-card,
-#float-pool,
-.ov-section {
+.mission-card {
   background: var(--glass-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border-color: var(--glass-border);
   box-shadow: var(--glass-shadow);
+}
+#float-pool,
+.ov-section {
+  background: var(--panel);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: var(--border);
+  box-shadow: none;
 }
 /* Modals are deliberately NOT frosted. They sit over a busy board and hold the
    densest text in the app — a settings form, a 15-row user list, a 16 x 4
@@ -2488,12 +2706,13 @@ body.touch-mode .hl-edit { opacity: 1; }
   background: var(--panel);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  border: 1px solid var(--border);
-  box-shadow: var(--glass-shadow);
+  border: none;
+  box-shadow: var(--shadow);
 }
-.mission-card, .zone { border-radius: 12px; }
-.zone-label { background: color-mix(in srgb, var(--glass) 55%, var(--panel)); }
-#status-zones { border-bottom-color: var(--glass-border); }
+.mission-card { border-radius: 12px; }
+.zone { border-radius: var(--r-box); }
+.zone-label { background: var(--bg-soft); }
+#status-zones { border-bottom-color: var(--border); }
 
 /* dropdowns / date picker / right-click menu: strong tint + blur so their
    text stays readable over whatever they cover — including the navy top bar,
@@ -2501,10 +2720,12 @@ body.touch-mode .hl-edit { opacity: 1; }
 .ms-pop,
 #datepicker-pop,
 #context-menu {
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border-color: var(--glass-border);
+  background: var(--panel);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: var(--border);
+  border-radius: var(--r-box);
+  box-shadow: var(--shadow);
 }
 
 /* a soft blur behind an open modal lifts it off the board */
@@ -2514,21 +2735,6 @@ body.touch-mode .hl-edit { opacity: 1; }
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: rgba(15,23,42,.55);
-}
-
-/* plain toolbar buttons become frosted chips; the coloured variants below keep
-   their solid fills (re-asserted here because .btn now comes later in source) */
-.btn {
-  background: var(--glass);
-  -webkit-backdrop-filter: saturate(1.4) blur(6px);
-  backdrop-filter: saturate(1.4) blur(6px);
-  border-color: var(--glass-border);
-}
-.btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
-.btn-danger  { background: var(--danger);  border-color: var(--danger);  color: #fff; }
-.btn-holiday { background: #f59e0b; border-color: #f59e0b; color: #fff; }
-.btn-primary, .btn-danger, .btn-holiday {
-  -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 
 /* ---- EXPORT: swap the glass tokens for the theme's opaque surfaces and drop
@@ -2570,12 +2776,10 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  border-radius: var(--r-box);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
   border-left: 4px solid var(--muted);
   font-size: 13px;
   color: var(--text);
@@ -2801,7 +3005,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 /* the fields fill their column instead of being loose flex children */
 .settings-table td input[type="text"],
 .settings-table td input[type="tel"] { width: 100%; margin-top: 0; }
-.settings-table .st-swatch { width: 74px; }
 .settings-table .st-act { width: 52px; text-align: right; }
 .settings-table .st-board { width: 200px; font-weight: 600; }
 /* Engineer pane: name and phone are the account's, shown rather than edited,
@@ -2811,14 +3014,56 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .settings-table .st-account { white-space: nowrap; }
 .settings-table .st-account select { width: 100%; margin-top: 0; }
 .st-hint { font-size: 11px; color: var(--muted); font-style: italic; }
-.settings-table td input[type="color"] {
-  width: 38px;
-  height: 30px;
-  padding: 1px;
-  margin-top: 0;
-  border-radius: 6px;
+/* A bare <input type="color"> is drawn by the browser as a colour chip inside
+   its OWN bordered box, in a fixed grey that ignores the theme — a box, inside
+   a box, inside a table cell. .sw-pick strips that chrome so the swatch itself
+   is the control, and prints the hex beside it so the value is never carried
+   by colour alone (the same rule the Overview tables follow). */
+.sw-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 28px;
+  padding: 0 9px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--panel);
   cursor: pointer;
 }
+.sw-pick:hover { background: var(--hover-tint); }
+.sw-pick:focus-within { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+.sw-pick b {
+  font-weight: 400;
+  font-size: 11.5px;
+  letter-spacing: .02em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.settings-table td input[type="color"] {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-top: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: none;
+  cursor: pointer;
+  /* the vendor pseudo-elements ARE the box-in-a-box; flatten both */
+  -webkit-appearance: none;
+  appearance: none;
+}
+.settings-table td input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.settings-table td input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.16);
+}
+.settings-table td input[type="color"]::-moz-color-swatch {
+  border: none;
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.16);
+}
+.settings-table .st-swatch { width: 116px; }
 /* A row of solid red blocks down the page shouted louder than deleting an
    engineer deserves. Quiet until you reach for it. */
 .st-del {
@@ -2844,14 +3089,11 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   color: #fca5a5;
 }
 /* the weekday chips sit on one line beside the board name */
-.settings-table .settings-board-days { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; }
+.settings-table .settings-board-days { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 0; }
 .settings-table .settings-board-name { margin: 0; font-size: 13px; }
 #modal-settings .modal-actions {
   flex: 0 0 auto;
-  justify-content: flex-end;
-  margin-top: 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+  margin-top: 0;   /* the pane above already fills the dialog */
 }
 /* Inside the modal the PANE is the scroll container, so the table must not open
    a second one — a nested scroller is what stops a sticky header from ever
