@@ -5337,7 +5337,6 @@ function renderAccountPane() {
         `</div>` +
         `<p class="import-note">Your role decides which tabs you see and what you can change. Only an admin can alter it.</p>`);
   const form = $("#form-account-name");
-  form.fullName.value = me.fullName || "";
   form.displayName.value = me.displayName || "";
   form.phone.value = me.phone || "";
   // what the box would fill in by itself if it were left empty
@@ -5345,21 +5344,23 @@ function renderAccountPane() {
 }
 
 /* The same rule the database uses (derive_display_name), for the placeholder
-   that shows what an empty box will be filled in with: first name, a dot, the
-   initial of the last name. It is a hint only — the database is what actually
-   sets the value, so the two can never disagree on what is saved. */
+   that shows what an empty box will be filled in with. The email address comes
+   first — every TRIGO address is first name + "." + last name, which is the one
+   spelling of a person that is always there — and the typed full name is the
+   fallback for an address that isn't in that shape. It is a hint only: the
+   database is what actually sets the value, so the two can never disagree
+   about what is saved. */
 function autoDisplayName(fullName, email) {
-  let src = String(fullName || "").trim().replace(/\s+/g, " ");
-  let fromEmail = false;
-  if (!src) {
-    fromEmail = true;
-    src = String(email || "").split("@")[0].replace(/[._-]+/g, " ").trim().replace(/\s+/g, " ");
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  const mail = String(email || "").split("@")[0].replace(/[._-]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  // a single leading character is an initial, not a first name ("n.somchai@")
+  if (mail.length > 1 && mail[0].length > 1) {
+    return cap(mail[0]) + "." + mail[mail.length - 1].charAt(0).toUpperCase();
   }
-  if (!src) return "";
-  let parts = src.split(" ");
-  if (fromEmail) parts = parts.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-  if (parts.length === 1) return parts[0];
-  return parts[0] + "." + parts[parts.length - 1].charAt(0).toUpperCase();
+  const name = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (name.length > 1) return name[0] + "." + name[name.length - 1].charAt(0).toUpperCase();
+  if (name.length === 1) return name[0];
+  return mail.length === 1 ? cap(mail[0]) : "";
 }
 
 function wireAccountPane() {
@@ -5367,9 +5368,12 @@ function wireAccountPane() {
     ev.preventDefault();
     const form = ev.target;
     safely(async () => {
-      // a blank display name is not an error — the database fills it back in
-      // from the full name, which is how somebody resets to the automatic one
-      await cloud.updateMyProfile(form.fullName.value, form.displayName.value, form.phone.value);
+      // The full name is an admin's record of who somebody is (Settings →
+      // Users), not something to edit here, so it goes back unchanged —
+      // update_my_profile writes the whole row and would otherwise blank it.
+      // A blank display name IS meaningful: the database fills it back in from
+      // the email address, which is how somebody resets to the automatic one.
+      await cloud.updateMyProfile((D().me || {}).fullName, form.displayName.value, form.phone.value);
       toast("Saved.", "info");
       renderAccountPane();
       renderSettings();

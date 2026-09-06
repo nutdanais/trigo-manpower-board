@@ -518,9 +518,8 @@
           <h4>My account</h4>
           <div id="account-identity" class="account-identity"></div>
           <form id="form-account-name" class="account-form">
-            <label>Full name <input name="fullName" type="text" maxlength="80" placeholder="e.g. Somchai Prasert" autocomplete="name"></label>
             <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off"></label>
-            <p class="import-note">The short name the board shows you by. Filled in from your full name as <b>first name . last initial</b> — leave it empty to keep it that way, or type your own if it clashes with somebody.</p>
+            <p class="import-note">The short name the board shows you by, taken from your email address — <b>first name . last initial</b>. Leave it empty to keep it that way, or type your own if it clashes with somebody.</p>
             <label>Mobile number <input name="phone" type="tel" maxlength="40" placeholder="e.g. 081-234-5678" autocomplete="tel"></label>
             <p class="import-note">Shown as a tap-to-call link on every mission card you are the engineer for, and on the printed board. Yours to keep up to date — nobody edits it for you in Settings.</p>
             <button type="submit" class="btn btn-small btn-primary">Save</button>
@@ -652,7 +651,7 @@
       <p id="user-modal-email" class="import-note"></p>
       <label>Full name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
       <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off"></label>
-      <p class="import-note">The short name the board shows. Left empty it is worked out from the full name — <b>first name . last initial</b>. Their mobile number is theirs to set, under Settings → My account.</p>
+      <p class="import-note">The short name the board shows. Left empty it comes from their email address — <b>first name . last initial</b>. Their mobile number is theirs to set, under Settings → My account.</p>
       <label>Role <select name="roleKey" required></select></label>
       <p id="user-role-hint" class="import-note"></p>
       <label>Status <select name="status" required>
@@ -682,7 +681,7 @@
     <h3>Add someone</h3>
     <form id="form-add-user">
       <label>Their name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
-      <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off" placeholder="worked out from their name"></label>
+      <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off" placeholder="from their email address"></label>
       <label>Email <input name="email" type="email" required autocomplete="off" placeholder="name@trigo-group.com"></label>
       <label>Role <select name="roleKey" required></select></label>
       <p class="import-note">The account is created straight away, already approved. You'll get a temporary password to pass on — they choose their own the first time they sign in. Only <span class="invite-domain">@trigo-group.com</span> addresses can be added.</p>

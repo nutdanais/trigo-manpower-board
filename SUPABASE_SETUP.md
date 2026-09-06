@@ -59,7 +59,8 @@ ever be approved. Everyone else you add from inside the app from here on.
 > which adds the flag behind "choose your own password the first time you sign in",
 > and
 > [`supabase/migration-2026-09-06-display-names.sql`](supabase/migration-2026-09-06-display-names.sql),
-> which gives every account a short display name (`Somchai.P`), moves the
+> which gives every account a short display name taken from its email address
+> (`somchai.prasert@` → `Somchai.P`), moves the
 > engineer's phone number onto their own account, and links engineer records to
 > the accounts they belong to — matching them up by name where that is
 > unambiguous, and leaving the rest to be linked in Settings → Engineer. No

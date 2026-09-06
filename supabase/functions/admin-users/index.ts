@@ -112,8 +112,8 @@ Deno.serve(async (req: Request) => {
     if (action === "create") {
       const email = String(body.email ?? "").trim().toLowerCase();
       const fullName = String(body.fullName ?? "").trim();
-      // Optional: left blank, the database fills in "Somchai.P" from the full
-      // name (fill_display_name), which is what the Add-user form expects.
+      // Optional: left blank, the database fills in "Somchai.P" from the email
+      // address (fill_display_name), which is what the Add-user form expects.
       const displayName = String(body.displayName ?? "").trim();
       const roleKey = String(body.roleKey ?? "viewer");
       if (!email.includes("@")) return json({ error: "That doesn't look like an email address." }, 400);

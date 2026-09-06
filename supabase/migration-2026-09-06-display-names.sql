@@ -7,13 +7,21 @@
 --   1. profiles.display_name and profiles.phone — the short name a person is
 --      known by on the board, and their own mobile number.
 --
---      display_name is the short name a person is known by on the board:
---      first name, a dot, the initial of the last name ("Somchai.P").
---      Filled in automatically from full_name (or, failing that, the local part
---      of the email) and kept in step with it, but it is a plain column: an
---      admin, or the person themselves, can type something else when the
---      automatic answer collides with somebody or reads wrong. Blank it out
---      and the automatic name comes back.
+--      display_name is that short name: first name, a dot, the initial of
+--      the last name ("Somchai.P"). Worked
+--      out from the email address, because every TRIGO address is already
+--      first name + "." + last name — the one spelling of a person that is
+--      always there and always in the same shape. (An address that is not in
+--      that shape falls back to the typed full name.) It is a plain column,
+--      though, not a formula: an admin, or the person themselves, can type
+--      something else when the automatic answer collides with somebody or
+--      reads wrong. Blank it out and the automatic name comes back.
+--
+--      Already ran an earlier version of this file? It derived names from the
+--      full name first. To hand everyone back to the address, run:
+--        update profiles set display_name = null;
+--      — the trigger below refills every row. Anything typed by hand is lost
+--      that way, so skip it if somebody has already set their own.
 --
 --      phone is the number the mission card dials. It used to live on the
 --      engineer record and be typed by whoever was in Settings; it belongs to
@@ -37,39 +45,52 @@ alter table profiles add column if not exists display_name text;
 -- at the bottom of this file, once the engineer -> account links exist)
 alter table profiles add column if not exists phone text;
 
-/* "Somchai Prasert" -> "Somchai.P". The rules, in order:
-     * a full name of two or more words -> first word + "." + initial of the last
+/* "somchai.prasert@trigo-group.com" -> "Somchai.P". The email address is the
+   first source, not the last: every TRIGO address is first name + "." + last
+   name, so it is the one spelling of a person that is always there and always
+   in the same shape — a name box is whatever somebody typed into it, if they
+   typed anything. The rules, in order:
+
+     * an address whose local part splits into two or more pieces on . _ or -
+       -> first piece + "." + initial of the last, capitalised on the way
+       through (an address is written in lower case, a name is not)
+     * unless that first piece is a single character: "n.sirinapanont@" is an
+       initial, not a first name, so the full name gets the next word
+     * a full name of two or more words -> first word + "." + initial of the
+       last, left exactly as the person typed it, so "McDonald" does not come
+       back as "Mcdonald"
      * a one-word full name -> that word, unchanged (many Thai accounts have one)
-     * no full name at all -> the same treatment applied to the email's local
-       part, where "somchai.prasert@…" is already first.last. Capitalised on
-       the way through, because an address is written in lower case and a name
-       is not — a full name the person typed is left exactly as they typed it,
-       so "McDonald" does not come back as "Mcdonald".
+     * nothing but a one-piece address -> that piece, capitalised
+
    left() counts characters rather than bytes, so a Thai initial survives. */
 create or replace function public.derive_display_name(p_full_name text, p_email text default null)
 returns text language plpgsql immutable set search_path = public, pg_temp as $fn$
 declare
-  src        text;
-  from_email boolean := false;
-  parts      text[];
-  n          int;
+  mail text[];
+  name text[];
+  n    int;
 begin
-  src := regexp_replace(btrim(coalesce(p_full_name, '')), '\s+', ' ', 'g');
-  if src = '' then
-    from_email := true;
-    src := btrim(regexp_replace(
-             translate(split_part(coalesce(p_email, ''), '@', 1), '._-', '   '),
-             '\s+', ' ', 'g'));
+  -- the address, split on the separators a local part uses
+  mail := string_to_array(
+            btrim(regexp_replace(
+              translate(split_part(coalesce(p_email, ''), '@', 1), '._-', '   '),
+              '\s+', ' ', 'g')), ' ');
+  n := coalesce(array_length(mail, 1), 0);
+  if n > 1 and length(mail[1]) > 1 then
+    return initcap(mail[1]) || '.' || upper(left(mail[n], 1));
   end if;
-  if src = '' then return null; end if;
 
-  parts := string_to_array(src, ' ');
-  n := array_length(parts, 1);
-  if from_email then
-    parts := array(select initcap(p) from unnest(parts) p);
+  -- the typed name, for an address that is not first.last (or is an initial)
+  name := string_to_array(
+            regexp_replace(btrim(coalesce(p_full_name, '')), '\s+', ' ', 'g'), ' ');
+  if coalesce(array_length(name, 1), 0) > 1 then
+    return name[1] || '.' || upper(left(name[array_length(name, 1)], 1));
   end if;
-  if n = 1 then return parts[1]; end if;
-  return parts[1] || '.' || upper(left(parts[n], 1));
+  if name[1] is not null and name[1] <> '' then return name[1]; end if;
+
+  -- a one-piece address ("info@…", or a nickname) is still better than nothing
+  if n = 1 and mail[1] <> '' then return initcap(mail[1]); end if;
+  return null;
 end;
 $fn$;
 
@@ -238,27 +259,42 @@ create trigger sync_engineer_name
 grant execute on function public.engineer_directory()          to authenticated;
 grant execute on function public.ensure_engineer_for_profile(uuid) to authenticated;
 
+/* Is this engineer record's name a way of writing this person's name? Every
+   form one of them is likely to have been typed as: the display name whole
+   ("Phada.K"), its first piece ("Phada" — what the engineer list has always
+   held), the full name, its first word, and the first piece of the address.
+   Used once, by the link-up below, and dropped again at the end of it. */
+create or replace function public.engineer_link_name_matches(
+  p_name text, p_display text, p_full text, p_email text)
+returns boolean language sql immutable set search_path = public, pg_temp as $fn$
+  select lower(btrim(coalesce(p_name, ''))) <> ''
+     and lower(btrim(p_name)) in (
+       lower(btrim(coalesce(p_display, ''))),
+       lower(split_part(coalesce(p_display, ''), '.', 1)),
+       lower(btrim(coalesce(p_full, ''))),
+       lower(split_part(btrim(coalesce(p_full, '')), ' ', 1)),
+       lower(split_part(split_part(coalesce(p_email, ''), '@', 1), '.', 1))
+     );
+$fn$;
+
 /* Best-effort link-up of the engineers who were on the list before accounts
    existed. Deliberately timid: it only joins a pair when the name matches
    exactly one account AND exactly one engineer record, so "Phada" finding one
    Phada is linked and anything ambiguous is left for a person to do in
-   Settings → Engineer. Matched against the display name, the first name and
-   the whole full name, because "Phada" could be any of the three. */
+   Settings → Engineer. */
 update engineers e
    set profile_id = p.id
   from profiles p
  where e.profile_id is null
    and p.status = 'active'
-   and (lower(p.display_name) = lower(e.name)
-     or lower(p.full_name) = lower(e.name)
-     or lower(split_part(btrim(p.full_name), ' ', 1)) = lower(e.name))
+   and public.engineer_link_name_matches(e.name, p.display_name, p.full_name, p.email)
    and (select count(*) from engineers e2 where lower(e2.name) = lower(e.name)) = 1
    and (select count(*) from profiles p2
          where p2.status = 'active'
-           and (lower(p2.display_name) = lower(e.name)
-             or lower(p2.full_name) = lower(e.name)
-             or lower(split_part(btrim(p2.full_name), ' ', 1)) = lower(e.name))) = 1
+           and public.engineer_link_name_matches(e.name, p2.display_name, p2.full_name, p2.email)) = 1
    and not exists (select 1 from engineers e3 where e3.profile_id = p.id);
+
+drop function if exists public.engineer_link_name_matches(text, text, text, text);
 
 /* The phone numbers follow the same links: an engineer record that now belongs
    to somebody hands its number over to them, so the mission card keeps dialling
