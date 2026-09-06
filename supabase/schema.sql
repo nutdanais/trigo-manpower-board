@@ -336,16 +336,24 @@ $fn$;
    hands the field back to fill_display_name() below, which is how somebody
    resets to the automatic "Somchai.P". */
 drop function if exists public.update_my_profile(text);
--- Writes the whole form every time — a null or blank argument clears that
--- field rather than leaving it as it was, which is what makes "empty the
--- display name to get the automatic one back" work.
+/* An argument that is not given at all leaves that field as it was; an
+   argument given as "" clears it. The distinction matters twice:
+
+     * emptying the Display name box has to mean something — it hands the
+       field back to the trigger above, which fills the automatic name in
+       again. That is a "" from the form, not a missing argument.
+     * an older client that calls this with the name alone should not thereby
+       wipe the phone number and display name it does not know about. */
 create or replace function public.update_my_profile(
-  p_full_name text, p_display_name text default null, p_phone text default null)
+  p_full_name text default null, p_display_name text default null, p_phone text default null)
 returns void language sql security definer set search_path = public, pg_temp as $fn$
   update profiles
-     set full_name    = nullif(btrim(coalesce(p_full_name, '')), ''),
-         display_name = nullif(btrim(coalesce(p_display_name, '')), ''),
-         phone        = nullif(btrim(coalesce(p_phone, '')), ''),
+     set full_name    = case when p_full_name    is null then full_name
+                             else nullif(btrim(p_full_name), '') end,
+         display_name = case when p_display_name is null then display_name
+                             else nullif(btrim(p_display_name), '') end,
+         phone        = case when p_phone        is null then phone
+                             else nullif(btrim(p_phone), '') end,
          updated_at   = now()
    where id = auth.uid();
 $fn$;
