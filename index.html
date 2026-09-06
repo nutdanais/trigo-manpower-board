@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-05b">
+<link rel="stylesheet" href="styles.css?v=2026-09-06">
 </head>
 <body>
 
@@ -386,9 +386,14 @@
         <label>Start <input name="startTime" type="time" value="08:00"></label>
         <label>End <input name="endTime" type="time" value="17:00"></label>
       </div>
-      <label>Engineer
-        <select name="engineerId" required></select>
-      </label>
+      <!-- Engineer is a search over the people who may run a mission: everyone
+           from Engineer upwards, by the display name on their account. Same
+           shape as the Host box above — the datalist gives the browser's own
+           type-ahead, and #mission-engineer-note says live who has been
+           matched. Resolved to an engineer record on save (see saveMission). -->
+      <label>Engineer <input name="engineer" required list="engineer-options" autocomplete="off" placeholder="Search by name…"></label>
+      <datalist id="engineer-options"></datalist>
+      <p id="mission-engineer-note" class="import-note hidden"></p>
       <label>Remark <textarea name="remark" rows="2" placeholder="Optional notes"></textarea></label>
       <div class="modal-actions">
         <button type="button" class="btn btn-danger hidden" id="btn-delete-mission">Delete</button>
@@ -513,8 +518,11 @@
           <h4>My account</h4>
           <div id="account-identity" class="account-identity"></div>
           <form id="form-account-name" class="account-form">
-            <label>Display name <input name="fullName" type="text" maxlength="80" placeholder="e.g. Somchai P." autocomplete="name"></label>
-            <button type="submit" class="btn btn-small btn-primary">Save name</button>
+            <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off"></label>
+            <p class="import-note">The short name the board shows you by, taken from your email address — <b>first name . last initial</b>. Leave it empty to keep it that way, or type your own if it clashes with somebody.</p>
+            <label>Mobile number <input name="phone" type="tel" maxlength="40" placeholder="e.g. 081-234-5678" autocomplete="tel"></label>
+            <p class="import-note">Shown as a tap-to-call link on every mission card you are the engineer for, and on the printed board. Yours to keep up to date — nobody edits it for you in Settings.</p>
+            <button type="submit" class="btn btn-small btn-primary">Save</button>
           </form>
           <h4>Change password</h4>
           <form id="form-account-password" class="account-form">
@@ -536,11 +544,11 @@
           <h4>Engineers
             <button class="btn btn-small btn-primary" id="btn-add-engineer">+ Add engineer</button>
           </h4>
-          <p class="settings-hint">The colour marks every mission card this engineer is responsible for.</p>
+          <p class="settings-hint">Everyone with the <b>Engineer</b> role is here automatically. Use <b>+ Add engineer</b> for a manager or admin who runs missions of their own. The colour marks every mission card that person is responsible for; the name and phone number come from their account, and each person keeps their own number up to date under <b>My account</b>.</p>
           <div class="settings-list">
             <table class="settings-table">
               <thead><tr>
-                <th class="st-swatch">Colour</th><th>Name</th><th>Phone</th><th class="st-act"></th>
+                <th class="st-swatch">Colour</th><th>Name</th><th>Phone</th><th>Account</th><th class="st-act"></th>
               </tr></thead>
               <tbody id="settings-engineers"></tbody>
             </table>
@@ -641,7 +649,9 @@
     <h3 id="user-modal-title">User</h3>
     <form id="form-user">
       <p id="user-modal-email" class="import-note"></p>
-      <label>Display name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
+      <label>Full name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
+      <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off"></label>
+      <p class="import-note">The short name the board shows. Left empty it comes from their email address — <b>first name . last initial</b>. Their mobile number is theirs to set, under Settings → My account.</p>
       <label>Role <select name="roleKey" required></select></label>
       <p id="user-role-hint" class="import-note"></p>
       <label>Status <select name="status" required>
@@ -671,12 +681,28 @@
     <h3>Add someone</h3>
     <form id="form-add-user">
       <label>Their name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
+      <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off" placeholder="from their email address"></label>
       <label>Email <input name="email" type="email" required autocomplete="off" placeholder="name@trigo-group.com"></label>
       <label>Role <select name="roleKey" required></select></label>
       <p class="import-note">The account is created straight away, already approved. You'll get a temporary password to pass on — they choose their own the first time they sign in. Only <span class="invite-domain">@trigo-group.com</span> addresses can be added.</p>
       <div class="modal-actions">
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Create account</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Adding an engineer is naming an account: everyone with the Engineer role
+       is already on the list, so this is for the manager or admin who also runs
+       missions themselves. -->
+  <div class="modal hidden" id="modal-add-engineer">
+    <h3>Add an engineer</h3>
+    <form id="form-add-engineer">
+      <label>Person <select name="profileId" required></select></label>
+      <p id="add-engineer-note" class="import-note">They get a colour of their own and can be picked in the Engineer box on a mission. Their name and phone number come from their account.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btn-add-engineer-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add</button>
       </div>
     </form>
   </div>
@@ -754,8 +780,8 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-05b"></script>
-<script src="charts.js?v=2026-09-05b"></script>
-<script src="app.js?v=2026-09-05b"></script>
+<script src="cloud.js?v=2026-09-06"></script>
+<script src="charts.js?v=2026-09-06"></script>
+<script src="app.js?v=2026-09-06"></script>
 </body>
 </html>

@@ -56,8 +56,15 @@ ever be approved. Everyone else you add from inside the app from here on.
 > access, and re-running it never re-promotes someone you have since demoted.
 > Then run
 > [`supabase/migration-2026-09-05-admin-passwords.sql`](supabase/migration-2026-09-05-admin-passwords.sql),
-> which adds the flag behind "choose your own password the first time you sign in".
-> No editing needed on that one.
+> which adds the flag behind "choose your own password the first time you sign in",
+> and
+> [`supabase/migration-2026-09-06-display-names.sql`](supabase/migration-2026-09-06-display-names.sql),
+> which gives every account a short display name taken from its email address
+> (`somchai.prasert@` → `Somchai.P`), moves the
+> engineer's phone number onto their own account, and links engineer records to
+> the accounts they belong to — matching them up by name where that is
+> unambiguous, and leaving the rest to be linked in Settings → Engineer. No
+> editing needed on either of those.
 
 ## 4b. Turn off email confirmation
 

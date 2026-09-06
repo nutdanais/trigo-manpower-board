@@ -4086,15 +4086,102 @@ function updateMissionHostNote() {
   }
 }
 
+/* ---------- the Engineer box on a mission ---------- */
+/* Who a mission may name. Everyone from Engineer upwards, by the display name
+   on their account (cloud.data.directory) — plus any engineer record with no
+   account behind it, so a board built before accounts existed keeps working and
+   an old mission can still be opened and saved.
+
+   `label` is what the datalist matches on, so it has to be unique: two people
+   who both come out "Somchai.S" are told apart by their full name, and an
+   unlikely third by a number. */
+function engineerCandidates() {
+  const out = [];
+  for (const d of D().directory) {
+    out.push({
+      name: d.displayName || d.fullName || "?",
+      label: d.displayName || d.fullName || "?",
+      detail: [d.fullName, roleLabel(d.roleKey)].filter(Boolean).join(" · "),
+      full: d.fullName || "",
+      profileId: d.id, engineerId: d.engineerId, roleKey: d.roleKey,
+    });
+  }
+  const throughAccount = new Set(D().directory.map(d => d.engineerId).filter(Boolean));
+  for (const e of D().engineers) {
+    if (throughAccount.has(e.id)) continue;
+    out.push({
+      name: e.name, label: e.name,
+      detail: e.profileId ? "" : "no account yet",
+      full: "", profileId: e.profileId || null, engineerId: e.id, roleKey: null,
+    });
+  }
+  out.sort((a, b) => a.label.localeCompare(b.label));
+  const clashes = new Map();
+  for (const c of out) clashes.set(c.label.toLowerCase(), (clashes.get(c.label.toLowerCase()) || 0) + 1);
+  const used = new Map();
+  for (const c of out) {
+    let label = c.label;
+    if (clashes.get(label.toLowerCase()) > 1 && c.full && c.full.toLowerCase() !== label.toLowerCase()) {
+      label = `${label} (${c.full})`;
+    }
+    const seen = (used.get(label.toLowerCase()) || 0) + 1;
+    used.set(label.toLowerCase(), seen);
+    c.label = seen === 1 ? label : `${label} (${seen})`;
+  }
+  return out;
+}
+
+/* Typed text -> one candidate. The label is the canonical answer; a plain name
+   is accepted too when only one person answers to it, so somebody who types
+   "Somchai.P" and never opens the suggestion list still gets the right person. */
+function missionEngineerMatch(typed) {
+  const key = String(typed || "").trim().toLowerCase();
+  if (!key) return null;
+  const list = engineerCandidates();
+  const exact = list.find(c => c.label.toLowerCase() === key);
+  if (exact) return exact;
+  const byName = list.filter(c => c.name.toLowerCase() === key);
+  return byName.length === 1 ? byName[0] : null;
+}
+
+function engineerLabelFor(engineerId) {
+  const c = engineerCandidates().find(x => x.engineerId === engineerId);
+  return c ? c.label : "";
+}
+
+function renderMissionEngineerOptions() {
+  $("#engineer-options").innerHTML = engineerCandidates()
+    .map(c => `<option value="${escapeHtml(c.label)}">${escapeHtml(c.detail)}</option>`).join("");
+}
+
+/* Live feedback under the Engineer box, in the same three states the Host box
+   uses: recognised, recognised-but-not-on-the-board-yet, and unknown. */
+function updateMissionEngineerNote() {
+  const note = $("#mission-engineer-note");
+  const typed = $("#form-mission").engineer.value.trim();
+  if (!typed) { note.classList.add("hidden"); return; }
+  note.classList.remove("hidden");
+  const match = missionEngineerMatch(typed);
+  if (!match) {
+    note.className = "import-note host-note-new";
+    note.textContent = `⚠ "${typed}" isn't on the engineer list — pick a name from the suggestions.`;
+    return;
+  }
+  note.className = "import-note host-note-ok";
+  note.textContent = `✓ ${match.name}`
+    + (match.detail ? ` — ${match.detail}` : "")
+    + (match.engineerId ? "" : " · first mission for them — they'll get a colour of their own");
+}
+
 function openMissionModal(missionId) {
   state.editingMissionId = missionId || null;
   const form = $("#form-mission");
   form.reset();
   renderMissionHostOptions();
+  renderMissionEngineerOptions();
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
   $("#btn-hide-mission").classList.toggle("hidden", !missionId);
-  form.engineerId.innerHTML = D().engineers.map(e => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
   if (missionId) {
     const m = getPlan().missions.find(x => x.id === missionId);
     form.number.value = m.number;
@@ -4104,10 +4191,11 @@ function openMissionModal(missionId) {
     form.shift.value = m.shift;
     form.startTime.value = m.startTime;
     form.endTime.value = m.endTime;
-    form.engineerId.value = m.engineerId;
+    form.engineer.value = engineerLabelFor(m.engineerId);
     form.remark.value = m.remark || "";
   }
   updateMissionHostNote();
+  updateMissionEngineerNote();
   openModal("#modal-mission");
 }
 
@@ -4123,7 +4211,6 @@ function saveMission(ev) {
     shift: form.shift.value,
     startTime: form.startTime.value || "08:00",
     endTime: form.endTime.value || "17:00",
-    engineerId: form.engineerId.value,
   };
   /* The host has to be one from the Host List. That list is what carries a
      host's location and service area, and a mission naming a host that isn't
@@ -4140,6 +4227,15 @@ function saveMission(ev) {
     return;
   }
   vals.host = hostRec.name;
+  /* The engineer has to be somebody the board knows — an account from Engineer
+     upwards, or one of the engineer records that predate accounts. Resolved to
+     an engineers row below, because that is what a mission stores and what the
+     card colour, the filters and the Overview all read. */
+  const eng = missionEngineerMatch(form.engineer.value);
+  if (!eng) {
+    toast(`"${form.engineer.value.trim()}" isn't on the engineer list. Pick a name from the suggestions — everyone from Engineer upwards is there.`, "warn");
+    return;
+  }
   // instant client-side check (same number + shift, excluding the mission being edited);
   // scans hidden missions too — the DB unique constraint covers them regardless —
   // this just avoids a round trip and points at the hidden one if that's the clash
@@ -4154,6 +4250,9 @@ function saveMission(ev) {
     return;
   }
   safely(async () => {
+    // the first time somebody is picked they have no engineer record yet, so
+    // one is made here — that is where their mission colour lives
+    vals.engineerId = eng.engineerId || await cloud.ensureEngineerForProfile(eng.profileId);
     await cloud.saveMission(D().activeBoardId, state.date, state.editingMissionId, vals);
     closeModal();
     await refreshAndRender();
@@ -4352,28 +4451,201 @@ function applySettingsTab() {
   if (state.settingsTab === "roles") renderRolesMatrix();
 }
 
-function renderSettings() {
-  applySettingsTab();
+/* ---------- Settings -> Engineer ---------- */
+/* The pane is a view of the people who may run a mission, not a list of loose
+   records: everyone with the Engineer role is here because of their role, a
+   manager or admin appears once they have been added with "+ Add engineer",
+   and an engineer record with no account behind it stays until somebody links
+   it. Only the colour is edited here — the name and the phone number belong to
+   the account, and each person keeps their own number in My account. */
+const DEFAULT_ENGINEER_COLOR = "#9ca3af";
+
+function engineerPaneRows() {
+  const rows = [];
+  for (const d of D().directory) {
+    // by role, or because somebody added them
+    if (d.roleKey !== "engineer" && !d.engineerId) continue;
+    const rec = d.engineerId ? D().engineers.find(e => e.id === d.engineerId) : null;
+    rows.push({
+      kind: "account", profile: d, engineer: rec,
+      name: d.displayName || d.fullName || "?", phone: d.phone || "",
+      color: rec ? rec.color : DEFAULT_ENGINEER_COLOR,
+    });
+  }
+  const throughAccount = new Set(D().directory.map(d => d.engineerId).filter(Boolean));
+  for (const e of D().engineers) {
+    if (throughAccount.has(e.id)) continue;
+    rows.push({
+      // "stranded": the account it points at is no longer an active engineer
+      // (demoted, or disabled), so the person is not in the directory to show
+      kind: e.profileId ? "stranded" : "record",
+      profile: null, engineer: e, name: e.name, phone: e.phone || "", color: e.color,
+    });
+  }
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderEngineerRows() {
   const engBox = $("#settings-engineers");
   engBox.innerHTML = "";
-  for (const e of D().engineers) {
+  const rows = engineerPaneRows();
+  if (!rows.length) {
+    engBox.innerHTML = `<tr><td colspan="5" class="import-note">Nobody has the Engineer role yet. Give somebody that role under <b>Users</b>, or add a manager or admin here.</td></tr>`;
+    return;
+  }
+  // accounts that could be linked to a record that has none: everyone in the
+  // directory who isn't already an engineer in their own right
+  const linkable = D().directory.filter(d => !d.engineerId);
+
+  for (const r of rows) {
+    const rec = r.engineer;
     const row = document.createElement("tr");
     row.className = "st-row";
-    row.innerHTML = `
-      <td class="st-swatch"><input type="color" value="${e.color}" title="Engineer colour" aria-label="Engineer colour"></td>
-      <td><input type="text" value="${escapeHtml(e.name)}" placeholder="Name" aria-label="Engineer name"></td>
-      <td><input type="tel" value="${escapeHtml(e.phone || "")}" placeholder="Phone" aria-label="Engineer phone"></td>
-      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(e.name)}" aria-label="Delete ${escapeHtml(e.name)}">✕</button></td>`;
-    const [color, name, phone, del] = [...row.querySelectorAll("input, button")];
-    color.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "color", color.value); render(); });
-    name.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "name", name.value.trim() || e.name); render(); });
-    phone.onchange = () => safely(async () => { await cloud.saveEngineerField(e.id, "phone", phone.value.trim()); render(); });
-    del.onclick = () => showConfirm("Delete engineer?", `Delete ${e.name}?`, () => safely(async () => {
-      await cloud.deleteEngineer(e.id);
-      renderSettings(); render(); openModal("#modal-settings");
-    }));
+
+    const swatch = document.createElement("td");
+    swatch.className = "st-swatch";
+    const color = document.createElement("input");
+    color.type = "color";
+    color.value = r.color;
+    color.title = "Mission card colour";
+    color.setAttribute("aria-label", `Colour for ${r.name}`);
+    color.onchange = () => safely(async () => {
+      // an engineer listed by role alone has no record yet — picking a colour
+      // is what creates it
+      const id = rec ? rec.id : await cloud.ensureEngineerForProfile(r.profile.id);
+      await cloud.saveEngineerField(id, "color", color.value);
+      renderSettings(); render();
+    });
+    swatch.appendChild(color);
+
+    const nameCell = document.createElement("td");
+    if (r.kind === "record") {
+      // no account behind it: the record's own name is still the only name
+      // there is, so it stays editable until somebody links it
+      const name = document.createElement("input");
+      name.type = "text";
+      name.value = r.name;
+      name.placeholder = "Name";
+      name.setAttribute("aria-label", "Engineer name");
+      name.onchange = () => safely(async () => {
+        await cloud.saveEngineerField(rec.id, "name", name.value.trim() || r.name);
+        renderSettings(); render();
+      });
+      nameCell.appendChild(name);
+    } else {
+      nameCell.className = "st-name";
+      nameCell.textContent = r.name;
+      if (r.profile && r.profile.fullName) nameCell.title = r.profile.fullName;
+    }
+
+    const phoneCell = document.createElement("td");
+    phoneCell.className = "st-phone";
+    phoneCell.textContent = r.phone || "—";
+    phoneCell.title = r.kind === "account"
+      ? "Set by this person under Settings → My account."
+      : "From the engineer record. Link it to an account and the number comes from there.";
+
+    const acctCell = document.createElement("td");
+    acctCell.className = "st-account";
+    if (r.kind === "account") {
+      acctCell.innerHTML = `<span class="role-pill role-${escapeHtml(r.profile.roleKey || "none")}">${escapeHtml(roleLabel(r.profile.roleKey))}</span>`;
+      if (!rec) {
+        const hint = document.createElement("span");
+        hint.className = "st-hint";
+        hint.textContent = " no colour yet";
+        acctCell.appendChild(hint);
+      }
+    } else if (r.kind === "stranded") {
+      // the account behind this record is not an active engineer any more —
+      // demoted, or disabled. Unlinking is the way back to an ordinary record
+      // that can be renamed and pointed at somebody else.
+      acctCell.innerHTML = `<span class="st-hint">account is no longer an engineer</span> `;
+      const unlink = document.createElement("button");
+      unlink.type = "button";
+      unlink.className = "btn btn-small";
+      unlink.textContent = "Unlink";
+      unlink.title = "Keep the engineer record and its colour, but stop reading the name and phone from that account.";
+      unlink.onclick = () => safely(async () => {
+        await cloud.saveEngineerField(rec.id, "profile_id", null);
+        renderSettings(); render();
+      });
+      acctCell.appendChild(unlink);
+    } else {
+      const link = document.createElement("select");
+      link.setAttribute("aria-label", `Account for ${r.name}`);
+      link.innerHTML = `<option value="">— no account —</option>` +
+        linkable.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.displayName || d.fullName || "?")}</option>`).join("");
+      link.title = "Link this record to the person's account — their name and phone number then come from it.";
+      link.onchange = () => safely(async () => {
+        await cloud.saveEngineerField(rec.id, "profile_id", link.value || null);
+        renderSettings(); render();
+      });
+      acctCell.appendChild(link);
+    }
+
+    const actCell = document.createElement("td");
+    actCell.className = "st-act";
+    // An Engineer-by-role is on this list because of their role: taking them
+    // off it is a role change under Users, not a delete here. Everything else
+    // — an added manager or admin, an unlinked record — can go.
+    const removable = r.kind !== "account" || (rec && r.profile.roleKey !== "engineer");
+    if (removable) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "st-del";
+      del.title = `Remove ${r.name}`;
+      del.setAttribute("aria-label", `Remove ${r.name}`);
+      del.textContent = "✕";
+      del.onclick = () => showConfirm("Remove this engineer?",
+        `${r.name} will no longer be offered on a mission, and their colour is forgotten. ` +
+        `Missions that already name them keep their record of who ran them, but lose the engineer on the card.`,
+        () => safely(async () => {
+          await cloud.deleteEngineer(rec.id);
+          renderSettings(); render(); openModal("#modal-settings");
+        }));
+      actCell.appendChild(del);
+    }
+
+    row.append(swatch, nameCell, phoneCell, acctCell, actCell);
     engBox.appendChild(row);
   }
+}
+
+/* "+ Add engineer": for the manager or admin who runs missions themselves.
+   Everyone with the Engineer role is on the list already, so the picker only
+   offers accounts that are not there yet. */
+function openAddEngineerModal() {
+  const form = $("#form-add-engineer");
+  const note = $("#add-engineer-note");
+  const free = D().directory.filter(d => !d.engineerId && d.roleKey !== "engineer");
+  form.profileId.innerHTML = free
+    .map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.displayName || d.fullName || "?")} — ${escapeHtml(roleLabel(d.roleKey))}</option>`)
+    .join("");
+  const none = !free.length;
+  form.profileId.disabled = none;
+  $("#form-add-engineer button[type=submit]").disabled = none;
+  note.textContent = none
+    ? (D().directory.length
+        ? "Everyone who can be added is already on the list. Anyone else needs an account with the Engineer role or above first, under Users."
+        : "Adding engineers by account needs the one-time database update (migration-2026-09-06-display-names.sql).")
+    : "They get a colour of their own and can be picked in the Engineer box on a mission. Their name and phone number come from their account.";
+  openModal("#modal-add-engineer");
+}
+
+function addEngineerFromModal(ev) {
+  ev.preventDefault();
+  const profileId = ev.target.profileId.value;
+  if (!profileId) return;
+  safely(async () => {
+    await cloud.addEngineer(profileId);
+    reopenSettings();
+    render();
+  });
+}
+
+function renderSettings() {
+  applySettingsTab();
+  renderEngineerRows();
   const areaBox = $("#settings-areas");
   areaBox.innerHTML = "";
   for (const a of D().areas) {
@@ -4437,7 +4709,7 @@ function renderSettings() {
   // the counts under each table — cheap orientation, and they make an empty
   // list say so rather than showing a bare frame
   const n = (one, many, count) => `${count} ${count === 1 ? one : many}`;
-  $("#engineers-count").textContent = n("engineer", "engineers", D().engineers.length);
+  $("#engineers-count").textContent = n("engineer", "engineers", engineerPaneRows().length);
   $("#areas-count").textContent = n("service area", "service areas", D().areas.length);
   $("#boards-count").textContent = n("board", "boards", D().boards.length);
 
@@ -5064,17 +5336,48 @@ function renderAccountPane() {
           `<span class="status-pill status-${escapeHtml(me.status)}">${escapeHtml(status ? status.label : me.status)}</span>` +
         `</div>` +
         `<p class="import-note">Your role decides which tabs you see and what you can change. Only an admin can alter it.</p>`);
-  $("#form-account-name").fullName.value = me.fullName || "";
+  const form = $("#form-account-name");
+  form.displayName.value = me.displayName || "";
+  form.phone.value = me.phone || "";
+  // what the box would fill in by itself if it were left empty
+  form.displayName.placeholder = autoDisplayName(me.fullName, me.email) || "e.g. Somchai.P";
+}
+
+/* The same rule the database uses (derive_display_name), for the placeholder
+   that shows what an empty box will be filled in with. The email address comes
+   first — every TRIGO address is first name + "." + last name, which is the one
+   spelling of a person that is always there — and the typed full name is the
+   fallback for an address that isn't in that shape. It is a hint only: the
+   database is what actually sets the value, so the two can never disagree
+   about what is saved. */
+function autoDisplayName(fullName, email) {
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  const mail = String(email || "").split("@")[0].replace(/[._-]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  // a single leading character is an initial, not a first name ("n.somchai@")
+  if (mail.length > 1 && mail[0].length > 1) {
+    return cap(mail[0]) + "." + mail[mail.length - 1].charAt(0).toUpperCase();
+  }
+  const name = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (name.length > 1) return name[0] + "." + name[name.length - 1].charAt(0).toUpperCase();
+  if (name.length === 1) return name[0];
+  return mail.length === 1 ? cap(mail[0]) : "";
 }
 
 function wireAccountPane() {
   $("#form-account-name").onsubmit = (ev) => {
     ev.preventDefault();
-    const name = ev.target.fullName.value;
+    const form = ev.target;
     safely(async () => {
-      await cloud.updateMyProfile(name);
-      toast("Name saved.", "info");
+      // The full name is an admin's record of who somebody is (Settings →
+      // Users), not something to edit here, so it goes back unchanged —
+      // update_my_profile writes the whole row and would otherwise blank it.
+      // A blank display name IS meaningful: the database fills it back in from
+      // the email address, which is how somebody resets to the automatic one.
+      await cloud.updateMyProfile((D().me || {}).fullName, form.displayName.value, form.phone.value);
+      toast("Saved.", "info");
       renderAccountPane();
+      renderSettings();
+      render();
       if (D().users) renderUserRows();
     });
   };
@@ -5100,7 +5403,9 @@ function usersFilteredSorted() {
     if (f.roleKey.length && !f.roleKey.includes(u.roleKey)) return false;
     if (f.status.length && !f.status.includes(u.status)) return false;
     if (!q) return true;
-    return (u.email || "").toLowerCase().includes(q) || (u.fullName || "").toLowerCase().includes(q);
+    return (u.email || "").toLowerCase().includes(q)
+        || (u.fullName || "").toLowerCase().includes(q)
+        || (u.displayName || "").toLowerCase().includes(q);
   });
   const val = (u) => ({
     name: (u.fullName || "").toLowerCase(),
@@ -5211,7 +5516,7 @@ function renderUserRows() {
     const isMe = D().me && u.id === D().me.id;
     tr.className = "user-row status-" + u.status + (isMe ? " user-row-me" : "");
     tr.innerHTML = `
-      <td data-label="Name">${escapeHtml(u.fullName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}</td>
+      <td data-label="Name">${escapeHtml(u.fullName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
       <td data-label="Email">${escapeHtml(u.email || "")}</td>
       <td data-label="Role"><span class="role-pill role-${escapeHtml(u.roleKey || "none")}">${escapeHtml(roleLabel(u.roleKey))}</span></td>
       <td data-label="Status"><span class="status-pill status-${escapeHtml(u.status)}" title="${escapeHtml(st.hint || "")}">${escapeHtml(st.label)}</span></td>
@@ -5286,6 +5591,8 @@ function openUserModal(id) {
   $("#user-modal-title").textContent = u.fullName || u.email;
   $("#user-modal-email").textContent = u.email;
   form.fullName.value = u.fullName || "";
+  form.displayName.value = u.displayName || "";
+  form.displayName.placeholder = autoDisplayName(u.fullName, u.email) || "e.g. Somchai.P";
   fillRoleSelect(form.roleKey, u.roleKey || "viewer");
   form.status.value = u.status;
   const locked = userLockReason(u);
@@ -5318,7 +5625,7 @@ function saveUserModal(ev) {
   const id = state.users.editingId;
   const before = (D().users || []).find(x => x.id === id);
   if (!before) return;
-  const vals = { fullName: form.fullName.value };
+  const vals = { fullName: form.fullName.value, displayName: form.displayName.value };
   if (!form.roleKey.disabled) { vals.roleKey = form.roleKey.value; vals.status = form.status.value; }
   safely(async () => {
     await cloud.saveUser(id, vals);
@@ -5361,7 +5668,7 @@ function addUser(ev) {
   const form = ev.target;
   const email = form.email.value.trim().toLowerCase();
   safely(async () => {
-    const res = await cloud.createUser(email, form.fullName.value, form.roleKey.value);
+    const res = await cloud.createUser(email, form.fullName.value, form.displayName.value, form.roleKey.value);
     renderUserRows();
     showTempPassword(email, res.password, "Account created.");
   });
@@ -5411,9 +5718,9 @@ function showTempPassword(email, password, headline, warning) {
 
 function exportUsersCsv() {
   const rows = usersFilteredSorted();   // the same rows the table is showing right now
-  const header = ["Name", "Email", "Role", "Status", "Last seen", "Requested", "Approved", "Approved by"];
+  const header = ["Name", "Display name", "Email", "Role", "Status", "Last seen", "Requested", "Approved", "Approved by"];
   const out = rows.map(u => [
-    u.fullName || "", u.email || "", roleLabel(u.roleKey),
+    u.fullName || "", u.displayName || "", u.email || "", roleLabel(u.roleKey),
     (USER_STATUS[u.status] || {}).label || u.status,
     u.lastSeenAt || "", u.requestedAt || "", u.approvedAt || "", u.approvedBy || "",
   ]);
@@ -5689,7 +5996,11 @@ function wireApp() {
     btn.onclick = () => { state.employeeTab = btn.dataset.tab; applyEmployeeTab(); };
   }
   wireUserManagement();
-  $("#btn-add-engineer").onclick = () => safely(async () => { await cloud.addEngineer(); renderSettings(); });
+  $("#btn-add-engineer").onclick = openAddEngineerModal;
+  $("#form-add-engineer").onsubmit = addEngineerFromModal;
+  // back to Settings rather than closing everything: the pane it was opened
+  // from is what the person was in the middle of
+  $("#btn-add-engineer-cancel").onclick = reopenSettings;
   $("#btn-add-area").onclick = () => safely(async () => { await cloud.addArea(); renderSettings(); });
 
   initTheme();
@@ -5864,6 +6175,7 @@ function wireApp() {
   // with the mouse doesn't always fire input on every browser)
   for (const ev of ["input", "change"]) {
     $("#form-mission").host.addEventListener(ev, updateMissionHostNote);
+    $("#form-mission").engineer.addEventListener(ev, updateMissionEngineerNote);
   }
 
   // Long-press bookkeeping (see attachLongPress). Capture phase on both: the
