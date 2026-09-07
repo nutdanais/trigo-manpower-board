@@ -15,7 +15,20 @@
   --danger-tint: #fef2f2;
   --warn: #f59e0b;
   --warn-text: #8a4f10;
-  --warn-tint: rgba(245,158,11,.12);
+  --warn-tint: rgba(245,158,11,.12);   /* hover wash, not a resting surface */
+  /* ==== Status surfaces ====
+     ok / warn / danger, each a surface + line + text triple. These used to be
+     raw hex written once — #f0fdf4, #fffbeb, #fef3c7 — with no value under
+     [data-theme="dark"], so a near-white panel stayed near-white on the dark
+     ground and glared. As tokens they follow the theme like everything else,
+     and Overview, the Host list and the User list all read from the same set
+     instead of three private copies of the same idea. */
+  --ok-surface: #f7faef;
+  --ok-line: #cfdcae;
+  --ok-text: #4d6810;
+  --warn-surface: #fdf8ef;
+  --warn-line: #e0c9a4;
+  --danger-text: #a3271f;
 
   --bg-soft: #eef1f5;        /* subtle fills: inactive tabs, stat chips, zone labels */
   --hover-tint: #eef3fb;     /* hover highlight for menu/dropdown rows */
@@ -109,17 +122,9 @@
   --on-navy-line-strong: rgba(255, 255, 255, .62);
   --on-navy-fill: rgba(255, 255, 255, .14);
 
-  /* ---- Glassmorphism: frosted translucent surfaces over the body gradient.
-     Kept as tokens so body.exporting can swap them for opaque equivalents —
-     html2canvas cannot render backdrop-filter, and the JPG must stay crisp. ---- */
-  --glass: rgba(255, 255, 255, 0.55);          /* zones, panel, toolbar chrome */
-  --glass-strong: rgba(255, 255, 255, 0.72);   /* cards/modals holding dense text */
-  --glass-border: rgba(255, 255, 255, 0.7);
-  --glass-shadow: 0 4px 24px rgba(20, 40, 80, 0.10), 0 1px 2px rgba(20, 40, 80, 0.06);
-  --glass-blur: saturate(1.5) blur(14px);
-  /* #topbar itself is intentionally NOT glass — solid brand navy per the CI
-     guide (PMS 295C, --primary). Glass is only for things that float above
-     it: the date picker, dropdowns, modals, the context menu. */
+  /* #topbar keeps a solid brand navy per the CI guide (PMS 295C, --primary).
+     It is chrome with its own fixed identity, so it does not follow the
+     light/dark toggle — same reasoning as --card-ink. */
 }
 
 :root[data-theme="dark"] {
@@ -131,8 +136,16 @@
   --primary-text: #6fb1e0;
   --danger-line: #7f2222;
   --danger-tint: rgba(185,28,28,.16);
+  --danger-text: #fca5a5;
   --warn-text: #e0b070;
   --warn-tint: rgba(245,158,11,.16);
+  /* dark steps of the status set: a low-chroma ground with a lifted ink,
+     rather than the light values dimmed — dimming them turns amber to mud */
+  --ok-surface: #1b2416;
+  --ok-line: #46592a;
+  --ok-text: #a8c855;
+  --warn-surface: #2a2313;
+  --warn-line: #6a5426;
   --bg-soft: #232a33;
   --hover-tint: #232c38;
   --track-off: #3a424b;
@@ -168,12 +181,6 @@
 
   --shadow: 0 14px 36px rgba(0, 0, 0, .52);
 
-  /* darker, lower-key glass so text stays legible on the dark ground */
-  --glass: rgba(28, 34, 42, 0.52);
-  --glass-strong: rgba(30, 36, 45, 0.68);
-  --glass-border: rgba(255, 255, 255, 0.10);
-  --glass-shadow: 0 6px 26px rgba(0, 0, 0, 0.42), 0 1px 2px rgba(0, 0, 0, 0.34);
-  --glass-blur: saturate(1.3) blur(14px);
 }
 
 body {
@@ -399,8 +406,30 @@ button, input, select, textarea, optgroup {
    nowhere else. currentColor is the whole point: an icon dims with its own
    label when a control is disabled, which the emoji these replaced could not
    do. */
-.ic { width: 16px; height: 16px; flex: none; display: block; }
+/* inline-block, not block: a flex container blockifies its children anyway, so
+   this behaves identically inside a button — but it also lets an icon sit in an
+   ordinary inline run of text. As display:block it was a block box inside an
+   inline <span>, which forced a line break and stacked the glyph above its own
+   label (the Host coverage risk rows, the Overview callouts, the host link). */
+.ic { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -.15em; }
 .ic-sm { width: 13px; height: 13px; }
+/* Elements that hold an icon followed by text and are NOT already flex rows.
+   icon() and setIconLabel() emit no separator — deliberately, so a caller
+   controls the spacing — so the gap belongs here, where the pairing is known.
+   Anything already using flex (buttons, .import-note, the toolbar) has its own
+   gap and must not be listed. */
+#readonly-badge,
+.ctx-item,
+.hl-loc-link,
+.ov-avail-title,
+.ov-avail-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ctx-item { display: flex; }          /* a menu row still fills its menu */
+.ov-avail-ok { display: flex; align-items: flex-start; }
+
 
 /* These come AFTER .btn deliberately. Both are single-class selectors, so the
    cascade is decided by source order alone — with this block above .btn, the
@@ -658,9 +687,9 @@ button, input, select, textarea, optgroup {
 .toggle-active input:checked + .toggle-track { background: var(--brand-green); }
 .toggle-active .toggle-text { font-weight: 600; font-size: 12px; }
 #readonly-badge {
-  background: #fef3c7;
+  background: var(--warn-surface);
   border: 1px solid #f59e0b;
-  color: #92400e;
+  color: var(--warn-text);
   padding: 4px 10px;
   border-radius: 6px;
   font-weight: 600;
@@ -838,9 +867,24 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   flex: none;
   background: rgba(255,255,255,.72);
   color: var(--primary);
-  box-shadow: inset 0 0 0 1px rgba(0,73,131,.25);
+  /* A REAL border, not an inset shadow. html2canvas renders outer shadows but
+     not inset ones, so the exported JPG dropped this ring entirely and left a
+     72%-white chip on the pale engineer tint — invisible. A border is geometry,
+     so screen, JPG and PDF now agree. Padding drops 5px -> 4px to keep the
+     chip the same width as before. */
+  border: 1px solid rgba(0,73,131,.30);
+  padding: 0 4px;
 }
-.mission-header .m-shift.night { background: var(--night); color: #fff; box-shadow: none; }
+.mission-header .m-shift.night {
+  background: var(--night);
+  color: #fff;
+  border-color: var(--night);
+}
+/* The moon sits in a span rather than being a flex child of the chip, and the
+   chip stays a plain inline box: html2canvas drops an <svg> that is a direct
+   flex item, which is what emptied the NIGHT chip in the exported JPG. */
+.mission-header .m-shift-ico { display: inline-block; margin-right: 3px; }
+.mission-header .m-shift-ico .ic { width: 10px; height: 10px; vertical-align: -.12em; }
 /* the host's service area travels with the shift chip: one group, pushed to
    the right of the band together, so the pair reads as "when and where" and a
    host with no area set just leaves the shift chip where it always was */
@@ -919,11 +963,15 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 /* flex:none so the pin is never the first thing clipped off a long host name —
    the name ellipsises, the pin stays. text-decoration:none keeps the underline
    under the words rather than dragging through the emoji. */
+/* wrapper span, so the svg is never a direct flex item of .m-host-link
+   (html2canvas drops those — see the NIGHT chip above) */
 .mission-header .m-host-pin {
   flex: none;
-  font-size: 11px;
+  display: inline-block;
+  line-height: 0;
   text-decoration: none;
 }
+.mission-header .m-host-pin .ic { width: 11px; height: 11px; vertical-align: -.1em; }
 .mission-header .m-host-link:hover,
 .mission-header .m-host-link:focus-visible { color: var(--text); }
 .mission-body {
@@ -1887,9 +1935,9 @@ body.board-view #app-root { margin-right: 264px; }
    secondary did not. .import-note next to it is too quiet for that, and
    .login-error too alarming. */
 .modal-warn {
-  background: #fffbeb;
-  border: 1px solid #fcd34d;
-  color: #92400e;
+  background: var(--warn-surface);
+  border: 1px solid var(--warn-line);
+  color: var(--warn-text);
   border-radius: 6px;
   padding: 8px 10px;
   font-size: 13px;
@@ -1914,9 +1962,9 @@ body.board-view #app-root { margin-right: 264px; }
   color: var(--text);
 }
 .login-error {
-  background: #fef2f2;
-  border: 1px solid #fca5a5;
-  color: #b91c1c;
+  background: var(--danger-tint);
+  border: 1px solid var(--danger-line);
+  color: var(--danger-text);
   padding: 6px 9px;
   border-radius: 6px;
   font-size: 12.5px;
@@ -1982,7 +2030,7 @@ body.board-view #app-root { margin-right: 264px; }
   border: 1px solid var(--border);
   border-left-width: 5px;
   border-left-style: solid;
-  border-radius: 10px;
+  border-radius: var(--r-box);
   padding: 12px 18px;
 }
 .ov-status-main { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
@@ -1997,7 +2045,7 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-kpi-tile {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-box);
   padding: 14px 16px;
 }
 .ov-kpi-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -2007,8 +2055,8 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-kpi-value-sub { font-size: 15px; font-weight: 600; color: var(--muted); }
 .ov-kpi-label { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 .ov-kpi-breakdown { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
-.ov-kpi-breakdown b.up { color: #15803d; }
-.ov-kpi-breakdown b.down { color: #b91c1c; }
+.ov-kpi-breakdown b.up { color: var(--ok-text); }
+.ov-kpi-breakdown b.down { color: var(--danger-text); }
 .ov-kpi-mixbar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin-top: 8px; }
 .ov-kpi-meter { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .ov-kpi-meter-track { flex-grow: 1; height: 8px; border-radius: 999px; overflow: hidden; }
@@ -2029,7 +2077,7 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-section {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-box);
   padding: 18px 20px;
 }
 .ov-section h3 { font-size: 15px; margin-bottom: 2px; }
@@ -2062,7 +2110,8 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-table-nameinner { display: flex; align-items: center; gap: 8px; }
 .ov-table-name.clickable { cursor: pointer; }
 .ov-table-name.clickable:hover .ov-table-label { color: var(--primary-text); text-decoration: underline; }
-.ov-table-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+/* the same round mark the stats bar uses — one shape for "this is a series" */
+.ov-table-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; border: 1px solid rgba(0,0,0,.12); }
 .ov-table-label { font-weight: 600; line-height: 1.25; }
 .ov-table-label small { display: block; font-weight: 400; font-size: 10.5px; color: var(--muted); }
 .ov-cell { display: flex; align-items: center; gap: 8px; }
@@ -2073,7 +2122,7 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-table-totalrow td { border-top: 2px solid var(--border); border-bottom: none; padding-top: 10px; }
 .ov-table-totalrow .ov-table-label { font-weight: 700; }
 .ov-table-totalrow .ov-cell-val { font-weight: 700; color: var(--primary-text); }
-.ov-cell-val.warn { color: #b45309; }
+.ov-cell-val.warn { color: var(--warn-text); }
 :root[data-theme="dark"] .ov-cell-val.warn { color: #e0a94a; }
 .ov-cell-bar {
   flex: 1 1 auto;
@@ -2150,14 +2199,42 @@ body.board-view #app-root { margin-right: 264px; }
 /* flex-wrap so a narrow column drops "who" onto its own line instead of
    squeezing the host name into a cramped, overlapping wrap — at full width
    all three still sit on one line. */
-.ov-hostrisk-rows { display: flex; flex-direction: column; gap: 6px; }
-.ov-hostrisk-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; border: 1px solid var(--border); border-radius: 6px; padding: 8px 11px; }
-.ov-hostrisk-row.risk { border-color: #f59e0b; background: #fffbeb; }
-.ov-hostrisk-name { font-size: 13px; font-weight: 600; flex: 1 1 140px; min-width: 0; }
-.ov-hostrisk-row.risk .ov-hostrisk-name { font-weight: 700; }
-.ov-hostrisk-count { font-size: 11.5px; color: var(--muted); flex: 0 0 auto; }
-.ov-hostrisk-row.risk .ov-hostrisk-count { font-weight: 700; color: #92400e; }
-.ov-hostrisk-who { font-size: 11px; color: var(--muted); flex: 1 1 auto; min-width: 84px; text-align: right; }
+/* Host coverage risk — one grid, so the columns stop wandering.
+   Before: the host name was `flex: 1 1 140px` and the inspector list
+   `flex: 1 1 auto`, so BOTH outer columns were flexible and the count in the
+   middle landed wherever their text lengths left it — a different x on every
+   row. A grid gives the three columns fixed tracks and the raggedness goes.
+
+   Two other things changed with it. The count is a bare number now, with the
+   word said once in the column header instead of repeated down the list. And
+   severity is real: the rail is amber only for a host with a SINGLE trained
+   inspector. Every row used to be `risk`, which spent the warning colour on
+   all six and therefore marked none of them. */
+.ov-hostrisk-head,
+.ov-hostrisk-row {
+  display: grid;
+  grid-template-columns: 3px 1fr 62px minmax(130px, 1.1fr);
+  align-items: center;
+  gap: 0 12px;
+}
+.ov-hostrisk-head {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: 7px;
+}
+.ov-hostrisk-head .r { text-align: right; }
+.ov-hostrisk-rows { border-top: 1px solid var(--border); }
+.ov-hostrisk-row { padding: 9px 0; border-bottom: 1px solid var(--border); }
+/* the rail carries severity, so the row itself needs no fill */
+.ov-hostrisk-rail { width: 3px; height: 22px; border-radius: 2px; background: var(--border); }
+.ov-hostrisk-row.risk .ov-hostrisk-rail { background: var(--warn); }
+.ov-hostrisk-name { font-size: 13px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-hostrisk-count { font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+.ov-hostrisk-row.risk .ov-hostrisk-count { color: var(--warn-text); }
+.ov-hostrisk-who { font-size: 11px; color: var(--muted); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-hostrisk-note { font-size: 11.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
 
 /* trend: title+caption on the left, metric switcher + range switcher on the
@@ -2267,14 +2344,17 @@ button.chart-legend-item:hover { text-decoration: underline; }
 .chart-tip-value { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .chart-tip-label { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
 
+/* A tinted surface with a hairline, not a saturated amber panel. This box
+   annotates numbers; at full strength it shouted louder than the figures it
+   was pointing at, and with every row amber nothing inside it stood out. */
 .ov-avail {
   margin-top: 10px;
-  border: 1px solid #f59e0b;
-  background: #fffbeb;
-  border-radius: 8px;
-  padding: 8px 10px;
+  border: 1px solid var(--warn-line);
+  background: var(--warn-surface);
+  border-radius: var(--r);
+  padding: 9px 11px;
 }
-.ov-avail-title { font-size: 12px; font-weight: 700; color: #92400e; margin-bottom: 6px; }
+.ov-avail-title { font-size: 12px; font-weight: 700; color: var(--warn-text); margin-bottom: 6px; }
 /* Action queue's header row: the amber count on the left, the per-board
    breakdown ("Non-Rayong 7 · Rayong 3") on the right — one aggregated box
    instead of a repeated card per board. */
@@ -2303,9 +2383,9 @@ button.chart-legend-item:hover { text-decoration: underline; }
 }
 .ov-mini.oncall { border: 1.5px dashed var(--emp-oncall-border); }
 .ov-avail-ok {
-  border-color: #22c55e;
-  background: #f0fdf4;
-  color: #15803d;
+  border-color: var(--ok-line);
+  background: var(--ok-surface);
+  color: var(--ok-text);
   font-size: 12.5px;
   font-weight: 700;
 }
@@ -2538,7 +2618,7 @@ body.touch-mode .hl-edit { opacity: 1; }
   background: rgba(237,161,0,.10);
   font-size: 13px;
 }
-#hostlist-dupbar .dupbar-icon { color: #b45309; font-weight: 700; }
+#hostlist-dupbar .dupbar-icon { color: var(--warn-text); font-weight: 700; }
 #hostlist-dup-text { flex: 1; min-width: 200px; }
 :root[data-theme="dark"] #hostlist-dupbar { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
 :root[data-theme="dark"] #hostlist-dupbar .dupbar-icon { color: #f0b45c; }
@@ -2556,7 +2636,7 @@ body.touch-mode .hl-edit { opacity: 1; }
   vertical-align: middle;
 }
 .hl-tag-arch { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
-.hl-tag-dup { background: rgba(237,161,0,.18); color: #b45309; border: 1px solid #e5b980; }
+.hl-tag-dup { background: var(--warn-tint); color: var(--warn-text); border: 1px solid var(--warn-line); }
 :root[data-theme="dark"] .hl-tag-dup { color: #f0b45c; border-color: #7a5a1f; }
 /* an archived host is still readable, just visibly off the active roster —
    same treatment (and same reasoning) as an inactive employee's row */
@@ -2600,7 +2680,7 @@ body.touch-mode .hl-edit { opacity: 1; }
 .modal .toggle-archived .toggle-text { font-weight: 600; font-size: 12px; }
 /* live verdict under the New Mission host box (see updateMissionHostNote) */
 .host-note-ok { color: var(--primary-text); font-weight: 600; }
-.host-note-new { color: #b45309; font-weight: 600; }
+.host-note-new { color: var(--warn-text); font-weight: 600; }
 :root[data-theme="dark"] .host-note-new { color: #f0b45c; }
 
 .hl-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: center; }
@@ -2656,32 +2736,22 @@ body.touch-mode .hl-edit { opacity: 1; }
 .hl-empty { color: var(--muted); font-size: 12.5px; }
 
 /* ==========================================================================
-   Glassmorphism — frosted translucent surfaces over the body gradient.
-   Applied here, after the base rules, as background/border/shadow overrides so
-   the change reads (and reverts) as one block. Every blur pulls from
-   --glass-blur so `body.exporting` (bottom) can switch the whole app back to
-   opaque surfaces for a crisp JPG — html2canvas can't render backdrop-filter.
+   Surfaces — applied after the base rules as background/border/shadow
+   overrides, so the whole surface treatment reads as one block.
    ========================================================================== */
 
-/* let the body gradient show behind the board so the glass has something to blur */
+/* the board sits on the page ground rather than painting its own */
 #board-capture { background: transparent; }
 
-/* #topbar deliberately keeps its solid brand-navy background (see the
-   original rule near the top of this file) — it is chrome, not a glass
-   surface. Everything that can render layered above it — the date picker
-   popover, filter dropdowns, modals, the context menu — gets the glass
-   treatment below instead. */
+/* Frosted surfaces are gone, the mission card included. Blur over a moving
+   background cost legibility on the densest screens, drew a different picture
+   in the exported JPG than on screen (html2canvas cannot render
+   backdrop-filter, so every capture had to swap tokens first), and gave every
+   surface the same soft edge, so nothing read as nearer than anything else.
+   Panels are opaque now and separate with a border.
 
-/* Frosted surfaces are gone everywhere except the mission card. Blur over a
-   moving background cost legibility on the densest screens, produced a
-   different drawing in the exported JPG than on screen (html2canvas cannot
-   render backdrop-filter, hence the token swap at the bottom of this block),
-   and gave every surface the same soft edge, so nothing read as nearer than
-   anything else. Panels are opaque now and separate with a border.
-
-   .mission-card keeps its glass deliberately: its surface is part of the card
-   design, which is out of scope for this refresh. That is also why the
-   body.exporting token swap below has to stay. */
+   Nothing in the app runs backdrop-filter any more, which is what lets the
+   export capture the same surfaces the screen shows. */
 .zone,
 #board-empty {
   background: var(--panel);
@@ -2690,13 +2760,7 @@ body.touch-mode .hl-edit { opacity: 1; }
   border-color: var(--border);
   box-shadow: none;
 }
-.mission-card {
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border-color: var(--glass-border);
-  box-shadow: var(--glass-shadow);
-}
+.mission-card,
 #float-pool,
 .ov-section {
   background: var(--panel);
@@ -2705,10 +2769,10 @@ body.touch-mode .hl-edit { opacity: 1; }
   border-color: var(--border);
   box-shadow: none;
 }
-/* Modals are deliberately NOT frosted. They sit over a busy board and hold the
-   densest text in the app — a settings form, a 15-row user list, a 16 x 4
-   permission grid — and translucency over a moving background is exactly what
-   makes that hard to read. The board's own surfaces above keep the glass. */
+/* A modal separates with the one shadow rather than a border: it is the only
+   thing in the app that genuinely floats. It holds the densest text there is —
+   a settings form, a 15-row user list, a 16 x 4 permission grid — so it stays
+   fully opaque. */
 .modal {
   background: var(--panel);
   -webkit-backdrop-filter: none;
@@ -2716,7 +2780,7 @@ body.touch-mode .hl-edit { opacity: 1; }
   border: none;
   box-shadow: var(--shadow);
 }
-.mission-card { border-radius: 12px; }
+.mission-card,
 .zone { border-radius: var(--r-box); }
 .zone-label { background: var(--bg-soft); }
 #status-zones { border-bottom-color: var(--border); }
@@ -2744,15 +2808,9 @@ body.touch-mode .hl-edit { opacity: 1; }
   background: rgba(15,23,42,.55);
 }
 
-/* ---- EXPORT: swap the glass tokens for the theme's opaque surfaces and drop
-   all blur so the captured JPG is crisp (html2canvas ignores backdrop-filter) ---- */
-body.exporting {
-  --glass: var(--panel);
-  --glass-strong: var(--panel);
-  --glass-border: var(--border);
-  --glass-shadow: none;
-  --glass-blur: none;
-}
+/* No token swap before a capture any more: every surface is opaque, so what
+   html2canvas draws and what the screen shows are the same thing by
+   construction rather than by substitution. */
 body.exporting #board-capture { background: var(--bg); }
 body.exporting .zone-label { background: var(--bg-soft); }
 
@@ -3085,15 +3143,15 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   cursor: pointer;
 }
 .st-del:hover, .st-del:focus-visible {
-  background: #fef2f2;
-  border-color: #fca5a5;
-  color: #b91c1c;
+  background: var(--danger-tint);
+  border-color: var(--danger-line);
+  color: var(--danger-text);
 }
 :root[data-theme="dark"] .st-del:hover,
 :root[data-theme="dark"] .st-del:focus-visible {
   background: rgba(185,28,28,.18);
   border-color: #7f2222;
-  color: #fca5a5;
+  color: var(--danger-text);
 }
 /* the weekday chips sit on one line beside the board name */
 .settings-table .settings-board-days { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 0; }
@@ -3153,7 +3211,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   background: rgba(237,161,0,.10);
   font-size: 13px;
 }
-#users-pending .dupbar-icon { color: #b45309; font-weight: 700; }
+#users-pending .dupbar-icon { color: var(--warn-text); font-weight: 700; }
 #users-pending-text { flex: 1; min-width: 180px; }
 :root[data-theme="dark"] #users-pending { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
 :root[data-theme="dark"] #users-pending .dupbar-icon { color: #f0b45c; }
@@ -3219,7 +3277,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .role-pill.role-engineer { background: #dcfce7; color: #14532d; }
 .role-pill.role-viewer   { background: #f1f5f9; color: #334155; }
 .status-pill.status-active   { background: #dcfce7; color: #14532d; }
-.status-pill.status-pending  { background: #fef3c7; color: #92400e; }
+.status-pill.status-pending  { background: var(--warn-surface); color: var(--warn-text); }
 .status-pill.status-disabled { background: #f1f5f9; color: #64748b; }
 /* the pills carry their own ink, so dark mode only softens the plate */
 :root[data-theme="dark"] .role-pill,

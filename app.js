@@ -67,17 +67,40 @@ function yearStart(iso) { return iso.slice(0, 4) + "-01-01"; }
    already trusted HTML — never concatenated with user-entered text that has
    not been through escapeHtml(). iconEl() is the same thing as a node, for the
    code paths that build controls with createElement instead. */
+/* The sprite in index.html stays the single source of truth, but an icon is
+   INLINED from it rather than referenced with <use>. Two html2canvas
+   limitations force this, both verified against the bundled build:
+
+     - a <use> pointing at a <symbol> renders as nothing in the capture, so
+       every icon on the board vanished from the exported JPG;
+     - an <svg> (or <img>) that is a DIRECT FLEX ITEM is dropped as well, which
+       is why wrapping matters at the two call sites on the board.
+
+   Inlining costs a little markup and fixes the first. currentColor still
+   resolves, so themes and disabled states are unaffected. */
+const ICON_CACHE = new Map();
+function iconMarkup(name) {
+  if (ICON_CACHE.has(name)) return ICON_CACHE.get(name);
+  const sym = document.getElementById("i-" + name);
+  // an unknown name must not silently draw nothing — that is how the missing
+  // moon went unnoticed the first time
+  if (!sym) { console.warn("unknown icon", name); ICON_CACHE.set(name, ""); return ""; }
+  const attrs = [...sym.attributes]
+    .filter(a => a.name !== "id")
+    .map(a => `${a.name}="${a.value}"`).join(" ");
+  const out = { attrs, inner: sym.innerHTML };
+  ICON_CACHE.set(name, out);
+  return out;
+}
 function icon(name, cls) {
-  return `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+  const m = iconMarkup(name);
+  if (!m) return "";
+  return `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true" ${m.attrs}>${m.inner}</svg>`;
 }
 function iconEl(name, cls) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "ic" + (cls ? " " + cls : ""));
-  svg.setAttribute("aria-hidden", "true");
-  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-  use.setAttribute("href", "#i-" + name);
-  svg.appendChild(use);
-  return svg;
+  const span = document.createElement("span");
+  span.innerHTML = icon(name, cls);
+  return span.firstElementChild || document.createTextNode("");
 }
 
 /* A control whose label is rebuilt on every render: icon + text, with the text
@@ -1546,7 +1569,7 @@ function renderMissions() {
         ${hostHtml}
         <span class="m-pills">
           ${areaPillHtml(hostArea, "m-area")}
-          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "🌙 NIGHT" : "DAY"}</span>
+          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? `<span class="m-shift-ico">${icon("moon")}</span>NIGHT` : "DAY"}</span>
         </span>
       </div>
       <div class="m-line2">
@@ -2465,7 +2488,7 @@ function renderOverview() {
      calm confirmation, same tone as the tick empty-state elsewhere on this page. */
   const statusBar = document.createElement("div");
   statusBar.className = "ov-status-bar";
-  statusBar.style.borderLeftColor = totalStandby ? "#f59e0b" : "#22c55e";
+  statusBar.style.borderLeftColor = totalStandby ? "var(--warn)" : "var(--ok-text)";
   const statusMain = document.createElement("div");
   statusMain.className = "ov-status-main";
   const statusHeading = document.createElement("div");
@@ -2720,16 +2743,24 @@ function renderOverview() {
     hostRiskSec.appendChild(Object.assign(document.createElement("p"),
       { className: "ov-avail ov-avail-ok", textContent: "No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about." }));
   } else {
+    // "people ever" is said once, in the header, instead of on all six rows
+    const head = document.createElement("div");
+    head.className = "ov-hostrisk-head";
+    head.innerHTML = `<span></span><span>Host</span><span class="r">People</span><span class="r">Inspectors</span>`;
+    hostRiskSec.appendChild(head);
+
     const rowsWrap = document.createElement("div");
     rowsWrap.className = "ov-hostrisk-rows";
     for (const r of riskyHosts) {
       const row = document.createElement("div");
-      row.className = "ov-hostrisk-row risk";
+      // Only a host with a SINGLE trained inspector is the emergency — that is
+      // the one nobody can cover if they take leave. Two is thin, not urgent.
+      row.className = "ov-hostrisk-row" + (r.count === 1 ? " risk" : "");
       const who = r.names.join(", ") + (r.count > r.names.length ? ` +${r.count - r.names.length}` : "");
-      const countLabel = `${r.count} person${r.count === 1 ? "" : "s"} ever`;
       row.innerHTML = `
+        <span class="ov-hostrisk-rail" aria-hidden="true"></span>
         <span class="ov-hostrisk-name">${escapeHtml(r.host)}</span>
-        <span class="ov-hostrisk-count">${icon("alert")}${countLabel}</span>
+        <span class="ov-hostrisk-count">${r.count}</span>
         <span class="ov-hostrisk-who">${escapeHtml(who)}</span>`;
       rowsWrap.appendChild(row);
     }
@@ -3341,7 +3372,7 @@ function hostNameHtml(name, rec) {
     + ` target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"`
     + ` title="Open ${escapeHtml(name)} in Google Maps">`
     + `<span class="m-host-name">${escapeHtml(name)}</span>`
-    + `<span class="m-host-pin" aria-hidden="true">📍</span></a>`;
+    + `<span class="m-host-pin">${icon("pin")}</span></a>`;
 }
 
 /* One row per host, merging the fetched directory with the host master records
@@ -4873,9 +4904,16 @@ function layoutMasonry(forceCols) {
     const j = i < cols ? i : colH.indexOf(Math.min(...colH));
     c.style.left = (j * (colW + MASONRY_GAP)) + "px";
     c.style.top = colH[j] + "px";
-    colH[j] += c.offsetHeight + MASONRY_GAP;
+    // getBoundingClientRect(), not offsetHeight: offsetHeight is ROUNDED to a
+    // whole pixel, and summing ~9 rounded card heights down a column drifts
+    // several px below the real bottom. The grid then declares itself shorter
+    // than its own absolutely-positioned children reach — invisible on screen,
+    // but in print that overflow does not fit the page the height was measured
+    // for, and Chrome moves the whole unbreakable grid onto a second sheet.
+    colH[j] += c.getBoundingClientRect().height + MASONRY_GAP;
   });
-  grid.style.height = (Math.max(...colH) - MASONRY_GAP) + "px";
+  // ceil so the declared height can never land under the true content bottom
+  grid.style.height = Math.ceil(Math.max(...colH) - MASONRY_GAP) + "px";
 }
 
 /* For the export only, hide any mission that has no crew on it, so an empty
@@ -4927,7 +4965,7 @@ async function exportBoard() {
   // The exported JPG is a shared artifact (printed, posted, sent to a customer) —
   // it must not depend on the viewer's own dark-mode preference. Force light for
   // the capture, since --bg/--panel/--emp-card etc. all redefine under
-  // [data-theme="dark"] and body.exporting only swaps the glass tokens.
+  // [data-theme="dark"].
   const wasDark = document.documentElement.getAttribute("data-theme") === "dark";
   if (wasDark) document.documentElement.removeAttribute("data-theme");
   // temporarily fold the available pools into the captured board — but not on a
@@ -5018,9 +5056,14 @@ function prepareForPrint() {
   $("#capture-title").textContent = boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
-  // `exporting` is what swaps the glass tokens for opaque surfaces; a printer
-  // (and a PDF) has no backdrop-filter, so without it every glass panel prints
-  // as a flat nothing. `printing` is this path's own hook.
+  // Save-as-PDF names the file after document.title, so without this every
+  // print lands as "Manpower Management Board.pdf" whichever board and day it
+  // is. Same shape as the JPG's name (see exportBoard). Restored in
+  // printRestore below, so a cancelled dialog cannot leave the tab renamed.
+  const prevTitle = document.title;
+  document.title = `${boardName.replace(/\s+/g, "_")}_${state.date}`;
+  // `exporting` carries the export-only layout (pinned capture width, no board
+  // prompt); `printing` is this path's own hook.
   document.body.classList.add("exporting", "printing");
   // Same reasoning as the export: a shared artifact must not carry the viewer's
   // own dark-mode preference — and a dark board wastes a cartridge besides.
@@ -5048,13 +5091,19 @@ function prepareForPrint() {
     layoutMasonry(EXPORT_COLS);
   }
   // Measured last, after every other decision above has changed the height.
-  setPrintPageSize($("#board-capture").getBoundingClientRect());
+  // scrollHeight as well as the rect: the rect is the border box, while
+  // scrollHeight also covers anything a descendant overflows by, which is
+  // exactly what pushed the grid onto a second page.
+  const cap = $("#board-capture");
+  const capRect = cap.getBoundingClientRect();
+  setPrintPageSize({ width: capRect.width, height: Math.max(capRect.height, cap.scrollHeight) });
 
   printRestore = () => {
     if (restoreEmptyMissions) restoreEmptyMissions();
     if (restoreLeaveZones) restoreLeaveZones();
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
+    document.title = prevTitle;
     document.body.classList.remove("exporting", "printing");
     if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     clearPrintPageSize();
@@ -5088,15 +5137,33 @@ function prepareForPrint() {
    There is a ceiling, far above anything this app will meet: a PDF page maxes
    out at 200in (5080mm) a side. A 200-mission board measures ~111in, so the
    limit is roughly 360 missions on a single day — hence no guard here. */
+/* Two real exports (2026-09-07 and 2026-09-08) still split onto a second page
+   after the masonry rounding fix below, each by almost exactly the same ~8px
+   — 7.8px and 8.6px, on two boards whose measured heights differed from each
+   other by over 100px. A drift that stays constant while the content that
+   would accumulate it changes size is not the masonry sum; that was verified
+   independently by replaying this exact function over a 24-card masonry grid
+   built from real styles.css, which produced one page with room to spare. It
+   points at the browser's own print rasteriser rounding CSS px to device px
+   at print time — a step this code cannot observe or correct at the source,
+   since it happens after this measurement and outside the DOM entirely.
+   PRINT_SAFETY_PX buys back that margin. A PDF page is vector and is never
+   actually printed to a physical sheet (see the file-level comment below), so
+   a few extra millimetres of white space at the bottom costs nothing — it is
+   cheaper than being wrong again the next time this ~8px shows up. */
+const PRINT_SAFETY_PX = 24;
 function setPrintPageSize(rect) {
-  const mm = (px) => (px / 96 * 25.4).toFixed(1);
+  // Rounded UP to the next 0.1mm, never to nearest: @page is the hard edge, so
+  // a size that rounds DOWN is a page fractionally shorter than its content and
+  // the overflow starts a second sheet. Costs at most 0.1mm of white margin.
+  const mm = (px) => (Math.ceil(px / 96 * 25.4 * 10) / 10).toFixed(1);
   let el = document.getElementById("print-page-size");
   if (!el) {
     el = document.createElement("style");
     el.id = "print-page-size";
     document.head.appendChild(el);
   }
-  el.textContent = `@page { size: ${mm(Math.ceil(rect.width))}mm ${mm(Math.ceil(rect.height))}mm; margin: 0; }`;
+  el.textContent = `@page { size: ${mm(Math.ceil(rect.width))}mm ${mm(Math.ceil(rect.height) + PRINT_SAFETY_PX)}mm; margin: 0; }`;
 }
 
 function clearPrintPageSize() {
@@ -5108,7 +5175,18 @@ function restoreAfterPrint() {
   if (!printRestore) return;
   const done = printRestore;
   printRestore = null;   // cleared first, so a throw below can't wedge the board
-  done();
+  try {
+    done();
+  } catch (err) {
+    // Clearing printRestore is not enough on its own: if the closure throws
+    // part-way, whatever it had not undone yet stays applied — and the board
+    // is left in its export layout with a stale @page, so the NEXT print
+    // measures an already-exporting DOM and spills onto a second sheet. These
+    // are the two that must come off no matter what.
+    console.error("print restore failed", err);
+    document.body.classList.remove("exporting", "printing");
+    clearPrintPageSize();
+  }
 }
 
 function printBoard() {
