@@ -271,45 +271,6 @@ button, input, select, textarea, optgroup {
   background: var(--brand-green);
 }
 
-/* ===== Top-bar controls =====
-   Every control on the navy bar is the same 34px hairline outline with no
-   fill; a fill is reserved for the ONE state that is on (a locked board).
-   Transparent background is load-bearing: the base .btn sets
-   background:var(--panel), which is white in light mode and would swallow
-   these white labels. */
-.btn-top {
-  height: var(--ctl-h-top);
-  padding: 0 13px;
-  border: 1px solid var(--on-navy-line);
-  border-radius: var(--r-top);
-  background: transparent;
-  color: #fff;
-  font-size: 13.5px;
-  font-weight: 500;
-}
-.btn-top:hover { background: var(--on-navy-fill); }
-.btn-top:disabled { opacity: .5; }
-.btn-top:disabled:hover { background: transparent; }
-/* icon-only controls are square, so the row keeps one rhythm */
-.btn-top.btn-icon { width: var(--ctl-h-top); padding: 0; }
-
-/* The date controls read as one instrument rather than three floating buttons:
-   a single outline with hairlines between the cells. */
-.date-nav {
-  display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--on-navy-line);
-  border-radius: var(--r-top);
-  overflow: hidden;
-}
-.date-nav .btn-top {
-  border: none;
-  border-left: 1px solid rgba(255,255,255,.26);
-  border-radius: 0;
-}
-.date-nav .btn-top:first-child { border-left: none; }
-.date-nav .btn-top.btn-icon { width: 38px; }
-
 /* board tabs row (below the logo/title header) */
 #board-bar {
   display: flex;
@@ -440,6 +401,49 @@ button, input, select, textarea, optgroup {
    do. */
 .ic { width: 16px; height: 16px; flex: none; display: block; }
 .ic-sm { width: 13px; height: 13px; }
+
+/* These come AFTER .btn deliberately. Both are single-class selectors, so the
+   cascade is decided by source order alone — with this block above .btn, the
+   base rule's white background and dark text won, and every control on the
+   navy bar rendered as a white pill. */
+/* ===== Top-bar controls =====
+   Every control on the navy bar is the same 34px hairline outline with no
+   fill; a fill is reserved for the ONE state that is on (a locked board).
+   Transparent background is load-bearing: the base .btn sets
+   background:var(--panel), which is white in light mode and would swallow
+   these white labels. */
+.btn-top {
+  height: var(--ctl-h-top);
+  padding: 0 13px;
+  border: 1px solid var(--on-navy-line);
+  border-radius: var(--r-top);
+  background: transparent;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.btn-top:hover { background: var(--on-navy-fill); }
+.btn-top:disabled { opacity: .5; }
+.btn-top:disabled:hover { background: transparent; }
+/* icon-only controls are square, so the row keeps one rhythm */
+.btn-top.btn-icon { width: var(--ctl-h-top); padding: 0; }
+
+/* The date controls read as one instrument rather than three floating buttons:
+   a single outline with hairlines between the cells. */
+.date-nav {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--on-navy-line);
+  border-radius: var(--r-top);
+  overflow: hidden;
+}
+.date-nav .btn-top {
+  border: none;
+  border-left: 1px solid rgba(255,255,255,.26);
+  border-radius: 0;
+}
+.date-nav .btn-top:first-child { border-left: none; }
+.date-nav .btn-top.btn-icon { width: 38px; }
 
 /* save/sync status pill — plain text on the navy topbar, same treatment as
    #app-title's subtitle. Hidden until the first write of the session so it
@@ -1799,8 +1803,12 @@ body.board-view #app-root { margin-right: 264px; }
 }
 .weekday-chip:first-child { border-left: none; }
 /* .modal label is display:block (it wraps the form fields), which would break
-   these cells out of their row — they are labels too, but they are cells first */
-.modal .weekday-chip { display: inline-flex; margin-bottom: 0; }
+   these cells out of their row — they are labels too, but they are cells first.
+   The same applies to .sw-pick in the Settings tables: as a block it stretched
+   and dropped its hex onto a second line under the swatch. Both live inside
+   #modal-settings, so both need this. */
+.modal .weekday-chip,
+.modal .sw-pick { display: inline-flex; margin-bottom: 0; }
 .weekday-chip:hover { background: var(--hover-tint); color: var(--text); }
 .weekday-chip.on { background: var(--primary); color: #fff; }
 .weekday-chip.on:hover { background: var(--primary-dark); color: #fff; }
@@ -2307,7 +2315,6 @@ button.chart-legend-item:hover { text-decoration: underline; }
   background: var(--bg-soft);
 }
 .ov-avail-calm .ov-avail-title { color: var(--muted); }
-.board-tab.tab-overview.active { background: var(--brand-green); color: #fff; font-weight: 700; }
 
 /* export mode: freeze layout width for consistent capture; drop the panel margin */
 /* Pinned, not just floored: with only a min-width, a 1920px monitor laid the
@@ -3063,7 +3070,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   border-radius: var(--r-sm);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.16);
 }
-.settings-table .st-swatch { width: 116px; }
+.settings-table .st-swatch { width: 132px; }
 /* A row of solid red blocks down the page shouted louder than deleting an
    engineer deserves. Quiet until you reach for it. */
 .st-del {
