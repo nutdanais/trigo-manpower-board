@@ -60,7 +60,7 @@ if (-not $NoIssue) {
     Write-Host 'GitHub CLI (gh) is not installed, so automatic Issue creation is unavailable on this device.' -ForegroundColor Yellow
     Write-Host 'One-time Windows setup:  winget install --id GitHub.cli'
     Write-Host 'Then run:                gh auth login'
-    $answer = (Read-Host 'Continue this task WITHOUT a GitHub Issue? (y/N)').Trim().ToLowerInvariant()
+    $answer = (Read-Host 'Continue as a LOCAL-ONLY task without a GitHub Issue? (y/N)').Trim().ToLowerInvariant()
     if ($answer -ne 'y') { exit 0 }
     $NoIssue = $true
   } else {
@@ -69,7 +69,7 @@ if (-not $NoIssue) {
       Write-Host ''
       Write-Host 'GitHub CLI needs a one-time sign-in on this device.' -ForegroundColor Yellow
       Write-Host 'Run: gh auth login'
-      $answer = (Read-Host 'Continue this task WITHOUT a GitHub Issue? (y/N)').Trim().ToLowerInvariant()
+      $answer = (Read-Host 'Continue as a LOCAL-ONLY task without a GitHub Issue? (y/N)').Trim().ToLowerInvariant()
       if ($answer -ne 'y') { exit 0 }
       $NoIssue = $true
     }
@@ -134,15 +134,24 @@ if ((Test-Path $LocalConfig) -and -not (Test-Path $WorktreeConfig)) {
   Write-Host 'Copied local config.js into the isolated workspace (it remains git-ignored).'
 }
 
-$TaskReference = if ($IssueNumber) { "GitHub issue #$IssueNumber" } else { "task '$Title'" }
-$Prompt = "Read AGENTS.md and the relevant repository documentation. Work only on $TaskReference. First inspect the existing implementation and state your plan, then implement the smallest complete solution. Run the required validation, review your diff, commit and push the branch, and open a pull request. Do not merge it."
+if ($IssueNumber) {
+  $TaskReference = "GitHub issue #$IssueNumber"
+  $Prompt = "Read AGENTS.md and the relevant repository documentation. Work only on $TaskReference. First inspect the existing implementation and state your plan, then implement the smallest complete solution. Run the required validation, review your diff, commit and push the branch, and open a pull request. Do not merge it."
+} else {
+  $TaskReference = "local-only task '$Title'"
+  $Prompt = "Read AGENTS.md and the relevant repository documentation. Work only on $TaskReference. First inspect the existing implementation and state your plan, then implement the smallest complete solution and run the required validation. This task has no GitHub Issue: keep all work local, do not push, and do not open a pull request. If the change should be merged, stop and ask for a tracked GitHub Issue first."
+}
 
 Write-Host ''
 Write-Host 'Workspace ready.' -ForegroundColor Green
 Write-Host "Agent:      $Agent"
 Write-Host "Branch:     $Branch"
 Write-Host "Folder:     $Worktree"
-if ($IssueUrl) { Write-Host "Issue:      $IssueUrl" }
+if ($IssueUrl) {
+  Write-Host "Issue:      $IssueUrl"
+} else {
+  Write-Host 'Mode:       LOCAL ONLY (no push / no PR)' -ForegroundColor Yellow
+}
 Write-Host ''
 
 Set-Location $Worktree
