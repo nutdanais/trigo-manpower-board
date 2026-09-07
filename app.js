@@ -1546,7 +1546,7 @@ function renderMissions() {
         ${hostHtml}
         <span class="m-pills">
           ${areaPillHtml(hostArea, "m-area")}
-          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? "🌙 NIGHT" : "DAY"}</span>
+          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? icon("moon") + "NIGHT" : "DAY"}</span>
         </span>
       </div>
       <div class="m-line2">
@@ -2465,7 +2465,7 @@ function renderOverview() {
      calm confirmation, same tone as the tick empty-state elsewhere on this page. */
   const statusBar = document.createElement("div");
   statusBar.className = "ov-status-bar";
-  statusBar.style.borderLeftColor = totalStandby ? "#f59e0b" : "#22c55e";
+  statusBar.style.borderLeftColor = totalStandby ? "var(--warn)" : "var(--ok-text)";
   const statusMain = document.createElement("div");
   statusMain.className = "ov-status-main";
   const statusHeading = document.createElement("div");
@@ -2720,16 +2720,24 @@ function renderOverview() {
     hostRiskSec.appendChild(Object.assign(document.createElement("p"),
       { className: "ov-avail ov-avail-ok", textContent: "No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about." }));
   } else {
+    // "people ever" is said once, in the header, instead of on all six rows
+    const head = document.createElement("div");
+    head.className = "ov-hostrisk-head";
+    head.innerHTML = `<span></span><span>Host</span><span class="r">People</span><span class="r">Inspectors</span>`;
+    hostRiskSec.appendChild(head);
+
     const rowsWrap = document.createElement("div");
     rowsWrap.className = "ov-hostrisk-rows";
     for (const r of riskyHosts) {
       const row = document.createElement("div");
-      row.className = "ov-hostrisk-row risk";
+      // Only a host with a SINGLE trained inspector is the emergency — that is
+      // the one nobody can cover if they take leave. Two is thin, not urgent.
+      row.className = "ov-hostrisk-row" + (r.count === 1 ? " risk" : "");
       const who = r.names.join(", ") + (r.count > r.names.length ? ` +${r.count - r.names.length}` : "");
-      const countLabel = `${r.count} person${r.count === 1 ? "" : "s"} ever`;
       row.innerHTML = `
+        <span class="ov-hostrisk-rail" aria-hidden="true"></span>
         <span class="ov-hostrisk-name">${escapeHtml(r.host)}</span>
-        <span class="ov-hostrisk-count">${icon("alert")}${countLabel}</span>
+        <span class="ov-hostrisk-count">${r.count}</span>
         <span class="ov-hostrisk-who">${escapeHtml(who)}</span>`;
       rowsWrap.appendChild(row);
     }
@@ -3341,7 +3349,7 @@ function hostNameHtml(name, rec) {
     + ` target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"`
     + ` title="Open ${escapeHtml(name)} in Google Maps">`
     + `<span class="m-host-name">${escapeHtml(name)}</span>`
-    + `<span class="m-host-pin" aria-hidden="true">📍</span></a>`;
+    + `${icon("pin", "m-host-pin")}</a>`;
 }
 
 /* One row per host, merging the fetched directory with the host master records
@@ -4923,6 +4931,12 @@ async function exportBoard() {
   $("#capture-title").textContent = boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
+  // Save-as-PDF names the file after document.title, so without this every
+  // export lands as "Manpower Management Board.pdf" regardless of which board
+  // or day it is. Same shape as the JPG's own name (see exportBoard), and it
+  // is restored below so a cancelled print dialog cannot leave the tab renamed.
+  const prevTitle = document.title;
+  document.title = `${boardName.replace(/\s+/g, "_")}_${state.date}`;
   document.body.classList.add("exporting");
   // The exported JPG is a shared artifact (printed, posted, sent to a customer) —
   // it must not depend on the viewer's own dark-mode preference. Force light for
@@ -5055,6 +5069,7 @@ function prepareForPrint() {
     if (restoreLeaveZones) restoreLeaveZones();
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
+    document.title = prevTitle;
     document.body.classList.remove("exporting", "printing");
     if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     clearPrintPageSize();
