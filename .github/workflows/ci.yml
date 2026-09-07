@@ -37,6 +37,28 @@ jobs:
             node --check "$file"
           done < <(git ls-files '*.js')
 
+      - name: Agent shell launcher syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tools/agent/start-agent.sh
+          bash -n tools/agent/finish-agent.sh
+
+      - name: Agent PowerShell launcher syntax checks
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($file in @('tools/agent/start-agent.ps1', 'tools/agent/finish-agent.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Error "$file has PowerShell syntax errors: $($errors | Out-String)"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
       - name: Reject committed local config/secrets file
         shell: bash
         run: |
