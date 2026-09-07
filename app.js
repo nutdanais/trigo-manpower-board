@@ -5137,6 +5137,21 @@ function prepareForPrint() {
    There is a ceiling, far above anything this app will meet: a PDF page maxes
    out at 200in (5080mm) a side. A 200-mission board measures ~111in, so the
    limit is roughly 360 missions on a single day — hence no guard here. */
+/* Two real exports (2026-09-07 and 2026-09-08) still split onto a second page
+   after the masonry rounding fix below, each by almost exactly the same ~8px
+   — 7.8px and 8.6px, on two boards whose measured heights differed from each
+   other by over 100px. A drift that stays constant while the content that
+   would accumulate it changes size is not the masonry sum; that was verified
+   independently by replaying this exact function over a 24-card masonry grid
+   built from real styles.css, which produced one page with room to spare. It
+   points at the browser's own print rasteriser rounding CSS px to device px
+   at print time — a step this code cannot observe or correct at the source,
+   since it happens after this measurement and outside the DOM entirely.
+   PRINT_SAFETY_PX buys back that margin. A PDF page is vector and is never
+   actually printed to a physical sheet (see the file-level comment below), so
+   a few extra millimetres of white space at the bottom costs nothing — it is
+   cheaper than being wrong again the next time this ~8px shows up. */
+const PRINT_SAFETY_PX = 24;
 function setPrintPageSize(rect) {
   // Rounded UP to the next 0.1mm, never to nearest: @page is the hard edge, so
   // a size that rounds DOWN is a page fractionally shorter than its content and
@@ -5148,7 +5163,7 @@ function setPrintPageSize(rect) {
     el.id = "print-page-size";
     document.head.appendChild(el);
   }
-  el.textContent = `@page { size: ${mm(Math.ceil(rect.width))}mm ${mm(Math.ceil(rect.height))}mm; margin: 0; }`;
+  el.textContent = `@page { size: ${mm(Math.ceil(rect.width))}mm ${mm(Math.ceil(rect.height) + PRINT_SAFETY_PX)}mm; margin: 0; }`;
 }
 
 function clearPrintPageSize() {
