@@ -55,6 +55,49 @@ function yearStart(iso) { return iso.slice(0, 4) + "-01-01"; }
    interpolate static enum labels, or already use .textContent (see e.g.
    board/engineer names in the Overview charts) — this only touches the
    sites that were actually building HTML from user-entered text. */
+/* ---------- icons ----------
+   Controls used to be labelled with emoji. Emoji are multi-colour, render as a
+   different drawing on every OS, sit off the text baseline, and — the reason
+   that actually mattered — cannot take a colour, so a disabled or hovered
+   button kept a full-strength glyph beside its greyed-out label. These are one
+   stroke set from the sprite at the top of index.html, drawn in currentColor,
+   so an icon dims with the control it belongs to.
+
+   Returns MARKUP, so it may only be used where the surrounding string is
+   already trusted HTML — never concatenated with user-entered text that has
+   not been through escapeHtml(). iconEl() is the same thing as a node, for the
+   code paths that build controls with createElement instead. */
+function icon(name, cls) {
+  return `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+function iconEl(name, cls) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "ic" + (cls ? " " + cls : ""));
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", "#i-" + name);
+  svg.appendChild(use);
+  return svg;
+}
+
+/* A control whose label is rebuilt on every render: icon + text, with the text
+   as a real text node so nothing user-entered is ever parsed as markup. */
+function setIconLabel(el, name, text, labelClass) {
+  el.textContent = "";
+  el.appendChild(iconEl(name));
+  const span = document.createElement("span");
+  if (labelClass) span.className = labelClass;
+  span.textContent = text;
+  el.appendChild(span);
+}
+
+/* A colour value as the label shown beside its swatch: "#a8c855" -> "A8C855".
+   Printed so a colour is never encoded by colour alone — the same rule the
+   Overview tables follow. */
+function swHex(v) {
+  return String(v || "").replace(/^#/, "").toUpperCase();
+}
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -133,7 +176,7 @@ function defaultPlanningDate() {
    The date is deliberately NOT restored: the app always opens on the next
    working day. Restoring it meant a daily user who planned tomorrow today
    came back tomorrow and landed on that same date — by then <= today, so
-   read-only 🔒 (see isReadOnly) — and had to click forward every morning.
+   read-only (see isReadOnly) — and had to click forward every morning.
    Landing on a date is a pure read (cloud.ensurePlanLoaded), so the choice
    is purely about where it's most useful to start, not about data safety. */
 const VIEW_KEY = "mpm-last-view";
@@ -260,7 +303,7 @@ function setSaveStatus(kind) {
     el.textContent = "Saved " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   } else if (kind === "error") {
     el.classList.add("save-error");
-    el.textContent = "⚠ Save failed";
+    setIconLabel(el, "alert", "Save failed");
   }
 }
 const CLOUD_WRITE_METHODS = [
@@ -778,7 +821,7 @@ function render() {
   renderBoardEmptyState();
   const lock = board ? lockInfo(D().activeBoardId, state.date) : null;
   $("#readonly-badge").classList.toggle("hidden", !board || !isReadOnly());
-  $("#readonly-badge").textContent = lock ? `🔒 Locked by ${lock.lockedBy}` : "🔒 Read-only (past date)";
+  setIconLabel($("#readonly-badge"), "lock", lock ? `Locked by ${lock.lockedBy}` : "Read-only (past date)");
   updateSelectionUI();
   updateUndoButton();
   applySearchHighlight();
@@ -791,7 +834,7 @@ function updateHideMissionsButton() {
   const btn = $("#btn-hide-missions");
   if (!btn) return;
   const n = getPlan().missions.filter(m => m.hidden).length;
-  btn.textContent = n ? `👁 Hide/Unhide (${n})` : "👁 Hide/Unhide";
+  setIconLabel(btn, "eye-off", n ? `Hide/Unhide (${n})` : "Hide/Unhide");
 }
 
 /* A plan is "empty" when it has no missions and nobody in any leave zone —
@@ -809,7 +852,7 @@ function updateResetButton() {
   const btn = $("#btn-reset-board");
   if (!btn) return;
   const empty = planIsEmpty(getPlan());
-  btn.textContent = empty ? "↺ Carry over" : "↺ Reset Board";
+  setIconLabel(btn, "reset", empty ? "Carry over" : "Reset Board");
   btn.title = empty
     ? "Bring in a copy of the last working day's plan (missions + crew)"
     : "Replace this day's plan with a fresh copy of the last working day";
@@ -837,7 +880,7 @@ function renderBoardEmptyState() {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "btn btn-carry";
-  btn.textContent = "↺ Carry over last working day's plan";
+  setIconLabel(btn, "reset", "Carry over last working day's plan");
   btn.onclick = () => guardEdit(() => resetBoard());
   box.appendChild(msg);
   box.appendChild(sub);
@@ -850,7 +893,7 @@ function renderTabs() {
   if (can("overview")) {
   const ov = document.createElement("div");
   ov.className = "board-tab tab-overview" + (isOverview() ? " active" : "");
-  ov.textContent = "📊 Overview";
+  setIconLabel(ov, "chart", "Overview");
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
   }
@@ -860,7 +903,7 @@ function renderTabs() {
   // "List" is in its own span so the phone bar can drop it (see .tab-trim in
   // styles.css) — "Manpower" alongside "Overview" and a board picker is
   // unambiguous, and the two words it saves are what let the bar hold one line
-  eml.innerHTML = '🧑\u200d🤝\u200d🧑 Manpower<span class="tab-trim"> List</span>';
+  eml.innerHTML = icon("users") + 'Manpower<span class="tab-trim"> List</span>';
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
   }
@@ -869,7 +912,7 @@ function renderTabs() {
   hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
   // same .tab-trim trick as Manpower List: on a phone the bar keeps "Host" and
   // drops " list", which is unambiguous next to Overview / Manpower
-  hl.innerHTML = '🏭 Host<span class="tab-trim"> list</span>';
+  hl.innerHTML = icon("site") + 'Host<span class="tab-trim"> list</span>';
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
   }
@@ -937,7 +980,7 @@ function renderBoardSelect() {
 /* Built from spans rather than one string so the phone header can drop the
    parts it can't afford (see .btn-date .d-ico / .d-yr in styles.css). Once the
    two arrows and the four icon buttons share this one row, a full
-   "📅 Tue 25-Aug-2026" no longer fits — and a date cut off by an ellipsis is
+   "Tue 25-Aug-2026" with its icon no longer fits — and a date cut off by an ellipsis is
    worse than one deliberately shortened to "Tue 25-Aug". The title keeps the
    full date on every screen size, and the picker itself always shows the year. */
 function renderDateButton() {
@@ -945,7 +988,7 @@ function renderDateButton() {
   const full = fmtDate(state.date);
   const [d, mon, yr] = full.split("-");
   const btn = $("#btn-date");
-  btn.innerHTML = `<span class="d-ico">📅</span> ${dow} ${d}-${mon}<span class="d-yr">-${yr}</span>`;
+  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt">${dow} ${d}-${mon}<span class="d-yr">-${yr}</span></span>`;
   btn.title = `${dow} ${full} — click to pick a date`;
 }
 
@@ -965,11 +1008,11 @@ function renderLockButton() {
   btn.classList.toggle("locked", !!lock);
   if (lock) {
     const when = lock.lockedAt ? new Date(lock.lockedAt).toLocaleString() : "";
-    btn.innerHTML = '🔒<span class="btn-label"> Locked</span>';
+    setIconLabel(btn, "lock", "Locked", "btn-label");
     btn.title = `Locked by ${lock.lockedBy}${when ? " on " + when : ""}` +
       (mayLock ? " — click to unlock for everyone" : "");
   } else {
-    btn.innerHTML = '🔓<span class="btn-label"> Lock</span>';
+    setIconLabel(btn, "unlock", "Lock", "btn-label");
     btn.title = mayLock ? "Lock this board so it's view-only for everyone" : "This board's plan is unlocked";
   }
 }
@@ -1181,10 +1224,10 @@ function renderCtxMenu(view) {
 
   const addTitle = (text) => { const h = document.createElement("div"); h.className = "ctx-title"; h.textContent = text; menu.appendChild(h); };
   // a leaf action: run it and close
-  const addItem = (label, fn, cls) => {
+  const addItem = (label, fn, cls, ico) => {
     const it = document.createElement("div");
     it.className = "ctx-item" + (cls ? " " + cls : "");
-    it.textContent = label;
+    if (ico) setIconLabel(it, ico, label); else it.textContent = label;
     it.onclick = () => { hideContextMenu(); fn(); };
     menu.appendChild(it);
   };
@@ -1193,10 +1236,10 @@ function renderCtxMenu(view) {
   // document handler its own target is detached and closest("#context-menu")
   // no longer matches — the menu would be treated as an outside click and hide
   // itself the instant you opened a submenu.
-  const addSub = (label, target) => {
+  const addSub = (label, target, ico) => {
     const it = document.createElement("div");
     it.className = "ctx-item ctx-sub";
-    it.textContent = label;
+    if (ico) setIconLabel(it, ico, label); else it.textContent = label;
     it.onclick = (ev) => { ev.stopPropagation(); renderCtxMenu(target); };
     menu.appendChild(it);
   };
@@ -1249,16 +1292,16 @@ function renderCtxMenu(view) {
     }
   } else {
     addTitle(many ? `${ids.length} employees selected` : emp.name);
-    if (!many) addItem("✏ Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)));
-    if (targetBoards.length) addSub("➜ Move to board", "boards");
+    if (!many) addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
+    if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
     if (missions.length) addSub("⊕ Assign to mission", "missions");
-    if (leaveZones.length) addSub("🌴 Leave", "leave");
+    if (leaveZones.length) addSub("Leave", "leave", "leave");
     if (sameBoard && (many || current)) {
       addItem(many ? "↩ Return to standby / pool" : `↩ Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`,
         () => guardEdit(() => assignEmployeesTo(ids, null)));
     }
     addSep();
-    addItem(many ? `🚫 Deactivate ${ids.length} employees` : "🚫 Deactivate employee", () => {
+    addItem(many ? `Deactivate ${ids.length} employees` : "Deactivate employee", () => {
       showConfirm("Deactivate employee" + (many ? "s" : "") + "?",
         `Deactivate ${who}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
         () => safely(async () => { await cloud.setEmployeesActive(ids, false); clearSelection(); await refreshAndRender(); }));
@@ -1350,7 +1393,7 @@ function renderFloatPool() {
   // on a holiday, unassigned permanent employees are off, not on standby —
   // relabel the pool so the board doesn't read as a staffing gap
   const holiday = isNonWorkingDate(state.date);
-  $("#standby-label").textContent = holiday ? "🏖 Holiday" : "Standby";
+  $("#standby-label").textContent = holiday ? "Holiday" : "Standby";
   $("#standby-sub").textContent = holiday ? "permanent, on holiday" : "permanent, unassigned";
   let standbyN = 0, oncallN = 0;
   for (const emp of sortEmployeesDisplay(unassignedEmployees())) {
@@ -1645,11 +1688,11 @@ function renderStats() {
     ["Total", s.total], ["Assigned", s.assigned], ["Leave", s.leave],
     ["Standby", s.standby],
   ];
-  if (s.isHoliday) chips.push(["🏖 Holiday", s.onHoliday]);
+  if (s.isHoliday) chips.push(["Holiday", s.onHoliday]);
   chips.push(["On-call free", s.oncallAvailable]);
   for (const [label, n] of chips) bar.appendChild(statChip(label, n));
-  bar.appendChild(statChip("☀️ Day", s.dayMissions));
-  bar.appendChild(statChip("🌙 Night", s.nightMissions, null, "stat-chip-night"));
+  bar.appendChild(statChip("Day", s.dayMissions));
+  bar.appendChild(statChip("Night", s.nightMissions, null, "stat-chip-night"));
   // per-service-area counts sit on the right of the same row
   for (const a of D().areas) {
     const n = boardEmployees(D().activeBoardId).filter(e => e.areaId === a.id).length;
@@ -2222,7 +2265,7 @@ function engineerHistorySection(dates, recs, pendingCharts) {
   }
   if (!entities.length) {
     sec.appendChild(Object.assign(document.createElement("p"),
-      { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
+      { className: "import-note", textContent: "No engineers defined yet — add them under Settings." }));
     return sec;
   }
 
@@ -2419,7 +2462,7 @@ function renderOverview() {
 
   /* ---------- 1. status bar: the verdict, before any number ----------
      Amber + "needs attention" only when someone is actually idle; otherwise a
-     calm confirmation, same tone as the ✓ empty-state elsewhere on this page. */
+     calm confirmation, same tone as the tick empty-state elsewhere on this page. */
   const statusBar = document.createElement("div");
   statusBar.className = "ov-status-bar";
   statusBar.style.borderLeftColor = totalStandby ? "#f59e0b" : "#22c55e";
@@ -2439,8 +2482,8 @@ function renderOverview() {
   statusBar.appendChild(statusMain);
   const statusShifts = document.createElement("div");
   statusShifts.className = "ov-status-shifts";
-  statusShifts.appendChild(statChip("☀️ Day", todaysDayCount));
-  statusShifts.appendChild(statChip("🌙 Night", todaysNightCount, null, "stat-chip-night"));
+  statusShifts.appendChild(statChip("Day", todaysDayCount));
+  statusShifts.appendChild(statChip("Night", todaysNightCount, null, "stat-chip-night"));
   statusBar.appendChild(statusShifts);
   if (can("ov.status")) panel.appendChild(statusBar);
 
@@ -2538,7 +2581,7 @@ function renderOverview() {
       .map(b => `${b.name} ${stats[b.id].standby}`).join(" · ");
     box.innerHTML = `
       <div class="ov-avail-head">
-        <span class="ov-avail-title">⚠ ${totalStandby} permanent staff not assigned yet</span>
+        <span class="ov-avail-title">${icon("alert")}${totalStandby} permanent staff not assigned yet</span>
         <span class="ov-avail-sub">${escapeHtml(idleSub)}</span>
       </div>
       <div class="ov-avail-cards"></div>`;
@@ -2549,7 +2592,7 @@ function renderOverview() {
     actionSec.appendChild(box);
   } else {
     actionSec.appendChild(Object.assign(document.createElement("p"),
-      { className: "ov-avail ov-avail-ok", textContent: "✓ Everyone permanent is placed on every board." }));
+      { className: "ov-avail ov-avail-ok", textContent: "Everyone permanent is placed on every board." }));
   }
   const oncallAll = boards.flatMap(b => stats[b.id].oncallAvailableList.map(emp => ({ emp, board: b })))
     .sort((a, b) => a.emp.name.localeCompare(b.emp.name));
@@ -2675,7 +2718,7 @@ function renderOverview() {
     hostRiskSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
   } else if (!riskyHosts.length) {
     hostRiskSec.appendChild(Object.assign(document.createElement("p"),
-      { className: "ov-avail ov-avail-ok", textContent: "✓ No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about." }));
+      { className: "ov-avail ov-avail-ok", textContent: "No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about." }));
   } else {
     const rowsWrap = document.createElement("div");
     rowsWrap.className = "ov-hostrisk-rows";
@@ -2686,7 +2729,7 @@ function renderOverview() {
       const countLabel = `${r.count} person${r.count === 1 ? "" : "s"} ever`;
       row.innerHTML = `
         <span class="ov-hostrisk-name">${escapeHtml(r.host)}</span>
-        <span class="ov-hostrisk-count">⚠ ${countLabel}</span>
+        <span class="ov-hostrisk-count">${icon("alert")}${countLabel}</span>
         <span class="ov-hostrisk-who">${escapeHtml(who)}</span>`;
       rowsWrap.appendChild(row);
     }
@@ -2801,7 +2844,7 @@ function renderOverview() {
     }));
   } else {
     engSec.appendChild(Object.assign(document.createElement("p"),
-      { className: "import-note", textContent: "No engineers defined yet — add them under ⚙ Settings." }));
+      { className: "import-note", textContent: "No engineers defined yet — add them under Settings." }));
   }
 
   /* ---------- by service area (masonry-packed, see above) ----------
@@ -3555,7 +3598,7 @@ function hostLocationCell(r) {
   if (!text) return `<button type="button" class="hl-add-loc">+ Add location</button>`;
   return href
     ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
-         title="Open in Google Maps" onclick="event.stopPropagation()">📍 ${escapeHtml(text)}</a>`
+         title="Open in Google Maps" onclick="event.stopPropagation()">${icon("pin")}${escapeHtml(text)}</a>`
     : `<span class="hl-loc">${escapeHtml(text)}</span>`;
 }
 
@@ -3612,7 +3655,7 @@ function renderHostRows() {
         <span class="hl-host">${escapeHtml(r.name)}</span>
         ${r.archived ? `<span class="hl-tag hl-tag-arch" title="Archived — kept with its history, but not offered when creating a mission">archived</span>` : ""}
         ${dups.byName.has(r.name) ? `<span class="hl-tag hl-tag-dup" title="Another host has a very similar name — open this row to merge them">similar</span>` : ""}
-        <button type="button" class="hl-edit" title="Edit name, location, area, note — or merge this host into another">✎</button>
+        <button type="button" class="hl-edit" title="Edit name, location, area, note — or merge this host into another">${icon("edit")}</button>
       </td>
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
       <td data-label="Service area" class="hl-area-cell">${r.area
@@ -4078,11 +4121,11 @@ function updateMissionHostNote() {
   if (rec) {
     const area = rec.areaId ? D().areas.find(a => a.id === rec.areaId) : null;
     note.className = "import-note host-note-ok";
-    note.textContent = `✓ ${rec.name}${area ? " — " + area.name : " — no service area set yet"}`
-      + (rec.archived ? " · archived host" : "");
+    setIconLabel(note, "check", `${rec.name}${area ? " — " + area.name : " — no service area set yet"}`
+      + (rec.archived ? " · archived host" : ""));
   } else {
     note.className = "import-note host-note-new";
-    note.textContent = `⚠ "${typed}" is not in the Host list yet — saving will offer to create it.`;
+    setIconLabel(note, "alert", `"${typed}" is not in the Host list yet — saving will offer to create it.`);
   }
 }
 
@@ -4164,13 +4207,13 @@ function updateMissionEngineerNote() {
   const match = missionEngineerMatch(typed);
   if (!match) {
     note.className = "import-note host-note-new";
-    note.textContent = `⚠ "${typed}" isn't on the engineer list — pick a name from the suggestions.`;
+    setIconLabel(note, "alert", `"${typed}" isn't on the engineer list — pick a name from the suggestions.`);
     return;
   }
   note.className = "import-note host-note-ok";
-  note.textContent = `✓ ${match.name}`
+  setIconLabel(note, "check", `${match.name}`
     + (match.detail ? ` — ${match.detail}` : "")
-    + (match.engineerId ? "" : " · first mission for them — they'll get a colour of their own");
+    + (match.engineerId ? "" : " · first mission for them — they'll get a colour of their own"));
 }
 
 function openMissionModal(missionId) {
@@ -4245,7 +4288,7 @@ function saveMission(ev) {
   if (dup) {
     const shiftLabel = vals.shift === "night" ? "Night" : "Day";
     toast(dup.hidden
-      ? `A hidden mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use "👁 Hide/Unhide" to unhide and reuse it, or pick a different shift.`
+      ? `A hidden mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use "Hide/Unhide" to unhide and reuse it, or pick a different shift.`
       : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`, "warn");
     return;
   }
@@ -4270,7 +4313,7 @@ function deleteMission() {
 }
 
 /* Hide takes a mission off the board without deleting its record — its number,
-   host, engineer etc. all survive so it can be brought back with "👁 Hide/Unhide".
+   host, engineer etc. all survive so it can be brought back with "Hide/Unhide".
    Carries forward day to day like any other mission field (cloud._copyPlanForward
    copies the hidden flag), so a dormant mission stays off every future board
    until someone explicitly unhides it. */
@@ -4283,7 +4326,7 @@ function hideMission() {
   });
   if (m.members.length) {
     showConfirm("Hide mission?",
-      `Hide ${m.number}? Its ${m.members.length} assigned employee${m.members.length === 1 ? "" : "s"} return to Standby. The mission itself is kept — unhide it any time from "👁 Hide/Unhide".`,
+      `Hide ${m.number}? Its ${m.members.length} assigned employee${m.members.length === 1 ? "" : "s"} return to Standby. The mission itself is kept — unhide it any time from "Hide/Unhide".`,
       doHide);
   } else {
     doHide();
@@ -4413,7 +4456,7 @@ async function loadEmployeeHostRecord(empId) {
 /* settings modal — My account / Engineer / Service Area / Board / Users / Roles */
 /* Each button declares the permission area it needs (data-area in index.html).
    "account" is everybody's, so the modal always has at least one pane and the
-   ⚙ button is never a dead end. */
+   Settings button is never a dead end. */
 function settingsTabAllowed(btn) {
   const area = btn.dataset.area;
   if (area === "account") return true;
@@ -4504,11 +4547,21 @@ function renderEngineerRows() {
 
     const swatch = document.createElement("td");
     swatch.className = "st-swatch";
+    // The swatch IS the control. A bare <input type="color"> is drawn by the
+    // browser as a colour chip inside its OWN bordered box, using a fixed grey
+    // that ignores the theme — a box, inside a box, inside a table cell. The
+    // .sw-pick wrapper strips that chrome (see styles.css) and prints the hex
+    // beside it, so the value is never carried by colour alone.
+    const pick = document.createElement("label");
+    pick.className = "sw-pick";
     const color = document.createElement("input");
     color.type = "color";
     color.value = r.color;
     color.title = "Mission card colour";
     color.setAttribute("aria-label", `Colour for ${r.name}`);
+    const hex = document.createElement("b");
+    hex.textContent = swHex(color.value);
+    color.oninput = () => { hex.textContent = swHex(color.value); };
     color.onchange = () => safely(async () => {
       // an engineer listed by role alone has no record yet — picking a colour
       // is what creates it
@@ -4516,7 +4569,9 @@ function renderEngineerRows() {
       await cloud.saveEngineerField(id, "color", color.value);
       renderSettings(); render();
     });
-    swatch.appendChild(color);
+    pick.appendChild(color);
+    pick.appendChild(hex);
+    swatch.appendChild(pick);
 
     const nameCell = document.createElement("td");
     if (r.kind === "record") {
@@ -4595,7 +4650,7 @@ function renderEngineerRows() {
       del.className = "st-del";
       del.title = `Remove ${r.name}`;
       del.setAttribute("aria-label", `Remove ${r.name}`);
-      del.textContent = "✕";
+      del.innerHTML = icon("close");
       del.onclick = () => showConfirm("Remove this engineer?",
         `${r.name} will no longer be offered on a mission, and their colour is forgotten. ` +
         `Missions that already name them keep their record of who ran them, but lose the engineer on the card.`,
@@ -4652,10 +4707,11 @@ function renderSettings() {
     const row = document.createElement("tr");
     row.className = "st-row";
     row.innerHTML = `
-      <td class="st-swatch"><input type="color" value="${a.color}" title="Area colour" aria-label="Area colour"></td>
+      <td class="st-swatch"><label class="sw-pick"><input type="color" value="${a.color}" title="Area colour" aria-label="Area colour"><b>${swHex(a.color)}</b></label></td>
       <td><input type="text" value="${escapeHtml(a.name)}" placeholder="Area name" aria-label="Area name"></td>
-      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(a.name)}" aria-label="Delete ${escapeHtml(a.name)}">✕</button></td>`;
+      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(a.name)}" aria-label="Delete ${escapeHtml(a.name)}">${icon("close")}</button></td>`;
     const [color, name, del] = [...row.querySelectorAll("input, button")];
+    color.oninput = () => { const b = color.parentElement.querySelector("b"); if (b) b.textContent = swHex(color.value); };
     color.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "color", color.value); render(); });
     name.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "name", name.value.trim() || a.name); render(); });
     del.onclick = () => {
@@ -4689,7 +4745,13 @@ function renderSettings() {
       const lab = document.createElement("label");
       lab.className = "weekday-chip";
       lab.innerHTML = `<input type="checkbox" value="${i}" ${b.weekendDays.includes(i) ? "checked" : ""}> ${DOW_LABELS[i]}`;
-      lab.querySelector("input").onchange = () => {
+      // The checkbox stays in the DOM for keyboard and screen readers; the cell
+      // it sits in is what you actually see (see .weekday-picker in styles.css).
+      // The .on class rather than :has(:checked) so the selected day still reads
+      // correctly on the older browsers some of the factory PCs run.
+      lab.classList.toggle("on", b.weekendDays.includes(i));
+      lab.querySelector("input").onchange = (ev) => {
+        lab.classList.toggle("on", ev.target.checked);
         const weekendDays = Array.from(picker.querySelectorAll("input:checked")).map(c => Number(c.value));
         safely(async () => {
           await cloud.saveBoardWeekendDays(b.id, weekendDays);
@@ -4918,7 +4980,7 @@ async function exportBoard() {
     document.body.classList.remove("exporting");
     if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     btn.disabled = false;
-    btn.textContent = "📷 Export";
+    setIconLabel(btn, "camera", "Export");
     if (!isOverview()) layoutMasonry();   // re-pack at the normal on-screen width
   }
 }
@@ -4944,7 +5006,7 @@ async function exportBoard() {
    shared board only has to be made once (below, and in exportBoard).
 
    It hangs off beforeprint/afterprint rather than off the button alone so that
-   Ctrl+P produces the same page as clicking 🖨 — a print stylesheet that only
+   Ctrl+P produces the same page as clicking PDF — a print stylesheet that only
    works via one button is a trap for whoever hits the keyboard shortcut. */
 
 let printRestore = null;   // set while the DOM is in its printable state
@@ -5158,7 +5220,7 @@ function openImportModal() {
       }
       importCandidates = (await cloud.getMissionsForDate(boardId, srcDate)).filter(m => !m.hidden);
       if (!importCandidates.length) {
-        $("#import-list").innerHTML = '<p class="import-note">Every mission from that date is hidden. Unhide from "👁 Hide/Unhide" first if you want to bring one forward.</p>';
+        $("#import-list").innerHTML = '<p class="import-note">Every mission from that date is hidden. Unhide from "Hide/Unhide" first if you want to bring one forward.</p>';
         return;
       }
       $("#import-source-note").textContent =
@@ -5258,8 +5320,10 @@ function openBoardModal() {
   box.innerHTML = "";
   DOW_LABELS.forEach((label, i) => {
     const lab = document.createElement("label");
-    lab.className = "weekday-chip";
-    lab.innerHTML = `<input type="checkbox" value="${i}" ${(i === 0 || i === 6) ? "checked" : ""}> ${label}`;
+    const on = i === 0 || i === 6;
+    lab.className = "weekday-chip" + (on ? " on" : "");
+    lab.innerHTML = `<input type="checkbox" value="${i}" ${on ? "checked" : ""}> ${label}`;
+    lab.querySelector("input").onchange = (ev) => lab.classList.toggle("on", ev.target.checked);
     box.appendChild(lab);
   });
   openModal("#modal-board");
@@ -5286,7 +5350,7 @@ function saveBoard(ev) {
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   const btn = $("#btn-theme");
-  if (btn) btn.textContent = theme === "dark" ? "☀️" : "🌙";
+  if (btn) btn.innerHTML = icon(theme === "dark" ? "sun" : "moon");
 }
 function initTheme() {
   applyTheme(localStorage.getItem("mpm-theme") || "light");
@@ -5544,7 +5608,7 @@ function renderUserRows() {
       const edit = document.createElement("button");
       edit.type = "button";
       edit.className = "btn btn-small";
-      edit.textContent = "✎";
+      edit.innerHTML = icon("edit");
       edit.title = "Edit this person";
       edit.onclick = () => openUserModal(u.id);
       actions.appendChild(edit);
