@@ -50,13 +50,13 @@ if [[ "$no_issue" != "1" ]]; then
     printf '\nGitHub CLI (gh) is not installed, so automatic Issue creation is unavailable on this device.\n'
     printf 'One-time macOS setup with Homebrew:  brew install gh\n'
     printf 'Then run:                          gh auth login\n'
-    read -r -p 'Continue this task WITHOUT a GitHub Issue? (y/N): ' answer
+    read -r -p 'Continue as a LOCAL-ONLY task without a GitHub Issue? (y/N): ' answer
     [[ "$(lower "$answer")" == "y" ]] || exit 0
     no_issue="1"
   elif ! gh auth status >/dev/null 2>&1; then
     printf '\nGitHub CLI needs a one-time sign-in on this device.\n'
     printf 'Run: gh auth login\n'
-    read -r -p 'Continue this task WITHOUT a GitHub Issue? (y/N): ' answer
+    read -r -p 'Continue as a LOCAL-ONLY task without a GitHub Issue? (y/N): ' answer
     [[ "$(lower "$answer")" == "y" ]] || exit 0
     no_issue="1"
   fi
@@ -120,17 +120,21 @@ fi
 
 if [[ -n "$issue_number" ]]; then
   task_reference="GitHub issue #$issue_number"
+  prompt="Read AGENTS.md and the relevant repository documentation. Work only on $task_reference. First inspect the existing implementation and state your plan, then implement the smallest complete solution. Run the required validation, review your diff, commit and push the branch, and open a pull request. Do not merge it."
 else
-  task_reference="task '$title'"
+  task_reference="local-only task '$title'"
+  prompt="Read AGENTS.md and the relevant repository documentation. Work only on $task_reference. First inspect the existing implementation and state your plan, then implement the smallest complete solution and run the required validation. This task has no GitHub Issue: keep all work local, do not push, and do not open a pull request. If the change should be merged, stop and ask for a tracked GitHub Issue first."
 fi
-
-prompt="Read AGENTS.md and the relevant repository documentation. Work only on $task_reference. First inspect the existing implementation and state your plan, then implement the smallest complete solution. Run the required validation, review your diff, commit and push the branch, and open a pull request. Do not merge it."
 
 printf '\nWorkspace ready.\n'
 printf 'Agent:      %s\n' "$agent"
 printf 'Branch:     %s\n' "$branch"
 printf 'Folder:     %s\n' "$worktree"
-[[ -n "$issue_url" ]] && printf 'Issue:      %s\n' "$issue_url"
+if [[ -n "$issue_url" ]]; then
+  printf 'Issue:      %s\n' "$issue_url"
+else
+  printf 'Mode:       LOCAL ONLY (no push / no PR)\n'
+fi
 printf '\n'
 
 cd "$worktree"
