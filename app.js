@@ -4931,17 +4931,11 @@ async function exportBoard() {
   $("#capture-title").textContent = boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
-  // Save-as-PDF names the file after document.title, so without this every
-  // export lands as "Manpower Management Board.pdf" regardless of which board
-  // or day it is. Same shape as the JPG's own name (see exportBoard), and it
-  // is restored below so a cancelled print dialog cannot leave the tab renamed.
-  const prevTitle = document.title;
-  document.title = `${boardName.replace(/\s+/g, "_")}_${state.date}`;
   document.body.classList.add("exporting");
   // The exported JPG is a shared artifact (printed, posted, sent to a customer) —
   // it must not depend on the viewer's own dark-mode preference. Force light for
   // the capture, since --bg/--panel/--emp-card etc. all redefine under
-  // [data-theme="dark"] and body.exporting only swaps the glass tokens.
+  // [data-theme="dark"].
   const wasDark = document.documentElement.getAttribute("data-theme") === "dark";
   if (wasDark) document.documentElement.removeAttribute("data-theme");
   // temporarily fold the available pools into the captured board — but not on a
@@ -5032,9 +5026,14 @@ function prepareForPrint() {
   $("#capture-title").textContent = boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
-  // `exporting` is what swaps the glass tokens for opaque surfaces; a printer
-  // (and a PDF) has no backdrop-filter, so without it every glass panel prints
-  // as a flat nothing. `printing` is this path's own hook.
+  // Save-as-PDF names the file after document.title, so without this every
+  // print lands as "Manpower Management Board.pdf" whichever board and day it
+  // is. Same shape as the JPG's name (see exportBoard). Restored in
+  // printRestore below, so a cancelled dialog cannot leave the tab renamed.
+  const prevTitle = document.title;
+  document.title = `${boardName.replace(/\s+/g, "_")}_${state.date}`;
+  // `exporting` carries the export-only layout (pinned capture width, no board
+  // prompt); `printing` is this path's own hook.
   document.body.classList.add("exporting", "printing");
   // Same reasoning as the export: a shared artifact must not carry the viewer's
   // own dark-mode preference — and a dark board wastes a cartridge besides.
@@ -5104,7 +5103,10 @@ function prepareForPrint() {
    out at 200in (5080mm) a side. A 200-mission board measures ~111in, so the
    limit is roughly 360 missions on a single day — hence no guard here. */
 function setPrintPageSize(rect) {
-  const mm = (px) => (px / 96 * 25.4).toFixed(1);
+  // Rounded UP to the next 0.1mm, never to nearest: @page is the hard edge, so
+  // a size that rounds DOWN is a page fractionally shorter than its content and
+  // the overflow starts a second sheet. Costs at most 0.1mm of white margin.
+  const mm = (px) => (Math.ceil(px / 96 * 25.4 * 10) / 10).toFixed(1);
   let el = document.getElementById("print-page-size");
   if (!el) {
     el = document.createElement("style");
@@ -5123,7 +5125,18 @@ function restoreAfterPrint() {
   if (!printRestore) return;
   const done = printRestore;
   printRestore = null;   // cleared first, so a throw below can't wedge the board
-  done();
+  try {
+    done();
+  } catch (err) {
+    // Clearing printRestore is not enough on its own: if the closure throws
+    // part-way, whatever it had not undone yet stays applied — and the board
+    // is left in its export layout with a stale @page, so the NEXT print
+    // measures an already-exporting DOM and spills onto a second sheet. These
+    // are the two that must come off no matter what.
+    console.error("print restore failed", err);
+    document.body.classList.remove("exporting", "printing");
+    clearPrintPageSize();
+  }
 }
 
 function printBoard() {
