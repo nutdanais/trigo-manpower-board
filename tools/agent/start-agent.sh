@@ -11,6 +11,10 @@ fail() {
   exit 1
 }
 
+lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 slugify() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-42
 }
@@ -25,7 +29,7 @@ repo_name="$(printf '%s' "$remote_url" | sed -E 's#^.*github\.com[:/]##; s#\.git
 
 while [[ "$agent" != "codex" && "$agent" != "claude" ]]; do
   read -r -p 'Agent (codex / claude): ' agent
-  agent="$(printf '%s' "$agent" | tr '[:upper:]' '[:lower:]')"
+  agent="$(lower "$agent")"
 done
 
 if [[ -z "$title" ]]; then
@@ -47,13 +51,13 @@ if [[ "$no_issue" != "1" ]]; then
     printf 'One-time macOS setup with Homebrew:  brew install gh\n'
     printf 'Then run:                          gh auth login\n'
     read -r -p 'Continue this task WITHOUT a GitHub Issue? (y/N): ' answer
-    [[ "${answer,,}" == "y" ]] || exit 0
+    [[ "$(lower "$answer")" == "y" ]] || exit 0
     no_issue="1"
   elif ! gh auth status >/dev/null 2>&1; then
     printf '\nGitHub CLI needs a one-time sign-in on this device.\n'
     printf 'Run: gh auth login\n'
     read -r -p 'Continue this task WITHOUT a GitHub Issue? (y/N): ' answer
-    [[ "${answer,,}" == "y" ]] || exit 0
+    [[ "$(lower "$answer")" == "y" ]] || exit 0
     no_issue="1"
   fi
 fi
