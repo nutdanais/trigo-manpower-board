@@ -67,17 +67,40 @@ function yearStart(iso) { return iso.slice(0, 4) + "-01-01"; }
    already trusted HTML — never concatenated with user-entered text that has
    not been through escapeHtml(). iconEl() is the same thing as a node, for the
    code paths that build controls with createElement instead. */
+/* The sprite in index.html stays the single source of truth, but an icon is
+   INLINED from it rather than referenced with <use>. Two html2canvas
+   limitations force this, both verified against the bundled build:
+
+     - a <use> pointing at a <symbol> renders as nothing in the capture, so
+       every icon on the board vanished from the exported JPG;
+     - an <svg> (or <img>) that is a DIRECT FLEX ITEM is dropped as well, which
+       is why wrapping matters at the two call sites on the board.
+
+   Inlining costs a little markup and fixes the first. currentColor still
+   resolves, so themes and disabled states are unaffected. */
+const ICON_CACHE = new Map();
+function iconMarkup(name) {
+  if (ICON_CACHE.has(name)) return ICON_CACHE.get(name);
+  const sym = document.getElementById("i-" + name);
+  // an unknown name must not silently draw nothing — that is how the missing
+  // moon went unnoticed the first time
+  if (!sym) { console.warn("unknown icon", name); ICON_CACHE.set(name, ""); return ""; }
+  const attrs = [...sym.attributes]
+    .filter(a => a.name !== "id")
+    .map(a => `${a.name}="${a.value}"`).join(" ");
+  const out = { attrs, inner: sym.innerHTML };
+  ICON_CACHE.set(name, out);
+  return out;
+}
 function icon(name, cls) {
-  return `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+  const m = iconMarkup(name);
+  if (!m) return "";
+  return `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true" ${m.attrs}>${m.inner}</svg>`;
 }
 function iconEl(name, cls) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "ic" + (cls ? " " + cls : ""));
-  svg.setAttribute("aria-hidden", "true");
-  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-  use.setAttribute("href", "#i-" + name);
-  svg.appendChild(use);
-  return svg;
+  const span = document.createElement("span");
+  span.innerHTML = icon(name, cls);
+  return span.firstElementChild || document.createTextNode("");
 }
 
 /* A control whose label is rebuilt on every render: icon + text, with the text
@@ -1546,7 +1569,7 @@ function renderMissions() {
         ${hostHtml}
         <span class="m-pills">
           ${areaPillHtml(hostArea, "m-area")}
-          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? icon("moon") + "NIGHT" : "DAY"}</span>
+          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? `<span class="m-shift-ico">${icon("moon")}</span>NIGHT` : "DAY"}</span>
         </span>
       </div>
       <div class="m-line2">
@@ -3349,7 +3372,7 @@ function hostNameHtml(name, rec) {
     + ` target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"`
     + ` title="Open ${escapeHtml(name)} in Google Maps">`
     + `<span class="m-host-name">${escapeHtml(name)}</span>`
-    + `${icon("pin", "m-host-pin")}</a>`;
+    + `<span class="m-host-pin">${icon("pin")}</span></a>`;
 }
 
 /* One row per host, merging the fetched directory with the host master records
@@ -4881,9 +4904,16 @@ function layoutMasonry(forceCols) {
     const j = i < cols ? i : colH.indexOf(Math.min(...colH));
     c.style.left = (j * (colW + MASONRY_GAP)) + "px";
     c.style.top = colH[j] + "px";
-    colH[j] += c.offsetHeight + MASONRY_GAP;
+    // getBoundingClientRect(), not offsetHeight: offsetHeight is ROUNDED to a
+    // whole pixel, and summing ~9 rounded card heights down a column drifts
+    // several px below the real bottom. The grid then declares itself shorter
+    // than its own absolutely-positioned children reach — invisible on screen,
+    // but in print that overflow does not fit the page the height was measured
+    // for, and Chrome moves the whole unbreakable grid onto a second sheet.
+    colH[j] += c.getBoundingClientRect().height + MASONRY_GAP;
   });
-  grid.style.height = (Math.max(...colH) - MASONRY_GAP) + "px";
+  // ceil so the declared height can never land under the true content bottom
+  grid.style.height = Math.ceil(Math.max(...colH) - MASONRY_GAP) + "px";
 }
 
 /* For the export only, hide any mission that has no crew on it, so an empty
@@ -5061,7 +5091,12 @@ function prepareForPrint() {
     layoutMasonry(EXPORT_COLS);
   }
   // Measured last, after every other decision above has changed the height.
-  setPrintPageSize($("#board-capture").getBoundingClientRect());
+  // scrollHeight as well as the rect: the rect is the border box, while
+  // scrollHeight also covers anything a descendant overflows by, which is
+  // exactly what pushed the grid onto a second page.
+  const cap = $("#board-capture");
+  const capRect = cap.getBoundingClientRect();
+  setPrintPageSize({ width: capRect.width, height: Math.max(capRect.height, cap.scrollHeight) });
 
   printRestore = () => {
     if (restoreEmptyMissions) restoreEmptyMissions();

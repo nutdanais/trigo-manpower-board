@@ -879,11 +879,12 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   background: var(--night);
   color: #fff;
   border-color: var(--night);
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
 }
-.mission-header .m-shift.night .ic { width: 10px; height: 10px; vertical-align: 0; }
+/* The moon sits in a span rather than being a flex child of the chip, and the
+   chip stays a plain inline box: html2canvas drops an <svg> that is a direct
+   flex item, which is what emptied the NIGHT chip in the exported JPG. */
+.mission-header .m-shift-ico { display: inline-block; margin-right: 3px; }
+.mission-header .m-shift-ico .ic { width: 10px; height: 10px; vertical-align: -.12em; }
 /* the host's service area travels with the shift chip: one group, pushed to
    the right of the band together, so the pair reads as "when and where" and a
    host with no area set just leaves the shift chip where it always was */
@@ -962,11 +963,15 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
 /* flex:none so the pin is never the first thing clipped off a long host name —
    the name ellipsises, the pin stays. text-decoration:none keeps the underline
    under the words rather than dragging through the emoji. */
+/* wrapper span, so the svg is never a direct flex item of .m-host-link
+   (html2canvas drops those — see the NIGHT chip above) */
 .mission-header .m-host-pin {
   flex: none;
-  font-size: 11px;
+  display: inline-block;
+  line-height: 0;
   text-decoration: none;
 }
+.mission-header .m-host-pin .ic { width: 11px; height: 11px; vertical-align: -.1em; }
 .mission-header .m-host-link:hover,
 .mission-header .m-host-link:focus-visible { color: var(--text); }
 .mission-body {
