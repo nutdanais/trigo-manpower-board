@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-07e">
+<link rel="stylesheet" href="styles.css?v=2026-09-08">
 </head>
 <body>
 
@@ -139,8 +139,8 @@
 <div id="app-root" class="hidden">
 
 <!-- Sticky as one unit (see #sticky-header in styles.css) so "which day, which
-     board" stays visible while a long board scrolls — #stats-row and #toolbar
-     stay in normal flow below it so the sticky footprint stays small. -->
+     board" stays visible while a long board scrolls — #toolbar stays in normal
+     flow below it so the sticky footprint stays small. -->
 <div id="sticky-header">
 <header id="topbar">
   <div class="topbar-left">
@@ -174,62 +174,102 @@
 </div>
 </div>
 
-<div id="stats-row"><div id="stats-bar"></div><div id="area-bar"></div></div>
-
+<!-- Two rows, shared by every app-wide tab (Overview, Manpower, Host) and every
+     Board tab: whichever tab is active shows a strict subset of these children
+     (each one's own hidden toggle lives in render()/renderStats() in app.js).
+     Row 1 is what you DO here — create button, then filters/search — pinned
+     left. Row 2 is what you're LOOKING AT — that tab's stat chips pinned left,
+     then its export-type action (Export/PDF or CSV) pinned right. Splitting
+     these keeps the stats from crowding filters onto a wrapped second line, as
+     one combined row did once enough boards/areas were in play. -->
 <div id="toolbar">
-  <button id="btn-import-mission" class="btn btn-danger hidden"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add Mission</button>
-  <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
-  <button id="btn-toolbar-more" class="btn toolbar-more-toggle" type="button" title="More actions" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"></use></svg> More</button>
-  <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
-       in styles.css) instead of wrapping into several rows of controls above the
-       board — on a phone that wrap was pushing every mission below the first
-       screen. Above that width it's `display: contents`, so nothing changes:
-       these are still ordinary toolbar children in the same flex row. -->
-  <div id="toolbar-more">
+  <div id="toolbar-row1">
+    <button id="btn-import-mission" class="btn btn-danger hidden"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add Mission</button>
+    <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
+    <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
+    <button id="btn-add-host" class="btn btn-primary hidden" title="Record a host that isn't on any mission yet"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Host</button>
     <button id="btn-hide-missions" class="btn btn-quiet" title="Choose which missions are hidden from this board"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"></use></svg> Hide/Unhide</button>
-    <button id="btn-new-employee" class="btn"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
     <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
       <input type="checkbox" id="holiday-check">
       <span class="toggle-track"><span class="toggle-thumb"></span></span>
       <span class="toggle-text">Holiday</span>
     </label>
-    <div class="toolbar-spacer"></div>
-    <div id="emplist-area-bar" class="hidden"></div>
-    <div id="filters">
-      <div class="ms" data-filter="engineer">
-        <button type="button" class="ms-btn">Engineer: All</button>
-        <div class="ms-pop hidden"></div>
+    <button id="btn-toolbar-more" class="btn toolbar-more-toggle" type="button" title="More actions" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"></use></svg> More</button>
+    <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
+         in styles.css) instead of wrapping into several rows of controls above the
+         board — on a phone that wrap was pushing every mission below the first
+         screen. Above that width it's `display: contents`, so nothing changes:
+         these are still ordinary row-1 children in the same flex row. -->
+    <div id="toolbar-more">
+      <!-- Manpower's search/filters — a display:contents group so it folds into
+           this row; render() shows/hides the whole group with one class. -->
+      <div id="emplist-toolbar">
+        <input id="emplist-search" type="search" placeholder="Search name or mobile…" autocomplete="off">
+        <div id="emplist-filters">
+          <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
+        </div>
       </div>
-      <div class="ms" data-filter="host">
-        <button type="button" class="ms-btn">Host: All</button>
-        <div class="ms-pop hidden"></div>
+      <!-- Host's search/filters — same idea, folded up from its old standalone
+           panel-level row. -->
+      <div id="hostlist-toolbar">
+        <input id="hostlist-search" type="search" placeholder="Search host, location, inspector…" autocomplete="off">
+        <div id="hostlist-filters">
+          <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="empId"><button type="button" class="ms-btn">Inspector: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="location"><button type="button" class="ms-btn">Location: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+        </div>
       </div>
-      <div class="ms" data-filter="customer">
-        <button type="button" class="ms-btn">Customer: All</button>
-        <div class="ms-pop hidden"></div>
+      <div id="filters">
+        <div class="ms" data-filter="engineer">
+          <button type="button" class="ms-btn">Engineer: All</button>
+          <div class="ms-pop hidden"></div>
+        </div>
+        <div class="ms" data-filter="host">
+          <button type="button" class="ms-btn">Host: All</button>
+          <div class="ms-pop hidden"></div>
+        </div>
+        <div class="ms" data-filter="customer">
+          <button type="button" class="ms-btn">Customer: All</button>
+          <div class="ms-pop hidden"></div>
+        </div>
+        <div class="ms" data-filter="shift">
+          <button type="button" class="ms-btn">Shift: All</button>
+          <div class="ms-pop hidden"></div>
+        </div>
+        <select id="sort-by" title="Sort missions">
+          <option value="number">Sort: Mission No.</option>
+          <option value="engineer">Sort: Engineer</option>
+          <option value="host">Sort: Host</option>
+          <option value="customer">Sort: Customer</option>
+          <option value="shift">Sort: Shift</option>
+        </select>
       </div>
-      <div class="ms" data-filter="shift">
-        <button type="button" class="ms-btn">Shift: All</button>
-        <div class="ms-pop hidden"></div>
-      </div>
-      <select id="sort-by" title="Sort missions">
-        <option value="number">Sort: Mission No.</option>
-        <option value="engineer">Sort: Engineer</option>
-        <option value="host">Sort: Host</option>
-        <option value="customer">Sort: Customer</option>
-        <option value="shift">Sort: Shift</option>
-      </select>
+      <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day"><svg class="ic" aria-hidden="true"><use href="#i-reset"></use></svg> Reset Board</button>
+      <button id="btn-undo" class="btn btn-quiet" title="Undo last assignment change (Ctrl+Z)" disabled><svg class="ic" aria-hidden="true"><use href="#i-undo"></use></svg> Undo</button>
     </div>
-    <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day"><svg class="ic" aria-hidden="true"><use href="#i-reset"></use></svg> Reset Board</button>
-    <button id="btn-undo" class="btn btn-quiet" title="Undo last assignment change (Ctrl+Z)" disabled><svg class="ic" aria-hidden="true"><use href="#i-undo"></use></svg> Undo</button>
   </div>
-  <button id="btn-export" class="btn"><svg class="ic" aria-hidden="true"><use href="#i-camera"></use></svg> Export</button>
-  <!-- The sharp half of "share the plan": a JPG is re-encoded and downsized by
-       whatever chat app carries it, and it cannot hold a link. This prints the
-       same board as vector text (sharp at any zoom) with the host name and the
-       engineer phone still tappable inside the PDF. See printBoard in app.js. -->
-  <button id="btn-print" class="btn" title="Save as PDF — stays sharp at any zoom, and the location links stay tappable"><svg class="ic" aria-hidden="true"><use href="#i-printer"></use></svg> PDF</button>
-  <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
+  <div id="toolbar-row2">
+    <div id="stats-bar"></div>
+    <div id="area-bar"></div>
+    <div id="emplist-area-bar" class="hidden"></div>
+    <div class="toolbar-spacer"></div>
+    <span id="emplist-count" class="hidden"></span>
+    <button type="button" class="btn hidden" id="btn-emplist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+    <span id="hostlist-count" class="hidden"></span>
+    <button type="button" class="btn hidden" id="btn-hostlist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+    <button id="btn-export" class="btn"><svg class="ic" aria-hidden="true"><use href="#i-camera"></use></svg> Export</button>
+    <!-- The sharp half of "share the plan": a JPG is re-encoded and downsized by
+         whatever chat app carries it, and it cannot hold a link. This prints the
+         same board as vector text (sharp at any zoom) with the host name and the
+         engineer phone still tappable inside the PDF. See printBoard in app.js. -->
+    <button id="btn-print" class="btn" title="Save as PDF — stays sharp at any zoom, and the location links stay tappable"><svg class="ic" aria-hidden="true"><use href="#i-printer"></use></svg> PDF</button>
+    <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
+  </div>
 </div>
 
 <main id="board-capture">
@@ -266,18 +306,6 @@
   <section id="missions-grid"></section>
   <section id="overview-panel" class="hidden"></section>
   <section id="emplist-panel" class="hidden">
-    <div id="emplist-toolbar">
-      <input id="emplist-search" type="search" placeholder="Search name or mobile…" autocomplete="off">
-      <div id="emplist-filters">
-        <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
-        <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
-        <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
-        <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
-      </div>
-      <div class="toolbar-spacer"></div>
-      <span id="emplist-count"></span>
-      <button type="button" class="btn btn-small" id="btn-emplist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
-    </div>
     <div id="emplist-bulkbar" class="hidden">
       <span id="emplist-bulk-count"></span>
       <select id="emplist-bulk-contract">
@@ -328,20 +356,6 @@
        history, so every host the board has ever used is listed whether or not
        anyone has given it a location yet. -->
   <section id="hostlist-panel" class="hidden">
-    <div id="hostlist-toolbar">
-      <input id="hostlist-search" type="search" placeholder="Search host, location, inspector…" autocomplete="off">
-      <div id="hostlist-filters">
-        <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
-        <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
-        <div class="ms" data-filter="empId"><button type="button" class="ms-btn">Inspector: All</button><div class="ms-pop hidden"></div></div>
-        <div class="ms" data-filter="location"><button type="button" class="ms-btn">Location: All</button><div class="ms-pop hidden"></div></div>
-        <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
-      </div>
-      <div class="toolbar-spacer"></div>
-      <span id="hostlist-count"></span>
-      <button type="button" class="btn btn-small btn-primary" id="btn-add-host" title="Record a host that isn't on any mission yet"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Host</button>
-      <button type="button" class="btn btn-small" id="btn-hostlist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
-    </div>
     <!-- Duplicate finder: hosts whose names look like each other (see
          hostDuplicateGroups in app.js). It only ever suggests — merging is a
          deliberate action taken one group at a time from the host's own row. -->
@@ -822,6 +836,6 @@
 <script src="config.js"></script>
 <script src="cloud.js?v=2026-09-07e"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="app.js?v=2026-09-07e"></script>
+<script src="app.js?v=2026-09-08"></script>
 </body>
 </html>
