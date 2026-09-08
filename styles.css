@@ -226,9 +226,9 @@ button, input, select, textarea, optgroup {
    board) stay visible while a long board scrolls beneath them. A single
    sticky wrapper avoids stacking multiple sticky rows at hardcoded offsets,
    which would break the moment #topbar's height changes (it wraps onto a
-   second line on narrow screens). #stats-row/#toolbar are NOT included — they
-   stay in normal flow so the permanently-visible footprint stays small,
-   especially on phone. */
+   second line on narrow screens). #toolbar is NOT included — it stays in
+   normal flow so the permanently-visible footprint stays small, especially
+   on phone. */
 #sticky-header {
   position: sticky;
   top: 0;
@@ -499,21 +499,13 @@ button, input, select, textarea, optgroup {
    control — the reference's treatment — rather than switching to a colour
    that appears nowhere else on the bar. */
 #btn-lock.locked { background: var(--on-navy-fill); border-color: var(--on-navy-line-strong); color: #fff; }
-/* stats — one row: summary on the left, service-area counters on the right.
-   Wraps rather than scrolling at any width — a scrolling stats strip hides
-   counters off-screen with no visual hint (the same problem the board tabs
-   had), so this wraps into a second row instead once boards/areas add up. */
-#stats-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  padding: 9px 16px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-}
+/* stats — live inside #toolbar itself now (action → stats → filters → export),
+   right after that tab's create button. Wraps rather than scrolling at any
+   width — a scrolling stats strip hides counters off-screen with no visual
+   hint (the same problem the board tabs had), so this wraps onto a second line
+   within the toolbar instead once boards/areas add up. */
 #stats-bar { display: flex; gap: 0; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; }
-#area-bar  { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; margin-left: auto; }
+#area-bar  { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; }
 #btn-signout { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
 
 .stat-chip {
@@ -555,8 +547,8 @@ button, input, select, textarea, optgroup {
 }
 :root[data-theme="dark"] .stat-chip-night::after { background: var(--text); }
 #area-bar .stat-chip { gap: 6px; }
-/* Manpower List's per-area counts, on the same toolbar row as "+ New Employee",
-   pushed to the right edge by .toolbar-spacer like #area-bar is on a board. */
+/* Manpower List's per-area counts — same stats cluster as #stats-bar/#area-bar,
+   right after "+ New Employee" in the shared #toolbar row. */
 #emplist-area-bar { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
 #emplist-area-bar .stat-chip { gap: 6px; }
 
@@ -1363,10 +1355,10 @@ body.board-view #app-root { margin-right: 264px; }
 
 /* ===== Phone layout pass ===== */
 @media (max-width: 640px) {
-  /* stats already wrap at every width (see #stats-row above); phone just
-     tightens the spacing so more chips fit per row */
-  #stats-row { gap: 8px 14px; }
-  #area-bar { margin-left: 0; gap: 10px; }
+  /* stats already wrap at every width (see #stats-bar/#area-bar above); phone
+     just tightens the spacing so more chips fit per row */
+  #toolbar { gap: 8px 14px; }
+  #area-bar { gap: 10px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
 
@@ -1592,9 +1584,15 @@ body.board-view #app-root { margin-right: 264px; }
   }
   #toolbar-more.open { display: flex; }
   #toolbar-more .toolbar-spacer { display: none; }   /* only meaningful in a horizontal row */
-  #toolbar-more #filters { width: 100%; margin: 0; }
+  #toolbar-more #filters,
+  #toolbar-more #emplist-filters,
+  #toolbar-more #hostlist-filters { width: 100%; margin: 0; }
   #toolbar-more .btn { width: 100%; }
   #toolbar-more .toggle { width: 100%; justify-content: center; }
+  #toolbar-more #emplist-search,
+  #toolbar-more #hostlist-search { width: 100%; }
+  #toolbar-more #emplist-count,
+  #toolbar-more #hostlist-count { width: 100%; text-align: center; }
 }
 
 /* Below ~380px (an SE-sized screen) the controls row above still fits on one
@@ -2162,7 +2160,7 @@ body.board-view #app-root { margin-right: 264px; }
 .ov-leave-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 
 .ov-area-rows { display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin-bottom: 10px; }
-.ov-area-row { display: grid; grid-template-columns: minmax(0, 132px) 1fr 32px; align-items: center; gap: 10px; }
+.ov-area-row { display: grid; grid-template-columns: minmax(0, 132px) 1fr 64px; align-items: center; gap: 10px; }
 .ov-area-row-label { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
 /* the name is the row's identity and can be long, but the label column is
    fixed so every row's bar starts at the same x (that shared scale is the whole
@@ -2173,7 +2171,16 @@ body.board-view #app-root { margin-right: 264px; }
   overflow: hidden; overflow-wrap: anywhere; line-height: 1.25;
 }
 .ov-area-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border); }
+/* total stays the headline figure; the permanent/on-call split rides underneath
+   it as a second, smaller line so the mix is a glance, not a hover-only tooltip. */
+.ov-area-row-totalwrap { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
 .ov-area-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
+.ov-area-row-pct { font-weight: 500; font-variant-numeric: tabular-nums; font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+/* grand-total row: no bar (it would be full-width by definition), set off the
+   same way ovCompareTable's own all-boards/all-engineers total rows are. */
+.ov-area-row-grandtotal { border-top: 2px solid var(--border); padding-top: 10px; }
+.ov-area-row-grandtotal .ov-area-row-name { font-weight: 700; }
+.ov-area-row-grandtotal .ov-area-row-total { font-weight: 700; }
 
 
 /* day/night split: two headline tiles, then a per-board breakdown row */
@@ -2407,13 +2414,12 @@ body.exporting #board-capture { width: 1600px; min-width: 1600px; max-width: 160
 body.exporting #app-root { margin-right: 0; }
 
 /* ===== Manpower List tab ===== */
-#emplist-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
+/* A display:contents group (same trick #toolbar-more already uses) so these
+   fold into the shared #toolbar row as ordinary flex children instead of
+   forming their own boxed row — .hidden (render() in app.js) still hides the
+   whole group with one class since display:none on a contents element
+   removes its children from layout too. */
+#emplist-toolbar { display: contents; }
 #emplist-search {
   padding: 6px 10px;
   border: 1px solid var(--border);
@@ -2515,13 +2521,8 @@ body.exporting #app-root { margin-right: 0; }
    .table-wrap), with one structural difference: two of its four columns hold
    LISTS — every inspector who has worked the host, every board it shows up on
    — so cells wrap and align to the top instead of staying on one line. */
-#hostlist-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
+/* display:contents group — see #emplist-toolbar above for why. */
+#hostlist-toolbar { display: contents; }
 #hostlist-search {
   padding: 6px 10px;
   border: 1px solid var(--border);
@@ -3449,7 +3450,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 
   /* the app's furniture — none of it is part of the plan */
   #sticky-header,
-  #stats-row,
   #toolbar,
   #float-pool,
   #context-menu,
