@@ -327,9 +327,6 @@ button, input, select, textarea, optgroup {
   color: var(--muted);
 }
 .board-tab .ic { margin-right: 7px; }
-/* the leading space in " List" is inside its own flex item, where HTML would
-   collapse it away (see renderTabs); pre keeps it */
-.tab-trim { white-space: pre; }
 .board-tab:hover { color: var(--text); }
 .board-tab.active {
   color: var(--primary-text);
@@ -499,11 +496,13 @@ button, input, select, textarea, optgroup {
    control — the reference's treatment — rather than switching to a colour
    that appears nowhere else on the bar. */
 #btn-lock.locked { background: var(--on-navy-fill); border-color: var(--on-navy-line-strong); color: #fff; }
-/* stats — live inside #toolbar itself now (action → stats → filters → export),
-   right after that tab's create button. Wraps rather than scrolling at any
-   width — a scrolling stats strip hides counters off-screen with no visual
-   hint (the same problem the board tabs had), so this wraps onto a second line
-   within the toolbar instead once boards/areas add up. */
+/* stats — row 2 of #toolbar now (row 1 is action → filters; row 2 is
+   stats → export), in a smaller size than the rest of the toolbar so a full
+   board's worth of chips doesn't compete with row 1 for width and force
+   filters/export onto a wrapped extra line. Wraps rather than scrolling at
+   any width — a scrolling stats strip hides counters off-screen with no
+   visual hint (the same problem the board tabs had), so this wraps onto a
+   second line within row 2 instead once boards/areas add up. */
 #stats-bar { display: flex; gap: 0; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; }
 #area-bar  { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; flex-shrink: 1; min-width: 0; }
 #btn-signout { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
@@ -525,6 +524,10 @@ button, input, select, textarea, optgroup {
   color: var(--text);
 }
 .stat-chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; align-self: center; border: 1px solid rgba(0,0,0,.12); }
+/* every stat-chip lives in #toolbar-row2 now — shrink both sizes a step so
+   the row reads as secondary information next to row 1's actions. */
+#toolbar-row2 .stat-chip { font-size: 11px; }
+#toolbar-row2 .stat-chip b { font-size: 13px; }
 
 /* thin separators between summary stats only */
 #stats-bar .stat-chip { padding: 2px 13px; position: relative; }
@@ -547,25 +550,36 @@ button, input, select, textarea, optgroup {
 }
 :root[data-theme="dark"] .stat-chip-night::after { background: var(--text); }
 #area-bar .stat-chip { gap: 6px; }
-/* Manpower List's per-area counts — same stats cluster as #stats-bar/#area-bar,
-   right after "+ New Employee" in the shared #toolbar row. */
+/* Manpower's per-area counts — same stats cluster as #stats-bar/#area-bar,
+   in row 2 of the shared #toolbar. */
 #emplist-area-bar { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
 #emplist-area-bar .stat-chip { gap: 6px; }
 
-/* ===== Toolbar ===== */
+/* ===== Toolbar =====
+   Two rows stacked in one bordered block: row 1 is what you DO (action →
+   filters), row 2 is what you're LOOKING AT (stats → export). Splitting them
+   is what keeps row 1's filters and row 2's export pinned to predictable
+   sides instead of getting pushed around by however many stat chips a given
+   board happens to have. */
 #toolbar {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+#toolbar-row1, #toolbar-row2 {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  padding: 7px 14px;
   flex-wrap: wrap;
-  position: relative;
 }
+/* #toolbar-more's phone dropdown (see the phone block) anchors to row 1, the
+   row it belongs to. */
+#toolbar-row1 { position: relative; }
 .toolbar-spacer { flex: 1; }
 /* #toolbar-more is a no-op wrapper above ~640px — display:contents makes its
-   children ordinary flex items of #toolbar itself, so nothing about the
+   children ordinary flex items of #toolbar-row1 itself, so nothing about the
    desktop layout changes. Below that width (see the phone block) it becomes
    an actual dropdown panel instead of wrapping into extra toolbar rows. */
 #toolbar-more { display: contents; }
@@ -1357,7 +1371,7 @@ body.board-view #app-root { margin-right: 264px; }
 @media (max-width: 640px) {
   /* stats already wrap at every width (see #stats-bar/#area-bar above); phone
      just tightens the spacing so more chips fit per row */
-  #toolbar { gap: 8px 14px; }
+  #toolbar-row1, #toolbar-row2 { gap: 8px 14px; }
   #area-bar { gap: 10px; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
@@ -1397,8 +1411,6 @@ body.board-view #app-root { margin-right: 264px; }
      tab-shaped now: with the board tabs gone these no longer sit on the bar's
      bottom rule as the front edge of a strip. */
   .board-tab { padding: 9px; font-size: 13px; }
-  /* " List" — see renderTabs; "Manpower" carries it on a phone */
-  .tab-trim { display: none; }
   .btn { min-height: 40px; }
   .btn-small { min-height: 32px; }
   #topbar .btn-top { min-height: 34px; }
@@ -1583,7 +1595,6 @@ body.board-view #app-root { margin-right: 264px; }
     z-index: 90;
   }
   #toolbar-more.open { display: flex; }
-  #toolbar-more .toolbar-spacer { display: none; }   /* only meaningful in a horizontal row */
   #toolbar-more #filters,
   #toolbar-more #emplist-filters,
   #toolbar-more #hostlist-filters { width: 100%; margin: 0; }
@@ -1591,8 +1602,6 @@ body.board-view #app-root { margin-right: 264px; }
   #toolbar-more .toggle { width: 100%; justify-content: center; }
   #toolbar-more #emplist-search,
   #toolbar-more #hostlist-search { width: 100%; }
-  #toolbar-more #emplist-count,
-  #toolbar-more #hostlist-count { width: 100%; text-align: center; }
 }
 
 /* Below ~380px (an SE-sized screen) the controls row above still fits on one

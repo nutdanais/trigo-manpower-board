@@ -465,8 +465,8 @@ const PERM_AREAS = [
   { group: "Tabs & menus", items: [
     { key: "board",    label: "Board",          hint: "Missions, assignments, the day lock" },
     { key: "overview", label: "Overview tab",   hint: "The dashboard as a whole", viewOnly: true },
-    { key: "emplist",  label: "Manpower list",  hint: "The employee roster" },
-    { key: "hostlist", label: "Host list",      hint: "Sites and their records" },
+    { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
+    { key: "hostlist", label: "Host",           hint: "Sites and their records" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
   ]},
@@ -810,11 +810,19 @@ function render() {
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   $("#filters").classList.toggle("hidden", !board);
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
-  // Manpower List's and Host list's search/filters/count/CSV group — each is a
-  // display:contents wrapper (styles.css), so one class toggle here shows or
-  // hides that tab's whole cluster within the shared #toolbar row.
+  // Manpower's and Host's search/filters group — each is a display:contents
+  // wrapper (styles.css), so one class toggle here shows or hides that tab's
+  // whole cluster within row 1.
   $("#emplist-toolbar").classList.toggle("hidden", !eml);
   $("#hostlist-toolbar").classList.toggle("hidden", !hl);
+  // Row 2's export-type action is tab-specific — Board/Overview get Export+PDF
+  // (below), Manpower and Host each get their own count + CSV button instead.
+  // Each pair needs its own toggle: unlike the display:contents groups above,
+  // these live directly in #toolbar-row2, not inside a shared wrapper.
+  $("#emplist-count").classList.toggle("hidden", !eml);
+  $("#btn-emplist-csv").classList.toggle("hidden", !eml);
+  $("#hostlist-count").classList.toggle("hidden", !hl);
+  $("#btn-hostlist-csv").classList.toggle("hidden", !hl);
   // The two lists and the board bar carry their own create buttons; RLS would
   // refuse the write anyway, so hiding them is about not offering a dead end.
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
@@ -923,19 +931,14 @@ function renderTabs() {
   if (can("emplist")) {
   const eml = document.createElement("div");
   eml.className = "board-tab tab-emplist" + (isEmployeeList() ? " active" : "");
-  // "List" is in its own span so the phone bar can drop it (see .tab-trim in
-  // styles.css) — "Manpower" alongside "Overview" and a board picker is
-  // unambiguous, and the two words it saves are what let the bar hold one line
-  eml.innerHTML = icon("users") + 'Manpower<span class="tab-trim"> List</span>';
+  eml.innerHTML = icon("users") + 'Manpower';
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
   }
   if (can("hostlist")) {
   const hl = document.createElement("div");
   hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
-  // same .tab-trim trick as Manpower List: on a phone the bar keeps "Host" and
-  // drops " list", which is unambiguous next to Overview / Manpower
-  hl.innerHTML = icon("site") + 'Host<span class="tab-trim"> list</span>';
+  hl.innerHTML = icon("site") + 'Host';
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
   }
