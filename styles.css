@@ -1647,7 +1647,7 @@ body.board-view #app-root { margin-right: 264px; }
    .modal's own padding moves onto these three bands (see .modal below). */
 .modal h3 {
   margin: -20px -20px 16px;
-  padding: 15px 20px 13px;
+  padding: 15px 44px 13px 20px;
   border-bottom: 1px solid var(--border);
   font-family: inherit;
   font-size: 16px;
@@ -1657,6 +1657,28 @@ body.board-view #app-root { margin-right: 264px; }
   background: var(--panel);
   z-index: 3;
 }
+/* The X lives inside the sticky header so it stays put with the title while
+   the form beneath it scrolls, instead of riding away with the content. */
+.modal h3 .modal-close {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.modal h3 .modal-close:hover { color: var(--text); background: var(--bg-soft); }
 .modal label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
 .modal input, .modal select, .modal textarea {
   display: block;
@@ -1675,22 +1697,28 @@ body.board-view #app-root { margin-right: 264px; }
 .form-row { display: flex; gap: 8px; }
 .form-row label { flex: 1; }
 /* The committing action sits LAST, on the right — the position the platform
-   dialogs put it in, and the one a reader's eye lands on after the form. */
+   dialogs put it in, and the one a reader's eye lands on after the form.
+   Plain row + flex-end packs the buttons in DOM order against the right edge,
+   so Cancel-then-Save (the order every form here already uses) puts Save
+   outermost without needing row-reverse — which packed the pair against the
+   LEFT edge instead and put Cancel outermost, the opposite of both this
+   comment and every dialog's own reading order. */
 .modal-actions {
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: flex-end;
-  flex-direction: row-reverse;
   margin: 20px -20px -20px;
   padding: 13px 20px;
   border-top: 1px solid var(--border);
   background: var(--bg-soft);
 }
 .modal-actions .btn-primary { min-width: 90px; }
-/* anything that is not a button (a hint, a checkbox) keeps reading order and
-   is pushed away from the action pair */
-.modal-actions > :not(.btn) { margin-right: auto; order: 1; }
+/* anything that is not a button (a hint, a checkbox, the danger/Cancel/Save
+   spacer) keeps reading order; margin-left:auto eats the free space to its
+   left, pushing it and everything after it flush to the right edge while
+   whatever precedes it (a Delete/Deactivate button) stays pinned left. */
+.modal-actions > :not(.btn) { margin-left: auto; }
 
 /* Account-level actions in the user dialog. Set apart from Cancel/Save above a
    rule, because they act on the account rather than on the form. */
@@ -3213,10 +3241,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 #modal-settings .modal-actions {
   flex: 0 0 auto;
   margin-top: 0;   /* the pane above already fills the dialog */
-  /* Every pane shares this one footer, so Done sits bottom-right on all of
-     them. flex-direction:row (not the shared row-reverse) is what actually
-     pins a lone button to the end side under justify-content:flex-end. */
-  flex-direction: row;
 }
 /* Inside the modal the PANE is the scroll container, so the table must not open
    a second one — a nested scroller is what stops a sticky header from ever
