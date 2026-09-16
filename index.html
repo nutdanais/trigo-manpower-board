@@ -210,6 +210,7 @@
           <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
         </div>
       </div>
       <!-- Host's search/filters — same idea, folded up from its old standalone
@@ -463,6 +464,7 @@
     <h3 id="employee-modal-title">New Employee</h3>
     <div id="employee-tabs" class="settings-tabs hidden">
       <button type="button" class="settings-tab" data-tab="hosts">Host Record</button>
+      <button type="button" class="settings-tab" data-tab="note">Note</button>
       <button type="button" class="settings-tab" data-tab="edit">Edit Employee</button>
     </div>
     <div class="settings-pane hidden" data-pane="hosts">
@@ -471,6 +473,17 @@
       <div class="modal-actions">
         <button type="button" class="btn" data-close>Close</button>
       </div>
+    </div>
+    <div class="settings-pane hidden" data-pane="note">
+      <p class="import-note">Notes and remarks about this employee, most recent first. Visible to anyone who can edit the roster.</p>
+      <div id="employee-notes-list"></div>
+      <form id="form-employee-note">
+        <label>Add a note <textarea name="note" rows="3" required placeholder="e.g. prefers day shifts, needs a safety refresher…"></textarea></label>
+        <div class="modal-actions">
+          <button type="button" class="btn" data-close>Close</button>
+          <button type="submit" class="btn btn-primary">Add note</button>
+        </div>
+      </form>
     </div>
     <div class="settings-pane" data-pane="edit">
       <form id="form-employee">

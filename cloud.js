@@ -1220,6 +1220,32 @@ const cloud = {
     return (data || []).map((r) => ({ date: r.plan_date, host: r.host, number: r.mission_number, customer: r.customer }));
   },
 
+  /* ---------- per-employee notes (Note tab, employee_notes table) ---------- */
+  /* Free-text remarks about an employee — not tied to any date, assignment or
+     mission, unlike deployment_history. One row per note, newest first.
+     Degrades to an empty list (instead of throwing) on a database that
+     hasn't run migration-2026-09-16 yet. */
+  async getEmployeeNotes(employeeId) {
+    const { data, error } = await sb.from("employee_notes")
+      .select("id, note, created_by, created_at")
+      .eq("employee_id", employeeId)
+      .order("created_at", { ascending: false });
+    if (error) {
+      if (this._tableMissing(error)) return [];
+      throw error;
+    }
+    return (data || []).map((r) => ({ id: r.id, note: r.note, createdBy: r.created_by, createdAt: r.created_at }));
+  },
+  async addEmployeeNote(employeeId, note) {
+    const createdBy = await this._currentEmail();
+    const { error } = await sb.from("employee_notes").insert({ employee_id: employeeId, note, created_by: createdBy });
+    if (error) throw error;
+  },
+  async deleteEmployeeNote(id) {
+    const { error } = await sb.from("employee_notes").delete().eq("id", id);
+    if (error) throw error;
+  },
+
   /* ---------- host coverage (Overview's "Host coverage risk" module) ---------- */
   /* The inverse of getEmployeeHostHistory: for each host in the given list,
      how many distinct employees have ever been deployed there, and who (up to

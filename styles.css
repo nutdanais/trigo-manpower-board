@@ -1817,6 +1817,28 @@ body.board-view #app-root { margin-right: 264px; }
    .import-row .import-info small */
 .host-row .host-meta { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
 
+/* ===== Note tab (Edit Employee modal) ===== */
+.note-list { max-height: 260px; overflow-y: auto; margin-bottom: 12px; }
+.note-row {
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  margin-bottom: 6px;
+}
+.note-row .note-text { white-space: pre-wrap; }
+.note-row .note-meta { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.note-delete {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0;
+  margin-left: 6px;
+  text-decoration: underline;
+}
+.note-delete:hover { color: var(--primary-text); }
+
 /* weekday picker (new board modal) */
 .field-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 /* A week is a sequence of seven equal things, so it is ONE control with seven

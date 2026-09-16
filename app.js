@@ -337,6 +337,7 @@ const CLOUD_WRITE_METHODS = [
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
   "saveHost", "deleteHost", "mergeHost",
+  "addEmployeeNote", "deleteEmployeeNote",
 ];
 function wireSaveStatus() {
   for (const name of CLOUD_WRITE_METHODS) {
@@ -377,7 +378,7 @@ const state = {
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
-    filters: { contract: [], position: [], areaId: [], boardId: [] },
+    filters: { contract: [], position: [], areaId: [], boardId: [], status: [] },
     sortKey: "name",
     sortDir: 1,
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
@@ -3077,7 +3078,7 @@ function renderFilterOptions() {
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
-const EMPLIST_FILTER_LABELS = { contract: "Contract", position: "Position", areaId: "Service area", boardId: "Board" };
+const EMPLIST_FILTER_LABELS = { contract: "Contract", position: "Position", areaId: "Service area", boardId: "Board", status: "Status" };
 
 function emplistFilterOptions(key) {
   if (key === "contract") return [{ value: "permanent", label: "Permanent" }, { value: "oncall", label: "On-call" }];
@@ -3086,6 +3087,7 @@ function emplistFilterOptions(key) {
   }
   if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name }));
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
+  if (key === "status") return [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }];
   return [];
 }
 function emplistMsLabel(key) {
@@ -3136,6 +3138,7 @@ function emplistFilteredSorted() {
     if (f.position.length && !f.position.includes(e.position || "__none__")) return false;
     if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
+    if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
     if (q && !e.name.toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q)) return false;
     return true;
   });
@@ -4415,7 +4418,7 @@ function openEmployeeModal(empId) {
   state.employeeTab = empId ? "hosts" : "edit";
   $("#employee-tabs").classList.toggle("hidden", !empId);
   applyEmployeeTab();
-  if (empId) loadEmployeeHostRecord(empId);
+  if (empId) { loadEmployeeHostRecord(empId); loadEmployeeNotes(empId); }
   openModal("#modal-employee");
 }
 
@@ -4469,11 +4472,16 @@ function applyEmployeeTab() {
 }
 
 /* Host Record tab: every host this employee has ever been deployed to, most
-   recent first. One row per host, not per mission — a host they've visited
-   ten times is one line with a count, not ten. Loaded on modal open (not on
-   first tab click) so switching tabs feels instant; the query is a single
-   indexed read (assignments.employee_id) so this is cheap even for someone
-   with a long history. */
+   recent first. `getEmployeeHostHistory` reads deployment_history, which is
+   keyed one row per (employee, plan_date) — upserted, never duplicated, so
+   each row IS one distinct day worked, not one mission. Grouping those rows
+   by host and counting them therefore gives days at that host directly (same
+   figure the Host List's own inspector chips show, just from the other
+   side) — a host visited on ten different days is one line reading "10
+   days", not ten lines. Loaded on modal open (not on first tab click) so
+   switching tabs feels instant; the query is a single indexed read
+   (deployment_history.employee_id) so this is cheap even for someone with a
+   long history. */
 async function loadEmployeeHostRecord(empId) {
   const box = $("#employee-hosts-list");
   box.innerHTML = '<p class="import-note">Loading…</p>';
@@ -4487,13 +4495,13 @@ async function loadEmployeeHostRecord(empId) {
   // bail if the modal moved on to a different employee (or closed) while this was in flight
   if (state.editingEmployeeId !== empId) return;
   if (!rows.length) {
-    box.innerHTML = '<p class="import-note">No mission history yet.</p>';
+    box.innerHTML = '<p class="import-note">No host history yet.</p>';
     return;
   }
-  const byHost = new Map();   // host name -> { count, lastDate, lastNumber, lastCustomer }
+  const byHost = new Map();   // host name -> { days, lastDate, lastNumber, lastCustomer }
   for (const r of rows) {
-    const rec = byHost.get(r.host) || { count: 0, lastDate: r.date, lastNumber: r.number, lastCustomer: r.customer };
-    rec.count++;
+    const rec = byHost.get(r.host) || { days: 0, lastDate: r.date, lastNumber: r.number, lastCustomer: r.customer };
+    rec.days++;
     byHost.set(r.host, rec);
   }
   // rows arrive most-recent-first, so the first row seen per host is already its most recent
@@ -4501,9 +4509,59 @@ async function loadEmployeeHostRecord(empId) {
   box.innerHTML = `<div class="host-list">${hosts.map(([host, rec]) => `
     <div class="host-row">
       <div class="host-name">${escapeHtml(host)}</div>
-      <div class="host-meta">${rec.count} mission${rec.count === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
+      <div class="host-meta">${rec.days} day${rec.days === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
         (${escapeHtml(rec.lastNumber)}${rec.lastCustomer ? " — " + escapeHtml(rec.lastCustomer) : ""})</div>
     </div>`).join("")}</div>`;
+}
+
+/* Note tab: free-text remarks left about this employee (not tied to any date
+   or assignment), most recent first. Same load-on-modal-open pattern as
+   loadEmployeeHostRecord, backed by its own employee_notes table so a note
+   survives independently of the roster edit form. */
+async function loadEmployeeNotes(empId) {
+  const box = $("#employee-notes-list");
+  box.innerHTML = '<p class="import-note">Loading…</p>';
+  let rows;
+  try {
+    rows = await cloud.getEmployeeNotes(empId);
+  } catch (e) {
+    box.innerHTML = `<p class="import-note">Could not load notes: ${e.message || e}</p>`;
+    return;
+  }
+  // bail if the modal moved on to a different employee (or closed) while this was in flight
+  if (state.editingEmployeeId !== empId) return;
+  if (!rows.length) {
+    box.innerHTML = '<p class="import-note">No notes yet.</p>';
+    return;
+  }
+  box.innerHTML = `<div class="note-list">${rows.map((r) => `
+    <div class="note-row" data-id="${escapeHtml(r.id)}">
+      <div class="note-text">${escapeHtml(r.note)}</div>
+      <div class="note-meta">${escapeHtml(r.createdBy || "unknown")} · ${new Date(r.createdAt).toLocaleString()}
+        <button type="button" class="note-delete">Delete</button></div>
+    </div>`).join("")}</div>`;
+  for (const btn of box.querySelectorAll(".note-delete")) {
+    btn.onclick = () => {
+      const id = btn.closest(".note-row").dataset.id;
+      showConfirm("Delete note?", "Remove this note? This can't be undone.", () => safely(async () => {
+        await cloud.deleteEmployeeNote(id);
+        await loadEmployeeNotes(empId);
+      }));
+    };
+  }
+}
+
+function saveEmployeeNote(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const note = form.note.value.trim();
+  if (!note) return;
+  const empId = state.editingEmployeeId;
+  safely(async () => {
+    await cloud.addEmployeeNote(empId, note);
+    form.reset();
+    await loadEmployeeNotes(empId);
+  });
 }
 
 /* settings modal — My account / Engineer / Service Area / Board / Users / Roles */
@@ -6146,6 +6204,7 @@ function wireApp() {
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
   $("#form-employee").onsubmit = saveEmployee;
+  $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = deleteMission;
   $("#btn-hide-mission").onclick = hideMission;
   $("#btn-hide-missions").onclick = openHideMissionsModal;
