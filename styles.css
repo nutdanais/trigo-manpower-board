@@ -2938,7 +2938,29 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   flex-direction: row;
   padding: 0;                /* the rail and the body carry their own */
   overflow: hidden;          /* the pane scrolls, not the card */
+  position: relative;        /* anchors .modal-close to this box, not the viewport */
 }
+/* Sits above both the rail and every pane, same corner on every tab since it
+   is a child of the dialog itself rather than of #settings-body. */
+#modal-settings .modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+#modal-settings .modal-close:hover { color: var(--text); background: var(--bg-soft); }
 
 #settings-rail {
   flex: 0 0 200px;
@@ -3191,6 +3213,10 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 #modal-settings .modal-actions {
   flex: 0 0 auto;
   margin-top: 0;   /* the pane above already fills the dialog */
+  /* Every pane shares this one footer, so Done sits bottom-right on all of
+     them. flex-direction:row (not the shared row-reverse) is what actually
+     pins a lone button to the end side under justify-content:flex-end. */
+  flex-direction: row;
 }
 /* Inside the modal the PANE is the scroll container, so the table must not open
    a second one — a nested scroller is what stops a sticky header from ever
