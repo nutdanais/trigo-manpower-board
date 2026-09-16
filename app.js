@@ -4447,11 +4447,16 @@ function applyEmployeeTab() {
 }
 
 /* Host Record tab: every host this employee has ever been deployed to, most
-   recent first. One row per host, not per mission — a host they've visited
-   ten times is one line with a count, not ten. Loaded on modal open (not on
-   first tab click) so switching tabs feels instant; the query is a single
-   indexed read (assignments.employee_id) so this is cheap even for someone
-   with a long history. */
+   recent first. `getEmployeeHostHistory` reads deployment_history, which is
+   keyed one row per (employee, plan_date) — upserted, never duplicated, so
+   each row IS one distinct day worked, not one mission. Grouping those rows
+   by host and counting them therefore gives days at that host directly (same
+   figure the Host List's own inspector chips show, just from the other
+   side) — a host visited on ten different days is one line reading "10
+   days", not ten lines. Loaded on modal open (not on first tab click) so
+   switching tabs feels instant; the query is a single indexed read
+   (deployment_history.employee_id) so this is cheap even for someone with a
+   long history. */
 async function loadEmployeeHostRecord(empId) {
   const box = $("#employee-hosts-list");
   box.innerHTML = '<p class="import-note">Loading…</p>';
@@ -4465,13 +4470,13 @@ async function loadEmployeeHostRecord(empId) {
   // bail if the modal moved on to a different employee (or closed) while this was in flight
   if (state.editingEmployeeId !== empId) return;
   if (!rows.length) {
-    box.innerHTML = '<p class="import-note">No mission history yet.</p>';
+    box.innerHTML = '<p class="import-note">No host history yet.</p>';
     return;
   }
-  const byHost = new Map();   // host name -> { count, lastDate, lastNumber, lastCustomer }
+  const byHost = new Map();   // host name -> { days, lastDate, lastNumber, lastCustomer }
   for (const r of rows) {
-    const rec = byHost.get(r.host) || { count: 0, lastDate: r.date, lastNumber: r.number, lastCustomer: r.customer };
-    rec.count++;
+    const rec = byHost.get(r.host) || { days: 0, lastDate: r.date, lastNumber: r.number, lastCustomer: r.customer };
+    rec.days++;
     byHost.set(r.host, rec);
   }
   // rows arrive most-recent-first, so the first row seen per host is already its most recent
@@ -4479,7 +4484,7 @@ async function loadEmployeeHostRecord(empId) {
   box.innerHTML = `<div class="host-list">${hosts.map(([host, rec]) => `
     <div class="host-row">
       <div class="host-name">${escapeHtml(host)}</div>
-      <div class="host-meta">${rec.count} mission${rec.count === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
+      <div class="host-meta">${rec.days} day${rec.days === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
         (${escapeHtml(rec.lastNumber)}${rec.lastCustomer ? " — " + escapeHtml(rec.lastCustomer) : ""})</div>
     </div>`).join("")}</div>`;
 }
