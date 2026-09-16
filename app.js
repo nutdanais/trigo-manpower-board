@@ -378,7 +378,7 @@ const state = {
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
-    filters: { contract: [], position: [], areaId: [], boardId: [] },
+    filters: { contract: [], position: [], areaId: [], boardId: [], status: [] },
     sortKey: "name",
     sortDir: 1,
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
@@ -3056,7 +3056,7 @@ function renderFilterOptions() {
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
-const EMPLIST_FILTER_LABELS = { contract: "Contract", position: "Position", areaId: "Service area", boardId: "Board" };
+const EMPLIST_FILTER_LABELS = { contract: "Contract", position: "Position", areaId: "Service area", boardId: "Board", status: "Status" };
 
 function emplistFilterOptions(key) {
   if (key === "contract") return [{ value: "permanent", label: "Permanent" }, { value: "oncall", label: "On-call" }];
@@ -3065,6 +3065,7 @@ function emplistFilterOptions(key) {
   }
   if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name }));
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
+  if (key === "status") return [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }];
   return [];
 }
 function emplistMsLabel(key) {
@@ -3115,6 +3116,7 @@ function emplistFilteredSorted() {
     if (f.position.length && !f.position.includes(e.position || "__none__")) return false;
     if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
+    if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
     if (q && !e.name.toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q)) return false;
     return true;
   });
