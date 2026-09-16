@@ -337,6 +337,7 @@ const CLOUD_WRITE_METHODS = [
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
   "saveHost", "deleteHost", "mergeHost",
+  "addEmployeeNote", "deleteEmployeeNote",
 ];
 function wireSaveStatus() {
   for (const name of CLOUD_WRITE_METHODS) {
@@ -4393,7 +4394,7 @@ function openEmployeeModal(empId) {
   state.employeeTab = empId ? "hosts" : "edit";
   $("#employee-tabs").classList.toggle("hidden", !empId);
   applyEmployeeTab();
-  if (empId) loadEmployeeHostRecord(empId);
+  if (empId) { loadEmployeeHostRecord(empId); loadEmployeeNotes(empId); }
   openModal("#modal-employee");
 }
 
@@ -4487,6 +4488,56 @@ async function loadEmployeeHostRecord(empId) {
       <div class="host-meta">${rec.days} day${rec.days === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
         (${escapeHtml(rec.lastNumber)}${rec.lastCustomer ? " — " + escapeHtml(rec.lastCustomer) : ""})</div>
     </div>`).join("")}</div>`;
+}
+
+/* Note tab: free-text remarks left about this employee (not tied to any date
+   or assignment), most recent first. Same load-on-modal-open pattern as
+   loadEmployeeHostRecord, backed by its own employee_notes table so a note
+   survives independently of the roster edit form. */
+async function loadEmployeeNotes(empId) {
+  const box = $("#employee-notes-list");
+  box.innerHTML = '<p class="import-note">Loading…</p>';
+  let rows;
+  try {
+    rows = await cloud.getEmployeeNotes(empId);
+  } catch (e) {
+    box.innerHTML = `<p class="import-note">Could not load notes: ${e.message || e}</p>`;
+    return;
+  }
+  // bail if the modal moved on to a different employee (or closed) while this was in flight
+  if (state.editingEmployeeId !== empId) return;
+  if (!rows.length) {
+    box.innerHTML = '<p class="import-note">No notes yet.</p>';
+    return;
+  }
+  box.innerHTML = `<div class="note-list">${rows.map((r) => `
+    <div class="note-row" data-id="${escapeHtml(r.id)}">
+      <div class="note-text">${escapeHtml(r.note)}</div>
+      <div class="note-meta">${escapeHtml(r.createdBy || "unknown")} · ${new Date(r.createdAt).toLocaleString()}
+        <button type="button" class="note-delete">Delete</button></div>
+    </div>`).join("")}</div>`;
+  for (const btn of box.querySelectorAll(".note-delete")) {
+    btn.onclick = () => {
+      const id = btn.closest(".note-row").dataset.id;
+      showConfirm("Delete note?", "Remove this note? This can't be undone.", () => safely(async () => {
+        await cloud.deleteEmployeeNote(id);
+        await loadEmployeeNotes(empId);
+      }));
+    };
+  }
+}
+
+function saveEmployeeNote(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const note = form.note.value.trim();
+  if (!note) return;
+  const empId = state.editingEmployeeId;
+  safely(async () => {
+    await cloud.addEmployeeNote(empId, note);
+    form.reset();
+    await loadEmployeeNotes(empId);
+  });
 }
 
 /* settings modal — My account / Engineer / Service Area / Board / Users / Roles */
@@ -6129,6 +6180,7 @@ function wireApp() {
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
   $("#form-employee").onsubmit = saveEmployee;
+  $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = deleteMission;
   $("#btn-hide-mission").onclick = hideMission;
   $("#btn-hide-missions").onclick = openHideMissionsModal;

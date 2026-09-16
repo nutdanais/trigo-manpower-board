@@ -129,6 +129,21 @@ create table if not exists deployment_history (
 );
 create index if not exists deployment_history_employee_idx on deployment_history(employee_id);
 
+-- ===== Employee notes: free-text remarks for the employee Note tab =====
+-- Independent of deployment_history on purpose — a note is about the person,
+-- not about a date or a mission, so it isn't tied to any assignment lifecycle.
+-- One row per note (not one row per employee), newest first, so the tab reads
+-- as a running log rather than a single field that gets overwritten.
+
+create table if not exists employee_notes (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references employees(id) on delete cascade,
+  note text not null,
+  created_by text,
+  created_at timestamptz not null default now()
+);
+create index if not exists employee_notes_employee_idx on employee_notes(employee_id);
+
 -- ===== Hosts: the master record behind the Host List tab =====
 -- A host exists on the board as free text (missions.host, and the snapshot in
 -- deployment_history.host); this table is where anything ABOUT that host is
@@ -758,6 +773,7 @@ alter table day_overrides      enable row level security;
 alter table plan_days          enable row level security;
 alter table deployment_history enable row level security;
 alter table hosts              enable row level security;
+alter table employee_notes     enable row level security;
 
 -- ===== Row Level Security on the new tables =====
 
@@ -828,6 +844,7 @@ begin
     ('day_overrides',      'board'),
     ('deployment_history', 'board'),
     ('employees',          'emplist'),
+    ('employee_notes',     'emplist'),
     ('hosts',              'hostlist'),
     ('engineers',          'settings'),
     ('service_areas',      'settings'),
