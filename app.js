@@ -465,8 +465,8 @@ const PERM_AREAS = [
   { group: "Tabs & menus", items: [
     { key: "board",    label: "Board",          hint: "Missions, assignments, the day lock" },
     { key: "overview", label: "Overview tab",   hint: "The dashboard as a whole", viewOnly: true },
-    { key: "emplist",  label: "Manpower list",  hint: "The employee roster" },
-    { key: "hostlist", label: "Host list",      hint: "Sites and their records" },
+    { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
+    { key: "hostlist", label: "Host",           hint: "Sites and their records" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
   ]},
@@ -810,19 +810,27 @@ function render() {
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   $("#filters").classList.toggle("hidden", !board);
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
+  // Manpower's and Host's search/filters group — each is a display:contents
+  // wrapper (styles.css), so one class toggle here shows or hides that tab's
+  // whole cluster within row 1.
+  $("#emplist-toolbar").classList.toggle("hidden", !eml);
+  $("#hostlist-toolbar").classList.toggle("hidden", !hl);
+  // Row 2's export-type action is tab-specific — Board/Overview get Export+PDF
+  // (below), Manpower and Host each get their own count + CSV button instead.
+  // Each pair needs its own toggle: unlike the display:contents groups above,
+  // these live directly in #toolbar-row2, not inside a shared wrapper.
+  $("#emplist-count").classList.toggle("hidden", !eml);
+  $("#btn-emplist-csv").classList.toggle("hidden", !eml);
+  $("#hostlist-count").classList.toggle("hidden", !hl);
+  $("#btn-hostlist-csv").classList.toggle("hidden", !hl);
   // The two lists and the board bar carry their own create buttons; RLS would
   // refuse the write anyway, so hiding them is about not offering a dead end.
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
-  $("#btn-add-host").classList.toggle("hidden", !can("hostlist", "edit"));
+  $("#btn-add-host").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
   $("#btn-export").classList.toggle("hidden", eml || hl);
   // Print, like Export, is a read: a Viewer may take the board away with them.
   $("#btn-print").classList.toggle("hidden", eml || hl);
   $("#btn-reset-board").classList.toggle("hidden", !boardEdit);
-  // Every control in the main toolbar belongs to a board or to the employee
-  // roster, so on the Host List the row would be empty furniture (and on a
-  // phone, a "⋯ More" button opening an empty menu) — the tab carries its own
-  // toolbar inside the panel instead.
-  $("#toolbar").classList.toggle("hidden", hl);
   renderStats();
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
   $("#float-pool").classList.toggle("hidden", !board);
@@ -923,19 +931,14 @@ function renderTabs() {
   if (can("emplist")) {
   const eml = document.createElement("div");
   eml.className = "board-tab tab-emplist" + (isEmployeeList() ? " active" : "");
-  // "List" is in its own span so the phone bar can drop it (see .tab-trim in
-  // styles.css) — "Manpower" alongside "Overview" and a board picker is
-  // unambiguous, and the two words it saves are what let the bar hold one line
-  eml.innerHTML = icon("users") + 'Manpower<span class="tab-trim"> List</span>';
+  eml.innerHTML = icon("users") + 'Manpower';
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
   }
   if (can("hostlist")) {
   const hl = document.createElement("div");
   hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
-  // same .tab-trim trick as Manpower List: on a phone the bar keeps "Host" and
-  // drops " list", which is unambiguous next to Overview / Manpower
-  hl.innerHTML = icon("site") + 'Host<span class="tab-trim"> list</span>';
+  hl.innerHTML = icon("site") + 'Host';
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
   }
@@ -1683,8 +1686,8 @@ function renderStats() {
     bar.appendChild(statChip("Total employees", D().employees.length));
     bar.appendChild(statChip("Permanent", permN));
     bar.appendChild(statChip("On-call", D().employees.length - permN));
-    // per-service-area counts, same idea as a board's #area-bar — shown on the
-    // toolbar row (next to "+ New Employee") since Manpower List has no stats row of its own
+    // per-service-area counts, same idea as a board's #area-bar — its own chip
+    // group right after the ones above, still inside the shared #toolbar row
     const emplistAreaBar = $("#emplist-area-bar");
     emplistAreaBar.innerHTML = "";
     for (const a of D().areas) {
@@ -1716,7 +1719,7 @@ function renderStats() {
   for (const [label, n] of chips) bar.appendChild(statChip(label, n));
   bar.appendChild(statChip("Day", s.dayMissions));
   bar.appendChild(statChip("Night", s.nightMissions, null, "stat-chip-night"));
-  // per-service-area counts sit on the right of the same row
+  // per-service-area counts, right after the chips above in the same row
   for (const a of D().areas) {
     const n = boardEmployees(D().activeBoardId).filter(e => e.areaId === a.id).length;
     if (n) areaBar.appendChild(statChip(a.name, n));
@@ -2897,11 +2900,19 @@ function renderOverview() {
     const areaMax = Math.max(...areaData.map(r => r.total));
     const areaWrap = document.createElement("div");
     areaWrap.className = "ov-area-rows";
+    // Same count/percent text as contractMixCell's "42 (68%) / 20 (32%)" pattern
+    // (see below) — the bold total stays the headline figure, this is a second,
+    // smaller line under it so each row's contract mix is a glance, not a hover.
+    const pctSplit = (perm, total) => {
+      const pctPerm = total ? Math.round((perm / total) * 100) : 0;
+      return `${pctPerm}% / ${100 - pctPerm}%`;
+    };
     for (const r of areaData) {
       const row = document.createElement("div");
       row.className = "ov-area-row";
       row.innerHTML = `<span class="ov-area-row-label" title="${escapeHtml(r.area.name)}"><span class="ov-area-dot" style="background:${escapeHtml(r.area.color)}"></span><span class="ov-area-row-name">${escapeHtml(r.area.name)}</span></span>
-        <div class="ov-area-row-track"></div><span class="ov-area-row-total">${r.total}</span>`;
+        <div class="ov-area-row-track"></div>
+        <span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${r.total}</span><span class="ov-area-row-pct">${pctSplit(r.perm, r.total)}</span></span>`;
       row.querySelector(".ov-area-row-track").innerHTML = Charts.stackedBarH({
         segments: [
           { label: "Permanent", value: r.perm, color: "var(--chart-permanent)" },
@@ -2911,10 +2922,21 @@ function renderOverview() {
       });
       areaWrap.appendChild(row);
     }
+    const permTotal = areaData.reduce((n, r) => n + r.perm, 0);
+    const oncallTotal = areaData.reduce((n, r) => n + r.oncall, 0);
+    // Grand-total row: no bar (it would be full-width by definition, same
+    // reasoning as the isTotal/noBar rows in ovCompareTable), just the two-line
+    // total + split, set off by a top border.
+    const totalRow = document.createElement("div");
+    totalRow.className = "ov-area-row ov-area-row-grandtotal";
+    totalRow.innerHTML = `<span class="ov-area-row-label"><span class="ov-area-row-name">All areas</span></span>
+      <div></div>
+      <span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${permTotal + oncallTotal}</span><span class="ov-area-row-pct">${pctSplit(permTotal, permTotal + oncallTotal)}</span></span>`;
+    areaWrap.appendChild(totalRow);
     areaSec.appendChild(areaWrap);
     areaSec.appendChild(Charts.legendEl([
-      { key: "perm", label: `Permanent (${areaData.reduce((n, r) => n + r.perm, 0)})`, color: "var(--chart-permanent)" },
-      { key: "oncall", label: `On-call (${areaData.reduce((n, r) => n + r.oncall, 0)})`, color: "var(--chart-oncall)" },
+      { key: "perm", label: `Permanent (${permTotal})`, color: "var(--chart-permanent)" },
+      { key: "oncall", label: `On-call (${oncallTotal})`, color: "var(--chart-oncall)" },
     ]));
   } else {
     areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
