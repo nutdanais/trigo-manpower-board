@@ -1759,17 +1759,26 @@ body.board-view #app-root { margin-right: 264px; }
 #modal-employee {
   display: flex;
   flex-direction: column;
-  height: min(560px, 84vh);
+  height: min(600px, 84vh);
+  /* the pane scrolls, not the card — without this the dialog's own
+     overflow-y:auto (from the shared .modal rule) fights the pane's, and the
+     two nested scrollbars together were what pushed a 1-2px sliver of
+     horizontal overflow into view as a spurious horizontal scrollbar too. */
+  overflow: hidden;
 }
 /* Each pane is a flex column of its own, so a short one (Host Record, Note)
    pins its footer to the bottom of the fixed box above instead of leaving it
    stranded right under a couple of lines of content with dead white space
    below. Note and Edit Employee carry their footer inside a <form>, so that
-   needs the same column treatment to pass the space down to it. */
+   needs the same column treatment to pass the space down to it.
+   overflow-x is pinned to hidden: nothing in any of the three panes is meant
+   to scroll sideways, so this also rules out that sliver of horizontal
+   overflow outright rather than just outrunning it with more height. */
 #modal-employee .settings-pane {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
