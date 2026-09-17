@@ -999,11 +999,15 @@ const orgCrewCount = (n) => n.type === "employee" ? 1 : n.children.reduce((s, c)
 const orgMissionCount = (n) => n.type === "mission" ? 1 : n.children.reduce((s, c) => s + orgMissionCount(c), 0);
 const orgCountType = (n, t) => (n.type === t ? 1 : 0) + n.children.reduce((s, c) => s + orgCountType(c, t), 0);
 function orgDistinctAreas(n) { const s = new Set(); (function w(x) { if (x.type === "area") s.add(x._id.split("/a:")[1]); x.children.forEach(w); })(n); return s.size; }
+/* Engineers repeat across boards (one node per board they run a mission on), so
+   count DISTINCT people for the root's roll-up, not engineer nodes. */
+function orgDistinctEngineers(n) { const s = new Set(); (function w(x) { if (x.type === "engineer") s.add(x._id.split("/e:")[1]); x.children.forEach(w); })(n); return s.size; }
 const orgIsLeaf = (n) => !n.children.length;
 const orgLevelLabel = (t) => ({ board: "Board", engineer: "Engineer", area: "Service area", mission: "Mission", employee: "Crew", bucket: "Pool" }[t] || "");
 
 function orgCountText(n) {
   const crew = orgCrewCount(n);
+  if (n.type === "root") return `${orgCountType(n, "board")} boards · ${orgMissionCount(n)} missions · ${orgDistinctEngineers(n)} engineers · ${orgDistinctAreas(n)} areas · ${crew} crew`;
   if (n.type === "board") return `${orgMissionCount(n)} miss · ${orgCountType(n, "engineer")} eng · ${orgDistinctAreas(n)} areas · ${crew} crew`;
   if (n.type === "engineer") return `${orgMissionCount(n)} miss · ${orgCountType(n, "area")} areas · ${crew} crew`;
   if (n.type === "area") return `${orgMissionCount(n)} miss · ${crew} crew`;
