@@ -1647,7 +1647,7 @@ body.board-view #app-root { margin-right: 264px; }
    .modal's own padding moves onto these three bands (see .modal below). */
 .modal h3 {
   margin: -20px -20px 16px;
-  padding: 15px 20px 13px;
+  padding: 15px 44px 13px 20px;
   border-bottom: 1px solid var(--border);
   font-family: inherit;
   font-size: 16px;
@@ -1657,6 +1657,28 @@ body.board-view #app-root { margin-right: 264px; }
   background: var(--panel);
   z-index: 3;
 }
+/* The X lives inside the sticky header so it stays put with the title while
+   the form beneath it scrolls, instead of riding away with the content. */
+.modal h3 .modal-close {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.modal h3 .modal-close:hover { color: var(--text); background: var(--bg-soft); }
 .modal label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
 .modal input, .modal select, .modal textarea {
   display: block;
@@ -1675,22 +1697,28 @@ body.board-view #app-root { margin-right: 264px; }
 .form-row { display: flex; gap: 8px; }
 .form-row label { flex: 1; }
 /* The committing action sits LAST, on the right — the position the platform
-   dialogs put it in, and the one a reader's eye lands on after the form. */
+   dialogs put it in, and the one a reader's eye lands on after the form.
+   Plain row + flex-end packs the buttons in DOM order against the right edge,
+   so Cancel-then-Save (the order every form here already uses) puts Save
+   outermost without needing row-reverse — which packed the pair against the
+   LEFT edge instead and put Cancel outermost, the opposite of both this
+   comment and every dialog's own reading order. */
 .modal-actions {
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: flex-end;
-  flex-direction: row-reverse;
   margin: 20px -20px -20px;
   padding: 13px 20px;
   border-top: 1px solid var(--border);
   background: var(--bg-soft);
 }
 .modal-actions .btn-primary { min-width: 90px; }
-/* anything that is not a button (a hint, a checkbox) keeps reading order and
-   is pushed away from the action pair */
-.modal-actions > :not(.btn) { margin-right: auto; order: 1; }
+/* anything that is not a button (a hint, a checkbox, the danger/Cancel/Save
+   spacer) keeps reading order; margin-left:auto eats the free space to its
+   left, pushing it and everything after it flush to the right edge while
+   whatever precedes it (a Delete/Deactivate button) stays pinned left. */
+.modal-actions > :not(.btn) { margin-left: auto; }
 
 /* Account-level actions in the user dialog. Set apart from Cancel/Save above a
    rule, because they act on the account rather than on the form. */
@@ -1719,6 +1747,95 @@ body.board-view #app-root { margin-right: 264px; }
 }
 .settings-tab:hover { color: var(--text); }
 .settings-tab.active { color: var(--primary-text); border-bottom-color: var(--primary-text); }
+
+/* Employee modal: Host Record / Note / Edit Employee share one dialog, and
+   each pane's natural content is a different height (a short host list vs.
+   the full edit form) — without a fixed box the dialog resized and visibly
+   jumped every time you switched tabs.
+
+   A guessed fixed height fought a losing battle here: real host/note cards
+   set in the actual Noto Sans (not a fallback font), at whatever zoom and
+   viewport height the person's browser happens to have, never quite matched
+   a number picked from one test render — it was either a little too short
+   (an unwanted scrollbar) or wasteful. Stacking all three panes in the same
+   CSS grid cell instead sizes the box to whichever pane is tallest using the
+   real, live layout — accurate on any font, viewport or zoom, with no JS
+   measuring — while an inactive pane still occupies that cell (so it still
+   counts toward the height) but is invisible and unclickable. */
+#modal-employee {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  /* the pane scrolls, not the card — without this the dialog's own
+     overflow-y:auto (from the shared .modal rule) fights the pane's, and the
+     two nested scrollbars together were what pushed a 1-2px sliver of
+     horizontal overflow into view as a spurious horizontal scrollbar too. */
+  overflow: hidden;
+}
+.employee-pane-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  /* auto, not 1fr: this container's own height is intrinsic (sized to
+     content, not a fixed box divvied up), and fr units only have a real
+     "share of the free space" to size against once the container's size is
+     already definite — in an intrinsically-sized one they're ambiguous, and
+     that's the kind of ambiguity that shows up as a couple of stray pixels
+     of "phantom" overflow (a vertical scrollbar with nothing visibly left
+     to scroll to). auto is the unambiguous "fit the tallest pane" value. */
+  grid-template-rows: minmax(0, auto);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Every pane shares the stack's one cell — that's what makes the tallest of
+   the three set the box's height. overflow-x is pinned to hidden: nothing in
+   any of the three panes is meant to scroll sideways, so this rules out a
+   horizontal scrollbar outright rather than just outrunning it with more
+   height. The couple of pixels of bottom padding are cheap insurance against
+   text metrics rounding a pixel or two differently on whatever browser/OS/
+   zoom is actually rendering this, not a fix for anything specific. */
+#modal-employee .settings-pane {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+}
+/* The global .hidden utility is display:none, which would drop an inactive
+   pane out of the grid cell entirely — and then the cell would size to
+   whichever pane is merely active, right back to the original jump. Keeping
+   it laid out (so it still counts toward the cell's height) but invisible
+   and unclickable is the whole point of stacking them, so this has to win
+   over that !important with one of its own. */
+#modal-employee .settings-pane.hidden {
+  display: flex !important;
+  visibility: hidden !important;
+  pointer-events: none;
+}
+#modal-employee .settings-pane form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* .modal-actions' own margin-bottom is -20px, meant to bleed the footer
+   through the dialog's 20px padding to sit flush with its outer edge — a
+   trick that only works when nothing else sits between it and that padding.
+   Here it sits inside a *scrolling* pane instead, which has no padding of
+   its own for that negative margin to cancel against, so the footer was
+   rendering 20px below the pane's own bottom edge — extra scrollable
+   overflow nothing was ever meant to reveal, and the actual source of the
+   scrollbar this whole pass was chasing (invisible in a headless/overlay-
+   scrollbar browser, but very visible with a classic one). Zeroing it out
+   here is what actually removes that phantom 20px, not a taller box. */
+#modal-employee .settings-pane > .modal-actions,
+#modal-employee .settings-pane form > .modal-actions {
+  margin-top: auto;
+  margin-bottom: 0;
+}
 
 .settings-section { margin-bottom: 18px; }
 .settings-section h4 { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
@@ -2938,7 +3055,29 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   flex-direction: row;
   padding: 0;                /* the rail and the body carry their own */
   overflow: hidden;          /* the pane scrolls, not the card */
+  position: relative;        /* anchors .modal-close to this box, not the viewport */
 }
+/* Sits above both the rail and every pane, same corner on every tab since it
+   is a child of the dialog itself rather than of #settings-body. */
+#modal-settings .modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+#modal-settings .modal-close:hover { color: var(--text); background: var(--bg-soft); }
 
 #settings-rail {
   flex: 0 0 200px;
@@ -3015,7 +3154,12 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 18px 20px;
+  /* Settings has no shared header band the way every other modal's <h3> gives
+     it, so nothing here yet keeps the pane's own top-right content (an "+ Add
+     …" button, or the pane's own scrollbar once it overflows) out from under
+     #modal-settings' close button. This top padding is that reserved band,
+     applied once so every pane clears it the same way. */
+  padding: 48px 20px 18px;
 }
 /* The scroll region. min-height:0 is what actually lets a flex child scroll
    instead of growing to fit and pushing the footer off-screen. Height stays a

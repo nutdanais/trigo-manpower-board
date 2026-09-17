@@ -421,7 +421,7 @@
 <div id="modal-backdrop" class="hidden">
 
   <div class="modal hidden" id="modal-mission">
-    <h3 id="mission-modal-title">New Mission</h3>
+    <h3><span id="mission-modal-title">New Mission</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-mission">
       <label>Mission number <input name="number" required placeholder="e.g. BANGN.26.0007"></label>
       <!-- Host is a search over the Host list: the datalist is filled by
@@ -461,64 +461,70 @@
   </div>
 
   <div class="modal hidden" id="modal-employee">
-    <h3 id="employee-modal-title">New Employee</h3>
+    <h3><span id="employee-modal-title">New Employee</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <div id="employee-tabs" class="settings-tabs hidden">
       <button type="button" class="settings-tab" data-tab="hosts">Host Record</button>
       <button type="button" class="settings-tab" data-tab="note">Note</button>
       <button type="button" class="settings-tab" data-tab="edit">Edit Employee</button>
     </div>
-    <div class="settings-pane hidden" data-pane="hosts">
-      <p class="import-note">Every host this employee has been deployed to, most recent first.</p>
-      <div id="employee-hosts-list"></div>
-      <div class="modal-actions">
-        <button type="button" class="btn" data-close>Close</button>
-      </div>
-    </div>
-    <div class="settings-pane hidden" data-pane="note">
-      <p class="import-note">Notes and remarks about this employee, most recent first. Visible to anyone who can edit the roster.</p>
-      <div id="employee-notes-list"></div>
-      <form id="form-employee-note">
-        <label>Add a note <textarea name="note" rows="3" required placeholder="e.g. prefers day shifts, needs a safety refresher…"></textarea></label>
+    <!-- All three panes are stacked in the same grid cell (see .employee-pane-stack
+         in styles.css) so the box sizes itself to whichever is tallest — pixel-
+         accurate to the actual rendered content, not a guessed height — instead
+         of jumping to fit whichever one happens to be showing. -->
+    <div class="employee-pane-stack">
+      <div class="settings-pane hidden" data-pane="hosts">
+        <p class="import-note">Every host this employee has been deployed to, most recent first.</p>
+        <div id="employee-hosts-list"></div>
         <div class="modal-actions">
           <button type="button" class="btn" data-close>Close</button>
-          <button type="submit" class="btn btn-primary">Add note</button>
         </div>
-      </form>
-    </div>
-    <div class="settings-pane" data-pane="edit">
-      <form id="form-employee">
-        <label>Employee name <input name="name" required placeholder="e.g. สุริยา"></label>
-        <label>Contract type
-          <select name="contract">
-            <option value="permanent">Permanent</option>
-            <option value="oncall">On-call</option>
-          </select>
-        </label>
-        <label>Position
-          <select name="position">
-            <option value="">— none —</option>
-            <option value="inspector">Inspector</option>
-            <option value="senior_inspector">Senior Inspector</option>
-            <option value="technician">Technician</option>
-            <option value="team_leader">Team Leader</option>
-            <option value="assistant_site_engineer">Assistant Site Engineer</option>
-          </select>
-        </label>
-        <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
-        <label>Service area <select name="areaId" required></select></label>
-        <label>Board <select name="boardId" required></select></label>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee"><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg> Deactivate</button>
-          <span class="toolbar-spacer"></span>
-          <button type="button" class="btn" data-close>Cancel</button>
-          <button type="submit" class="btn btn-primary">Save</button>
-        </div>
-      </form>
+      </div>
+      <div class="settings-pane hidden" data-pane="note">
+        <p class="import-note">Notes and remarks about this employee, most recent first. Visible to anyone who can edit the roster.</p>
+        <div id="employee-notes-list"></div>
+        <form id="form-employee-note">
+          <label>Add a note <textarea name="note" rows="3" required placeholder="e.g. prefers day shifts, needs a safety refresher…"></textarea></label>
+          <div class="modal-actions">
+            <button type="button" class="btn" data-close>Close</button>
+            <button type="submit" class="btn btn-primary">Add note</button>
+          </div>
+        </form>
+      </div>
+      <div class="settings-pane" data-pane="edit">
+        <form id="form-employee">
+          <label>Employee name <input name="name" required placeholder="e.g. สุริยา"></label>
+          <label>Contract type
+            <select name="contract">
+              <option value="permanent">Permanent</option>
+              <option value="oncall">On-call</option>
+            </select>
+          </label>
+          <label>Position
+            <select name="position">
+              <option value="">— none —</option>
+              <option value="inspector">Inspector</option>
+              <option value="senior_inspector">Senior Inspector</option>
+              <option value="technician">Technician</option>
+              <option value="team_leader">Team Leader</option>
+              <option value="assistant_site_engineer">Assistant Site Engineer</option>
+            </select>
+          </label>
+          <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+          <label>Service area <select name="areaId" required></select></label>
+          <label>Board <select name="boardId" required></select></label>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee"><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg> Deactivate</button>
+            <span class="toolbar-spacer"></span>
+            <button type="button" class="btn" data-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
   <div class="modal hidden" id="modal-host">
-    <h3 id="host-modal-title">Host</h3>
+    <h3><span id="host-modal-title">Host</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-host">
       <label>Host name <input name="name" required placeholder="e.g. Fortune"></label>
       <p id="host-name-note" class="import-note hidden">The name is how this record is tied to the host's missions and deployment history. Renaming rewrites it on all of them, so the history follows the host — past mission cards will read the new name too. To combine this host with another one instead, use <b>Merge</b> below.</p>
@@ -559,6 +565,7 @@
        are the ones app.js reads (#settings-tabs, .settings-tab, data-tab,
        data-area) — only the box around them changed. -->
   <div class="modal hidden" id="modal-settings">
+    <button type="button" class="modal-close" data-close aria-label="Close">&times;</button>
     <aside id="settings-rail">
       <h3>Settings</h3>
       <nav id="settings-tabs" class="settings-tabs">
@@ -713,7 +720,7 @@
   </div>
 
   <div class="modal hidden" id="modal-user">
-    <h3 id="user-modal-title">User</h3>
+    <h3><span id="user-modal-title">User</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-user">
       <p id="user-modal-email" class="import-note"></p>
       <label>Full name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
@@ -745,7 +752,7 @@
   <!-- No invitation email is possible here, so the account is made outright and
        the admin carries the password over by hand. -->
   <div class="modal hidden" id="modal-add-user">
-    <h3>Add someone</h3>
+    <h3>Add someone<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-add-user">
       <label>Their name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
       <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off" placeholder="from their email address"></label>
@@ -763,7 +770,7 @@
        is already on the list, so this is for the manager or admin who also runs
        missions themselves. -->
   <div class="modal hidden" id="modal-add-engineer">
-    <h3>Add an engineer</h3>
+    <h3>Add an engineer<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-add-engineer">
       <label>Person <select name="profileId" required></select></label>
       <p id="add-engineer-note" class="import-note">They get a colour of their own and can be picked in the Engineer box on a mission. Their name and phone number come from their account.</p>
@@ -778,7 +785,7 @@
        the Edge Function and never stored anywhere readable, so closing this
        without passing it on means issuing another one. -->
   <div class="modal hidden" id="modal-temp-password">
-    <h3 id="temp-password-title">Account created.</h3>
+    <h3><span id="temp-password-title">Account created.</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p id="temp-password-for" class="import-note"></p>
     <div class="temp-password">
       <code id="temp-password-value"></code>
@@ -794,7 +801,7 @@
   </div>
 
   <div class="modal hidden" id="modal-board">
-    <h3>New Board</h3>
+    <h3>New Board<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-board">
       <label>Board name <input name="name" required placeholder="e.g. Rayong"></label>
       <div class="field-label">Weekend (non-working) days</div>
@@ -808,7 +815,7 @@
   </div>
 
   <div class="modal hidden" id="modal-import">
-    <h3>Add Mission</h3>
+    <h3>Add Mission<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p id="import-source-note" class="import-note"></p>
     <div id="import-list"></div>
     <div class="modal-actions">
@@ -818,7 +825,7 @@
   </div>
 
   <div class="modal hidden" id="modal-hide-missions">
-    <h3>Hide/Unhide Missions</h3>
+    <h3>Hide/Unhide Missions<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p class="import-note">Ticked missions are hidden from this board and date — their definition (and carried-forward days) is kept, just off the board. Anyone assigned to a mission you hide returns to Standby.</p>
     <div id="hide-missions-list"></div>
     <div class="modal-actions">
@@ -828,7 +835,7 @@
   </div>
 
   <div class="modal hidden" id="modal-confirm">
-    <h3 id="confirm-title">Confirm</h3>
+    <h3><span id="confirm-title">Confirm</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p id="confirm-message"></p>
     <div class="modal-actions">
       <button type="button" class="btn" id="btn-confirm-no">Cancel</button>
