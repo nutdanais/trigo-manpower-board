@@ -3783,12 +3783,18 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .oc-box-wrap { position: relative; display: inline-block; }
 .oc-box { text-align: left; vertical-align: top; background: var(--panel); border: 1px solid var(--border);
   border-top: 3px solid var(--oc-c, var(--primary)); border-radius: var(--r-box);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(16,32,52,.1)); padding: 9px 12px; min-width: 150px; max-width: 240px;
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(16,32,52,.1)); padding: 9px 12px; min-width: 150px;
   display: inline-flex; gap: 9px; align-items: flex-start; white-space: normal; }
 .oc-box .oc-body { min-width: 0; }
 .oc-box .oc-ttl { font-weight: 700; font-size: 13px; display: flex; gap: 7px; align-items: baseline; flex-wrap: wrap; }
 .oc-box .oc-meta { margin-top: 5px; }
-.oc-box.is-employee { min-width: 160px; }
+/* Every non-leaf box keeps its title and its counts on one line each: the box
+   widens to fit rather than wrapping and growing taller, so all boxes at a
+   level share one height and their children rows line up across branches.
+   (Employee leaves may wrap their chips — nothing hangs below them.) */
+.oc-box:not(.is-employee) .oc-ttl,
+.oc-box:not(.is-employee) .oc-meta { flex-wrap: nowrap; white-space: nowrap; }
+.oc-box.is-employee { min-width: 160px; max-width: 240px; }
 .oc-box.is-board .oc-ttl { font-size: 14px; }
 .oc-box.is-bucket { border-style: dashed; }
 .oc-tree li.kids-off > ul { display: none; }

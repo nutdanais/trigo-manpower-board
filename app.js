@@ -1005,11 +1005,14 @@ function orgDistinctEngineers(n) { const s = new Set(); (function w(x) { if (x.t
 const orgIsLeaf = (n) => !n.children.length;
 const orgLevelLabel = (t) => ({ board: "Board", engineer: "Engineer", area: "Service area", mission: "Mission", employee: "Crew", bucket: "Pool" }[t] || "");
 
+/* Each node counts its descendant levels in hierarchy order —
+   board → engineer → service area → mission → crew — so a node lists only
+   the tiers that sit below it, left to right. */
 function orgCountText(n) {
   const crew = orgCrewCount(n);
-  if (n.type === "root") return `${orgCountType(n, "board")} boards · ${orgMissionCount(n)} missions · ${orgDistinctEngineers(n)} engineers · ${orgDistinctAreas(n)} areas · ${crew} crew`;
-  if (n.type === "board") return `${orgMissionCount(n)} miss · ${orgCountType(n, "engineer")} eng · ${orgDistinctAreas(n)} areas · ${crew} crew`;
-  if (n.type === "engineer") return `${orgMissionCount(n)} miss · ${orgCountType(n, "area")} areas · ${crew} crew`;
+  if (n.type === "root") return `${orgCountType(n, "board")} boards · ${orgDistinctEngineers(n)} engineers · ${orgDistinctAreas(n)} areas · ${orgMissionCount(n)} missions · ${crew} crew`;
+  if (n.type === "board") return `${orgCountType(n, "engineer")} eng · ${orgDistinctAreas(n)} areas · ${orgMissionCount(n)} miss · ${crew} crew`;
+  if (n.type === "engineer") return `${orgCountType(n, "area")} areas · ${orgMissionCount(n)} miss · ${crew} crew`;
   if (n.type === "area") return `${orgMissionCount(n)} miss · ${crew} crew`;
   return `${crew} crew`;
 }
