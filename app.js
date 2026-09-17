@@ -893,6 +893,10 @@ const org = {
   collapsed: new Set(),     // node _id -> children hidden
   seeded: false,            // first paint collapses missions + pools
   pz: { scale: 1, tx: 24, ty: 24, fitted: false },   // org-chart canvas transform
+  filters: { boards: new Set(), engineers: new Set(), areas: new Set() },  // keys the user hid
+  filterOpts: { boards: [], engineers: [], areas: [] },   // what's available to filter this render
+  tree: null,               // the filtered tree currently on screen (both views read it)
+  closer: null,             // document click handler that closes open filter pops
 };
 const ORG_LEVELS = {
   board:    ["board"],
@@ -1021,16 +1025,89 @@ function orgEmpChips(n) {
   return pos + contract + area + st;
 }
 
+/* Which board / engineer / service area appear in this snapshot — the lists
+   the filter dropdowns offer (built from the unfiltered tree, keyed the same
+   way orgPrune reads them). */
+function orgFilterOptions(fullTree) {
+  const boards = [], engMap = new Map(), areaMap = new Map();
+  for (const b of fullTree.children) {
+    boards.push({ key: b._id.slice(2), name: b.name });
+    for (const e of b.children) {
+      if (e.type !== "engineer") continue;
+      const ek = e._id.split("/e:")[1];
+      if (!engMap.has(ek)) engMap.set(ek, e.name);
+      for (const a of e.children) {
+        if (a.type !== "area") continue;
+        const ak = a._id.split("/a:")[1];
+        if (!areaMap.has(ak)) areaMap.set(ak, a.name);
+      }
+    }
+  }
+  return {
+    boards,
+    engineers: [...engMap].map(([key, name]) => ({ key, name })),
+    areas: [...areaMap].map(([key, name]) => ({ key, name })),
+  };
+}
+/* Drop the boards / engineers / service areas the user has hidden. Mutates the
+   passed tree; counts recompute from what's left, so the visible tallies match
+   the visible tree. Engineers emptied by an area filter are dropped too. */
+function orgPrune(tree, f) {
+  tree.children = tree.children.filter(b => !f.boards.has(b._id.slice(2)));
+  for (const b of tree.children) {
+    b.children = b.children.filter(n => n.type !== "engineer" || !f.engineers.has(n._id.split("/e:")[1]));
+    for (const e of b.children) {
+      if (e.type !== "engineer") continue;
+      e.children = e.children.filter(a => !(a.type === "area" && f.areas.has(a._id.split("/a:")[1])));
+    }
+    b.children = b.children.filter(n => n.type !== "engineer" || n.children.length);
+  }
+}
+function orgFilterDropdown(dim, label, items) {
+  const hidden = org.filters[dim];
+  const rows = items.map(it =>
+    `<label><input type="checkbox" value="${escapeHtml(it.key)}" ${hidden.has(it.key) ? "" : "checked"}>${escapeHtml(it.name)}</label>`
+  ).join("");
+  return `<div class="oc-ms" data-dim="${dim}">
+      <button type="button" class="btn oc-ms-btn">${label}: <b class="oc-ms-state"></b></button>
+      <div class="oc-ms-pop hidden">
+        <div class="oc-ms-actions"><button type="button" data-all>All</button><button type="button" data-none>None</button></div>
+        ${rows || '<div class="oc-hint" style="padding:6px">none today</div>'}
+      </div>
+    </div>`;
+}
+function orgFilterState(dim) {
+  const total = org.filterOpts[dim].length;
+  const hidden = org.filterOpts[dim].filter(it => org.filters[dim].has(it.key)).length;
+  return { total, hidden, visible: total - hidden };
+}
+function orgUpdateFilterLabels(panel) {
+  panel.querySelectorAll(".oc-ms").forEach(ms => {
+    const dim = ms.dataset.dim;
+    const s = orgFilterState(dim);
+    ms.querySelector(".oc-ms-state").textContent = s.hidden ? `${s.visible}/${s.total}` : "All";
+    ms.querySelector(".oc-ms-btn").classList.toggle("filtered", s.hidden > 0);
+  });
+}
+
 function renderOrgChart() {
   const panel = $("#orgchart-panel");
-  const tree = buildOrgTree();
+  const full = buildOrgTree();
   if (!org.seeded) {
-    (function w(n) { if (n.type === "mission" || n.type === "bucket") org.collapsed.add(n._id); n.children.forEach(w); })(tree);
+    (function w(n) { if (n.type === "mission" || n.type === "bucket") org.collapsed.add(n._id); n.children.forEach(w); })(full);
     org.seeded = true;
   }
+  org.filterOpts = orgFilterOptions(full);
+  // forget filter selections whose board/engineer/area is gone from this snapshot
+  for (const dim of ["boards", "engineers", "areas"]) {
+    const live = new Set(org.filterOpts[dim].map(it => it.key));
+    for (const k of [...org.filters[dim]]) if (!live.has(k)) org.filters[dim].delete(k);
+  }
+  orgPrune(full, org.filters);
+  org.tree = full;
 
   const levelOpts = [["board", "Board"], ["engineer", "Engineer"], ["area", "Service area"], ["mission", "Mission"], ["all", "Everything"]]
-    .map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+    .map(([v, l]) => `<option value="${v}"${v === "mission" ? " selected" : ""}>${l}</option>`).join("");
 
   panel.innerHTML =
     `<div class="oc-wrap">
@@ -1040,6 +1117,12 @@ function renderOrgChart() {
           <button type="button" class="btn oc-view-btn" data-v="chart">${icon("orgchart")}<span>Org chart</span></button>
         </div>
         <div class="oc-spacer"></div>
+        <span class="oc-flabel">Filter</span>
+        <div class="oc-filters">
+          ${orgFilterDropdown("boards", "Board", org.filterOpts.boards)}
+          ${orgFilterDropdown("engineers", "Engineer", org.filterOpts.engineers)}
+          ${orgFilterDropdown("areas", "Service area", org.filterOpts.areas)}
+        </div>
         <label class="oc-levelctl">Show to
           <select id="oc-level" class="oc-select">${levelOpts}</select>
         </label>
@@ -1067,10 +1150,7 @@ function renderOrgChart() {
   // view toggle
   const setView = (v) => {
     org.view = v;
-    panel.querySelectorAll(".oc-view-btn").forEach(b => {
-      const on = b.dataset.v === v;
-      b.classList.toggle("btn-primary", on);
-    });
+    panel.querySelectorAll(".oc-view-btn").forEach(b => b.classList.toggle("btn-primary", b.dataset.v === v));
     $("#oc-outline").classList.toggle("hidden", v !== "outline");
     $("#oc-chart").classList.toggle("hidden", v !== "chart");
     if (v === "chart") { orgApplyPz(); if (!org.pz.fitted) { org.pz.fitted = true; requestAnimationFrame(orgFitPz); } }
@@ -1082,38 +1162,72 @@ function renderOrgChart() {
   lvlSel.onchange = () => {
     org.collapsed.clear();
     const types = ORG_LEVELS[lvlSel.value] || [];
-    (function w(n) { if (types.includes(n.type)) org.collapsed.add(n._id); n.children.forEach(w); })(tree);
-    orgRerender(tree);
+    (function w(n) { if (types.includes(n.type)) org.collapsed.add(n._id); n.children.forEach(w); })(org.tree);
+    orgRerender();
   };
 
-  orgRenderOutline(tree);
-  orgRenderChart(tree);
-  orgWirePan(tree);
+  // filters — each dropdown toggles its pop, its checkboxes hide/show a dimension
+  panel.querySelectorAll(".oc-ms").forEach(ms => {
+    const dim = ms.dataset.dim;
+    const btn = ms.querySelector(".oc-ms-btn");
+    const pop = ms.querySelector(".oc-ms-pop");
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const willOpen = pop.classList.contains("hidden");
+      panel.querySelectorAll(".oc-ms-pop").forEach(p => p.classList.add("hidden"));
+      pop.classList.toggle("hidden", !willOpen);
+    };
+    pop.onclick = (e) => e.stopPropagation();
+    pop.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      cb.onchange = () => { cb.checked ? org.filters[dim].delete(cb.value) : org.filters[dim].add(cb.value); orgApplyFilters(); };
+    });
+    const all = pop.querySelector("[data-all]"), none = pop.querySelector("[data-none]");
+    if (all) all.onclick = () => { org.filters[dim].clear(); pop.querySelectorAll("input").forEach(c => c.checked = true); orgApplyFilters(); };
+    if (none) none.onclick = () => { org.filterOpts[dim].forEach(it => org.filters[dim].add(it.key)); pop.querySelectorAll("input").forEach(c => c.checked = false); orgApplyFilters(); };
+  });
+  // one document handler closes any open pop on an outside click
+  if (org.closer) document.removeEventListener("click", org.closer);
+  org.closer = (e) => { if (!e.target.closest(".oc-ms")) panel.querySelectorAll(".oc-ms-pop").forEach(p => p.classList.add("hidden")); };
+  document.addEventListener("click", org.closer);
+
+  orgUpdateFilterLabels(panel);
+  orgRenderOutline();
+  orgRenderChart();
+  orgWirePan();
   setView(org.view);
 }
 
-/* redraw both views after a collapse/expand change, keeping pan + view */
-function orgRerender(tree) {
-  orgRenderOutline(tree);
-  orgRenderChart(tree);
-  orgWirePan(tree);
+/* re-prune from live data and redraw both views in place, keeping the filter
+   pops open so several boxes can be ticked in a row */
+function orgApplyFilters() {
+  const t = buildOrgTree();
+  orgPrune(t, org.filters);
+  org.tree = t;
+  orgUpdateFilterLabels($("#orgchart-panel"));
+  orgRerender();
+}
+/* redraw both views after a collapse/expand or filter change, keeping pan + view */
+function orgRerender() {
+  orgRenderOutline();
+  orgRenderChart();
+  orgWirePan();
   $("#oc-outline").classList.toggle("hidden", org.view !== "outline");
   $("#oc-chart").classList.toggle("hidden", org.view !== "chart");
   if (org.view === "chart") orgApplyPz();
 }
-function orgToggle(id, tree) {
+function orgToggle(id) {
   org.collapsed.has(id) ? org.collapsed.delete(id) : org.collapsed.add(id);
   const sel = $("#oc-level"); if (sel) sel.selectedIndex = -1;   // manual edit clears the "show to" choice
-  orgRerender(tree);
+  orgRerender();
 }
 
 /* ---- Outline view ---- */
-function orgRenderOutline(tree) {
-  const root = $("#oc-outline"); if (!root) return;
+function orgRenderOutline() {
+  const root = $("#oc-outline"); if (!root || !org.tree) return;
   root.innerHTML = "";
-  root.appendChild(orgOutlineNode(tree, tree));
+  root.appendChild(orgOutlineNode(org.tree));
 }
-function orgOutlineNode(n, tree) {
+function orgOutlineNode(n) {
   const box = document.createElement("div");
   box.className = "oc-ol-item" + (org.collapsed.has(n._id) ? " r-off" : "");
   const row = document.createElement("div");
@@ -1138,41 +1252,41 @@ function orgOutlineNode(n, tree) {
   if (!orgIsLeaf(n)) {
     // The caret sits inside the row; stop its click bubbling to the row handler
     // below, or the two would fire back-to-back and cancel each other out.
-    row.querySelector(".oc-caret").onclick = (e) => { e.stopPropagation(); orgToggle(n._id, tree); };
+    row.querySelector(".oc-caret").onclick = (e) => { e.stopPropagation(); orgToggle(n._id); };
     row.style.cursor = "pointer";
-    row.onclick = (e) => { if (!e.target.closest("a")) orgToggle(n._id, tree); };
+    row.onclick = (e) => { if (!e.target.closest("a")) orgToggle(n._id); };
     const kids = document.createElement("div");
     kids.className = "oc-ol-kids";
-    n.children.forEach(c => kids.appendChild(orgOutlineNode(c, tree)));
+    n.children.forEach(c => kids.appendChild(orgOutlineNode(c)));
     box.appendChild(kids);
   }
   return box;
 }
 
 /* ---- Org chart view (top-down boxes) ---- */
-function orgRenderChart(tree) {
-  const root = $("#oc-tree"); if (!root) return;
+function orgRenderChart() {
+  const root = $("#oc-tree"); if (!root || !org.tree) return;
   root.innerHTML = "";
   const ul = document.createElement("ul");
   const li = document.createElement("li");
   li.className = "oc-root";
-  orgChartBuild(tree, li, tree);
+  orgChartBuild(org.tree, li);
   ul.appendChild(li);
   root.appendChild(ul);
 }
-function orgChartBuild(n, li, tree) {
+function orgChartBuild(n, li) {
   if (org.collapsed.has(n._id)) li.classList.add("kids-off");
   const bw = document.createElement("div");
   bw.className = "oc-box-wrap";
-  bw.appendChild(orgChartBox(n, tree));
+  bw.appendChild(orgChartBox(n));
   li.appendChild(bw);
   if (!orgIsLeaf(n)) {
     const ul = document.createElement("ul");
-    n.children.forEach(c => { const cli = document.createElement("li"); orgChartBuild(c, cli, tree); ul.appendChild(cli); });
+    n.children.forEach(c => { const cli = document.createElement("li"); orgChartBuild(c, cli); ul.appendChild(cli); });
     li.appendChild(ul);
   }
 }
-function orgChartBox(n, tree) {
+function orgChartBox(n) {
   const el = document.createElement("div");
   el.className = "oc-box is-" + n.type;
   el.style.setProperty("--oc-c", n.color || n.areaColor || "var(--primary)");
@@ -1192,7 +1306,7 @@ function orgChartBox(n, tree) {
   el.innerHTML = `${head}<div class="oc-body"><span class="oc-lvl">${orgLevelLabel(n.type)}</span>` +
     `<div class="oc-ttl">${escapeHtml(n.name)} ${sub}</div>${meta}</div>${btn}`;
   const t = el.querySelector(".oc-tog");
-  if (t) t.onclick = (e) => { e.stopPropagation(); orgToggle(n._id, tree); };
+  if (t) t.onclick = (e) => { e.stopPropagation(); orgToggle(n._id); };
   return el;
 }
 
@@ -1213,7 +1327,7 @@ function orgFitPz() {
   const s = Math.min(2, Math.max(0.3, Math.min(vw / cw, vh / ch)));
   org.pz.scale = s; org.pz.tx = Math.max(12, (vw - cw * s) / 2); org.pz.ty = 12; orgApplyPz();
 }
-function orgWirePan(tree) {
+function orgWirePan() {
   const vp = $("#oc-vp"); if (!vp) return;
   $("#oc-zin").onclick = () => orgZoomAt(vp.clientWidth / 2, vp.clientHeight / 2, 1.2);
   $("#oc-zout").onclick = () => orgZoomAt(vp.clientWidth / 2, vp.clientHeight / 2, 1 / 1.2);
