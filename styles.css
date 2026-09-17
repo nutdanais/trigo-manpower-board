@@ -1751,36 +1751,59 @@ body.board-view #app-root { margin-right: 264px; }
 /* Employee modal: Host Record / Note / Edit Employee share one dialog, and
    each pane's natural content is a different height (a short host list vs.
    the full edit form) — without a fixed box the dialog resized and visibly
-   jumped every time you switched tabs. Fixing the height to what Edit
-   Employee (the tallest, and always the same size) needs, then letting the
-   active pane fill and scroll within it, keeps the box still across all
-   three; a short host or note list just leaves blank space below it instead
-   of shrinking the dialog. */
+   jumped every time you switched tabs.
+
+   A guessed fixed height fought a losing battle here: real host/note cards
+   set in the actual Noto Sans (not a fallback font), at whatever zoom and
+   viewport height the person's browser happens to have, never quite matched
+   a number picked from one test render — it was either a little too short
+   (an unwanted scrollbar) or wasteful. Stacking all three panes in the same
+   CSS grid cell instead sizes the box to whichever pane is tallest using the
+   real, live layout — accurate on any font, viewport or zoom, with no JS
+   measuring — while an inactive pane still occupies that cell (so it still
+   counts toward the height) but is invisible and unclickable. */
 #modal-employee {
   display: flex;
   flex-direction: column;
-  height: min(600px, 84vh);
+  max-height: 90vh;
   /* the pane scrolls, not the card — without this the dialog's own
      overflow-y:auto (from the shared .modal rule) fights the pane's, and the
      two nested scrollbars together were what pushed a 1-2px sliver of
      horizontal overflow into view as a spurious horizontal scrollbar too. */
   overflow: hidden;
 }
-/* Each pane is a flex column of its own, so a short one (Host Record, Note)
-   pins its footer to the bottom of the fixed box above instead of leaving it
-   stranded right under a couple of lines of content with dead white space
-   below. Note and Edit Employee carry their footer inside a <form>, so that
-   needs the same column treatment to pass the space down to it.
-   overflow-x is pinned to hidden: nothing in any of the three panes is meant
-   to scroll sideways, so this also rules out that sliver of horizontal
-   overflow outright rather than just outrunning it with more height. */
-#modal-employee .settings-pane {
+.employee-pane-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   flex: 1 1 auto;
+  min-height: 0;
+}
+/* Every pane shares the stack's one cell — that's what makes the tallest of
+   the three set the box's height. overflow-x is pinned to hidden: nothing in
+   any of the three panes is meant to scroll sideways, so this rules out a
+   horizontal scrollbar outright rather than just outrunning it with more
+   height. */
+#modal-employee .settings-pane {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+}
+/* The global .hidden utility is display:none, which would drop an inactive
+   pane out of the grid cell entirely — and then the cell would size to
+   whichever pane is merely active, right back to the original jump. Keeping
+   it laid out (so it still counts toward the cell's height) but invisible
+   and unclickable is the whole point of stacking them, so this has to win
+   over that !important with one of its own. */
+#modal-employee .settings-pane.hidden {
+  display: flex !important;
+  visibility: hidden !important;
+  pointer-events: none;
 }
 #modal-employee .settings-pane form {
   display: flex;
