@@ -1775,7 +1775,14 @@ body.board-view #app-root { margin-right: 264px; }
 .employee-pane-stack {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  /* auto, not 1fr: this container's own height is intrinsic (sized to
+     content, not a fixed box divvied up), and fr units only have a real
+     "share of the free space" to size against once the container's size is
+     already definite — in an intrinsically-sized one they're ambiguous, and
+     that's the kind of ambiguity that shows up as a couple of stray pixels
+     of "phantom" overflow (a vertical scrollbar with nothing visibly left
+     to scroll to). auto is the unambiguous "fit the tallest pane" value. */
+  grid-template-rows: minmax(0, auto);
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -1783,7 +1790,9 @@ body.board-view #app-root { margin-right: 264px; }
    the three set the box's height. overflow-x is pinned to hidden: nothing in
    any of the three panes is meant to scroll sideways, so this rules out a
    horizontal scrollbar outright rather than just outrunning it with more
-   height. */
+   height. The couple of pixels of bottom padding are cheap insurance against
+   text metrics rounding a pixel or two differently on whatever browser/OS/
+   zoom is actually rendering this, not a fix for anything specific. */
 #modal-employee .settings-pane {
   grid-column: 1;
   grid-row: 1;
@@ -1791,6 +1800,7 @@ body.board-view #app-root { margin-right: 264px; }
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-bottom: 2px;
   display: flex;
   flex-direction: column;
 }
@@ -1811,9 +1821,20 @@ body.board-view #app-root { margin-right: 264px; }
   flex: 1 1 auto;
   min-height: 0;
 }
+/* .modal-actions' own margin-bottom is -20px, meant to bleed the footer
+   through the dialog's 20px padding to sit flush with its outer edge — a
+   trick that only works when nothing else sits between it and that padding.
+   Here it sits inside a *scrolling* pane instead, which has no padding of
+   its own for that negative margin to cancel against, so the footer was
+   rendering 20px below the pane's own bottom edge — extra scrollable
+   overflow nothing was ever meant to reveal, and the actual source of the
+   scrollbar this whole pass was chasing (invisible in a headless/overlay-
+   scrollbar browser, but very visible with a classic one). Zeroing it out
+   here is what actually removes that phantom 20px, not a taller box. */
 #modal-employee .settings-pane > .modal-actions,
 #modal-employee .settings-pane form > .modal-actions {
   margin-top: auto;
+  margin-bottom: 0;
 }
 
 .settings-section { margin-bottom: 18px; }
