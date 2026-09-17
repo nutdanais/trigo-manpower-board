@@ -1748,6 +1748,42 @@ body.board-view #app-root { margin-right: 264px; }
 .settings-tab:hover { color: var(--text); }
 .settings-tab.active { color: var(--primary-text); border-bottom-color: var(--primary-text); }
 
+/* Employee modal: Host Record / Note / Edit Employee share one dialog, and
+   each pane's natural content is a different height (a short host list vs.
+   the full edit form) — without a fixed box the dialog resized and visibly
+   jumped every time you switched tabs. Fixing the height to what Edit
+   Employee (the tallest, and always the same size) needs, then letting the
+   active pane fill and scroll within it, keeps the box still across all
+   three; a short host or note list just leaves blank space below it instead
+   of shrinking the dialog. */
+#modal-employee {
+  display: flex;
+  flex-direction: column;
+  height: min(560px, 84vh);
+}
+/* Each pane is a flex column of its own, so a short one (Host Record, Note)
+   pins its footer to the bottom of the fixed box above instead of leaving it
+   stranded right under a couple of lines of content with dead white space
+   below. Note and Edit Employee carry their footer inside a <form>, so that
+   needs the same column treatment to pass the space down to it. */
+#modal-employee .settings-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+#modal-employee .settings-pane form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+#modal-employee .settings-pane > .modal-actions,
+#modal-employee .settings-pane form > .modal-actions {
+  margin-top: auto;
+}
+
 .settings-section { margin-bottom: 18px; }
 .settings-section h4 { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
 /* The engineer / area / board rows used to be flex divs; they are table rows now
