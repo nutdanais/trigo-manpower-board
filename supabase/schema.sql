@@ -292,6 +292,9 @@ select v.role_key, v.area, v.level from (values
   -- tabs & menus
   ('admin','board','edit'),      ('manager','board','edit'),      ('engineer','board','edit'),      ('viewer','board','view'),
   ('admin','overview','view'),   ('manager','overview','view'),   ('engineer','overview','view'),   ('viewer','overview','view'),
+  -- Org Chart tab: a read-only re-view of the same missions/assignments the
+  -- Overview reads (no write keys off it), so view for everyone like overview.
+  ('admin','orgchart','view'),   ('manager','orgchart','view'),   ('engineer','orgchart','view'),   ('viewer','orgchart','view'),
   ('admin','emplist','edit'),    ('manager','emplist','edit'),    ('engineer','emplist','edit'),    ('viewer','emplist','view'),
   ('admin','hostlist','edit'),   ('manager','hostlist','edit'),   ('engineer','hostlist','edit'),   ('viewer','hostlist','view'),
   ('admin','settings','edit'),   ('manager','settings','edit'),   ('engineer','settings','edit'),   ('viewer','settings','none'),

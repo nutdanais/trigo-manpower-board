@@ -434,9 +434,11 @@ const state = {
 
 const D = () => cloud.data;
 const OVERVIEW_ID = "__overview__";
+const ORGCHART_ID = "__orgchart__";
 const EMPLIST_ID = "__emplist__";
 const HOSTLIST_ID = "__hostlist__";
 const isOverview = () => D().activeBoardId === OVERVIEW_ID;
+const isOrgChart = () => D().activeBoardId === ORGCHART_ID;
 const isEmployeeList = () => D().activeBoardId === EMPLIST_ID;
 const isHostList = () => D().activeBoardId === HOSTLIST_ID;
 
@@ -457,7 +459,14 @@ function can(area, need = "view") {
   if (me.legacy) return true;
   if (me.status !== "active") return false;
   const row = D().perms[me.roleKey] || {};
-  return (LEVELS[row[area]] || 0) >= (LEVELS[need] || 0);
+  // The Org Chart tab is a read-only re-view of the same missions/assignments
+  // the Overview reads, so until a project runs the orgchart migration it
+  // simply follows whatever "overview" grants — an explicit orgchart row (once
+  // seeded, or set in Settings) always wins. No write ever keys off "orgchart",
+  // so this fallback is presentation only.
+  let level = row[area];
+  if (area === "orgchart" && level === undefined) level = row["overview"];
+  return (LEVELS[level] || 0) >= (LEVELS[need] || 0);
 }
 /* The areas the permission matrix covers, in the order they are shown in
    Settings -> Roles & permissions. Labels are the ones already used on the tabs
@@ -466,6 +475,7 @@ const PERM_AREAS = [
   { group: "Tabs & menus", items: [
     { key: "board",    label: "Board",          hint: "Missions, assignments, the day lock" },
     { key: "overview", label: "Overview tab",   hint: "The dashboard as a whole", viewOnly: true },
+    { key: "orgchart", label: "Org Chart",      hint: "Board → engineer → service area → mission → crew", viewOnly: true },
     { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
     { key: "hostlist", label: "Host",           hint: "Sites and their records" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
@@ -490,6 +500,7 @@ const PERM_AREAS = [
 function firstAllowedView() {
   if (can("board") && D().boards.length) return D().boards[0].id;
   if (can("overview")) return OVERVIEW_ID;
+  if (can("orgchart")) return ORGCHART_ID;
   if (can("emplist")) return EMPLIST_ID;
   if (can("hostlist")) return HOSTLIST_ID;
   return null;
@@ -497,12 +508,13 @@ function firstAllowedView() {
 /* True when the view is one this user may still open. */
 function mayOpenView(id) {
   if (id === OVERVIEW_ID) return can("overview");
+  if (id === ORGCHART_ID) return can("orgchart");
   if (id === EMPLIST_ID) return can("emplist");
   if (id === HOSTLIST_ID) return can("hostlist");
   return can("board") && D().boards.some(b => b.id === id);
 }
 /* the three app-wide tabs: not a board, so nothing date- or plan-scoped applies */
-const isNonBoardView = () => isOverview() || isEmployeeList() || isHostList();
+const isNonBoardView = () => isOverview() || isOrgChart() || isEmployeeList() || isHostList();
 const isPast = () => state.date < todayStr();
 /* ---------- lock (finalized board, view-only for everyone) ---------- */
 const lockInfo = (boardId, date) => D().locks.find(l => l.boardId === boardId && l.date === date) || null;
@@ -712,6 +724,10 @@ async function refreshData() {
       can("ov.hostRisk") ? ensureHostCoverageLoaded() : Promise.resolve(),
       can("ov.history") ? ensureHistoryLoaded() : Promise.resolve(),
     ]);
+  } else if (isOrgChart()) {
+    // the org chart is today's snapshot across every board, same read the
+    // Overview does — warm each board's plan for the shown date, then draw
+    await Promise.all(D().boards.map(b => cloud.ensurePlanLoaded(b.id, state.date)));
   } else if (isEmployeeList()) {
     // employee master data is already warm in the cache; the 30D column is the
     // one thing here that needs a fetch, and it's cached across redraws so
@@ -788,9 +804,10 @@ function render() {
   renderDateButton();
   renderLockButton();
   const ov = isOverview();
+  const org = isOrgChart();
   const eml = isEmployeeList();
   const hl = isHostList();
-  const board = !ov && !eml && !hl;   // an actual board is on screen
+  const board = !ov && !org && !eml && !hl;   // an actual board is on screen
   // Everything below asks "may this role edit here?" as well as "is this view on
   // screen?". The board's own mutations are stopped at guardEdit() rather than
   // here — hiding a button is a courtesy, guardEdit is the rule.
@@ -798,11 +815,12 @@ function render() {
   $("#status-zones").classList.toggle("hidden", !board);
   $("#missions-grid").classList.toggle("hidden", !board);
   $("#overview-panel").classList.toggle("hidden", !ov);
+  $("#orgchart-panel").classList.toggle("hidden", !org);
   $("#emplist-panel").classList.toggle("hidden", !eml);
   $("#hostlist-panel").classList.toggle("hidden", !hl);
   $("#btn-new-mission").classList.toggle("hidden", !boardEdit);
   $("#btn-hide-missions").classList.toggle("hidden", !boardEdit);
-  $("#btn-new-employee").classList.toggle("hidden", ov || hl || !can("emplist", "edit"));
+  $("#btn-new-employee").classList.toggle("hidden", ov || org || hl || !can("emplist", "edit"));
   $("#btn-import-mission").classList.toggle("hidden", !boardEdit || !isNonWorkingDate(state.date));
   // Holiday toggle: ON = this date is non-working. Any editable future date
   // (weekday or weekend); hidden on read-only past/today and on the app-wide tabs.
@@ -839,6 +857,8 @@ function render() {
   $("#btn-undo").classList.toggle("hidden", !boardEdit);
   if (ov) {
     renderOverview();
+  } else if (org) {
+    renderOrgChart();
   } else if (eml) {
     renderEmployeeList();
   } else if (hl) {
@@ -857,6 +877,479 @@ function render() {
   updateSelectionUI();
   updateUndoButton();
   applySearchHighlight();
+}
+
+/* ======================================================================
+   Org Chart tab — today's operational structure as a collapsible tree.
+
+   Board → Engineer → Service area → Mission → Employee, plus a per-board
+   "Standby / Leave" pool for anyone not on a mission. Two views over the
+   same tree: a dense Outline (default) and a pan/zoom Org chart. It is a
+   pure read of the same plans the Overview loads (refreshData warms every
+   board's plan for state.date first), so nothing here mutates anything.
+   ====================================================================== */
+const org = {
+  view: "outline",          // "outline" | "chart"
+  collapsed: new Set(),     // node _id -> children hidden
+  seeded: false,            // first paint collapses missions + pools
+  pz: { scale: 1, tx: 24, ty: 24, fitted: false },   // org-chart canvas transform
+  filters: { boards: new Set(), engineers: new Set(), areas: new Set() },  // keys the user hid
+  filterOpts: { boards: [], engineers: [], areas: [] },   // what's available to filter this render
+  tree: null,               // the filtered tree currently on screen (both views read it)
+  closer: null,             // document click handler that closes open filter pops
+};
+const ORG_LEVELS = {
+  board:    ["board"],
+  engineer: ["engineer", "bucket"],
+  area:     ["area", "bucket"],
+  mission:  ["mission", "bucket"],
+  all:      [],
+};
+
+/* Build the tree from live data for the shown date. Node ids are structural
+   paths so a collapsed/expanded state survives a rebuild (realtime, date
+   change) as long as the shape is the same. */
+function buildOrgTree() {
+  const engById = new Map(D().engineers.map(e => [e.id, e]));
+  const areaById = new Map(D().areas.map(a => [a.id, a]));
+  const empById = new Map(D().employees.map(e => [e.id, e]));
+  const hostByName = new Map(D().hosts.map(h => [h.name.trim().toLowerCase(), h]));
+  const date = state.date;
+
+  const empNode = (parentId, e, status) => {
+    const area = e.areaId ? areaById.get(e.areaId) : null;
+    return {
+      type: "employee", _id: parentId + "/emp:" + e.id, name: e.name,
+      position: POSITIONS[e.position] ? POSITIONS[e.position].label : "",
+      contract: e.contract, areaName: area ? area.name : "", areaColor: area ? area.color : "#c3ccd6",
+      phone: e.phone || "", status: status || "", children: [],
+    };
+  };
+
+  const root = { type: "root", _id: "root", name: "TRIGO Manpower", children: [] };
+  for (const b of D().boards) {
+    const plan = (D().plans[b.id] || {})[date] || { missions: [], zones: {} };
+    const boardId = "b:" + b.id;
+    const boardNode = { type: "board", _id: boardId, name: b.name, color: "var(--primary)", children: [] };
+    const missions = plan.missions.filter(m => !m.hidden);
+
+    const engMap = new Map();
+    const engNodeFor = (engineerId) => {
+      const key = engineerId || "__none__";
+      if (engMap.has(key)) return engMap.get(key);
+      const eng = engById.get(engineerId);
+      const node = {
+        type: "engineer", _id: boardId + "/e:" + key,
+        name: eng ? eng.name : "Unassigned engineer", sub: eng ? (eng.phone || "") : "",
+        color: eng ? eng.color : "#c3ccd6", _areas: new Map(), children: [],
+      };
+      engMap.set(key, node); boardNode.children.push(node);
+      return node;
+    };
+    const areaNodeFor = (engNode, areaId) => {
+      const key = areaId || "__none__";
+      if (engNode._areas.has(key)) return engNode._areas.get(key);
+      const area = areaById.get(areaId);
+      const node = {
+        type: "area", _id: engNode._id + "/a:" + key,
+        name: area ? area.name : "No service area", color: area ? area.color : "#c3ccd6", children: [],
+      };
+      engNode._areas.set(key, node); engNode.children.push(node);
+      return node;
+    };
+
+    for (const m of missions) {
+      const host = hostByName.get((m.host || "").trim().toLowerCase());
+      const areaId = host ? host.areaId : null;
+      const en = engNodeFor(m.engineerId);
+      const an = areaNodeFor(en, areaId);
+      const mNode = {
+        type: "mission", _id: an._id + "/m:" + m.id, name: m.number, sub: m.host || "",
+        shift: m.shift, color: an.color, children: [],
+      };
+      const crew = m.members.map(id => empById.get(id)).filter(Boolean)
+        .sort((a, c) => (a.contract === "oncall") - (c.contract === "oncall") || a.name.localeCompare(c.name));
+      for (const e of crew) mNode.children.push(empNode(mNode._id, e));
+      an.children.push(mNode);
+    }
+
+    // Standby / Leave pool: everyone on this board's roster who is not on a
+    // mission today — standby (unassigned) plus each leave zone, labelled.
+    const placed = new Set();
+    missions.forEach(m => m.members.forEach(id => placed.add(id)));
+    Object.values(plan.zones || {}).forEach(arr => (arr || []).forEach(id => placed.add(id)));
+    const bucketId = boardId + "/bucket";
+    const bucket = { type: "bucket", _id: bucketId, name: "Standby / Leave", sub: "not on a mission today", color: "#c3ccd6", children: [] };
+    for (const e of boardEmployees(b.id).filter(onRoster)) {
+      if (!placed.has(e.id)) bucket.children.push(empNode(bucketId, e, "standby"));
+    }
+    for (const z of ZONES) {
+      for (const id of (plan.zones && plan.zones[z]) || []) {
+        const e = empById.get(id);
+        if (e && e.boardId === b.id) bucket.children.push(empNode(bucketId, e, z));
+      }
+    }
+    if (bucket.children.length) boardNode.children.push(bucket);
+    root.children.push(boardNode);
+  }
+  return root;
+}
+
+const orgCrewCount = (n) => n.type === "employee" ? 1 : n.children.reduce((s, c) => s + orgCrewCount(c), 0);
+const orgMissionCount = (n) => n.type === "mission" ? 1 : n.children.reduce((s, c) => s + orgMissionCount(c), 0);
+const orgCountType = (n, t) => (n.type === t ? 1 : 0) + n.children.reduce((s, c) => s + orgCountType(c, t), 0);
+function orgDistinctAreas(n) { const s = new Set(); (function w(x) { if (x.type === "area") s.add(x._id.split("/a:")[1]); x.children.forEach(w); })(n); return s.size; }
+/* Engineers repeat across boards (one node per board they run a mission on), so
+   count DISTINCT people for the root's roll-up, not engineer nodes. */
+function orgDistinctEngineers(n) { const s = new Set(); (function w(x) { if (x.type === "engineer") s.add(x._id.split("/e:")[1]); x.children.forEach(w); })(n); return s.size; }
+const orgIsLeaf = (n) => !n.children.length;
+const orgLevelLabel = (t) => ({ board: "Board", engineer: "Engineer", area: "Service area", mission: "Mission", employee: "Crew", bucket: "Pool" }[t] || "");
+
+/* Each node counts its descendant levels in hierarchy order —
+   board → engineer → service area → mission → crew — so a node lists only
+   the tiers that sit below it, left to right. */
+function orgCountText(n) {
+  const crew = orgCrewCount(n);
+  if (n.type === "root") return `${orgCountType(n, "board")} boards · ${orgDistinctEngineers(n)} engineers · ${orgDistinctAreas(n)} areas · ${orgMissionCount(n)} missions · ${crew} crew`;
+  if (n.type === "board") return `${orgCountType(n, "engineer")} eng · ${orgDistinctAreas(n)} areas · ${orgMissionCount(n)} miss · ${crew} crew`;
+  if (n.type === "engineer") return `${orgCountType(n, "area")} areas · ${orgMissionCount(n)} miss · ${crew} crew`;
+  if (n.type === "area") return `${orgMissionCount(n)} miss · ${crew} crew`;
+  return `${crew} crew`;
+}
+function orgInitials(s) { return String(s).replace(/[^A-Za-z ]/g, "").split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase() || "•"; }
+const ZONE_STATUS = { annual: "Annual leave", sick: "Sick leave", business: "Business leave", unpaid: "Unpaid leave", exchange: "Exchange day" };
+
+function orgEmpChips(n) {
+  const contract = n.contract === "permanent"
+    ? '<span class="oc-chip oc-perm">Permanent</span>'
+    : '<span class="oc-chip oc-oncall">On-call</span>';
+  const pos = n.position ? `<span class="oc-chip oc-pos">${escapeHtml(n.position)}</span>` : "";
+  const area = n.areaName
+    ? `<span class="oc-chip oc-area"><span class="oc-sw" style="background:${n.areaColor}"></span>${escapeHtml(n.areaName)}</span>` : "";
+  let st = "";
+  if (n.status && n.status !== "standby") st = `<span class="oc-chip oc-leave">${escapeHtml(ZONE_STATUS[n.status] || n.status)}</span>`;
+  else if (n.status === "standby") st = '<span class="oc-chip oc-standby">Standby</span>';
+  return pos + contract + area + st;
+}
+
+/* Which board / engineer / service area appear in this snapshot — the lists
+   the filter dropdowns offer (built from the unfiltered tree, keyed the same
+   way orgPrune reads them). */
+function orgFilterOptions(fullTree) {
+  const boards = [], engMap = new Map(), areaMap = new Map();
+  for (const b of fullTree.children) {
+    boards.push({ key: b._id.slice(2), name: b.name });
+    for (const e of b.children) {
+      if (e.type !== "engineer") continue;
+      const ek = e._id.split("/e:")[1];
+      if (!engMap.has(ek)) engMap.set(ek, e.name);
+      for (const a of e.children) {
+        if (a.type !== "area") continue;
+        const ak = a._id.split("/a:")[1];
+        if (!areaMap.has(ak)) areaMap.set(ak, a.name);
+      }
+    }
+  }
+  return {
+    boards,
+    engineers: [...engMap].map(([key, name]) => ({ key, name })),
+    areas: [...areaMap].map(([key, name]) => ({ key, name })),
+  };
+}
+/* Drop the boards / engineers / service areas the user has hidden. Mutates the
+   passed tree; counts recompute from what's left, so the visible tallies match
+   the visible tree. Engineers emptied by an area filter are dropped too. */
+function orgPrune(tree, f) {
+  tree.children = tree.children.filter(b => !f.boards.has(b._id.slice(2)));
+  for (const b of tree.children) {
+    b.children = b.children.filter(n => n.type !== "engineer" || !f.engineers.has(n._id.split("/e:")[1]));
+    for (const e of b.children) {
+      if (e.type !== "engineer") continue;
+      e.children = e.children.filter(a => !(a.type === "area" && f.areas.has(a._id.split("/a:")[1])));
+    }
+    b.children = b.children.filter(n => n.type !== "engineer" || n.children.length);
+  }
+}
+function orgFilterDropdown(dim, label, items) {
+  const hidden = org.filters[dim];
+  const rows = items.map(it =>
+    `<label><input type="checkbox" value="${escapeHtml(it.key)}" ${hidden.has(it.key) ? "" : "checked"}>${escapeHtml(it.name)}</label>`
+  ).join("");
+  return `<div class="oc-ms" data-dim="${dim}">
+      <button type="button" class="btn oc-ms-btn">${label}: <b class="oc-ms-state"></b></button>
+      <div class="oc-ms-pop hidden">
+        <div class="oc-ms-actions"><button type="button" data-all>All</button><button type="button" data-none>None</button></div>
+        ${rows || '<div class="oc-hint" style="padding:6px">none today</div>'}
+      </div>
+    </div>`;
+}
+function orgFilterState(dim) {
+  const total = org.filterOpts[dim].length;
+  const hidden = org.filterOpts[dim].filter(it => org.filters[dim].has(it.key)).length;
+  return { total, hidden, visible: total - hidden };
+}
+function orgUpdateFilterLabels(panel) {
+  panel.querySelectorAll(".oc-ms").forEach(ms => {
+    const dim = ms.dataset.dim;
+    const s = orgFilterState(dim);
+    ms.querySelector(".oc-ms-state").textContent = s.hidden ? `${s.visible}/${s.total}` : "All";
+    ms.querySelector(".oc-ms-btn").classList.toggle("filtered", s.hidden > 0);
+  });
+}
+
+function renderOrgChart() {
+  const panel = $("#orgchart-panel");
+  const full = buildOrgTree();
+  if (!org.seeded) {
+    (function w(n) { if (n.type === "mission" || n.type === "bucket") org.collapsed.add(n._id); n.children.forEach(w); })(full);
+    org.seeded = true;
+  }
+  org.filterOpts = orgFilterOptions(full);
+  // forget filter selections whose board/engineer/area is gone from this snapshot
+  for (const dim of ["boards", "engineers", "areas"]) {
+    const live = new Set(org.filterOpts[dim].map(it => it.key));
+    for (const k of [...org.filters[dim]]) if (!live.has(k)) org.filters[dim].delete(k);
+  }
+  orgPrune(full, org.filters);
+  org.tree = full;
+
+  const levelOpts = [["board", "Board"], ["engineer", "Engineer"], ["area", "Service area"], ["mission", "Mission"], ["all", "Everything"]]
+    .map(([v, l]) => `<option value="${v}"${v === "mission" ? " selected" : ""}>${l}</option>`).join("");
+
+  panel.innerHTML =
+    `<div class="oc-wrap">
+      <div class="oc-toolbar">
+        <div class="oc-views">
+          <button type="button" class="btn oc-view-btn" data-v="outline">${icon("list")}<span>Outline</span></button>
+          <button type="button" class="btn oc-view-btn" data-v="chart">${icon("orgchart")}<span>Org chart</span></button>
+        </div>
+        <div class="oc-spacer"></div>
+        <span class="oc-flabel">Filter</span>
+        <div class="oc-filters">
+          ${orgFilterDropdown("boards", "Board", org.filterOpts.boards)}
+          ${orgFilterDropdown("engineers", "Engineer", org.filterOpts.engineers)}
+          ${orgFilterDropdown("areas", "Service area", org.filterOpts.areas)}
+        </div>
+        <label class="oc-levelctl">Show to
+          <select id="oc-level" class="oc-select">${levelOpts}</select>
+        </label>
+      </div>
+      <div class="oc-legend">
+        <span class="oc-k"><span class="oc-sw" style="background:var(--chart-permanent)"></span>Permanent</span>
+        <span class="oc-k"><span class="oc-sw" style="background:var(--chart-oncall)"></span>On-call</span>
+        <span class="oc-k"><span class="oc-sw oc-round" style="background:var(--brand-green)"></span>Engineer</span>
+        <span class="oc-k oc-hint">Crew shows position · contract · service area · phone</span>
+      </div>
+      <div class="oc-view oc-outline" id="oc-outline"></div>
+      <div class="oc-view oc-chart" id="oc-chart">
+        <div class="oc-panbar">
+          <button type="button" class="btn btn-small" id="oc-zout" title="Zoom out">${icon("minus")}</button>
+          <span class="oc-zlabel" id="oc-zlabel">100%</span>
+          <button type="button" class="btn btn-small" id="oc-zin" title="Zoom in">${icon("plus")}</button>
+          <button type="button" class="btn btn-small" id="oc-zfit" title="Fit to screen">Fit</button>
+          <button type="button" class="btn btn-small" id="oc-zreset" title="Reset to 100%">${icon("reset")}</button>
+        </div>
+        <div class="oc-panhint">Drag to pan · scroll to zoom</div>
+        <div class="oc-viewport" id="oc-vp"><div class="oc-canvas" id="oc-canvas"><div class="oc-tree" id="oc-tree"></div></div></div>
+      </div>
+    </div>`;
+
+  // view toggle
+  const setView = (v) => {
+    org.view = v;
+    panel.querySelectorAll(".oc-view-btn").forEach(b => b.classList.toggle("btn-primary", b.dataset.v === v));
+    $("#oc-outline").classList.toggle("hidden", v !== "outline");
+    $("#oc-chart").classList.toggle("hidden", v !== "chart");
+    if (v === "chart") { orgApplyPz(); if (!org.pz.fitted) { org.pz.fitted = true; requestAnimationFrame(orgFitPz); } }
+  };
+  panel.querySelectorAll(".oc-view-btn").forEach(b => b.onclick = () => setView(b.dataset.v));
+
+  // level control
+  const lvlSel = $("#oc-level");
+  lvlSel.onchange = () => {
+    org.collapsed.clear();
+    const types = ORG_LEVELS[lvlSel.value] || [];
+    (function w(n) { if (types.includes(n.type)) org.collapsed.add(n._id); n.children.forEach(w); })(org.tree);
+    orgRerender();
+  };
+
+  // filters — each dropdown toggles its pop, its checkboxes hide/show a dimension
+  panel.querySelectorAll(".oc-ms").forEach(ms => {
+    const dim = ms.dataset.dim;
+    const btn = ms.querySelector(".oc-ms-btn");
+    const pop = ms.querySelector(".oc-ms-pop");
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const willOpen = pop.classList.contains("hidden");
+      panel.querySelectorAll(".oc-ms-pop").forEach(p => p.classList.add("hidden"));
+      pop.classList.toggle("hidden", !willOpen);
+    };
+    pop.onclick = (e) => e.stopPropagation();
+    pop.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      cb.onchange = () => { cb.checked ? org.filters[dim].delete(cb.value) : org.filters[dim].add(cb.value); orgApplyFilters(); };
+    });
+    const all = pop.querySelector("[data-all]"), none = pop.querySelector("[data-none]");
+    if (all) all.onclick = () => { org.filters[dim].clear(); pop.querySelectorAll("input").forEach(c => c.checked = true); orgApplyFilters(); };
+    if (none) none.onclick = () => { org.filterOpts[dim].forEach(it => org.filters[dim].add(it.key)); pop.querySelectorAll("input").forEach(c => c.checked = false); orgApplyFilters(); };
+  });
+  // one document handler closes any open pop on an outside click
+  if (org.closer) document.removeEventListener("click", org.closer);
+  org.closer = (e) => { if (!e.target.closest(".oc-ms")) panel.querySelectorAll(".oc-ms-pop").forEach(p => p.classList.add("hidden")); };
+  document.addEventListener("click", org.closer);
+
+  orgUpdateFilterLabels(panel);
+  orgRenderOutline();
+  orgRenderChart();
+  orgWirePan();
+  setView(org.view);
+}
+
+/* re-prune from live data and redraw both views in place, keeping the filter
+   pops open so several boxes can be ticked in a row */
+function orgApplyFilters() {
+  const t = buildOrgTree();
+  orgPrune(t, org.filters);
+  org.tree = t;
+  orgUpdateFilterLabels($("#orgchart-panel"));
+  orgRerender();
+}
+/* redraw both views after a collapse/expand or filter change, keeping pan + view */
+function orgRerender() {
+  orgRenderOutline();
+  orgRenderChart();
+  orgWirePan();
+  $("#oc-outline").classList.toggle("hidden", org.view !== "outline");
+  $("#oc-chart").classList.toggle("hidden", org.view !== "chart");
+  if (org.view === "chart") orgApplyPz();
+}
+function orgToggle(id) {
+  org.collapsed.has(id) ? org.collapsed.delete(id) : org.collapsed.add(id);
+  const sel = $("#oc-level"); if (sel) sel.selectedIndex = -1;   // manual edit clears the "show to" choice
+  orgRerender();
+}
+
+/* ---- Outline view ---- */
+function orgRenderOutline() {
+  const root = $("#oc-outline"); if (!root || !org.tree) return;
+  root.innerHTML = "";
+  root.appendChild(orgOutlineNode(org.tree));
+}
+function orgOutlineNode(n) {
+  const box = document.createElement("div");
+  box.className = "oc-ol-item" + (org.collapsed.has(n._id) ? " r-off" : "");
+  const row = document.createElement("div");
+  row.className = "oc-ol-row l-" + n.type;
+  const caret = orgIsLeaf(n) ? '<span class="oc-caret leaf"></span>'
+    : `<span class="oc-caret">${icon("chevron-right")}</span>`;
+  let tagEl;
+  if (n.type === "employee") tagEl = `<span class="oc-tag" style="--oc-c:${n.areaColor}">${orgInitials(n.name)}</span>`;
+  else if (n.type === "board" || n.type === "engineer") tagEl = `<span class="oc-tag" style="--oc-c:${n.color}">${orgInitials(n.name)}</span>`;
+  else if (n.type === "area") tagEl = `<span class="oc-tag" style="--oc-c:${n.color}">${escapeHtml(n.name).slice(0, 3)}</span>`;
+  else if (n.type === "mission") tagEl = `<span class="oc-tag" style="--oc-c:${n.color}">M</span>`;
+  else tagEl = `<span class="oc-tag" style="--oc-c:#c3ccd6">◑</span>`;
+  const sub = n.sub ? `<span class="oc-sub">${escapeHtml(n.sub)}</span>` : "";
+  let right;
+  if (n.type === "employee") right = `<span class="oc-meta">${orgEmpChips(n)}<span class="oc-phone">${escapeHtml(n.phone)}</span></span>`;
+  else {
+    const shift = n.type === "mission" ? `<span class="oc-chip oc-${n.shift}">${n.shift === "night" ? "Night" : "Day"}</span>` : "";
+    right = `<span class="oc-meta">${shift}<span class="oc-cnt">${orgCountText(n)}</span></span>`;
+  }
+  row.innerHTML = `${caret}${tagEl}<span class="oc-nm">${escapeHtml(n.name)}${sub}</span><span class="oc-grow"></span>${right}`;
+  box.appendChild(row);
+  if (!orgIsLeaf(n)) {
+    // The caret sits inside the row; stop its click bubbling to the row handler
+    // below, or the two would fire back-to-back and cancel each other out.
+    row.querySelector(".oc-caret").onclick = (e) => { e.stopPropagation(); orgToggle(n._id); };
+    row.style.cursor = "pointer";
+    row.onclick = (e) => { if (!e.target.closest("a")) orgToggle(n._id); };
+    const kids = document.createElement("div");
+    kids.className = "oc-ol-kids";
+    n.children.forEach(c => kids.appendChild(orgOutlineNode(c)));
+    box.appendChild(kids);
+  }
+  return box;
+}
+
+/* ---- Org chart view (top-down boxes) ---- */
+function orgRenderChart() {
+  const root = $("#oc-tree"); if (!root || !org.tree) return;
+  root.innerHTML = "";
+  const ul = document.createElement("ul");
+  const li = document.createElement("li");
+  li.className = "oc-root";
+  orgChartBuild(org.tree, li);
+  ul.appendChild(li);
+  root.appendChild(ul);
+}
+function orgChartBuild(n, li) {
+  if (org.collapsed.has(n._id)) li.classList.add("kids-off");
+  const bw = document.createElement("div");
+  bw.className = "oc-box-wrap";
+  bw.appendChild(orgChartBox(n));
+  li.appendChild(bw);
+  if (!orgIsLeaf(n)) {
+    const ul = document.createElement("ul");
+    n.children.forEach(c => { const cli = document.createElement("li"); orgChartBuild(c, cli); ul.appendChild(cli); });
+    li.appendChild(ul);
+  }
+}
+function orgChartBox(n) {
+  const el = document.createElement("div");
+  el.className = "oc-box is-" + n.type;
+  el.style.setProperty("--oc-c", n.color || n.areaColor || "var(--primary)");
+  let head = "";
+  if (n.type === "board" || n.type === "engineer") head = `<span class="oc-tag" style="--oc-c:${n.color}">${orgInitials(n.name)}</span>`;
+  else if (n.type === "area") head = `<span class="oc-tag" style="--oc-c:${n.color}">${escapeHtml(n.name).slice(0, 3)}</span>`;
+  else if (n.type === "employee") head = `<span class="oc-tag" style="--oc-c:${n.areaColor}">${orgInitials(n.name)}</span>`;
+  let meta;
+  if (n.type === "employee") {
+    meta = `<div class="oc-meta">${orgEmpChips(n)}</div><div class="oc-meta oc-phone">${escapeHtml(n.phone)}</div>`;
+  } else {
+    const shift = n.type === "mission" ? `<span class="oc-chip oc-${n.shift}">${n.shift === "night" ? "Night" : "Day"}</span>` : "";
+    meta = `<div class="oc-meta">${shift}<span class="oc-cnt">${orgCountText(n)}</span></div>`;
+  }
+  const sub = n.sub ? `<span class="oc-sub">${escapeHtml(n.sub)}</span>` : "";
+  const btn = orgIsLeaf(n) ? "" : `<button type="button" class="oc-tog" title="Collapse / expand">${org.collapsed.has(n._id) ? "+" : "–"}</button>`;
+  el.innerHTML = `${head}<div class="oc-body"><span class="oc-lvl">${orgLevelLabel(n.type)}</span>` +
+    `<div class="oc-ttl">${escapeHtml(n.name)} ${sub}</div>${meta}</div>${btn}`;
+  const t = el.querySelector(".oc-tog");
+  if (t) t.onclick = (e) => { e.stopPropagation(); orgToggle(n._id); };
+  return el;
+}
+
+/* ---- pan / zoom for the org-chart canvas ---- */
+function orgApplyPz() {
+  const c = $("#oc-canvas"); if (!c) return;
+  c.style.transform = `translate(${org.pz.tx}px,${org.pz.ty}px) scale(${org.pz.scale})`;
+  const l = $("#oc-zlabel"); if (l) l.textContent = Math.round(org.pz.scale * 100) + "%";
+}
+function orgZoomAt(cx, cy, factor) {
+  const ns = Math.min(2, Math.max(0.3, org.pz.scale * factor)), k = ns / org.pz.scale;
+  org.pz.tx = cx - (cx - org.pz.tx) * k; org.pz.ty = cy - (cy - org.pz.ty) * k; org.pz.scale = ns; orgApplyPz();
+}
+function orgFitPz() {
+  const vp = $("#oc-vp"), c = $("#oc-canvas"); if (!vp || !c) return;
+  const cw = c.scrollWidth, ch = c.scrollHeight, vw = vp.clientWidth, vh = vp.clientHeight;
+  if (!cw || !ch) return;
+  const s = Math.min(2, Math.max(0.3, Math.min(vw / cw, vh / ch)));
+  org.pz.scale = s; org.pz.tx = Math.max(12, (vw - cw * s) / 2); org.pz.ty = 12; orgApplyPz();
+}
+function orgWirePan() {
+  const vp = $("#oc-vp"); if (!vp) return;
+  $("#oc-zin").onclick = () => orgZoomAt(vp.clientWidth / 2, vp.clientHeight / 2, 1.2);
+  $("#oc-zout").onclick = () => orgZoomAt(vp.clientWidth / 2, vp.clientHeight / 2, 1 / 1.2);
+  $("#oc-zfit").onclick = orgFitPz;
+  $("#oc-zreset").onclick = () => { org.pz.scale = 1; org.pz.tx = 24; org.pz.ty = 24; orgApplyPz(); };
+  vp.onwheel = (e) => { e.preventDefault(); const r = vp.getBoundingClientRect(); orgZoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.1 : 1 / 1.1); };
+  let drag = null;
+  vp.onpointerdown = (e) => {
+    if (e.target.closest(".oc-tog")) return;
+    drag = { x: e.clientX, y: e.clientY, tx: org.pz.tx, ty: org.pz.ty };
+    vp.classList.add("grabbing"); vp.setPointerCapture(e.pointerId);
+  };
+  vp.onpointermove = (e) => { if (!drag) return; org.pz.tx = drag.tx + (e.clientX - drag.x); org.pz.ty = drag.ty + (e.clientY - drag.y); orgApplyPz(); };
+  const end = () => { drag = null; vp.classList.remove("grabbing"); };
+  vp.onpointerup = end; vp.onpointercancel = end;
 }
 
 /* label the Hide/Unhide toolbar button with how many missions are currently
@@ -928,6 +1421,13 @@ function renderTabs() {
   setIconLabel(ov, "chart", "Overview");
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
+  }
+  if (can("orgchart")) {
+  const oc = document.createElement("div");
+  oc.className = "board-tab tab-orgchart" + (isOrgChart() ? " active" : "");
+  setIconLabel(oc, "orgchart", "Org Chart");
+  oc.onclick = () => { clearSelection(); D().activeBoardId = ORGCHART_ID; refreshAndRender(); };
+  el.appendChild(oc);
   }
   if (can("emplist")) {
   const eml = document.createElement("div");
@@ -1680,6 +2180,24 @@ function renderStats() {
   if (isOverview()) {
     bar.appendChild(statChip("All employees", D().employees.filter(onRoster).length));
     for (const b of D().boards) bar.appendChild(statChip(b.name, rosterEmployees(b.id).length));
+    return;
+  }
+  if (isOrgChart()) {
+    let missions = 0, crew = 0; const engs = new Set();
+    for (const b of D().boards) {
+      const plan = (D().plans[b.id] || {})[state.date];
+      if (!plan) continue;
+      for (const m of plan.missions) {
+        if (m.hidden) continue;
+        missions++;
+        if (m.engineerId) engs.add(m.engineerId);
+        crew += m.members.length;
+      }
+    }
+    bar.appendChild(statChip("Boards", D().boards.length));
+    bar.appendChild(statChip("Engineers", engs.size));
+    bar.appendChild(statChip("Missions", missions));
+    bar.appendChild(statChip("Crew deployed", crew));
     return;
   }
   if (isEmployeeList()) {
@@ -5037,11 +5555,15 @@ async function exportBoard() {
   btn.disabled = true;
   btn.textContent = "Exporting…";
   const board = D().boards.find(b => b.id === D().activeBoardId);
-  const boardName = board ? board.name : "Overview";
-  $("#capture-title").textContent = boardName + " Manpower Board";
+  const boardName = isOrgChart() ? "Org_Chart" : (board ? board.name : "Overview");
+  $("#capture-title").textContent = isOrgChart() ? "Organisation Chart" : boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
   document.body.classList.add("exporting");
+  // The org chart lives in a fixed-height, clipped pan/zoom viewport; the class
+  // below expands it to its natural size and neutralises the pan transform so
+  // the whole tree is captured, not just what's on screen.
+  if (isOrgChart()) document.body.classList.add("org-capturing");
   // The exported JPG is a shared artifact (printed, posted, sent to a customer) —
   // it must not depend on the viewer's own dark-mode preference. Force light for
   // the capture, since --bg/--panel/--emp-card etc. all redefine under
@@ -5052,7 +5574,7 @@ async function exportBoard() {
   // holiday, where only the employees actually assigned to work should show up
   // (standby/available on-call are meaningless when nobody is expected in)
   let pools = null;
-  if (!isOverview() && !isNonWorkingDate(state.date)) {
+  if (!isOverview() && !isOrgChart() && !isNonWorkingDate(state.date)) {
     const built = buildExportPools();
     if (built.children.length) {   // both pools empty (fully staffed) — nothing to show
       pools = built;
@@ -5063,10 +5585,10 @@ async function exportBoard() {
   let restoreLeaveZones = null;
   try {
     await document.fonts.ready;   // avoid capturing the fallback font mid-swap
-    // On a real board only (the Overview capture has no mission grid): drop the
-    // empty missions and empty leave zones, then re-pack the masonry at the wider
-    // export width so the JPG is as tight as possible.
-    if (!isOverview()) {
+    // On a real board only (the Overview / Org Chart captures have no mission grid):
+    // drop the empty missions and empty leave zones, then re-pack the masonry at the
+    // wider export width so the JPG is as tight as possible.
+    if (!isOverview() && !isOrgChart()) {
       restoreEmptyMissions = hideEmptyMissionsForExport();
       restoreLeaveZones = hideEmptyLeaveZonesForExport();
       layoutMasonry(EXPORT_COLS);
@@ -5075,8 +5597,11 @@ async function exportBoard() {
     // Deliberately a constant, not max(scrollWidth, 1600): body.exporting has
     // already forced #board-capture to exactly EXPORT_WIDTH, so measuring the
     // real document here would hand html2canvas a different width than the one
-    // the cards were just laid out at. See EXPORT_WIDTH.
-    const windowWidth = EXPORT_WIDTH;
+    // the cards were just laid out at. See EXPORT_WIDTH. The org chart is the
+    // exception — its tree can be wider than a board, and org-capturing lets
+    // #board-capture size to that content, so measure it and capture at least
+    // that wide (still capped by the maxDim scale guard below).
+    const windowWidth = isOrgChart() ? Math.max(EXPORT_WIDTH, el.scrollWidth) : EXPORT_WIDTH;
     // Many mobile GPUs (Android especially) silently return a blank/black canvas
     // once its pixel dimensions pass roughly 4096px on a side or ~16.7M px total,
     // instead of erroring — that's the "export sometimes comes out all black" bug.
@@ -5095,11 +5620,11 @@ async function exportBoard() {
     if (restoreLeaveZones) restoreLeaveZones();          // unhide the empty leave zones again
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
-    document.body.classList.remove("exporting");
+    document.body.classList.remove("exporting", "org-capturing");
     if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     btn.disabled = false;
     setIconLabel(btn, "camera", "Export");
-    if (!isOverview()) layoutMasonry();   // re-pack at the normal on-screen width
+    if (!isOverview() && !isOrgChart()) layoutMasonry();   // re-pack at the normal on-screen width
   }
 }
 
@@ -5132,8 +5657,8 @@ let printRestore = null;   // set while the DOM is in its printable state
 function prepareForPrint() {
   if (printRestore) return;   // beforeprint can fire more than once per dialog
   const board = D().boards.find(b => b.id === D().activeBoardId);
-  const boardName = board ? board.name : "Overview";
-  $("#capture-title").textContent = boardName + " Manpower Board";
+  const boardName = isOrgChart() ? "Org_Chart" : (board ? board.name : "Overview");
+  $("#capture-title").textContent = isOrgChart() ? "Organisation Chart" : boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
   // Save-as-PDF names the file after document.title, so without this every
@@ -5143,15 +5668,17 @@ function prepareForPrint() {
   const prevTitle = document.title;
   document.title = `${boardName.replace(/\s+/g, "_")}_${state.date}`;
   // `exporting` carries the export-only layout (pinned capture width, no board
-  // prompt); `printing` is this path's own hook.
+  // prompt); `printing` is this path's own hook. `org-capturing` expands the
+  // org chart's clipped pan viewport so the whole tree is measured and printed.
   document.body.classList.add("exporting", "printing");
+  if (isOrgChart()) document.body.classList.add("org-capturing");
   // Same reasoning as the export: a shared artifact must not carry the viewer's
   // own dark-mode preference — and a dark board wastes a cartridge besides.
   const wasDark = document.documentElement.getAttribute("data-theme") === "dark";
   if (wasDark) document.documentElement.removeAttribute("data-theme");
 
   let pools = null;
-  if (!isOverview() && !isNonWorkingDate(state.date)) {
+  if (!isOverview() && !isOrgChart() && !isNonWorkingDate(state.date)) {
     const built = buildExportPools();
     if (built.children.length) {
       pools = built;
@@ -5160,7 +5687,7 @@ function prepareForPrint() {
   }
   let restoreEmptyMissions = null;
   let restoreLeaveZones = null;
-  if (!isOverview()) {
+  if (!isOverview() && !isOrgChart()) {
     restoreEmptyMissions = hideEmptyMissionsForExport();
     restoreLeaveZones = hideEmptyLeaveZonesForExport();
     // The masonry lays out at exactly the width body.exporting has just pinned
@@ -5184,10 +5711,10 @@ function prepareForPrint() {
     if (pools) pools.remove();
     $("#capture-header").classList.add("hidden");
     document.title = prevTitle;
-    document.body.classList.remove("exporting", "printing");
+    document.body.classList.remove("exporting", "printing", "org-capturing");
     if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     clearPrintPageSize();
-    if (!isOverview()) layoutMasonry();
+    if (!isOverview() && !isOrgChart()) layoutMasonry();
   };
 }
 
@@ -5264,7 +5791,7 @@ function restoreAfterPrint() {
     // measures an already-exporting DOM and spills onto a second sheet. These
     // are the two that must come off no matter what.
     console.error("print restore failed", err);
-    document.body.classList.remove("exporting", "printing");
+    document.body.classList.remove("exporting", "printing", "org-capturing");
     clearPrintPageSize();
   }
 }
