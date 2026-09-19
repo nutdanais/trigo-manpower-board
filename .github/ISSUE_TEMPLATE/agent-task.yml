@@ -1,0 +1,96 @@
+name: Agent task
+description: Define a scoped task for Codex, Claude, or a human contributor.
+title: "[Task] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use one issue for one independently reviewable change. Prefer one owner agent, one branch, one worktree, and one PR.
+
+  - type: dropdown
+    id: owner_agent
+    attributes:
+      label: Preferred owner
+      description: Pick the primary implementer. This can be changed before work starts.
+      options:
+        - Codex
+        - Claude
+        - Human
+        - Unassigned
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What outcome should this task produce?
+      placeholder: Describe the desired user or system outcome, not just the file to edit.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable conditions that must be true when the task is complete.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Expected scope / affected areas
+      description: Note likely files, screens, data flows, or modules. This helps avoid assigning conflicting parallel tasks.
+      placeholder: e.g. Settings modal; app.js settings handlers; index.html settings markup
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Explicitly list adjacent work that should not be folded into this task.
+
+  - type: dropdown
+    id: data_risk
+    attributes:
+      label: Data / Supabase impact
+      options:
+        - None expected
+        - Client-side Supabase behavior only
+        - RLS / auth / permissions
+        - Schema / migration
+        - Production-data operation
+        - Unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy_risk
+    attributes:
+      label: Deployment impact
+      options:
+        - None expected
+        - User-facing release / cache-busting update
+        - Netlify configuration
+        - Unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation notes
+      description: Add specific test cases beyond the repository-wide checks in AGENTS.md.
+      placeholder: Include happy path, important edge cases, responsive behavior, and permission/data cases where relevant.
+
+  - type: checkboxes
+    id: parallelism
+    attributes:
+      label: Parallel-work check
+      options:
+        - label: I checked that this task is not intentionally modifying the same architectural seam/files as another active agent task, or I documented the dependency/conflict above.
+          required: true

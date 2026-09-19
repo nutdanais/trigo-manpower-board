@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: JavaScript syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node --check cloud.js
+          node --check charts.js
+
+          # Syntax-check any other tracked JavaScript files except local/generated config.
+          while IFS= read -r file; do
+            case "$file" in
+              app.js|cloud.js|charts.js|config.js) continue ;;
+            esac
+            node --check "$file"
+          done < <(git ls-files '*.js')
+
+      - name: Agent shell launcher syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n tools/agent/start-agent.sh
+          bash -n tools/agent/finish-agent.sh
+
+      - name: Agent PowerShell launcher syntax checks
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($file in @('tools/agent/start-agent.ps1', 'tools/agent/finish-agent.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Error "$file has PowerShell syntax errors: $($errors | Out-String)"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Reject committed local config/secrets file
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files --error-unmatch config.js >/dev/null 2>&1; then
+            echo 'config.js must remain untracked; use config.sample.js and deployment environment variables.' >&2
+            exit 1
+          fi
+
+      - name: Check conflict markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -E '^(<<<<<<<|=======|>>>>>>>)' -- . ':!*.md' ':!*.txt'; then
+            echo 'Merge-conflict markers detected.' >&2
+            exit 1
+          fi
