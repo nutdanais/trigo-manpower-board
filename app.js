@@ -332,7 +332,7 @@ function setSaveStatus(kind) {
 const CLOUD_WRITE_METHODS = [
   "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff",
   "setCapacityCells", "deleteCapacityRow", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
-  "startForecastFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
+  "startForecastFromConfirmed", "addForecastMissionsFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
   "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
@@ -909,11 +909,16 @@ function render() {
   $("#hostlist-panel").classList.toggle("hidden", !hl);
   $("#capacity-panel").classList.toggle("hidden", !cap);
   $("#btn-new-mission").classList.toggle("hidden", !planEdit);
-  // a forecast has no hidden missions and no weekend import — it is built
-  // from "Start from confirmed" or by hand
+  // a forecast has no hidden missions; it is built from "Start from confirmed",
+  // "Add Mission" (only the missions an engineer picks) or by hand
   $("#btn-hide-missions").classList.toggle("hidden", !boardEdit || fc);
   $("#btn-new-employee").classList.toggle("hidden", ov || org || hl || cap || !can("emplist", "edit"));
-  $("#btn-import-mission").classList.toggle("hidden", !boardEdit || fc || !isNonWorkingDate(state.date));
+  // "Add Mission": on a holiday/weekend (import mission definitions), and on
+  // every forecast day (pick missions from the latest confirmed day)
+  $("#btn-import-mission").classList.toggle("hidden", fc ? !planEdit : (!boardEdit || !isNonWorkingDate(state.date)));
+  $("#btn-import-mission").title = fc
+    ? "Pick missions from the latest confirmed day to add to this forecast"
+    : "Copy missions from the latest weekday onto this holiday";
   // Holiday toggle: ON = this date is non-working. Any editable future date
   // (weekday or weekend); hidden on read-only past/today and on the app-wide tabs.
   const showHoliday = boardEdit && !isReadOnly();
@@ -1516,17 +1521,27 @@ function renderBoardEmptyState() {
   const sub = document.createElement("div");
   sub.className = "empty-sub";
   sub.textContent = fc
-    ? "Start from a copy of the latest confirmed working day, or add missions yourself. A forecast is tentative: it never reaches the confirmed board, the export or the Host Record until someone merges it."
+    ? "Start from a copy of the latest confirmed working day, pick only the missions you will work on, or create missions yourself. A forecast is tentative: it never reaches the confirmed board, the export or the Host Record until someone merges it."
     : "Carry over the last working day's missions and crew to start from there, or just add missions manually.";
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "btn btn-carry";
-  setIconLabel(btn, "reset", fc ? "Start from confirmed" : "Carry over last working day's plan");
+  setIconLabel(btn, "reset", fc ? "Start from confirmed (all missions)" : "Carry over last working day's plan");
   btn.onclick = () => guardEdit(() => resetBoard());
   if (fc && !can("forecast", "edit")) btn.classList.add("hidden");
   box.appendChild(msg);
   box.appendChild(sub);
   box.appendChild(btn);
+  if (fc && can("forecast", "edit")) {
+    // or only the missions this engineer will work on
+    const pick = document.createElement("button");
+    pick.type = "button";
+    pick.className = "btn btn-carry-alt";
+    setIconLabel(pick, "plus", "Add Mission…");
+    pick.title = "Pick only the missions you will work on from the latest confirmed day";
+    pick.onclick = () => openImportModal();
+    box.appendChild(pick);
+  }
 }
 
 function renderTabs() {
@@ -6083,10 +6098,14 @@ function renderDatePicker() {
 
 /* ---------- weekend "Add Mission" (import from latest weekday) ---------- */
 let importCandidates = [];
+let importMode = "holiday";      // "holiday" | "forecast" — which list #modal-import is showing
+let importForecastSrc = null;    // forecast mode: the confirmed day the list came from
 
 function openImportModal() {
-  if (isForecastView()) return;
+  if (isForecastView()) { openForecastAddModal(); return; }
   guardEdit(async () => {
+    importMode = "holiday";
+    $("#import-crew").classList.add("hidden");
     $("#import-list").innerHTML = '<p class="import-note">Loading…</p>';
     $("#import-source-note").textContent = "";
     openModal("#modal-import");
@@ -6122,8 +6141,79 @@ function openImportModal() {
   });
 }
 
+/* Forecast "Add Mission": the same picker, listing the latest confirmed day's
+   missions so an engineer adds only the ones they will work on (optionally
+   with their crew) instead of the whole board. Missions this forecast
+   already has (same number + shift) are shown but can't be ticked. */
+function openForecastAddModal() {
+  guardEdit(async () => {
+    importMode = "forecast";
+    importForecastSrc = null;
+    const boardId = D().activeBoardId, date = state.date;
+    $("#import-crew").classList.remove("hidden");
+    $("#import-list").innerHTML = '<p class="import-note">Loading…</p>';
+    $("#import-source-note").textContent = "";
+    openModal("#modal-import");
+    try {
+      const src = await cloud.findLatestWeekdayMissionDate(boardId, date);
+      if (!src) {
+        $("#import-list").innerHTML = '<p class="import-note">There is no confirmed working day with missions to pick from yet. Use "New Mission" to create one.</p>';
+        return;
+      }
+      const preview = await cloud.buildCarryPreview(boardId, src);
+      const missions = preview.missions.filter(m => !m.hidden)
+        .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }) || (a.shift === "night") - (b.shift === "night"));
+      if (!missions.length) {
+        $("#import-list").innerHTML = '<p class="import-note">Every mission on the latest confirmed day is hidden, so there is nothing to pick.</p>';
+        return;
+      }
+      importForecastSrc = src;
+      const have = new Set(getPlan().missions.map(m => m.number + "|" + m.shift));
+      $("#import-source-note").textContent =
+        `Missions on the confirmed board for ${fmtDow(src)} ${fmtDate(src)} — tick the ones you will work on for ${fmtDow(date)} ${fmtDate(date)}:`;
+      const list = $("#import-list");
+      list.innerHTML = "";
+      for (const m of missions) {
+        const key = m.number + "|" + m.shift;
+        const present = have.has(key);
+        const eng = D().engineers.find(e => e.id === m.engineerId);
+        const n = m.members.length;
+        const row = document.createElement("label");
+        row.className = "import-row" + (present ? " is-present" : "");
+        row.innerHTML = `<input type="checkbox" value="${escapeHtml(key)}"${present ? " disabled" : ""}>
+          <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
+          <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""} • ${n} ${n === 1 ? "person" : "people"}${present ? " • already on this forecast" : ""}</small></span>`;
+        list.appendChild(row);
+      }
+    } catch (e) {
+      $("#import-list").innerHTML = `<p class="import-note">Could not load missions: ${escapeHtml(e.message || String(e))}</p>`;
+    }
+  });
+}
+
+function confirmForecastAdd(keys) {
+  const withCrew = $("#import-with-crew").checked;
+  const src = importForecastSrc;
+  safely(async () => {
+    const r = await cloud.addForecastMissionsFromConfirmed(D().activeBoardId, state.date, src, keys, { withCrew });
+    closeModal();
+    await refreshAndRender();
+    const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const parts = [];
+    if (r.added) parts.push(`Added ${pl(r.added, "mission", "missions")}` + (withCrew ? ` with ${pl(r.crewPlaced, "person", "people")}.` : " (no crew)."));
+    if (r.crewKept) parts.push(`${pl(r.crewKept, "person was", "people were")} already placed elsewhere on this day and stayed there.`);
+    if (r.skipped) parts.push(`${pl(r.skipped, "mission was", "missions were")} already on this forecast and left as they are.`);
+    if (parts.length) toast(parts.join(" "), r.crewKept ? "warn" : "info");
+  });
+}
+
 function confirmImport() {
   const ids = Array.from($$("#import-list input[type=checkbox]:checked")).map(c => c.value);
+  if (importMode === "forecast") {
+    if (!ids.length || !importForecastSrc || !isForecastView()) { closeModal(); return; }
+    confirmForecastAdd(ids);
+    return;
+  }
   if (!ids.length) { closeModal(); return; }
   safely(async () => {
     const result = await cloud.importMissions(D().activeBoardId, state.date, ids);

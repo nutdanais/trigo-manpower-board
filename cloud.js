@@ -1952,6 +1952,34 @@ const cloud = {
     return srcDate;
   },
 
+  /* "Add Mission" on a forecast day: the missions an engineer picks from the
+     latest confirmed working day (srcDate), not the whole board. keys are
+     "number|shift". With withCrew, each mission's people come along as
+     Carry over would place them, held by the current user — but only people
+     still unplaced on this forecast day: someone another engineer already
+     holds here stays where they are (forecast_assignments is one row per
+     person per day and the write never overwrites). A number+shift the
+     forecast already has is skipped, never overwritten.
+     -> { added, skipped, crewPlaced, crewKept } */
+  async addForecastMissionsFromConfirmed(boardId, date, srcDate, keys, { withCrew = true } = {}) {
+    const want = new Set(keys);
+    const preview = await this.buildCarryPreview(boardId, srcDate);
+    const picked = preview.missions.filter((m) => !m.hidden && want.has(m.number + "|" + m.shift));
+    const before = await this.ensureForecastLoaded(boardId, date, { force: true });
+    const have = new Set(before.missions.map((m) => m.number + "|" + m.shift));
+    const fresh = picked.filter((m) => !have.has(m.number + "|" + m.shift))
+      .map((m) => (withCrew ? m : { ...m, members: [] }));
+    if (!fresh.length) return { added: 0, skipped: picked.length, crewPlaced: 0, crewKept: 0 };
+    await this._writeForecastPlan(boardId, date, { missions: fresh, zones: {} });
+    const after = await this.ensureForecastLoaded(boardId, date, { force: true });
+    const freshKeys = new Set(fresh.map((m) => m.number + "|" + m.shift));
+    const active = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
+    const wanted = fresh.reduce((n, m) => n + m.members.filter((id) => active.has(id)).length, 0);
+    const crewPlaced = after.missions.filter((m) => freshKeys.has(m.number + "|" + m.shift))
+      .reduce((n, m) => n + m.members.length, 0);
+    return { added: fresh.length, skipped: picked.length - fresh.length, crewPlaced, crewKept: Math.max(0, wanted - crewPlaced) };
+  },
+
   /* "Copy forecast to next N working days": copies into each date whose
      forecast is still empty for this board, and skips the rest — a date
      someone has already started forecasting is theirs, not overwritten. */

@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-24e">
+<link rel="stylesheet" href="styles.css?v=2026-09-24f">
 </head>
 <body>
 
@@ -850,6 +850,8 @@
     <h3>Add Mission<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p id="import-source-note" class="import-note"></p>
     <div id="import-list"></div>
+    <label id="import-crew" class="import-crew hidden"><input type="checkbox" id="import-with-crew" checked>
+      <span>Bring each mission's crew too<small>People already placed somewhere on this forecast day stay where they are. Everyone brought in is held by you.</small></span></label>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-import-confirm">Add selected</button>
@@ -934,8 +936,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="planning.js?v=2026-09-24e"></script>
-<script src="cloud.js?v=2026-09-24e"></script>
+<script src="cloud.js?v=2026-09-24f"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="app.js?v=2026-09-24e"></script>
+<script src="app.js?v=2026-09-24f"></script>
 </body>
 </html>

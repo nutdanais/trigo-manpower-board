@@ -273,6 +273,76 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       await a.close();
     }
 
+    /* ================= Part C: Add Mission on a forecast day ================= */
+    {
+      const db = new h.FakeDb();
+      h.seedBase(db, { src: SRC });
+      const a = await env.openAs(db, h.USERS.a);
+      const b = await env.openAs(db, h.USERS.b);
+      const pa = a.page, pb = b.page;
+      await gotoDate(pa, F);
+      await gotoDate(pb, F);
+      const fm = (n, shift = "day") => db.t("forecast_missions").find((m) => m.plan_date === F && m.number === n && m.shift === shift);
+      const fa = (emp) => db.t("forecast_assignments").find((r) => r.employee_id === emp && r.plan_date === F);
+      const pick = async (p, numbers, withCrew) => {
+        await p.click("#btn-import-mission");
+        await until(async () => (await p.locator("#import-list .import-row").count()) === 3, "three missions to pick from");
+        for (const n of numbers) await p.locator("#import-list .import-row", { hasText: new RegExp("^\\s*" + n + " ") }).locator("input").check();
+        await p.locator("#import-with-crew").setChecked(withCrew);
+        await p.click("#btn-import-confirm");
+        await until(async () => !(await p.isVisible("#modal-import")), "picker closes");
+      };
+
+      await step("C8: a forecast day offers Add Mission; it adds only the picked missions, with their crew held by the engineer", async () => {
+        assert.ok(await pa.isVisible("#btn-import-mission"), "Add Mission in the toolbar");
+        assert.ok(await pa.isVisible("#board-empty >> text=Add Mission…"), "and on the empty-forecast prompt");
+        await pick(pa, ["102"], true);
+        await until(() => !!fm("102"), "102 added to the forecast");
+        assert.equal(db.t("forecast_missions").filter((m) => m.plan_date === F).length, 1, "only the picked mission");
+        assert.equal(fa("e3").forecast_mission_id, fm("102").id, "its crew came along");
+        assert.equal(fa("e3").held_by, "eng.a@example.com", "held by the engineer who added it");
+        assert.equal(db.t("missions").filter((m) => m.plan_date === F).length, 0, "nothing confirmed");
+        assert.equal(db.t("deployment_history").filter((r) => r.plan_date === F).length, 0, "no Host Record");
+        await until(async () => (await pa.locator("#missions-grid .mission-card").count()) === 1, "one card on A's board");
+      });
+
+      await step("C8b: missions already on the forecast can't be picked again; someone another engineer holds stays with them", async () => {
+        // B adds 103 without crew and puts Person A (crew of 101 on the confirmed day) on it
+        await until(async () => (await pb.locator("#missions-grid .mission-card").count()) === 1, "B sees A's mission live");
+        await pick(pb, ["103"], false);
+        await until(() => !!fm("103", "night"), "103 added");
+        assert.equal(fa("e4"), undefined, "no crew when unticked");
+        asUser(db, h.USERS.b)({ op: "rpc", fn: "set_forecast_assignment", args: { p_employee_id: "e1", p_plan_date: F, p_mission_id: fm("103", "night").id, p_zone: null } });
+        // A picks 101 with crew: Person B joins, Person A stays on B's 103
+        await pa.click("#btn-import-mission");
+        await until(async () => (await pa.locator("#import-list .import-row").count()) === 3, "list");
+        const disabled = await pa.$$eval("#import-list .import-row", (els) => els.filter((e) => e.querySelector("input").disabled).map((e) => e.querySelector("b").textContent));
+        assert.deepEqual(disabled.sort(), ["102", "103"], "already on the forecast");
+        await pa.locator("#import-list .import-row", { hasText: /^\s*101 / }).locator("input").check();
+        await pa.click("#btn-import-confirm");
+        await until(() => !!fm("101"), "101 added");
+        await until(() => fa("e2") && fa("e2").forecast_mission_id === fm("101").id, "Person B placed on 101");
+        assert.equal(fa("e2").held_by, "eng.a@example.com");
+        assert.equal(fa("e1").forecast_mission_id, fm("103", "night").id, "Person A stays where B put them");
+        assert.equal(fa("e1").held_by, "eng.b@example.com");
+        assert.equal(db.t("forecast_hold_events").length, 0, "nobody's hold was taken");
+        await until(async () => /1 person was already placed elsewhere on this day and stayed there/.test(await pa.textContent("#toast-stack")), "A is told");
+      });
+
+      await step("C8c: on a confirmed working day the button stays hidden; a weekend past the horizon still offers it", async () => {
+        await gotoDate(pa, H);
+        assert.equal(await pa.isVisible("#btn-import-mission"), false);
+        let sat = T; while (new Date(sat + "T00:00:00").getDay() !== 6) sat = h.addDays(sat, 1);
+        if (sat > H) {
+          await gotoDate(pa, sat);
+          // a Saturday past the horizon is a forecast day too, so it gets the forecast picker
+          assert.equal(await pa.isVisible("#btn-import-mission"), true);
+        }
+      });
+      for (const p of [a, b]) assert.deepEqual(p.errors, [], "no console errors");
+      await a.close(); await b.close();
+    }
+
     /* ================= Part B: Capacity ================= */
     {
       const db = new h.FakeDb();

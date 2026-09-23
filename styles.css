@@ -815,6 +815,7 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   font-weight: 700;
 }
 #board-empty .btn-carry:hover { filter: brightness(0.96); }
+#board-empty .btn-carry-alt { font-weight: 600; }
 
 /* JS masonry container: layoutMasonry() (app.js) absolutely-positions each
    mission card into the shortest column and sets this element's height. The
@@ -1916,9 +1917,19 @@ body.board-view #app-root { margin-right: 264px; }
   cursor: pointer;
   font-weight: 400;
 }
+/* .modal label is display:block — these rows are flex (checkbox beside the text) */
+.modal .import-row, .modal .import-crew { display: flex; }
+.modal .import-crew.hidden { display: none; }
 .import-row:hover { background: var(--hover-tint); }
 .import-row input { width: auto; margin-top: 3px; }
 .import-info small { display: block; color: var(--muted); }
+.import-row.is-present { cursor: default; opacity: .55; }
+.import-row.is-present:hover { background: none; }
+/* forecast "Add Mission": bring each picked mission's people too */
+.import-crew { display: flex; align-items: flex-start; gap: 9px; margin: 10px 0 2px; padding: 9px 10px; border-radius: 7px; background: var(--bg-soft); font-size: 13px; font-weight: 600; cursor: pointer; }
+.import-crew.hidden { display: none; }
+.import-crew input { width: auto; margin-top: 3px; }
+.import-crew small { display: block; font-weight: 400; color: var(--muted); }
 
 /* ===== Host Record tab (Edit Employee modal) ===== */
 .host-list { max-height: 320px; overflow-y: auto; }
