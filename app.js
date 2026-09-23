@@ -6773,6 +6773,7 @@ function renderCapacityToolbar() {
   }
   $("#cap-range").value = String(state.capacity.weeks);
   $("#btn-cap-copy-week").classList.toggle("hidden", !can("capacity", "edit"));
+  $("#btn-cap-seed").classList.toggle("hidden", !can("capacity", "edit"));
 }
 
 const CAP_CHART_H = 190, CAP_CHART_TOP = 30, CAP_COL_H = 232;
@@ -6889,7 +6890,10 @@ function renderCapacity() {
   dh.appendChild(head("Day"));
   for (const x of m.days) {
     const c = dayCell(x);
-    c.innerHTML = `<span class="cap-dow">${fmtDow(x.date)}</span><span class="cap-dm${x.date === todayStr() ? " today" : ""}">${shortDateLabel(x.date)}</span>`;
+    c.innerHTML = `<span class="cap-dow">${fmtDow(x.date)}</span><span class="cap-dm${x.date === todayStr() ? " today" : ""}">${shortDateLabel(x.date)}</span>` +
+      (x.forecast
+        ? '<span class="cap-mode fc" title="Tentative: the board opens this day in forecast mode">FORECAST</span>'
+        : '<span class="cap-mode cf" title="The confirmed board: the plan people are sent out on">CONFIRMED</span>');
     dh.appendChild(c);
   }
   grid.appendChild(dh);
@@ -6915,7 +6919,10 @@ function renderCapacity() {
 
   // ----- named on board -----
   const nr = row("cap-namedrow");
-  nr.appendChild(head("Named on board", "people already placed"));
+  const namedHead = head("Named on board", "people already on a mission");
+  namedHead.title = "How many of this board's people are already put on a mission that day — on the confirmed board up to the next working day, in the forecast after that.\n" +
+    "Compare it with Demand: a lower number means the numbers are planned but not everyone has been named yet.";
+  nr.appendChild(namedHead);
   for (const x of m.days) {
     const c = dayCell(x);
     c.textContent = x.a ? String(x.a.named) : "";
@@ -7071,6 +7078,35 @@ function capacityAddRowForm(boardId) {
     render();
   };
   return form;
+}
+/* "Start from confirmed plan": the latest confirmed day's deployment on this
+   board — people per host x shift — becomes the starting demand on every
+   working day in range. Only empty cells are filled, so an engineer then just
+   corrects the hosts they look after and nobody's typed numbers are lost. */
+function seedCapacityFromConfirmed() {
+  if (!can("capacity", "edit")) return;
+  const boardId = capBoardId();
+  const board = D().boards.find(b => b.id === boardId);
+  safely(async () => {
+    const src = await cloud.findLatestWeekdayMissionDate(boardId, addDays(horizonEndFor(boardId), 1));
+    if (!src) { toast(`${board.name} has no confirmed working day with missions to start from.`, "info"); return; }
+    const plan = await cloud.ensurePlanLoaded(boardId, src);
+    const active = new Set(D().employees.filter(e => e.boardId === boardId && e.active !== false).map(e => e.id));
+    const seed = Capacity.seedFromPlan(plan, active);
+    if (!seed.length) { toast(`Nobody is placed on a mission on ${board.name} on ${fmtShort(src)}, so there is nothing to start from.`, "info"); return; }
+    const dates = capacityDates(boardId);
+    const have = new Set(((D().capacity && D().capacity.rows) || []).filter(r => r.board_id === boardId)
+      .map(r => r.plan_date + "\u0001" + r.host + "\u0001" + r.shift));
+    const cells = Capacity.fillEmpty(seed, dates, (d, h, sh) => have.has(d + "\u0001" + h + "\u0001" + sh))
+      .map(c => ({ boardId, ...c }));
+    if (!cells.length) { toast("Every one of those cells already has a number — nothing was changed.", "info"); return; }
+    const list = seed.slice(0, 6).map(x => `${x.host}${x.shift === "night" ? " (night)" : ""}: ${x.headcount}`).join(", ") +
+      (seed.length > 6 ? `, and ${seed.length - 6} more` : "");
+    showConfirm("Start from the confirmed plan?",
+      `Use ${board.name}'s deployment on ${fmtShort(src)} as the starting demand: ${list}.\n\n` +
+      `It goes into ${cells.length} empty cell${cells.length === 1 ? "" : "s"} across the next ${state.capacity.weeks} week${state.capacity.weeks === 1 ? "" : "s"}. Cells that already have a number are kept. Then adjust the hosts you look after.`,
+      () => saveCapacityCells(cells));
+  });
 }
 /* the board on screen only — "one board at a time" goes for the copy too */
 function copyCapacityWeek() {
@@ -7936,6 +7972,7 @@ function wireApp() {
   $("#btn-plandiff-apply").onclick = applyPlanDiffFromModal;
   $("#cap-range").onchange = (ev) => { state.capacity.weeks = Number(ev.target.value); state.capacity.cacheKey = null; refreshAndRender(); };
   $("#btn-cap-copy-week").onclick = copyCapacityWeek;
+  $("#btn-cap-seed").onclick = seedCapacityFromConfirmed;
 
   // employee search (floating panel) — filter as you type, keep selection
   $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });

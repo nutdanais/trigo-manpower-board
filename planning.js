@@ -264,7 +264,36 @@
     return gridDates.filter((d) => d > date && d <= end && isWorking(d));
   }
 
-  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd };
+  /* "Start from confirmed plan": a day's deployment turned into demand — how
+     many people are on each host x shift, counting only visible missions and
+     only the people in `activeIds` (the board's current roster). Several
+     missions at one host on one shift add up to one row. */
+  function seedFromPlan(plan, activeIds) {
+    const byKey = new Map();
+    for (const m of (plan && plan.missions) || []) {
+      if (m.hidden || !m.host) continue;
+      const n = (m.members || []).filter((id) => !activeIds || activeIds.has(id)).length;
+      if (!n) continue;
+      const k = m.host + "\u0001" + m.shift;
+      byKey.set(k, (byKey.get(k) || 0) + n);
+    }
+    return [...byKey].map(([k, headcount]) => {
+      const [host, shift] = k.split("\u0001");
+      return { host, shift, headcount };
+    }).sort((a, b) => a.host.localeCompare(b.host) || (a.shift === "night") - (b.shift === "night"));
+  }
+
+  /* The seed copied onto every date, but only into cells that are still empty
+     (`has(date, host, shift)` false): a number someone already typed is theirs. */
+  function fillEmpty(seed, dates, has) {
+    const out = [];
+    for (const d of dates) {
+      for (const s of seed) if (!has(d, s.host, s.shift)) out.push({ date: d, host: s.host, shift: s.shift, headcount: s.headcount });
+    }
+    return out;
+  }
+
+  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, seedFromPlan, fillEmpty };
 
   const api = { PlanDiff, Horizon, Capacity };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

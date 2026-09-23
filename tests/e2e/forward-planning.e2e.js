@@ -366,6 +366,47 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       await a.close(); await b.close(); await v.close();
     }
 
+    /* ================= Part B: chips + start from the confirmed plan ================= */
+    {
+      const db = new h.FakeDb();
+      h.seedBase(db, { src: SRC });
+      // someone already typed Host Alpha for tomorrow: must survive the seeding
+      db.seed("capacity_demand", [{ board_id: "b1", plan_date: H, host: "Host Alpha", shift: "day", headcount: 9 }]);
+      const a = await env.openAs(db, h.USERS.a);
+      const pa = a.page;
+      await pa.click("#board-tabs .tab-capacity");
+      await pa.waitForSelector(".cap-gapchip");
+
+      await step("B6: every day carries a CONFIRMED or FORECAST chip", async () => {
+        const chips = await pa.$$eval(".cap-dayhead .cap-day", (els) => els.map((e) => e.querySelector(".cap-mode").textContent));
+        const dates = await pa.$$eval(".cap-gapchip", (els) => els.map((e) => e.dataset.date));
+        dates.forEach((d, i) => assert.equal(chips[i], d <= H ? "CONFIRMED" : "FORECAST", d));
+        assert.ok(chips.includes("FORECAST") && chips.includes("CONFIRMED"));
+      });
+
+      await step("B7: Start from confirmed plan fills empty cells from the latest confirmed day, keeping typed numbers", async () => {
+        await pa.click("#btn-cap-seed");
+        await until(() => pa.isVisible("#modal-confirm"), "confirmation");
+        const msg = await pa.textContent("#confirm-message");
+        assert.match(msg, /Host Alpha: 2, Host Beta: 1, Host Gamma \(night\): 1/);
+        await pa.click("#btn-confirm-yes");
+        const days = (await pa.$$eval(".cap-gapchip", (els) => els.length));
+        await until(() => db.t("capacity_demand").length === days * 3, "every host x day filled");
+        const at = (d, host, shift) => (db.t("capacity_demand").find((r) => r.plan_date === d && r.host === host && r.shift === shift) || {}).headcount;
+        assert.equal(at(H, "Host Alpha", "day"), 9, "a number someone typed is kept");
+        assert.equal(at(F, "Host Alpha", "day"), 2);
+        assert.equal(at(F, "Host Gamma", "night"), 1);
+        await until(async () => (await pa.locator(".cap-hostrow .cap-cell input").count()) === days * 3, "three host rows on screen");
+      });
+
+      await step("B8: Named on board explains itself", async () => {
+        const tip = await pa.getAttribute(".cap-namedrow .cap-left", "title");
+        assert.match(tip, /already put on a mission/);
+      });
+      assert.deepEqual(a.errors, [], "no console errors");
+      await a.close();
+    }
+
     /* ================= Missing-migration tolerance ================= */
     {
       const db = new h.FakeDb({ forwardPlanning: false });

@@ -4073,6 +4073,10 @@ body.forecast-mode .zone { border-style: dashed; }
 .cap-dow { font-size: 11px; color: var(--muted); }
 .cap-dm { font-size: 13.5px; font-weight: 700; }
 .cap-dm.today { color: var(--primary-text); }
+.cap-mode { margin-top: 3px; padding: 0 4px; border-radius: 5px; font-size: 9px; font-weight: 700; letter-spacing: .3px; line-height: 15px; }
+.cap-mode.cf { color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); }
+.cap-mode.fc { color: var(--primary-text); background: var(--panel); border: 1px dashed var(--primary-text); }
+.cap-namedrow .cap-left { cursor: help; }
 .cap-gaprow { border-top: 1px solid var(--border); }
 .cap-gaprow .cap-day { padding: 8px 4px; }
 .cap-gaprow .cap-left-title { font-size: 15px; }

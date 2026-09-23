@@ -127,3 +127,23 @@ test("capacity: demand totals and fill-right dates", () => {
   assert.equal(Capacity.weekStart("2026-09-27"), "2026-09-21");
   assert.equal(Capacity.weekEnd("2026-09-21"), "2026-09-27");
 });
+
+test("capacity seed: a confirmed day's deployment becomes demand per host x shift, filling only empty cells", () => {
+  const plan = { missions: [
+    mission("101", ["a", "b", "gone"], { host: "Host A" }),
+    mission("102", ["c"], { host: "Host A" }),                      // same host + shift: adds up
+    mission("103", ["d"], { host: "Host A", shift: "night" }),
+    mission("104", ["e"], { host: "Host B", hidden: true }),         // hidden: ignored
+    mission("105", [], { host: "Host C" }),                          // nobody on it: no row
+  ], zones: zones() };
+  const seed = Capacity.seedFromPlan(plan, new Set(["a", "b", "c", "d", "e"]));
+  assert.deepEqual(seed, [
+    { host: "Host A", shift: "day", headcount: 3 },
+    { host: "Host A", shift: "night", headcount: 1 },
+  ]);
+  const kept = new Set(["2026-09-25|Host A|day"]);
+  const cells = Capacity.fillEmpty(seed, ["2026-09-24", "2026-09-25"], (d, h, s) => kept.has(d + "|" + h + "|" + s));
+  assert.deepEqual(cells.map((c) => `${c.date} ${c.host} ${c.shift} ${c.headcount}`), [
+    "2026-09-24 Host A day 3", "2026-09-24 Host A night 1", "2026-09-25 Host A night 1",
+  ]);
+});
