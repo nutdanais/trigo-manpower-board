@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-08">
+<link rel="stylesheet" href="styles.css?v=2026-09-24">
 </head>
 <body>
 
@@ -167,6 +167,10 @@
 
 <div id="board-bar">
   <div id="board-tabs"></div>
+  <!-- CONFIRMED / FORECAST for the board and date on screen, and the
+       "holds taken from you" counter (forward planning; see app.js) -->
+  <span id="mode-pill" class="mode-pill hidden"></span>
+  <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
   <!-- Phone-only stand-in for the per-board tabs and "+ Board" (see #board-select
        in styles.css). A native <select> is deliberate: it gets the platform's own
        picker, which is a far better target than a row of tabs, and it collapses
@@ -254,6 +258,7 @@
         </select>
       </div>
       <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day"><svg class="ic" aria-hidden="true"><use href="#i-reset"></use></svg> Reset Board</button>
+      <button id="btn-forecast-copy" class="btn btn-quiet hidden" title="Copy this forecast onto the next working days that have none yet"><svg class="ic" aria-hidden="true"><use href="#i-arrow-right"></use></svg> Copy forecast</button>
       <button id="btn-undo" class="btn btn-quiet" title="Undo last assignment change (Ctrl+Z)" disabled><svg class="ic" aria-hidden="true"><use href="#i-undo"></use></svg> Undo</button>
     </div>
   </div>
@@ -275,6 +280,10 @@
     <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
   </div>
 </div>
+
+<!-- Outside #board-capture on purpose: the stale-carry and forecast banners
+     are for the planner, never part of an exported board. -->
+<div id="plan-banners"></div>
 
 <main id="board-capture">
   <div id="capture-header" class="hidden">
@@ -360,6 +369,7 @@
        instead of the people. Its rows are assembled from mission + deployment
        history, so every host the board has ever used is listed whether or not
        anyone has given it a location yet. -->
+  <section id="capacity-panel" class="hidden"></section>
   <section id="hostlist-panel" class="hidden">
     <!-- Duplicate finder: hosts whose names look like each other (see
          hostDuplicateGroups in app.js). It only ever suggests — merging is a
@@ -838,6 +848,53 @@
     </div>
   </div>
 
+  <!-- PlanDiff: "Review changes" (stale carry-over) and "Review & merge" (forecast) -->
+  <div class="modal hidden" id="modal-plandiff">
+    <h3><span id="plandiff-title">Review changes</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p id="plandiff-sub" class="import-note"></p>
+    <div id="plandiff-tools">
+      <button type="button" class="btn btn-small" id="btn-plandiff-all">Tick all</button>
+      <button type="button" class="btn btn-small" id="btn-plandiff-none">Untick all</button>
+    </div>
+    <div id="plandiff-body"></div>
+    <div class="modal-actions">
+      <span id="plandiff-count"></span>
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-plandiff-apply">Apply</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="modal-holds">
+    <h3><span id="holds-title">Holds taken</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note">Someone moved these people out of a forecast they were held in. The flag stays on the mission until it is acknowledged.</p>
+    <div id="holds-list"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="btn-holds-ack-all">Acknowledge all</button>
+      <button type="button" class="btn btn-primary" data-close>Close</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="modal-forecast-copy">
+    <h3>Copy forecast to the next working days<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <label>How many working days
+      <input type="number" id="forecast-copy-n" min="1" max="10" value="5">
+    </label>
+    <p id="forecast-copy-dates" class="import-note"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-forecast-copy-confirm">Copy</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="modal-forecast-view">
+    <h3><span id="forecast-view-title">Forecast</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note">Read-only. A forecast is kept for reference after it has been merged.</p>
+    <div id="forecast-view-list"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" data-close>Close</button>
+    </div>
+  </div>
+
   <div class="modal hidden" id="modal-confirm">
     <h3><span id="confirm-title">Confirm</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p id="confirm-message"></p>
@@ -858,8 +915,9 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="cloud.js?v=2026-09-07e"></script>
+<script src="planning.js?v=2026-09-24"></script>
+<script src="cloud.js?v=2026-09-24"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="app.js?v=2026-09-08"></script>
+<script src="app.js?v=2026-09-24"></script>
 </body>
 </html>

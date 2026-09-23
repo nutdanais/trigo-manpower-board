@@ -3824,3 +3824,233 @@ body.org-capturing #orgchart-panel .oc-canvas { position: static !important; tra
   body.printing #orgchart-panel .oc-viewport { height: auto !important; overflow: visible !important; border: 0 !important; }
   body.printing #orgchart-panel .oc-canvas { position: static !important; transform: none !important; padding: 0 !important; }
 }
+
+/* ======================================================================
+   Forward planning — mode pill, board banners, forecast mode, lost-hold
+   flags, the PlanDiff review panel and the Capacity grid. Everything takes
+   its colour from the existing tokens, so dark mode follows automatically.
+   ====================================================================== */
+#confirm-message { white-space: pre-line; }
+
+/* CONFIRMED / FORECAST in the board bar */
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  margin-left: 8px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  flex: none;
+  cursor: default;
+}
+.mode-pill.hidden { display: none; }
+.mode-pill.mode-confirmed { color: var(--ok-text); border-color: var(--ok-line); background: var(--ok-surface); }
+.mode-pill.mode-forecast { color: var(--primary-text); border: 1px dashed var(--primary-text); background: var(--hover-tint); }
+#btn-hold-alerts { color: var(--danger-text); border-color: var(--danger-line); background: var(--danger-tint); font-weight: 600; margin-left: 6px; }
+#btn-hold-alerts .ic { color: var(--danger); }
+
+/* the banners above the board (outside #board-capture, so never exported) */
+#plan-banners { display: flex; flex-direction: column; gap: 8px; padding: 0 14px; }
+#plan-banners:not(:empty) { padding-top: 12px; }
+.plan-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--r-box);
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.plan-banner-icon { display: inline-flex; flex: none; }
+.plan-banner-icon .ic { width: 16px; height: 16px; }
+.plan-banner-text { flex: 1 1 320px; min-width: 0; }
+.plan-banner-actions { display: flex; gap: 6px; flex: none; }
+.plan-banner-stale { border-color: var(--warn-line); background: var(--warn-surface); }
+.plan-banner-stale .plan-banner-icon { color: var(--warn-text); }
+.plan-banner-forecast { border-color: var(--primary-text); }
+.plan-banner-forecast .plan-banner-icon { color: var(--primary-text); }
+.plan-banner-forecast-info { border-style: dashed; border-left-style: solid; border-left-color: var(--primary-text); color: var(--muted); }
+.plan-banner-forecast-info b { color: var(--primary-text); }
+.plan-banner-merged { color: var(--muted); border-left-color: var(--ok-line); }
+.plan-banner-merged .plan-banner-icon { color: var(--ok-text); }
+
+/* forecast mode: dashed cards on a slightly muted ground — the board reads as
+   a sketch, not the plan people will be sent out on */
+body.forecast-mode #board-capture {
+  background-image: repeating-linear-gradient(135deg, transparent 0 14px, rgba(0, 73, 131, .035) 14px 28px);
+}
+body.forecast-mode .mission-card {
+  border-style: dashed;
+  border-top-style: solid;
+  border-right-color: var(--muted);
+  border-bottom-color: var(--muted);
+  border-left-color: var(--muted);
+}
+body.forecast-mode .zone { border-style: dashed; }
+
+/* D3: people taken out of this forecast mission by someone else */
+.hold-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--danger-line);
+  border-radius: 10px;
+  background: var(--danger-tint);
+  color: var(--danger-text);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hold-badge.mine { background: var(--danger); border-color: var(--danger); color: #fff; }
+.hold-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.hold-row .hold-text { flex: 1; min-width: 0; font-size: 13px; }
+.hold-row .hold-text small { display: block; color: var(--muted); margin-top: 2px; }
+.hold-row .btn { flex: none; }
+
+/* PlanDiff review panel: wide, with the list scrolling inside it */
+#modal-plandiff { width: 760px; display: flex; flex-direction: column; overflow: hidden; }
+#modal-plandiff > h3 { position: static; flex: none; }
+#plandiff-sub { flex: none; }
+#plandiff-tools { display: flex; gap: 6px; margin-bottom: 8px; flex: none; }
+#plandiff-tools.hidden { display: none; }
+#plandiff-body { flex: 1 1 auto; min-height: 60px; overflow-y: auto; margin: 0 -20px; padding: 0 20px 4px; }
+#modal-plandiff > .modal-actions { flex: none; }
+#plandiff-count { color: var(--muted); font-size: 12.5px; margin-right: auto; margin-left: 0; }
+.pd-group { margin-bottom: 12px; }
+.pd-group-head {
+  padding: 6px 10px;
+  border-left: 4px solid var(--border);
+  background: var(--bg-soft);
+  border-radius: 4px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.pd-item {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 !important;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400 !important;
+  cursor: pointer;
+}
+.pd-item:hover { background: var(--hover-tint); }
+.pd-item input { width: auto !important; margin: 3px 0 0 !important; flex: none; }
+.pd-tag {
+  flex: none;
+  min-width: 62px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  background: var(--bg-soft);
+  color: var(--muted);
+}
+.pd-add .pd-tag { background: var(--ok-surface); color: var(--ok-text); }
+.pd-leave .pd-tag { background: var(--warn-surface); color: var(--warn-text); }
+.pd-remove .pd-tag { background: var(--danger-tint); color: var(--danger-text); }
+.pd-text { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+
+/* Capacity tab */
+#capacity-panel { display: flex; flex-direction: column; gap: 10px; }
+#capacity-panel.hidden { display: none; }
+.cap-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cap-title { flex: 1 1 320px; display: flex; flex-direction: column; gap: 2px; }
+.cap-title b { font-size: 15px; }
+.cap-title span { color: var(--muted); font-size: 12.5px; }
+#cap-range {
+  height: var(--ctl-h);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+.cap-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-box); background: var(--panel); }
+.cap-grid { border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; min-width: 100%; }
+.cap-grid th, .cap-grid td { border-bottom: 1px solid var(--border); padding: 0; text-align: center; white-space: nowrap; }
+.cap-grid thead th { padding: 6px 4px; font-weight: 600; font-size: 12px; background: var(--bg-soft); position: sticky; top: 0; z-index: 2; }
+.cap-grid thead th span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+.cap-grid th.cap-today { color: var(--primary-text); }
+.cap-grid .cap-week-start { border-left: 2px solid var(--border); }
+.cap-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 210px;
+  max-width: 280px;
+  padding: 6px 10px !important;
+  text-align: left !important;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  white-space: normal !important;
+}
+.cap-grid thead .cap-sticky { z-index: 3; background: var(--bg-soft); }
+.cap-board-row th { background: var(--bg-soft) !important; padding: 8px 10px; text-align: left; }
+.cap-board-row .cap-sticky b { display: block; font-size: 13.5px; margin-bottom: 4px; }
+.cap-add { display: flex; gap: 4px; align-items: center; }
+.cap-add input, .cap-add select {
+  height: var(--ctl-h-sm);
+  min-width: 0;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.cap-add input { flex: 1 1 90px; }
+.cap-rowhead { display: table-cell; }
+.cap-rowhead span:first-child { margin-right: 6px; overflow-wrap: anywhere; }
+.cap-rowhead .m-shift { font-size: 10px; }
+.cap-empty { color: var(--muted); font-weight: 400; font-style: italic; }
+.cap-cell { min-width: 48px; }
+.cap-cell input {
+  width: 100%;
+  min-width: 44px;
+  height: 30px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.cap-cell input::-webkit-outer-spin-button,
+.cap-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cap-cell input:focus { outline: 2px solid var(--primary-text); outline-offset: -2px; background: var(--hover-tint); }
+.cap-grid .cap-fc { background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0, 73, 131, .05) 6px 12px); }
+.cap-grid .cap-off { background: var(--bg-soft); }
+.cap-sum td, .cap-sum th { padding: 5px 4px; font-weight: 600; }
+.cap-sum td small { display: block; font-size: 10px; font-weight: 400; color: var(--muted); }
+.cap-demand td, .cap-demand th { border-top: 2px solid var(--border); }
+.cap-gap td.neg { color: var(--danger-text); background: var(--danger-tint); }
+.cap-named td, .cap-named th { color: var(--muted); font-weight: 500; }
+.cap-note { color: var(--muted); font-size: 12px; }
+
+/* Ctrl+P on a forecast or the Capacity grid: a notice, not the tentative plan */
+@media print {
+  body.print-blocked #app-root > * { display: none !important; }
+  body.print-blocked #app-root::before {
+    content: "Forecasts and the Capacity grid are tentative and are not printed or exported.";
+    display: block;
+    padding: 40px;
+    font: 16px var(--font-ui);
+  }
+}

@@ -330,7 +330,9 @@ function setSaveStatus(kind) {
   }
 }
 const CLOUD_WRITE_METHODS = [
-  "_copyPlanForward", "resetBoardFromLastWorkingDay", "setAssignment",
+  "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff",
+  "setCapacityCells", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
+  "startForecastFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
   "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
@@ -430,6 +432,18 @@ const state = {
     history: null,                // cloud.getUtilizationRange() over the History range
     historyCacheKey: null,
   },
+  /* the board's two banners (see renderPlanBanners): what cloud.getPlanSignals
+     and the forecast cache said about the board+date in `key` */
+  signals: { key: null, stamp: null, stale: null, forecast: null },
+  dismissedStale: new Set(),   // "board|date|source edit time" the user dismissed this session
+  diff: null,                  // the open Review changes / Review & merge session
+  capacity: {                  // Capacity tab
+    weeks: 2,                  // range: 1..8 weeks from today
+    inputs: null,              // cloud.getCapacityInputs() for the range
+    cacheKey: null,
+    customers: null,           // known customer names for the row picker (fetched once)
+    extraRows: {},             // { boardId: [{customer, shift}] } rows added but with no number yet
+  },
 };
 
 const D = () => cloud.data;
@@ -437,10 +451,15 @@ const OVERVIEW_ID = "__overview__";
 const ORGCHART_ID = "__orgchart__";
 const EMPLIST_ID = "__emplist__";
 const HOSTLIST_ID = "__hostlist__";
+const CAPACITY_ID = "__capacity__";
 const isOverview = () => D().activeBoardId === OVERVIEW_ID;
 const isOrgChart = () => D().activeBoardId === ORGCHART_ID;
 const isEmployeeList = () => D().activeBoardId === EMPLIST_ID;
 const isHostList = () => D().activeBoardId === HOSTLIST_ID;
+const isCapacity = () => D().activeBoardId === CAPACITY_ID;
+/* which forward-planning tables this database has (see cloud._loadFeatures) —
+   each part of the feature stays hidden until its migration has been run */
+const feat = () => D().features || {};
 
 /* ---------- permissions ----------
    The JS twin of public.can() in the database (see
@@ -478,6 +497,8 @@ const PERM_AREAS = [
     { key: "orgchart", label: "Org Chart",      hint: "Board → engineer → service area → mission → crew", viewOnly: true },
     { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
     { key: "hostlist", label: "Host",           hint: "Sites and their records" },
+    { key: "capacity", label: "Capacity",       hint: "Headcount demand vs available, weeks ahead" },
+    { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
   ]},
@@ -503,6 +524,7 @@ function firstAllowedView() {
   if (can("orgchart")) return ORGCHART_ID;
   if (can("emplist")) return EMPLIST_ID;
   if (can("hostlist")) return HOSTLIST_ID;
+  if (can("capacity") && feat().capacity) return CAPACITY_ID;
   return null;
 }
 /* True when the view is one this user may still open. */
@@ -511,10 +533,31 @@ function mayOpenView(id) {
   if (id === ORGCHART_ID) return can("orgchart");
   if (id === EMPLIST_ID) return can("emplist");
   if (id === HOSTLIST_ID) return can("hostlist");
+  if (id === CAPACITY_ID) return can("capacity") && !!feat().capacity;
   return can("board") && D().boards.some(b => b.id === id);
 }
 /* the three app-wide tabs: not a board, so nothing date- or plan-scoped applies */
-const isNonBoardView = () => isOverview() || isOrgChart() || isEmployeeList() || isHostList();
+const isNonBoardView = () => isOverview() || isOrgChart() || isEmployeeList() || isHostList() || isCapacity();
+
+/* ---------- confirm horizon: confirmed vs forecast dates ----------
+   A confirmed plan is made up to the next working day of each board (its own
+   work week and holidays); every date after that is FORECAST. Past dates,
+   today and any non-working days before the horizon stay confirmed exactly as
+   before. Only applies once the forecast tables exist — before the migration
+   every date is a confirmed date, as it always was. */
+function horizonEndFor(boardId) {
+  return Horizon.end(todayStr(), (d) => isNonWorkingDate(d, boardId), Horizon.N);
+}
+function isForecastDateFor(boardId, date) {
+  return !!feat().forecast && date > horizonEndFor(boardId);
+}
+/* the board on screen is showing a forecast (not the confirmed plan) */
+const isForecastView = () => !isNonBoardView() && !!D().activeBoardId && isForecastDateFor(D().activeBoardId, state.date);
+const sameEmail = (a, b) => !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase();
+/* a forecast hold that belongs to another engineer. "migrated" marks a hold
+   the data migration could not attribute to anyone — nobody to tell, so it is
+   treated as unowned (the database skips the event for it too). */
+const isOthersHold = (heldBy) => !!heldBy && heldBy.toLowerCase() !== "migrated" && !sameEmail(heldBy, state.myEmail);
 const isPast = () => state.date < todayStr();
 /* ---------- lock (finalized board, view-only for everyone) ---------- */
 const lockInfo = (boardId, date) => D().locks.find(l => l.boardId === boardId && l.date === date) || null;
@@ -522,8 +565,10 @@ const lockInfo = (boardId, date) => D().locks.find(l => l.boardId === boardId &&
    so lockInfo() already reflects "unlocked" the moment it resolves — no local
    override needed (and one would risk masking a later re-lock by someone else). */
 const isLocked = (boardId, date) => !!lockInfo(boardId, date);
-/* past AND today are read-only by default — today's plan is already being executed */
-const isReadOnly = () => isLocked(D().activeBoardId, state.date) || (state.date <= todayStr() && !state.unlockedDates.has(state.date));
+/* past AND today are read-only by default — today's plan is already being executed.
+   A forecast date is never read-only: it is after tomorrow by definition, and
+   locks belong to confirmed days (the Lock button is hidden there). */
+const isReadOnly = () => !isForecastView() && (isLocked(D().activeBoardId, state.date) || (state.date <= todayStr() && !state.unlockedDates.has(state.date)));
 const boardEmployees = (boardId) => D().employees.filter(e => e.boardId === boardId);
 /* A deactivated employee (Status column in the Manpower List) is off the
    planning roster: they disappear from the pools, from mission/leave cards and
@@ -539,11 +584,19 @@ const rosterEmployees = (boardId) => boardEmployees(boardId).filter(onRoster);
 /* ---------- plan access (reads the cache cloud.js keeps warm) ---------- */
 function emptyPlan() { return { missions: [], zones: emptyZones(), updatedAt: null }; }
 
+/* On a forecast date the board on screen is the FORECAST plan, from its own
+   cache — every board read below (cards, pools, stats, the context menu) then
+   works on it unchanged. Nothing else ever reads the forecast cache: Overview,
+   Org Chart, utilization and the export all go through the confirmed plans. */
+function forecastPlanOf(boardId, date) {
+  const plan = D().forecast[boardId] && D().forecast[boardId][date];
+  return plan || { ...emptyPlan(), holds: {}, authors: [], isForecast: true };
+}
 function getPlan() {
-  const boardId = D().activeBoardId;
-  return (D().plans[boardId] && D().plans[boardId][state.date]) || emptyPlan();
+  return peekPlan(D().activeBoardId);
 }
 function peekPlan(boardId) {
+  if (boardId === D().activeBoardId && isForecastView()) return forecastPlanOf(boardId, state.date);
   return (D().plans[boardId] && D().plans[boardId][state.date]) || emptyPlan();
 }
 
@@ -737,9 +790,33 @@ async function refreshData() {
     // one bulk read of the host directory; host master records (location / map
     // link) are already warm in the cache alongside boards and employees
     await ensureHostDirectoryLoaded();
+  } else if (isCapacity()) {
+    await ensureCapacityLoaded();
   } else if (D().activeBoardId) {
-    await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
+    const boardId = D().activeBoardId, date = state.date;
+    if (isForecastView()) {
+      await cloud.ensureForecastLoaded(boardId, date);
+    } else {
+      await cloud.ensurePlanLoaded(boardId, date);
+      await refreshPlanSignals(boardId, date);
+    }
   }
+}
+
+/* What the confirmed board's banners need: the day's stamp, whether it has
+   gone stale against the day it was carried from, and the forecast for it (if
+   anyone made one). The staleness check is skipped outright where the brief
+   says no banner belongs: past days, locked days and non-working days. */
+async function refreshPlanSignals(boardId, date) {
+  const f = feat();
+  if (!f.stamps && !f.forecast) { state.signals = { key: null, stamp: null, stale: null, forecast: null }; return; }
+  const notPast = date >= todayStr();
+  const checkStale = f.stamps && notPast && !isLocked(boardId, date) && !isNonWorkingDate(date, boardId);
+  const [sig, forecast] = await Promise.all([
+    cloud.getPlanSignals(boardId, date, { stale: checkStale }),
+    f.forecast && notPast ? cloud.ensureForecastLoaded(boardId, date) : Promise.resolve(null),
+  ]);
+  state.signals = { key: boardId + "|" + date, stamp: sig.stamp, stale: sig.stale, forecast };
 }
 async function refreshAndRender() {
   await refreshData();
@@ -769,6 +846,12 @@ function guardEdit(action) {
   // not even be offered "edit a past date anyway?", because the write behind it
   // would be refused by RLS. Every board mutation passes through here, so this
   // one check is what makes the board genuinely read-only for them.
+  if (isForecastView()) {
+    // a forecast has its own permission and is never locked or read-only
+    if (!can("forecast", "edit")) { toast("Your role can view forecasts but not change them.", "info"); return; }
+    action();
+    return;
+  }
   if (!can("board", "edit")) {
     toast("Your role can view this board but not change it.", "info");
     return;
@@ -807,21 +890,29 @@ function render() {
   const org = isOrgChart();
   const eml = isEmployeeList();
   const hl = isHostList();
-  const board = !ov && !org && !eml && !hl;   // an actual board is on screen
+  const cap = isCapacity();
+  const board = !ov && !org && !eml && !hl && !cap;   // an actual board is on screen
+  // a board beyond the confirm horizon shows its FORECAST, with its own permission
+  const fc = board && isForecastView();
   // Everything below asks "may this role edit here?" as well as "is this view on
   // screen?". The board's own mutations are stopped at guardEdit() rather than
   // here — hiding a button is a courtesy, guardEdit is the rule.
   const boardEdit = board && can("board", "edit");
+  const planEdit = board && (fc ? can("forecast", "edit") : can("board", "edit"));
+  document.body.classList.toggle("forecast-mode", fc);
   $("#status-zones").classList.toggle("hidden", !board);
   $("#missions-grid").classList.toggle("hidden", !board);
   $("#overview-panel").classList.toggle("hidden", !ov);
   $("#orgchart-panel").classList.toggle("hidden", !org);
   $("#emplist-panel").classList.toggle("hidden", !eml);
   $("#hostlist-panel").classList.toggle("hidden", !hl);
-  $("#btn-new-mission").classList.toggle("hidden", !boardEdit);
-  $("#btn-hide-missions").classList.toggle("hidden", !boardEdit);
-  $("#btn-new-employee").classList.toggle("hidden", ov || org || hl || !can("emplist", "edit"));
-  $("#btn-import-mission").classList.toggle("hidden", !boardEdit || !isNonWorkingDate(state.date));
+  $("#capacity-panel").classList.toggle("hidden", !cap);
+  $("#btn-new-mission").classList.toggle("hidden", !planEdit);
+  // a forecast has no hidden missions and no weekend import — it is built
+  // from "Start from confirmed" or by hand
+  $("#btn-hide-missions").classList.toggle("hidden", !boardEdit || fc);
+  $("#btn-new-employee").classList.toggle("hidden", ov || org || hl || cap || !can("emplist", "edit"));
+  $("#btn-import-mission").classList.toggle("hidden", !boardEdit || fc || !isNonWorkingDate(state.date));
   // Holiday toggle: ON = this date is non-working. Any editable future date
   // (weekday or weekend); hidden on read-only past/today and on the app-wide tabs.
   const showHoliday = boardEdit && !isReadOnly();
@@ -846,15 +937,24 @@ function render() {
   // refuse the write anyway, so hiding them is about not offering a dead end.
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
   $("#btn-add-host").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
-  $("#btn-export").classList.toggle("hidden", eml || hl);
+  // A forecast is never exported: the JPG and the PDF are what goes to LINE,
+  // and a tentative plan must not reach it (exportBoard refuses as well).
+  $("#btn-export").classList.toggle("hidden", eml || hl || cap || fc);
   // Print, like Export, is a read: a Viewer may take the board away with them.
-  $("#btn-print").classList.toggle("hidden", eml || hl);
-  $("#btn-reset-board").classList.toggle("hidden", !boardEdit);
+  $("#btn-print").classList.toggle("hidden", eml || hl || cap || fc);
+  // Carry over / Reset Board on a confirmed day; "Start from confirmed" on an
+  // empty forecast day (and nothing once a forecast exists — that is somebody's
+  // work, not something to replace wholesale)
+  const planEmpty = board && planIsEmpty(getPlan());
+  $("#btn-reset-board").classList.toggle("hidden", fc ? !(planEdit && planEmpty) : !boardEdit);
+  $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
   renderStats();
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
   $("#float-pool").classList.toggle("hidden", !board);
   document.body.classList.toggle("board-view", board);
-  $("#btn-undo").classList.toggle("hidden", !boardEdit);
+  $("#btn-undo").classList.toggle("hidden", !planEdit);
+  renderModePill();
+  renderHoldAlerts();
   if (ov) {
     renderOverview();
   } else if (org) {
@@ -863,6 +963,8 @@ function render() {
     renderEmployeeList();
   } else if (hl) {
     renderHostList();
+  } else if (cap) {
+    renderCapacity();
   } else {
     renderZones();
     renderMissions();
@@ -871,6 +973,7 @@ function render() {
     updateResetButton();
   }
   renderBoardEmptyState();
+  renderPlanBanners();
   const lock = board ? lockInfo(D().activeBoardId, state.date) : null;
   $("#readonly-badge").classList.toggle("hidden", !board || !isReadOnly());
   setIconLabel($("#readonly-badge"), "lock", lock ? `Locked by ${lock.lockedBy}` : "Read-only (past date)");
@@ -1377,6 +1480,11 @@ function updateResetButton() {
   const btn = $("#btn-reset-board");
   if (!btn) return;
   const empty = planIsEmpty(getPlan());
+  if (isForecastView()) {
+    setIconLabel(btn, "reset", "Start from confirmed");
+    btn.title = "Start this day's forecast from a copy of the latest confirmed working day";
+    return;
+  }
   setIconLabel(btn, "reset", empty ? "Carry over" : "Reset Board");
   btn.title = empty
     ? "Bring in a copy of the last working day's plan (missions + crew)"
@@ -1396,17 +1504,23 @@ function renderBoardEmptyState() {
   box.classList.toggle("hidden", !show);
   box.innerHTML = "";
   if (!show) return;
+  const fc = isForecastView();
   const msg = document.createElement("div");
   msg.className = "empty-title";
-  msg.innerHTML = `This board is empty for <b>${fmtDow(state.date)} ${fmtDate(state.date)}</b>.`;
+  msg.innerHTML = fc
+    ? `No forecast yet for <b>${fmtDow(state.date)} ${fmtDate(state.date)}</b>.`
+    : `This board is empty for <b>${fmtDow(state.date)} ${fmtDate(state.date)}</b>.`;
   const sub = document.createElement("div");
   sub.className = "empty-sub";
-  sub.textContent = "Carry over the last working day's missions and crew to start from there, or just add missions manually.";
+  sub.textContent = fc
+    ? "Start from a copy of the latest confirmed working day, or add missions yourself. A forecast is tentative: it never reaches the confirmed board, the export or the Host Record until someone merges it."
+    : "Carry over the last working day's missions and crew to start from there, or just add missions manually.";
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "btn btn-carry";
-  setIconLabel(btn, "reset", "Carry over last working day's plan");
+  setIconLabel(btn, "reset", fc ? "Start from confirmed" : "Carry over last working day's plan");
   btn.onclick = () => guardEdit(() => resetBoard());
+  if (fc && !can("forecast", "edit")) btn.classList.add("hidden");
   box.appendChild(msg);
   box.appendChild(sub);
   box.appendChild(btn);
@@ -1442,6 +1556,13 @@ function renderTabs() {
   hl.innerHTML = icon("site") + 'Host';
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
+  }
+  if (can("capacity") && feat().capacity) {
+  const cp = document.createElement("div");
+  cp.className = "board-tab tab-capacity" + (isCapacity() ? " active" : "");
+  cp.innerHTML = icon("list") + 'Capacity';
+  cp.onclick = () => { clearSelection(); D().activeBoardId = CAPACITY_ID; refreshAndRender(); };
+  el.appendChild(cp);
   }
   // visual break: the three above are app-wide views; the rest are per-board.
   // Only worth drawing when there is something on both sides of it.
@@ -1525,7 +1646,8 @@ function renderLockButton() {
   // A Viewer still needs to SEE that a day is locked — that is why the plan on
   // screen cannot be edited — so the button is hidden only when there is no
   // board on screen, and disabled rather than removed when they may not toggle it.
-  const hide = isNonBoardView();
+  // no lock on a forecast: locking finalises a confirmed day
+  const hide = isNonBoardView() || isForecastView();
   btn.classList.toggle("hidden", hide);
   if (hide) return;
   const mayLock = can("board", "edit");
@@ -1789,12 +1911,17 @@ function renderCtxMenu(view) {
     const e = D().employees.find(x => x.id === id);
     return e && e.boardId === menuBoardId;
   });
-  const plan = sameBoard ? peekPlan(menuBoardId) : null;
-  const current = sameBoard && !many ? currentAssignmentOfIn(plan, emp.id) : null;
+  // Placing someone needs the plan they would land in. On a forecast date that
+  // is the forecast — which only the board itself has loaded — so from the
+  // Manpower List the placement items are left out there rather than
+  // writing a confirmed assignment onto a forecast date.
+  const placeable = sameBoard && !(isNonBoardView() && isForecastDateFor(menuBoardId, state.date));
+  const plan = placeable ? peekPlan(menuBoardId) : null;
+  const current = placeable && !many ? currentAssignmentOfIn(plan, emp.id) : null;
   // already-there targets are dropped: assigning someone to where they already
   // are is a no-op assignEmployeesTo would skip anyway
-  const missions = sameBoard ? plan.missions.filter(m => !m.hidden && !(current && current.missionId === m.id)) : [];
-  const leaveZones = sameBoard ? LEAVE_ZONES.filter(z => !(current && current.zone === z)) : [];
+  const missions = placeable ? plan.missions.filter(m => !m.hidden && !(current && current.missionId === m.id)) : [];
+  const leaveZones = placeable ? LEAVE_ZONES.filter(z => !(current && current.zone === z)) : [];
   const targetBoards = many ? D().boards : D().boards.filter(b => b.id !== emp.boardId);
   const who = many ? `${ids.length} employees` : emp.name;
 
@@ -1823,7 +1950,7 @@ function renderCtxMenu(view) {
     if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
     if (missions.length) addSub("⊕ Assign to mission", "missions");
     if (leaveZones.length) addSub("Leave", "leave", "leave");
-    if (sameBoard && (many || current)) {
+    if (placeable && (many || current)) {
       addItem(many ? "↩ Return to standby / pool" : `↩ Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`,
         () => guardEdit(() => assignEmployeesTo(ids, null)));
     }
@@ -2016,6 +2143,7 @@ function renderMissions() {
   const grid = $("#missions-grid");
   grid.innerHTML = "";
   let missions = plan.missions.filter(m => !m.hidden);
+  const fcView = isForecastView();
   if (state.sort) {
     missions.sort((a, b) =>
       missionSortValue(a).localeCompare(missionSortValue(b)) || a.number.localeCompare(b.number));
@@ -2087,6 +2215,11 @@ function renderMissions() {
       </div>
       ${ppeLine}`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
+    if (fcView) {
+      // D3: people taken out of this mission by another engineer, until acknowledged
+      const lost = D().holdEvents.filter(e => e.fromMissionId === m.id);
+      if (lost.length) header.appendChild(holdBadge(lost));
+    }
     const body = document.createElement("div");
     body.className = "mission-body dropzone";
     body.dataset.drop = "mission:" + m.id;
@@ -2213,6 +2346,13 @@ function renderStats() {
       const n = D().employees.filter(e => e.areaId === a.id).length;
       if (n) emplistAreaBar.appendChild(statChip(a.name, n));
     }
+    return;
+  }
+  if (isCapacity()) {
+    const c = D().capacity;
+    bar.appendChild(statChip("Boards", D().boards.length));
+    bar.appendChild(statChip("Weeks", state.capacity.weeks));
+    bar.appendChild(statChip("Demand rows", c ? new Set(c.rows.map(r => r.board_id + "|" + r.customer + "|" + r.shift)).size : 0));
     return;
   }
   if (isHostList()) {
@@ -4578,6 +4718,7 @@ function dropTargetToPayload(target) {
 
 /* assign a set of employees to one target, recording an undo entry for the batch */
 function assignEmployeesTo(empIds, payload) {
+  const forecast = isForecastView();
   const entries = [];
   for (const id of empIds) {
     const prior = currentAssignmentOf(id);
@@ -4585,14 +4726,34 @@ function assignEmployeesTo(empIds, payload) {
     entries.push({ empId: id, prior });
   }
   if (!entries.length) { clearSelection(); return; }
-  safely(async () => {
-    for (const e of entries) await cloud.setAssignment(e.empId, state.date, payload);
-    state.undoStack.push({ date: state.date, entries });
+  const run = () => safely(async () => {
+    for (const e of entries) {
+      if (forecast) await cloud.setForecastAssignment(e.empId, state.date, payload);
+      else await cloud.setAssignment(e.empId, state.date, payload);
+    }
+    state.undoStack.push({ date: state.date, forecast, entries });
     if (state.undoStack.length > 25) state.undoStack.shift();
     clearSelection();
     await refreshAndRender();
     updateUndoButton();
   });
+  if (!forecast) { run(); return; }
+  /* D3: taking someone out of ANOTHER engineer's forecast is allowed, but not
+     silently — say whose hold it is first; the database records the loss and
+     flags their mission until they acknowledge it. */
+  const plan = getPlan();
+  const taken = entries.filter(e => e.prior && isOthersHold(plan.holds && plan.holds[e.empId]));
+  if (!taken.length) { run(); return; }
+  const lines = taken.map(e => {
+    const emp = D().employees.find(x => x.id === e.empId);
+    const where = e.prior.missionId
+      ? "mission " + ((plan.missions.find(m => m.id === e.prior.missionId) || {}).number || "?")
+      : ZONE_LABELS[e.prior.zone] || e.prior.zone;
+    return `${emp ? emp.name : "?"} — held by ${plan.holds[e.empId]} in ${where}`;
+  });
+  showConfirm(taken.length === 1 ? "Take a held person?" : `Take ${taken.length} held people?`,
+    `${lines.join("\n")}\n\nMove ${taken.length === 1 ? "them" : "them all"} anyway? The engineer who placed ${taken.length === 1 ? "them" : "each one"} will see a red flag on their mission until they acknowledge it.`,
+    run);
 }
 
 function undoLast() {
@@ -4601,7 +4762,10 @@ function undoLast() {
   if (!action) return;
   state.date = action.date;   // jump back to the affected date so the change is visible
   safely(async () => {
-    for (const e of action.entries) await cloud.setAssignment(e.empId, action.date, e.prior);
+    for (const e of action.entries) {
+      if (action.forecast) await cloud.setForecastAssignment(e.empId, action.date, e.prior);
+      else await cloud.setAssignment(e.empId, action.date, e.prior);
+    }
     await refreshAndRender();
   });
 }
@@ -4798,7 +4962,8 @@ function openMissionModal(missionId) {
   renderMissionEngineerOptions();
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
-  $("#btn-hide-mission").classList.toggle("hidden", !missionId);
+  $("#btn-hide-mission").classList.toggle("hidden", !missionId || isForecastView());
+  $("#mission-modal-title").textContent = (missionId ? "Edit" : "New") + (isForecastView() ? " Forecast Mission" : " Mission");
   if (missionId) {
     const m = getPlan().missions.find(x => x.id === missionId);
     form.number.value = m.number;
@@ -4870,7 +5035,8 @@ function saveMission(ev) {
     // the first time somebody is picked they have no engineer record yet, so
     // one is made here — that is where their mission colour lives
     vals.engineerId = eng.engineerId || await cloud.ensureEngineerForProfile(eng.profileId);
-    await cloud.saveMission(D().activeBoardId, state.date, state.editingMissionId, vals);
+    if (isForecastView()) await cloud.saveForecastMission(D().activeBoardId, state.date, state.editingMissionId, vals);
+    else await cloud.saveMission(D().activeBoardId, state.date, state.editingMissionId, vals);
     closeModal();
     await refreshAndRender();
   });
@@ -4878,9 +5044,16 @@ function saveMission(ev) {
 
 function deleteMission() {
   const m = getPlan().missions.find(x => x.id === state.editingMissionId);
-  showConfirm("Delete mission?", `Delete ${m.number}? Its employees return to the Available pool.`, () => {
+  const forecast = isForecastView();
+  const plan = getPlan();
+  // someone else's holds go with the mission — say so rather than let it happen quietly
+  const othersHolds = forecast ? m.members.filter(id => isOthersHold(plan.holds && plan.holds[id])).length : 0;
+  showConfirm(forecast ? "Delete forecast mission?" : "Delete mission?",
+    `Delete ${m.number}? Its employees return to the Available pool.` +
+      (othersHolds ? ` ${othersHolds} of them ${othersHolds === 1 ? "is" : "are"} held by another engineer.` : ""), () => {
     safely(async () => {
-      await cloud.deleteMission(state.editingMissionId);
+      if (forecast) await cloud.deleteForecastMission(state.editingMissionId);
+      else await cloud.deleteMission(state.editingMissionId);
       await refreshAndRender();
     });
   });
@@ -5551,6 +5724,8 @@ function hideEmptyLeaveZonesForExport() {
 }
 
 async function exportBoard() {
+  // the JPG goes to LINE: a forecast (or the capacity grid) never does
+  if (isForecastView() || isCapacity()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
   const btn = $("#btn-export");
   btn.disabled = true;
   btn.textContent = "Exporting…";
@@ -5656,6 +5831,13 @@ let printRestore = null;   // set while the DOM is in its printable state
 
 function prepareForPrint() {
   if (printRestore) return;   // beforeprint can fire more than once per dialog
+  // Ctrl+P reaches here without the (hidden) PDF button: a forecast or the
+  // capacity grid prints a one-line notice instead of the tentative plan
+  if (isForecastView() || isCapacity()) {
+    document.body.classList.add("print-blocked");
+    printRestore = () => document.body.classList.remove("print-blocked");
+    return;
+  }
   const board = D().boards.find(b => b.id === D().activeBoardId);
   const boardName = isOrgChart() ? "Org_Chart" : (board ? board.name : "Overview");
   $("#capture-title").textContent = isOrgChart() ? "Organisation Chart" : boardName + " Manpower Board";
@@ -5891,6 +6073,7 @@ function renderDatePicker() {
 let importCandidates = [];
 
 function openImportModal() {
+  if (isForecastView()) return;
   guardEdit(async () => {
     $("#import-list").innerHTML = '<p class="import-note">Loading…</p>';
     $("#import-source-note").textContent = "";
@@ -5944,6 +6127,7 @@ function confirmImport() {
 
 /* ---------- Hide/Unhide missions (declutter the board without deleting) ---------- */
 function openHideMissionsModal() {
+  if (isForecastView()) return;
   guardEdit(() => {
     const missions = [...getPlan().missions].sort((a, b) => a.number.localeCompare(b.number));
     const list = $("#hide-missions-list");
@@ -5980,19 +6164,804 @@ function saveHideMissions() {
 
 /* ---------- reset board (re-clone the last working day's plan) ---------- */
 function resetBoard() {
+  if (isForecastView()) { startForecast(); return; }
   const board = D().boards.find(b => b.id === D().activeBoardId);
   const boardName = board ? board.name : "this board";
   const run = () => safely(async () => {
     const src = await cloud.resetBoardFromLastWorkingDay(D().activeBoardId, state.date);
     await refreshAndRender();
-    if (!src) toast("No previous working-day plan was found to copy from.", "warn");
+    if (!src) { toast("No previous working-day plan was found to copy from.", "warn"); return; }
+    // a forecast made for this day earlier is offered straight away (6.1 Merge)
+    if (unmergedForecast()) openPlanDiff("merge");
   });
   // On an untouched day there's nothing to overwrite, so carry over straight
   // away. Once the day has content, confirm first — this replaces it.
   if (planIsEmpty(getPlan())) { run(); return; }
+  const stale = currentStale();
   showConfirm("Reset board?",
-    `This will replace ${fmtDow(state.date)} ${fmtDate(state.date)} on ${boardName} with a fresh copy of the last working day's plan — its missions and employee assignments. Any changes already made to this day will be overwritten. Continue?`,
+    `This will replace ${fmtDow(state.date)} ${fmtDate(state.date)} on ${boardName} with a fresh copy of the last working day's plan — its missions and employee assignments. Any changes already made to this day will be overwritten. Continue?` +
+      (stale ? "\n\nTip: \"Review changes\" in the banner above updates only what changed, and keeps everything else on this day." : ""),
     run);
+}
+
+/* Forecast mode's "Start from confirmed" */
+function startForecast() {
+  guardEdit(() => safely(async () => {
+    const src = await cloud.startForecastFromConfirmed(D().activeBoardId, state.date);
+    await refreshAndRender();
+    if (!src) toast("There is no confirmed working day to start from yet.", "warn");
+    else toast(`Forecast started from ${fmtDow(src)} ${fmtDate(src)}. It is tentative until someone merges it into the confirmed plan.`, "info");
+  }));
+}
+
+/* ======================================================================
+   Forward planning — the confirmed/forecast mode pill, the two board
+   banners (stale carry-over, unmerged forecast), the PlanDiff review panel,
+   lost-hold flags, forecast copy/view, and the Capacity tab.
+   ====================================================================== */
+
+/* "Tue 22 Sep" — the short form the banners use */
+function fmtShort(iso) {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${fmtDow(iso)} ${d} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1]}`;
+}
+/* a timestamp as HH:MM, with the date in front when it isn't today */
+function fmtStamp(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const iso = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  return iso === todayStr() ? hm : `${fmtShort(iso)} ${hm}`;
+}
+/* who, as the board shows people who have no employee card: the local part of
+   their address ("somchai.p") — the directory carries no emails by design */
+function who(email) { return String(email || "someone").split("@")[0]; }
+function empName(id) { const e = D().employees.find(x => x.id === id); return e ? e.name : "(unknown)"; }
+function nextWorkingDates(boardId, after, n) {
+  const out = [];
+  let d = after;
+  for (let i = 0; i < 120 && out.length < n; i++) {
+    d = addDays(d, 1);
+    if (!isNonWorkingDate(d, boardId)) out.push(d);
+  }
+  return out;
+}
+
+/* ---------- mode pill ---------- */
+function renderModePill() {
+  const pill = $("#mode-pill");
+  const show = !isNonBoardView() && !!D().activeBoardId && !!feat().forecast && can("board");
+  if (!show) { pill.className = "mode-pill hidden"; return; }
+  const fc = isForecastView();
+  const end = horizonEndFor(D().activeBoardId);
+  pill.className = "mode-pill " + (fc ? "mode-forecast" : "mode-confirmed");
+  pill.textContent = fc ? "FORECAST" : "CONFIRMED";
+  pill.title = (fc ? "Tentative plan — never exported, never in the Host Record. " : "The operational plan. ") +
+    `Confirmed plans run up to ${fmtShort(end)} (the next working day); every later date opens as a forecast.`;
+}
+
+/* ---------- lost holds (D3) ---------- */
+function myLostHolds() {
+  return (D().holdEvents || []).filter(e => sameEmail(e.fromHeldBy, state.myEmail));
+}
+function holdPlace(missionId, zone) {
+  if (missionId) { const m = D().holdMissions[missionId]; return m ? `mission ${m.number}${m.shift === "night" ? " (night)" : ""}` : "a mission"; }
+  if (zone) return ZONE_LABELS[zone] || zone;
+  return "Standby";
+}
+/* "B moved Somchai from your mission 123 (Mon 5 Oct) to mission 456" */
+function describeHold(e) {
+  const from = sameEmail(e.fromHeldBy, state.myEmail) ? "your " : `${who(e.fromHeldBy)}'s `;
+  return `${who(e.takenBy)} moved ${empName(e.employeeId)} from ${from}${holdPlace(e.fromMissionId, e.fromZone)} (${fmtShort(e.date)}) to ${holdPlace(e.toMissionId, e.toZone)}`;
+}
+function renderHoldAlerts() {
+  const btn = $("#btn-hold-alerts");
+  const mine = feat().forecast && can("forecast") ? myLostHolds() : [];
+  btn.classList.toggle("hidden", !mine.length);
+  if (!mine.length) return;
+  setIconLabel(btn, "alert", `${mine.length} hold${mine.length === 1 ? "" : "s"} taken from you`);
+  btn.title = mine.map(describeHold).join("\n");
+}
+function holdBadge(events) {
+  const b = document.createElement("button");
+  b.type = "button";
+  const mine = events.some(e => sameEmail(e.fromHeldBy, state.myEmail));
+  b.className = "hold-badge" + (mine ? " mine" : "");
+  const takers = [...new Set(events.map(e => who(e.takenBy)))];
+  b.textContent = `${events.length} ${events.length === 1 ? "person" : "people"} taken by ${takers.join(", ")}`;
+  b.title = events.map(describeHold).join("\n") + "\nClick for details and to acknowledge.";
+  b.onclick = (ev) => { ev.stopPropagation(); openHoldEventsModal(events.map(e => e.id), "People taken from this mission"); };
+  return b;
+}
+let holdModalIds = [];
+function openHoldEventsModal(ids, title) {
+  holdModalIds = ids;
+  $("#holds-title").textContent = title;
+  renderHoldEventsModal();
+  openModal("#modal-holds");
+}
+function renderHoldEventsModal() {
+  const list = $("#holds-list");
+  list.innerHTML = "";
+  const events = (D().holdEvents || []).filter(e => holdModalIds.includes(e.id));
+  const mayAck = can("forecast", "edit");
+  $("#btn-holds-ack-all").classList.toggle("hidden", !mayAck || events.length < 2);
+  if (!events.length) {
+    list.innerHTML = '<p class="import-note">All acknowledged — nothing left here.</p>';
+    return;
+  }
+  for (const e of events) {
+    const row = document.createElement("div");
+    row.className = "hold-row";
+    const text = document.createElement("div");
+    text.className = "hold-text";
+    text.textContent = describeHold(e);
+    const when = document.createElement("small");
+    when.textContent = `Taken ${fmtStamp(e.takenAt)} · held by ${who(e.fromHeldBy)}`;
+    text.appendChild(when);
+    row.appendChild(text);
+    const m = e.fromMissionId && D().holdMissions[e.fromMissionId];
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "btn btn-small";
+    go.textContent = "Open day";
+    go.onclick = () => {
+      closeModal();
+      clearSelection();
+      if (m && m.boardId) D().activeBoardId = m.boardId;
+      else { const emp = D().employees.find(x => x.id === e.employeeId); if (emp) D().activeBoardId = emp.boardId; }
+      state.date = e.date;
+      refreshAndRender();
+    };
+    row.appendChild(go);
+    if (mayAck) {
+      const ack = document.createElement("button");
+      ack.type = "button";
+      ack.className = "btn btn-small btn-primary";
+      ack.textContent = "Acknowledge";
+      ack.onclick = () => safely(async () => { await cloud.acknowledgeHoldEvents([e.id]); renderHoldEventsModal(); render(); });
+      row.appendChild(ack);
+    }
+    list.appendChild(row);
+  }
+}
+
+/* ---------- board banners ---------- */
+function signalsForScreen() {
+  return state.signals.key === D().activeBoardId + "|" + state.date ? state.signals : null;
+}
+/* the staleness warning for the day on screen, unless it was dismissed or
+   the day has since become somewhere the banner doesn't belong */
+function currentStale() {
+  const sig = signalsForScreen();
+  if (!sig || !sig.stale || isForecastView()) return null;
+  const boardId = D().activeBoardId;
+  if (state.date < todayStr() || isLocked(boardId, state.date) || isNonWorkingDate(state.date, boardId)) return null;
+  const dk = `${boardId}|${state.date}|${sig.stale.sourceEditedAt || ""}|${sig.stale.newerDate || ""}`;
+  return state.dismissedStale.has(dk) ? null : { ...sig.stale, dismissKey: dk };
+}
+function forecastCounts(plan) {
+  const people = plan.missions.reduce((n, m) => n + m.members.length, 0) + ZONES.reduce((n, z) => n + plan.zones[z].length, 0);
+  return { missions: plan.missions.length, people };
+}
+/* a forecast for the confirmed day on screen that nobody has merged yet */
+function unmergedForecast() {
+  const sig = signalsForScreen();
+  if (!sig || !sig.forecast || isForecastView() || state.date < todayStr()) return null;
+  if (planIsEmpty(sig.forecast)) return null;
+  if (sig.stamp && sig.stamp.forecast_merged_at) return null;
+  return sig.forecast;
+}
+function bannerEl(kind, parts) {
+  const el = document.createElement("div");
+  el.className = "plan-banner plan-banner-" + kind;
+  el.setAttribute("role", "status");
+  const ic = document.createElement("span");
+  ic.className = "plan-banner-icon";
+  ic.innerHTML = icon(kind === "forecast-info" ? "calendar" : "alert");
+  el.appendChild(ic);
+  const text = document.createElement("div");
+  text.className = "plan-banner-text";
+  for (const p of parts.text) {
+    if (typeof p === "string") text.appendChild(document.createTextNode(p));
+    else { const b = document.createElement("b"); b.textContent = p.b; text.appendChild(b); }
+  }
+  el.appendChild(text);
+  const actions = document.createElement("div");
+  actions.className = "plan-banner-actions";
+  for (const a of parts.actions || []) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-small" + (a.primary ? " btn-primary" : " btn-quiet");
+    btn.textContent = a.label;
+    btn.onclick = a.run;
+    actions.appendChild(btn);
+  }
+  el.appendChild(actions);
+  return el;
+}
+function renderPlanBanners() {
+  const box = $("#plan-banners");
+  box.innerHTML = "";
+  if (isNonBoardView() || !D().activeBoardId) return;
+  if (isForecastView()) {
+    const plan = getPlan();
+    const by = plan.authors && plan.authors.length ? ` Worked on by ${plan.authors.map(who).join(", ")}.` : "";
+    box.appendChild(bannerEl("forecast-info", {
+      text: [{ b: "Forecast" }, ` — a tentative plan for ${fmtShort(state.date)}. It stays out of the confirmed board, Overview, exports and the Host Record until it is merged, the day before.${by}`],
+    }));
+    return;
+  }
+  const mayEdit = can("board", "edit");
+  const stale = currentStale();
+  if (stale) {
+    const text = [];
+    if (stale.edited) {
+      text.push("This plan was carried over from ", { b: fmtShort(stale.carriedFrom) }, ` at ${fmtStamp(stale.carriedAt)}. `,
+        { b: fmtShort(stale.carriedFrom) }, ` has been edited since (last change ${fmtStamp(stale.sourceEditedAt)} by ${who(stale.sourceEditedBy)}).`);
+    } else {
+      text.push("This plan was carried over from ", { b: fmtShort(stale.carriedFrom) }, ` at ${fmtStamp(stale.carriedAt)}.`);
+    }
+    if (stale.newerDate) text.push(" A newer day (", { b: fmtShort(stale.newerDate) }, ") now exists before this date.");
+    const actions = [];
+    if (mayEdit) actions.push({ label: "Review changes", primary: true, run: () => openPlanDiff("resync") });
+    actions.push({ label: "Dismiss", run: () => { state.dismissedStale.add(stale.dismissKey); renderPlanBanners(); } });
+    box.appendChild(bannerEl("stale", { text, actions }));
+  }
+  const fplan = unmergedForecast();
+  if (fplan) {
+    const c = forecastCounts(fplan);
+    const by = fplan.authors.length ? ` by ${fplan.authors.map(who).join(", ")}` : "";
+    const actions = [{ label: "View", run: () => openForecastViewer() }];
+    if (mayEdit) actions.unshift({ label: "Review & merge", primary: true, run: () => openPlanDiff("merge") });
+    box.appendChild(bannerEl("forecast", {
+      text: [{ b: "Forecast for this day" }, `${by}: ${c.missions} mission${c.missions === 1 ? "" : "s"}, ${c.people} ${c.people === 1 ? "person" : "people"}.`],
+      actions,
+    }));
+  } else {
+    const sig = signalsForScreen();
+    if (sig && sig.forecast && !planIsEmpty(sig.forecast) && sig.stamp && sig.stamp.forecast_merged_at) {
+      box.appendChild(bannerEl("merged", {
+        text: [`Forecast merged by ${who(sig.stamp.forecast_merged_by)} ${fmtStamp(sig.stamp.forecast_merged_at)}. Kept read-only for reference.`],
+        actions: [{ label: "View", run: () => openForecastViewer() }],
+      }));
+    }
+  }
+}
+
+/* ---------- PlanDiff review panel ---------- */
+function openPlanDiff(mode) {
+  guardEdit(() => safely(async () => {
+    const boardId = D().activeBoardId, date = state.date;
+    let proposed, source = null;
+    if (mode === "resync") {
+      const st = currentStale() || (signalsForScreen() || {}).stale;
+      if (!st) return;
+      source = st.source;
+      proposed = await cloud.buildCarryPreview(boardId, source);
+    } else {
+      proposed = await cloud.ensureForecastLoaded(boardId, date, { force: true });
+    }
+    const base = await cloud.ensurePlanLoaded(boardId, date, { force: true });
+    const employeeIds = boardEmployees(boardId).filter(e => e.active !== false).map(e => e.id);
+    state.diff = { mode, boardId, date, source, diff: PlanDiff.compute(base, proposed, { employeeIds }), applying: false };
+    renderPlanDiff();
+    openModal("#modal-plandiff");
+  }));
+}
+function diffMissionLabel(key) {
+  const d = state.diff.diff;
+  const m = d.proposedByKey.get(key) || d.baseByKey.get(key);
+  return m ? `${m.number}${m.shift === "night" ? " (night)" : ""}` : key;
+}
+function diffPlaceLabel(p) {
+  if (p.kind === "mission") return "mission " + diffMissionLabel(p.key);
+  if (p.kind === "zone") return ZONE_LABELS[p.zone] || p.zone;
+  return "Standby";
+}
+function diffFieldValue(field, v) {
+  if (field === "engineerId") { const e = D().engineers.find(x => x.id === v); return e ? e.name : (v ? "?" : "none"); }
+  return v === "" || v == null ? "(blank)" : String(v);
+}
+function diffItemParts(it) {
+  // [tag, text] — text only, never markup: names and fields are user-typed
+  if (it.type === "add") {
+    const m = it.mission;
+    const eng = D().engineers.find(e => e.id === m.engineerId);
+    let t = `Add mission ${m.number} · ${m.host} → ${m.customer} · ${m.shift === "night" ? "Night" : "Day"} ${m.startTime}–${m.endTime}${eng ? " · " + eng.name : ""}`;
+    if (it.members.length) {
+      t += ` — with ${it.members.length} ${it.members.length === 1 ? "person" : "people"}: ` +
+        it.members.map(x => x.from.kind === "standby" ? empName(x.empId) : `${empName(x.empId)} (from ${diffPlaceLabel(x.from)})`).join(", ");
+    }
+    return ["New", t];
+  }
+  if (it.type === "update") {
+    return ["Update", it.changes.map(c => `${c.label}: ${diffFieldValue(c.field, c.before)} → ${diffFieldValue(c.field, c.after)}`).join(" · ")];
+  }
+  if (it.type === "remove") {
+    const n = it.mission.members.length;
+    const src = state.diff.mode === "merge" ? "the forecast" : fmtShort(state.diff.source);
+    return ["Remove?", `Remove mission ${it.mission.number} — it is not in ${src}${n ? `; its ${n} ${n === 1 ? "person returns" : "people return"} to Standby` : ""}`];
+  }
+  if (it.type === "leave") return ["Leave", `${ZONE_LABELS[it.to.zone]} for ${empName(it.empId)} (now ${diffPlaceLabel(it.from)})`];
+  return ["Move", `Move ${empName(it.empId)}: ${diffPlaceLabel(it.from)} → ${diffPlaceLabel(it.to)}`];
+}
+function renderPlanDiff() {
+  const sd = state.diff;
+  if (!sd) return;
+  const merge = sd.mode === "merge";
+  $("#plandiff-title").textContent = merge
+    ? `Review & merge forecast — ${fmtShort(sd.date)}`
+    : `Review changes — ${fmtShort(sd.date)}`;
+  $("#plandiff-sub").textContent = merge
+    ? `Ticked lines are written into the confirmed plan for ${fmtShort(sd.date)} (people placed on missions also go into the Host Record). Unticked lines are left out. The forecast itself is kept, read-only.`
+    : `Compared with a fresh carry-over from ${fmtShort(sd.source)}. Only the ticked lines are applied — nothing else on ${fmtShort(sd.date)} is touched.`;
+  const body = $("#plandiff-body");
+  body.innerHTML = "";
+  const groups = PlanDiff.groups(sd.diff);
+  $("#plandiff-tools").classList.toggle("hidden", !groups.length);
+  if (!groups.length) {
+    const p = document.createElement("p");
+    p.className = "import-note";
+    p.textContent = merge
+      ? "No differences — the confirmed plan already matches the forecast."
+      : `No differences — this day already matches ${fmtShort(sd.source)}.`;
+    body.appendChild(p);
+  }
+  for (const g of groups) {
+    const sec = document.createElement("section");
+    sec.className = "pd-group";
+    const h = document.createElement("div");
+    h.className = "pd-group-head";
+    if (g.kind === "mission") {
+      const m = g.mission;
+      const eng = D().engineers.find(e => e.id === m.engineerId);
+      if (eng) h.style.borderLeftColor = eng.color;
+      const num = document.createElement("b");
+      num.textContent = m.number;
+      h.appendChild(num);
+      h.appendChild(document.createTextNode(` · ${m.host} → ${m.customer} · ${m.shift === "night" ? "Night" : "Day"}`));
+    } else {
+      h.textContent = g.kind === "leave" ? "Leave" : "Back to Standby";
+    }
+    sec.appendChild(h);
+    for (const it of g.items) {
+      const row = document.createElement("label");
+      row.className = "pd-item pd-" + it.type;
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = it.ticked;
+      box.onchange = () => { it.ticked = box.checked; updatePlanDiffCount(); };
+      row.appendChild(box);
+      const [tag, text] = diffItemParts(it);
+      const t = document.createElement("span");
+      t.className = "pd-tag";
+      t.textContent = tag;
+      row.appendChild(t);
+      const s = document.createElement("span");
+      s.className = "pd-text";
+      s.textContent = text;
+      row.appendChild(s);
+      sec.appendChild(row);
+    }
+    body.appendChild(sec);
+  }
+  updatePlanDiffCount();
+}
+function updatePlanDiffCount() {
+  const sd = state.diff;
+  const n = sd.diff.items.filter(i => i.ticked).length;
+  const btn = $("#btn-plandiff-apply");
+  btn.textContent = n ? `Apply ${n} change${n === 1 ? "" : "s"}` : (sd.mode === "merge" ? "Mark forecast as merged" : "Mark as reviewed");
+  btn.title = n ? "" : (sd.mode === "merge"
+    ? "Changes nothing on the board; hides the forecast banner for everyone"
+    : "Changes nothing on the board; hides this warning for everyone until the source day changes again");
+  btn.disabled = sd.applying;
+  $("#plandiff-count").textContent = `${n} of ${sd.diff.items.length} ticked`;
+}
+function setAllPlanDiff(on) {
+  for (const it of state.diff.diff.items) it.ticked = on;
+  renderPlanDiff();
+}
+function applyPlanDiffFromModal() {
+  const sd = state.diff;
+  if (!sd || sd.applying) return;
+  sd.applying = true;
+  updatePlanDiffCount();
+  (async () => {
+    try {
+      const n = sd.diff.items.filter(i => i.ticked).length;
+      const sum = await cloud.applyPlanDiff(sd.boardId, sd.date, sd.diff,
+        sd.mode === "resync" ? { carriedFrom: sd.source } : { forecastMerge: true });
+      state.diff = null;
+      closeModal();
+      const bits = [];
+      if (sum.added) bits.push(`${sum.added} mission${sum.added === 1 ? "" : "s"} added`);
+      if (sum.updated) bits.push(`${sum.updated} updated`);
+      if (sum.placed) bits.push(`${sum.placed} ${sum.placed === 1 ? "person" : "people"} placed`);
+      if (sum.removed) bits.push(`${sum.removed} removed`);
+      toast(n ? `Applied ${n} change${n === 1 ? "" : "s"}: ${bits.join(", ")}.` : (sd.mode === "merge" ? "Forecast marked as merged." : "Marked as reviewed."), "info");
+      await refreshAndRender();
+    } catch (e) {
+      sd.applying = false;
+      updatePlanDiffCount();
+      toast(e.message || String(e), "error");
+    }
+  })();
+}
+
+/* ---------- forecast: copy to next days, read-only viewer ---------- */
+function openForecastCopyModal() {
+  guardEdit(() => {
+    $("#forecast-copy-n").value = "5";
+    updateForecastCopyPreview();
+    openModal("#modal-forecast-copy");
+  });
+}
+function forecastCopyTargets() {
+  const n = Math.max(1, Math.min(10, parseInt($("#forecast-copy-n").value, 10) || 1));
+  return nextWorkingDates(D().activeBoardId, state.date, n);
+}
+function updateForecastCopyPreview() {
+  const dates = forecastCopyTargets();
+  $("#forecast-copy-dates").textContent = `Copies ${fmtShort(state.date)}'s forecast onto: ${dates.map(fmtShort).join(", ")}. A day that already has a forecast is skipped, never overwritten.`;
+}
+function confirmForecastCopy() {
+  const dates = forecastCopyTargets();
+  safely(async () => {
+    const res = await cloud.copyForecastToDates(D().activeBoardId, state.date, dates);
+    closeModal();
+    await refreshAndRender();
+    toast(`Copied to ${res.copied.length} day${res.copied.length === 1 ? "" : "s"}` +
+      (res.skipped.length ? `; skipped ${res.skipped.map(fmtShort).join(", ")} (already forecast)` : "") + ".", "info");
+  });
+}
+function openForecastViewer() {
+  const sig = signalsForScreen();
+  const plan = sig && sig.forecast;
+  if (!plan) return;
+  $("#forecast-view-title").textContent = `Forecast for ${fmtShort(state.date)}`;
+  const list = $("#forecast-view-list");
+  list.innerHTML = "";
+  const missions = [...plan.missions].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+  for (const m of missions) {
+    const row = document.createElement("div");
+    row.className = "import-row";
+    const info = document.createElement("span");
+    info.className = "import-info";
+    const b = document.createElement("b");
+    b.textContent = m.number;
+    info.appendChild(b);
+    info.appendChild(document.createTextNode(` — ${m.host} → ${m.customer}`));
+    const small = document.createElement("small");
+    small.textContent = `${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime} • ${m.members.length ? m.members.map(empName).join(", ") : "nobody yet"}`;
+    info.appendChild(small);
+    row.appendChild(info);
+    list.appendChild(row);
+  }
+  for (const z of ZONES) {
+    if (!plan.zones[z].length) continue;
+    const p = document.createElement("p");
+    p.className = "import-note";
+    p.textContent = `${ZONE_LABELS[z]}: ${plan.zones[z].map(empName).join(", ")}`;
+    list.appendChild(p);
+  }
+  if (!list.children.length) list.innerHTML = '<p class="import-note">This forecast is empty.</p>';
+  openModal("#modal-forecast-view");
+}
+
+/* ---------- small generic menu (Capacity cells) on the shared #context-menu ---------- */
+function showQuickMenu(x, y, items) {
+  const menu = $("#context-menu");
+  menu.innerHTML = "";
+  for (const it of items) {
+    const row = document.createElement("div");
+    row.className = "ctx-item";
+    row.textContent = it.label;
+    row.onclick = () => { hideContextMenu(); it.run(); };
+    menu.appendChild(row);
+  }
+  menu.classList.remove("hidden");
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + "px";
+  menu.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + "px";
+}
+
+/* ---------- Capacity tab ---------- */
+function capacityRange() {
+  const from = todayStr();
+  return { from, to: addDays(from, state.capacity.weeks * 7 - 1) };
+}
+async function ensureCapacityLoaded() {
+  const { from, to } = capacityRange();
+  const key = from + ".." + to + "|" + D().employees.length;
+  const c = D().capacity;
+  if (state.capacity.cacheKey === key && c && c.from === from && c.to === to && state.capacity.inputs) return;
+  const [, inputs, customers] = await Promise.all([
+    cloud.loadCapacityDemand(from, to),
+    cloud.getCapacityInputs(from, to),
+    state.capacity.customers ? Promise.resolve(state.capacity.customers) : cloud.getKnownCustomers(addDays(from, -180)),
+  ]);
+  state.capacity.inputs = inputs;
+  state.capacity.customers = customers;
+  state.capacity.cacheKey = key;
+}
+/* grid columns: every date in range that is a working day for at least one
+   board — a date every board has off is collapsed away entirely */
+function capacityDates() {
+  const { from, to } = capacityRange();
+  const out = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) if (D().boards.some(b => !isNonWorkingDate(d, b.id))) out.push(d);
+  return out;
+}
+const capKey = (boardId, date, customer, shift) => [boardId, date, customer, shift].join("\u0001");
+function capacityRowsFor(boardId, demand) {
+  const seen = new Map();
+  for (const r of demand) if (r.board_id === boardId) seen.set(r.customer + "\u0001" + r.shift, { customer: r.customer, shift: r.shift });
+  for (const r of state.capacity.extraRows[boardId] || []) if (!seen.has(r.customer + "\u0001" + r.shift)) seen.set(r.customer + "\u0001" + r.shift, r);
+  return [...seen.values()].sort((a, b) => a.customer.localeCompare(b.customer) || (a.shift === "night") - (b.shift === "night"));
+}
+function saveCapacityCells(cells) {
+  safely(async () => { await cloud.setCapacityCells(cells); render(); });
+}
+function renderCapacity() {
+  const panel = $("#capacity-panel");
+  // keep the cell being typed in across a redraw (a Realtime ping from another
+  // planner must not throw away what this one is halfway through typing)
+  const ae = document.activeElement;
+  const keep = ae && ae.dataset && ae.dataset.capKey ? { key: ae.dataset.capKey, value: ae.value, dirty: ae.value !== ae.defaultValue } : null;
+  panel.innerHTML = "";
+  const mayEdit = can("capacity", "edit");
+  const c = D().capacity;
+  const demand = (c && c.rows) || [];
+  const dates = capacityDates();
+  const inputs = state.capacity.inputs;
+
+  const head = document.createElement("div");
+  head.className = "cap-head";
+  const title = document.createElement("div");
+  title.className = "cap-title";
+  title.innerHTML = "<b>Capacity</b><span>Headcount needed per customer and shift against people available — numbers only, no names; nothing here touches a board.</span>";
+  head.appendChild(title);
+  const range = document.createElement("select");
+  range.id = "cap-range";
+  range.title = "How far ahead";
+  for (let w = 1; w <= 8; w++) {
+    const o = document.createElement("option");
+    o.value = String(w);
+    o.textContent = `Next ${w} week${w === 1 ? "" : "s"}`;
+    range.appendChild(o);
+  }
+  range.value = String(state.capacity.weeks);
+  range.onchange = () => { state.capacity.weeks = Number(range.value); state.capacity.cacheKey = null; refreshAndRender(); };
+  head.appendChild(range);
+  if (mayEdit) {
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "btn";
+    copy.id = "btn-cap-copy-week";
+    copy.textContent = "Copy this week → next week";
+    copy.onclick = copyCapacityWeek;
+    head.appendChild(copy);
+  }
+  panel.appendChild(head);
+
+  const dl = document.createElement("datalist");
+  dl.id = "cap-customer-list";
+  for (const name of state.capacity.customers || []) { const o = document.createElement("option"); o.value = name; dl.appendChild(o); }
+  panel.appendChild(dl);
+
+  const scroll = document.createElement("div");
+  scroll.className = "cap-scroll";
+  const table = document.createElement("table");
+  table.className = "cap-grid";
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  const corner = document.createElement("th");
+  corner.className = "cap-sticky";
+  corner.textContent = "Board · customer · shift";
+  hr.appendChild(corner);
+  for (const d of dates) {
+    const th = document.createElement("th");
+    th.className = "cap-date" + (d === todayStr() ? " cap-today" : "") + (Capacity.weekStart(d) === d ? " cap-week-start" : "");
+    th.innerHTML = `<span>${fmtDow(d)}</span>${escapeHtml(shortDateLabel(d))}`;
+    hr.appendChild(th);
+  }
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const agg = inputs ? Capacity.aggregate({
+    boards: D().boards, employees: D().employees, dates, isForecast: isForecastDateFor,
+    confirmed: inputs.confirmed, forecast: inputs.forecast,
+  }) : {};
+  const totals = Capacity.demandTotals(demand);
+  const cellVal = new Map(demand.map(r => [capKey(r.board_id, r.plan_date, r.customer, r.shift), r.headcount]));
+
+  for (const b of D().boards) {
+    const tb = document.createElement("tbody");
+    tb.className = "cap-board";
+    const br = document.createElement("tr");
+    br.className = "cap-board-row";
+    const bth = document.createElement("th");
+    bth.className = "cap-sticky";
+    bth.colSpan = 1;
+    const bname = document.createElement("b");
+    bname.textContent = b.name;
+    bth.appendChild(bname);
+    if (mayEdit) bth.appendChild(capacityAddRowForm(b.id));
+    br.appendChild(bth);
+    const bfill = document.createElement("th");
+    bfill.colSpan = dates.length;
+    bfill.className = "cap-board-fill";
+    br.appendChild(bfill);
+    tb.appendChild(br);
+
+    const rows = capacityRowsFor(b.id, demand);
+    if (!rows.length) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("th");
+      th.className = "cap-sticky cap-empty";
+      th.textContent = mayEdit ? "No demand yet — add a customer above." : "No demand entered.";
+      tr.appendChild(th);
+      const td = document.createElement("td");
+      td.colSpan = dates.length;
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    }
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("th");
+      th.className = "cap-sticky cap-rowhead";
+      const cust = document.createElement("span");
+      cust.textContent = r.customer;
+      th.appendChild(cust);
+      const sh = document.createElement("span");
+      sh.className = "m-shift" + (r.shift === "night" ? " night" : "");
+      sh.textContent = r.shift === "night" ? "NIGHT" : "DAY";
+      th.appendChild(sh);
+      tr.appendChild(th);
+      for (const d of dates) {
+        const td = document.createElement("td");
+        const off = isNonWorkingDate(d, b.id);
+        td.className = "cap-cell" + (off ? " cap-off" : "") + (isForecastDateFor(b.id, d) ? " cap-fc" : "");
+        const key = capKey(b.id, d, r.customer, r.shift);
+        const v = cellVal.get(key);
+        if (mayEdit && !off) {
+          const inp = document.createElement("input");
+          inp.type = "number";
+          inp.min = "0";
+          inp.step = "1";
+          inp.inputMode = "numeric";
+          inp.dataset.capKey = key;
+          inp.defaultValue = v == null ? "" : String(v);
+          inp.value = inp.defaultValue;
+          inp.setAttribute("aria-label", `${b.name} ${r.customer} ${r.shift} ${d}`);
+          inp.onchange = () => {
+            const raw = inp.value.trim();
+            if (raw !== "" && !(Number(raw) >= 0)) { inp.value = inp.defaultValue; return; }
+            saveCapacityCells([{ boardId: b.id, date: d, customer: r.customer, shift: r.shift, headcount: raw === "" ? null : Number(raw) }]);
+          };
+          inp.onkeydown = (ev) => {
+            if (ev.key !== "Enter") return;
+            ev.preventDefault();
+            const next = td.nextElementSibling && td.nextElementSibling.querySelector("input");
+            if (next) next.focus(); else inp.blur();
+          };
+          const menu = (x, y) => showQuickMenu(x, y, [
+            { label: "Fill right to end of week", run: () => {
+              const val = inp.value.trim();
+              if (val === "") { toast("Type a number in this cell first.", "info"); return; }
+              const targets = Capacity.fillRightDates(d, dates, (x2) => !isNonWorkingDate(x2, b.id));
+              if (!targets.length) { toast("Nothing to fill — this is the last working day of the week on the grid.", "info"); return; }
+              saveCapacityCells([d, ...targets].map(t => ({ boardId: b.id, date: t, customer: r.customer, shift: r.shift, headcount: Number(val) })));
+            } },
+            { label: "Clear this cell", run: () => saveCapacityCells([{ boardId: b.id, date: d, customer: r.customer, shift: r.shift, headcount: null }]) },
+          ]);
+          td.addEventListener("contextmenu", (ev) => { ev.preventDefault(); menu(ev.clientX, ev.clientY); });
+          attachLongPress(td, menu);
+          td.appendChild(inp);
+        } else {
+          td.textContent = off ? "" : (v == null ? "" : String(v));
+        }
+        tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+
+    const footer = (cls, label, fn, tip) => {
+      const tr = document.createElement("tr");
+      tr.className = "cap-sum " + cls;
+      const th = document.createElement("th");
+      th.className = "cap-sticky";
+      th.textContent = label;
+      if (tip) th.title = tip;
+      tr.appendChild(th);
+      for (const d of dates) {
+        const td = document.createElement("td");
+        if (isNonWorkingDate(d, b.id)) { td.className = "cap-off"; tr.appendChild(td); continue; }
+        if (isForecastDateFor(b.id, d)) td.className = "cap-fc";
+        fn(td, d, (agg[b.id] || {})[d], ((totals[b.id] || {})[d]) || 0);
+        tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    };
+    footer("cap-demand", "Demand", (td, d, a, dem) => { td.textContent = String(dem); });
+    footer("cap-avail", "Available", (td, d, a) => {
+      if (!a) return;
+      td.innerHTML = `${a.available}<small>P ${a.availPerm} · OC ${a.availOncall}</small>`;
+      td.title = `${a.headPerm + a.headOncall} on the roster, ${a.leavePerm + a.leaveOncall} on leave`;
+    }, "Active employees on this board (permanent + on-call) minus people on leave that day");
+    footer("cap-gap", "Gap", (td, d, a, dem) => {
+      if (!a) return;
+      const gap = a.available - dem;
+      td.textContent = gap > 0 ? "+" + gap : String(gap);
+      if (gap < 0) td.classList.add("neg");
+    }, "Available − Demand");
+    footer("cap-named", "Named on board", (td, d, a) => { if (a) td.textContent = String(a.named); },
+      "People actually placed on a mission that day — the confirmed board up to tomorrow, the forecast after that");
+    table.appendChild(tb);
+  }
+  scroll.appendChild(table);
+  panel.appendChild(scroll);
+
+  const note = document.createElement("p");
+  note.className = "cap-note";
+  note.textContent = "Available uses the current roster, so future hires and leavers are not reflected. Leave comes from the confirmed board up to the next working day and from forecasts after it. " +
+    (mayEdit ? "Right-click (or long-press) a cell to fill it to the end of the week. " : "") +
+    "Shaded columns are forecast dates for that board.";
+  panel.appendChild(note);
+
+  if (keep) {
+    const again = panel.querySelector(`input[data-cap-key="${CSS.escape(keep.key)}"]`);
+    if (again) {
+      if (keep.dirty) again.value = keep.value;
+      again.focus();
+    }
+  }
+}
+function capacityAddRowForm(boardId) {
+  const form = document.createElement("form");
+  form.className = "cap-add";
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.placeholder = "Customer…";
+  inp.setAttribute("list", "cap-customer-list");
+  inp.setAttribute("aria-label", "Customer");
+  const sh = document.createElement("select");
+  sh.setAttribute("aria-label", "Shift");
+  sh.innerHTML = '<option value="day">Day</option><option value="night">Night</option>';
+  const btn = document.createElement("button");
+  btn.type = "submit";
+  btn.className = "btn btn-small";
+  btn.textContent = "Add row";
+  form.append(inp, sh, btn);
+  form.onsubmit = (ev) => {
+    ev.preventDefault();
+    let name = inp.value.trim();
+    if (!name) return;
+    // settle on the spelling already in use, so "aptiv" doesn't start a second row
+    const known = (state.capacity.customers || []).find(c => c.toLowerCase() === name.toLowerCase());
+    if (known) name = known;
+    const list = state.capacity.extraRows[boardId] || (state.capacity.extraRows[boardId] = []);
+    if (!list.some(r => r.customer === name && r.shift === sh.value)) list.push({ customer: name, shift: sh.value });
+    render();
+  };
+  return form;
+}
+function copyCapacityWeek() {
+  const { from } = capacityRange();
+  const ws = Capacity.weekStart(from);
+  const we = addDays(ws, 6);
+  safely(async () => {
+    const rows = await cloud.getCapacityDemand(ws, we);
+    const cells = rows
+      .map(r => ({ boardId: r.board_id, date: addDays(r.plan_date, 7), customer: r.customer, shift: r.shift, headcount: r.headcount }))
+      .filter(c => !isNonWorkingDate(c.date, c.boardId));
+    if (!cells.length) { toast(`Nothing entered for the week of ${fmtShort(ws)} yet.`, "info"); return; }
+    showConfirm("Copy this week to next week?",
+      `Copy ${cells.length} entr${cells.length === 1 ? "y" : "ies"} from the week of ${fmtShort(ws)} to the week of ${fmtShort(addDays(ws, 7))}? The same customer/shift cells next week are overwritten; everything else is left alone.`,
+      () => saveCapacityCells(cells));
+  });
 }
 
 /* ---------- new board (with weekend-day config) ---------- */
@@ -6825,6 +7794,19 @@ function wireApp() {
   window.addEventListener("beforeprint", prepareForPrint);
   window.addEventListener("afterprint", restoreAfterPrint);
   $("#btn-reset-board").onclick = () => guardEdit(() => resetBoard());
+  // ---------- forward planning ----------
+  $("#btn-forecast-copy").onclick = openForecastCopyModal;
+  $("#forecast-copy-n").addEventListener("input", updateForecastCopyPreview);
+  $("#btn-forecast-copy-confirm").onclick = confirmForecastCopy;
+  $("#btn-hold-alerts").onclick = () => openHoldEventsModal(myLostHolds().map(e => e.id), "Holds taken from you");
+  $("#btn-holds-ack-all").onclick = () => safely(async () => {
+    await cloud.acknowledgeHoldEvents(holdModalIds.filter(id => D().holdEvents.some(e => e.id === id)));
+    renderHoldEventsModal();
+    render();
+  });
+  $("#btn-plandiff-all").onclick = () => setAllPlanDiff(true);
+  $("#btn-plandiff-none").onclick = () => setAllPlanDiff(false);
+  $("#btn-plandiff-apply").onclick = applyPlanDiffFromModal;
 
   // employee search (floating panel) — filter as you type, keep selection
   $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });
@@ -7037,6 +8019,15 @@ async function boot() {
   cloud.onChange((payload) => {
     state.overview.utilCacheKey = null;
     state.overview.historyCacheKey = null;
+    // the Capacity grid's leave / named counts come from the same rows
+    state.capacity.cacheKey = null;
+    // D3: a live heads-up for the ONE person whose hold was just taken —
+    // the red flag on their mission is what persists; this is the "now"
+    if (payload && payload.holdEvent && sameEmail(payload.holdEvent.from_held_by, state.myEmail)) {
+      const e = D().holdEvents.find(x => x.id === payload.holdEvent.id);
+      if (e) toast(describeHold(e) + ".", "warn", { duration: 12000 });
+    }
+    if (!$("#modal-holds").classList.contains("hidden")) renderHoldEventsModal();
     // a mission or an assignment anywhere can change who has worked where —
     // refreshData only re-reads the directory when the Host List is on screen
     state.hostlist.dirCacheKey = null;
