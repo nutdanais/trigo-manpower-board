@@ -1,0 +1,368 @@
+/* Acceptance run for the forward-planning release (brief §4.4, §5.4, §6.6),
+   driving the real app in Chromium against the shared fake backend.
+     NODE_PATH=$(npm root -g) node tests/e2e/forward-planning.e2e.js
+   Each scenario starts from a fresh database. Exits non-zero on the first
+   failed check. */
+"use strict";
+
+const assert = require("node:assert/strict");
+const h = require("./harness");
+
+const T = h.iso(new Date());
+const SRC = h.isWeekend(T) ? h.prevWorking(T) : T;   // the day carried from
+const H = h.nextWorking(T);                          // horizon end: last confirmed day
+const F = h.nextWorking(H);                          // first forecast working day
+
+let failures = 0;
+async function step(name, fn) {
+  try { await fn(); console.log("ok - " + name); }
+  catch (e) { failures++; console.log("FAIL - " + name + "\n   " + (e && e.stack || e).split("\n").slice(0, 4).join("\n   ")); throw e; }
+}
+async function until(fn, what, ms = 8000) {
+  const t0 = Date.now();
+  let last;
+  while (Date.now() - t0 < ms) {
+    try { last = await fn(); if (last) return last; } catch (e) { last = e; }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error("timed out waiting for: " + what + (last instanceof Error ? " (" + last.message + ")" : ""));
+}
+async function gotoDate(page, date) {
+  await page.evaluate((d) => { state.date = d; clearSelection(); return refreshAndRender(); }, date);
+}
+async function gotoBoard(page, id) {
+  await page.evaluate((b) => { D().activeBoardId = b; return refreshAndRender(); }, id);
+}
+const missionCard = (page, number) => page.locator("#missions-grid .mission-card", { has: page.locator(".m-number", { hasText: new RegExp("^" + number + "$") }) });
+function placeOf(db, table, empId, date) {
+  const a = db.t(table).find((r) => r.employee_id === empId && r.plan_date === date);
+  if (!a) return "standby";
+  if (a.zone) return "zone:" + a.zone;
+  const m = db.t(table === "assignments" ? "missions" : "forecast_missions").find((x) => x.id === (a.mission_id || a.forecast_mission_id));
+  return m ? m.number : "?";
+}
+function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.error) throw new Error(r.error.message); return r; }; }
+
+(async () => {
+  const env = await h.launch();
+  try {
+    /* ================= Part A: staleness + Review changes ================= */
+    {
+      const db = new h.FakeDb();
+      h.seedBase(db, { src: SRC });
+      const a = await env.openAs(db, h.USERS.a);
+      const pa = a.page;
+      await gotoDate(pa, H);
+
+      await step("A: Carry over copies the source day and stamps the carry", async () => {
+        await pa.click("#btn-reset-board");
+        await until(async () => (await pa.locator("#missions-grid .mission-card").count()) === 3, "3 carried missions");
+        const s = db.t("plan_day_stamps").find((x) => x.board_id === "b1" && x.plan_date === H);
+        assert.equal(s.carried_from, SRC);
+        assert.equal(await pa.locator(".plan-banner-stale").count(), 0, "no banner straight after a carry");
+      });
+
+      await step("A1: another engineer moving one person and deleting one assignment on the source day raises the banner (live)", async () => {
+        const exec = asUser(db, h.USERS.b);
+        exec({ table: "assignments", op: "update", values: { mission_id: "s102" }, filters: [["eq", "employee_id", "e1"], ["eq", "plan_date", SRC]] });
+        exec({ table: "assignments", op: "delete", filters: [["eq", "employee_id", "e4"], ["eq", "plan_date", SRC]] });
+        await until(async () => (await pa.locator(".plan-banner-stale").count()) === 1, "stale banner");
+        const text = await pa.textContent(".plan-banner-stale");
+        assert.match(text, /has been edited since/);
+        assert.match(text, /by eng\.b/);
+      });
+
+      await step("A1b: a delete alone is enough to trigger the banner", async () => {
+        const db2 = new h.FakeDb();
+        h.seedBase(db2, { src: SRC });
+        const c = (q) => db2.exec(q, h.USERS.a);
+        // replay the stamp a carry leaves (after the seed's own edits), then
+        // delete one source row — nothing else
+        c({ op: "rpc", fn: "stamp_carry", args: { p_board_id: "b1", p_plan_date: H, p_carried_from: SRC } });
+        c({ table: "assignments", op: "delete", filters: [["eq", "employee_id", "e3"], ["eq", "plan_date", SRC]] });
+        const src = db2.t("plan_day_stamps").find((x) => x.plan_date === SRC);
+        const dest = db2.t("plan_day_stamps").find((x) => x.plan_date === H);
+        assert.ok(src.last_edited_at > dest.carried_at, "delete bumped the source stamp past the carry");
+      });
+
+      await step("A2: Review changes lists exactly those two differences; applying one changes only that one", async () => {
+        await pa.click(".plan-banner-stale >> text=Review changes");
+        await until(() => pa.isVisible("#modal-plandiff"), "review panel");
+        const items = await pa.$$eval("#plandiff-body .pd-item .pd-text", (els) => els.map((e) => e.textContent));
+        assert.deepEqual(items.sort(), ["Move Person A: mission 101 → mission 102", "Move Person D: mission 103 (night) → Standby"]);
+        await pa.click("#btn-plandiff-none");
+        await pa.locator("#plandiff-body .pd-item", { hasText: "Person A" }).locator("input").check();
+        assert.equal((await pa.textContent("#btn-plandiff-apply")).trim(), "Apply 1 change");
+        await pa.click("#btn-plandiff-apply");
+        await until(async () => !(await pa.isVisible("#modal-plandiff")), "panel closes");
+        assert.equal(placeOf(db, "assignments", "e1", H), "102", "ticked move applied");
+        assert.equal(placeOf(db, "assignments", "e4", H), "103", "unticked move left alone");
+        await until(async () => (await pa.locator(".plan-banner-stale").count()) === 0, "banner cleared by the re-sync stamp");
+      });
+
+      await step("A3: no banner on a locked day, a past day, a weekend, or a day with no carry record", async () => {
+        asUser(db, h.USERS.b)({ table: "assignments", op: "update", values: { zone: "sick", mission_id: null }, filters: [["eq", "employee_id", "e2"], ["eq", "plan_date", SRC]] });
+        await until(async () => (await pa.locator(".plan-banner-stale").count()) === 1, "stale again");
+        await pa.click("#btn-lock");
+        await until(async () => (await pa.locator(".plan-banner-stale").count()) === 0, "locked day: no banner");
+        await gotoDate(pa, h.addDays(T, -1));
+        assert.equal(await pa.locator(".plan-banner").count(), 0, "past day");
+        let sat = T; while (new Date(sat + "T00:00:00").getDay() !== 6) sat = h.addDays(sat, 1);
+        await gotoDate(pa, sat);
+        assert.equal(await pa.locator(".plan-banner-stale").count(), 0, "weekend");
+        await gotoBoard(pa, "b2");
+        await gotoDate(pa, H);
+        assert.equal(await pa.locator(".plan-banner-stale").count(), 0, "board with no carry record");
+      });
+
+      await step("A5: editing a day never writes plan_days (no lock-reload traffic)", async () => {
+        const locks = db.t("plan_days").filter((r) => r.plan_date === H);
+        assert.equal(locks.length, 1, "only the explicit lock above wrote plan_days");
+        assert.equal(db.t("plan_days").length, 1);
+      });
+      assert.deepEqual(a.errors, [], "no console errors");
+      await a.close();
+    }
+
+    /* ================= Part C: forecast mode, holds (D3) ================= */
+    {
+      const db = new h.FakeDb();
+      h.seedBase(db, { src: SRC });
+      const a = await env.openAs(db, h.USERS.a);
+      const pa = a.page;
+      await gotoDate(pa, F);
+
+      await step("C1: a date beyond the horizon opens in Forecast mode — no export, no PDF, no lock", async () => {
+        assert.equal((await pa.textContent("#mode-pill")).trim(), "FORECAST");
+        assert.ok(await pa.evaluate(() => document.body.classList.contains("forecast-mode")));
+        for (const sel of ["#btn-export", "#btn-print", "#btn-lock"]) assert.equal(await pa.isVisible(sel), false, sel + " hidden");
+        assert.equal((await pa.textContent("#btn-reset-board")).trim(), "Start from confirmed");
+      });
+
+      await step("C1b: Start from confirmed writes only forecast rows — nothing confirmed, no Host Record", async () => {
+        await pa.click("#btn-reset-board");
+        await until(async () => (await pa.locator("#missions-grid .mission-card").count()) === 3, "3 forecast missions");
+        assert.equal(db.t("forecast_missions").filter((m) => m.plan_date === F).length, 3);
+        assert.equal(db.t("missions").filter((m) => m.plan_date === F).length, 0, "no confirmed missions");
+        assert.equal(db.t("assignments").filter((m) => m.plan_date === F).length, 0, "no confirmed assignments");
+        assert.equal(db.t("deployment_history").filter((m) => m.plan_date === F).length, 0, "no deployment history");
+        assert.ok(db.t("forecast_assignments").filter((r) => r.plan_date === F).every((r) => r.held_by === "eng.a@example.com"));
+        const refused = await pa.evaluate(async () => { await exportBoard(); return document.querySelector("#toast-stack").textContent; });
+        assert.match(refused, /never exported/);
+      });
+
+      await step("C1c: the forecast never shows on Overview or Org Chart", async () => {
+        await pa.evaluate(() => { D().activeBoardId = "__orgchart__"; return refreshAndRender(); });
+        const crew = await pa.textContent("#stats-bar");
+        assert.match(crew, /Missions: 0/);
+        await gotoBoard(pa, "b1");
+      });
+
+      const b = await env.openAs(db, h.USERS.b);
+      const pb = b.page;
+      await gotoDate(pb, F);
+
+      await step("C2: B placing a person A holds must confirm, and records the loss", async () => {
+        await until(async () => (await pb.locator("#missions-grid .mission-card").count()) === 3, "B sees A's forecast live");
+        await pb.click('#missions-grid .emp-card[data-emp-id="e1"]');
+        await missionCard(pb, "102").locator(".mission-body").evaluate((el) => el.click());
+        await until(() => pb.isVisible("#modal-confirm"), "hold confirmation");
+        assert.match(await pb.textContent("#confirm-message"), /Person A — held by eng\.a@example\.com in mission 101/);
+        await pb.click("#btn-confirm-yes");
+        await until(() => db.t("forecast_hold_events").length === 1, "event recorded");
+        const ev = db.t("forecast_hold_events")[0];
+        assert.equal(ev.from_held_by, "eng.a@example.com");
+        assert.equal(ev.taken_by, "eng.b@example.com");
+        assert.equal(placeOf(db, "forecast_assignments", "e1", F), "102");
+      });
+
+      await step("C2b / D3 toast: only A gets the live toast; A's mission shows the red flag and the board-bar counter", async () => {
+        await until(async () => /eng\.b moved Person A from your mission 101/.test(await pa.textContent("#toast-stack")), "toast for A");
+        assert.doesNotMatch(await pb.textContent("#toast-stack"), /from your mission/, "no toast for B");
+        await until(async () => (await missionCard(pa, "101").locator(".hold-badge").count()) === 1, "badge on A's mission");
+        assert.equal((await missionCard(pa, "101").locator(".hold-badge").textContent()).trim(), "1 person taken by eng.b");
+        assert.match(await pa.textContent("#btn-hold-alerts"), /1 hold taken from you/);
+        assert.equal(await pb.isVisible("#btn-hold-alerts"), false, "B lost nothing");
+      });
+
+      await step("C2c: moving your own hold records no event", async () => {
+        await pb.click('#missions-grid .emp-card[data-emp-id="e1"]');
+        await missionCard(pb, "103").locator(".mission-body").evaluate((el) => el.click());
+        await until(() => placeOf(db, "forecast_assignments", "e1", F) === "103", "B moved own hold");
+        assert.equal(await pb.isVisible("#modal-confirm"), false);
+        assert.equal(db.t("forecast_hold_events").length, 1);
+      });
+
+      await step("C7 / D3: the flag survives a reload and clears only on Acknowledge, recording who", async () => {
+        await pa.reload();
+        await pa.waitForSelector("#board-tabs .board-tab");
+        await gotoDate(pa, F);
+        await until(async () => (await missionCard(pa, "101").locator(".hold-badge").count()) === 1, "badge after reload");
+        await missionCard(pa, "101").locator(".hold-badge").click();
+        await until(() => pa.isVisible("#modal-holds"), "details");
+        assert.match(await pa.textContent("#holds-list"), /eng\.b moved Person A from your mission 101/);
+        await pa.click("#holds-list >> text=Acknowledge");
+        await until(() => !!db.t("forecast_hold_events")[0].acknowledged_at, "acknowledged");
+        assert.equal(db.t("forecast_hold_events")[0].acknowledged_by, "eng.a@example.com");
+        await pa.click("#modal-holds [data-close].btn");
+        await until(async () => (await pa.locator(".hold-badge").count()) === 0, "badge cleared");
+        assert.equal(await pa.isVisible("#btn-hold-alerts"), false);
+      });
+
+      await step("C: Copy forecast to the next working days skips days that already have one", async () => {
+        const next = h.nextWorking(F);
+        asUser(db, h.USERS.b)({ table: "forecast_missions", op: "insert", values: { board_id: "b1", plan_date: next, number: "900", host: "Host Beta", customer: "Cust Beta", shift: "day" } });
+        await pa.click("#btn-forecast-copy");
+        await pa.fill("#forecast-copy-n", "2");
+        await pa.click("#btn-forecast-copy-confirm");
+        const after = h.nextWorking(next);
+        await until(() => db.t("forecast_missions").filter((m) => m.plan_date === after).length === 3, "copied onto the empty day");
+        assert.equal(db.t("forecast_missions").filter((m) => m.plan_date === next).length, 1, "non-empty day untouched");
+      });
+      assert.deepEqual(a.errors, [], "no console errors (A)");
+      assert.deepEqual(b.errors, [], "no console errors (B)");
+      await a.close();
+      await b.close();
+    }
+
+    /* ================= Part C: merge a forecast into the confirmed day ================= */
+    {
+      const db = new h.FakeDb();
+      h.seedBase(db, { src: SRC });
+      db.seed("forecast_missions", [
+        { id: "f101", board_id: "b1", plan_date: H, number: "101", host: "Host Alpha", customer: "Cust Alpha", shift: "day", engineer_id: "eng-1", created_by: "eng.b@example.com" },
+        { id: "f201", board_id: "b1", plan_date: H, number: "201", host: "Host Beta", customer: "Cust Beta", shift: "day", engineer_id: "eng-2", created_by: "eng.b@example.com" },
+      ]);
+      db.seed("forecast_assignments", [
+        { employee_id: "e1", plan_date: H, forecast_mission_id: "f101", zone: null, held_by: "eng.b@example.com" },
+        { employee_id: "e6", plan_date: H, forecast_mission_id: "f201", zone: null, held_by: "eng.b@example.com" },
+        { employee_id: "e7", plan_date: H, forecast_mission_id: null, zone: "sick", held_by: "eng.b@example.com" },
+      ]);
+      const a = await env.openAs(db, h.USERS.a);
+      const pa = a.page;
+      await gotoDate(pa, H);
+
+      await step("C4: a confirmed day with an unmerged forecast shows the merge banner", async () => {
+        await until(async () => (await pa.locator(".plan-banner-forecast").count()) === 1, "forecast banner");
+        assert.match(await pa.textContent(".plan-banner-forecast"), /Forecast for this day by eng\.b: 2 missions, 3 people/);
+      });
+
+      await step("C4b: Carry over into it offers Review & merge; applying writes confirmed rows + history only for applied items", async () => {
+        await pa.click("#btn-reset-board");
+        await until(() => pa.isVisible("#modal-plandiff"), "merge panel opens after the carry");
+        assert.match(await pa.textContent("#plandiff-title"), /Review & merge forecast/);
+        const ticked = await pa.$$eval("#plandiff-body .pd-item", (els) => els.filter((e) => e.querySelector("input").checked).map((e) => e.querySelector(".pd-text").textContent));
+        assert.ok(ticked.some((t) => /^Add mission 201/.test(t) && /Person F/.test(t)), "add ticked by default");
+        assert.ok(ticked.some((t) => /^Sick Leave for Person G/.test(t)), "set leave ticked by default");
+        const unticked = await pa.$$eval("#plandiff-body .pd-item", (els) => els.filter((e) => !e.querySelector("input").checked).map((e) => e.querySelector(".pd-text").textContent));
+        assert.ok(unticked.some((t) => /^Remove mission 102/.test(t)), "remove unticked by default");
+        await pa.click("#btn-plandiff-apply");
+        await until(async () => !(await pa.isVisible("#modal-plandiff")), "applied");
+        assert.equal(placeOf(db, "assignments", "e6", H), "201");
+        assert.equal(placeOf(db, "assignments", "e7", H), "zone:sick");
+        assert.ok(db.t("missions").some((m) => m.plan_date === H && m.number === "102"), "unticked removal not applied");
+        const hist = db.t("deployment_history").filter((r) => r.plan_date === H).map((r) => r.employee_id).sort();
+        assert.ok(hist.includes("e6"), "history for the applied placement");
+        assert.ok(!hist.includes("e7"), "no history for leave");
+        const stamp = db.t("plan_day_stamps").find((s) => s.plan_date === H);
+        assert.ok(stamp.forecast_merged_at, "merge stamped");
+        await until(async () => (await pa.locator(".plan-banner-merged").count()) === 1, "merged note replaces the banner");
+        assert.equal(db.t("forecast_missions").filter((m) => m.plan_date === H).length, 2, "D6: forecast kept");
+      });
+      assert.deepEqual(a.errors, [], "no console errors");
+      await a.close();
+    }
+
+    /* ================= Part B: Capacity ================= */
+    {
+      const db = new h.FakeDb();
+      h.seedBase(db, { src: SRC });
+      const a = await env.openAs(db, h.USERS.a);
+      const b = await env.openAs(db, h.USERS.b);
+      const v = await env.openAs(db, h.USERS.v);
+      for (const p of [a.page, b.page, v.page]) await p.click("#board-tabs .tab-capacity");
+      const pa = a.page, pb = b.page;
+      const cell = (p, date) => p.locator(`input[data-cap-key^="b1\u0001${date}\u0001Cust Alpha\u0001day"]`);
+      const gapCell = async (p, date) => {
+        const idx = await p.$$eval(".cap-grid thead th", (ths, d) => ths.findIndex((th) => th.textContent.includes(d.slice(8, 10) + "/" + d.slice(5, 7))), date);
+        return p.$eval(".cap-grid tbody.cap-board:first-of-type tr.cap-gap", (tr, i) => tr.children[i].textContent, idx);
+      };
+
+      await step("B1: enter demand for two customers; Gap updates live, including for a second user", async () => {
+        await pa.fill(".cap-board:first-of-type .cap-add input", "Cust Alpha");
+        await pa.click(".cap-board:first-of-type .cap-add button");
+        await cell(pa, H).fill("12");
+        await cell(pa, H).press("Enter");
+        await until(() => db.t("capacity_demand").some((r) => r.plan_date === H && r.headcount === 12), "saved");
+        await pa.fill(".cap-board:first-of-type .cap-add input", "Cust Beta");
+        await pa.selectOption(".cap-board:first-of-type .cap-add select", "night");
+        await pa.click(".cap-board:first-of-type .cap-add button");
+        const beta = pa.locator(`input[data-cap-key^="b1\u0001${H}\u0001Cust Beta\u0001night"]`);
+        await beta.fill("3");
+        await beta.press("Tab");
+        await until(() => db.t("capacity_demand").length === 2, "second customer saved");
+        // 8 on the roster, nobody on leave on H yet: 8 - 15 = -7
+        await until(async () => (await gapCell(pa, H)) === "-7", "gap for A");
+        await until(async () => (await gapCell(pb, H)) === "-7", "gap for B, via Realtime");
+        assert.equal(await pa.$eval(".cap-gap td.neg", (td) => td.textContent), "-7", "negative gap is flagged");
+      });
+
+      await step("B1b: Fill right to end of week writes the following working days only", async () => {
+        await cell(pa, H).click({ button: "right" });
+        await pa.click("#context-menu >> text=Fill right to end of week");
+        const expected = [];
+        for (let d = h.addDays(H, 1); new Date(d + "T00:00:00").getDay() !== 1; d = h.addDays(d, 1)) if (!h.isWeekend(d)) expected.push(d);
+        await until(() => expected.every((d) => db.t("capacity_demand").some((r) => r.plan_date === d && r.customer === "Cust Alpha" && r.headcount === 12)), "filled right");
+        assert.ok(!db.t("capacity_demand").some((r) => h.isWeekend(r.plan_date)), "never onto a weekend");
+      });
+
+      await step("B2: putting someone on confirmed annual leave that date reduces Available by 1", async () => {
+        asUser(db, h.USERS.b)({ table: "assignments", op: "insert", values: { employee_id: "e8", plan_date: H, mission_id: null, zone: "annual" } });
+        await until(async () => (await gapCell(pa, H)) === "-8", "gap after leave");
+      });
+
+      await step("B4: a viewer sees the grid read-only", async () => {
+        await until(async () => (await v.page.locator(".cap-grid .cap-cell").count()) > 0, "viewer grid");
+        assert.equal(await v.page.locator(".cap-grid input").count(), 0, "no inputs");
+        assert.equal(await v.page.locator(".cap-add").count(), 0, "no add-row form");
+        assert.equal(await v.page.locator("#btn-cap-copy-week").count(), 0);
+      });
+
+      await step("B5 / layout: the wide grid scrolls in its own container, not the page", async () => {
+        await pa.selectOption("#cap-range", "8");
+        await until(async () => (await pa.locator(".cap-grid thead th").count()) > 30, "8 weeks of columns");
+        const m = await pa.evaluate(() => {
+          const s = document.querySelector(".cap-scroll");
+          return { scrollW: s.scrollWidth, clientW: s.clientWidth, docW: document.documentElement.scrollWidth, winW: document.documentElement.clientWidth };
+        });
+        assert.ok(m.scrollW > m.clientW, "grid overflows its container");
+        assert.ok(m.docW <= m.winW, "page itself has no horizontal scroll");
+      });
+      for (const p of [a, b, v]) assert.deepEqual(p.errors, [], "no console errors");
+      await a.close(); await b.close(); await v.close();
+    }
+
+    /* ================= Missing-migration tolerance ================= */
+    {
+      const db = new h.FakeDb({ forwardPlanning: false });
+      h.seedBase(db, { src: SRC });
+      const a = await env.openAs(db, h.USERS.a);
+      await step("no migration: the app works as before, the new features stay hidden", async () => {
+        const tabs = await a.page.$$eval("#board-tabs .board-tab", (els) => els.map((e) => e.textContent.trim()));
+        assert.ok(!tabs.includes("Capacity"));
+        assert.equal(await a.page.isVisible("#mode-pill"), false);
+        await gotoDate(a.page, F);
+        assert.equal(await a.page.evaluate(() => isForecastView()), false, "no forecast mode without the tables");
+        await gotoDate(a.page, H);
+        await a.page.click("#btn-reset-board");
+        await until(async () => (await a.page.locator("#missions-grid .mission-card").count()) === 3, "carry over still works");
+        assert.deepEqual(a.errors, []);
+      });
+      await a.close();
+    }
+  } finally {
+    await env.close();
+  }
+  console.log(failures ? `\n${failures} FAILED` : "\nALL END-TO-END CHECKS PASSED");
+  process.exit(failures ? 1 : 0);
+})().catch((e) => { console.error(e && e.message ? "" : e); process.exit(1); });
