@@ -147,3 +147,26 @@ test("capacity seed: a confirmed day's deployment becomes demand per host x shif
     "2026-09-24 Host A day 3", "2026-09-24 Host A night 1", "2026-09-25 Host A night 1",
   ]);
 });
+
+test("capacity paste: Excel-style clipboard text parses to whole numbers, blanks clear", () => {
+  assert.deepEqual(Capacity.parseClip("3\t4\r\n\t5\r\n"), { rows: [[3, 4], [null, 5]] });
+  assert.deepEqual(Capacity.parseClip(" 12 "), { rows: [[12]] });
+  assert.deepEqual(Capacity.parseClip("7.0"), { rows: [[7]] }, "Excel's 7.0 is still a whole number");
+  assert.deepEqual(Capacity.parseClip("2\t2.5"), { error: "2.5" });
+  assert.deepEqual(Capacity.parseClip("Host A\t3"), { error: "Host A" });
+  assert.deepEqual(Capacity.parseClip("\n"), { rows: [] });
+});
+
+test("capacity paste: a block lands at the selection's top-left; one value fills the selection; overflow is dropped", () => {
+  const block = [[1, 2], [3, 4]];
+  const p = Capacity.pastePlan(block, { r0: 1, c0: 3, r1: 1, c1: 3 }, 3, 5);
+  assert.deepEqual(p.cells, [{ r: 1, c: 3, v: 1 }, { r: 1, c: 4, v: 2 }, { r: 2, c: 3, v: 3 }, { r: 2, c: 4, v: 4 }]);
+  assert.deepEqual([p.r0, p.c0, p.r1, p.c1, p.dropped], [1, 3, 2, 4, 0]);
+  const off = Capacity.pastePlan(block, { r0: 2, c0: 4, r1: 2, c1: 4 }, 3, 5);
+  assert.deepEqual(off.cells, [{ r: 2, c: 4, v: 1 }]);
+  assert.equal(off.dropped, 3);
+  const fill = Capacity.pastePlan([[null]], { r0: 0, c0: 0, r1: 1, c1: 1 }, 3, 5);
+  assert.deepEqual(fill.cells.map((c) => [c.r, c.c, c.v]), [[0, 0, null], [0, 1, null], [1, 0, null], [1, 1, null]]);
+  const ragged = Capacity.pastePlan([[1, 2], [3]], { r0: 0, c0: 0, r1: 0, c1: 0 }, 3, 5);
+  assert.deepEqual(ragged.cells.map((c) => c.v), [1, 2, 3]);
+});

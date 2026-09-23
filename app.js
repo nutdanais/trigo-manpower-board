@@ -331,7 +331,7 @@ function setSaveStatus(kind) {
 }
 const CLOUD_WRITE_METHODS = [
   "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff",
-  "setCapacityCells", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
+  "setCapacityCells", "deleteCapacityRow", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
   "startForecastFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
   "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
@@ -443,6 +443,7 @@ const state = {
     inputs: null,              // cloud.getCapacityInputs() for the range
     cacheKey: null,
     extraRows: {},             // { boardId: [{host, shift}] } rows added but with no number yet
+    sel: null,                 // Excel-style selection { boardId, a: [row, col], f: [row, col] }
   },
 };
 
@@ -6783,6 +6784,7 @@ function renderCapacity() {
   // planner must not throw away what this one is halfway through typing)
   const ae = document.activeElement;
   const keep = ae && ae.dataset && ae.dataset.capKey ? { key: ae.dataset.capKey, value: ae.value, dirty: ae.value !== ae.defaultValue } : null;
+  const clipHadFocus = ae && ae.id === "cap-clip";
   const scrollWas = (panel.querySelector(".cap-scroll") || {}).scrollLeft || 0;
   panel.innerHTML = "";
   const boardId = capBoardId();
@@ -6954,7 +6956,7 @@ function renderCapacity() {
     for (const x of m.days) er.appendChild(dayCell(x));
     grid.appendChild(er);
   }
-  for (const r of rows) {
+  for (const [ri, r] of rows.entries()) {
     const hr = row("cap-hostrow");
     const hl = document.createElement("div");
     hl.className = "cap-left cap-hosthead";
@@ -6967,10 +6969,22 @@ function renderCapacity() {
     shp.className = "cap-shift" + (r.shift === "night" ? " night" : "");
     shp.textContent = r.shift === "night" ? "NIGHT" : "DAY";
     hl.appendChild(shp);
+    if (mayEdit) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "cap-row-del";
+      del.textContent = "\u2715";
+      del.title = "Remove this row";
+      del.setAttribute("aria-label", `Remove the ${r.host} ${r.shift} row`);
+      del.onclick = () => removeCapacityRow(boardId, r);
+      hl.appendChild(del);
+    }
     hr.appendChild(hl);
-    for (const x of m.days) {
+    for (const [ci, x] of m.days.entries()) {
       const d = x.date;
       const c = dayCell(x, "cap-cell");
+      c.dataset.r = String(ri);
+      c.dataset.c = String(ci);
       const key = capKey(boardId, d, r.host, r.shift);
       const v = cellVal.get(key);
       if (mayEdit) {
@@ -6988,6 +7002,12 @@ function renderCapacity() {
           if (raw !== "" && !(Number(raw) >= 0)) { inp.value = inp.defaultValue; return; }
           saveCapacityCells([{ boardId, date: d, host: r.host, shift: r.shift, headcount: raw === "" ? null : Number(raw) }]);
         };
+        inp.onfocus = () => {
+          // Tab / Enter moving through the cells moves the selection with them
+          if (capDragging) return;
+          state.capacity.sel = { boardId, a: [ri, ci], f: [ri, ci] };
+          capApplySel();
+        };
         inp.onkeydown = (ev) => {
           if (ev.key !== "Enter") return;
           ev.preventDefault();
@@ -6995,6 +7015,7 @@ function renderCapacity() {
           if (next) next.focus(); else inp.blur();
         };
         const menu = (mx, my) => showQuickMenu(mx, my, [
+          ...capSelectionMenu(ri, ci),
           { label: "Fill right to end of week", run: () => {
             const val = inp.value.trim();
             if (val === "") { toast("Type a number in this cell first.", "info"); return; }
@@ -7023,7 +7044,8 @@ function renderCapacity() {
   const note = document.createElement("span");
   note.className = "cap-note";
   note.textContent = "Available uses the current roster, so future hires and leavers are not reflected. Leave and named people come from the confirmed board up to the next working day and from forecasts after it. " +
-    (mayEdit ? "Right-click (or long-press) a cell to fill it to the end of the week. " : "") + "Hover a bar for the details.";
+    (mayEdit ? "Right-click (or long-press) a cell to fill it to the end of the week. Drag across cells to select them, then Ctrl+C and Ctrl+V to copy them to other days (works with Excel too); Delete clears a selection. "
+      : "Drag across cells and press Ctrl+C to copy them. ") + "Hover a bar for the details.";
   foot.appendChild(note);
   card.appendChild(foot);
   panel.appendChild(card);
@@ -7039,6 +7061,19 @@ function renderCapacity() {
   }
   panel.appendChild(dl);
 
+  // selection, copy and paste (see "Capacity: Excel-style" below)
+  capGrid = { boardId, rows, dates: m.dates, mayEdit, grid };
+  grid.addEventListener("mousedown", capMouseDown);
+  grid.addEventListener("mouseover", capMouseOver);
+  const clip = document.createElement("textarea");
+  clip.id = "cap-clip";
+  clip.className = "cap-clip";
+  clip.tabIndex = -1;
+  clip.setAttribute("aria-label", "Selected cells");
+  clip.addEventListener("keydown", capClipKey);
+  panel.appendChild(clip);
+  capApplySel();
+
   scroll.scrollLeft = scrollWas;
   if (keep) {
     const again = panel.querySelector(`input[data-cap-key="${CSS.escape(keep.key)}"]`);
@@ -7046,6 +7081,8 @@ function renderCapacity() {
       if (keep.dirty) again.value = keep.value;
       again.focus();
     }
+  } else if (clipHadFocus && capSelRect()) {
+    capFocusClip();
   }
 }
 function capacityAddRowForm(boardId) {
@@ -7125,6 +7162,216 @@ function copyCapacityWeek() {
       `Copy ${cells.length} entr${cells.length === 1 ? "y" : "ies"} for ${board.name} from the week of ${fmtShort(ws)} to the week of ${fmtShort(addDays(ws, 7))}? The same host/shift cells next week are overwritten; everything else is left alone.`,
       () => saveCapacityCells(cells));
   });
+}
+
+/* Remove a host x shift row: all of its numbers from today on (past days are
+   history). A row that was only added, with no number yet, just goes. */
+function removeCapacityRow(boardId, r) {
+  if (!can("capacity", "edit")) return;
+  const board = D().boards.find(b => b.id === boardId);
+  const dropExtra = () => {
+    const l = state.capacity.extraRows[boardId];
+    if (l) state.capacity.extraRows[boardId] = l.filter(x => !(x.host === r.host && x.shift === r.shift));
+    state.capacity.sel = null;
+  };
+  const n = ((D().capacity && D().capacity.rows) || [])
+    .filter(x => x.board_id === boardId && x.host === r.host && x.shift === r.shift).length;
+  if (!n) { dropExtra(); render(); return; }
+  const shiftName = r.shift === "night" ? "night" : "day";
+  showConfirm(`Remove ${r.host} (${shiftName} shift)?`,
+    `This deletes ${r.host}'s ${shiftName}-shift demand on ${board.name} from today on: ${n} number${n === 1 ? "" : "s"} in the ${state.capacity.weeks} week${state.capacity.weeks === 1 ? "" : "s"} shown, and any entered further ahead. Past days are kept.`,
+    () => {
+      dropExtra();
+      safely(async () => { await cloud.deleteCapacityRow(boardId, r.host, r.shift, todayStr()); render(); });
+    });
+}
+
+/* ---------- Capacity: Excel-style select, copy, paste ----------
+   Drag across number cells (or Shift+click) to select a block; Ctrl+C copies
+   it as tab-separated text, the same format Excel uses, so a block can go to
+   and from a spreadsheet too. Ctrl+V pastes with the block's top-left corner
+   at the selected cell; a single copied number fills the whole selection.
+   While a block is selected, focus sits on a hidden textarea (#cap-clip) so
+   the browser's own copy/paste keys land somewhere this code hears them. */
+let capGrid = null;          // what the last renderCapacity drew
+let capDragging = false;
+function capSelRect() {
+  const s = state.capacity.sel;
+  if (!s || !capGrid || s.boardId !== capGrid.boardId || !capGrid.rows.length || !capGrid.dates.length) return null;
+  const cr = (n) => Math.min(Math.max(n, 0), capGrid.rows.length - 1);
+  const cc = (n) => Math.min(Math.max(n, 0), capGrid.dates.length - 1);
+  const [ar, ac] = [cr(s.a[0]), cc(s.a[1])], [fr, fc] = [cr(s.f[0]), cc(s.f[1])];
+  return { r0: Math.min(ar, fr), r1: Math.max(ar, fr), c0: Math.min(ac, fc), c1: Math.max(ac, fc) };
+}
+const capRectSize = (r) => (r.r1 - r.r0 + 1) * (r.c1 - r.c0 + 1);
+function capApplySel() {
+  if (!capGrid) return;
+  const r = capSelRect();
+  for (const el of capGrid.grid.querySelectorAll(".cap-cell[data-r]")) {
+    const i = Number(el.dataset.r), j = Number(el.dataset.c);
+    const on = !!r && i >= r.r0 && i <= r.r1 && j >= r.c0 && j <= r.c1;
+    el.classList.toggle("cap-sel", on);
+    el.classList.toggle("cap-sel-t", on && i === r.r0);
+    el.classList.toggle("cap-sel-b", on && i === r.r1);
+    el.classList.toggle("cap-sel-l", on && j === r.c0);
+    el.classList.toggle("cap-sel-r", on && j === r.c1);
+  }
+}
+function capCellPos(target) {
+  const el = target && target.closest ? target.closest(".cap-cell[data-r]") : null;
+  if (!el || !capGrid || !capGrid.grid.contains(el)) return null;
+  return [Number(el.dataset.r), Number(el.dataset.c)];
+}
+function capCellText(i, j) {
+  const el = capGrid.grid.querySelector(`.cap-cell[data-r="${i}"][data-c="${j}"]`);
+  if (!el) return "";
+  const inp = el.querySelector("input");
+  return (inp ? inp.value : el.textContent).trim();
+}
+function capSelTsv(r) {
+  const lines = [];
+  for (let i = r.r0; i <= r.r1; i++) {
+    const vals = [];
+    for (let j = r.c0; j <= r.c1; j++) vals.push(capCellText(i, j));
+    lines.push(vals.join("\t"));
+  }
+  return lines.join("\n");
+}
+function capFocusClip() {
+  const clip = document.getElementById("cap-clip");
+  const r = capSelRect();
+  if (!clip || !r) return;
+  clip.value = capSelTsv(r);
+  clip.focus({ preventScroll: true });
+  clip.select();
+}
+function capMouseDown(ev) {
+  if (ev.button !== 0) return;
+  const pos = capCellPos(ev.target);
+  if (!pos) return;
+  const s = state.capacity.sel;
+  if (ev.shiftKey && s && s.boardId === capGrid.boardId) {
+    ev.preventDefault();
+    s.f = pos;
+    capApplySel();
+    capFocusClip();
+    return;
+  }
+  state.capacity.sel = { boardId: capGrid.boardId, a: pos, f: pos };
+  capDragging = true;
+  capApplySel();
+}
+function capMouseOver(ev) {
+  if (!capDragging) return;
+  if (!(ev.buttons & 1)) { capDragging = false; return; }
+  const pos = capCellPos(ev.target);
+  const s = state.capacity.sel;
+  if (!pos || !s || (pos[0] === s.f[0] && pos[1] === s.f[1])) return;
+  s.f = pos;
+  capGrid.grid.classList.add("cap-dragging");
+  // leaving the first cell: a number typed there is saved (its change event),
+  // and the text the drag was selecting inside it is dropped
+  const ae = document.activeElement;
+  if (ae && ae.dataset && ae.dataset.capKey) ae.blur();
+  const ws = window.getSelection && window.getSelection();
+  if (ws) ws.removeAllRanges();
+  capApplySel();
+}
+function capMouseUp() {
+  if (!capDragging) return;
+  capDragging = false;
+  if (capGrid) capGrid.grid.classList.remove("cap-dragging");
+  const r = capSelRect();
+  if (!r) return;
+  // one editable cell keeps the caret in its input; a block (or a read-only
+  // cell) hands the keyboard to the hidden textarea
+  const one = capRectSize(r) === 1 && capGrid.mayEdit;
+  if (!one) capFocusClip();
+}
+function capClearSel() {
+  if (!state.capacity.sel) return;
+  state.capacity.sel = null;
+  capApplySel();
+}
+function capClearSelectedCells() {
+  const r = capSelRect();
+  if (!r || !capGrid.mayEdit) return;
+  // only the cells that hold a number: clearing an empty one is a no-op
+  const cells = [];
+  for (let i = r.r0; i <= r.r1; i++) {
+    for (let j = r.c0; j <= r.c1; j++) {
+      if (capCellText(i, j) === "") continue;
+      const row = capGrid.rows[i];
+      cells.push({ boardId: capGrid.boardId, date: capGrid.dates[j], host: row.host, shift: row.shift, headcount: null });
+    }
+  }
+  if (!cells.length) return;
+  saveCapacityCells(cells);
+  toast(`Cleared ${cells.length} cell${cells.length === 1 ? "" : "s"}.`, "info");
+}
+function capClipKey(ev) {
+  if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); capClearSelectedCells(); return; }
+  if (ev.key === "Escape") { capClearSel(); ev.target.blur(); return; }
+  // anything that would type into the hidden textarea is swallowed; the
+  // copy / paste / select-all shortcuts still go through
+  if (!(ev.ctrlKey || ev.metaKey) && ev.key.length === 1) ev.preventDefault();
+}
+/* extra right-click items when the cell is part of a block selection; a right
+   click outside the selection selects that one cell instead (as Excel does) */
+function capSelectionMenu(i, j) {
+  const r = capSelRect();
+  const inside = r && i >= r.r0 && i <= r.r1 && j >= r.c0 && j <= r.c1;
+  if (!inside) {
+    state.capacity.sel = { boardId: capGrid.boardId, a: [i, j], f: [i, j] };
+    capApplySel();
+    return [];
+  }
+  const n = capRectSize(r);
+  if (n < 2) return [];
+  return [{ label: `Clear ${n} selected cells`, run: capClearSelectedCells }];
+}
+/* is this copy / paste event aimed at the Capacity grid? */
+function capClipboardTarget(ev) {
+  if (!capGrid || !isCapacity()) return false;
+  const t = ev.target;
+  return !!(t && (t.id === "cap-clip" || (t.closest && t.closest(".cap-cell[data-r]") && capGrid.grid.contains(t))));
+}
+function capOnCopy(ev) {
+  if (!capClipboardTarget(ev)) return;
+  const r = capSelRect();
+  if (!r) return;
+  ev.preventDefault();
+  ev.clipboardData.setData("text/plain", capSelTsv(r));
+  const n = capRectSize(r);
+  if (n > 1) toast(`Copied ${n} cells. Click the cell where they should start and press Ctrl+V.`, "info");
+}
+function capOnPaste(ev) {
+  if (!capClipboardTarget(ev) || !capGrid.mayEdit) return;
+  const r = capSelRect();
+  if (!r) return;
+  ev.preventDefault();
+  const parsed = Capacity.parseClip(ev.clipboardData.getData("text/plain"));
+  if (parsed.error != null) {
+    const bad = parsed.error.length > 24 ? parsed.error.slice(0, 24) + "…" : parsed.error;
+    toast(`Only whole numbers can be pasted here — "${bad}" is not one.`, "warn");
+    return;
+  }
+  const plan = Capacity.pastePlan(parsed.rows, r, capGrid.rows.length, capGrid.dates.length);
+  if (!plan.cells.length) return;
+  const cells = plan.cells.map(x => ({
+    boardId: capGrid.boardId, date: capGrid.dates[x.c], host: capGrid.rows[x.r].host, shift: capGrid.rows[x.r].shift, headcount: x.v,
+  }));
+  state.capacity.sel = { boardId: capGrid.boardId, a: [plan.r0, plan.c0], f: [plan.r1, plan.c1] };
+  capApplySel();
+  // the block now selected is what focus should sit on after the redraw
+  if (capRectSize(capSelRect()) > 1) capFocusClip();
+  else if (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.capKey) {
+    const inp = document.activeElement;
+    inp.value = inp.defaultValue = cells[0].headcount == null ? "" : String(cells[0].headcount);
+  }
+  saveCapacityCells(cells);
+  if (plan.dropped) toast(`Pasted ${cells.length} cell${cells.length === 1 ? "" : "s"}. ${plan.dropped} did not fit — the block ran past the last row or day on the grid.`, "warn");
+  else if (cells.length > 1) toast(`Pasted ${cells.length} cells.`, "info");
 }
 
 /* ---------- new board (with weekend-day config) ---------- */
@@ -8100,6 +8347,16 @@ function wireApp() {
         && !ev.target.closest("#hostlist-filters .ms")) closeFilterPops();
     if (!ev.target.closest("#toolbar-more")) hideToolbarMore();
   });
+  // Capacity grid: drag-select ends anywhere on the page; a click outside the
+  // grid drops the selection; copy / paste go through the grid's handlers
+  document.addEventListener("mouseup", capMouseUp);
+  document.addEventListener("mousedown", (ev) => {
+    const t = ev.target;
+    if (t && t.closest && (t.closest(".cap-cell[data-r]") || t.closest("#context-menu") || t.closest(".modal") || t.id === "cap-clip")) return;
+    capClearSel();
+  });
+  document.addEventListener("copy", capOnCopy);
+  document.addEventListener("paste", capOnPaste);
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape") { hideContextMenu(); hideDatePicker(); closeFilterPops(); hideToolbarMore(); clearSelection(); closeModal(); }
     // Ctrl/Cmd+Z = undo last assignment change (ignore while typing in a field)

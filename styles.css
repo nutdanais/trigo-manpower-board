@@ -3974,12 +3974,14 @@ body.forecast-mode .zone { border-style: dashed; }
   --cap-dem: #004983;
   --cap-over: #d0342c;
   --cap-stripe: rgba(0, 73, 131, .05);
+  --cap-sel: rgba(0, 73, 131, .12);
 }
 :root[data-theme="dark"] {
   --cap-avail: #34414f;
   --cap-dem: #6fb1e0;
   --cap-over: #ef5b52;
   --cap-stripe: rgba(111, 177, 224, .07);
+  --cap-sel: rgba(111, 177, 224, .2);
 }
 #capacity-toolbar { display: contents; }
 #cap-board-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-soft); flex-wrap: wrap; }
@@ -4130,6 +4132,33 @@ body.forecast-mode .zone { border-style: dashed; }
 .cap-cell input::-webkit-outer-spin-button,
 .cap-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .cap-cell input:focus { outline: 2px solid var(--primary-text); outline-offset: -2px; background: var(--hover-tint); }
+/* Excel-style range selection: tinted cells, one outline round the block */
+.cap-grid2.cap-dragging { user-select: none; -webkit-user-select: none; }
+.cap-cell.cap-sel { background-color: var(--cap-sel); }
+.cap-cell.cap-sel-t { box-shadow: inset 0 2px 0 var(--primary-text); }
+.cap-cell.cap-sel-b { box-shadow: inset 0 -2px 0 var(--primary-text); }
+.cap-cell.cap-sel-t.cap-sel-b { box-shadow: inset 0 2px 0 var(--primary-text), inset 0 -2px 0 var(--primary-text); }
+.cap-cell.cap-sel-l::before, .cap-cell.cap-sel-r::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 2px; background: var(--primary-text); pointer-events: none;
+}
+.cap-cell.cap-sel-l::before { left: 0; }
+.cap-cell.cap-sel-r::after { right: 0; }
+.cap-clip { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
+.cap-row-del {
+  flex: none;
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cap-row-del:hover, .cap-row-del:focus-visible { color: var(--danger-text); border-color: var(--border); background: var(--panel); }
 .cap-card-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--border); }
 .cap-add { display: flex; gap: 6px; align-items: center; }
 .cap-add input, .cap-add select {

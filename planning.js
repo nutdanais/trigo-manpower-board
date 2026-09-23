@@ -293,7 +293,47 @@
     return out;
   }
 
-  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, seedFromPlan, fillEmpty };
+  /* Clipboard text as Excel and the Capacity grid write it: rows split by
+     newlines, cells by tabs, one trailing newline. A blank cell clears.
+     -> { rows: [[number|null]] } or { error: "<the first value that is not a
+     whole number>" }. Nothing but whitespace -> { rows: [] }. */
+  function parseClip(text) {
+    let t = String(text == null ? "" : text).replace(/\r\n?/g, "\n");
+    if (t.endsWith("\n")) t = t.slice(0, -1);
+    if (!t.trim()) return { rows: [] };
+    const rows = t.split("\n").map((l) => l.split("\t").map((v) => v.trim()));
+    for (const r of rows) {
+      for (const v of r) if (v !== "" && !(/^\d+(\.0+)?$/.test(v))) return { error: v };
+    }
+    return { rows: rows.map((r) => r.map((v) => (v === "" ? null : Number(v)))) };
+  }
+
+  /* Where a pasted block lands on a grid of nRows x nCols, the selection
+     sel = {r0, c0, r1, c1} being where it goes: the block starts at the
+     selection's top-left corner; a single value fills the whole selection
+     (as in Excel). Cells that would fall off the grid are counted, not
+     written. -> { cells: [{r, c, v}], dropped, r0, c0, r1, c1 } (the
+     rectangle actually written). */
+  function pastePlan(block, sel, nRows, nCols) {
+    if (!block.length) return { cells: [], dropped: 0, r0: sel.r0, c0: sel.c0, r1: sel.r0, c1: sel.c0 };
+    const single = block.length === 1 && block[0].length === 1;
+    const h = single ? sel.r1 - sel.r0 + 1 : block.length;
+    const w = single ? sel.c1 - sel.c0 + 1 : Math.max(...block.map((r) => r.length));
+    const cells = [];
+    let dropped = 0;
+    for (let i = 0; i < h; i++) {
+      for (let j = 0; j < w; j++) {
+        const v = single ? block[0][0] : block[i][j];
+        if (v === undefined) continue;          // a short row in a ragged block
+        const r = sel.r0 + i, c = sel.c0 + j;
+        if (r >= nRows || c >= nCols) { dropped++; continue; }
+        cells.push({ r, c, v });
+      }
+    }
+    return { cells, dropped, r0: sel.r0, c0: sel.c0, r1: Math.min(sel.r0 + h, nRows) - 1, c1: Math.min(sel.c0 + w, nCols) - 1 };
+  }
+
+  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, seedFromPlan, fillEmpty, parseClip, pastePlan };
 
   const api = { PlanDiff, Horizon, Capacity };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

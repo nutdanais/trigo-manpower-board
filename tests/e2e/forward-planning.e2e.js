@@ -403,6 +403,101 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         const tip = await pa.getAttribute(".cap-namedrow .cap-left", "title");
         assert.match(tip, /already put on a mission/);
       });
+
+      // rows: 0 Host Alpha day, 1 Host Beta day, 2 Host Gamma night
+      const dates = await pa.$$eval(".cap-gapchip", (els) => els.map((e) => e.dataset.date));
+      const at = (d, host, shift) => (db.t("capacity_demand").find((r) => r.plan_date === d && r.host === host && r.shift === shift) || {}).headcount;
+      const cellAt = (i, j) => pa.locator(`.cap-cell[data-r="${i}"][data-c="${j}"]`);
+      // a save redraws the grid, so a cell can be swapped out between lookups: retry
+      const centre = async (i, j) => {
+        let b = null;
+        await until(async () => (b = await cellAt(i, j).boundingBox().catch(() => null)) != null, "cell on screen");
+        return [b.x + b.width / 2, b.y + b.height / 2];
+      };
+      const dispatchClip = (type, text) => pa.evaluate(([type, text]) => {
+        const dt = new DataTransfer();
+        if (text != null) dt.setData("text/plain", text);
+        const ev = new ClipboardEvent(type, { clipboardData: dt, bubbles: true, cancelable: true });
+        document.activeElement.dispatchEvent(ev);
+        return { data: dt.getData("text/plain"), handled: ev.defaultPrevented };
+      }, [type, text]);
+
+      await step("B9: drag across cells selects a block; Ctrl+C copies it as tab-separated text", async () => {
+        await cellAt(0, 0).locator("input").fill("5");
+        await cellAt(0, 0).locator("input").press("Tab");
+        await until(() => at(dates[0], "Host Alpha", "day") === 5, "typed value saved");
+        const [x0, y0] = await centre(0, 0), [x1, y1] = await centre(1, 1);
+        await pa.mouse.move(x0, y0);
+        await pa.mouse.down();
+        await pa.mouse.move(x1, y1, { steps: 6 });
+        await pa.mouse.up();
+        assert.equal(await pa.locator(".cap-cell.cap-sel").count(), 4, "2 x 2 block selected");
+        assert.equal(await pa.evaluate(() => document.activeElement.id), "cap-clip", "keyboard sits on the clipboard proxy");
+        const c = await dispatchClip("copy");
+        assert.ok(c.handled);
+        const exp = [[at(dates[0], "Host Alpha", "day"), at(dates[1], "Host Alpha", "day")], [at(dates[0], "Host Beta", "day"), at(dates[1], "Host Beta", "day")]];
+        assert.equal(c.data, exp.map((r) => r.join("\t")).join("\n"));
+        assert.equal(c.data.split("\n")[0].split("\t")[0], "5");
+      });
+
+      await step("B10: Ctrl+V pastes the block with its top-left at the clicked cell, on later days", async () => {
+        const text = (await dispatchClip("copy")).data;
+        await cellAt(0, 3).locator("input").click();
+        const p = await dispatchClip("paste", text);
+        assert.ok(p.handled);
+        await until(() => at(dates[3], "Host Alpha", "day") === 5, "pasted top-left");
+        assert.equal(at(dates[4], "Host Alpha", "day"), at(dates[1], "Host Alpha", "day"));
+        assert.equal(at(dates[3], "Host Beta", "day"), at(dates[0], "Host Beta", "day"));
+        assert.equal(at(dates[4], "Host Beta", "day"), at(dates[1], "Host Beta", "day"));
+        assert.equal(at(dates[5], "Host Alpha", "day"), 2, "nothing written outside the block");
+        await until(async () => (await pa.locator(".cap-cell.cap-sel").count()) === 4, "the pasted block is selected");
+        assert.equal(await cellAt(0, 3).locator("input").inputValue(), "5");
+      });
+
+      await step("B10b: pasting from Excel works too; a single number fills the whole selection; text is refused", async () => {
+        const last = dates.length - 1;
+        await cellAt(2, last).locator("input").click();
+        await dispatchClip("paste", "7\t8\r\n9\t10\r\n");        // Excel's line endings; 2 x 2 at the bottom-right corner
+        await until(() => at(dates[last], "Host Gamma", "night") === 7, "corner pasted");
+        await until(async () => /1 did not fit|3 did not fit/.test(await pa.textContent("#toast-stack")), "overflow reported");
+        // shift+click extends the selection: rows 0-1, days 6-7
+        await cellAt(0, 6).locator("input").click();
+        await cellAt(1, 7).click({ modifiers: ["Shift"] });
+        assert.equal(await pa.locator(".cap-cell.cap-sel").count(), 4);
+        await dispatchClip("paste", "4");
+        await until(() => [at(dates[6], "Host Alpha", "day"), at(dates[7], "Host Alpha", "day"), at(dates[6], "Host Beta", "day"), at(dates[7], "Host Beta", "day")].every((v) => v === 4), "filled with 4");
+        const before = JSON.stringify(db.t("capacity_demand"));
+        await dispatchClip("paste", "Host Alpha\t3");
+        await until(async () => /Only whole numbers/.test(await pa.textContent("#toast-stack")), "refused");
+        assert.equal(JSON.stringify(db.t("capacity_demand")), before, "nothing written");
+      });
+
+      await step("B10c: Delete clears the selected block", async () => {
+        await pa.keyboard.press("Delete");
+        await until(() => [dates[6], dates[7]].every((d) => at(d, "Host Alpha", "day") === undefined && at(d, "Host Beta", "day") === undefined), "cleared");
+        assert.equal(at(dates[6], "Host Gamma", "night"), 1, "row outside the selection kept");
+        await pa.keyboard.press("Escape");
+        assert.equal(await pa.locator(".cap-cell.cap-sel").count(), 0, "Escape drops the selection");
+      });
+
+      await step("B11: a row can be deleted: its numbers go from today on, after a confirmation", async () => {
+        const past = h.addDays(dates[0], -1);
+        db.seed("capacity_demand", [{ board_id: "b1", plan_date: past, host: "Host Gamma", shift: "night", headcount: 4 }]);
+        await pa.click('.cap-row-del[aria-label="Remove the Host Gamma night row"]');
+        await until(() => pa.isVisible("#modal-confirm"), "confirmation");
+        assert.match(await pa.textContent("#confirm-message"), /Past days are kept/);
+        await pa.click("#btn-confirm-yes");
+        await until(() => !db.t("capacity_demand").some((r) => r.host === "Host Gamma" && r.plan_date >= dates[0]), "row's numbers deleted");
+        assert.equal(at(past, "Host Gamma", "night"), 4, "history kept");
+        await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 0, "row gone from the grid");
+        // a row that was only added (no numbers yet) goes without a question
+        await pa.fill("#cap-add input", "Host Gamma");
+        await pa.click("#cap-add button");
+        await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 1, "re-added");
+        await pa.click('.cap-row-del[aria-label="Remove the Host Gamma day row"]');
+        await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 0, "empty row removed");
+        assert.equal(await pa.isVisible("#modal-confirm"), false);
+      });
       assert.deepEqual(a.errors, [], "no console errors");
       await a.close();
     }

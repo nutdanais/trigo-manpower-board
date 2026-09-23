@@ -1765,11 +1765,28 @@ const cloud = {
       const { error } = await sb.from("capacity_demand").upsert(upserts, { onConflict: "board_id,plan_date,host,shift" });
       if (error) throw error;
     }
+    // clears: one delete per host x shift row, not one per cell (a pasted
+    // block of blanks can clear dozens of cells at once)
+    const clears = new Map();
     for (const c of cells.filter((x) => x.headcount === null || x.headcount === "" || x.headcount === undefined)) {
+      const k = [c.boardId, c.host, c.shift].join("\u0001");
+      if (!clears.has(k)) clears.set(k, { boardId: c.boardId, host: c.host, shift: c.shift, dates: [] });
+      clears.get(k).dates.push(c.date);
+    }
+    for (const c of clears.values()) {
       const { error } = await sb.from("capacity_demand").delete()
-        .eq("board_id", c.boardId).eq("plan_date", c.date).eq("host", c.host).eq("shift", c.shift);
+        .eq("board_id", c.boardId).eq("host", c.host).eq("shift", c.shift).in("plan_date", c.dates);
       if (error) throw error;
     }
+    if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
+  },
+
+  /* Removes a host x shift row from the Capacity grid: every number it has on
+     fromDate or later. Earlier dates are history and are left alone. */
+  async deleteCapacityRow(boardId, host, shift, fromDate) {
+    const { error } = await sb.from("capacity_demand").delete()
+      .eq("board_id", boardId).eq("host", host).eq("shift", shift).gte("plan_date", fromDate);
+    if (error) throw error;
     if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
   },
 
