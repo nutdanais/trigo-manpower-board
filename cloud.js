@@ -76,6 +76,18 @@ const cloud = {
              its own profile row, and this deliberately carries no email or
              account status with it. Empty before migration-2026-09-06. */
           directory: [],
+          /* Forward planning (migration-2026-09-24). `features` says which of
+             its tables exist on this database — each part of the feature hides
+             itself until its migration has been run, rather than erroring.
+             `forecast` is the forecast plan cache, kept apart from `plans` so a
+             forecast edit never throws away the confirmed plans and vice versa.
+             `holdEvents` are the unacknowledged "someone took your hold" rows,
+             with `holdMissions` naming the forecast missions they point at. */
+          features: { stamps: false, forecast: false, capacity: false },
+          forecast: {},
+          holdEvents: [],
+          holdMissions: {},
+          capacity: null,
           activeBoardId: null },
   _listeners: [],
   _currentDate: () => todayStrISO(),
@@ -293,9 +305,29 @@ const cloud = {
     // identity first: everything below is read under RLS, and app.js needs to
     // know the caller's role before it decides what to render
     await this._loadIdentity();
-    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts(), this._loadDirectory()]);
+    await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts(), this._loadDirectory(), this._loadFeatures()]);
+    if (this.data.features.forecast) await this.loadHoldEvents();
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
+  },
+
+  /* Which forward-planning tables this database has. One cheap read each; a
+     missing table just switches that part of the feature off. Any OTHER error
+     (network, RLS) also leaves it off for this session, with a warning — a
+     half-working forecast layer would be worse than none. */
+  async _loadFeatures() {
+    const probe = async (table, col) => {
+      const { error } = await sb.from(table).select(col).limit(1);
+      if (!error) return true;
+      if (!this._tableMissing(error)) console.warn(`${table} unavailable:`, error.message || error);
+      return false;
+    };
+    const [stamps, forecast, capacity] = await Promise.all([
+      probe("plan_day_stamps", "board_id"),
+      (async () => (await probe("forecast_missions", "id")) && (await probe("forecast_assignments", "id")) && (await probe("forecast_hold_events", "id")))(),
+      probe("capacity_demand", "id"),
+    ]);
+    this.data.features = { stamps, forecast, capacity };
   },
 
   async _loadAreas() {
@@ -535,10 +567,84 @@ const cloud = {
     return null;
   },
 
-  async _copyPlanForward(boardId, srcDate, destDate) {
+  /* ---------- carry-over: one read, two outcomes ----------
+     The carry-over used to be one function that read the source day and wrote
+     the destination. It is split so the same rules can also produce a PREVIEW
+     — what a fresh carry would put on a day, computed in memory with no writes
+     — which is what "Review changes" diffs a day against (see PlanDiff in
+     planning.js). Both paths share _carrySource / _carryPlacements, so the
+     preview can never drift from what a real carry would do; the write path
+     is unchanged row for row (tests/carry-parity.test.js holds it to that). */
+  async _carrySource(boardId, srcDate) {
+    const { data: srcMissions, error: mErr } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", srcDate);
+    if (mErr) throw mErr;
+    const { data: srcAssignments, error: aErr } = await sb.from("assignments").select("*").eq("plan_date", srcDate);
+    if (aErr) throw aErr;
+    return { srcMissions: srcMissions || [], srcAssignments: srcAssignments || [] };
+  },
+
+  /* Which employees the carry brings across, and where to. `destMissions` are
+     the destination's missions ({id, number, shift}); a source mission maps to
+     the destination mission with the same number+shift (matching by content,
+     not id, since ids differ per day). Returns [{employeeId, missionId, zone,
+     srcMission}] — missionId set for a mission placement, zone for leave. */
+  _carryPlacements(boardId, srcMissions, srcAssignments, destMissions) {
+    const idMap = {};
+    for (const sm of srcMissions) {
+      const match = (destMissions || []).find((dm) => dm.number === sm.number && dm.shift === sm.shift);
+      if (match) idMap[sm.id] = match.id;
+    }
+    // active !== false — a new day's plan is a "current roster" operation,
+    // unlike a historical read (ensurePlanLoaded's own boardEmpIds, above,
+    // deliberately does NOT filter this way). Employees load unfiltered now
+    // (see _loadEmployees), so a deactivated employee's old assignment would
+    // otherwise get carried into a brand new day — exactly what deactivating
+    // them should prevent.
+    const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
+    const srcMissionById = Object.fromEntries(srcMissions.map((m) => [m.id, m]));
+    const out = [];
+    for (const a of srcAssignments) {
+      if (!boardEmpIds.has(a.employee_id)) continue;
+      if (a.mission_id) {
+        const mapped = idMap[a.mission_id];
+        if (!mapped) continue;   // that mission isn't on the destination day → leave the employee on standby
+        out.push({ employeeId: a.employee_id, missionId: mapped, zone: null, srcMission: srcMissionById[a.mission_id] || null });
+      } else if (a.zone) {
+        out.push({ employeeId: a.employee_id, missionId: null, zone: a.zone, srcMission: null });
+      }
+    }
+    return out;
+  },
+
+  /* What "Carry over" from srcDate would put on an EMPTY day — same shape as
+     ensurePlanLoaded returns, no writes. Mission ids are placeholders
+     ("preview:<number>|<shift>"); PlanDiff matches by number+shift anyway. */
+  async buildCarryPreview(boardId, srcDate) {
+    const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate);
+    const plan = { missions: [], zones: emptyZones(), updatedAt: null, sourceDate: srcDate };
+    const byId = {};
+    const virtualDest = srcMissions.map((m) => ({ id: "preview:" + m.number + "|" + m.shift, number: m.number, shift: m.shift }));
+    for (const m of srcMissions) {
+      const obj = {
+        id: "preview:" + m.number + "|" + m.shift, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+        startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
+        ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
+      };
+      if (byId[obj.id]) continue;   // a duplicate number+shift (pre-2026-07-15 data) carries once
+      byId[obj.id] = obj;
+      plan.missions.push(obj);
+    }
+    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, virtualDest)) {
+      if (p.missionId) byId[p.missionId].members.push(p.employeeId);
+      else if (plan.zones[p.zone]) plan.zones[p.zone].push(p.employeeId);
+    }
+    return plan;
+  },
+
+  /* The write path behind Carry over / Reset Board. */
+  async applyCarry(boardId, srcDate, destDate) {
     const updatedBy = await this._currentEmail();
-    const { data: srcMissions } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", srcDate);
-    const { data: srcAssignments } = await sb.from("assignments").select("*").eq("plan_date", srcDate);
+    const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate);
 
     // Only a day with NO missions of its own gets yesterday's missions seeded in.
     // If the planner has already created/edited missions (or remarks) for this
@@ -548,7 +654,7 @@ const cloud = {
       .from("missions").select("id, number, shift").eq("board_id", boardId).eq("plan_date", destDate);
     if (destErr) throw destErr;
 
-    if ((!destMissions || destMissions.length === 0) && srcMissions && srcMissions.length) {
+    if ((!destMissions || destMissions.length === 0) && srcMissions.length) {
       const inserts = srcMissions.map((m) => ({
         board_id: boardId, plan_date: destDate, number: m.number, host: m.host, customer: m.customer,
         shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id,
@@ -563,37 +669,15 @@ const cloud = {
         .from("missions").select("id, number, shift").eq("board_id", boardId).eq("plan_date", destDate));
     }
 
-    // map each source mission to the destination mission with the same
-    // number+shift (matching by content, not id, since ids differ per day)
-    const idMap = {};
-    for (const sm of srcMissions || []) {
-      const match = (destMissions || []).find((dm) => dm.number === sm.number && dm.shift === sm.shift);
-      if (match) idMap[sm.id] = match.id;
-    }
-    // active !== false — a new day's plan is a "current roster" operation,
-    // unlike a historical read (ensurePlanLoaded's own boardEmpIds, above,
-    // deliberately does NOT filter this way). Employees load unfiltered now
-    // (see _loadEmployees), so a deactivated employee's old assignment would
-    // otherwise get carried into a brand new day — exactly what deactivating
-    // them should prevent.
-    const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
     const assignInserts = [];
     const historyInserts = [];
-    const srcMissionById = Object.fromEntries((srcMissions || []).map((m) => [m.id, m]));
-    for (const a of srcAssignments || []) {
-      if (!boardEmpIds.has(a.employee_id)) continue;
-      if (a.mission_id) {
-        const mapped = idMap[a.mission_id];
-        if (!mapped) continue;   // that mission isn't on the destination day → leave the employee on standby
-        assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: mapped, zone: null, updated_by: updatedBy });
-        // same content as the source mission (it was just cloned onto destDate),
-        // so no extra lookup needed — see cloud.js's _writeDeploymentHistory for
-        // why this is a plain-text snapshot rather than a mission_id FK
-        const sm = srcMissionById[a.mission_id];
-        if (sm) historyInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_number: sm.number, host: sm.host, customer: sm.customer, board_id: boardId });
-      } else if (a.zone) {
-        assignInserts.push({ employee_id: a.employee_id, plan_date: destDate, mission_id: null, zone: a.zone, updated_by: updatedBy });
-      }
+    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, destMissions)) {
+      assignInserts.push({ employee_id: p.employeeId, plan_date: destDate, mission_id: p.missionId, zone: p.zone, updated_by: updatedBy });
+      // same content as the source mission (it was just cloned onto destDate),
+      // so no extra lookup needed — see cloud.js's _writeDeploymentHistory for
+      // why this is a plain-text snapshot rather than a mission_id FK
+      const sm = p.srcMission;
+      if (p.missionId && sm) historyInserts.push({ employee_id: p.employeeId, plan_date: destDate, mission_number: sm.number, host: sm.host, customer: sm.customer, board_id: boardId });
     }
     if (assignInserts.length) {
       // insert-only (never overwrite): the caller already guarantees the target
@@ -640,7 +724,8 @@ const cloud = {
     }
     const { error: mErr } = await sb.from("missions").delete().eq("board_id", boardId).eq("plan_date", date);
     if (mErr) throw mErr;
-    await this._copyPlanForward(boardId, srcDate, date);
+    await this.applyCarry(boardId, srcDate, date);
+    await this._stampCarry(boardId, date, srcDate);
     this._invalidatePlans();
     return srcDate;
   },
@@ -712,14 +797,14 @@ const cloud = {
     };
     const attempt = (r) => missionId
       ? sb.from("missions").update(r).eq("id", missionId)
-      : sb.from("missions").insert({ ...r, board_id: boardId, plan_date: date });
+      : sb.from("missions").insert({ ...r, board_id: boardId, plan_date: date }).select("id").single();
     // remark and updated_by are both optional (migrations that may not have
     // run yet) — shed whichever column Postgres reports missing and retry,
     // same guarded pattern as _upsertMissionsGuarded, so saves still work
     // either way
-    let error;
+    let error, data;
     for (let i = 0; i < 3; i++) {
-      ({ error } = await attempt(row));
+      ({ error, data } = await attempt(row));
       if (!error) break;
       const missingCol = this._missingColumnFromError(error);
       if (!missingCol || !(missingCol in row)) break;
@@ -728,6 +813,8 @@ const cloud = {
     }
     if (error) throw this._friendlyMissionError(error);
     this._invalidatePlans();
+    // the new mission's id, for a caller that places people on it straight away
+    return missionId || (data && data.id) || null;
   },
   async deleteMission(missionId) {
     const { error } = await sb.from("missions").delete().eq("id", missionId);
@@ -934,6 +1021,7 @@ const cloud = {
   },
   async moveEmployeeToBoard(employeeId, targetBoardId, date) {
     await sb.from("assignments").delete().eq("employee_id", employeeId).eq("plan_date", date);
+    await this._clearForecastPlacements([employeeId], date);
     const { error } = await sb.from("employees").update({ board_id: targetBoardId }).eq("id", employeeId);
     if (error) throw error;
     this._invalidatePlans();
@@ -950,10 +1038,21 @@ const cloud = {
     });
     if (!movingIds.length) return;
     await sb.from("assignments").delete().in("employee_id", movingIds).eq("plan_date", date);
+    await this._clearForecastPlacements(movingIds, date);
     const { error } = await sb.from("employees").update({ board_id: targetBoardId }).in("id", movingIds);
     if (error) throw error;
     this._invalidatePlans();
     await this._loadEmployees();
+  },
+
+  /* A forecast placement belongs to the old board's forecast mission — moving
+     the person to another board takes them off it for the date on screen,
+     same as their confirmed assignment above. Best-effort. */
+  async _clearForecastPlacements(ids, date) {
+    if (!this.data.features.forecast || !ids.length) return;
+    const { error } = await sb.from("forecast_assignments").delete().in("employee_id", ids).eq("plan_date", date);
+    if (error) console.warn("forecast placement not cleared on board move:", error.message || error);
+    this._invalidateForecast();
   },
 
   async createBoard(name, weekendDays) {
@@ -1202,7 +1301,7 @@ const cloud = {
      setMissionsHidden) and a deleted mission cascades the same way, so a live
      join would lose exactly the history this tab exists to preserve.
      deployment_history is written once per (employee, date) the moment an
-     assignment is made (see _writeDeploymentHistory / _copyPlanForward) and
+     assignment is made (see _writeDeploymentHistory / applyCarry) and
      never deleted by the board's normal hide/unassign/delete flows. Not
      date-bounded like the 30D util figure — this answers "which hosts has
      this person ever worked". Degrades to an empty history (instead of
@@ -1389,6 +1488,7 @@ const cloud = {
     if (mErr) throw mErr;
     const { error: dErr } = await sb.from("deployment_history").update({ host: to }).eq("host", from);
     if (dErr && !this._tableMissing(dErr)) throw dErr;
+    await this._renameForecastHost(from, to);
 
     // A host known only from its missions has no row here to rename; the
     // caller's saveHost then creates one under the new name.
@@ -1401,6 +1501,17 @@ const cloud = {
 
     this._invalidatePlans();
     await this._loadHosts();
+  },
+
+  /* Forecast missions carry the host as the same plain text, so a rename or
+     merge has to reach them too — or the forecast would re-introduce the old
+     spelling the day it is merged. A role without forecast edit can still
+     rename a host (Host list), so a refusal here is logged, not thrown. */
+  async _renameForecastHost(from, to) {
+    if (!this.data.features.forecast) return;
+    const { error } = await sb.from("forecast_missions").update({ host: to }).eq("host", from);
+    if (error && !this._tableMissing(error)) console.warn("forecast host rename skipped:", error.message || error);
+    this._invalidateForecast();
   },
 
   async mergeHost(fromName, toName) {
@@ -1418,6 +1529,7 @@ const cloud = {
     // 2. the durable history (absent on a database that never ran that migration)
     const { error: hErr } = await sb.from("deployment_history").update({ host: to }).eq("host", from);
     if (hErr && !this._tableMissing(hErr)) throw hErr;
+    await this._renameForecastHost(from, to);
 
     // 3. carry over anything only the losing record knows, then drop it
     if (fromRec) {
@@ -1518,6 +1630,377 @@ const cloud = {
     return out;
   },
 
+  /* ================= Forward planning (migration-2026-09-24) ================= */
+
+  /* ---------- plan-day stamps: "the day this was copied from has changed" ---------- */
+  /* Best-effort, like deployment history: the carry itself has already
+     happened and must not be reported as failed because its bookkeeping
+     couldn't be written. The RPC stamps the server's clock (see stamp_carry). */
+  async _stampCarry(boardId, destDate, srcDate) {
+    if (!this.data.features.stamps || !srcDate) return;
+    const { error } = await sb.rpc("stamp_carry", { p_board_id: boardId, p_plan_date: destDate, p_carried_from: srcDate });
+    if (error) console.warn("stamp_carry failed (the staleness banner may not show for this day):", error.message || error);
+  },
+
+  /* Everything the board needs to decide on its two banners for one
+     board+date, in as few reads as possible:
+       stamp         the day's own plan_day_stamps row (or null)
+       stale         set when the day was carried over and EITHER its source
+                     day has been edited since (compared against the SOURCE's
+                     stamp — the carry itself bumps this day's own stamp) OR a
+                     newer working day now exists between the source and this
+                     day. `source` is the day a fresh carry would use now.
+     opts.stale: whether to run the staleness check at all (the caller has
+     already ruled out past, locked and non-working days). */
+  async getPlanSignals(boardId, date, opts = {}) {
+    const out = { stamp: null, stale: null };
+    if (!this.data.features.stamps || !boardId) return out;
+    const { data: stamp, error } = await sb.from("plan_day_stamps").select("*")
+      .eq("board_id", boardId).eq("plan_date", date).maybeSingle();
+    if (error) { console.warn("plan_day_stamps read failed:", error.message || error); return out; }
+    out.stamp = stamp || null;
+    if (!opts.stale || !stamp || !stamp.carried_from || !stamp.carried_at) return out;
+    const [srcRes, latest] = await Promise.all([
+      sb.from("plan_day_stamps").select("last_edited_at, last_edited_by")
+        .eq("board_id", boardId).eq("plan_date", stamp.carried_from).maybeSingle(),
+      this.findLatestWeekdayMissionDate(boardId, date),
+    ]);
+    const src = srcRes && srcRes.data;
+    const edited = !!(src && src.last_edited_at && new Date(src.last_edited_at) > new Date(stamp.carried_at));
+    const newerDate = latest && latest > stamp.carried_from ? latest : null;
+    if (edited || newerDate) {
+      out.stale = {
+        carriedFrom: stamp.carried_from, carriedAt: stamp.carried_at,
+        edited, sourceEditedAt: src ? src.last_edited_at : null, sourceEditedBy: src ? src.last_edited_by : null,
+        newerDate, source: newerDate || stamp.carried_from,
+      };
+    }
+    return out;
+  },
+
+  /* ---------- PlanDiff apply: write the ticked items onto a confirmed day ---------- */
+  /* Only through the existing mutations (saveMission, setAssignment,
+     setMissionsHidden, deleteMission), so deployment history, updated_by and
+     the stamps all behave exactly as they do for a hand edit — including
+     writing deployment history for applied mission placements and nothing else.
+
+     Refuses to start if the day was locked while the review was open: the
+     lock is re-read from the database, not trusted from this browser's cache.
+
+     opts.carriedFrom  stamp this day as re-synced from that date afterwards
+     opts.forecastMerge stamp the day's forecast as merged afterwards */
+  async applyPlanDiff(boardId, date, diff, opts = {}) {
+    await this._loadLocks();
+    if (this.data.locks.some((l) => l.boardId === boardId && l.date === date)) {
+      throw new Error("This day was locked while you were reviewing it, so nothing was changed. Unlock it first if it still needs these changes.");
+    }
+    const steps = PlanDiff.plan(diff);
+    const idByKey = new Map([...diff.baseByKey].map(([k, m]) => [k, m.id]));
+    const hiddenIds = new Set([...diff.baseByKey.values()].filter((m) => m.hidden).map((m) => m.id));
+    const vals = (m) => ({
+      number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+      startTime: m.startTime, endTime: m.endTime, engineerId: m.engineerId || null,
+      ppe: m.ppe || "", remark: m.remark || "",
+    });
+    const summary = { added: 0, updated: 0, placed: 0, removed: 0 };
+
+    for (const it of steps.adds) {
+      const id = await this.saveMission(boardId, date, null, vals(it.mission));
+      idByKey.set(it.key, id);
+      for (const mem of it.members) await this.setAssignment(mem.empId, date, { missionId: id });
+      summary.added++;
+      summary.placed += it.members.length;
+    }
+    for (const it of steps.updates) {
+      await this.saveMission(boardId, date, it.baseId, { ...vals(it.mission), number: it.baseMission.number, shift: it.baseMission.shift });
+      if (it.changes.some((c) => c.field === "hidden")) { await this.setMissionsHidden([it.baseId], false); hiddenIds.delete(it.baseId); }
+      summary.updated++;
+    }
+    for (const it of steps.placements) {
+      let target = null;
+      if (it.to.kind === "mission") {
+        const id = idByKey.get(it.to.key);
+        if (!id) continue;
+        // placing someone on a hidden mission would make them invisible
+        if (hiddenIds.has(id)) { await this.setMissionsHidden([id], false); hiddenIds.delete(id); }
+        target = { missionId: id };
+      } else if (it.to.kind === "zone") {
+        target = { zone: it.to.zone };
+      }
+      await this.setAssignment(it.empId, date, target);
+      summary.placed++;
+    }
+    for (const it of steps.removes) {
+      await this.deleteMission(it.baseId);
+      summary.removed++;
+    }
+    if (opts.carriedFrom) await this._stampCarry(boardId, date, opts.carriedFrom);
+    if (opts.forecastMerge) await this.stampForecastMerged(boardId, date);
+    this._invalidatePlans();
+    return summary;
+  },
+
+  /* ---------- Capacity tab ---------- */
+  /* the grid's range is cached in data.capacity (Realtime reloads it);
+     getCapacityDemand reads any other range without touching that cache */
+  async getCapacityDemand(fromDate, toDate) {
+    return fetchAllPages(() => sb.from("capacity_demand").select("*")
+      .gte("plan_date", fromDate).lte("plan_date", toDate).order("plan_date"));
+  },
+  async loadCapacityDemand(fromDate, toDate) {
+    const rows = await this.getCapacityDemand(fromDate, toDate);
+    this.data.capacity = { from: fromDate, to: toDate, rows };
+    return rows;
+  },
+
+  /* cells: [{boardId, date, customer, shift, headcount}] — a null/blank
+     headcount clears that cell (deletes its row). */
+  async setCapacityCells(cells) {
+    const updatedBy = await this._currentEmail();
+    const now = new Date().toISOString();
+    const upserts = cells.filter((c) => c.headcount !== null && c.headcount !== "" && c.headcount !== undefined)
+      .map((c) => ({ board_id: c.boardId, plan_date: c.date, customer: c.customer, shift: c.shift,
+                     headcount: Math.max(0, Math.round(Number(c.headcount))), updated_by: updatedBy, updated_at: now }));
+    if (upserts.length) {
+      const { error } = await sb.from("capacity_demand").upsert(upserts, { onConflict: "board_id,plan_date,customer,shift" });
+      if (error) throw error;
+    }
+    for (const c of cells.filter((x) => x.headcount === null || x.headcount === "" || x.headcount === undefined)) {
+      const { error } = await sb.from("capacity_demand").delete()
+        .eq("board_id", c.boardId).eq("plan_date", c.date).eq("customer", c.customer).eq("shift", c.shift);
+      if (error) throw error;
+    }
+    if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
+  },
+
+  /* The raw rows the Capacity grid derives Leave and "Named on board" from:
+     confirmed rows and forecast rows over the whole range. Which of the two
+     counts for a given date is decided per board by Capacity.aggregate — the
+     horizon is a working-day rule only the app knows. Read-only. */
+  async getCapacityInputs(fromDate, toDate) {
+    const [cAssign, cMissions, fAssign, fMissions] = await Promise.all([
+      fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
+        .gte("plan_date", fromDate).lte("plan_date", toDate)),
+      fetchAllPages(() => sb.from("missions").select("id, board_id, hidden")
+        .gte("plan_date", fromDate).lte("plan_date", toDate)),
+      this.data.features.forecast
+        ? fetchAllPages(() => sb.from("forecast_assignments").select("employee_id, plan_date, forecast_mission_id, zone")
+            .gte("plan_date", fromDate).lte("plan_date", toDate))
+        : Promise.resolve([]),
+      this.data.features.forecast
+        ? fetchAllPages(() => sb.from("forecast_missions").select("id, board_id")
+            .gte("plan_date", fromDate).lte("plan_date", toDate))
+        : Promise.resolve([]),
+    ]);
+    return { confirmed: { assignments: cAssign, missions: cMissions }, forecast: { assignments: fAssign, missions: fMissions } };
+  },
+
+  /* Customer names the planners already use — the Capacity row picker offers
+     these so "Aptiv" and "APTIV " don't become two rows. Recent months only:
+     a customer nobody has planned for in half a year isn't worth offering. */
+  async getKnownCustomers(sinceDate) {
+    const [m, f] = await Promise.all([
+      fetchAllPages(() => sb.from("missions").select("customer").gte("plan_date", sinceDate)),
+      this.data.features.forecast
+        ? fetchAllPages(() => sb.from("forecast_missions").select("customer").gte("plan_date", sinceDate))
+        : Promise.resolve([]),
+    ]);
+    const names = new Set();
+    for (const r of [...m, ...f, ...((this.data.capacity && this.data.capacity.rows) || [])]) {
+      const c = String(r.customer || "").trim();
+      if (c) names.add(c);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  },
+
+  /* ---------- Forecast layer ---------- */
+  _invalidateForecast() { this.data.forecast = {}; },
+
+  /* Same plan shape as ensurePlanLoaded, from the forecast tables, plus:
+       holds     { [empId]: heldBy } — who holds each placed person
+       authors   everyone who created or edited a mission, or holds someone
+       isForecast true */
+  async ensureForecastLoaded(boardId, date, opts = {}) {
+    const empty = { missions: [], zones: emptyZones(), updatedAt: null, holds: {}, authors: [], isForecast: true };
+    if (!boardId || !this.data.features.forecast) return empty;
+    if (!this.data.forecast[boardId]) this.data.forecast[boardId] = {};
+    if (this.data.forecast[boardId][date] && !opts.force) return this.data.forecast[boardId][date];
+
+    const [mRes, aRes] = await Promise.all([
+      sb.from("forecast_missions").select("*").eq("board_id", boardId).eq("plan_date", date),
+      sb.from("forecast_assignments").select("*").eq("plan_date", date),
+    ]);
+    if (mRes.error) throw mRes.error;
+    if (aRes.error) throw aRes.error;
+    const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId).map((e) => e.id));
+    const plan = { ...empty, zones: emptyZones(), holds: {} };
+    const byId = {};
+    const authors = new Set();
+    let latest = null;
+    for (const m of mRes.data || []) {
+      const obj = {
+        id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+        startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
+        ppe: m.ppe || "", remark: m.remark || "", hidden: false, members: [],
+        createdBy: m.created_by || null, updatedBy: m.updated_by || null,
+      };
+      byId[m.id] = obj;
+      plan.missions.push(obj);
+      if (m.created_by) authors.add(m.created_by);
+      if (m.updated_by) authors.add(m.updated_by);
+      if (!latest || m.updated_at > latest) latest = m.updated_at;
+    }
+    for (const a of aRes.data || []) {
+      if (!boardEmpIds.has(a.employee_id)) continue;
+      if (a.forecast_mission_id && byId[a.forecast_mission_id]) byId[a.forecast_mission_id].members.push(a.employee_id);
+      else if (a.zone && plan.zones[a.zone]) plan.zones[a.zone].push(a.employee_id);
+      else continue;
+      plan.holds[a.employee_id] = a.held_by || null;
+      if (a.held_by) authors.add(a.held_by);
+      if (!latest || a.updated_at > latest) latest = a.updated_at;
+    }
+    plan.authors = [...authors].sort();
+    plan.updatedAt = latest;
+    this.data.forecast[boardId][date] = plan;
+    return plan;
+  },
+
+  async saveForecastMission(boardId, date, missionId, vals) {
+    const me = await this._currentEmail();
+    const row = {
+      number: vals.number, host: vals.host, customer: vals.customer, shift: vals.shift,
+      start_time: vals.startTime, end_time: vals.endTime, engineer_id: vals.engineerId,
+      ppe: vals.ppe || null, remark: vals.remark || null,
+      updated_at: new Date().toISOString(), updated_by: me,
+    };
+    const res = missionId
+      ? await sb.from("forecast_missions").update(row).eq("id", missionId)
+      : await sb.from("forecast_missions").insert({ ...row, board_id: boardId, plan_date: date, created_by: me }).select("id").single();
+    if (res.error) throw this._friendlyMissionError(res.error);
+    this._invalidateForecast();
+    return missionId || (res.data && res.data.id) || null;
+  },
+  async deleteForecastMission(missionId) {
+    const { error } = await sb.from("forecast_missions").delete().eq("id", missionId);
+    if (error) throw error;
+    this._invalidateForecast();
+  },
+
+  /* Place (or, with a null target, remove) one person in a forecast. Goes
+     through set_forecast_assignment so taking someone out of another
+     engineer's hold and recording that it happened are one transaction.
+     Returns {changed, taken_from} — taken_from is the engineer who lost them. */
+  async setForecastAssignment(employeeId, date, target) {
+    const { data, error } = await sb.rpc("set_forecast_assignment", {
+      p_employee_id: employeeId, p_plan_date: date,
+      p_mission_id: (target && target.missionId) || null, p_zone: (target && target.zone) || null,
+    });
+    if (error) throw error;
+    this._invalidateForecast();
+    return data || {};
+  },
+
+  /* Write a whole plan (PlanDiff plan shape) into an EMPTY forecast day: the
+     missions first, then everyone onto them by number+shift, held by the
+     current user. Insert-only — never overwrites a forecast someone made. */
+  async _writeForecastPlan(boardId, date, plan) {
+    const me = await this._currentEmail();
+    const now = new Date().toISOString();
+    const missions = (plan.missions || []).filter((m) => !m.hidden);
+    if (missions.length) {
+      const { error } = await sb.from("forecast_missions").upsert(missions.map((m) => ({
+        board_id: boardId, plan_date: date, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+        start_time: m.startTime, end_time: m.endTime, engineer_id: m.engineerId || null,
+        ppe: m.ppe || null, remark: m.remark || null, created_by: me, updated_by: me, updated_at: now,
+      })), { onConflict: "board_id,plan_date,number,shift", ignoreDuplicates: true });
+      if (error) throw error;
+    }
+    const { data: dest, error: dErr } = await sb.from("forecast_missions").select("id, number, shift")
+      .eq("board_id", boardId).eq("plan_date", date);
+    if (dErr) throw dErr;
+    const idOf = new Map((dest || []).map((m) => [m.number + "|" + m.shift, m.id]));
+    const active = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
+    const rows = [];
+    for (const m of missions) {
+      const id = idOf.get(m.number + "|" + m.shift);
+      if (!id) continue;
+      for (const empId of m.members || []) if (active.has(empId)) rows.push({ employee_id: empId, plan_date: date, forecast_mission_id: id, zone: null, held_by: me, updated_at: now });
+    }
+    for (const z of ZONES) {
+      for (const empId of ((plan.zones || {})[z] || [])) if (active.has(empId)) rows.push({ employee_id: empId, plan_date: date, forecast_mission_id: null, zone: z, held_by: me, updated_at: now });
+    }
+    if (rows.length) {
+      const { error } = await sb.from("forecast_assignments").upsert(rows, { onConflict: "employee_id,plan_date", ignoreDuplicates: true });
+      if (error) throw error;
+    }
+    this._invalidateForecast();
+  },
+
+  async _forecastDayIsEmpty(boardId, date) {
+    const plan = await this.ensureForecastLoaded(boardId, date, { force: true });
+    return !plan.missions.length && ZONES.every((z) => !plan.zones[z].length);
+  },
+
+  /* "Start from confirmed": a forecast for `date` built from the latest
+     confirmed working day, through the same carry rules as Carry over
+     (buildCarryPreview) — and nothing else: no deployment history, no stamps.
+     Returns the source date, or null when there is no confirmed day to copy. */
+  async startForecastFromConfirmed(boardId, date) {
+    if (!(await this._forecastDayIsEmpty(boardId, date))) throw new Error("This day already has a forecast. Edit it directly instead.");
+    const srcDate = await this.findLatestWeekdayMissionDate(boardId, date);
+    if (!srcDate) return null;
+    await this._writeForecastPlan(boardId, date, await this.buildCarryPreview(boardId, srcDate));
+    return srcDate;
+  },
+
+  /* "Copy forecast to next N working days": copies into each date whose
+     forecast is still empty for this board, and skips the rest — a date
+     someone has already started forecasting is theirs, not overwritten. */
+  async copyForecastToDates(boardId, srcDate, dates) {
+    const src = await this.ensureForecastLoaded(boardId, srcDate, { force: true });
+    const copied = [], skipped = [];
+    for (const d of dates) {
+      if (await this._forecastDayIsEmpty(boardId, d)) { await this._writeForecastPlan(boardId, d, src); copied.push(d); }
+      else skipped.push(d);
+    }
+    this._invalidateForecast();
+    return { copied, skipped };
+  },
+
+  async stampForecastMerged(boardId, date) {
+    if (!this.data.features.stamps) return;
+    const { error } = await sb.rpc("stamp_forecast_merge", { p_board_id: boardId, p_plan_date: date });
+    if (error) console.warn("stamp_forecast_merge failed (the forecast banner may stay up):", error.message || error);
+  },
+
+  /* ---------- lost holds ---------- */
+  /* Unacknowledged events only — an acknowledged one has done its job. The
+     forecast missions they point at are read alongside so a flag can say
+     "from your mission 123 (5 Oct)" without another round trip per event. */
+  async loadHoldEvents() {
+    if (!this.data.features.forecast) { this.data.holdEvents = []; return; }
+    const { data, error } = await sb.from("forecast_hold_events").select("*")
+      .is("acknowledged_at", null).order("taken_at", { ascending: false }).limit(500);
+    if (error) { console.warn("forecast_hold_events read failed:", error.message || error); return; }
+    this.data.holdEvents = (data || []).map((r) => ({
+      id: r.id, employeeId: r.employee_id, date: r.plan_date,
+      fromMissionId: r.from_forecast_mission_id, fromZone: r.from_zone, fromHeldBy: r.from_held_by,
+      toMissionId: r.to_forecast_mission_id, toZone: r.to_zone, takenBy: r.taken_by, takenAt: r.taken_at,
+    }));
+    const ids = [...new Set(this.data.holdEvents.flatMap((e) => [e.fromMissionId, e.toMissionId]).filter(Boolean))];
+    this.data.holdMissions = {};
+    if (ids.length) {
+      const { data: ms } = await sb.from("forecast_missions").select("id, number, shift, board_id, plan_date").in("id", ids);
+      for (const m of ms || []) this.data.holdMissions[m.id] = { number: m.number, shift: m.shift, boardId: m.board_id, date: m.plan_date };
+    }
+  },
+  async acknowledgeHoldEvents(ids) {
+    if (!ids.length) return;
+    const { error } = await sb.rpc("acknowledge_hold_events", { p_ids: ids });
+    if (error) throw error;
+    await this.loadHoldEvents();
+  },
+
   /* Resolve {boardId, planDate, updatedBy} from a missions/assignments
      realtime payload — app.js compares updatedBy to the viewing user's own
      email, and boardId+planDate to what's currently on screen, to decide
@@ -1543,7 +2026,31 @@ const cloud = {
       this.data.plans = {};
       this.notify(this._attributionFromPayload(payload));
     };
-    sb.channel("db-changes")
+    const ch = sb.channel("db-changes");
+    // Forward planning — registered only when its tables exist: a
+    // postgres_changes filter naming a table that isn't there can make the
+    // server refuse the whole channel, which would take the existing live
+    // updates down with it on a database that hasn't run the migration.
+    // Forecast events drop only the FORECAST cache: the confirmed plans on
+    // screen elsewhere don't change because somebody moved a tentative hold.
+    if (this.data.features.forecast) {
+      const forecastChanged = () => { this._invalidateForecast(); this.notify({ forecast: true }); };
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "forecast_missions" }, forecastChanged)
+        .on("postgres_changes", { event: "*", schema: "public", table: "forecast_assignments" }, forecastChanged)
+        .on("postgres_changes", { event: "*", schema: "public", table: "forecast_hold_events" }, async (payload) => {
+          await this.loadHoldEvents();
+          // the INSERT carries the whole row: app.js toasts it to the one
+          // user whose hold was taken (from_held_by), nobody else
+          this.notify({ holdEvent: payload && payload.eventType === "INSERT" ? payload.new : null });
+        });
+    }
+    if (this.data.features.capacity) {
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "capacity_demand" }, async () => {
+        if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
+        this.notify({ capacity: true });
+      });
+    }
+    ch
       .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, async () => { await this._loadEmployees(); this.notify(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "boards" }, async () => { await this._loadBoards(); this.notify(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "engineers" }, async () => { await this._loadEngineers(); this.notify(); })
