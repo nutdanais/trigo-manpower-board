@@ -439,6 +439,7 @@ const state = {
   diff: null,                  // the open Review changes / Review & merge session
   capacity: {                  // Capacity tab
     weeks: 2,                  // range: 1..8 weeks from today
+    boardId: null,             // the one board the tab shows (see capBoardId)
     inputs: null,              // cloud.getCapacityInputs() for the range
     cacheKey: null,
     extraRows: {},             // { boardId: [{host, shift}] } rows added but with no number yet
@@ -924,6 +925,8 @@ function render() {
   // whole cluster within row 1.
   $("#emplist-toolbar").classList.toggle("hidden", !eml);
   $("#hostlist-toolbar").classList.toggle("hidden", !hl);
+  $("#capacity-toolbar").classList.toggle("hidden", !cap);
+  if (cap) renderCapacityToolbar();
   // Row 2's export-type action is tab-specific — Board/Overview get Export+PDF
   // (below), Manpower and Host each get their own count + CSV button instead.
   // Each pair needs its own toggle: unlike the display:contents groups above,
@@ -1560,7 +1563,13 @@ function renderTabs() {
   const cp = document.createElement("div");
   cp.className = "board-tab tab-capacity" + (isCapacity() ? " active" : "");
   cp.innerHTML = icon("list") + 'Capacity';
-  cp.onclick = () => { clearSelection(); D().activeBoardId = CAPACITY_ID; refreshAndRender(); };
+  cp.onclick = () => {
+    clearSelection();
+    // open on the board the user was just looking at
+    if (D().boards.some(b => b.id === D().activeBoardId)) state.capacity.boardId = D().activeBoardId;
+    D().activeBoardId = CAPACITY_ID;
+    refreshAndRender();
+  };
   el.appendChild(cp);
   }
   // visual break: the three above are app-wide views; the rest are per-board.
@@ -2348,10 +2357,13 @@ function renderStats() {
     return;
   }
   if (isCapacity()) {
-    const c = D().capacity;
-    bar.appendChild(statChip("Boards", D().boards.length));
-    bar.appendChild(statChip("Weeks", state.capacity.weeks));
-    bar.appendChild(statChip("Demand rows", c ? new Set(c.rows.map(r => r.board_id + "|" + r.customer + "|" + r.shift)).size : 0));
+    const boardId = capBoardId();
+    if (!boardId) return;
+    const m = capacityModel(boardId);
+    if (m.roster) bar.appendChild(statChip("Roster", `${m.roster.perm + m.roster.oncall} (${m.roster.perm} P · ${m.roster.oncall} OC)`));
+    bar.appendChild(statChip("Short days", m.short, null, m.short ? "stat-chip-bad" : ""));
+    if (m.worst && m.worst.gap < 0) bar.appendChild(statChip("Biggest gap", `${fmtGap(m.worst.gap)} · ${shortDM(m.worst.date)}`, null, "stat-chip-bad"));
+    if (m.peak && m.peak.demand) bar.appendChild(statChip("Peak demand", `${m.peak.demand} · ${shortDM(m.peak.date)}`));
     return;
   }
   if (isHostList()) {
@@ -6683,12 +6695,19 @@ async function ensureCapacityLoaded() {
   state.capacity.inputs = inputs;
   state.capacity.cacheKey = key;
 }
-/* grid columns: every date in range that is a working day for at least one
-   board — a date every board has off is collapsed away entirely */
-function capacityDates() {
+/* The board the Capacity tab is showing — one at a time. Falls back to the
+   first board the user may see when nothing (or a deleted board) is chosen. */
+function capBoardId() {
+  const boards = D().boards;
+  if (!boards.some(b => b.id === state.capacity.boardId)) state.capacity.boardId = boards.length ? boards[0].id : null;
+  return state.capacity.boardId;
+}
+/* columns: that board's working days in the range; its weekends and holidays
+   are simply left out */
+function capacityDates(boardId) {
   const { from, to } = capacityRange();
   const out = [];
-  for (let d = from; d <= to; d = addDays(d, 1)) if (D().boards.some(b => !isNonWorkingDate(d, b.id))) out.push(d);
+  for (let d = from; d <= to; d = addDays(d, 1)) if (!isNonWorkingDate(d, boardId)) out.push(d);
   return out;
 }
 const capKey = (boardId, date, host, shift) => [boardId, date, host, shift].join("\u0001");
@@ -6701,221 +6720,319 @@ function capacityRowsFor(boardId, demand) {
 function saveCapacityCells(cells) {
   safely(async () => { await cloud.setCapacityCells(cells); render(); });
 }
+/* Everything the chart, the gap chips and the stats row say about one board:
+   per working day its demand, who is available (and why not), how many are
+   already named on a mission, and the gap — plus the headline figures. */
+function capacityModel(boardId) {
+  const dates = capacityDates(boardId);
+  const inputs = state.capacity.inputs;
+  const demand = ((D().capacity && D().capacity.rows) || []).filter(r => r.board_id === boardId);
+  const agg = inputs ? Capacity.aggregate({
+    boards: [{ id: boardId }], employees: D().employees, dates, isForecast: isForecastDateFor,
+    confirmed: inputs.confirmed, forecast: inputs.forecast,
+  })[boardId] : {};
+  const totals = Capacity.demandTotals(demand)[boardId] || {};
+  const days = dates.map(d => {
+    const a = agg[d] || null;
+    const dem = totals[d] || 0;
+    const gap = a ? a.available - dem : null;
+    return { date: d, a, demand: dem, gap, kind: gap == null ? null : gap < 0 ? "short" : gap <= 1 ? "tight" : "ok", forecast: isForecastDateFor(boardId, d) };
+  });
+  const scored = days.filter(x => x.gap != null);
+  const worst = scored.reduce((w, x) => (!w || x.gap < w.gap ? x : w), null);
+  const peak = days.reduce((p, x) => (!p || x.demand > p.demand ? x : p), null);
+  const first = days.find(x => x.a);
+  return {
+    dates, days, demand,
+    short: scored.filter(x => x.gap < 0).length,
+    worst, peak,
+    roster: first ? { perm: first.a.headPerm, oncall: first.a.headOncall } : null,
+  };
+}
+const fmtGap = (g) => (g > 0 ? "+" + g : g < 0 ? "−" + Math.abs(g) : "0");
+const shortDM = (d) => `${fmtDow(d)} ${shortDateLabel(d)}`;
+
+/* the board switch, range and week copy in the toolbar row */
+function renderCapacityToolbar() {
+  const sw = $("#cap-board-switch");
+  sw.innerHTML = "";
+  const current = capBoardId();
+  for (const b of D().boards) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cap-board-btn" + (b.id === current ? " on" : "");
+    btn.setAttribute("aria-pressed", String(b.id === current));
+    const name = document.createElement("span");
+    name.textContent = b.name;
+    const n = document.createElement("span");
+    n.className = "cap-board-n";
+    n.textContent = "· " + D().employees.filter(e => e.boardId === b.id && e.active !== false).length;
+    btn.append(name, n);
+    btn.onclick = () => { state.capacity.boardId = b.id; render(); };
+    sw.appendChild(btn);
+  }
+  $("#cap-range").value = String(state.capacity.weeks);
+  $("#btn-cap-copy-week").classList.toggle("hidden", !can("capacity", "edit"));
+}
+
+const CAP_CHART_H = 190, CAP_CHART_TOP = 30, CAP_COL_H = 232;
 function renderCapacity() {
   const panel = $("#capacity-panel");
   // keep the cell being typed in across a redraw (a Realtime ping from another
   // planner must not throw away what this one is halfway through typing)
   const ae = document.activeElement;
   const keep = ae && ae.dataset && ae.dataset.capKey ? { key: ae.dataset.capKey, value: ae.value, dirty: ae.value !== ae.defaultValue } : null;
+  const scrollWas = (panel.querySelector(".cap-scroll") || {}).scrollLeft || 0;
   panel.innerHTML = "";
+  const boardId = capBoardId();
+  if (!boardId) { panel.innerHTML = '<p class="import-note">No boards yet.</p>'; return; }
+  const board = D().boards.find(b => b.id === boardId);
   const mayEdit = can("capacity", "edit");
-  const c = D().capacity;
-  const demand = (c && c.rows) || [];
-  const dates = capacityDates();
-  const inputs = state.capacity.inputs;
+  const m = capacityModel(boardId);
+  const cols = `var(--cap-left) repeat(${m.dates.length}, minmax(64px, 1fr))`;
+  const row = (cls) => { const r = document.createElement("div"); r.className = "cap-row " + (cls || ""); r.style.gridTemplateColumns = cols; return r; };
+  const head = (text, sub) => {
+    const c = document.createElement("div");
+    c.className = "cap-left";
+    const b = document.createElement("span");
+    b.className = "cap-left-title";
+    b.textContent = text;
+    c.appendChild(b);
+    if (sub) { const s = document.createElement("span"); s.className = "cap-left-sub"; s.textContent = sub; c.appendChild(s); }
+    return c;
+  };
+  const dayCell = (x, extra) => {
+    const c = document.createElement("div");
+    c.className = "cap-day" + (x.forecast ? " cap-fc" : "") + (Capacity.weekStart(x.date) === x.date ? " cap-wk" : "") + (extra ? " " + extra : "");
+    return c;
+  };
 
-  const head = document.createElement("div");
-  head.className = "cap-head";
-  const title = document.createElement("div");
-  title.className = "cap-title";
-  title.innerHTML = "<b>Capacity</b><span>Headcount needed per host and shift against people available — numbers only, no names; nothing here touches a board.</span>";
-  head.appendChild(title);
-  const range = document.createElement("select");
-  range.id = "cap-range";
-  range.title = "How far ahead";
-  for (let w = 1; w <= 8; w++) {
-    const o = document.createElement("option");
-    o.value = String(w);
-    o.textContent = `Next ${w} week${w === 1 ? "" : "s"}`;
-    range.appendChild(o);
-  }
-  range.value = String(state.capacity.weeks);
-  range.onchange = () => { state.capacity.weeks = Number(range.value); state.capacity.cacheKey = null; refreshAndRender(); };
-  head.appendChild(range);
-  if (mayEdit) {
-    const copy = document.createElement("button");
-    copy.type = "button";
-    copy.className = "btn";
-    copy.id = "btn-cap-copy-week";
-    copy.textContent = "Copy this week → next week";
-    copy.onclick = copyCapacityWeek;
-    head.appendChild(copy);
-  }
-  panel.appendChild(head);
+  const card = document.createElement("section");
+  card.className = "cap-card";
+  card.setAttribute("aria-label", `Capacity for ${board.name}`);
+  const top = document.createElement("div");
+  top.className = "cap-card-head";
+  const h = document.createElement("span");
+  h.className = "cap-card-title";
+  h.textContent = `Demand against available people — ${board.name}`;
+  top.appendChild(h);
+  top.insertAdjacentHTML("beforeend",
+    '<span class="cap-key"><i class="cap-key-avail"></i>Available</span>' +
+    '<span class="cap-key"><i class="cap-key-dem"></i>Demand covered</span>' +
+    '<span class="cap-key"><i class="cap-key-over"></i>Demand not covered</span>' +
+    '<span class="cap-key"><i class="cap-key-fc"></i>Forecast day</span>');
+  card.appendChild(top);
 
-  // the Host list is the picker, exactly as on the New Mission form
+  const scroll = document.createElement("div");
+  scroll.className = "cap-scroll";
+  const grid = document.createElement("div");
+  grid.className = "cap-grid2";
+  grid.style.minWidth = `calc(var(--cap-left) + ${m.dates.length * 64}px)`;
+
+  // ----- chart -----
+  const maxVal = Math.max(5, ...m.days.map(x => Math.max(x.demand, x.a ? x.a.available : 0)));
+  const scaleMax = Math.ceil(maxVal * 1.1 / 5) * 5;
+  const px = (n) => Math.round(n / scaleMax * CAP_CHART_H);
+  const ticks = [];
+  for (let v = 0; v <= scaleMax; v += scaleMax > 30 ? 10 : 5) ticks.push(v);
+  const base = CAP_COL_H - CAP_CHART_TOP - CAP_CHART_H;
+  const chart = row("cap-chart");
+  const axis = document.createElement("div");
+  axis.className = "cap-left cap-axis";
+  axis.style.height = CAP_COL_H + "px";
+  for (const v of ticks) {
+    const t = document.createElement("span");
+    t.className = "cap-tick-label";
+    t.style.bottom = (base + px(v) - 7) + "px";
+    t.textContent = v;
+    axis.appendChild(t);
+  }
+  chart.appendChild(axis);
+  for (const x of m.days) {
+    const c = dayCell(x, "cap-col");
+    c.style.height = CAP_COL_H + "px";
+    for (const v of ticks) {
+      const l = document.createElement("i");
+      l.className = "cap-tick" + (v === 0 ? " cap-tick0" : "");
+      l.style.bottom = (base + px(v)) + "px";
+      c.appendChild(l);
+    }
+    const av = x.a ? x.a.available : 0;
+    const covered = Math.min(x.demand, av), over = Math.max(0, x.demand - av);
+    const bar = (cls, bottom, height) => {
+      if (height <= 0) return;
+      const b = document.createElement("i");
+      b.className = cls;
+      b.style.bottom = bottom + "px";
+      b.style.height = height + "px";
+      c.appendChild(b);
+    };
+    bar("cap-bar-avail", base, px(av));
+    bar("cap-bar-dem", base, px(covered));
+    bar("cap-bar-over", base + px(covered), px(over));
+    const lab = document.createElement("span");
+    lab.className = "cap-bar-label" + (x.kind === "short" ? " short" : "");
+    lab.style.bottom = (base + px(Math.max(av, x.demand)) + 5) + "px";
+    lab.textContent = `${x.demand} / ${av}`;
+    c.appendChild(lab);
+    if (x.a) {
+      c.title = `${fmtDow(x.date)} ${fmtDate(x.date)}${x.forecast ? " (forecast)" : ""}\n` +
+        `Demand ${x.demand} · Available ${x.a.available} (${x.a.availPerm} permanent, ${x.a.availOncall} on-call)\n` +
+        `${x.a.leavePerm + x.a.leaveOncall} on leave · ${x.a.named} already named on the board`;
+    }
+    chart.appendChild(c);
+  }
+  grid.appendChild(chart);
+
+  // ----- day header -----
+  const dh = row("cap-dayhead");
+  dh.appendChild(head("Day"));
+  for (const x of m.days) {
+    const c = dayCell(x);
+    c.innerHTML = `<span class="cap-dow">${fmtDow(x.date)}</span><span class="cap-dm${x.date === todayStr() ? " today" : ""}">${shortDateLabel(x.date)}</span>`;
+    dh.appendChild(c);
+  }
+  grid.appendChild(dh);
+
+  // ----- gap -----
+  const gr = row("cap-gaprow");
+  gr.appendChild(head("Gap", "available − demand"));
+  for (const x of m.days) {
+    const c = dayCell(x);
+    if (x.gap != null) {
+      const chip = document.createElement("span");
+      chip.className = "cap-gapchip " + x.kind;
+      chip.dataset.date = x.date;
+      const word = x.kind === "short" ? `short by ${-x.gap}` : x.kind === "tight" ? (x.gap === 0 ? "exactly enough" : "1 spare") : `${x.gap} spare`;
+      chip.setAttribute("aria-label", `${fmtDow(x.date)} ${shortDateLabel(x.date)}: ${word}`);
+      chip.title = word;
+      chip.textContent = `${x.kind === "short" ? "▼" : x.kind === "tight" ? "●" : "▲"} ${fmtGap(x.gap)}`;
+      c.appendChild(chip);
+    }
+    gr.appendChild(c);
+  }
+  grid.appendChild(gr);
+
+  // ----- named on board -----
+  const nr = row("cap-namedrow");
+  nr.appendChild(head("Named on board", "people already placed"));
+  for (const x of m.days) {
+    const c = dayCell(x);
+    c.textContent = x.a ? String(x.a.named) : "";
+    nr.appendChild(c);
+  }
+  grid.appendChild(nr);
+
+  // ----- demand by host -----
+  const sh = row("cap-sechead");
+  const shl = document.createElement("div");
+  shl.className = "cap-left cap-sechead-title";
+  shl.textContent = "Demand by host · shift";
+  sh.appendChild(shl);
+  for (const x of m.days) {
+    const c = dayCell(x);
+    c.textContent = shortDateLabel(x.date);
+    sh.appendChild(c);
+  }
+  grid.appendChild(sh);
+
+  const cellVal = new Map(m.demand.map(r => [capKey(r.board_id, r.plan_date, r.host, r.shift), r.headcount]));
+  const rows = capacityRowsFor(boardId, m.demand);
+  if (!rows.length) {
+    const er = row("cap-hostrow");
+    const t = document.createElement("div");
+    t.className = "cap-left cap-empty";
+    t.textContent = mayEdit ? "No demand yet — add a host below." : "No demand entered.";
+    er.appendChild(t);
+    for (const x of m.days) er.appendChild(dayCell(x));
+    grid.appendChild(er);
+  }
+  for (const r of rows) {
+    const hr = row("cap-hostrow");
+    const hl = document.createElement("div");
+    hl.className = "cap-left cap-hosthead";
+    const nm = document.createElement("span");
+    nm.className = "cap-hostname";
+    nm.textContent = r.host;
+    hl.appendChild(nm);
+    hl.insertAdjacentHTML("beforeend", areaPillHtml(hostAreaOf(r.host), "cap-area"));
+    const shp = document.createElement("span");
+    shp.className = "cap-shift" + (r.shift === "night" ? " night" : "");
+    shp.textContent = r.shift === "night" ? "NIGHT" : "DAY";
+    hl.appendChild(shp);
+    hr.appendChild(hl);
+    for (const x of m.days) {
+      const d = x.date;
+      const c = dayCell(x, "cap-cell");
+      const key = capKey(boardId, d, r.host, r.shift);
+      const v = cellVal.get(key);
+      if (mayEdit) {
+        const inp = document.createElement("input");
+        inp.type = "number";
+        inp.min = "0";
+        inp.step = "1";
+        inp.inputMode = "numeric";
+        inp.dataset.capKey = key;
+        inp.defaultValue = v == null ? "" : String(v);
+        inp.value = inp.defaultValue;
+        inp.setAttribute("aria-label", `${r.host} ${r.shift} ${fmtDow(d)} ${shortDateLabel(d)}`);
+        inp.onchange = () => {
+          const raw = inp.value.trim();
+          if (raw !== "" && !(Number(raw) >= 0)) { inp.value = inp.defaultValue; return; }
+          saveCapacityCells([{ boardId, date: d, host: r.host, shift: r.shift, headcount: raw === "" ? null : Number(raw) }]);
+        };
+        inp.onkeydown = (ev) => {
+          if (ev.key !== "Enter") return;
+          ev.preventDefault();
+          const next = c.nextElementSibling && c.nextElementSibling.querySelector("input");
+          if (next) next.focus(); else inp.blur();
+        };
+        const menu = (mx, my) => showQuickMenu(mx, my, [
+          { label: "Fill right to end of week", run: () => {
+            const val = inp.value.trim();
+            if (val === "") { toast("Type a number in this cell first.", "info"); return; }
+            const targets = Capacity.fillRightDates(d, m.dates, (t) => !isNonWorkingDate(t, boardId));
+            if (!targets.length) { toast("Nothing to fill — this is the last working day of the week on the grid.", "info"); return; }
+            saveCapacityCells([d, ...targets].map(t => ({ boardId, date: t, host: r.host, shift: r.shift, headcount: Number(val) })));
+          } },
+          { label: "Clear this cell", run: () => saveCapacityCells([{ boardId, date: d, host: r.host, shift: r.shift, headcount: null }]) },
+        ]);
+        c.addEventListener("contextmenu", (ev) => { ev.preventDefault(); menu(ev.clientX, ev.clientY); });
+        attachLongPress(c, menu);
+        c.appendChild(inp);
+      } else {
+        c.textContent = v == null ? "" : String(v);
+      }
+      hr.appendChild(c);
+    }
+    grid.appendChild(hr);
+  }
+  scroll.appendChild(grid);
+  card.appendChild(scroll);
+
+  const foot = document.createElement("div");
+  foot.className = "cap-card-foot";
+  if (mayEdit) foot.appendChild(capacityAddRowForm(boardId));
+  const note = document.createElement("span");
+  note.className = "cap-note";
+  note.textContent = "Available uses the current roster, so future hires and leavers are not reflected. Leave and named people come from the confirmed board up to the next working day and from forecasts after it. " +
+    (mayEdit ? "Right-click (or long-press) a cell to fill it to the end of the week. " : "") + "Hover a bar for the details.";
+  foot.appendChild(note);
+  card.appendChild(foot);
+  panel.appendChild(card);
+
   const dl = document.createElement("datalist");
   dl.id = "cap-host-list";
-  for (const h of D().hosts.filter(x => !x.archived).slice().sort((x, y) => x.name.localeCompare(y.name))) {
+  for (const hh of D().hosts.filter(x => !x.archived).slice().sort((a, b) => a.name.localeCompare(b.name))) {
     const o = document.createElement("option");
-    o.value = h.name;
-    const area = h.areaId ? D().areas.find(a => a.id === h.areaId) : null;
-    o.textContent = [area ? area.name : "", h.location].filter(Boolean).join(" · ");
+    o.value = hh.name;
+    const area = hh.areaId ? D().areas.find(a => a.id === hh.areaId) : null;
+    o.textContent = [area ? area.name : "", hh.location].filter(Boolean).join(" · ");
     dl.appendChild(o);
   }
   panel.appendChild(dl);
 
-  const scroll = document.createElement("div");
-  scroll.className = "cap-scroll";
-  const table = document.createElement("table");
-  table.className = "cap-grid";
-  const thead = document.createElement("thead");
-  const hr = document.createElement("tr");
-  const corner = document.createElement("th");
-  corner.className = "cap-sticky";
-  corner.textContent = "Board · host · shift";
-  hr.appendChild(corner);
-  for (const d of dates) {
-    const th = document.createElement("th");
-    th.className = "cap-date" + (d === todayStr() ? " cap-today" : "") + (Capacity.weekStart(d) === d ? " cap-week-start" : "");
-    th.innerHTML = `<span>${fmtDow(d)}</span>${escapeHtml(shortDateLabel(d))}`;
-    hr.appendChild(th);
-  }
-  thead.appendChild(hr);
-  table.appendChild(thead);
-
-  const agg = inputs ? Capacity.aggregate({
-    boards: D().boards, employees: D().employees, dates, isForecast: isForecastDateFor,
-    confirmed: inputs.confirmed, forecast: inputs.forecast,
-  }) : {};
-  const totals = Capacity.demandTotals(demand);
-  const cellVal = new Map(demand.map(r => [capKey(r.board_id, r.plan_date, r.host, r.shift), r.headcount]));
-
-  for (const b of D().boards) {
-    const tb = document.createElement("tbody");
-    tb.className = "cap-board";
-    const br = document.createElement("tr");
-    br.className = "cap-board-row";
-    const bth = document.createElement("th");
-    bth.className = "cap-sticky";
-    bth.colSpan = 1;
-    const bname = document.createElement("b");
-    bname.textContent = b.name;
-    bth.appendChild(bname);
-    if (mayEdit) bth.appendChild(capacityAddRowForm(b.id));
-    br.appendChild(bth);
-    const bfill = document.createElement("th");
-    bfill.colSpan = dates.length;
-    bfill.className = "cap-board-fill";
-    br.appendChild(bfill);
-    tb.appendChild(br);
-
-    const rows = capacityRowsFor(b.id, demand);
-    if (!rows.length) {
-      const tr = document.createElement("tr");
-      const th = document.createElement("th");
-      th.className = "cap-sticky cap-empty";
-      th.textContent = mayEdit ? "No demand yet — add a host above." : "No demand entered.";
-      tr.appendChild(th);
-      const td = document.createElement("td");
-      td.colSpan = dates.length;
-      tr.appendChild(td);
-      tb.appendChild(tr);
-    }
-    for (const r of rows) {
-      const tr = document.createElement("tr");
-      const th = document.createElement("th");
-      th.className = "cap-sticky cap-rowhead";
-      const hostName = document.createElement("span");
-      hostName.textContent = r.host;
-      th.appendChild(hostName);
-      th.insertAdjacentHTML("beforeend", areaPillHtml(hostAreaOf(r.host), "cap-area"));
-      const sh = document.createElement("span");
-      sh.className = "m-shift" + (r.shift === "night" ? " night" : "");
-      sh.textContent = r.shift === "night" ? "NIGHT" : "DAY";
-      th.appendChild(sh);
-      tr.appendChild(th);
-      for (const d of dates) {
-        const td = document.createElement("td");
-        const off = isNonWorkingDate(d, b.id);
-        td.className = "cap-cell" + (off ? " cap-off" : "") + (isForecastDateFor(b.id, d) ? " cap-fc" : "");
-        const key = capKey(b.id, d, r.host, r.shift);
-        const v = cellVal.get(key);
-        if (mayEdit && !off) {
-          const inp = document.createElement("input");
-          inp.type = "number";
-          inp.min = "0";
-          inp.step = "1";
-          inp.inputMode = "numeric";
-          inp.dataset.capKey = key;
-          inp.defaultValue = v == null ? "" : String(v);
-          inp.value = inp.defaultValue;
-          inp.setAttribute("aria-label", `${b.name} ${r.host} ${r.shift} ${d}`);
-          inp.onchange = () => {
-            const raw = inp.value.trim();
-            if (raw !== "" && !(Number(raw) >= 0)) { inp.value = inp.defaultValue; return; }
-            saveCapacityCells([{ boardId: b.id, date: d, host: r.host, shift: r.shift, headcount: raw === "" ? null : Number(raw) }]);
-          };
-          inp.onkeydown = (ev) => {
-            if (ev.key !== "Enter") return;
-            ev.preventDefault();
-            const next = td.nextElementSibling && td.nextElementSibling.querySelector("input");
-            if (next) next.focus(); else inp.blur();
-          };
-          const menu = (x, y) => showQuickMenu(x, y, [
-            { label: "Fill right to end of week", run: () => {
-              const val = inp.value.trim();
-              if (val === "") { toast("Type a number in this cell first.", "info"); return; }
-              const targets = Capacity.fillRightDates(d, dates, (x2) => !isNonWorkingDate(x2, b.id));
-              if (!targets.length) { toast("Nothing to fill — this is the last working day of the week on the grid.", "info"); return; }
-              saveCapacityCells([d, ...targets].map(t => ({ boardId: b.id, date: t, host: r.host, shift: r.shift, headcount: Number(val) })));
-            } },
-            { label: "Clear this cell", run: () => saveCapacityCells([{ boardId: b.id, date: d, host: r.host, shift: r.shift, headcount: null }]) },
-          ]);
-          td.addEventListener("contextmenu", (ev) => { ev.preventDefault(); menu(ev.clientX, ev.clientY); });
-          attachLongPress(td, menu);
-          td.appendChild(inp);
-        } else {
-          td.textContent = off ? "" : (v == null ? "" : String(v));
-        }
-        tr.appendChild(td);
-      }
-      tb.appendChild(tr);
-    }
-
-    const footer = (cls, label, fn, tip) => {
-      const tr = document.createElement("tr");
-      tr.className = "cap-sum " + cls;
-      const th = document.createElement("th");
-      th.className = "cap-sticky";
-      th.textContent = label;
-      if (tip) th.title = tip;
-      tr.appendChild(th);
-      for (const d of dates) {
-        const td = document.createElement("td");
-        if (isNonWorkingDate(d, b.id)) { td.className = "cap-off"; tr.appendChild(td); continue; }
-        if (isForecastDateFor(b.id, d)) td.className = "cap-fc";
-        fn(td, d, (agg[b.id] || {})[d], ((totals[b.id] || {})[d]) || 0);
-        tr.appendChild(td);
-      }
-      tb.appendChild(tr);
-    };
-    footer("cap-demand", "Demand", (td, d, a, dem) => { td.textContent = String(dem); });
-    footer("cap-avail", "Available", (td, d, a) => {
-      if (!a) return;
-      td.innerHTML = `${a.available}<small>P ${a.availPerm} · OC ${a.availOncall}</small>`;
-      td.title = `${a.headPerm + a.headOncall} on the roster, ${a.leavePerm + a.leaveOncall} on leave`;
-    }, "Active employees on this board (permanent + on-call) minus people on leave that day");
-    footer("cap-gap", "Gap", (td, d, a, dem) => {
-      if (!a) return;
-      const gap = a.available - dem;
-      td.textContent = gap > 0 ? "+" + gap : String(gap);
-      if (gap < 0) td.classList.add("neg");
-    }, "Available − Demand");
-    footer("cap-named", "Named on board", (td, d, a) => { if (a) td.textContent = String(a.named); },
-      "People actually placed on a mission that day — the confirmed board up to tomorrow, the forecast after that");
-    table.appendChild(tb);
-  }
-  scroll.appendChild(table);
-  panel.appendChild(scroll);
-
-  const note = document.createElement("p");
-  note.className = "cap-note";
-  note.textContent = "Available uses the current roster, so future hires and leavers are not reflected. Leave comes from the confirmed board up to the next working day and from forecasts after it. " +
-    (mayEdit ? "Right-click (or long-press) a cell to fill it to the end of the week. " : "") +
-    "Shaded columns are forecast dates for that board.";
-  panel.appendChild(note);
-
+  scroll.scrollLeft = scrollWas;
   if (keep) {
     const again = panel.querySelector(`input[data-cap-key="${CSS.escape(keep.key)}"]`);
     if (again) {
@@ -6927,6 +7044,7 @@ function renderCapacity() {
 function capacityAddRowForm(boardId) {
   const form = document.createElement("form");
   form.className = "cap-add";
+  form.id = "cap-add";
   const inp = document.createElement("input");
   inp.type = "text";
   inp.placeholder = "Host…";
@@ -6938,7 +7056,7 @@ function capacityAddRowForm(boardId) {
   const btn = document.createElement("button");
   btn.type = "submit";
   btn.className = "btn btn-small";
-  btn.textContent = "Add row";
+  btn.textContent = "+ Add host row";
   form.append(inp, sh, btn);
   form.onsubmit = (ev) => {
     ev.preventDefault();
@@ -6948,25 +7066,27 @@ function capacityAddRowForm(boardId) {
     // what keeps "Fortune" and "fortune " from becoming two rows
     const rec = hostRecordOf(typed);
     if (!rec) { toast(`"${typed}" is not in the Host list. Pick a host from the suggestions, or add it in the Host tab first.`, "warn"); return; }
-    const name = rec.name;
     const list = state.capacity.extraRows[boardId] || (state.capacity.extraRows[boardId] = []);
-    if (!list.some(r => r.host === name && r.shift === sh.value)) list.push({ host: name, shift: sh.value });
+    if (!list.some(r => r.host === rec.name && r.shift === sh.value)) list.push({ host: rec.name, shift: sh.value });
     render();
   };
   return form;
 }
+/* the board on screen only — "one board at a time" goes for the copy too */
 function copyCapacityWeek() {
+  const boardId = capBoardId();
+  const board = D().boards.find(b => b.id === boardId);
   const { from } = capacityRange();
   const ws = Capacity.weekStart(from);
   const we = addDays(ws, 6);
   safely(async () => {
-    const rows = await cloud.getCapacityDemand(ws, we);
+    const rows = (await cloud.getCapacityDemand(ws, we)).filter(r => r.board_id === boardId);
     const cells = rows
-      .map(r => ({ boardId: r.board_id, date: addDays(r.plan_date, 7), host: r.host, shift: r.shift, headcount: r.headcount }))
-      .filter(c => !isNonWorkingDate(c.date, c.boardId));
-    if (!cells.length) { toast(`Nothing entered for the week of ${fmtShort(ws)} yet.`, "info"); return; }
+      .map(r => ({ boardId, date: addDays(r.plan_date, 7), host: r.host, shift: r.shift, headcount: r.headcount }))
+      .filter(c => !isNonWorkingDate(c.date, boardId));
+    if (!cells.length) { toast(`Nothing entered for ${board.name} in the week of ${fmtShort(ws)} yet.`, "info"); return; }
     showConfirm("Copy this week to next week?",
-      `Copy ${cells.length} entr${cells.length === 1 ? "y" : "ies"} from the week of ${fmtShort(ws)} to the week of ${fmtShort(addDays(ws, 7))}? The same host/shift cells next week are overwritten; everything else is left alone.`,
+      `Copy ${cells.length} entr${cells.length === 1 ? "y" : "ies"} for ${board.name} from the week of ${fmtShort(ws)} to the week of ${fmtShort(addDays(ws, 7))}? The same host/shift cells next week are overwritten; everything else is left alone.`,
       () => saveCapacityCells(cells));
   });
 }
@@ -7814,6 +7934,8 @@ function wireApp() {
   $("#btn-plandiff-all").onclick = () => setAllPlanDiff(true);
   $("#btn-plandiff-none").onclick = () => setAllPlanDiff(false);
   $("#btn-plandiff-apply").onclick = applyPlanDiffFromModal;
+  $("#cap-range").onchange = (ev) => { state.capacity.weeks = Number(ev.target.value); state.capacity.cacheKey = null; refreshAndRender(); };
+  $("#btn-cap-copy-week").onclick = copyCapacityWeek;
 
   // employee search (floating panel) — filter as you type, keep selection
   $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });

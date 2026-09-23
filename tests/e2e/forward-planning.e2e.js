@@ -283,33 +283,41 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       for (const p of [a.page, b.page, v.page]) await p.click("#board-tabs .tab-capacity");
       const pa = a.page, pb = b.page;
       const cell = (p, date) => p.locator(`input[data-cap-key^="b1\u0001${date}\u0001Host Alpha\u0001day"]`);
-      const gapCell = async (p, date) => {
-        const idx = await p.$$eval(".cap-grid thead th", (ths, d) => ths.findIndex((th) => th.textContent.includes(d.slice(8, 10) + "/" + d.slice(5, 7))), date);
-        return p.$eval(".cap-grid tbody.cap-board:first-of-type tr.cap-gap", (tr, i) => tr.children[i].textContent, idx);
-      };
+      const gapChip = async (p, date) => ((await p.textContent(`.cap-gapchip[data-date="${date}"]`)) || "").trim();
 
-      await step("B1: enter demand for two hosts; Gap updates live, including for a second user", async () => {
-        await pa.fill(".cap-board:first-of-type .cap-add input", "Host Alpha");
-        await pa.click(".cap-board:first-of-type .cap-add button");
+      await step("B0: the board to plan is picked in the toolbar, one board at a time", async () => {
+        assert.ok(await pa.isVisible("#capacity-toolbar #cap-board-switch"));
+        const btns = await pa.$$eval("#cap-board-switch .cap-board-btn", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-pressed")]));
+        assert.deepEqual(btns, [["Board One· 8", "true"], ["Board Two· 2", "false"]]);
+        assert.match(await pa.textContent(".cap-card-title"), /Board One/);
+      });
+
+      await step("B1: enter demand for two hosts; the gap chip turns red and updates live, including for a second user", async () => {
+        await pa.fill("#cap-add input", "Host Alpha");
+        await pa.click("#cap-add button");
         await cell(pa, H).fill("12");
         await cell(pa, H).press("Enter");
         await until(() => db.t("capacity_demand").some((r) => r.plan_date === H && r.headcount === 12), "saved");
-        await pa.fill(".cap-board:first-of-type .cap-add input", "Host Beta");
-        await pa.selectOption(".cap-board:first-of-type .cap-add select", "night");
-        await pa.click(".cap-board:first-of-type .cap-add button");
+        await pa.fill("#cap-add input", "Host Beta");
+        await pa.selectOption("#cap-add select", "night");
+        await pa.click("#cap-add button");
         const beta = pa.locator(`input[data-cap-key^="b1\u0001${H}\u0001Host Beta\u0001night"]`);
         await beta.fill("3");
         await beta.press("Tab");
         await until(() => db.t("capacity_demand").length === 2, "second host saved");
         // 8 on the roster, nobody on leave on H yet: 8 - 15 = -7
-        await until(async () => (await gapCell(pa, H)) === "-7", "gap for A");
-        await until(async () => (await gapCell(pb, H)) === "-7", "gap for B, via Realtime");
-        assert.equal(await pa.$eval(".cap-gap td.neg", (td) => td.textContent), "-7", "negative gap is flagged");
+        await until(async () => (await gapChip(pa, H)) === "▼ −7", "gap for A");
+        await until(async () => (await gapChip(pb, H)) === "▼ −7", "gap for B, via Realtime");
+        assert.ok(await pa.$eval(`.cap-gapchip[data-date="${H}"]`, (el) => el.classList.contains("short")), "short day is flagged");
+        assert.equal(await pa.locator(".cap-col .cap-bar-over").count(), 1, "uncovered demand drawn in red on the chart");
+        assert.match(await pa.textContent("#stats-bar"), /Short days: 1/);
+        assert.match(await pa.textContent("#stats-bar"), /Biggest gap: −7/);
+        assert.equal(await gapChip(pa, F), "▲ +8", "a day with no demand shows its spare people");
       });
 
       await step("B1c: a host that is not on the Host list is refused", async () => {
-        await pa.fill(".cap-board:first-of-type .cap-add input", "Nowhere Site");
-        await pa.click(".cap-board:first-of-type .cap-add button");
+        await pa.fill("#cap-add input", "Nowhere Site");
+        await pa.click("#cap-add button");
         await until(async () => /not in the Host list/.test(await pa.textContent("#toast-stack")), "refusal toast");
         assert.equal(await pa.locator('input[data-cap-key*="Nowhere Site"]').count(), 0, "no row added");
       });
@@ -325,19 +333,28 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
 
       await step("B2: putting someone on confirmed annual leave that date reduces Available by 1", async () => {
         asUser(db, h.USERS.b)({ table: "assignments", op: "insert", values: { employee_id: "e8", plan_date: H, mission_id: null, zone: "annual" } });
-        await until(async () => (await gapCell(pa, H)) === "-8", "gap after leave");
+        await until(async () => (await gapChip(pa, H)) === "▼ −8", "gap after leave");
+      });
+
+      await step("B3: switching board shows only that board's demand and people", async () => {
+        await pa.click("#cap-board-switch .cap-board-btn:nth-child(2)");
+        await until(async () => /Board Two/.test(await pa.textContent(".cap-card-title")), "board two");
+        assert.equal(await pa.locator(".cap-cell input").count(), 0, "Board One's host rows are not shown");
+        assert.equal(await gapChip(pa, H), "▲ +2", "Board Two's own roster of 2");
+        await pa.click("#cap-board-switch .cap-board-btn:nth-child(1)");
+        await until(async () => /Board One/.test(await pa.textContent(".cap-card-title")), "back to board one");
       });
 
       await step("B4: a viewer sees the grid read-only", async () => {
-        await until(async () => (await v.page.locator(".cap-grid .cap-cell").count()) > 0, "viewer grid");
-        assert.equal(await v.page.locator(".cap-grid input").count(), 0, "no inputs");
-        assert.equal(await v.page.locator(".cap-add").count(), 0, "no add-row form");
-        assert.equal(await v.page.locator("#btn-cap-copy-week").count(), 0);
+        await until(async () => (await v.page.locator(".cap-hostrow .cap-cell").count()) > 0, "viewer grid");
+        assert.equal(await v.page.locator(".cap-grid2 input").count(), 0, "no inputs");
+        assert.equal(await v.page.locator("#cap-add").count(), 0, "no add-row form");
+        assert.equal(await v.page.isVisible("#btn-cap-copy-week"), false);
       });
 
       await step("B5 / layout: the wide grid scrolls in its own container, not the page", async () => {
         await pa.selectOption("#cap-range", "8");
-        await until(async () => (await pa.locator(".cap-grid thead th").count()) > 30, "8 weeks of columns");
+        await until(async () => (await pa.locator(".cap-dayhead .cap-day").count()) > 30, "8 weeks of columns");
         const m = await pa.evaluate(() => {
           const s = document.querySelector(".cap-scroll");
           return { scrollW: s.scrollWidth, clientW: s.clientWidth, docW: document.documentElement.scrollWidth, winW: document.documentElement.clientWidth };

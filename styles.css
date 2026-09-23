@@ -3964,13 +3964,41 @@ body.forecast-mode .zone { border-style: dashed; }
 .pd-remove .pd-tag { background: var(--danger-tint); color: var(--danger-text); }
 .pd-text { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 
-/* Capacity tab */
-#capacity-panel { display: flex; flex-direction: column; gap: 10px; }
-#capacity-panel.hidden { display: none; }
-.cap-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.cap-title { flex: 1 1 320px; display: flex; flex-direction: column; gap: 2px; }
-.cap-title b { font-size: 15px; }
-.cap-title span { color: var(--muted); font-size: 12.5px; }
+/* Capacity tab — one board at a time: a demand-vs-available chart per
+   working day, the gap under it as a coloured chip (the arrow and the sign
+   carry it too, never colour alone), then demand by host on the same columns.
+   Everything shares one scroll container so the columns never drift apart. */
+:root {
+  --cap-left: 250px;
+  --cap-avail: #d6e0eb;
+  --cap-dem: #004983;
+  --cap-over: #d0342c;
+  --cap-stripe: rgba(0, 73, 131, .05);
+}
+:root[data-theme="dark"] {
+  --cap-avail: #34414f;
+  --cap-dem: #6fb1e0;
+  --cap-over: #ef5b52;
+  --cap-stripe: rgba(111, 177, 224, .07);
+}
+#capacity-toolbar { display: contents; }
+#cap-board-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-soft); flex-wrap: wrap; }
+.cap-board-btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cap-board-btn:hover { background: var(--hover-tint); }
+.cap-board-btn.on { background: var(--primary); color: #fff; font-weight: 700; }
+.cap-board-n { margin-left: 5px; font-weight: 500; opacity: .75; }
+.cap-tool-label { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-left: 6px; }
 #cap-range {
   height: var(--ctl-h);
   padding: 0 8px;
@@ -3979,61 +4007,114 @@ body.forecast-mode .zone { border-style: dashed; }
   background: var(--panel);
   color: var(--text);
   font: inherit;
+  font-size: 13.5px;
 }
-.cap-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-box); background: var(--panel); }
-.cap-grid { border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; min-width: 100%; }
-.cap-grid th, .cap-grid td { border-bottom: 1px solid var(--border); padding: 0; text-align: center; white-space: nowrap; }
-.cap-grid thead th { padding: 6px 4px; font-weight: 600; font-size: 12px; background: var(--bg-soft); position: sticky; top: 0; z-index: 2; }
-.cap-grid thead th span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 500; }
-.cap-grid th.cap-today { color: var(--primary-text); }
-.cap-grid .cap-week-start { border-left: 2px solid var(--border); }
-.cap-sticky {
+.stat-chip-bad b { color: var(--danger-text); }
+
+#capacity-panel { display: flex; flex-direction: column; gap: 10px; }
+#capacity-panel.hidden { display: none; }
+.cap-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; }
+.cap-card-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px 6px; }
+.cap-card-title { font-size: 15px; font-weight: 700; margin-right: 6px; }
+.cap-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.cap-key i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+.cap-key-avail { background: var(--cap-avail); }
+.cap-key-dem { background: var(--cap-dem); }
+.cap-key-over { background: var(--cap-over); }
+.cap-key-fc { border: 1px dashed var(--primary-text); background: repeating-linear-gradient(135deg, transparent 0 3px, var(--cap-stripe) 3px 6px); }
+.cap-scroll { overflow-x: auto; }
+.cap-grid2 { font-variant-numeric: tabular-nums; }
+.cap-row { display: grid; }
+.cap-left {
   position: sticky;
   left: 0;
-  z-index: 1;
-  min-width: 210px;
-  max-width: 280px;
-  padding: 6px 10px !important;
-  text-align: left !important;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 16px;
   background: var(--panel);
   border-right: 1px solid var(--border);
-  white-space: normal !important;
-}
-.cap-grid thead .cap-sticky { z-index: 3; background: var(--bg-soft); }
-.cap-board-row th { background: var(--bg-soft) !important; padding: 8px 10px; text-align: left; }
-.cap-board-row .cap-sticky b { display: block; font-size: 13.5px; margin-bottom: 4px; }
-.cap-add { display: flex; gap: 4px; align-items: center; }
-.cap-add input, .cap-add select {
-  height: var(--ctl-h-sm);
   min-width: 0;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  font-size: 12.5px;
 }
-.cap-add input { flex: 1 1 90px; }
-.cap-rowhead { display: table-cell; }
-.cap-rowhead span:first-child { margin-right: 6px; overflow-wrap: anywhere; }
-.cap-rowhead .m-shift { font-size: 10px; }
-.cap-rowhead .cap-area {
-  display: inline-block;
-  margin-right: 6px;
-  padding: 0 6px;
-  border-radius: 8px;
-  font-size: 10px;
+.cap-left-title { font-size: 13.5px; font-weight: 700; }
+.cap-left-sub { font-size: 11.5px; color: var(--muted); }
+.cap-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--bg-soft);
+  text-align: center;
+  min-width: 0;
+}
+.cap-day.cap-wk { border-left: 2px solid var(--border); }
+.cap-fc { background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--cap-stripe) 6px 12px); }
+
+/* the chart */
+.cap-axis { position: sticky; }
+.cap-tick-label { position: absolute; right: 12px; font-size: 11px; color: var(--muted); }
+.cap-col { justify-content: flex-end; }
+.cap-tick { position: absolute; left: 0; right: 0; height: 1px; background: var(--bg-soft); }
+.cap-tick0 { background: var(--border); }
+.cap-bar-avail, .cap-bar-dem, .cap-bar-over { position: absolute; display: block; border-radius: 4px 4px 0 0; }
+.cap-bar-avail { left: 20%; right: 20%; background: var(--cap-avail); }
+.cap-bar-dem { left: 35%; right: 35%; background: var(--cap-dem); border-radius: 3px 3px 0 0; }
+.cap-bar-over { left: 35%; right: 35%; background: var(--cap-over); border-radius: 3px 3px 0 0; }
+.cap-bar-label { position: absolute; left: 0; right: 0; font-size: 11.5px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.cap-bar-label.short { color: var(--danger-text); }
+
+/* day header, gap, named */
+.cap-dayhead { background: var(--bg-soft); border-top: 1px solid var(--border); }
+.cap-dayhead .cap-left { background: var(--bg-soft); }
+.cap-dayhead .cap-left-title { font-size: 11.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.cap-dayhead .cap-day { padding: 5px 2px; }
+.cap-dow { font-size: 11px; color: var(--muted); }
+.cap-dm { font-size: 13.5px; font-weight: 700; }
+.cap-dm.today { color: var(--primary-text); }
+.cap-gaprow { border-top: 1px solid var(--border); }
+.cap-gaprow .cap-day { padding: 8px 4px; }
+.cap-gaprow .cap-left-title { font-size: 15px; }
+.cap-gapchip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 54px;
+  height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border-radius: 15px;
+  font-size: 14.5px;
   font-weight: 700;
-  line-height: 16px;
-  vertical-align: 1px;
+  white-space: nowrap;
+  border: 1px solid transparent;
 }
-.cap-empty { color: var(--muted); font-weight: 400; font-style: italic; }
-.cap-cell { min-width: 48px; }
+.cap-gapchip.short { background: var(--cap-over); color: #fff; }
+.cap-gapchip.tight { background: var(--warn-surface); color: var(--warn-text); border-color: var(--warn-line); }
+.cap-gapchip.ok { background: var(--ok-surface); color: var(--ok-text); border-color: var(--ok-line); }
+.cap-namedrow { border-top: 1px solid var(--bg-soft); }
+.cap-namedrow .cap-day { font-size: 13px; color: var(--muted); padding: 6px 2px; }
+.cap-namedrow .cap-left-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+/* demand by host */
+.cap-sechead { background: var(--bg-soft); border-top: 2px solid var(--border); }
+.cap-sechead .cap-left { background: var(--bg-soft); }
+.cap-sechead-title { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--primary-text); }
+.cap-sechead .cap-day { font-size: 11.5px; color: var(--muted); padding: 5px 2px; }
+.cap-hostrow { border-top: 1px solid var(--bg-soft); min-height: 38px; }
+.cap-hosthead { flex-direction: row; align-items: center; justify-content: flex-start; gap: 7px; }
+.cap-hostname { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.cap-area { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 16px; flex: none; }
+.cap-shift { flex: none; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); }
+.cap-shift.night { background: var(--night); border-color: var(--night); color: #fff; }
+:root[data-theme="dark"] .cap-shift.night { background: #0b0f14; border-color: var(--muted); }
+.cap-empty { color: var(--muted); font-style: italic; font-size: 13px; }
+.cap-cell { font-size: 14px; font-weight: 600; }
 .cap-cell input {
   width: 100%;
-  min-width: 44px;
-  height: 30px;
+  height: 36px;
   padding: 0 4px;
   border: 0;
   background: transparent;
@@ -4045,14 +4126,20 @@ body.forecast-mode .zone { border-style: dashed; }
 .cap-cell input::-webkit-outer-spin-button,
 .cap-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .cap-cell input:focus { outline: 2px solid var(--primary-text); outline-offset: -2px; background: var(--hover-tint); }
-.cap-grid .cap-fc { background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0, 73, 131, .05) 6px 12px); }
-.cap-grid .cap-off { background: var(--bg-soft); }
-.cap-sum td, .cap-sum th { padding: 5px 4px; font-weight: 600; }
-.cap-sum td small { display: block; font-size: 10px; font-weight: 400; color: var(--muted); }
-.cap-demand td, .cap-demand th { border-top: 2px solid var(--border); }
-.cap-gap td.neg { color: var(--danger-text); background: var(--danger-tint); }
-.cap-named td, .cap-named th { color: var(--muted); font-weight: 500; }
-.cap-note { color: var(--muted); font-size: 12px; }
+.cap-card-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--border); }
+.cap-add { display: flex; gap: 6px; align-items: center; }
+.cap-add input, .cap-add select {
+  height: var(--ctl-h-sm);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.cap-add input { width: 200px; }
+.cap-note { flex: 1 1 320px; color: var(--muted); font-size: 12px; }
 
 /* Ctrl+P on a forecast or the Capacity grid: a notice, not the tentative plan */
 @media print {

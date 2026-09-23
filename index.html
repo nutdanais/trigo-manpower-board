@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-24b">
+<link rel="stylesheet" href="styles.css?v=2026-09-24c">
 </head>
 <body>
 
@@ -201,6 +201,23 @@
       <span class="toggle-track"><span class="toggle-thumb"></span></span>
       <span class="toggle-text">Holiday</span>
     </label>
+    <!-- Capacity tab: the board it shows (one at a time), how far ahead, and
+         the week copy — a display:contents group like #emplist-toolbar. -->
+    <div id="capacity-toolbar" class="hidden">
+      <div id="cap-board-switch" role="group" aria-label="Board"></div>
+      <label class="cap-tool-label" for="cap-range">Range</label>
+      <select id="cap-range" title="How far ahead">
+        <option value="1">Next 1 week</option>
+        <option value="2">Next 2 weeks</option>
+        <option value="3">Next 3 weeks</option>
+        <option value="4">Next 4 weeks</option>
+        <option value="5">Next 5 weeks</option>
+        <option value="6">Next 6 weeks</option>
+        <option value="7">Next 7 weeks</option>
+        <option value="8">Next 8 weeks</option>
+      </select>
+      <button type="button" id="btn-cap-copy-week" class="btn" title="Copy this board's demand for the current week onto next week">Copy this week → next week</button>
+    </div>
     <button id="btn-toolbar-more" class="btn toolbar-more-toggle" type="button" title="More actions" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"></use></svg> More</button>
     <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
          in styles.css) instead of wrapping into several rows of controls above the
@@ -918,6 +935,6 @@
 <script src="planning.js?v=2026-09-24"></script>
 <script src="cloud.js?v=2026-09-24b"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="app.js?v=2026-09-24b"></script>
+<script src="app.js?v=2026-09-24c"></script>
 </body>
 </html>
