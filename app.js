@@ -441,8 +441,7 @@ const state = {
     weeks: 2,                  // range: 1..8 weeks from today
     inputs: null,              // cloud.getCapacityInputs() for the range
     cacheKey: null,
-    customers: null,           // known customer names for the row picker (fetched once)
-    extraRows: {},             // { boardId: [{customer, shift}] } rows added but with no number yet
+    extraRows: {},             // { boardId: [{host, shift}] } rows added but with no number yet
   },
 };
 
@@ -497,7 +496,7 @@ const PERM_AREAS = [
     { key: "orgchart", label: "Org Chart",      hint: "Board → engineer → service area → mission → crew", viewOnly: true },
     { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
     { key: "hostlist", label: "Host",           hint: "Sites and their records" },
-    { key: "capacity", label: "Capacity",       hint: "Headcount demand vs available, weeks ahead" },
+    { key: "capacity", label: "Capacity",       hint: "Headcount needed per host vs available, weeks ahead" },
     { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
@@ -6677,13 +6676,11 @@ async function ensureCapacityLoaded() {
   const key = from + ".." + to + "|" + D().employees.length;
   const c = D().capacity;
   if (state.capacity.cacheKey === key && c && c.from === from && c.to === to && state.capacity.inputs) return;
-  const [, inputs, customers] = await Promise.all([
+  const [, inputs] = await Promise.all([
     cloud.loadCapacityDemand(from, to),
     cloud.getCapacityInputs(from, to),
-    state.capacity.customers ? Promise.resolve(state.capacity.customers) : cloud.getKnownCustomers(addDays(from, -180)),
   ]);
   state.capacity.inputs = inputs;
-  state.capacity.customers = customers;
   state.capacity.cacheKey = key;
 }
 /* grid columns: every date in range that is a working day for at least one
@@ -6694,12 +6691,12 @@ function capacityDates() {
   for (let d = from; d <= to; d = addDays(d, 1)) if (D().boards.some(b => !isNonWorkingDate(d, b.id))) out.push(d);
   return out;
 }
-const capKey = (boardId, date, customer, shift) => [boardId, date, customer, shift].join("\u0001");
+const capKey = (boardId, date, host, shift) => [boardId, date, host, shift].join("\u0001");
 function capacityRowsFor(boardId, demand) {
   const seen = new Map();
-  for (const r of demand) if (r.board_id === boardId) seen.set(r.customer + "\u0001" + r.shift, { customer: r.customer, shift: r.shift });
-  for (const r of state.capacity.extraRows[boardId] || []) if (!seen.has(r.customer + "\u0001" + r.shift)) seen.set(r.customer + "\u0001" + r.shift, r);
-  return [...seen.values()].sort((a, b) => a.customer.localeCompare(b.customer) || (a.shift === "night") - (b.shift === "night"));
+  for (const r of demand) if (r.board_id === boardId) seen.set(r.host + "\u0001" + r.shift, { host: r.host, shift: r.shift });
+  for (const r of state.capacity.extraRows[boardId] || []) if (!seen.has(r.host + "\u0001" + r.shift)) seen.set(r.host + "\u0001" + r.shift, r);
+  return [...seen.values()].sort((a, b) => a.host.localeCompare(b.host) || (a.shift === "night") - (b.shift === "night"));
 }
 function saveCapacityCells(cells) {
   safely(async () => { await cloud.setCapacityCells(cells); render(); });
@@ -6721,7 +6718,7 @@ function renderCapacity() {
   head.className = "cap-head";
   const title = document.createElement("div");
   title.className = "cap-title";
-  title.innerHTML = "<b>Capacity</b><span>Headcount needed per customer and shift against people available — numbers only, no names; nothing here touches a board.</span>";
+  title.innerHTML = "<b>Capacity</b><span>Headcount needed per host and shift against people available — numbers only, no names; nothing here touches a board.</span>";
   head.appendChild(title);
   const range = document.createElement("select");
   range.id = "cap-range";
@@ -6746,9 +6743,16 @@ function renderCapacity() {
   }
   panel.appendChild(head);
 
+  // the Host list is the picker, exactly as on the New Mission form
   const dl = document.createElement("datalist");
-  dl.id = "cap-customer-list";
-  for (const name of state.capacity.customers || []) { const o = document.createElement("option"); o.value = name; dl.appendChild(o); }
+  dl.id = "cap-host-list";
+  for (const h of D().hosts.filter(x => !x.archived).slice().sort((x, y) => x.name.localeCompare(y.name))) {
+    const o = document.createElement("option");
+    o.value = h.name;
+    const area = h.areaId ? D().areas.find(a => a.id === h.areaId) : null;
+    o.textContent = [area ? area.name : "", h.location].filter(Boolean).join(" · ");
+    dl.appendChild(o);
+  }
   panel.appendChild(dl);
 
   const scroll = document.createElement("div");
@@ -6759,7 +6763,7 @@ function renderCapacity() {
   const hr = document.createElement("tr");
   const corner = document.createElement("th");
   corner.className = "cap-sticky";
-  corner.textContent = "Board · customer · shift";
+  corner.textContent = "Board · host · shift";
   hr.appendChild(corner);
   for (const d of dates) {
     const th = document.createElement("th");
@@ -6775,7 +6779,7 @@ function renderCapacity() {
     confirmed: inputs.confirmed, forecast: inputs.forecast,
   }) : {};
   const totals = Capacity.demandTotals(demand);
-  const cellVal = new Map(demand.map(r => [capKey(r.board_id, r.plan_date, r.customer, r.shift), r.headcount]));
+  const cellVal = new Map(demand.map(r => [capKey(r.board_id, r.plan_date, r.host, r.shift), r.headcount]));
 
   for (const b of D().boards) {
     const tb = document.createElement("tbody");
@@ -6801,7 +6805,7 @@ function renderCapacity() {
       const tr = document.createElement("tr");
       const th = document.createElement("th");
       th.className = "cap-sticky cap-empty";
-      th.textContent = mayEdit ? "No demand yet — add a customer above." : "No demand entered.";
+      th.textContent = mayEdit ? "No demand yet — add a host above." : "No demand entered.";
       tr.appendChild(th);
       const td = document.createElement("td");
       td.colSpan = dates.length;
@@ -6812,9 +6816,10 @@ function renderCapacity() {
       const tr = document.createElement("tr");
       const th = document.createElement("th");
       th.className = "cap-sticky cap-rowhead";
-      const cust = document.createElement("span");
-      cust.textContent = r.customer;
-      th.appendChild(cust);
+      const hostName = document.createElement("span");
+      hostName.textContent = r.host;
+      th.appendChild(hostName);
+      th.insertAdjacentHTML("beforeend", areaPillHtml(hostAreaOf(r.host), "cap-area"));
       const sh = document.createElement("span");
       sh.className = "m-shift" + (r.shift === "night" ? " night" : "");
       sh.textContent = r.shift === "night" ? "NIGHT" : "DAY";
@@ -6824,7 +6829,7 @@ function renderCapacity() {
         const td = document.createElement("td");
         const off = isNonWorkingDate(d, b.id);
         td.className = "cap-cell" + (off ? " cap-off" : "") + (isForecastDateFor(b.id, d) ? " cap-fc" : "");
-        const key = capKey(b.id, d, r.customer, r.shift);
+        const key = capKey(b.id, d, r.host, r.shift);
         const v = cellVal.get(key);
         if (mayEdit && !off) {
           const inp = document.createElement("input");
@@ -6835,11 +6840,11 @@ function renderCapacity() {
           inp.dataset.capKey = key;
           inp.defaultValue = v == null ? "" : String(v);
           inp.value = inp.defaultValue;
-          inp.setAttribute("aria-label", `${b.name} ${r.customer} ${r.shift} ${d}`);
+          inp.setAttribute("aria-label", `${b.name} ${r.host} ${r.shift} ${d}`);
           inp.onchange = () => {
             const raw = inp.value.trim();
             if (raw !== "" && !(Number(raw) >= 0)) { inp.value = inp.defaultValue; return; }
-            saveCapacityCells([{ boardId: b.id, date: d, customer: r.customer, shift: r.shift, headcount: raw === "" ? null : Number(raw) }]);
+            saveCapacityCells([{ boardId: b.id, date: d, host: r.host, shift: r.shift, headcount: raw === "" ? null : Number(raw) }]);
           };
           inp.onkeydown = (ev) => {
             if (ev.key !== "Enter") return;
@@ -6853,9 +6858,9 @@ function renderCapacity() {
               if (val === "") { toast("Type a number in this cell first.", "info"); return; }
               const targets = Capacity.fillRightDates(d, dates, (x2) => !isNonWorkingDate(x2, b.id));
               if (!targets.length) { toast("Nothing to fill — this is the last working day of the week on the grid.", "info"); return; }
-              saveCapacityCells([d, ...targets].map(t => ({ boardId: b.id, date: t, customer: r.customer, shift: r.shift, headcount: Number(val) })));
+              saveCapacityCells([d, ...targets].map(t => ({ boardId: b.id, date: t, host: r.host, shift: r.shift, headcount: Number(val) })));
             } },
-            { label: "Clear this cell", run: () => saveCapacityCells([{ boardId: b.id, date: d, customer: r.customer, shift: r.shift, headcount: null }]) },
+            { label: "Clear this cell", run: () => saveCapacityCells([{ boardId: b.id, date: d, host: r.host, shift: r.shift, headcount: null }]) },
           ]);
           td.addEventListener("contextmenu", (ev) => { ev.preventDefault(); menu(ev.clientX, ev.clientY); });
           attachLongPress(td, menu);
@@ -6924,9 +6929,9 @@ function capacityAddRowForm(boardId) {
   form.className = "cap-add";
   const inp = document.createElement("input");
   inp.type = "text";
-  inp.placeholder = "Customer…";
-  inp.setAttribute("list", "cap-customer-list");
-  inp.setAttribute("aria-label", "Customer");
+  inp.placeholder = "Host…";
+  inp.setAttribute("list", "cap-host-list");
+  inp.setAttribute("aria-label", "Host");
   const sh = document.createElement("select");
   sh.setAttribute("aria-label", "Shift");
   sh.innerHTML = '<option value="day">Day</option><option value="night">Night</option>';
@@ -6937,13 +6942,15 @@ function capacityAddRowForm(boardId) {
   form.append(inp, sh, btn);
   form.onsubmit = (ev) => {
     ev.preventDefault();
-    let name = inp.value.trim();
-    if (!name) return;
-    // settle on the spelling already in use, so "aptiv" doesn't start a second row
-    const known = (state.capacity.customers || []).find(c => c.toLowerCase() === name.toLowerCase());
-    if (known) name = known;
+    const typed = inp.value.trim();
+    if (!typed) return;
+    // same rule as a mission's host: it has to be on the Host list, which is
+    // what keeps "Fortune" and "fortune " from becoming two rows
+    const rec = hostRecordOf(typed);
+    if (!rec) { toast(`"${typed}" is not in the Host list. Pick a host from the suggestions, or add it in the Host tab first.`, "warn"); return; }
+    const name = rec.name;
     const list = state.capacity.extraRows[boardId] || (state.capacity.extraRows[boardId] = []);
-    if (!list.some(r => r.customer === name && r.shift === sh.value)) list.push({ customer: name, shift: sh.value });
+    if (!list.some(r => r.host === name && r.shift === sh.value)) list.push({ host: name, shift: sh.value });
     render();
   };
   return form;
@@ -6955,11 +6962,11 @@ function copyCapacityWeek() {
   safely(async () => {
     const rows = await cloud.getCapacityDemand(ws, we);
     const cells = rows
-      .map(r => ({ boardId: r.board_id, date: addDays(r.plan_date, 7), customer: r.customer, shift: r.shift, headcount: r.headcount }))
+      .map(r => ({ boardId: r.board_id, date: addDays(r.plan_date, 7), host: r.host, shift: r.shift, headcount: r.headcount }))
       .filter(c => !isNonWorkingDate(c.date, c.boardId));
     if (!cells.length) { toast(`Nothing entered for the week of ${fmtShort(ws)} yet.`, "info"); return; }
     showConfirm("Copy this week to next week?",
-      `Copy ${cells.length} entr${cells.length === 1 ? "y" : "ies"} from the week of ${fmtShort(ws)} to the week of ${fmtShort(addDays(ws, 7))}? The same customer/shift cells next week are overwritten; everything else is left alone.`,
+      `Copy ${cells.length} entr${cells.length === 1 ? "y" : "ies"} from the week of ${fmtShort(ws)} to the week of ${fmtShort(addDays(ws, 7))}? The same host/shift cells next week are overwritten; everything else is left alone.`,
       () => saveCapacityCells(cells));
   });
 }

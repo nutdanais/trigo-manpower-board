@@ -18,7 +18,7 @@ const UNIQUE = {
   plan_days: ["board_id", "plan_date"],
   plan_day_stamps: ["board_id", "plan_date"],
   day_overrides: ["board_id", "override_date"],
-  capacity_demand: ["board_id", "plan_date", "customer", "shift"],
+  capacity_demand: ["board_id", "plan_date", "host", "shift"],
   forecast_missions: ["board_id", "plan_date", "number", "shift"],
   forecast_assignments: ["employee_id", "plan_date"],
   hosts: ["name"],

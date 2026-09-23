@@ -1753,21 +1753,21 @@ const cloud = {
     return rows;
   },
 
-  /* cells: [{boardId, date, customer, shift, headcount}] — a null/blank
+  /* cells: [{boardId, date, host, shift, headcount}] — a null/blank
      headcount clears that cell (deletes its row). */
   async setCapacityCells(cells) {
     const updatedBy = await this._currentEmail();
     const now = new Date().toISOString();
     const upserts = cells.filter((c) => c.headcount !== null && c.headcount !== "" && c.headcount !== undefined)
-      .map((c) => ({ board_id: c.boardId, plan_date: c.date, customer: c.customer, shift: c.shift,
+      .map((c) => ({ board_id: c.boardId, plan_date: c.date, host: c.host, shift: c.shift,
                      headcount: Math.max(0, Math.round(Number(c.headcount))), updated_by: updatedBy, updated_at: now }));
     if (upserts.length) {
-      const { error } = await sb.from("capacity_demand").upsert(upserts, { onConflict: "board_id,plan_date,customer,shift" });
+      const { error } = await sb.from("capacity_demand").upsert(upserts, { onConflict: "board_id,plan_date,host,shift" });
       if (error) throw error;
     }
     for (const c of cells.filter((x) => x.headcount === null || x.headcount === "" || x.headcount === undefined)) {
       const { error } = await sb.from("capacity_demand").delete()
-        .eq("board_id", c.boardId).eq("plan_date", c.date).eq("customer", c.customer).eq("shift", c.shift);
+        .eq("board_id", c.boardId).eq("plan_date", c.date).eq("host", c.host).eq("shift", c.shift);
       if (error) throw error;
     }
     if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
@@ -1793,24 +1793,6 @@ const cloud = {
         : Promise.resolve([]),
     ]);
     return { confirmed: { assignments: cAssign, missions: cMissions }, forecast: { assignments: fAssign, missions: fMissions } };
-  },
-
-  /* Customer names the planners already use — the Capacity row picker offers
-     these so "Aptiv" and "APTIV " don't become two rows. Recent months only:
-     a customer nobody has planned for in half a year isn't worth offering. */
-  async getKnownCustomers(sinceDate) {
-    const [m, f] = await Promise.all([
-      fetchAllPages(() => sb.from("missions").select("customer").gte("plan_date", sinceDate)),
-      this.data.features.forecast
-        ? fetchAllPages(() => sb.from("forecast_missions").select("customer").gte("plan_date", sinceDate))
-        : Promise.resolve([]),
-    ]);
-    const names = new Set();
-    for (const r of [...m, ...f, ...((this.data.capacity && this.data.capacity.rows) || [])]) {
-      const c = String(r.customer || "").trim();
-      if (c) names.add(c);
-    }
-    return [...names].sort((a, b) => a.localeCompare(b));
   },
 
   /* ---------- Forecast layer ---------- */

@@ -282,29 +282,36 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       const v = await env.openAs(db, h.USERS.v);
       for (const p of [a.page, b.page, v.page]) await p.click("#board-tabs .tab-capacity");
       const pa = a.page, pb = b.page;
-      const cell = (p, date) => p.locator(`input[data-cap-key^="b1\u0001${date}\u0001Cust Alpha\u0001day"]`);
+      const cell = (p, date) => p.locator(`input[data-cap-key^="b1\u0001${date}\u0001Host Alpha\u0001day"]`);
       const gapCell = async (p, date) => {
         const idx = await p.$$eval(".cap-grid thead th", (ths, d) => ths.findIndex((th) => th.textContent.includes(d.slice(8, 10) + "/" + d.slice(5, 7))), date);
         return p.$eval(".cap-grid tbody.cap-board:first-of-type tr.cap-gap", (tr, i) => tr.children[i].textContent, idx);
       };
 
-      await step("B1: enter demand for two customers; Gap updates live, including for a second user", async () => {
-        await pa.fill(".cap-board:first-of-type .cap-add input", "Cust Alpha");
+      await step("B1: enter demand for two hosts; Gap updates live, including for a second user", async () => {
+        await pa.fill(".cap-board:first-of-type .cap-add input", "Host Alpha");
         await pa.click(".cap-board:first-of-type .cap-add button");
         await cell(pa, H).fill("12");
         await cell(pa, H).press("Enter");
         await until(() => db.t("capacity_demand").some((r) => r.plan_date === H && r.headcount === 12), "saved");
-        await pa.fill(".cap-board:first-of-type .cap-add input", "Cust Beta");
+        await pa.fill(".cap-board:first-of-type .cap-add input", "Host Beta");
         await pa.selectOption(".cap-board:first-of-type .cap-add select", "night");
         await pa.click(".cap-board:first-of-type .cap-add button");
-        const beta = pa.locator(`input[data-cap-key^="b1\u0001${H}\u0001Cust Beta\u0001night"]`);
+        const beta = pa.locator(`input[data-cap-key^="b1\u0001${H}\u0001Host Beta\u0001night"]`);
         await beta.fill("3");
         await beta.press("Tab");
-        await until(() => db.t("capacity_demand").length === 2, "second customer saved");
+        await until(() => db.t("capacity_demand").length === 2, "second host saved");
         // 8 on the roster, nobody on leave on H yet: 8 - 15 = -7
         await until(async () => (await gapCell(pa, H)) === "-7", "gap for A");
         await until(async () => (await gapCell(pb, H)) === "-7", "gap for B, via Realtime");
         assert.equal(await pa.$eval(".cap-gap td.neg", (td) => td.textContent), "-7", "negative gap is flagged");
+      });
+
+      await step("B1c: a host that is not on the Host list is refused", async () => {
+        await pa.fill(".cap-board:first-of-type .cap-add input", "Nowhere Site");
+        await pa.click(".cap-board:first-of-type .cap-add button");
+        await until(async () => /not in the Host list/.test(await pa.textContent("#toast-stack")), "refusal toast");
+        assert.equal(await pa.locator('input[data-cap-key*="Nowhere Site"]').count(), 0, "no row added");
       });
 
       await step("B1b: Fill right to end of week writes the following working days only", async () => {
@@ -312,7 +319,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await pa.click("#context-menu >> text=Fill right to end of week");
         const expected = [];
         for (let d = h.addDays(H, 1); new Date(d + "T00:00:00").getDay() !== 1; d = h.addDays(d, 1)) if (!h.isWeekend(d)) expected.push(d);
-        await until(() => expected.every((d) => db.t("capacity_demand").some((r) => r.plan_date === d && r.customer === "Cust Alpha" && r.headcount === 12)), "filled right");
+        await until(() => expected.every((d) => db.t("capacity_demand").some((r) => r.plan_date === d && r.host === "Host Alpha" && r.headcount === 12)), "filled right");
         assert.ok(!db.t("capacity_demand").some((r) => h.isWeekend(r.plan_date)), "never onto a weekend");
       });
 

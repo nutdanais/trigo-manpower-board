@@ -876,18 +876,35 @@ $fn$;
 
 -- ===== 2. Capacity demand =====
 
+-- One row per board, date, HOST and shift: the site the people are needed
+-- at, by the same name the Host list and every mission use.
 create table if not exists capacity_demand (
   id         uuid primary key default gen_random_uuid(),
   board_id   uuid not null references boards(id) on delete cascade,
   plan_date  date not null,
-  customer   text not null,
+  host       text not null,
   shift      text not null check (shift in ('day', 'night')),
   headcount  int  not null check (headcount >= 0),
   note       text,
   updated_by text,
   updated_at timestamptz not null default now(),
-  unique (board_id, plan_date, customer, shift)
+  unique (board_id, plan_date, host, shift)
 );
+-- The first draft of this table was keyed by customer. A database that ran
+-- that draft keeps its rows; the column (and its unique key) is renamed.
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'capacity_demand' and column_name = 'customer')
+     and not exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'capacity_demand' and column_name = 'host') then
+    alter table capacity_demand rename column customer to host;
+  end if;
+  if exists (select 1 from pg_constraint where conname = 'capacity_demand_board_id_plan_date_customer_shift_key') then
+    alter table capacity_demand rename constraint capacity_demand_board_id_plan_date_customer_shift_key
+      to capacity_demand_board_id_plan_date_host_shift_key;
+  end if;
+end $$;
 create index if not exists capacity_demand_date_idx on capacity_demand(plan_date);
 
 -- ===== 3. Forecast layer =====

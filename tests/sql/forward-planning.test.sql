@@ -189,13 +189,13 @@ select t.check((select count(*) = 1 from forecast_hold_events), 'taking a ''migr
 -- ---------- 5. capacity RLS ----------
 select t.as_user('eng.a@example.com');
 set role authenticated;
-insert into capacity_demand (board_id, plan_date, customer, shift, headcount) values ('10000000-0000-0000-0000-000000000001', current_date + 5, 'Cust Y', 'day', 12);
+insert into capacity_demand (board_id, plan_date, host, shift, headcount) values ('10000000-0000-0000-0000-000000000001', current_date + 5, 'Host X', 'day', 12);
 reset role;
 select t.as_user('viewer.c@example.com');
 set role authenticated;
 select t.check((select count(*) = 1 from capacity_demand), 'a viewer can read capacity');
 do $$ begin
-  insert into capacity_demand (board_id, plan_date, customer, shift, headcount) values ('10000000-0000-0000-0000-000000000001', current_date + 6, 'Cust Y', 'day', 3);
+  insert into capacity_demand (board_id, plan_date, host, shift, headcount) values ('10000000-0000-0000-0000-000000000001', current_date + 6, 'Host X', 'day', 3);
   raise exception 'FAILED: viewer wrote capacity_demand';
 exception when insufficient_privilege then raise notice 'ok - RLS rejects a viewer''s capacity write';
 end $$;

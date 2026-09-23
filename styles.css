@@ -4018,6 +4018,16 @@ body.forecast-mode .zone { border-style: dashed; }
 .cap-rowhead { display: table-cell; }
 .cap-rowhead span:first-child { margin-right: 6px; overflow-wrap: anywhere; }
 .cap-rowhead .m-shift { font-size: 10px; }
+.cap-rowhead .cap-area {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  vertical-align: 1px;
+}
 .cap-empty { color: var(--muted); font-weight: 400; font-style: italic; }
 .cap-cell { min-width: 48px; }
 .cap-cell input {
