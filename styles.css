@@ -815,6 +815,7 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   font-weight: 700;
 }
 #board-empty .btn-carry:hover { filter: brightness(0.96); }
+#board-empty .btn-carry-alt { font-weight: 600; }
 
 /* JS masonry container: layoutMasonry() (app.js) absolutely-positions each
    mission card into the shortest column and sets this element's height. The
@@ -1916,9 +1917,19 @@ body.board-view #app-root { margin-right: 264px; }
   cursor: pointer;
   font-weight: 400;
 }
+/* .modal label is display:block — these rows are flex (checkbox beside the text) */
+.modal .import-row, .modal .import-crew { display: flex; }
+.modal .import-crew.hidden { display: none; }
 .import-row:hover { background: var(--hover-tint); }
 .import-row input { width: auto; margin-top: 3px; }
 .import-info small { display: block; color: var(--muted); }
+.import-row.is-present { cursor: default; opacity: .55; }
+.import-row.is-present:hover { background: none; }
+/* forecast "Add Mission": bring each picked mission's people too */
+.import-crew { display: flex; align-items: flex-start; gap: 9px; margin: 10px 0 2px; padding: 9px 10px; border-radius: 7px; background: var(--bg-soft); font-size: 13px; font-weight: 600; cursor: pointer; }
+.import-crew.hidden { display: none; }
+.import-crew input { width: auto; margin-top: 3px; }
+.import-crew small { display: block; font-weight: 400; color: var(--muted); }
 
 /* ===== Host Record tab (Edit Employee modal) ===== */
 .host-list { max-height: 320px; overflow-y: auto; }
@@ -3823,4 +3834,364 @@ body.org-capturing #orgchart-panel .oc-canvas { position: static !important; tra
   body.printing #orgchart-panel .oc-panhint { display: none !important; }
   body.printing #orgchart-panel .oc-viewport { height: auto !important; overflow: visible !important; border: 0 !important; }
   body.printing #orgchart-panel .oc-canvas { position: static !important; transform: none !important; padding: 0 !important; }
+}
+
+/* ======================================================================
+   Forward planning — mode pill, board banners, forecast mode, lost-hold
+   flags, the PlanDiff review panel and the Capacity grid. Everything takes
+   its colour from the existing tokens, so dark mode follows automatically.
+   ====================================================================== */
+#confirm-message { white-space: pre-line; }
+
+/* CONFIRMED / FORECAST in the board bar */
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  margin-left: 8px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  flex: none;
+  cursor: default;
+}
+.mode-pill.hidden { display: none; }
+.mode-pill.mode-confirmed { color: var(--ok-text); border-color: var(--ok-line); background: var(--ok-surface); }
+.mode-pill.mode-forecast { color: var(--primary-text); border: 1px dashed var(--primary-text); background: var(--hover-tint); }
+#btn-hold-alerts { color: var(--danger-text); border-color: var(--danger-line); background: var(--danger-tint); font-weight: 600; margin-left: 6px; }
+#btn-hold-alerts .ic { color: var(--danger); }
+
+/* the banners above the board (outside #board-capture, so never exported) */
+#plan-banners { display: flex; flex-direction: column; gap: 8px; padding: 0 14px; }
+#plan-banners:not(:empty) { padding-top: 12px; }
+.plan-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--r-box);
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.plan-banner-icon { display: inline-flex; flex: none; }
+.plan-banner-icon .ic { width: 16px; height: 16px; }
+.plan-banner-text { flex: 1 1 320px; min-width: 0; }
+.plan-banner-actions { display: flex; gap: 6px; flex: none; }
+.plan-banner-stale { border-color: var(--warn-line); background: var(--warn-surface); }
+.plan-banner-stale .plan-banner-icon { color: var(--warn-text); }
+.plan-banner-forecast { border-color: var(--primary-text); }
+.plan-banner-forecast .plan-banner-icon { color: var(--primary-text); }
+.plan-banner-forecast-info { border-style: dashed; border-left-style: solid; border-left-color: var(--primary-text); color: var(--muted); }
+.plan-banner-forecast-info b { color: var(--primary-text); }
+.plan-banner-merged { color: var(--muted); border-left-color: var(--ok-line); }
+.plan-banner-merged .plan-banner-icon { color: var(--ok-text); }
+
+/* forecast mode: dashed cards on a slightly muted ground — the board reads as
+   a sketch, not the plan people will be sent out on */
+body.forecast-mode #board-capture {
+  background-image: repeating-linear-gradient(135deg, transparent 0 14px, rgba(0, 73, 131, .035) 14px 28px);
+}
+body.forecast-mode .mission-card {
+  border-style: dashed;
+  border-top-style: solid;
+  border-right-color: var(--muted);
+  border-bottom-color: var(--muted);
+  border-left-color: var(--muted);
+}
+body.forecast-mode .zone { border-style: dashed; }
+
+/* D3: people taken out of this forecast mission by someone else */
+.hold-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--danger-line);
+  border-radius: 10px;
+  background: var(--danger-tint);
+  color: var(--danger-text);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hold-badge.mine { background: var(--danger); border-color: var(--danger); color: #fff; }
+.hold-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.hold-row .hold-text { flex: 1; min-width: 0; font-size: 13px; }
+.hold-row .hold-text small { display: block; color: var(--muted); margin-top: 2px; }
+.hold-row .btn { flex: none; }
+
+/* PlanDiff review panel: wide, with the list scrolling inside it */
+#modal-plandiff { width: 760px; display: flex; flex-direction: column; overflow: hidden; }
+#modal-plandiff > h3 { position: static; flex: none; }
+#plandiff-sub { flex: none; }
+#plandiff-tools { display: flex; gap: 6px; margin-bottom: 8px; flex: none; }
+#plandiff-tools.hidden { display: none; }
+#plandiff-body { flex: 1 1 auto; min-height: 60px; overflow-y: auto; margin: 0 -20px; padding: 0 20px 4px; }
+#modal-plandiff > .modal-actions { flex: none; }
+#plandiff-count { color: var(--muted); font-size: 12.5px; margin-right: auto; margin-left: 0; }
+.pd-group { margin-bottom: 12px; }
+.pd-group-head {
+  padding: 6px 10px;
+  border-left: 4px solid var(--border);
+  background: var(--bg-soft);
+  border-radius: 4px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.pd-item {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 !important;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 400 !important;
+  cursor: pointer;
+}
+.pd-item:hover { background: var(--hover-tint); }
+.pd-item input { width: auto !important; margin: 3px 0 0 !important; flex: none; }
+.pd-tag {
+  flex: none;
+  min-width: 62px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  background: var(--bg-soft);
+  color: var(--muted);
+}
+.pd-add .pd-tag { background: var(--ok-surface); color: var(--ok-text); }
+.pd-leave .pd-tag { background: var(--warn-surface); color: var(--warn-text); }
+.pd-remove .pd-tag { background: var(--danger-tint); color: var(--danger-text); }
+.pd-text { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+
+/* Capacity tab — one board at a time: a demand-vs-available chart per
+   working day, the gap under it as a coloured chip (the arrow and the sign
+   carry it too, never colour alone), then demand by host on the same columns.
+   Everything shares one scroll container so the columns never drift apart. */
+:root {
+  --cap-left: 250px;
+  --cap-avail: #d6e0eb;
+  --cap-dem: #004983;
+  --cap-over: #d0342c;
+  --cap-stripe: rgba(0, 73, 131, .05);
+  --cap-sel: rgba(0, 73, 131, .12);
+}
+:root[data-theme="dark"] {
+  --cap-avail: #34414f;
+  --cap-dem: #6fb1e0;
+  --cap-over: #ef5b52;
+  --cap-stripe: rgba(111, 177, 224, .07);
+  --cap-sel: rgba(111, 177, 224, .2);
+}
+#capacity-toolbar { display: contents; }
+#cap-board-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-soft); flex-wrap: wrap; }
+.cap-board-btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cap-board-btn:hover { background: var(--hover-tint); }
+.cap-board-btn.on { background: var(--primary); color: #fff; font-weight: 700; }
+.cap-board-n { margin-left: 5px; font-weight: 500; opacity: .75; }
+.cap-tool-label { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-left: 6px; }
+#cap-range {
+  height: var(--ctl-h);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.stat-chip-bad b { color: var(--danger-text); }
+
+#capacity-panel { display: flex; flex-direction: column; gap: 10px; }
+#capacity-panel.hidden { display: none; }
+.cap-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; }
+.cap-card-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px 6px; }
+.cap-card-title { font-size: 15px; font-weight: 700; margin-right: 6px; }
+.cap-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.cap-key i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+.cap-key-avail { background: var(--cap-avail); }
+.cap-key-dem { background: var(--cap-dem); }
+.cap-key-over { background: var(--cap-over); }
+.cap-key-fc { border: 1px dashed var(--primary-text); background: repeating-linear-gradient(135deg, transparent 0 3px, var(--cap-stripe) 3px 6px); }
+.cap-scroll { overflow-x: auto; }
+.cap-grid2 { font-variant-numeric: tabular-nums; }
+.cap-row { display: grid; }
+.cap-left {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 16px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  min-width: 0;
+}
+.cap-left-title { font-size: 13.5px; font-weight: 700; }
+.cap-left-sub { font-size: 11.5px; color: var(--muted); }
+.cap-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--bg-soft);
+  text-align: center;
+  min-width: 0;
+}
+.cap-day.cap-wk { border-left: 2px solid var(--border); }
+.cap-fc { background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--cap-stripe) 6px 12px); }
+
+/* the chart */
+.cap-axis { position: sticky; }
+.cap-tick-label { position: absolute; right: 12px; font-size: 11px; color: var(--muted); }
+.cap-col { justify-content: flex-end; }
+.cap-tick { position: absolute; left: 0; right: 0; height: 1px; background: var(--bg-soft); }
+.cap-tick0 { background: var(--border); }
+.cap-bar-avail, .cap-bar-dem, .cap-bar-over { position: absolute; display: block; border-radius: 4px 4px 0 0; }
+.cap-bar-avail { left: 20%; right: 20%; background: var(--cap-avail); }
+.cap-bar-dem { left: 35%; right: 35%; background: var(--cap-dem); border-radius: 3px 3px 0 0; }
+.cap-bar-over { left: 35%; right: 35%; background: var(--cap-over); border-radius: 3px 3px 0 0; }
+.cap-bar-label { position: absolute; left: 0; right: 0; font-size: 11.5px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.cap-bar-label.short { color: var(--danger-text); }
+
+/* day header, gap, named */
+.cap-dayhead { background: var(--bg-soft); border-top: 1px solid var(--border); }
+.cap-dayhead .cap-left { background: var(--bg-soft); }
+.cap-dayhead .cap-left-title { font-size: 11.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.cap-dayhead .cap-day { padding: 5px 2px; }
+.cap-dow { font-size: 11px; color: var(--muted); }
+.cap-dm { font-size: 13.5px; font-weight: 700; }
+.cap-dm.today { color: var(--primary-text); }
+.cap-mode { margin-top: 3px; padding: 0 4px; border-radius: 5px; font-size: 9px; font-weight: 700; letter-spacing: .3px; line-height: 15px; }
+.cap-mode.cf { color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); }
+.cap-mode.fc { color: var(--primary-text); background: var(--panel); border: 1px dashed var(--primary-text); }
+.cap-namedrow .cap-left { cursor: help; }
+.cap-gaprow { border-top: 1px solid var(--border); }
+.cap-gaprow .cap-day { padding: 8px 4px; }
+.cap-gaprow .cap-left-title { font-size: 15px; }
+.cap-gapchip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 54px;
+  height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border-radius: 15px;
+  font-size: 14.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.cap-gapchip.short { background: var(--cap-over); color: #fff; }
+.cap-gapchip.tight { background: var(--warn-surface); color: var(--warn-text); border-color: var(--warn-line); }
+.cap-gapchip.ok { background: var(--ok-surface); color: var(--ok-text); border-color: var(--ok-line); }
+.cap-namedrow { border-top: 1px solid var(--bg-soft); }
+.cap-namedrow .cap-day { font-size: 13px; color: var(--muted); padding: 6px 2px; }
+.cap-namedrow .cap-left-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+/* demand by host */
+.cap-sechead { background: var(--bg-soft); border-top: 2px solid var(--border); }
+.cap-sechead .cap-left { background: var(--bg-soft); }
+.cap-sechead-title { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--primary-text); }
+.cap-sechead .cap-day { font-size: 11.5px; color: var(--muted); padding: 5px 2px; }
+.cap-hostrow { border-top: 1px solid var(--bg-soft); min-height: 38px; }
+.cap-hosthead { flex-direction: row; align-items: center; justify-content: flex-start; gap: 7px; }
+.cap-hostname { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.cap-area { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 16px; flex: none; }
+.cap-shift { flex: none; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); }
+.cap-shift.night { background: var(--night); border-color: var(--night); color: #fff; }
+:root[data-theme="dark"] .cap-shift.night { background: #0b0f14; border-color: var(--muted); }
+.cap-empty { color: var(--muted); font-style: italic; font-size: 13px; }
+.cap-cell { font-size: 14px; font-weight: 600; }
+.cap-cell input {
+  width: 100%;
+  height: 36px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.cap-cell input::-webkit-outer-spin-button,
+.cap-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cap-cell input:focus { outline: 2px solid var(--primary-text); outline-offset: -2px; background: var(--hover-tint); }
+/* Excel-style range selection: tinted cells, one outline round the block */
+.cap-grid2.cap-dragging { user-select: none; -webkit-user-select: none; }
+.cap-cell.cap-sel { background-color: var(--cap-sel); }
+.cap-cell.cap-sel-t { box-shadow: inset 0 2px 0 var(--primary-text); }
+.cap-cell.cap-sel-b { box-shadow: inset 0 -2px 0 var(--primary-text); }
+.cap-cell.cap-sel-t.cap-sel-b { box-shadow: inset 0 2px 0 var(--primary-text), inset 0 -2px 0 var(--primary-text); }
+.cap-cell.cap-sel-l::before, .cap-cell.cap-sel-r::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 2px; background: var(--primary-text); pointer-events: none;
+}
+.cap-cell.cap-sel-l::before { left: 0; }
+.cap-cell.cap-sel-r::after { right: 0; }
+.cap-clip { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
+.cap-row-del {
+  flex: none;
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cap-row-del:hover, .cap-row-del:focus-visible { color: var(--danger-text); border-color: var(--border); background: var(--panel); }
+.cap-card-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--border); }
+.cap-add { display: flex; gap: 6px; align-items: center; }
+.cap-add input, .cap-add select {
+  height: var(--ctl-h-sm);
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.cap-add input { width: 200px; }
+.cap-note { flex: 1 1 320px; color: var(--muted); font-size: 12px; }
+
+/* Ctrl+P on a forecast or the Capacity grid: a notice, not the tentative plan */
+@media print {
+  body.print-blocked #app-root > * { display: none !important; }
+  body.print-blocked #app-root::before {
+    content: "Forecasts and the Capacity grid are tentative and are not printed or exported.";
+    display: block;
+    padding: 40px;
+    font: 16px var(--font-ui);
+  }
 }
