@@ -1208,6 +1208,23 @@ drop policy if exists "boards delete" on public.boards;
 create policy "boards delete" on public.boards
   for delete using ((select public.can('boarddelete', 'edit')));
 
+-- Renaming a board needs the same grant (see migration-2026-09-29c-board-rename.sql).
+create or replace function public.guard_board_rename()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $fn$
+begin
+  if new.name is distinct from old.name and auth.uid() is not null
+     and not public.can('boarddelete', 'edit') then
+    raise exception 'Only roles allowed to rename & delete boards may rename a board.'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end;
+$fn$;
+drop trigger if exists guard_board_rename on boards;
+create trigger guard_board_rename
+  before update on boards
+  for each row execute function public.guard_board_rename();
+
 -- ===== Horizon backstop on missions and assignments =====
 -- Replaces the write policies the RLS loop in schema.sql creates for these two
 -- tables with the same rule plus the calendar ceiling. Reads are unchanged.

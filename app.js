@@ -502,7 +502,7 @@ const PERM_AREAS = [
     { key: "capacity", label: "Capacity",       hint: "Headcount needed per host vs available, weeks ahead" },
     { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
-    { key: "boarddelete", label: "Delete boards", hint: "Settings → Board: remove a board and all its missions", allowOnly: true },
+    { key: "boarddelete", label: "Rename & delete boards", hint: "Settings → Board: rename a board, or remove it and all its missions", allowOnly: true },
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
   ]},
   { group: "Overview sections", viewOnly: true, items: [
@@ -5568,10 +5568,10 @@ function renderSettings() {
     row.className = "st-row";
     const nameCell = document.createElement("td");
     nameCell.className = "st-board";
-    // Renaming is an everyday Settings edit (boards update policy = settings);
-    // an empty or unchanged name is simply put back.
+    // Renaming shares the "Rename & delete boards" permission (Admin only by
+    // default; a trigger enforces it). An empty or unchanged name is put back.
     let nameEl;
-    if (can("settings", "edit")) {
+    if (can("boarddelete", "edit")) {
       nameEl = document.createElement("input");
       nameEl.type = "text";
       nameEl.className = "settings-board-name";
@@ -5620,7 +5620,7 @@ function renderSettings() {
     daysCell.appendChild(picker);
     row.appendChild(nameCell);
     row.appendChild(daysCell);
-    // Delete is its own permission (Roles & permissions → "Delete boards",
+    // Delete is its own permission (Roles & permissions → "Rename & delete boards",
     // Admin only by default) because it takes every mission on the board with it.
     const actCell = document.createElement("td");
     actCell.className = "st-act";
