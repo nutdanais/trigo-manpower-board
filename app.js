@@ -502,6 +502,7 @@ const PERM_AREAS = [
     { key: "capacity", label: "Capacity",       hint: "Headcount needed per host vs available, weeks ahead" },
     { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
+    { key: "boarddelete", label: "Delete boards", hint: "Settings → Board: remove a board and all its missions", allowOnly: true },
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
   ]},
   { group: "Overview sections", viewOnly: true, items: [
@@ -5597,6 +5598,21 @@ function renderSettings() {
     daysCell.appendChild(picker);
     row.appendChild(nameCell);
     row.appendChild(daysCell);
+    // Delete is its own permission (Roles & permissions → "Delete boards",
+    // Admin only by default) because it takes every mission on the board with it.
+    const actCell = document.createElement("td");
+    actCell.className = "st-act";
+    if (can("boarddelete", "edit")) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "st-del";
+      del.title = `Delete ${b.name}`;
+      del.setAttribute("aria-label", `Delete ${b.name}`);
+      del.innerHTML = icon("close");
+      del.onclick = () => confirmDeleteBoard(b);
+      actCell.appendChild(del);
+    }
+    row.appendChild(actCell);
     boardsBox.appendChild(row);
   }
 
@@ -5608,6 +5624,32 @@ function renderSettings() {
   $("#boards-count").textContent = n("board", "boards", D().boards.length);
 
   applySettingsTab();
+}
+
+/* Deleting a board cascades to its missions, plans, overrides and forecasts in
+   the database — and to its employees, which is why a board that still has
+   people on it is refused rather than confirmed: move them first. */
+function confirmDeleteBoard(b) {
+  const back = () => openModal("#modal-settings");
+  if (D().boards.length <= 1) {
+    showConfirm("Cannot delete", `${b.name} is the only board. Create another board before deleting this one.`, back, back);
+    return;
+  }
+  const people = D().employees.filter(e => e.boardId === b.id).length;
+  if (people) {
+    showConfirm("Cannot delete",
+      `${b.name} still has ${people} employee${people === 1 ? "" : "s"}. Move them to another board first.`, back, back);
+    return;
+  }
+  showConfirm(`Delete ${b.name}?`,
+    `This permanently deletes the board ${b.name} with all of its missions, plans, holidays and forecasts. ` +
+    `This cannot be undone.`,
+    () => safely(async () => {
+      await cloud.deleteBoard(b.id);
+      if (D().activeBoardId === b.id) D().activeBoardId = firstAllowedView();
+      renderSettings(); render(); openModal("#modal-settings");
+    }),
+    back);
 }
 
 /* ---------- export to JPG ---------- */
@@ -8818,10 +8860,11 @@ function renderRolesMatrix() {
         sel.className = "rm-level";
         // A section that nothing can "edit" only offers off/on — a third state
         // that means nothing would just be a way to get it wrong.
-        const levels = viewOnly ? ["none", "view"] : ["none", "view", "edit"];
+        // A one-off action (deleting a board) is simply allowed or not.
+        const levels = item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
         sel.innerHTML = levels.map(l =>
-          `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : "Edit"}</option>`).join("");
-        sel.value = levels.includes(cur) ? cur : "view";
+          `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : item.allowOnly ? "Allowed" : "Edit"}</option>`).join("");
+        sel.value = levels.includes(cur) ? cur : (item.allowOnly ? "none" : "view");
         sel.disabled = !!role.protected;
         if (role.protected) sel.title = "Admin always keeps full access.";
         sel.onchange = () => {

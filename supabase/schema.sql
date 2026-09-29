@@ -298,6 +298,8 @@ select v.role_key, v.area, v.level from (values
   ('admin','emplist','edit'),    ('manager','emplist','edit'),    ('engineer','emplist','edit'),    ('viewer','emplist','view'),
   ('admin','hostlist','edit'),   ('manager','hostlist','edit'),   ('engineer','hostlist','edit'),   ('viewer','hostlist','view'),
   ('admin','settings','edit'),   ('manager','settings','edit'),   ('engineer','settings','edit'),   ('viewer','settings','none'),
+  -- deleting a board takes its missions and employees with it: Admin only
+  ('admin','boarddelete','edit'), ('manager','boarddelete','none'), ('engineer','boarddelete','none'), ('viewer','boarddelete','none'),
   ('admin','users','edit'),      ('manager','users','none'),      ('engineer','users','none'),      ('viewer','users','none'),
   -- overview sections. ov.history (History + Engineer workload) and
   -- ov.byEngineer are the per-engineer performance picture — management data
@@ -1200,6 +1202,11 @@ begin
       m.tbl || ' delete', m.tbl, m.area);
   end loop;
 end $$;
+
+-- Deleting a board is its own permission (see migration-2026-09-29b-board-delete.sql).
+drop policy if exists "boards delete" on public.boards;
+create policy "boards delete" on public.boards
+  for delete using ((select public.can('boarddelete', 'edit')));
 
 -- ===== Horizon backstop on missions and assignments =====
 -- Replaces the write policies the RLS loop in schema.sql creates for these two

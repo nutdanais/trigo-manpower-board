@@ -1081,6 +1081,15 @@ const cloud = {
     await this._loadBoards();
   },
 
+  /* Everything on the board (missions, plans, overrides, forecasts) goes with
+     it via ON DELETE CASCADE; RLS lets this through only with `boarddelete`. */
+  async deleteBoard(boardId) {
+    const { data, error } = await sb.from("boards").delete().eq("id", boardId).select("id");
+    if (error) throw error;
+    if (!data || !data.length) throw new Error("The board was not deleted — your role may not be allowed to delete boards.");
+    await this._loadBoards();
+  },
+
   async saveEngineerField(id, field, value) {
     const { error } = await sb.from("engineers").update({ [field]: value }).eq("id", id);
     if (error) throw error;
