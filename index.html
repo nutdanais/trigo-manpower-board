@@ -884,9 +884,35 @@
     </div>
   </div>
 
+  <!-- Review & merge (forecast): the carry-over and the forecast side by side,
+       one row per mission, and a decision for every difference (PlanDiff merge model) -->
+  <div class="modal hidden" id="modal-merge">
+    <h3><span id="merge-title">Review &amp; merge forecast</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p id="merge-sub" class="import-note"></p>
+    <div id="merge-tools"></div>
+    <div id="merge-body"></div>
+    <div class="modal-actions">
+      <div id="merge-progress"></div>
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn hidden" id="btn-merge-back">Back to review</button>
+      <button type="button" class="btn btn-primary" id="btn-merge-apply">Review &amp; apply</button>
+    </div>
+  </div>
+
+  <!-- the decisions behind a merged forecast (forecast_merge_decisions) -->
+  <div class="modal hidden" id="modal-merge-log">
+    <h3><span id="merge-log-title">Merge decisions</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p id="merge-log-sub" class="import-note"></p>
+    <label class="merge-log-filter"><input type="checkbox" id="merge-log-only"> Only what was not used from the forecast</label>
+    <div id="merge-log-body"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-primary" data-close>Close</button>
+    </div>
+  </div>
+
   <div class="modal hidden" id="modal-holds">
     <h3><span id="holds-title">Holds taken</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <p class="import-note">Someone moved these people out of a forecast they were held in. The flag stays on the mission until it is acknowledged.</p>
+    <p class="import-note" id="holds-note">Someone moved these people out of a forecast they were held in. The flag stays on the mission until it is acknowledged.</p>
     <div id="holds-list"></div>
     <div class="modal-actions">
       <button type="button" class="btn" id="btn-holds-ack-all">Acknowledge all</button>

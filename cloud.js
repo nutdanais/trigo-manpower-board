@@ -83,7 +83,7 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false },
           forecast: {},
           holdEvents: [],
           holdMissions: {},
@@ -327,7 +327,10 @@ const cloud = {
       (async () => (await probe("forecast_missions", "id")) && (await probe("forecast_assignments", "id")) && (await probe("forecast_hold_events", "id")))(),
       probe("capacity_demand", "id"),
     ]);
-    this.data.features = { stamps, forecast, capacity };
+    // the merge review's decision log and alerts (migration-2026-09-29):
+    // without it, Review & merge still works, it just can't tell anyone
+    const mergeLog = forecast && stamps && (await probe("forecast_merge_decisions", "id"));
+    this.data.features = { stamps, forecast, capacity, mergeLog };
   },
 
   async _loadAreas() {
@@ -1994,6 +1997,40 @@ const cloud = {
     return { copied, skipped };
   },
 
+  /* "Review & merge" with a decision for every difference (PlanDiff merge
+     model). Writes the chosen side through applyPlanDiff — the same path, and
+     the same lock check, as every other review — then records the decisions:
+     one log row each, plus an alert to each engineer whose forecast was not
+     used (record_forecast_merge, which also stamps the day as merged). `rows`
+     is PlanDiff.decisionRows(): the log needs the app's own words for places.
+
+     The board is already written when the record is made, so a failure there
+     doesn't undo anything: it is reported back (logged: false) and the day is
+     still stamped, so the banner doesn't offer the same merge twice. */
+  async applyForecastMerge(boardId, date, model, rows) {
+    const diff = PlanDiff.toDiff(model);
+    const summary = await this.applyPlanDiff(boardId, date, diff);
+    summary.logged = false;
+    summary.alerts = 0;
+    if (this.data.features.mergeLog) {
+      const { data, error } = await sb.rpc("record_forecast_merge", { p_board_id: boardId, p_plan_date: date, p_items: rows });
+      if (error) console.warn("record_forecast_merge failed (no decision log or alerts for this merge):", error.message || error);
+      else { summary.logged = true; summary.alerts = (data && data.events) || 0; }
+    }
+    if (!summary.logged) await this.stampForecastMerged(boardId, date);
+    this._invalidatePlans();
+    return summary;
+  },
+
+  /* Every decision made when this day's forecast was merged, newest merge first. */
+  async loadMergeDecisions(boardId, date) {
+    if (!this.data.features.mergeLog) return [];
+    const { data, error } = await sb.from("forecast_merge_decisions").select("*")
+      .eq("board_id", boardId).eq("plan_date", date).order("merged_at", { ascending: false });
+    if (error) { console.warn("forecast_merge_decisions read failed:", error.message || error); return []; }
+    return data || [];
+  },
+
   async stampForecastMerged(boardId, date) {
     if (!this.data.features.stamps) return;
     const { error } = await sb.rpc("stamp_forecast_merge", { p_board_id: boardId, p_plan_date: date });
@@ -2013,12 +2050,16 @@ const cloud = {
       id: r.id, employeeId: r.employee_id, date: r.plan_date,
       fromMissionId: r.from_forecast_mission_id, fromZone: r.from_zone, fromHeldBy: r.from_held_by,
       toMissionId: r.to_forecast_mission_id, toZone: r.to_zone, takenBy: r.taken_by, takenAt: r.taken_at,
+      // 'taken': someone moved a person out of this hold on the forecast;
+      // 'merge': the forecast was not used when the day was confirmed
+      // (detail says what was not used; reason is the planner's, if given)
+      kind: r.kind || "taken", reason: r.reason || null, detail: r.detail || null, mergeId: r.merge_id || null,
     }));
     const ids = [...new Set(this.data.holdEvents.flatMap((e) => [e.fromMissionId, e.toMissionId]).filter(Boolean))];
     this.data.holdMissions = {};
     if (ids.length) {
-      const { data: ms } = await sb.from("forecast_missions").select("id, number, shift, board_id, plan_date").in("id", ids);
-      for (const m of ms || []) this.data.holdMissions[m.id] = { number: m.number, shift: m.shift, boardId: m.board_id, date: m.plan_date };
+      const { data: ms } = await sb.from("forecast_missions").select("id, number, shift, board_id, plan_date, host, customer, engineer_id").in("id", ids);
+      for (const m of ms || []) this.data.holdMissions[m.id] = { number: m.number, shift: m.shift, boardId: m.board_id, date: m.plan_date, host: m.host, customer: m.customer, engineerId: m.engineer_id };
     }
   },
   async acknowledgeHoldEvents(ids) {

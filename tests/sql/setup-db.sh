@@ -16,4 +16,5 @@ for f in migration-2026-08-23-updated-by migration-2026-08-23-employee-active mi
 done
 if [ "${2:-}" != "--base-only" ]; then
   $P -d "$DB" -f supabase/migration-2026-09-24-forward-planning.sql
+  $P -d "$DB" -f supabase/migration-2026-09-29-forecast-merge-review.sql
 fi
