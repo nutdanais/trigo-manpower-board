@@ -41,6 +41,8 @@ const nowIso = () => new Date(Date.now()).toISOString();
 class FakeDb {
   constructor(opts = {}) {
     this.forwardPlanning = opts.forwardPlanning !== false;
+    // migration-2026-09-29 (merge decisions + merge alerts) on top of it
+    this.mergeLog = this.forwardPlanning && opts.mergeLog !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -65,7 +67,7 @@ class FakeDb {
   }
 
   _missing(table) {
-    return !this.forwardPlanning && FORWARD_TABLES.has(table);
+    return (!this.forwardPlanning && FORWARD_TABLES.has(table)) || (!this.mergeLog && table === "forecast_merge_decisions");
   }
 
   /* ---------- query execution ---------- */
@@ -260,7 +262,7 @@ class FakeDb {
   _rpc(q, user) {
     const fn = this.rpcs[q.fn];
     if (!fn) return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${q.fn} in the schema cache` } };
-    if (this._missing({ stamp_carry: "plan_day_stamps", stamp_forecast_merge: "plan_day_stamps", set_forecast_assignment: "forecast_assignments", acknowledge_hold_events: "forecast_hold_events" }[q.fn] || "")) {
+    if (this._missing({ stamp_carry: "plan_day_stamps", stamp_forecast_merge: "plan_day_stamps", set_forecast_assignment: "forecast_assignments", acknowledge_hold_events: "forecast_hold_events", record_forecast_merge: "forecast_merge_decisions" }[q.fn] || "")) {
       return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${q.fn} in the schema cache` } };
     }
     return { data: fn(q.args || {}, user), error: null };
@@ -297,7 +299,7 @@ class FakeDb {
         eventId = this._insertRow("forecast_hold_events", {
           employee_id: a.p_employee_id, plan_date: a.p_plan_date,
           from_forecast_mission_id: old.forecast_mission_id || null, from_zone: old.zone || null, from_held_by: old.held_by,
-          to_forecast_mission_id: mission, to_zone: zone, taken_by: me, acknowledged_at: null, acknowledged_by: null,
+          to_forecast_mission_id: mission, to_zone: zone, taken_by: me, acknowledged_at: null, acknowledged_by: null, kind: "taken",
         }, u).id;
       }
       if (!mission && !zone) {
@@ -310,6 +312,46 @@ class FakeDb {
         this._insertRow("forecast_assignments", { employee_id: a.p_employee_id, plan_date: a.p_plan_date, forecast_mission_id: mission, zone, held_by: me }, u);
       }
       return { changed: true, event_id: eventId, taken_from: eventId ? old.held_by : null };
+    };
+    /* mirrors public.record_forecast_merge: one log row per decision, the
+       forecaster read from the forecast rows (never from the item), an alert
+       only for a carry choice over somebody else's forecast */
+    this.rpcs.record_forecast_merge = (a, u) => {
+      const me = email(u);
+      const mergeId = crypto.randomUUID();
+      const at = this.now();
+      let events = 0;
+      for (const it of a.p_items || []) {
+        let fm = null, zone = null, forecaster = null;
+        if (it.type === "person") {
+          const emp = this.t("employees").find((e) => e.id === it.employee_id);
+          if (!emp || emp.board_id !== a.p_board_id) throw Object.assign(new Error("That employee is not on this board."), { code: "23514" });
+          const fa = this.t("forecast_assignments").find((r) => r.employee_id === it.employee_id && r.plan_date === a.p_plan_date);
+          if (fa) { fm = fa.forecast_mission_id || null; zone = fa.zone || null; forecaster = fa.held_by || null; }
+        } else if (it.type === "field" || it.type === "add") {
+          const m = this.t("forecast_missions").find((r) => r.board_id === a.p_board_id && r.plan_date === a.p_plan_date && r.number === it.mission_number && r.shift === it.mission_shift);
+          if (m) { fm = m.id; forecaster = it.type === "add" ? (m.created_by || null) : (m.updated_by || m.created_by || null); }
+        }
+        const reason = ((it.reason || "").trim().slice(0, 500)) || null;
+        this._insertRow("forecast_merge_decisions", {
+          merge_id: mergeId, board_id: a.p_board_id, plan_date: a.p_plan_date, item_type: it.type, employee_id: it.employee_id || null,
+          mission_number: it.mission_number || null, mission_shift: it.mission_shift || null, field: it.field || null,
+          carry_value: it.carry_value ?? null, forecast_value: it.forecast_value ?? null, choice: it.choice,
+          forecaster, reason, merged_by: me, merged_at: at,
+        }, u);
+        if (it.choice === "carry" && forecaster && forecaster.toLowerCase() !== me && forecaster.toLowerCase() !== "migrated") {
+          this._insertRow("forecast_hold_events", {
+            kind: "merge", employee_id: it.type === "person" ? it.employee_id : null, plan_date: a.p_plan_date,
+            from_forecast_mission_id: fm, from_zone: zone, from_held_by: forecaster, to_forecast_mission_id: null, to_zone: null,
+            taken_by: me, taken_at: at, reason, merge_id: mergeId, acknowledged_at: null, acknowledged_by: null,
+            detail: { type: it.type, board_id: a.p_board_id, mission_number: it.mission_number || null, mission_shift: it.mission_shift || null,
+                      field: it.field || null, carry_value: it.carry_value ?? null, forecast_value: it.forecast_value ?? null },
+          }, u);
+          events++;
+        }
+      }
+      this.rpcs.stamp_forecast_merge({ p_board_id: a.p_board_id, p_plan_date: a.p_plan_date }, u);
+      return { merge_id: mergeId, decisions: (a.p_items || []).length, events };
     };
     this.rpcs.acknowledge_hold_events = (a, u) => {
       let n = 0;

@@ -153,7 +153,198 @@
     };
   }
 
-  const PlanDiff = { compute, groups, plan, missionKey, MISSION_FIELDS, STANDBY };
+  /* ================= PlanDiff merge model =================
+     "Review & merge" for a forecast. Where compute() lists lines to tick, this
+     lists DECISIONS: for every place the carry-over and the forecast disagree,
+     the planner picks "carry" or "forecast", and nothing is decided for them
+     except where there is no collision to decide.
+
+     Items (each { id, type, decision: null | "carry" | "forecast",
+     forecaster }):
+       person  someone the two plans place differently. `from` is the
+               carry-over place, `to` the forecast place. Pre-decided
+               "forecast" when the carry-over has them on Standby: nobody's
+               plan is overruled then. Not listed at all when the forecast
+               simply doesn't mention them (Standby there) and their
+               carry-over mission isn't in the forecast either — they follow
+               that mission's own remove decision instead.
+       field   one changed mission detail (host, start, engineer...), so a
+               planner can take the new start time and keep the old engineer.
+       add     a mission only the forecast has. Pre-decided "forecast"; a
+               person whose forecast place is this mission can only take the
+               forecast side while the mission is being added (see locked).
+       remove  a carry-over mission the forecast doesn't have. "forecast"
+               removes it and sends whoever stays on it to Standby.
+
+     toDiff() turns the decisions into compute()'s item shape, so the write
+     path (cloud.applyPlanDiff) is exactly the one already in use.
+     decisionRows() is the log (and the alerts) record_forecast_merge takes. */
+  function computeMerge(base, forecast, opts = {}) {
+    const scope = opts.employeeIds ? new Set(opts.employeeIds) : null;
+    const holds = forecast.holds || {};
+    const baseByKey = new Map((base.missions || []).map((m) => [missionKey(m), m]));
+    const propByKey = new Map((forecast.missions || []).map((m) => [missionKey(m), m]));
+    const items = [];
+    const addKeys = new Set(), removeKeys = new Set();
+
+    for (const [key, fm] of propByKey) {
+      const bm = baseByKey.get(key);
+      if (!bm) {
+        addKeys.add(key);
+        items.push({ id: "add:" + key, type: "add", key, mission: fm, forecaster: fm.createdBy || null, decision: "forecast" });
+        continue;
+      }
+      const by = fm.updatedBy || fm.createdBy || null;
+      for (const f of MISSION_FIELDS) {
+        if (norm(bm[f.key]) === norm(fm[f.key])) continue;
+        items.push({ id: "field:" + key + ":" + f.key, type: "field", key, field: f.key, label: f.label,
+                     carry: bm[f.key] ?? "", forecast: fm[f.key] ?? "", forecaster: by, decision: null });
+      }
+      if (bm.hidden) {
+        items.push({ id: "field:" + key + ":hidden", type: "field", key, field: "hidden", label: "Visibility",
+                     carry: "Hidden", forecast: "Visible", forecaster: by, decision: null });
+      }
+    }
+    for (const [key, bm] of baseByKey) {
+      if (propByKey.has(key) || bm.hidden) continue;
+      removeKeys.add(key);
+      items.push({ id: "remove:" + key, type: "remove", key, mission: bm, forecaster: null, decision: null });
+    }
+
+    const bPlace = placements(base, scope);
+    const pPlace = placements(forecast, scope);
+    const people = new Map();
+    for (const empId of new Set([...bPlace.keys(), ...pPlace.keys()])) {
+      const from = bPlace.get(empId) || STANDBY;
+      const to = pPlace.get(empId) || STANDBY;
+      people.set(empId, { from, to });
+      if (samePlace(from, to)) continue;
+      // the forecast is silent about them: only a collision when it planned
+      // their carry-over mission without them
+      if (to.kind === "standby" && !(from.kind === "mission" && propByKey.has(from.key))) continue;
+      const free = from.kind === "standby";
+      items.push({ id: "person:" + empId, type: "person", empId, from, to, free,
+                   forecaster: to.kind === "standby" ? null : (holds[empId] || null),
+                   decision: free ? "forecast" : null });
+    }
+    return { items, byId: new Map(items.map((i) => [i.id, i])), people, baseByKey, proposedByKey: propByKey, addKeys, removeKeys };
+  }
+
+  /* a person bound for a new mission that isn't being added stays on the carry-over */
+  function mergeLocked(model, it) {
+    return !!it && it.type === "person" && it.to.kind === "mission" && model.addKeys.has(it.to.key)
+      && decisionOf(model, "add:" + it.to.key) !== "forecast";
+  }
+  function decisionOf(model, id) {
+    const it = model.byId.get(id);
+    if (!it) return null;
+    return mergeLocked(model, it) ? "carry" : it.decision;
+  }
+  function decide(model, id, choice) {
+    const it = model.byId.get(id);
+    if (!it || mergeLocked(model, it) || (choice !== "carry" && choice !== "forecast" && choice !== null)) return false;
+    it.decision = choice;
+    return true;
+  }
+  function pending(model) { return model.items.filter((i) => !decisionOf(model, i.id)); }
+
+  /* where the carry-over side leaves someone: Standby if their mission is removed */
+  function carryPlace(model, from) {
+    if (from.kind === "mission" && model.removeKeys.has(from.key) && decisionOf(model, "remove:" + from.key) === "forecast") return STANDBY;
+    return from;
+  }
+  /* where each person ends up with the decisions made so far (undecided = carry-over) */
+  function resultPlace(model, empId) {
+    const p = model.people.get(empId);
+    if (!p) return STANDBY;
+    const it = model.byId.get("person:" + empId);
+    if (it && decisionOf(model, it.id) === "forecast") return p.to;
+    return carryPlace(model, p.from);
+  }
+  function missionOnBoard(model, key) {
+    if (model.addKeys.has(key)) return decisionOf(model, "add:" + key) === "forecast";
+    if (model.removeKeys.has(key)) return decisionOf(model, "remove:" + key) !== "forecast";
+    return model.baseByKey.has(key);
+  }
+
+  function toDiff(model) {
+    if (pending(model).length) throw new Error("Every difference needs a decision before it can be applied.");
+    const chosen = (it) => decisionOf(model, it.id) === "forecast";
+    const items = [];
+    const adds = new Map();
+    for (const it of model.items) {
+      if (it.type !== "add" || !chosen(it)) continue;
+      const a = { id: it.id, type: "add", key: it.key, mission: it.mission, members: [], ticked: true };
+      adds.set(it.key, a);
+      items.push(a);
+    }
+    const fieldsByKey = new Map();
+    for (const it of model.items) {
+      if (it.type !== "field" || !chosen(it)) continue;
+      if (!fieldsByKey.has(it.key)) fieldsByKey.set(it.key, []);
+      fieldsByKey.get(it.key).push(it);
+    }
+    for (const [key, fields] of fieldsByKey) {
+      const bm = model.baseByKey.get(key), fm = model.proposedByKey.get(key);
+      const mission = { ...bm };
+      const changes = [];
+      for (const f of fields) {
+        if (f.field !== "hidden") mission[f.field] = fm[f.field];
+        changes.push({ field: f.field, label: f.label, before: f.carry, after: f.forecast });
+      }
+      items.push({ id: "update:" + key, type: "update", key, baseId: bm.id, mission, baseMission: bm, changes, ticked: true });
+    }
+    for (const it of model.items) {
+      if (it.type !== "person" || !chosen(it)) continue;
+      if (it.to.kind === "mission" && adds.has(it.to.key)) adds.get(it.to.key).members.push({ empId: it.empId, from: it.from });
+      else items.push({ id: (it.to.kind === "zone" ? "leave:" : "move:") + it.empId, type: it.to.kind === "zone" ? "leave" : "move",
+                        empId: it.empId, from: it.from, to: it.to, ticked: true });
+    }
+    for (const it of model.items) {
+      if (it.type !== "remove" || !chosen(it)) continue;
+      items.push({ id: it.id, type: "remove", key: it.key, baseId: it.mission.id, mission: it.mission, ticked: true });
+    }
+    return { items, baseByKey: model.baseByKey, proposedByKey: model.proposedByKey };
+  }
+
+  /* One row per decision for record_forecast_merge. `label` turns a place
+     ({kind, key|zone}) and a field value into the text the log shows —
+     the app owns those words (zone names, engineer names). */
+  function decisionRows(model, label, reasons = {}) {
+    const split = (key) => { const i = key.lastIndexOf("|"); return { mission_number: key.slice(0, i), mission_shift: key.slice(i + 1) }; };
+    const rows = [];
+    for (const it of model.items) {
+      const choice = decisionOf(model, it.id);
+      if (!choice) continue;
+      const row = { type: it.type, choice, reason: (reasons[it.id] || "").trim() || null,
+                    employee_id: null, mission_number: null, mission_shift: null, field: null };
+      if (it.type === "person") {
+        row.employee_id = it.empId;
+        const at = it.to.kind === "mission" ? it.to : (it.from.kind === "mission" ? it.from : null);
+        if (at) Object.assign(row, split(at.key));
+        row.carry_value = label.place(carryPlace(model, it.from));
+        row.forecast_value = label.place(it.to);
+      } else {
+        Object.assign(row, split(it.key));
+        if (it.type === "field") {
+          row.field = it.field;
+          row.carry_value = label.field(it.field, it.carry);
+          row.forecast_value = label.field(it.field, it.forecast);
+        } else if (it.type === "add") {
+          row.carry_value = "Not on the carry-over";
+          row.forecast_value = label.place({ kind: "mission", key: it.key });
+        } else {
+          row.carry_value = "Keep";
+          row.forecast_value = "Remove (not in the forecast)";
+        }
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  const PlanDiff = { compute, groups, plan, missionKey, MISSION_FIELDS, STANDBY,
+                     computeMerge, decisionOf, decide, pending, mergeLocked, carryPlace, resultPlace, missionOnBoard, toDiff, decisionRows };
 
   /* ================= Horizon =================
      A confirmed plan exists up to the Nth next working day (N = 1: tomorrow,

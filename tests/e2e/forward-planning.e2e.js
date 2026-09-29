@@ -235,42 +235,106 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       ]);
       db.seed("forecast_assignments", [
         { employee_id: "e1", plan_date: H, forecast_mission_id: "f101", zone: null, held_by: "eng.b@example.com" },
+        { employee_id: "e3", plan_date: H, forecast_mission_id: "f101", zone: null, held_by: "eng.b@example.com" },
         { employee_id: "e6", plan_date: H, forecast_mission_id: "f201", zone: null, held_by: "eng.b@example.com" },
         { employee_id: "e7", plan_date: H, forecast_mission_id: null, zone: "sick", held_by: "eng.b@example.com" },
       ]);
       const a = await env.openAs(db, h.USERS.a);
-      const pa = a.page;
+      const b = await env.openAs(db, h.USERS.b);
+      const pa = a.page, pb = b.page;
       await gotoDate(pa, H);
+      const row = (n) => pa.locator("#merge-body .merge-row", { has: pa.locator(".merge-num b", { hasText: new RegExp("^" + n + "$") }) });
+      const chip = (side, emp) => pa.locator(`#merge-body .merge-cell${side === "forecast" ? ".fc" : ":not(.fc)"} .mini-emp[data-emp="${emp}"]`);
 
       await step("C4: a confirmed day with an unmerged forecast shows the merge banner", async () => {
         await until(async () => (await pa.locator(".plan-banner-forecast").count()) === 1, "forecast banner");
-        assert.match(await pa.textContent(".plan-banner-forecast"), /Forecast for this day by eng\.b: 2 missions, 3 people/);
+        assert.match(await pa.textContent(".plan-banner-forecast"), /Forecast for this day by eng\.b: 2 missions, 4 people/);
       });
 
-      await step("C4b: Carry over into it offers Review & merge; applying writes confirmed rows + history only for applied items", async () => {
+      await step("C4b: Carry over opens the side-by-side review; only collisions wait for a decision", async () => {
         await pa.click("#btn-reset-board");
-        await until(() => pa.isVisible("#modal-plandiff"), "merge panel opens after the carry");
-        assert.match(await pa.textContent("#plandiff-title"), /Review & merge forecast/);
-        const ticked = await pa.$$eval("#plandiff-body .pd-item", (els) => els.filter((e) => e.querySelector("input").checked).map((e) => e.querySelector(".pd-text").textContent));
-        assert.ok(ticked.some((t) => /^Add mission 201/.test(t) && /Person F/.test(t)), "add ticked by default");
-        assert.ok(ticked.some((t) => /^Sick Leave for Person G/.test(t)), "set leave ticked by default");
-        const unticked = await pa.$$eval("#plandiff-body .pd-item", (els) => els.filter((e) => !e.querySelector("input").checked).map((e) => e.querySelector(".pd-text").textContent));
-        assert.ok(unticked.some((t) => /^Remove mission 102/.test(t)), "remove unticked by default");
-        await pa.click("#btn-plandiff-apply");
-        await until(async () => !(await pa.isVisible("#modal-plandiff")), "applied");
+        await until(() => pa.isVisible("#modal-merge"), "merge review opens after the carry");
+        assert.match(await pa.textContent("#merge-title"), /Review & merge forecast/);
+        // 101 · 102 · 103 · 201, then Leave and Standby
+        assert.deepEqual(await pa.$$eval("#merge-body .merge-row:not(.merge-head) .merge-num", (els) => els.map((e) => e.firstChild.textContent)),
+          ["101", "102", "103", "201", "Leave", "Standby"]);
+        // e2 (101, left out of the forecast's 101), e3 (102 -> 101), keep/remove 102 and 103: 4 of 7
+        assert.match(await pa.textContent("#merge-progress"), /3 of 7 differences decided/);
+        assert.equal(await chip("carry", "e3").getAttribute("class").then((c) => /\bconf\b/.test(c)), true, "e3 flagged on the carry-over side");
+        assert.equal(await chip("forecast", "e3").getAttribute("class").then((c) => /\bconf\b/.test(c)), true, "and on the forecast side");
+        assert.match(await chip("forecast", "e6").getAttribute("class"), /\bkept\b/, "off Standby into a new mission: not a collision, pre-decided");
+        assert.match(await pa.textContent("#btn-merge-apply"), /Apply \(4 left\)/);
+        await pa.click("#btn-merge-apply");
+        await until(async () => /still need/.test(await pa.textContent("#toast-stack")), "apply refuses while anything is undecided");
+        assert.ok(await pa.isVisible("#modal-merge"), "still open");
+        assert.equal(db.t("forecast_merge_decisions").length, 0, "nothing written");
+      });
+
+      await step("C4c: decide each collision, give a reason, confirm, and only the chosen side is written", async () => {
+        await chip("carry", "e2").click();                        // keep Person B on 101
+        await chip("carry", "e3").click();                        // keep Person C on 102, not eng.b's 101
+        assert.match(await chip("forecast", "e3").getAttribute("class"), /\bdropped\b/);
+        await row("102").locator(".merge-seg button", { hasText: /^Keep$/ }).click();
+        await row("103").locator(".merge-seg button", { hasText: /^Keep$/ }).click();
+        assert.match(await pa.textContent("#merge-progress"), /7 of 7 differences decided/);
+        // one carry choice over eng.b's forecast: one reason box
+        assert.equal(await pa.locator(".merge-reason").count(), 1);
+        assert.match(await pa.textContent(".merge-reason"), /Person C kept on 102 Day/);
+        await pa.fill(".merge-reason input", "Needed on Beta");
+        await pa.click("#btn-merge-apply");
+        await until(() => pa.isVisible(".merge-confirm"), "confirm step");
+        assert.match(await pa.textContent(".merge-callout"), /eng\.b: 1 part of their forecast not used/);
+        assert.match(await pa.textContent(".merge-confirm"), /201 Day: new, 1 person/);
+        await pa.click("#btn-merge-apply");
+        await until(async () => !(await pa.isVisible("#modal-merge")), "applied");
         assert.equal(placeOf(db, "assignments", "e6", H), "201");
         assert.equal(placeOf(db, "assignments", "e7", H), "zone:sick");
-        assert.ok(db.t("missions").some((m) => m.plan_date === H && m.number === "102"), "unticked removal not applied");
+        assert.equal(placeOf(db, "assignments", "e2", H), "101", "kept on the carry-over");
+        assert.equal(placeOf(db, "assignments", "e3", H), "102", "kept on the carry-over, not the forecast");
+        assert.ok(["102", "103"].every((n) => db.t("missions").some((m) => m.plan_date === H && m.number === n)), "kept missions stay");
         const hist = db.t("deployment_history").filter((r) => r.plan_date === H).map((r) => r.employee_id).sort();
         assert.ok(hist.includes("e6"), "history for the applied placement");
         assert.ok(!hist.includes("e7"), "no history for leave");
         const stamp = db.t("plan_day_stamps").find((s) => s.plan_date === H);
         assert.ok(stamp.forecast_merged_at, "merge stamped");
-        await until(async () => (await pa.locator(".plan-banner-merged").count()) === 1, "merged note replaces the banner");
         assert.equal(db.t("forecast_missions").filter((m) => m.plan_date === H).length, 2, "D6: forecast kept");
+        assert.equal(db.t("forecast_merge_decisions").length, 7, "every decision logged");
+        const ev = db.t("forecast_hold_events").filter((e) => e.kind === "merge");
+        assert.deepEqual(ev.map((e) => [e.employee_id, e.from_held_by, e.taken_by, e.reason]), [["e3", "eng.b@example.com", "eng.a@example.com", "Needed on Beta"]]);
       });
-      assert.deepEqual(a.errors, [], "no console errors");
+
+      await step("C4d / D2: the merged note counts what was not used and opens the decision log", async () => {
+        await until(async () => (await pa.locator(".plan-banner-merged").count()) === 1, "merged note replaces the banner");
+        assert.match(await pa.textContent(".plan-banner-merged"), /7 decisions\. 1 of eng\.b's not used\./);
+        await pa.locator(".plan-banner-merged button", { hasText: "Decisions" }).click();
+        await until(() => pa.isVisible("#modal-merge-log"), "log opens");
+        assert.equal(await pa.locator("#merge-log-body tbody tr").count(), 7);
+        const nu = await pa.locator("#merge-log-body tr.not-used").textContent();
+        assert.match(nu, /Person C/); assert.match(nu, /Needed on Beta/); assert.match(nu, /eng\.b/);
+        await pa.check("#merge-log-only");
+        assert.equal(await pa.locator("#merge-log-body tbody tr").count(), 1, "filter to what was not used");
+        await pa.click("#modal-merge-log [data-close]");
+      });
+
+      await step("C4e / D1: the forecaster gets one live toast, a header alert, and the visual breakdown", async () => {
+        await until(async () => /merged|kept Person C/.test(await pb.textContent("#toast-stack")), "live toast for eng.b");
+        assert.match(await pb.textContent("#toast-stack"), /eng\.a kept Person C on 102 Day · Host Beta → Cust Beta instead of your mission 101/);
+        await until(async () => /1 not used at merge/.test(await pb.textContent("#btn-hold-alerts")), "header alert");
+        await pb.click("#btn-hold-alerts");
+        await until(async () => (await pb.locator("#holds-list .alert-group").count()) === 1, "one mission card");
+        await until(async () => (await pb.locator("#holds-list .alert-score-big").count()) === 1, "scorecard loaded");
+        assert.equal(await pb.textContent("#holds-list .alert-score-big"), "3/4", "e3 not used; e1, e6, e7 as forecast");
+        assert.equal(await pb.locator("#holds-list .alert-lane.plan .mini-emp.lost").count(), 1, "Person C struck out of the forecast lane");
+        assert.match(await pb.textContent("#holds-list .alert-pill.board"), /102 Day/);
+        assert.match(await pb.textContent("#holds-list .alert-quote"), /Needed on Beta/);
+        await pb.locator("#holds-list .alert-change button", { hasText: "Acknowledge" }).click();
+        await until(() => db.t("forecast_hold_events").every((e) => e.kind !== "merge" || e.acknowledged_by === "eng.b@example.com"), "acknowledged by eng.b");
+        await until(async () => !(await pb.isVisible("#btn-hold-alerts")), "header alert clears");
+      });
+      assert.deepEqual(a.errors, [], "no console errors (a)");
+      assert.deepEqual(b.errors, [], "no console errors (b)");
       await a.close();
+      await b.close();
     }
 
     /* ================= Part C: Add Mission on a forecast day ================= */

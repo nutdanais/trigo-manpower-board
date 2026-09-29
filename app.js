@@ -330,7 +330,7 @@ function setSaveStatus(kind) {
   }
 }
 const CLOUD_WRITE_METHODS = [
-  "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff",
+  "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff", "applyForecastMerge",
   "setCapacityCells", "deleteCapacityRow", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
   "startForecastFromConfirmed", "addForecastMissionsFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
@@ -434,9 +434,10 @@ const state = {
   },
   /* the board's two banners (see renderPlanBanners): what cloud.getPlanSignals
      and the forecast cache said about the board+date in `key` */
-  signals: { key: null, stamp: null, stale: null, forecast: null },
+  signals: { key: null, stamp: null, stale: null, forecast: null, decisions: [] },
   dismissedStale: new Set(),   // "board|date|source edit time" the user dismissed this session
-  diff: null,                  // the open Review changes / Review & merge session
+  diff: null,                  // the open Review changes session
+  merge: null,                 // the open Review & merge (forecast) session: PlanDiff merge model + choices
   capacity: {                  // Capacity tab
     weeks: 2,                  // range: 1..8 weeks from today
     boardId: null,             // the one board the tab shows (see capBoardId)
@@ -501,6 +502,7 @@ const PERM_AREAS = [
     { key: "capacity", label: "Capacity",       hint: "Headcount needed per host vs available, weeks ahead" },
     { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
+    { key: "boarddelete", label: "Rename & delete boards", hint: "Settings → Board: rename a board, or remove it and all its missions", allowOnly: true },
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
   ]},
   { group: "Overview sections", viewOnly: true, items: [
@@ -810,14 +812,16 @@ async function refreshData() {
    says no banner belongs: past days, locked days and non-working days. */
 async function refreshPlanSignals(boardId, date) {
   const f = feat();
-  if (!f.stamps && !f.forecast) { state.signals = { key: null, stamp: null, stale: null, forecast: null }; return; }
+  if (!f.stamps && !f.forecast) { state.signals = { key: null, stamp: null, stale: null, forecast: null, decisions: [] }; return; }
   const notPast = date >= todayStr();
   const checkStale = f.stamps && notPast && !isLocked(boardId, date) && !isNonWorkingDate(date, boardId);
   const [sig, forecast] = await Promise.all([
     cloud.getPlanSignals(boardId, date, { stale: checkStale }),
     f.forecast && notPast ? cloud.ensureForecastLoaded(boardId, date) : Promise.resolve(null),
   ]);
-  state.signals = { key: boardId + "|" + date, stamp: sig.stamp, stale: sig.stale, forecast };
+  // D2: what was decided when this day's forecast was merged
+  const decisions = f.mergeLog && sig.stamp && sig.stamp.forecast_merged_at ? await cloud.loadMergeDecisions(boardId, date) : [];
+  state.signals = { key: boardId + "|" + date, stamp: sig.stamp, stale: sig.stale, forecast, decisions };
 }
 async function refreshAndRender() {
   await refreshData();
@@ -5564,9 +5568,31 @@ function renderSettings() {
     row.className = "st-row";
     const nameCell = document.createElement("td");
     nameCell.className = "st-board";
-    const nameEl = document.createElement("div");
-    nameEl.className = "settings-board-name";
-    nameEl.textContent = b.name;
+    // Renaming shares the "Rename & delete boards" permission (Admin only by
+    // default; a trigger enforces it). An empty or unchanged name is put back.
+    let nameEl;
+    if (can("boarddelete", "edit")) {
+      nameEl = document.createElement("input");
+      nameEl.type = "text";
+      nameEl.className = "settings-board-name";
+      nameEl.value = b.name;
+      nameEl.placeholder = "Board name";
+      nameEl.setAttribute("aria-label", "Board name");
+      nameEl.onchange = () => {
+        const name = nameEl.value.trim();
+        if (!name || name === b.name) { nameEl.value = b.name; return; }
+        if (D().boards.some(x => x.id !== b.id && x.name.toLowerCase() === name.toLowerCase())) {
+          nameEl.value = b.name;
+          showConfirm("Cannot rename", `There is already a board called ${name}.`, () => openModal("#modal-settings"), () => openModal("#modal-settings"));
+          return;
+        }
+        safely(async () => { await cloud.renameBoard(b.id, name); renderSettings(); render(); });
+      };
+    } else {
+      nameEl = document.createElement("div");
+      nameEl.className = "settings-board-name";
+      nameEl.textContent = b.name;
+    }
     const daysCell = document.createElement("td");
     const picker = document.createElement("div");
     picker.className = "weekday-picker settings-board-days";
@@ -5594,6 +5620,21 @@ function renderSettings() {
     daysCell.appendChild(picker);
     row.appendChild(nameCell);
     row.appendChild(daysCell);
+    // Delete is its own permission (Roles & permissions → "Rename & delete boards",
+    // Admin only by default) because it takes every mission on the board with it.
+    const actCell = document.createElement("td");
+    actCell.className = "st-act";
+    if (can("boarddelete", "edit")) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "st-del";
+      del.title = `Delete ${b.name}`;
+      del.setAttribute("aria-label", `Delete ${b.name}`);
+      del.innerHTML = icon("close");
+      del.onclick = () => confirmDeleteBoard(b);
+      actCell.appendChild(del);
+    }
+    row.appendChild(actCell);
     boardsBox.appendChild(row);
   }
 
@@ -5605,6 +5646,32 @@ function renderSettings() {
   $("#boards-count").textContent = n("board", "boards", D().boards.length);
 
   applySettingsTab();
+}
+
+/* Deleting a board cascades to its missions, plans, overrides and forecasts in
+   the database — and to its employees, which is why a board that still has
+   people on it is refused rather than confirmed: move them first. */
+function confirmDeleteBoard(b) {
+  const back = () => openModal("#modal-settings");
+  if (D().boards.length <= 1) {
+    showConfirm("Cannot delete", `${b.name} is the only board. Create another board before deleting this one.`, back, back);
+    return;
+  }
+  const people = D().employees.filter(e => e.boardId === b.id).length;
+  if (people) {
+    showConfirm("Cannot delete",
+      `${b.name} still has ${people} employee${people === 1 ? "" : "s"}. Move them to another board first.`, back, back);
+    return;
+  }
+  showConfirm(`Delete ${b.name}?`,
+    `This permanently deletes the board ${b.name} with all of its missions, plans, holidays and forecasts. ` +
+    `This cannot be undone.`,
+    () => safely(async () => {
+      await cloud.deleteBoard(b.id);
+      if (D().activeBoardId === b.id) D().activeBoardId = firstAllowedView();
+      renderSettings(); render(); openModal("#modal-settings");
+    }),
+    back);
 }
 
 /* ---------- export to JPG ---------- */
@@ -6353,15 +6420,27 @@ function holdPlace(missionId, zone) {
 }
 /* "B moved Somchai from your mission 123 (Mon 5 Oct) to mission 456" */
 function describeHold(e) {
+  if (e.kind === "merge") return describeMergeAlert(e);
   const from = sameEmail(e.fromHeldBy, state.myEmail) ? "your " : `${who(e.fromHeldBy)}'s `;
   return `${who(e.takenBy)} moved ${empName(e.employeeId)} from ${from}${holdPlace(e.fromMissionId, e.fromZone)} (${fmtShort(e.date)}) to ${holdPlace(e.toMissionId, e.toZone)}`;
+}
+/* "B kept Somchai on 101 Day instead of your 205 Day (Mon 5 Oct)" */
+function describeMergeAlert(e) {
+  const whose = sameEmail(e.fromHeldBy, state.myEmail) ? "your" : `${who(e.fromHeldBy)}'s`;
+  const d = e.detail || {};
+  const when = ` (${fmtShort(e.date)})`;
+  if (d.type === "field") return `${who(e.takenBy)} kept ${mergeFieldLabel(d.field).toLowerCase()} on ${d.mission_number} at ${d.carry_value || "(blank)"} instead of ${whose} ${d.forecast_value || "(blank)"}${when}`;
+  if (d.type === "add") return `${who(e.takenBy)} did not add ${whose} new mission ${d.mission_number}${when}`;
+  return `${who(e.takenBy)} kept ${empName(e.employeeId)} on ${d.carry_value || "the carry-over"} instead of ${whose} ${holdPlace(e.fromMissionId, e.fromZone)}${when}`;
 }
 function renderHoldAlerts() {
   const btn = $("#btn-hold-alerts");
   const mine = feat().forecast && can("forecast") ? myLostHolds() : [];
   btn.classList.toggle("hidden", !mine.length);
   if (!mine.length) return;
-  setIconLabel(btn, "alert", `${mine.length} hold${mine.length === 1 ? "" : "s"} taken from you`);
+  const merged = mine.filter(e => e.kind === "merge").length, taken = mine.length - merged;
+  setIconLabel(btn, "alert", !merged ? `${taken} hold${taken === 1 ? "" : "s"} taken from you`
+    : !taken ? `${merged} not used at merge` : `${mine.length} forecast alerts`);
   btn.title = mine.map(describeHold).join("\n");
 }
 function holdBadge(events) {
@@ -6370,14 +6449,32 @@ function holdBadge(events) {
   const mine = events.some(e => sameEmail(e.fromHeldBy, state.myEmail));
   b.className = "hold-badge" + (mine ? " mine" : "");
   const takers = [...new Set(events.map(e => who(e.takenBy)))];
-  b.textContent = `${events.length} ${events.length === 1 ? "person" : "people"} taken by ${takers.join(", ")}`;
+  b.textContent = events.every(e => e.kind === "merge")
+    ? `${events.length} not used at merge`
+    : `${events.length} ${events.length === 1 ? "person" : "people"} taken by ${takers.join(", ")}`;
   b.title = events.map(describeHold).join("\n") + "\nClick for details and to acknowledge.";
   b.onclick = (ev) => { ev.stopPropagation(); openHoldEventsModal(events.map(e => e.id), "People taken from this mission"); };
   return b;
 }
 let holdModalIds = [];
+/* a merge writes one alert row per unused part of a forecast; they arrive as
+   separate Realtime events, so they are gathered into one toast per merge */
+let mergeToastTimer = null, mergeToastIds = [];
+function queueMergeToast(id) {
+  mergeToastIds.push(id);
+  clearTimeout(mergeToastTimer);
+  mergeToastTimer = setTimeout(() => {
+    const evs = (D().holdEvents || []).filter(e => mergeToastIds.includes(e.id));
+    mergeToastIds = [];
+    if (!evs.length) return;
+    const e0 = evs[0];
+    toast(evs.length === 1 ? describeHold(e0) + "."
+      : `${who(e0.takenBy)} merged your forecast for ${fmtShort(e0.date)}: ${evs.length} parts of it were not used.`, "warn", { duration: 12000 });
+  }, 700);
+}
 function openHoldEventsModal(ids, title) {
   holdModalIds = ids;
+  holdPlanCache.clear();
   $("#holds-title").textContent = title;
   renderHoldEventsModal();
   openModal("#modal-holds");
@@ -6388,11 +6485,20 @@ function renderHoldEventsModal() {
   const events = (D().holdEvents || []).filter(e => holdModalIds.includes(e.id));
   const mayAck = can("forecast", "edit");
   $("#btn-holds-ack-all").classList.toggle("hidden", !mayAck || events.length < 2);
+  $("#modal-holds").classList.toggle("wide", events.some(e => e.kind === "merge"));
+  const merges = events.filter(e => e.kind === "merge"), taken = events.filter(e => e.kind !== "merge");
+  $("#holds-note").textContent = merges.length && !taken.length
+    ? "Parts of a forecast that were not used when the day was confirmed: what was forecast, what is on the board now, and why. The flag stays until it is acknowledged."
+    : merges.length
+      ? "Forecasts not used when a day was confirmed, and people moved out of a forecast they were held in. Each flag stays until it is acknowledged."
+      : "Someone moved these people out of a forecast they were held in. The flag stays on the mission until it is acknowledged.";
   if (!events.length) {
     list.innerHTML = '<p class="import-note">All acknowledged — nothing left here.</p>';
     return;
   }
-  for (const e of events) {
+  if (merges.length) list.appendChild(mergeAlertsEl(merges, mayAck));
+  if (merges.length && taken.length) list.appendChild(mkEl("h4", "holds-subhead", "Taken by other engineers on the forecast"));
+  for (const e of taken) {
     const row = document.createElement("div");
     row.className = "hold-row";
     const text = document.createElement("div");
@@ -6522,17 +6628,31 @@ function renderPlanBanners() {
     }));
   } else {
     const sig = signalsForScreen();
-    if (sig && sig.forecast && !planIsEmpty(sig.forecast) && sig.stamp && sig.stamp.forecast_merged_at) {
-      box.appendChild(bannerEl("merged", {
-        text: [`Forecast merged by ${who(sig.stamp.forecast_merged_by)} ${fmtStamp(sig.stamp.forecast_merged_at)}. Kept read-only for reference.`],
-        actions: [{ label: "View", run: () => openForecastViewer() }],
-      }));
+    const hasForecast = sig && sig.forecast && !planIsEmpty(sig.forecast);
+    const decisions = (sig && sig.decisions) || [];
+    if (sig && sig.stamp && sig.stamp.forecast_merged_at && (hasForecast || decisions.length)) {
+      const text = [`Forecast merged by ${who(sig.stamp.forecast_merged_by)} ${fmtStamp(sig.stamp.forecast_merged_at)}.`];
+      if (decisions.length) {
+        const nu = new Map();
+        for (const r of decisions.filter(decisionNotUsed)) nu.set(who(r.forecaster), (nu.get(who(r.forecaster)) || 0) + 1);
+        text.push(` ${decisions.length} ${decisions.length === 1 ? "decision" : "decisions"}. `);
+        if (nu.size) text.push({ b: [...nu].map(([w, n]) => `${n} of ${w}'s`).join(", ") + " not used." });
+        else text.push("Everything forecast was used.");
+      } else {
+        text.push(" Kept read-only for reference.");
+      }
+      const actions = [];
+      if (decisions.length) actions.push({ label: "Decisions", run: () => openMergeLog() });
+      if (hasForecast) actions.push({ label: "View", run: () => openForecastViewer() });
+      box.appendChild(bannerEl("merged", { text, actions }));
     }
   }
 }
 
 /* ---------- PlanDiff review panel ---------- */
 function openPlanDiff(mode) {
+  // a forecast merge has its own review: carry-over and forecast side by side
+  if (mode === "merge") { openMergeReview(); return; }
   guardEdit(() => safely(async () => {
     const boardId = D().activeBoardId, date = state.date;
     let proposed, source = null;
@@ -6690,6 +6810,782 @@ function applyPlanDiffFromModal() {
       toast(e.message || String(e), "error");
     }
   })();
+}
+
+/* ======================================================================
+   Review & merge (forecast): the carry-over and the forecast side by side,
+   one row per mission, and a decision for every difference. The decisions
+   live in PlanDiff's merge model (planning.js); this draws it and passes
+   clicks to PlanDiff.decide. Nothing that collides is decided for the
+   planner: Apply stays locked until every difference has a side.
+   ====================================================================== */
+const MERGE_REASONS = ["Customer changed the schedule", "Needed on this site", "Certification / skill", "Leave not approved"];
+const MERGE_FC_COLORS = 4;   // --fc-1 .. --fc-4 in styles.css
+
+function openMergeReview() {
+  guardEdit(() => safely(async () => {
+    const boardId = D().activeBoardId, date = state.date;
+    const [forecast, base] = await Promise.all([
+      cloud.ensureForecastLoaded(boardId, date, { force: true }),
+      cloud.ensurePlanLoaded(boardId, date, { force: true }),
+    ]);
+    const employeeIds = boardEmployees(boardId).filter(e => e.active !== false).map(e => e.id);
+    const sig = signalsForScreen();
+    const model = PlanDiff.computeMerge(base, forecast, { employeeIds });
+    const forecasters = [...new Set(model.items.map(i => i.forecaster).filter(Boolean).map(x => x.toLowerCase()))].sort();
+    state.merge = {
+      boardId, date, model, forecasters,
+      carriedFrom: (sig && sig.stamp && sig.stamp.carried_from) || null,
+      reasons: {}, filter: "all", step: "review", applying: false,
+    };
+    renderMerge();
+    openModal("#modal-merge");
+  }));
+}
+
+/* ---------- small shared pieces (also used by the forecast alerts) ---------- */
+const initialsOf = (email) => who(email).split(/[._-]/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+function mergeFcColor(email) {
+  const i = state.merge ? state.merge.forecasters.indexOf(String(email || "").toLowerCase()) : -1;
+  return i < 0 ? "var(--muted)" : `var(--fc-${(i % MERGE_FC_COLORS) + 1})`;
+}
+function mergeFieldLabel(field) {
+  if (field === "hidden") return "Visibility";
+  const f = PlanDiff.MISSION_FIELDS.find(x => x.key === field);
+  return f ? f.label : field;
+}
+function mergeMissionOf(key) {
+  const m = state.merge.model;
+  return m.proposedByKey.get(key) || m.baseByKey.get(key);
+}
+const shiftWord = (s) => (s === "night" ? "Night" : "Day");
+function mergePlaceLabel(p) {
+  if (p.kind === "mission") { const m = mergeMissionOf(p.key); return m ? `${m.number} ${shiftWord(m.shift)}` : p.key; }
+  if (p.kind === "zone") return ZONE_LABELS[p.zone] || p.zone;
+  return "Standby";
+}
+function mergePlaceLong(p) {
+  if (p.kind !== "mission") return mergePlaceLabel(p);
+  const m = mergeMissionOf(p.key);
+  return m ? `${m.number} ${shiftWord(m.shift)} · ${m.host} → ${m.customer}` : p.key;
+}
+/* an employee as a small board card: name, position, OC — text only, never markup */
+function miniEmp(empId, opts = {}) {
+  const emp = D().employees.find(e => e.id === empId);
+  const el = document.createElement(opts.button ? "button" : "span");
+  if (opts.button) el.type = "button";
+  el.className = "mini-emp" + (emp && emp.contract === "oncall" ? " oncall" : "") + (opts.cls ? " " + opts.cls : "");
+  el.dataset.emp = empId;
+  if (opts.dot) {
+    const dot = document.createElement("i");
+    dot.className = "mini-dot";
+    dot.style.background = opts.dot;
+    el.appendChild(dot);
+  }
+  const nm = document.createElement("span");
+  nm.className = "mini-name";
+  nm.textContent = emp ? emp.name : "(unknown)";
+  el.appendChild(nm);
+  const meta = document.createElement("span");
+  meta.className = "mini-meta";
+  const pos = emp && emp.position ? POSITIONS[emp.position] : null;
+  if (pos) { const p = document.createElement("span"); p.className = "emp-pos"; p.textContent = pos.short; meta.appendChild(p); }
+  if (emp && emp.contract === "oncall") { const o = document.createElement("span"); o.className = "emp-oc"; o.textContent = "OC"; meta.appendChild(o); }
+  if (opts.note) { const n = document.createElement("span"); n.className = "mini-note"; n.textContent = opts.note; meta.appendChild(n); }
+  el.appendChild(meta);
+  if (opts.flag) { const f = document.createElement("span"); f.className = "mini-flag"; f.textContent = opts.flag; el.appendChild(f); }
+  if (opts.title) el.title = opts.title;
+  return el;
+}
+function mkEl(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+/* ---------- the review ---------- */
+function mergeRowKeys() {
+  const m = state.merge.model;
+  const keys = new Set(m.proposedByKey.keys());
+  for (const [k, bm] of m.baseByKey) if (!bm.hidden || m.proposedByKey.has(k)) keys.add(k);
+  return [...keys].sort((a, b) => {
+    const ma = mergeMissionOf(a), mb = mergeMissionOf(b);
+    return String(ma.number).localeCompare(String(mb.number), undefined, { numeric: true }) || String(ma.shift).localeCompare(String(mb.shift));
+  });
+}
+/* the collision items a row's buttons (and the forecaster filter) act on */
+function mergeRowItems(key) {
+  const m = state.merge.model;
+  return m.items.filter(it => it.type === "person"
+    ? ((it.from.kind === "mission" && it.from.key === key) || (it.to.kind === "mission" && it.to.key === key))
+    : it.key === key);
+}
+function mergeMatchesFilter(it) {
+  const f = state.merge.filter;
+  if (f === "all") return true;
+  return f === "none" ? !it.forecaster : !!it.forecaster && it.forecaster.toLowerCase() === f;
+}
+/* bulk choices touch collisions only: a person coming off Standby and a new
+   mission were never collisions, so "keep carry-over for all" doesn't undo them */
+const mergeBulkable = (it) => !(it.type === "person" && it.free) && it.type !== "add";
+
+function mergeChip(empId, side) {
+  const sm = state.merge, m = sm.model;
+  const it = m.byId.get("person:" + empId);
+  const p = m.people.get(empId);
+  const zoneNote = (pl) => (pl.kind === "zone" ? ZONE_LABELS[pl.zone] : null);
+  if (!it) {
+    // the same on both sides, or following its carry-over mission
+    const gone = side === "carry" && p.from.kind === "mission" && PlanDiff.carryPlace(m, p.from).kind === "standby";
+    return miniEmp(empId, {
+      cls: gone ? "dropped" : "same", note: gone ? "→ Standby" : zoneNote(side === "carry" ? p.from : p.to),
+      title: gone ? "Goes to Standby: this mission is being removed" : "The same on both sides",
+    });
+  }
+  const d = PlanDiff.decisionOf(m, it.id);
+  const locked = PlanDiff.mergeLocked(m, it);
+  const here = side === "carry" ? PlanDiff.carryPlace(m, it.from) : it.to;
+  const other = side === "carry" ? it.to : PlanDiff.carryPlace(m, it.from);
+  const name = empName(empId);
+  const chip = miniEmp(empId, {
+    button: !locked && !sm.applying,
+    cls: (!d ? "conf" : d === side ? "kept" : "dropped") + (locked ? " locked" : ""),
+    dot: side === "forecast" && it.forecaster ? mergeFcColor(it.forecaster) : null,
+    note: (side === "carry" ? "→ " : "← ") + mergePlaceLabel(other),
+    title: locked ? `${name} stays on the carry-over: ${mergePlaceLabel(it.to)} is not being added`
+      : side === "carry" ? `Keep ${name} on ${mergePlaceLabel(here)} (carry-over)`
+      : `Use ${it.forecaster ? who(it.forecaster) + "'s" : "the"} forecast: ${name} on ${mergePlaceLabel(here)}`,
+  });
+  chip.setAttribute("aria-pressed", String(d === side));
+  if (!locked) {
+    chip.onclick = () => { if (PlanDiff.decide(m, it.id, side)) renderMerge(); };
+    const pair = (on) => { for (const c of document.querySelectorAll(`#merge-body .mini-emp[data-emp="${CSS.escape(empId)}"]`)) c.classList.toggle("pair", on); };
+    chip.addEventListener("mouseenter", () => pair(true));
+    chip.addEventListener("mouseleave", () => pair(false));
+    chip.addEventListener("focus", () => pair(true));
+    chip.addEventListener("blur", () => pair(false));
+  }
+  return chip;
+}
+/* a two-way choice for one item: [carry-over text | forecast text] */
+function mergeSeg(itemId, carryText, forecastText, label) {
+  const m = state.merge.model;
+  const d = PlanDiff.decisionOf(m, itemId);
+  const seg = mkEl("div", "merge-seg" + (d ? "" : " undecided"));
+  seg.setAttribute("role", "radiogroup");
+  seg.setAttribute("aria-label", label);
+  for (const [side, text, tip] of [["carry", carryText, "Carry-over"], ["forecast", forecastText, "Forecast"]]) {
+    const b = mkEl("button", null, text);
+    b.type = "button";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(d === side));
+    b.title = tip;
+    b.disabled = state.merge.applying;
+    b.onclick = () => { if (PlanDiff.decide(m, itemId, side)) renderMerge(); };
+    seg.appendChild(b);
+  }
+  return seg;
+}
+function mergeCell(side, chips, emptyText) {
+  const cell = mkEl("div", "merge-cell" + (side === "forecast" ? " fc" : ""));
+  cell.appendChild(mkEl("span", "merge-cell-label", side === "carry" ? "Carry-over" : "Forecast"));
+  if (chips.length) for (const c of chips) cell.appendChild(c);
+  else cell.appendChild(mkEl("span", "merge-empty", emptyText));
+  return cell;
+}
+function mergeMissionRow(key) {
+  const sm = state.merge, m = sm.model;
+  const bm = m.baseByKey.get(key), fm = m.proposedByKey.get(key);
+  const mis = fm || bm;
+  const eng = D().engineers.find(e => e.id === mis.engineerId);
+  const onBoard = PlanDiff.missionOnBoard(m, key);
+  const people = [...m.people.entries()];
+  const carryIds = people.filter(([, p]) => p.from.kind === "mission" && p.from.key === key).map(([id]) => id);
+  const fcIds = people.filter(([, p]) => p.to.kind === "mission" && p.to.key === key).map(([id]) => id);
+  const after = onBoard ? people.filter(([id]) => { const r = PlanDiff.resultPlace(m, id); return r.kind === "mission" && r.key === key; }).length : 0;
+  const items = mergeRowItems(key);
+
+  const row = mkEl("div", "merge-row" + (onBoard ? "" : " gone") + (items.some(mergeMatchesFilter) || sm.filter === "all" ? "" : " dim"));
+  const info = mkEl("div", "merge-info");
+  if (eng) info.style.borderLeftColor = eng.color;
+  const head = mkEl("div", "merge-num");
+  head.appendChild(mkEl("b", null, mis.number));
+  head.appendChild(mkEl("span", "merge-shift" + (mis.shift === "night" ? " night" : ""), shiftWord(mis.shift).toUpperCase()));
+  info.appendChild(head);
+  info.appendChild(mkEl("div", "merge-host", `${mis.host} → ${mis.customer}`));
+  for (const it of items.filter(i => i.type === "field")) {
+    const f = mkEl("div", "merge-field");
+    f.appendChild(mkEl("span", "merge-field-label", `${it.label}:`));
+    const val = (v) => (it.field === "hidden" ? v : diffFieldValue(it.field, v));
+    f.appendChild(mergeSeg(it.id, val(it.carry), val(it.forecast), `${it.label} on ${mis.number}`));
+    info.appendChild(f);
+  }
+  const add = items.find(i => i.type === "add");
+  if (add) {
+    const f = mkEl("div", "merge-field");
+    f.appendChild(mkEl("span", "merge-field-label", `New in ${add.forecaster ? who(add.forecaster) + "'s" : "the"} forecast:`));
+    f.appendChild(mergeSeg(add.id, "Don't add", "Add", `Add mission ${mis.number}`));
+    info.appendChild(f);
+  }
+  const rem = items.find(i => i.type === "remove");
+  if (rem) {
+    const f = mkEl("div", "merge-field");
+    f.appendChild(mkEl("span", "merge-field-label", "Not in the forecast:"));
+    f.appendChild(mergeSeg(rem.id, "Keep", "Remove", `Keep mission ${mis.number}`));
+    info.appendChild(f);
+  }
+  info.appendChild(mkEl("div", "merge-after", onBoard ? `After merge: ${after} ${after === 1 ? "person" : "people"}` : (add ? "Not added" : "Removed")));
+  const bulk = items.filter(i => i.type !== "add" && i.type !== "remove" && !(i.type === "person" && i.free) && !PlanDiff.mergeLocked(m, i));
+  if (bulk.length && !sm.applying) {
+    const acts = mkEl("div", "merge-row-acts");
+    for (const [side, text] of [["carry", "Keep carry-over"], ["forecast", "Use forecast"]]) {
+      const b = mkEl("button", "btn btn-small", text);
+      b.type = "button";
+      b.title = side === "carry" ? "Keep this mission as the carry-over has it: its crew and details" : "Make this mission match the forecast: its crew and details";
+      b.onclick = () => { for (const it of bulk) PlanDiff.decide(m, it.id, side); renderMerge(); };
+      acts.appendChild(b);
+    }
+    info.appendChild(acts);
+  }
+  row.appendChild(info);
+  row.appendChild(mergeCell("carry", carryIds.map(id => mergeChip(id, "carry")), bm ? "Nobody" : "Not on the carry-over"));
+  row.appendChild(mergeCell("forecast", fcIds.map(id => mergeChip(id, "forecast")), fm ? "Nobody" : "Not in the forecast"));
+  return row;
+}
+/* Leave, and Standby for the people who move on or off it */
+function mergeLaneRow(kind) {
+  const sm = state.merge, m = sm.model;
+  const people = [...m.people.entries()];
+  const test = kind === "leave" ? (p) => p.kind === "zone" : (p) => p.kind === "standby";
+  const moving = (id) => m.byId.has("person:" + id);
+  const carryIds = people.filter(([id, p]) => test(p.from) && (kind === "leave" || moving(id))).map(([id]) => id);
+  const fcIds = people.filter(([id, p]) => test(p.to) && (kind === "leave" || moving(id))).map(([id]) => id);
+  if (!carryIds.length && !fcIds.length) return null;
+  const items = [...carryIds, ...fcIds].map(id => m.byId.get("person:" + id)).filter(Boolean);
+  const row = mkEl("div", "merge-row lane" + (items.some(mergeMatchesFilter) || sm.filter === "all" ? "" : " dim"));
+  const info = mkEl("div", "merge-info");
+  info.appendChild(mkEl("div", "merge-num", kind === "leave" ? "Leave" : "Standby"));
+  info.appendChild(mkEl("div", "merge-host", kind === "leave" ? "Annual, sick, business…" : "Only the people who move on or off it"));
+  row.appendChild(info);
+  row.appendChild(mergeCell("carry", carryIds.map(id => mergeChip(id, "carry")), "Nobody"));
+  row.appendChild(mergeCell("forecast", fcIds.map(id => mergeChip(id, "forecast")), "Nobody"));
+  return row;
+}
+/* the forecasters a carry-over choice will alert: never the planner, never 'migrated' */
+function mergeAlertItems() {
+  const m = state.merge.model;
+  return m.items.filter(it => it.forecaster && !sameEmail(it.forecaster, state.myEmail) && it.forecaster.toLowerCase() !== "migrated"
+    && PlanDiff.decisionOf(m, it.id) === "carry" && !PlanDiff.mergeLocked(m, it));
+}
+function mergeItemText(it) {
+  if (it.type === "person") return `${empName(it.empId)} kept on ${mergePlaceLabel(PlanDiff.carryPlace(state.merge.model, it.from))}`;
+  const mis = mergeMissionOf(it.key);
+  if (it.type === "field") return `${mis.number} ${it.label.toLowerCase()} kept at ${it.field === "hidden" ? it.carry : diffFieldValue(it.field, it.carry)}`;
+  if (it.type === "add") return `${mis.number} ${shiftWord(mis.shift)} not added`;
+  return `${mis.number} kept`;
+}
+function mergeReasonsEl() {
+  const sm = state.merge;
+  const list = mergeAlertItems();
+  if (!list.length) return null;
+  const box = mkEl("section", "merge-reasons");
+  box.appendChild(mkEl("h4", null, "Reasons for the forecasters (optional)"));
+  box.appendChild(mkEl("p", "import-note", "Each engineer below gets an alert that part of their forecast was not used. A reason is shown with it and kept in the merge log."));
+  for (const it of list) {
+    const row = mkEl("div", "merge-reason");
+    const t = mkEl("div", "merge-reason-text");
+    t.appendChild(mkEl("b", null, mergeItemText(it)));
+    t.appendChild(mkEl("small", null, `instead of ${who(it.forecaster)}'s forecast`));
+    row.appendChild(t);
+    const right = mkEl("div", "merge-reason-input");
+    const qs = mkEl("div", "merge-quick");
+    for (const q of MERGE_REASONS) {
+      const b = mkEl("button", "merge-qchip", q);
+      b.type = "button";
+      b.disabled = sm.applying;
+      b.onclick = () => { sm.reasons[it.id] = q; const inp = row.querySelector("input"); if (inp) inp.value = q; };
+      qs.appendChild(b);
+    }
+    right.appendChild(qs);
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.id = "merge-reason-" + it.id.replace(/[^a-z0-9]/gi, "-");
+    inp.maxLength = 200;
+    inp.placeholder = "Optional reason";
+    inp.value = sm.reasons[it.id] || "";
+    inp.disabled = sm.applying;
+    inp.setAttribute("aria-label", `Reason: ${mergeItemText(it)}`);
+    inp.oninput = () => { sm.reasons[it.id] = inp.value; };
+    right.appendChild(inp);
+    row.appendChild(right);
+    box.appendChild(row);
+  }
+  return box;
+}
+function renderMergeTools() {
+  const sm = state.merge;
+  const box = $("#merge-tools");
+  box.innerHTML = "";
+  box.classList.toggle("hidden", sm.step !== "review" || !sm.model.items.length);
+  if (sm.step !== "review") return;
+  const legend = mkEl("div", "merge-legend");
+  for (const [cls, text] of [["same", "Same on both sides"], ["conf", "Needs a decision"], ["kept", "Kept"], ["dropped", "Not used"]]) {
+    const chip = mkEl("span", "mini-emp legend " + cls);
+    chip.appendChild(mkEl("span", "mini-name", text));
+    legend.appendChild(chip);
+  }
+  box.appendChild(legend);
+  const bar = mkEl("div", "merge-filter");
+  const counts = { all: 0, none: 0 };
+  for (const it of sm.model.items) {
+    if (!mergeBulkable(it)) continue;
+    counts.all++;
+    const k = it.forecaster ? it.forecaster.toLowerCase() : "none";
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  const chips = [["all", "All"], ...sm.forecasters.map(f => [f, who(f)]), ...(counts.none ? [["none", "No forecaster"]] : [])];
+  for (const [k, text] of chips) {
+    const b = mkEl("button", "merge-fchip");
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(sm.filter === k));
+    if (k !== "all" && k !== "none") { const d = mkEl("i", "mini-dot"); d.style.background = mergeFcColor(k); b.appendChild(d); }
+    b.appendChild(document.createTextNode(`${text} · ${counts[k] || 0}`));
+    b.onclick = () => { sm.filter = k; renderMerge(); };
+    bar.appendChild(b);
+  }
+  const whose = sm.filter === "all" ? "" : sm.filter === "none" ? " (no forecaster)" : ` (${who(sm.filter)}'s)`;
+  for (const [side, text] of [["carry", `Keep carry-over for all${whose}`], ["forecast", `Take forecast for all${whose}`]]) {
+    const b = mkEl("button", "btn btn-small", text);
+    b.type = "button";
+    b.disabled = sm.applying;
+    b.onclick = () => { for (const it of sm.model.items) if (mergeBulkable(it) && mergeMatchesFilter(it)) PlanDiff.decide(sm.model, it.id, side); renderMerge(); };
+    bar.appendChild(b);
+  }
+  box.appendChild(bar);
+}
+function renderMerge() {
+  const sm = state.merge;
+  if (!sm) return;
+  const m = sm.model;
+  $("#merge-title").textContent = `Review & merge forecast — ${fmtShort(sm.date)}`;
+  const src = sm.carriedFrom ? `carried over from ${fmtShort(sm.carriedFrom)}` : "the confirmed plan";
+  $("#merge-sub").textContent = sm.step === "confirm"
+    ? "Check what the merge will do, then confirm."
+    : `Left: ${src}. Right: the forecast (dashed). Click a flagged person on the side you want to keep; hover to see where they are on the other side. Only the chosen side is written, and people placed on missions go into the Host Record.`;
+  renderMergeTools();
+  const body = $("#merge-body");
+  body.innerHTML = "";
+  if (sm.step === "confirm") body.appendChild(mergeConfirmEl());
+  else if (!m.items.length) {
+    body.appendChild(mkEl("p", "import-note", "No differences — the confirmed plan already matches the forecast."));
+  } else {
+    const grid = mkEl("div", "merge-grid");
+    const head = mkEl("div", "merge-row merge-head");
+    for (const t of ["Mission", "Carry-over (solid)", "Forecast (dashed)"]) head.appendChild(mkEl("div", null, t));
+    grid.appendChild(head);
+    for (const key of mergeRowKeys()) grid.appendChild(mergeMissionRow(key));
+    for (const k of ["leave", "standby"]) { const r = mergeLaneRow(k); if (r) grid.appendChild(r); }
+    body.appendChild(grid);
+    const reasons = mergeReasonsEl();
+    if (reasons) body.appendChild(reasons);
+  }
+  renderMergeFooter();
+}
+function renderMergeFooter() {
+  const sm = state.merge, m = sm.model;
+  const total = m.items.length, left = PlanDiff.pending(m).length, done = total - left;
+  const prog = $("#merge-progress");
+  prog.innerHTML = "";
+  if (total) {
+    prog.appendChild(mkEl("span", "merge-prog-text", sm.step === "confirm" ? "Every difference has a side" : `${done} of ${total} differences decided`));
+    const bar = mkEl("span", "merge-prog-bar");
+    const fill = mkEl("i");
+    fill.style.width = `${Math.round((done / total) * 100)}%`;
+    bar.appendChild(fill);
+    prog.appendChild(bar);
+  }
+  const apply = $("#btn-merge-apply");
+  $("#btn-merge-back").classList.toggle("hidden", sm.step !== "confirm");
+  apply.disabled = sm.applying;
+  // still clickable while anything is undecided: the click points at what is left
+  apply.classList.toggle("merge-pending", left > 0);
+  apply.textContent = sm.applying ? "Merging…"
+    : !total ? "Mark forecast as merged"
+    : sm.step === "confirm" ? "Confirm merge"
+    : left ? `Apply (${left} left)` : "Review & apply";
+  apply.title = !total ? "Changes nothing on the board; hides the forecast banner for everyone" : "";
+}
+function mergeConfirmEl() {
+  const sm = state.merge, m = sm.model;
+  const box = mkEl("div", "merge-confirm");
+  const people = [...m.people.entries()];
+  const lines = [];
+  for (const key of mergeRowKeys()) {
+    const before = m.baseByKey.has(key) ? people.filter(([, p]) => p.from.kind === "mission" && p.from.key === key).length : null;
+    const on = PlanDiff.missionOnBoard(m, key);
+    const after = on ? people.filter(([id]) => { const r = PlanDiff.resultPlace(m, id); return r.kind === "mission" && r.key === key; }).length : null;
+    if (before === after) continue;
+    const label = mergePlaceLabel({ kind: "mission", key });
+    lines.push(before === null ? `${label}: new, ${after} ${after === 1 ? "person" : "people"}`
+      : after === null ? `${label}: removed (${before} ${before === 1 ? "person goes" : "people go"} to Standby)`
+      : `${label}: ${before} → ${after} people`);
+  }
+  const fields = m.items.filter(it => it.type === "field" && PlanDiff.decisionOf(m, it.id) === "forecast");
+  for (const it of fields) lines.push(`${mergePlaceLabel({ kind: "mission", key: it.key })}: ${it.label} → ${it.field === "hidden" ? it.forecast : diffFieldValue(it.field, it.forecast)}`);
+  box.appendChild(mkEl("h4", null, "On the confirmed board"));
+  if (lines.length) { const ul = mkEl("ul"); for (const l of lines) ul.appendChild(mkEl("li", null, l)); box.appendChild(ul); }
+  else box.appendChild(mkEl("p", "import-note", "No crew sizes change. Only the people and details you picked from the forecast are written."));
+  const alerts = mergeAlertItems();
+  const byWho = new Map();
+  for (const it of alerts) byWho.set(it.forecaster.toLowerCase(), (byWho.get(it.forecaster.toLowerCase()) || 0) + 1);
+  const call = mkEl("div", "merge-callout" + (alerts.length ? "" : " ok"));
+  if (alerts.length && feat().mergeLog) {
+    call.appendChild(mkEl("b", null, "Alerts that will be sent"));
+    const ul = mkEl("ul");
+    for (const [f, n] of byWho) ul.appendChild(mkEl("li", null, `${who(f)}: ${n} ${n === 1 ? "part" : "parts"} of their forecast not used`));
+    call.appendChild(ul);
+  } else if (alerts.length) {
+    call.appendChild(mkEl("span", null, `${alerts.length} forecast ${alerts.length === 1 ? "placement is" : "placements are"} not used. This database can't send alerts yet (run migration-2026-09-29-forecast-merge-review.sql), so tell ${[...byWho.keys()].map(who).join(", ")} yourself.`));
+  } else {
+    call.appendChild(mkEl("span", null, "Everything forecast by other engineers is used. Nobody gets an alert."));
+  }
+  box.appendChild(call);
+  if (feat().mergeLog) box.appendChild(mkEl("p", "import-note", "Every decision and reason is saved in the merge log, linked from the “Forecast merged” note on this day. The forecast itself is kept, read-only."));
+  return box;
+}
+function onMergeApply() {
+  const sm = state.merge;
+  if (!sm || sm.applying) return;
+  const left = PlanDiff.pending(sm.model);
+  if (left.length) {
+    const first = document.querySelector("#merge-body .mini-emp.conf, #merge-body .merge-seg.undecided");
+    if (first) {
+      first.scrollIntoView({ block: "center", behavior: "smooth" });
+      first.classList.remove("merge-flash");
+      void first.offsetWidth;
+      first.classList.add("merge-flash");
+    }
+    toast(`${left.length} ${left.length === 1 ? "difference still needs" : "differences still need"} a side before the merge.`, "warn");
+    return;
+  }
+  if (sm.step === "review" && sm.model.items.length) { sm.step = "confirm"; renderMerge(); return; }
+  applyMerge();
+}
+function applyMerge() {
+  const sm = state.merge;
+  sm.applying = true;
+  renderMergeFooter();
+  (async () => {
+    try {
+      const rows = PlanDiff.decisionRows(sm.model, {
+        place: mergePlaceLong,
+        field: (f, v) => (f === "hidden" ? String(v) : diffFieldValue(f, v)),
+      }, sm.reasons);
+      const sum = await cloud.applyForecastMerge(sm.boardId, sm.date, sm.model, rows);
+      state.merge = null;
+      closeModal();
+      const bits = [];
+      if (sum.added) bits.push(`${sum.added} mission${sum.added === 1 ? "" : "s"} added`);
+      if (sum.updated) bits.push(`${sum.updated} updated`);
+      if (sum.placed) bits.push(`${sum.placed} ${sum.placed === 1 ? "person" : "people"} placed`);
+      if (sum.removed) bits.push(`${sum.removed} removed`);
+      if (sum.alerts) bits.push(`${sum.alerts} forecast alert${sum.alerts === 1 ? "" : "s"} sent`);
+      toast(`Forecast merged${bits.length ? ": " + bits.join(", ") : ""}.`, "info");
+      if (!sum.logged && feat().mergeLog) toast("The board was updated, but the decision log and the alerts could not be saved.", "warn", { duration: 12000 });
+      await refreshAndRender();
+    } catch (e) {
+      sm.applying = false;
+      renderMerge();
+      toast(e.message || String(e), "error");
+    }
+  })();
+}
+
+/* ======================================================================
+   Forecast alerts, merge kind (D1): what an engineer sees when the day
+   they forecast was confirmed without some of it. Drawn from the alert rows
+   plus the day's forecast and confirmed plan, so "your forecast" and "on
+   the board" are both read live, not from what the alert remembered.
+   ====================================================================== */
+const holdPlanCache = new Map();   // "board|date" -> { forecast, plan } while the alerts are open
+function holdPlans(boardId, date) {
+  const k = boardId + "|" + date;
+  const v = holdPlanCache.get(k);
+  if (v && v !== "loading") return v;
+  if (!v) {
+    holdPlanCache.set(k, "loading");
+    Promise.all([cloud.ensureForecastLoaded(boardId, date), cloud.ensurePlanLoaded(boardId, date)])
+      .then(([forecast, plan]) => { holdPlanCache.set(k, { forecast, plan }); })
+      .catch((e) => { console.warn("forecast alert plans not loaded:", e && e.message || e); holdPlanCache.set(k, { forecast: null, plan: null }); })
+      .then(() => { if (!$("#modal-holds").classList.contains("hidden")) renderHoldEventsModal(); });
+  }
+  return null;
+}
+function planPlaceOf(plan, empId) {
+  if (!plan) return null;
+  for (const m of plan.missions || []) if (!m.hidden && (m.members || []).includes(empId)) return { kind: "mission", key: PlanDiff.missionKey(m), mission: m };
+  for (const z of ZONES) if (((plan.zones || {})[z] || []).includes(empId)) return { kind: "zone", zone: z };
+  return { kind: "standby" };
+}
+const samePlanPlace = (a, b) => !!a && !!b && a.kind === b.kind && (a.kind === "standby" || (a.kind === "mission" ? a.key === b.key : a.zone === b.zone));
+function planPlaceText(p) {
+  if (!p) return "…";
+  if (p.kind === "mission") return `${p.mission.number} ${shiftWord(p.mission.shift)}`;
+  if (p.kind === "zone") return ZONE_LABELS[p.zone] || p.zone;
+  return "Standby";
+}
+function planPlaceSub(p) {
+  if (!p) return "";
+  if (p.kind === "mission") return `${p.mission.host} → ${p.mission.customer}`;
+  return p.kind === "zone" ? "Leave" : "Not on a mission";
+}
+function eventBoardId(e) {
+  if (e.detail && e.detail.board_id) return e.detail.board_id;
+  const hm = e.fromMissionId && D().holdMissions[e.fromMissionId];
+  if (hm) return hm.boardId;
+  const emp = D().employees.find(x => x.id === e.employeeId);
+  return emp ? emp.boardId : null;
+}
+function alertPill(kind, main, sub, color) {
+  const p = mkEl("span", "alert-pill " + kind);
+  if (color) p.style.borderTopColor = color;
+  p.appendChild(mkEl("span", "alert-pill-k", kind === "plan" ? "Forecast" : "On the board"));
+  p.appendChild(mkEl("b", null, main));
+  if (sub) p.appendChild(mkEl("small", null, sub));
+  return p;
+}
+function alertArrow() {
+  const a = mkEl("span", "alert-arrow");
+  a.setAttribute("aria-hidden", "true");
+  a.innerHTML = icon("arrow-right");
+  return a;
+}
+function mergeAlertsEl(events, mayAck) {
+  const wrap = mkEl("div", "merge-alerts");
+  // one block per forecast day (and whose forecast it was)
+  const days = new Map();
+  for (const e of events) {
+    const k = [eventBoardId(e), e.date, (e.fromHeldBy || "").toLowerCase()].join("|");
+    if (!days.has(k)) days.set(k, []);
+    days.get(k).push(e);
+  }
+  for (const [k, evs] of days) {
+    const [boardId, date, holder] = k.split("|");
+    const mine = sameEmail(holder, state.myEmail);
+    const plans = boardId ? holdPlans(boardId, date) : { forecast: null, plan: null };
+    const day = mkEl("section", "alert-day");
+    const top = mkEl("div", "alert-top");
+    const notice = mkEl("div", "alert-notice");
+    const takers = [...new Set(evs.map(e => e.takenBy))];
+    const av = mkEl("span", "alert-avatar", initialsOf(takers[0]));
+    av.title = who(takers[0]);
+    notice.appendChild(av);
+    const nt = mkEl("div", "alert-notice-text");
+    nt.appendChild(mkEl("b", null, `${takers.map(who).join(", ")} merged ${mine ? "your" : who(holder) + "'s"} forecast for ${fmtShort(date)}.`));
+    nt.appendChild(mkEl("small", null, `${evs.length} ${evs.length === 1 ? "part was" : "parts were"} not used · ${fmtStamp(evs[0].takenAt)}`));
+    notice.appendChild(nt);
+    top.appendChild(notice);
+    // scorecard: every person this engineer forecast that day, used or not
+    const card = mkEl("div", "alert-score");
+    if (plans && plans.forecast) {
+      const heldHere = Object.entries(plans.forecast.holds || {}).filter(([, by]) => sameEmail(by, holder)).map(([id]) => id);
+      const lost = new Set(heldHere.filter(id => !samePlanPlace(planPlaceOf(plans.forecast, id), planPlaceOf(plans.plan, id))));
+      const hd = mkEl("div", "alert-score-head");
+      hd.appendChild(mkEl("span", "alert-score-big", `${heldHere.length - lost.size}/${heldHere.length}`));
+      hd.appendChild(mkEl("b", null, "people placed as planned"));
+      card.appendChild(hd);
+      const tiles = mkEl("div", "alert-score-tiles");
+      for (const id of heldHere) tiles.appendChild(miniEmp(id, { cls: "small " + (lost.has(id) ? "lost" : "used"), flag: lost.has(id) ? "not used" : "✓" }));
+      for (const e of evs.filter(x => x.detail && x.detail.type !== "person")) {
+        const d = e.detail;
+        tiles.appendChild(mkEl("span", "alert-score-pill", d.type === "add" ? `New ${d.mission_number}` : `${d.mission_number} ${mergeFieldLabel(d.field)}`));
+      }
+      card.appendChild(tiles);
+    } else {
+      card.appendChild(mkEl("span", "import-note", "Loading the forecast…"));
+    }
+    top.appendChild(card);
+    day.appendChild(top);
+
+    // one card per forecast mission (or Leave) that lost something
+    const groups = new Map();
+    for (const e of evs) {
+      const g = e.fromMissionId || ("zone:" + (e.fromZone || "?"));
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(e);
+    }
+    for (const [g, list] of groups) day.appendChild(mergeAlertGroupEl(g, list, plans, mayAck));
+    wrap.appendChild(day);
+  }
+  return wrap;
+}
+function mergeAlertGroupEl(g, list, plans, mayAck) {
+  const isMission = !g.startsWith("zone:");
+  const hm = isMission ? D().holdMissions[g] : null;
+  const fMission = isMission && plans && plans.forecast ? plans.forecast.missions.find(m => m.id === g) : null;
+  const mis = fMission || hm;
+  const eng = mis && D().engineers.find(e => e.id === mis.engineerId);
+  const card = mkEl("section", "alert-group");
+  const head = mkEl("div", "alert-group-head");
+  if (eng) head.style.borderTopColor = eng.color;
+  if (mis) {
+    head.appendChild(mkEl("b", "alert-group-num", mis.number));
+    head.appendChild(mkEl("span", "merge-shift" + (mis.shift === "night" ? " night" : ""), shiftWord(mis.shift).toUpperCase()));
+    head.appendChild(mkEl("span", "alert-group-host", `${mis.host} → ${mis.customer}`));
+  } else {
+    head.appendChild(mkEl("b", "alert-group-num", isMission ? "Mission" : "Leave"));
+  }
+  head.appendChild(mkEl("span", "alert-sp"));
+  const open = list;
+  if (mayAck && open.length > 1) {
+    const b = mkEl("button", "hold-badge mine", `${open.length} not used · Acknowledge all`);
+    b.type = "button";
+    b.onclick = () => safely(async () => { await cloud.acknowledgeHoldEvents(open.map(e => e.id)); renderHoldEventsModal(); render(); });
+    head.appendChild(b);
+  } else {
+    head.appendChild(mkEl("span", "hold-badge mine", `${open.length} not used`));
+  }
+  card.appendChild(head);
+
+  // your forecast vs the board, for a mission that lost people
+  const personish = list.some(e => !e.detail || e.detail.type === "person" || e.detail.type === "add");
+  if (isMission && personish && plans && plans.forecast && fMission) {
+    const planned = fMission.members || [];
+    const bMission = (plans.plan.missions || []).find(m => !m.hidden && PlanDiff.missionKey(m) === PlanDiff.missionKey(fMission));
+    const here = { kind: "mission", key: PlanDiff.missionKey(fMission) };
+    const cmp = mkEl("div", "alert-compare");
+    cmp.appendChild(mkEl("div", "alert-lane-label", `Forecast · ${planned.length}`));
+    const lp = mkEl("div", "alert-lane plan");
+    for (const id of planned) {
+      const lost = !samePlanPlace(planPlaceOf(plans.plan, id), here);
+      lp.appendChild(miniEmp(id, { cls: lost ? "lost" : "", flag: lost ? "not used" : null }));
+    }
+    if (!planned.length) lp.appendChild(mkEl("span", "merge-empty", "Nobody"));
+    cmp.appendChild(lp);
+    const onBoard = bMission ? (bMission.members || []) : [];
+    cmp.appendChild(mkEl("div", "alert-lane-label", bMission ? `On the board · ${onBoard.length}` : "On the board"));
+    const lb = mkEl("div", "alert-lane board");
+    if (!bMission) { lb.appendChild(mkEl("span", "alert-stamp", "NOT ADDED")); lb.appendChild(mkEl("span", "merge-empty", "This mission is not on the confirmed board.")); }
+    for (const id of onBoard) lb.appendChild(planned.includes(id) ? miniEmp(id) : miniEmp(id, { cls: "newc", flag: "not in forecast" }));
+    if (bMission && !onBoard.length) lb.appendChild(mkEl("span", "merge-empty", "Nobody"));
+    cmp.appendChild(lb);
+    card.appendChild(cmp);
+  }
+
+  const color = eng ? eng.color : null;
+  for (const e of list) {
+    const d = e.detail || { type: "person" };
+    const row = mkEl("div", "alert-change");
+    const flow = mkEl("div", "alert-flow");
+    if (d.type === "field") {
+      row.appendChild(mkEl("span", "alert-field-chip", mergeFieldLabel(d.field)));
+      flow.appendChild(alertPill("plan", d.forecast_value || "(blank)", null, color));
+      flow.appendChild(alertArrow());
+      flow.appendChild(alertPill("board", d.carry_value || "(blank)", null, color));
+    } else if (d.type === "add") {
+      row.appendChild(mkEl("span", "alert-field-chip", "Mission"));
+      flow.appendChild(mkEl("span", null, "This new mission was not added. Its crew stayed where they were:"));
+      for (const id of (fMission ? fMission.members : [])) {
+        const at = plans && planPlaceOf(plans.plan, id);
+        const it = mkEl("span", "alert-crew");
+        it.appendChild(miniEmp(id));
+        it.appendChild(mkEl("span", "mini-note", "→ " + planPlaceText(at)));
+        flow.appendChild(it);
+      }
+    } else {
+      row.appendChild(miniEmp(e.employeeId, { cls: "big" }));
+      const fp = plans && plans.forecast ? planPlaceOf(plans.forecast, e.employeeId) : null;
+      const bp = plans && plans.plan ? planPlaceOf(plans.plan, e.employeeId) : null;
+      flow.appendChild(alertPill("plan", fp ? planPlaceText(fp) : holdPlace(e.fromMissionId, e.fromZone), fp ? planPlaceSub(fp) : "", color));
+      flow.appendChild(alertArrow());
+      const bm = bp && bp.kind === "mission" ? D().engineers.find(x => x.id === bp.mission.engineerId) : null;
+      flow.appendChild(alertPill("board", bp ? planPlaceText(bp) : (d.carry_value || "…"), bp ? planPlaceSub(bp) : "", bm ? bm.color : null));
+    }
+    row.appendChild(flow);
+    const acts = mkEl("div", "alert-acts");
+    const go = mkEl("button", "btn btn-small", "Open day");
+    go.type = "button";
+    go.onclick = () => { closeModal(); clearSelection(); const b = eventBoardId(e); if (b) D().activeBoardId = b; state.date = e.date; refreshAndRender(); };
+    acts.appendChild(go);
+    if (mayAck) {
+      const ack = mkEl("button", "btn btn-small btn-primary", "Acknowledge");
+      ack.type = "button";
+      ack.onclick = () => safely(async () => { await cloud.acknowledgeHoldEvents([e.id]); renderHoldEventsModal(); render(); });
+      acts.appendChild(ack);
+    }
+    row.appendChild(acts);
+    const bubble = mkEl("div", "alert-bubble");
+    const bav = mkEl("span", "alert-avatar small", initialsOf(e.takenBy));
+    bav.title = who(e.takenBy);
+    bubble.appendChild(bav);
+    bubble.appendChild(mkEl("span", "alert-quote" + (e.reason ? "" : " none"), e.reason ? `“${e.reason}”` : "No reason given"));
+    row.appendChild(bubble);
+    card.appendChild(row);
+  }
+  return card;
+}
+
+/* ======================================================================
+   Merge decision log (D2): every decision behind a merged forecast.
+   ====================================================================== */
+function mergeDecisionItemText(r) {
+  const mis = r.mission_number ? `${r.mission_number} ${shiftWord(r.mission_shift)}` : "";
+  if (r.item_type === "person") return r.employee_id ? empName(r.employee_id) : "(removed employee)";
+  if (r.item_type === "field") return `${mis} · ${mergeFieldLabel(r.field)}`;
+  if (r.item_type === "add") return `${mis} · new mission`;
+  return `${mis} · mission`;
+}
+const decisionNotUsed = (r) => r.choice === "carry" && !!r.forecaster && r.forecaster.toLowerCase() !== "migrated" && r.forecaster.toLowerCase() !== String(r.merged_by || "").toLowerCase();
+function openMergeLog() {
+  $("#merge-log-only").checked = false;
+  renderMergeLog();
+  openModal("#modal-merge-log");
+}
+function renderMergeLog() {
+  const sig = signalsForScreen();
+  const rows = (sig && sig.decisions) || [];
+  $("#merge-log-title").textContent = `Merge decisions — ${fmtShort(state.date)}`;
+  const only = $("#merge-log-only").checked;
+  const body = $("#merge-log-body");
+  body.innerHTML = "";
+  const merges = new Map();
+  for (const r of rows) { if (!merges.has(r.merge_id)) merges.set(r.merge_id, []); merges.get(r.merge_id).push(r); }
+  const nu = rows.filter(decisionNotUsed).length;
+  $("#merge-log-sub").textContent = rows.length
+    ? `${rows.length} ${rows.length === 1 ? "decision" : "decisions"}; ${nu} ${nu === 1 ? "part" : "parts"} of the forecast not used. Highlighted rows alerted the engineer who forecast them.`
+    : "No decisions were recorded for this merge.";
+  for (const [, list] of merges) {
+    const r0 = list[0];
+    body.appendChild(mkEl("p", "merge-log-when", `Merged by ${who(r0.merged_by)} · ${fmtStamp(r0.merged_at)}`));
+    const wrap = mkEl("div", "merge-log-wrap");
+    const table = mkEl("table", "merge-log");
+    const thead = mkEl("thead");
+    const hr = mkEl("tr");
+    for (const t of ["Item", "Carry-over", "Forecast", "Result", "Forecast by", "Reason"]) hr.appendChild(mkEl("th", null, t));
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    const tb = mkEl("tbody");
+    const order = { person: 0, field: 1, add: 2, remove: 3 };
+    const sorted = [...list].sort((a, b) => (order[a.item_type] - order[b.item_type]) || mergeDecisionItemText(a).localeCompare(mergeDecisionItemText(b)));
+    for (const r of sorted) {
+      if (only && !decisionNotUsed(r)) continue;
+      const tr = mkEl("tr", decisionNotUsed(r) ? "not-used" : "");
+      tr.appendChild(mkEl("td", "merge-log-item", mergeDecisionItemText(r)));
+      tr.appendChild(mkEl("td", null, r.carry_value || ""));
+      tr.appendChild(mkEl("td", null, r.forecast_value || ""));
+      const res = mkEl("td");
+      res.appendChild(mkEl("span", "merge-res " + (r.choice === "forecast" ? "f" : "c"), r.choice === "forecast" ? "Forecast" : "Carry-over"));
+      tr.appendChild(res);
+      tr.appendChild(mkEl("td", null, r.forecaster ? who(r.forecaster) : "—"));
+      tr.appendChild(mkEl("td", "merge-log-reason", r.reason || ""));
+      tb.appendChild(tr);
+    }
+    if (!tb.children.length) { const tr = mkEl("tr"); const td = mkEl("td", "import-note", "Nothing for this filter."); td.colSpan = 6; tr.appendChild(td); tb.appendChild(tr); }
+    table.appendChild(tb);
+    wrap.appendChild(table);
+    body.appendChild(wrap);
+  }
 }
 
 /* ---------- forecast: copy to next days, read-only viewer ---------- */
@@ -7986,10 +8882,11 @@ function renderRolesMatrix() {
         sel.className = "rm-level";
         // A section that nothing can "edit" only offers off/on — a third state
         // that means nothing would just be a way to get it wrong.
-        const levels = viewOnly ? ["none", "view"] : ["none", "view", "edit"];
+        // A one-off action (deleting a board) is simply allowed or not.
+        const levels = item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
         sel.innerHTML = levels.map(l =>
-          `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : "Edit"}</option>`).join("");
-        sel.value = levels.includes(cur) ? cur : "view";
+          `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : item.allowOnly ? "Allowed" : "Edit"}</option>`).join("");
+        sel.value = levels.includes(cur) ? cur : (item.allowOnly ? "none" : "view");
         sel.disabled = !!role.protected;
         if (role.protected) sel.title = "Admin always keeps full access.";
         sel.onchange = () => {
@@ -8298,7 +9195,7 @@ function wireApp() {
   $("#btn-forecast-copy").onclick = openForecastCopyModal;
   $("#forecast-copy-n").addEventListener("input", updateForecastCopyPreview);
   $("#btn-forecast-copy-confirm").onclick = confirmForecastCopy;
-  $("#btn-hold-alerts").onclick = () => openHoldEventsModal(myLostHolds().map(e => e.id), "Holds taken from you");
+  $("#btn-hold-alerts").onclick = () => openHoldEventsModal(myLostHolds().map(e => e.id), "Your forecast alerts");
   $("#btn-holds-ack-all").onclick = () => safely(async () => {
     await cloud.acknowledgeHoldEvents(holdModalIds.filter(id => D().holdEvents.some(e => e.id === id)));
     renderHoldEventsModal();
@@ -8307,6 +9204,9 @@ function wireApp() {
   $("#btn-plandiff-all").onclick = () => setAllPlanDiff(true);
   $("#btn-plandiff-none").onclick = () => setAllPlanDiff(false);
   $("#btn-plandiff-apply").onclick = applyPlanDiffFromModal;
+  $("#btn-merge-apply").onclick = onMergeApply;
+  $("#btn-merge-back").onclick = () => { if (state.merge && !state.merge.applying) { state.merge.step = "review"; renderMerge(); } };
+  $("#merge-log-only").onchange = renderMergeLog;
   $("#cap-range").onchange = (ev) => { state.capacity.weeks = Number(ev.target.value); state.capacity.cacheKey = null; refreshAndRender(); };
   $("#btn-cap-copy-week").onclick = copyCapacityWeek;
   $("#btn-cap-seed").onclick = seedCapacityFromConfirmed;
@@ -8537,8 +9437,11 @@ async function boot() {
     // D3: a live heads-up for the ONE person whose hold was just taken —
     // the red flag on their mission is what persists; this is the "now"
     if (payload && payload.holdEvent && sameEmail(payload.holdEvent.from_held_by, state.myEmail)) {
-      const e = D().holdEvents.find(x => x.id === payload.holdEvent.id);
-      if (e) toast(describeHold(e) + ".", "warn", { duration: 12000 });
+      if (payload.holdEvent.kind === "merge") queueMergeToast(payload.holdEvent.id);
+      else {
+        const e = D().holdEvents.find(x => x.id === payload.holdEvent.id);
+        if (e) toast(describeHold(e) + ".", "warn", { duration: 12000 });
+      }
     }
     if (!$("#modal-holds").classList.contains("hidden")) renderHoldEventsModal();
     // a mission or an assignment anywhere can change who has worked where —
