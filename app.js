@@ -5568,9 +5568,31 @@ function renderSettings() {
     row.className = "st-row";
     const nameCell = document.createElement("td");
     nameCell.className = "st-board";
-    const nameEl = document.createElement("div");
-    nameEl.className = "settings-board-name";
-    nameEl.textContent = b.name;
+    // Renaming is an everyday Settings edit (boards update policy = settings);
+    // an empty or unchanged name is simply put back.
+    let nameEl;
+    if (can("settings", "edit")) {
+      nameEl = document.createElement("input");
+      nameEl.type = "text";
+      nameEl.className = "settings-board-name";
+      nameEl.value = b.name;
+      nameEl.placeholder = "Board name";
+      nameEl.setAttribute("aria-label", "Board name");
+      nameEl.onchange = () => {
+        const name = nameEl.value.trim();
+        if (!name || name === b.name) { nameEl.value = b.name; return; }
+        if (D().boards.some(x => x.id !== b.id && x.name.toLowerCase() === name.toLowerCase())) {
+          nameEl.value = b.name;
+          showConfirm("Cannot rename", `There is already a board called ${name}.`, () => openModal("#modal-settings"), () => openModal("#modal-settings"));
+          return;
+        }
+        safely(async () => { await cloud.renameBoard(b.id, name); renderSettings(); render(); });
+      };
+    } else {
+      nameEl = document.createElement("div");
+      nameEl.className = "settings-board-name";
+      nameEl.textContent = b.name;
+    }
     const daysCell = document.createElement("td");
     const picker = document.createElement("div");
     picker.className = "weekday-picker settings-board-days";
