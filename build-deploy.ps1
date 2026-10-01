@@ -14,9 +14,11 @@ Copy-Item (Join-Path $root "app.js") $deploy -Force
 Copy-Item (Join-Path $root "cloud.js") $deploy -Force
 Copy-Item (Join-Path $root "planning.js") $deploy -Force
 Copy-Item (Join-Path $root "charts.js") $deploy -Force
+Copy-Item (Join-Path $root "xlsx-export.js") $deploy -Force
 Copy-Item (Join-Path $root "config.js") $deploy -Force
 Copy-Item (Join-Path $root "logo.svg") $deploy -Force
 if (Test-Path (Join-Path $root "logo.png")) { Copy-Item (Join-Path $root "logo.png") $deploy -Force }
 if (Test-Path (Join-Path $root "logo-on-navy.png")) { Copy-Item (Join-Path $root "logo-on-navy.png") $deploy -Force }
 Copy-Item (Join-Path $root "vendor\html2canvas.min.js") $vendor -Force
+Copy-Item (Join-Path $root "vendor\exceljs.min.js") $vendor -Force
 Write-Host "deploy/ folder rebuilt. Drag it onto Netlify to publish." -ForegroundColor Green

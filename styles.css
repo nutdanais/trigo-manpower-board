@@ -4375,3 +4375,11 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
     font: 16px var(--font-ui);
   }
 }
+
+/* ===== Export to Excel: column picker ===== */
+#xlsx-tools { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+#xlsx-count { margin-left: auto; font-size: 13px; color: var(--muted); }
+#xlsx-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+#xlsx-cols .import-row { margin-bottom: 0; align-items: center; }
+#xlsx-cols .import-row input { margin-top: 0; }
+#xlsx-hint { margin-bottom: 0; }

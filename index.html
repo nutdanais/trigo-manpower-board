@@ -26,7 +26,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-09-24f">
+<link rel="stylesheet" href="styles.css?v=2026-10-01a">
 </head>
 <body>
 
@@ -295,6 +295,9 @@
          same board as vector text (sharp at any zoom) with the host name and the
          engineer phone still tappable inside the PDF. See printBoard in app.js. -->
     <button id="btn-print" class="btn" title="Save as PDF — stays sharp at any zoom, and the location links stay tappable"><svg class="ic" aria-hidden="true"><use href="#i-printer"></use></svg> PDF</button>
+    <!-- The editable half of "share the plan": the same board as rows in a spreadsheet,
+         with the columns the planner picks first. See openXlsxModal in app.js. -->
+    <button id="btn-xlsx" class="btn" title="Export this board as an Excel file — you choose the columns"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
     <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
   </div>
 </div>
@@ -868,6 +871,22 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="modal-xlsx">
+    <h3>Export to Excel<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note" id="xlsx-summary"></p>
+    <div id="xlsx-tools">
+      <button type="button" class="btn btn-small" id="btn-xlsx-all">Tick all</button>
+      <button type="button" class="btn btn-small" id="btn-xlsx-none">Untick all</button>
+      <span id="xlsx-count"></span>
+    </div>
+    <div id="xlsx-cols"></div>
+    <p class="import-note" id="xlsx-hint">One row per person, in mission order. The TRIGO header, board name, date and total employees are always included. Your choice is remembered on this device.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-xlsx-go">Export</button>
+    </div>
+  </div>
+
   <!-- PlanDiff: "Review changes" (stale carry-over) and "Review & merge" (forecast) -->
   <div class="modal hidden" id="modal-plandiff">
     <h3><span id="plandiff-title">Review changes</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
@@ -964,6 +983,7 @@
 <script src="planning.js?v=2026-09-24e"></script>
 <script src="cloud.js?v=2026-09-24f"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="app.js?v=2026-09-24f"></script>
+<script src="xlsx-export.js?v=2026-10-01a"></script>
+<script src="app.js?v=2026-10-01a"></script>
 </body>
 </html>

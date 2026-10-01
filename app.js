@@ -954,6 +954,8 @@ function render() {
   $("#btn-export").classList.toggle("hidden", eml || hl || cap || fc);
   // Print, like Export, is a read: a Viewer may take the board away with them.
   $("#btn-print").classList.toggle("hidden", eml || hl || cap || fc);
+  // Excel is one board's rows, so — unlike Export/PDF — it has nothing to offer on Overview or Org Chart
+  $("#btn-xlsx").classList.toggle("hidden", !board || fc);
   // Carry over / Reset Board on a confirmed day; "Start from confirmed" on an
   // empty forecast day (and nothing once a forecast exists — that is somebody's
   // work, not something to replace wholesale)
@@ -5897,6 +5899,140 @@ async function exportBoard() {
   }
 }
 
+/* ---------- Excel export ----------
+   The board's day as rows in a spreadsheet, one per person on a mission, for
+   planners who want to sort, filter or hand it to someone who lives in Excel.
+   The sheet itself (TRIGO banner, table, totals) is built by xlsx-export.js;
+   this side only gathers the rows and asks which columns to include. People in
+   Standby, On-call pool or a leave zone have no mission and are not exported —
+   same as the mission grid in the JPG. ExcelJS is ~1 MB and almost nobody
+   opens this dialog, so it is fetched on the first export, not at page load. */
+const XLSX_PREF_KEY = "manpower.xlsxColumns";
+let xlsxLibPromise = null;
+
+function loadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (!xlsxLibPromise) {
+    xlsxLibPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "vendor/exceljs.min.js";
+      s.onload = () => resolve(window.ExcelJS);
+      s.onerror = () => { xlsxLibPromise = null; reject(new Error("Could not load the Excel library. Check the connection and try again.")); };
+      document.head.appendChild(s);
+    });
+  }
+  return xlsxLibPromise;
+}
+
+/* remembered per device; anything unreadable or stale falls back to every column */
+function xlsxSavedColumns() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(XLSX_PREF_KEY));
+    const keys = ManpowerXlsx.normalizeColumns(saved).map(c => c.key);
+    if (Array.isArray(saved) && keys.length) return keys;
+  } catch (e) { /* private mode / bad JSON */ }
+  return ManpowerXlsx.ALL_KEYS;
+}
+
+/* one row per person on a mission, missions in the order the board shows them,
+   people permanent-first then by name (same as the cards) */
+function xlsxRows() {
+  const boardId = D().activeBoardId;
+  const missions = getPlan().missions.filter(m => !m.hidden);
+  if (state.sort) {
+    missions.sort((a, b) =>
+      missionSortValue(a).localeCompare(missionSortValue(b)) || a.number.localeCompare(b.number));
+  }
+  const rows = [];
+  for (const m of missions) {
+    const eng = D().engineers.find(e => e.id === m.engineerId);
+    // same line the mission card shows: the host's own note first, then this mission's PPE
+    const ppe = [(hostRecordOf(m.host) || {}).note, m.ppe].filter(Boolean).join(" + ");
+    const emps = m.members
+      .map(id => D().employees.find(e => e.id === id))
+      .filter(e => e && e.boardId === boardId && onRoster(e));
+    for (const e of sortEmployeesDisplay(emps)) {
+      const area = D().areas.find(a => a.id === e.areaId);
+      const pos = e.position ? POSITIONS[e.position] : null;
+      rows.push({
+        empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
+        position: pos ? pos.label : "", area: area ? area.name : "", mission: m.number, host: m.host,
+        customer: m.customer, ppe, shift: m.shift === "night" ? "Night" : "Day", start: m.startTime, end: m.endTime,
+        engineer: eng ? eng.name : "", remark: m.remark || "",
+      });
+    }
+  }
+  return rows;
+}
+
+function updateXlsxCount() {
+  const boxes = $$("#xlsx-cols input[type=checkbox]");
+  const n = boxes.filter(b => b.checked).length;
+  $("#xlsx-count").textContent = `${n} of ${boxes.length} columns`;
+  $("#btn-xlsx-go").disabled = n === 0;
+}
+function setXlsxTicks(on) {
+  for (const b of $$("#xlsx-cols input[type=checkbox]")) b.checked = on;
+  updateXlsxCount();
+}
+
+function openXlsxModal() {
+  if (isForecastView()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
+  const rows = xlsxRows();
+  if (!rows.length) {
+    toast("Nobody is assigned to a mission on this board for this date, so there is nothing to export.", "info");
+    return;
+  }
+  const board = D().boards.find(b => b.id === D().activeBoardId);
+  const sum = ManpowerXlsx.summarize(rows);
+  const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  $("#xlsx-summary").textContent =
+    `${board ? board.name : "Board"} · ${fmtDow(state.date)} ${fmtDate(state.date)} · ${pl(sum.total, "employee", "employees")} on ${pl(sum.missions, "mission", "missions")}. Tick the columns to include.`;
+  const saved = new Set(xlsxSavedColumns());
+  $("#xlsx-cols").innerHTML = ManpowerXlsx.COLUMNS.map(c =>
+    `<label class="import-row"><input type="checkbox" value="${c.key}"${saved.has(c.key) ? " checked" : ""}><span class="import-info">${c.label}</span></label>`).join("");
+  for (const b of $$("#xlsx-cols input")) b.onchange = updateXlsxCount;
+  updateXlsxCount();
+  openModal("#modal-xlsx");
+}
+
+async function exportXlsx() {
+  const keys = $$("#xlsx-cols input[type=checkbox]:checked").map(b => b.value);
+  if (!keys.length) return;
+  const btn = $("#btn-xlsx-go");
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try {
+    try { localStorage.setItem(XLSX_PREF_KEY, JSON.stringify(keys)); } catch (e) { /* remembering is a courtesy */ }
+    const rows = xlsxRows();   // read again: the board may have moved while the dialog was open
+    const board = D().boards.find(b => b.id === D().activeBoardId);
+    const boardName = board ? board.name : "Board";
+    const [ExcelJS, logo] = await Promise.all([
+      loadExcelJS(),
+      fetch("logo-on-navy.png").then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),   // no logo = wordmark text instead
+    ]);
+    const { workbook, summary } = await ManpowerXlsx.buildWorkbook(ExcelJS, {
+      boardName, dateEn: `${fmtDow(state.date)} ${fmtDate(state.date)}`, dateTh: fmtDateThai(state.date),
+      columns: keys, rows, logo,
+    });
+    const buf = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const name = `${boardName.replace(/\s+/g, "_")}_${state.date}.xlsx`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    closeModal();
+    toast(`Exported ${summary.total} ${summary.total === 1 ? "employee" : "employees"} to ${name}.`, "info");
+  } catch (e) {
+    toast("Excel export failed: " + (e.message || e), "error");
+  } finally {
+    btn.textContent = "Export";
+    updateXlsxCount();
+  }
+}
+
 /* ---------- print / PDF ----------
 
    The JPG export above exists for the places that only take an image. This is
@@ -9187,6 +9323,10 @@ function wireApp() {
 
   $("#btn-export").onclick = exportBoard;
   $("#btn-print").onclick = printBoard;
+  $("#btn-xlsx").onclick = openXlsxModal;
+  $("#btn-xlsx-all").onclick = () => setXlsxTicks(true);
+  $("#btn-xlsx-none").onclick = () => setXlsxTicks(false);
+  $("#btn-xlsx-go").onclick = exportXlsx;
   // on the window, not the button: Ctrl+P has to get the same page as the click
   window.addEventListener("beforeprint", prepareForPrint);
   window.addEventListener("afterprint", restoreAfterPrint);
