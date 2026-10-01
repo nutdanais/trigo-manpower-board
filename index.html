@@ -880,7 +880,11 @@
       <span id="xlsx-count"></span>
     </div>
     <div id="xlsx-cols"></div>
-    <p class="import-note" id="xlsx-hint">One row per person, in mission order. The TRIGO header, board name, date and total employees are always included. Your choice is remembered on this device.</p>
+    <div id="xlsx-sheets-wrap" class="hidden">
+      <h4 id="xlsx-sheets-title">Extra sheets for people not on a mission</h4>
+      <div id="xlsx-sheets"></div>
+    </div>
+    <p class="import-note" id="xlsx-hint">Sheet 1 has one row per person on a mission, in mission order. Every sheet carries the TRIGO header, board name, date and total. The columns above also apply to the extra sheets (Name is always kept). Your choices are remembered on this device.</p>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-xlsx-go">Export</button>

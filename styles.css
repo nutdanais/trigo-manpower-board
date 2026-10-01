@@ -4382,4 +4382,10 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 #xlsx-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
 #xlsx-cols .import-row { margin-bottom: 0; align-items: center; }
 #xlsx-cols .import-row input { margin-top: 0; }
+#xlsx-sheets-wrap { margin-bottom: 12px; }
+#xlsx-sheets-wrap h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+#xlsx-sheets { display: grid; gap: 6px; }
+#xlsx-sheets .import-row { margin-bottom: 0; align-items: center; }
+#xlsx-sheets .import-row input { margin-top: 0; }
+#xlsx-sheets .import-info small { display: inline; margin-left: 2px; }
 #xlsx-hint { margin-bottom: 0; }

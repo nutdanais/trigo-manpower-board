@@ -44,6 +44,10 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       assert.equal(await p.locator("#xlsx-cols input:checked").count(), 13);
       assert.match(await p.textContent("#xlsx-count"), /13 of 13/);
       assert.match(await p.textContent("#xlsx-summary"), /Board One .* 4 employees on 3 missions/);
+      const sheets = await p.locator("#xlsx-sheets .import-row").allTextContents();
+      assert.deepEqual(sheets.map((t) => t.replace(/\s+/g, " ").trim()), [
+        "Leave & Exchange Working Day 1 person", "Standby (permanent, unassigned) 1 person", "Available On-call (unassigned) 2 people"]);
+      assert.equal(await p.locator("#xlsx-sheets input:checked").count(), 3);
       await p.screenshot({ path: "/tmp/xlsx-dialog.png" });
     });
 
@@ -86,18 +90,52 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       assert.equal(ws.getImages().length, 1, "TRIGO logo embedded");
     });
 
+    await step("the same file has the three extra sheets: leave + exchange, permanent standby, available on-call", async () => {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(fs.readFileSync(file));
+      assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "Leave & Exchange", "Standby", "Available On-call"]);
+      const [, leave, standby, oncall] = wb.worksheets;
+      const col = (ws, c, from, to) => { const o = []; for (let r = from; r <= to; r++) o.push(ws.getCell(r, c).value); return o; };
+      const head = (ws) => { const o = []; ws.getRow(6).eachCell((c) => o.push(c.value)); return o; };
+      assert.deepEqual(head(leave), ["Name", "Contract Type", "Position", "Service Area", "Leave Type", "Mobile Number"]);
+      assert.deepEqual(col(leave, 1, 7, 7), ["Person E"]);
+      assert.equal(leave.getCell(7, 5).value, "Annual Leave · ลาพักร้อน");
+      assert.deepEqual(col(standby, 1, 7, 7), ["Person F"]);
+      assert.deepEqual(col(oncall, 1, 7, 8), ["Person G", "Person H"]);
+      assert.deepEqual(col(oncall, 2, 7, 8), ["On-call", "On-call"]);
+      for (const ws of [leave, standby, oncall]) {
+        const t = []; ws.eachRow((r, n) => { if (n <= 3) r.eachCell((c) => t.push(String(c.value))); });
+        assert.ok(t.includes("Manpower Board") && t.includes("Board One") && t.some((x) => /^\w{3} \d\d-\w{3}-\d{4}/.test(x)), ws.name + " banner");
+        assert.equal(ws.getImages().length, 1, ws.name + " logo");
+      }
+    });
+
     await step("the column choice is remembered next time the dialog opens", async () => {
       await p.click("#btn-xlsx");
       await p.waitForSelector("#modal-xlsx:not(.hidden)");
       assert.equal(await p.locator("#xlsx-cols input:checked").count(), 10);
       assert.equal(await p.locator("#xlsx-cols input[value=shift]").isChecked(), false);
+      await p.uncheck("#xlsx-sheets input[value=standby]");
+      await p.uncheck("#xlsx-sheets input[value=oncall]");
+      const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
+      await dl.saveAs("/tmp/xlsx-e2e-2.xlsx");
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(fs.readFileSync("/tmp/xlsx-e2e-2.xlsx"));
+      assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "Leave & Exchange"], "unticked sheets are left out");
+      await p.click("#btn-xlsx");   // and that choice is remembered too
+      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      assert.equal(await p.locator("#xlsx-sheets input[value=leave]").isChecked(), true);
+      assert.equal(await p.locator("#xlsx-sheets input[value=standby]").isChecked(), false);
+      assert.equal(await p.locator("#xlsx-sheets input[value=oncall]").isChecked(), false);
       await p.click("#modal-xlsx [data-close].btn");
     });
 
-    await step("Excel is not offered on Overview, and a day with nobody assigned says so instead of opening", async () => {
+    await step("Excel is not offered on Overview; a non-working day with nobody on leave says so instead of opening", async () => {
       await p.evaluate(() => { D().activeBoardId = OVERVIEW_ID; return refreshAndRender(); });
       assert.equal(await p.locator("#btn-xlsx").isVisible(), false);
-      await p.evaluate((d) => { D().activeBoardId = "b2"; state.date = d; return refreshAndRender(); }, SRC);
+      let weekend = SRC;   // a past weekend: confirmed (not a forecast), and nobody is expected in
+      while (!h.isWeekend(weekend)) weekend = h.addDays(weekend, -1);
+      await p.evaluate((d) => { D().activeBoardId = "b2"; state.date = d; return refreshAndRender(); }, weekend);
       await p.click("#btn-xlsx");
       await p.waitForSelector(".toast, #toast-stack > *");
       assert.equal(await p.locator("#modal-xlsx:not(.hidden)").count(), 0);

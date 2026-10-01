@@ -5903,11 +5903,15 @@ async function exportBoard() {
    The board's day as rows in a spreadsheet, one per person on a mission, for
    planners who want to sort, filter or hand it to someone who lives in Excel.
    The sheet itself (TRIGO banner, table, totals) is built by xlsx-export.js;
-   this side only gathers the rows and asks which columns to include. People in
-   Standby, On-call pool or a leave zone have no mission and are not exported —
-   same as the mission grid in the JPG. ExcelJS is ~1 MB and almost nobody
-   opens this dialog, so it is fetched on the first export, not at page load. */
+   this side only gathers the people and asks which columns / sheets to include.
+   Sheet 1 is the mission grid (one row per person on a mission, like the JPG).
+   People with no mission go on their own sheets, one per reason: all the leave
+   types plus Exchange Working Day, permanent Standby, and Available On-call.
+   ExcelJS is ~1 MB and almost nobody opens this dialog, so it is fetched on the
+   first export, not at page load. */
 const XLSX_PREF_KEY = "manpower.xlsxColumns";
+const XLSX_SHEETS_OFF_KEY = "manpower.xlsxSheetsOff";   // sheets the user switched off; default is all on
+const XLSX_SHEET_LABELS = { leave: "Leave & Exchange Working Day", standby: "Standby (permanent, unassigned)", oncall: "Available On-call (unassigned)" };
 let xlsxLibPromise = null;
 
 function loadExcelJS() {
@@ -5965,6 +5969,42 @@ function xlsxRows() {
   return rows;
 }
 
+/* People with no mission, split by reason. Same roster rules as the mission
+   members. Standby and Available On-call are skipped on a non-working day, as
+   the JPG does: nobody is expected in, so "unassigned" means nothing there. */
+function xlsxGroups() {
+  const boardId = D().activeBoardId;
+  const plan = getPlan();
+  const person = (e, extra) => {
+    const area = D().areas.find(a => a.id === e.areaId);
+    const pos = e.position ? POSITIONS[e.position] : null;
+    return Object.assign({
+      empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
+      position: pos ? pos.label : "", area: area ? area.name : "", phone: e.phone || "",
+    }, extra);
+  };
+  const leave = [];
+  for (const z of LEAVE_ZONES) {
+    const emps = (plan.zones[z] || [])
+      .map(id => D().employees.find(e => e.id === id))
+      .filter(e => e && e.boardId === boardId && onRoster(e));
+    for (const e of sortEmployeesDisplay(emps)) {
+      leave.push(person(e, { leaveKey: z, leave: `${ZONE_LABELS[z]} · ${ZONE_LABELS_TH[z]}`, leaveEn: ZONE_LABELS[z] }));
+    }
+  }
+  const off = isNonWorkingDate(state.date);
+  const free = off ? [] : sortEmployeesDisplay(unassignedEmployees());
+  return {
+    leave,
+    standby: free.filter(e => e.contract !== "oncall").map(e => person(e)),
+    oncall: free.filter(e => e.contract === "oncall").map(e => person(e)),
+  };
+}
+function xlsxSheetsOff() {
+  try { const v = JSON.parse(localStorage.getItem(XLSX_SHEETS_OFF_KEY)); if (Array.isArray(v)) return new Set(v); } catch (e) { /* private mode / bad JSON */ }
+  return new Set();
+}
+
 function updateXlsxCount() {
   const boxes = $$("#xlsx-cols input[type=checkbox]");
   const n = boxes.filter(b => b.checked).length;
@@ -5979,8 +6019,10 @@ function setXlsxTicks(on) {
 function openXlsxModal() {
   if (isForecastView()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
   const rows = xlsxRows();
-  if (!rows.length) {
-    toast("Nobody is assigned to a mission on this board for this date, so there is nothing to export.", "info");
+  const groups = xlsxGroups();
+  const extra = ManpowerXlsx.GROUP_KEYS.filter(g => groups[g].length);
+  if (!rows.length && !extra.length) {
+    toast("Nobody is on this board for this date, so there is nothing to export.", "info");
     return;
   }
   const board = D().boards.find(b => b.id === D().activeBoardId);
@@ -5988,6 +6030,13 @@ function openXlsxModal() {
   const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   $("#xlsx-summary").textContent =
     `${board ? board.name : "Board"} · ${fmtDow(state.date)} ${fmtDate(state.date)} · ${pl(sum.total, "employee", "employees")} on ${pl(sum.missions, "mission", "missions")}. Tick the columns to include.`;
+  // the extra sheets: only reasons somebody is actually in today, each with its head-count
+  const off = xlsxSheetsOff();
+  $("#xlsx-sheets-wrap").classList.toggle("hidden", !extra.length);
+  $("#xlsx-sheets").innerHTML = extra.map(g => {
+    const n = new Set(groups[g].map(r => r.empId)).size;
+    return `<label class="import-row"><input type="checkbox" value="${g}"${off.has(g) ? "" : " checked"}><span class="import-info">${XLSX_SHEET_LABELS[g]} <small>${pl(n, "person", "people")}</small></span></label>`;
+  }).join("");
   const saved = new Set(xlsxSavedColumns());
   $("#xlsx-cols").innerHTML = ManpowerXlsx.COLUMNS.map(c =>
     `<label class="import-row"><input type="checkbox" value="${c.key}"${saved.has(c.key) ? " checked" : ""}><span class="import-info">${c.label}</span></label>`).join("");
@@ -6003,8 +6052,18 @@ async function exportXlsx() {
   btn.disabled = true;
   btn.textContent = "Exporting…";
   try {
-    try { localStorage.setItem(XLSX_PREF_KEY, JSON.stringify(keys)); } catch (e) { /* remembering is a courtesy */ }
-    const rows = xlsxRows();   // read again: the board may have moved while the dialog was open
+    // sheets offered in the dialog and ticked; the unticked ones are what gets remembered
+    const offered = $$("#xlsx-sheets input[type=checkbox]");
+    const picked = new Set(offered.filter(b => b.checked).map(b => b.value));
+    try {
+      localStorage.setItem(XLSX_PREF_KEY, JSON.stringify(keys));
+      localStorage.setItem(XLSX_SHEETS_OFF_KEY, JSON.stringify(offered.filter(b => !b.checked).map(b => b.value)));
+    } catch (e) { /* remembering is a courtesy */ }
+    // read again: the board may have moved while the dialog was open
+    const rows = xlsxRows();
+    const all = xlsxGroups();
+    const groups = {};
+    for (const g of ManpowerXlsx.GROUP_KEYS) groups[g] = picked.has(g) ? all[g] : [];
     const board = D().boards.find(b => b.id === D().activeBoardId);
     const boardName = board ? board.name : "Board";
     const [ExcelJS, logo] = await Promise.all([
@@ -6013,7 +6072,7 @@ async function exportXlsx() {
     ]);
     const { workbook, summary } = await ManpowerXlsx.buildWorkbook(ExcelJS, {
       boardName, dateEn: `${fmtDow(state.date)} ${fmtDate(state.date)}`, dateTh: fmtDateThai(state.date),
-      columns: keys, rows, logo,
+      columns: keys, rows, groups, logo,
     });
     const buf = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -6024,7 +6083,9 @@ async function exportXlsx() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     closeModal();
-    toast(`Exported ${summary.total} ${summary.total === 1 ? "employee" : "employees"} to ${name}.`, "info");
+    const sheets = ManpowerXlsx.GROUP_KEYS.filter(g => summary.groups[g]).map(g => ManpowerXlsx.GROUPS[g].sheetName);
+    toast(`Exported ${summary.total} ${summary.total === 1 ? "employee" : "employees"} to ${name}`
+      + (sheets.length ? `, plus ${sheets.join(", ")}.` : "."), "info");
   } catch (e) {
     toast("Excel export failed: " + (e.message || e), "error");
   } finally {
