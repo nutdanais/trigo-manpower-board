@@ -5960,7 +5960,7 @@ function xlsxRows() {
       const pos = e.position ? POSITIONS[e.position] : null;
       rows.push({
         empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
-        position: pos ? pos.label : "", area: area ? area.name : "", mission: m.number, host: m.host,
+        position: pos ? pos.label : "", phone: e.phone || "", area: area ? area.name : "", mission: m.number, host: m.host,
         customer: m.customer, ppe, shift: m.shift === "night" ? "Night" : "Day", start: m.startTime, end: m.endTime,
         engineer: eng ? eng.name : "", remark: m.remark || "",
       });

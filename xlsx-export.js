@@ -8,12 +8,13 @@
 "use strict";
 
 (function (root) {
-  /* The thirteen exportable columns, in sheet order. `width` is Excel's
+  /* The fourteen exportable columns, in sheet order. `width` is Excel's
      character width. `center` columns are the short ones (shift, times). */
   const COLUMNS = [
     { key: "name",     label: "Name",          width: 30 },
     { key: "contract", label: "Contract Type", width: 17 },
     { key: "position", label: "Position",      width: 25 },
+    { key: "phone",    label: "Mobile Number", width: 16 },
     { key: "area",     label: "Service Area",  width: 16 },
     { key: "mission",  label: "Mission",       width: 11 },
     { key: "host",     label: "Host",          width: 22 },
@@ -90,17 +91,16 @@
        standby  - permanent staff with no mission
        oncall   - on-call staff with no mission (Available On-call)
      Name is always there (a list without names is useless); Contract Type /
-     Position / Service Area follow the same ticks as the main sheet; Mobile
-     Number is added because these are the people a planner may need to ring. */
+     Position / Mobile Number / Service Area follow the same ticks as the main
+     sheet (so unticking Mobile Number keeps phone numbers out of every sheet). */
   const LEAVE_ORDER = ["annual", "sick", "business", "unpaid", "exchange"];
-  const PICKER_SHARED = ["contract", "position", "area"];
-  const PHONE_COL = { key: "phone", label: "Mobile Number", width: 16 };
+  const PICKER_SHARED = ["contract", "position", "phone", "area"];
   const LEAVE_TYPE_COL = { key: "leave", label: "Leave Type", width: 34 };
   /* what each extra sheet is called and says about itself */
   const GROUPS = {
-    leave:   { sheetName: "Leave & Exchange",  subtitle: "LEAVE & EXCHANGE WORKING DAY", bigLabel: "ON LEAVE / EXCHANGE", extra: [LEAVE_TYPE_COL, PHONE_COL] },
-    standby: { sheetName: "Standby",           subtitle: "STANDBY · PERMANENT, UNASSIGNED", bigLabel: "ON STANDBY", extra: [PHONE_COL] },
-    oncall:  { sheetName: "Available On-call", subtitle: "AVAILABLE ON-CALL · UNASSIGNED", bigLabel: "AVAILABLE ON-CALL", extra: [PHONE_COL] },
+    leave:   { sheetName: "Leave & Exchange",  subtitle: "LEAVE & EXCHANGE WORKING DAY", bigLabel: "ON LEAVE / EXCHANGE", extra: [LEAVE_TYPE_COL] },
+    standby: { sheetName: "Standby",           subtitle: "STANDBY · PERMANENT, UNASSIGNED", bigLabel: "ON STANDBY", extra: [] },
+    oncall:  { sheetName: "Available On-call", subtitle: "AVAILABLE ON-CALL · UNASSIGNED", bigLabel: "AVAILABLE ON-CALL", extra: [] },
   };
   const GROUP_KEYS = Object.keys(GROUPS);
   /* leave type cell tints: Exchange Working Day is a worked day so it reads green,
@@ -263,7 +263,7 @@
              groups: { leave: [pRow], standby: [pRow], oncall: [pRow] } (each optional),
              logo: ArrayBuffer|Buffer|null }
      A row (sheet 1: people on missions) is { empId, name, contract: "Permanent"|"On-call",
-     position, area, mission, host, customer, ppe, shift: "Day"|"Night", start, end, engineer, remark }.
+     position, phone, area, mission, host, customer, ppe, shift: "Day"|"Night", start, end, engineer, remark }.
      A pRow (people not on a mission) is { empId, name, contract, position, area, phone }, and for
      the leave group also { leaveKey: one of LEAVE_ORDER, leave: "Annual Leave · ลาพักร้อน", leaveEn }.
      An empty or missing group adds no sheet. The header and the total row show only the

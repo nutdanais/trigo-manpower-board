@@ -8,7 +8,7 @@ const X = require("../xlsx-export.js");
 
 const LOGO = fs.readFileSync(path.join(__dirname, "..", "logo-on-navy.png"));
 const row = (o) => ({
-  empId: o.name, name: o.name, contract: "Permanent", position: "Inspector", area: "FTM", mission: "M-101", host: "AAT Rayong",
+  empId: o.name, name: o.name, contract: "Permanent", position: "Inspector", phone: "081-111-1111", area: "FTM", mission: "M-101", host: "AAT Rayong",
   customer: "Thai Oil", ppe: "Helmet", shift: "Day", start: "08:00", end: "17:00", engineer: "K. Wichai", remark: "", ...o,
 });
 const ROWS = [
@@ -45,7 +45,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
 
 test("all columns come out in the agreed order", async () => {
   const { ws } = await roundTrip({ columns: X.ALL_KEYS });
-  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
+  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
 });
 
 test("ticked columns only, always in sheet order whatever order they were passed in", async () => {
@@ -58,9 +58,9 @@ test("ticked columns only, always in sheet order whatever order they were passed
 test("dropping Shift, Start and End leaves a sheet with no gaps", async () => {
   const keys = X.ALL_KEYS.filter((k) => !["shift", "start", "end"].includes(k));
   const { ws } = await roundTrip({ columns: keys });
-  assert.equal(headerOf(ws).length, 10);
+  assert.equal(headerOf(ws).length, 11);
   assert.ok(!headerOf(ws).includes("Shift"));
-  assert.equal(ws.getCell(7, 9).value, "K. Wichai");   // Engineer moved up
+  assert.equal(ws.getCell(7, 10).value, "K. Wichai");   // Engineer moved up
 });
 
 test("banner carries board, date and the total number of employees", async () => {
@@ -152,11 +152,11 @@ test("people not on a mission get one sheet per reason, after the mission sheet"
 test("leave sheet: leave type and mobile number as details, tinted, with a per-type total", async () => {
   const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, groups: GROUPS });
   const ws = sheets[1];
-  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Service Area", "Leave Type", "Mobile Number"]);
+  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area", "Leave Type"]);
   assert.equal(ws.getCell(7, 1).value, "Anan");
-  assert.equal(ws.getCell(7, 5).value, "Annual Leave · ลาพักร้อน");
-  assert.equal(ws.getCell(7, 6).value, "081-000-0000");
-  assert.notEqual(ws.getCell(7, 5).fill.fgColor.argb, ws.getCell(9, 5).fill.fgColor.argb, "exchange reads differently from leave");
+  assert.equal(ws.getCell(7, 6).value, "Annual Leave · ลาพักร้อน");
+  assert.equal(ws.getCell(7, 4).value, "081-000-0000");
+  assert.notEqual(ws.getCell(7, 6).fill.fgColor.argb, ws.getCell(9, 6).fill.fgColor.argb, "exchange reads differently from leave");
   assert.match(footerText(ws, 10), /TOTAL: 3\s+\(Annual Leave 1 · Sick Leave 1 · Exchange Working Day 1\)/);
   assert.ok(bannerTexts(ws).includes("ON LEAVE / EXCHANGE"));
   assert.ok(bannerTexts(ws).includes("LEAVE & EXCHANGE WORKING DAY"));
@@ -164,7 +164,7 @@ test("leave sheet: leave type and mobile number as details, tinted, with a per-t
 
 test("standby and on-call sheets list their people with a total", async () => {
   const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, groups: GROUPS });
-  assert.deepEqual(headerOf(sheets[2]), ["Name", "Contract Type", "Position", "Service Area", "Mobile Number"]);
+  assert.deepEqual(headerOf(sheets[2]), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area"]);
   assert.deepEqual([7, 8].map((r) => sheets[2].getCell(r, 1).value), ["Suda", "Niran"]);
   assert.equal(footerText(sheets[2], 9).trim(), "TOTAL: 2");
   assert.equal(sheets[3].getCell(7, 1).value, "Tawan");
@@ -174,10 +174,10 @@ test("standby and on-call sheets list their people with a total", async () => {
 test("the extra sheets follow the picked columns, but always keep Name", async () => {
   const { sheets } = await roundTripAll({ columns: ["mission", "host"], groups: GROUPS });
   assert.deepEqual(headerOf(sheets[0]), ["Mission", "Host"]);
-  assert.deepEqual(headerOf(sheets[1]), ["Name", "Leave Type", "Mobile Number"]);
-  assert.deepEqual(headerOf(sheets[2]), ["Name", "Mobile Number"]);
+  assert.deepEqual(headerOf(sheets[1]), ["Name", "Leave Type"]);
+  assert.deepEqual(headerOf(sheets[2]), ["Name"]);
   const some = await roundTripAll({ columns: ["name", "position"], groups: GROUPS });
-  assert.deepEqual(headerOf(some.sheets[2]), ["Name", "Position", "Mobile Number"]);
+  assert.deepEqual(headerOf(some.sheets[2]), ["Name", "Position"]);
 });
 
 test("an empty or missing group adds no sheet", async () => {
@@ -200,4 +200,15 @@ test("every sheet is free of single-cell merges and has a frozen, filterable hea
       assert.ok(ws.autoFilter);
     }
   }
+});
+
+test("Mobile Number is a picker column: shown on every sheet when ticked, on none when not", async () => {
+  const withPhone = await roundTripAll({ columns: ["name", "phone"], groups: GROUPS });
+  assert.deepEqual(withPhone.sheets.map(headerOf), [["Name", "Mobile Number"], ["Name", "Mobile Number", "Leave Type"], ["Name", "Mobile Number"], ["Name", "Mobile Number"]]);
+  assert.equal(withPhone.sheets[0].getCell(7, 2).value, "081-111-1111");
+  const without = await roundTripAll({ columns: X.ALL_KEYS.filter((k) => k !== "phone"), groups: GROUPS });
+  for (const ws of without.sheets) assert.ok(!headerOf(ws).includes("Mobile Number"), ws.name);
+  // a number with a leading zero stays text, not a number Excel would strip
+  const lead = await roundTrip({ columns: ["name", "phone"], rows: [row({ name: "Z", phone: "0812345678" })] });
+  assert.equal(lead.ws.getCell(7, 2).value, "0812345678");
 });
