@@ -237,6 +237,45 @@ button, input, select, textarea, optgroup {
   z-index: 40;
 }
 
+/* ===== Version: update banner, footer, and the "Version x" lines =====
+   The banner is the first row of #sticky-header so it stays on screen with the
+   topbar instead of scrolling away — nobody who has scrolled a long board would
+   ever see it otherwise. Panel colours, not brand navy, so it reads as a notice
+   rather than more chrome, in both themes. */
+#update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 14px;
+  background: var(--panel);
+  color: var(--text);
+  border-bottom: 3px solid var(--brand-green);
+  font-size: 13px;
+}
+#update-banner .btn { padding: 4px 12px; }
+.update-banner-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.update-banner-close:hover { color: var(--text); }
+
+.app-version { color: var(--muted); font-size: 12px; }
+.login-box .app-version { margin-top: 18px; text-align: center; }
+#settings-version { margin: auto 0 0; padding: 14px 18px 0; }
+#app-footer {
+  padding: 18px 14px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* ===== Top bar =====
    Fixed brand navy, always — this is chrome, not a page surface, so it does
    NOT react to the light/dark toggle (same reasoning as --card-ink: a brand
@@ -3629,6 +3668,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
     overflow-y: hidden;
   }
   #settings-rail > h3 { margin-bottom: 8px; }
+  #settings-version { display: none; }
   #settings-tabs { flex-direction: row; }
   #settings-tabs .settings-tab {
     width: auto;
@@ -3684,6 +3724,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   #modal-backdrop,
   #datepicker-pop,
   #chart-tip,
+  #app-footer,
   #toast-stack { display: none !important; }
 
   html, body { background: #fff !important; }

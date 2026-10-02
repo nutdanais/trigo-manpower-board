@@ -10007,11 +10007,71 @@ function wireApp() {
   for (const b of $$("[data-close]")) b.onclick = closeModal;
 }
 
+/* ---------- app version & update check ----------
+   window.APP_VERSION comes from version.js, loaded by index.html with the same
+   ?v= as every other file, so it is the release THIS page was built from — what
+   a bug report should quote. A tab can stay open for days on a factory PC, so
+   while signed in we re-fetch version.js (bypassing every cache) and, when the
+   server's version differs, offer a refresh. Never an automatic reload: the
+   person may be midway through a form. "Differs" rather than "is newer", so a
+   rollback also prompts a refresh. */
+const APP_VERSION_LOADED = window.APP_VERSION || "";
+const UPDATE_CHECK_EVERY_MS = 10 * 60 * 1000;
+const UPDATE_CHECK_MIN_GAP_MS = 2 * 60 * 1000;   // coming back to the tab re-checks, but not on every flick
+let updateCheckedAt = 0;
+let updateOffered = null;                        // the server version the banner is offering
+let updateDismissedFor = null;                   // the server version whose banner was closed
+
+function showAppVersion() {
+  for (const el of $$("[data-app-version]")) el.textContent = APP_VERSION_LOADED || "unknown";
+}
+
+function parseServerVersion(text) {
+  const m = /APP_VERSION\s*=\s*"([^"]+)"/.exec(text || "");
+  return m ? m[1] : null;
+}
+
+function showUpdateBanner(latest) {
+  const banner = $("#update-banner");
+  if (!banner) return;
+  updateOffered = latest;
+  if (!latest || latest === updateDismissedFor) { banner.classList.add("hidden"); return; }
+  $("#update-banner-text").textContent =
+    "A new version of the board is available (" + latest + "). You are on " + APP_VERSION_LOADED + ".";
+  banner.classList.remove("hidden");
+}
+
+async function checkForUpdate() {
+  if (!APP_VERSION_LOADED) return;   // version.js never loaded: nothing to compare with
+  updateCheckedAt = Date.now();
+  let latest = null;
+  try {
+    const res = await fetch("version.js?cb=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    latest = parseServerVersion(await res.text());
+  } catch (e) { return; }            // offline or blocked: try again next time
+  // null = the reply wasn't a version.js (e.g. a captive-portal page): say nothing
+  if (latest) showUpdateBanner(latest === APP_VERSION_LOADED ? null : latest);
+}
+
+function wireUpdateCheck() {
+  $("#btn-update-reload").onclick = () => location.reload();
+  $("#btn-update-dismiss").onclick = () => {
+    updateDismissedFor = updateOffered;
+    $("#update-banner").classList.add("hidden");
+  };
+  setInterval(checkForUpdate, UPDATE_CHECK_EVERY_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && Date.now() - updateCheckedAt > UPDATE_CHECK_MIN_GAP_MS) checkForUpdate();
+  });
+}
+
 async function boot() {
   $("#login-screen").classList.add("hidden");
   $("#app-root").classList.remove("hidden");
   wireSaveStatus();
   wireApp();
+  wireUpdateCheck();
   let session = null;
   try { session = await cloud.getSession(); state.myEmail = session && session.user && session.user.email; } catch (e) { /* toast attribution just won't fire */ }
   await cloud.init(() => state.date);
@@ -10092,6 +10152,7 @@ function isRecoveryLink() {
 }
 
 async function main() {
+  showAppVersion();
   wireLogin();
   wireReset();
   let session = null;
