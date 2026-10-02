@@ -41,6 +41,7 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 - **👁 Hide/Unhide**: takes a mission off the board without deleting its record — its definition is kept (and stays hidden as the plan carries forward day to day) until you unhide it. Anyone assigned to a mission you hide returns to Standby. Use this for a mission that's paused rather than gone for good.
 - **+ New Employee**: name, contract type (Permanent = solid card with `P`, On-call = dashed card with `OC`), service area (card color). Double-click an employee card to edit.
 - **Drag & drop** employee cards between missions, Leave / Standby zones, and the Available pool. (No "Return to Site" zone — since employees now belong to a specific board, sending someone back to their original board is done via right-click → Move to Board.)
+- **Resizable panel** (desktop): drag the thin handle on the floating panel's left edge to widen it (up to 60% of the window, max 760px) so the Standby / On-call cards wrap into several columns instead of one long list. Double-click the handle (or press Home) to reset; the arrow keys nudge it. The width is remembered in this browser, and the board reflows around it.
 - **Search** (top-right, floating panel): filters the two unassigned pools as you type. If a match is already assigned to a mission or on leave, the box says so and flashes/scrolls to their card on the board instead of just showing "No match".
 - **Stats bar**: total / assigned / leave / standby / return / available + a counter per service area.
 - **Filters**: by engineer, host, customer, shift — non-matching missions fade out.
@@ -108,6 +109,7 @@ Nothing here is needed to run the app; they are for checking a change.
 
 - `node --test tests/*.test.js` — the plan diff, capacity and horizon logic, and the carry-over **parity** test: the refactored carry is held to writing exactly the rows the previous code did (`tests/fixtures/copy-plan-forward.reference.js` is that previous code, frozen).
 - `node tests/e2e/excel-export.e2e.js` — the Excel export in a real browser: the column and sheet pickers, the downloaded file's four sheets, the remembered choices, who can see the button.
+- `node tests/e2e/pool-resize.e2e.js` — the adjustable available-employee panel in a real browser: dragging, wrapping into columns, min/max clamping, persistence, reset.
 - `node tests/e2e/forward-planning.e2e.js` — the forward-planning acceptance run in a real browser (needs Playwright + Chromium; set `NODE_PATH` to your global `node_modules`). The app runs unmodified; only Supabase is swapped for an in-memory fake (`tests/fake/`) shared by several signed-in "users", so Realtime between two people is tested too.
 - `tests/sql/setup-db.sh <db>` then `psql -d <db> -f tests/sql/forward-planning.test.sql` and `psql -d <db> -f tests/sql/forecast-merge-review.test.sql` (each on a fresh database), and `tests/sql/data-migration.test.sh` — the migrations against a real local Postgres, with `tests/sql/supabase-shim.sql` standing in for Supabase's `auth` schema.
 
