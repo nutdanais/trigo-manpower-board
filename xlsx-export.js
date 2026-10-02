@@ -32,6 +32,14 @@
     { key: "remark",   label: "Remark",        th: "หมายเหตุ",        width: 28 },
   ];
   const ALL_KEYS = COLUMNS.map((c) => c.key);
+  /* The TRIGO ID is not one of the picked columns: it is on every sheet,
+     right after Name (or first, when Name is unticked). */
+  const TRIGO_ID_COL = { key: "trigoId", label: "TRIGO ID", th: "รหัส TRIGO", width: 11, center: true };
+  function withTrigoId(cols) {
+    const out = cols.slice();
+    out.splice(out.findIndex((c) => c.key === "name") + 1, 0, TRIGO_ID_COL);
+    return out;
+  }
 
   /* TRIGO palette, ARGB. Same navy/green as the app's top bar (styles.css
      --primary / --brand-green) and the shift tints from the design system. */
@@ -165,7 +173,7 @@
        leave    - every leave type plus Exchange Working Day, with the type shown
        standby  - permanent staff with no mission
        oncall   - on-call staff with no mission (Available On-call)
-     Name is always there (a list without names is useless); Contract Type /
+     Name and TRIGO ID are always there (a list without names is useless); Contract Type /
      Position / Mobile Number / Start Date / Years of Service / Service Area follow the same ticks as the main
      sheet (so unticking Mobile Number keeps phone numbers out of every sheet). */
   const LEAVE_ORDER = ["annual", "sick", "business", "unpaid", "exchange"];
@@ -188,7 +196,7 @@
   function groupColumns(group, keys) {
     const want = new Set(Array.isArray(keys) ? keys : ALL_KEYS);
     const base = COLUMNS.filter((c) => c.key === "name" || (PICKER_SHARED.includes(c.key) && want.has(c.key)));
-    return base.concat(GROUPS[group].extra);
+    return withTrigoId(base).concat(GROUPS[group].extra);
   }
   /* the leave type in the file's language (a row may carry only a combined `leave`) */
   const leaveLabel = (r, lang) => (normLang(lang) === "th" ? (r.leaveTh || r.leave) : (r.leaveEn || r.leave)) || "";
@@ -376,16 +384,17 @@
              groups: { leave: [pRow], standby: [pRow], oncall: [pRow] } (each optional),
              today: "YYYY-MM-DD" (what Years of Service counts up to; the real today),
              logo: ArrayBuffer|Buffer|null }
-     A row (sheet 1: people on missions) is { empId, name, contract: "Permanent"|"On-call",
+     A row (sheet 1: people on missions) is { empId, name, trigoId, contract: "Permanent"|"On-call",
      position, phone, startDate: "YYYY-MM-DD"|"", area, mission, host, customer, ppe, shift: "Day"|"Night", start, end, engineer, remark }.
-     A pRow (people not on a mission) is { empId, name, contract, position, area, phone, startDate }, and for
+     A pRow (people not on a mission) is { empId, name, trigoId, contract, position, area, phone, startDate }, and for
      the leave group also { leaveKey: one of LEAVE_ORDER, leave: "Annual Leave · ลาพักร้อน", leaveEn }.
      An empty or missing group adds no sheet. The header and the total row show only the
      total number of employees; the Permanent / On-call split appears only when the
      Contract Type column was picked. */
   async function buildWorkbook(ExcelJS, opts) {
-    const cols = normalizeColumns(opts.columns);
-    if (!cols.length) throw new Error("Pick at least one column to export.");
+    const picked = normalizeColumns(opts.columns);
+    if (!picked.length) throw new Error("Pick at least one column to export.");
+    const cols = withTrigoId(picked);
     const lang = normLang(opts.lang), T = TEXT[lang];
     const rows = opts.rows || [];
     const sum = summarize(rows);

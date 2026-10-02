@@ -45,22 +45,22 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
 
 test("all columns come out in the agreed order", async () => {
   const { ws } = await roundTrip({ columns: X.ALL_KEYS });
-  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
+  assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
 });
 
 test("ticked columns only, always in sheet order whatever order they were passed in", async () => {
   const { ws } = await roundTrip({ columns: ["remark", "name", "engineer", "mission"] });
-  assert.deepEqual(headerOf(ws), ["Name", "Mission", "Engineer", "Remark"]);
+  assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Mission", "Engineer", "Remark"]);
   assert.equal(ws.getCell(7, 1).value, "Somchai");
-  assert.equal(ws.getCell(7, 2).value, "M-101");
+  assert.equal(ws.getCell(7, 3).value, "M-101");
 });
 
 test("dropping Shift, Start and End leaves a sheet with no gaps", async () => {
   const keys = X.ALL_KEYS.filter((k) => !["shift", "start", "end"].includes(k));
   const { ws } = await roundTrip({ columns: keys });
-  assert.equal(headerOf(ws).length, 13);
+  assert.equal(headerOf(ws).length, 14);
   assert.ok(!headerOf(ws).includes("Shift"));
-  assert.equal(ws.getCell(7, 12).value, "K. Wichai");   // Engineer moved up
+  assert.equal(ws.getCell(7, 13).value, "K. Wichai");   // Engineer moved up
 });
 
 test("banner carries board, date and the total number of employees", async () => {
@@ -85,7 +85,7 @@ test("total row counts people once and splits permanent from on-call", async () 
 
 test("a very narrow selection still gets a complete banner (filler columns, nothing cut off)", async () => {
   const { ws } = await roundTrip({ columns: ["name", "shift"] });
-  assert.deepEqual(headerOf(ws), ["Name", "Shift"]);
+  assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Shift"]);
   const L = X.bannerLayout([30, 8]);
   assert.ok(L.fillers.length > 0);
   assert.ok(ws.columnCount >= 2 + L.fillers.length);
@@ -152,11 +152,11 @@ test("people not on a mission get one sheet per reason, after the mission sheet"
 test("leave sheet: leave type and mobile number as details, tinted, with a per-type total", async () => {
   const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, groups: GROUPS });
   const ws = sheets[1];
-  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Leave Type"]);
+  assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Leave Type"]);
   assert.equal(ws.getCell(7, 1).value, "Anan");
-  assert.equal(ws.getCell(7, 8).value, "Annual Leave");
-  assert.equal(ws.getCell(7, 4).value, "081-000-0000");
-  assert.notEqual(ws.getCell(7, 8).fill.fgColor.argb, ws.getCell(9, 8).fill.fgColor.argb, "exchange reads differently from leave");
+  assert.equal(ws.getCell(7, 9).value, "Annual Leave");
+  assert.equal(ws.getCell(7, 5).value, "081-000-0000");
+  assert.notEqual(ws.getCell(7, 9).fill.fgColor.argb, ws.getCell(9, 9).fill.fgColor.argb, "exchange reads differently from leave");
   assert.match(footerText(ws, 10), /TOTAL: 3\s+\(Annual Leave 1 · Sick Leave 1 · Exchange Working Day 1\)/);
   assert.ok(bannerTexts(ws).includes("ON LEAVE / EXCHANGE"));
   assert.ok(bannerTexts(ws).includes("LEAVE & EXCHANGE WORKING DAY"));
@@ -164,20 +164,20 @@ test("leave sheet: leave type and mobile number as details, tinted, with a per-t
 
 test("standby and on-call sheets list their people with a total", async () => {
   const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, groups: GROUPS });
-  assert.deepEqual(headerOf(sheets[2]), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area"]);
+  assert.deepEqual(headerOf(sheets[2]), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area"]);
   assert.deepEqual([7, 8].map((r) => sheets[2].getCell(r, 1).value), ["Suda", "Niran"]);
   assert.equal(footerText(sheets[2], 9).trim(), "TOTAL: 2");
   assert.equal(sheets[3].getCell(7, 1).value, "Tawan");
   assert.ok(bannerTexts(sheets[3]).includes("AVAILABLE ON-CALL"));
 });
 
-test("the extra sheets follow the picked columns, but always keep Name", async () => {
+test("the extra sheets follow the picked columns, but always keep Name and TRIGO ID", async () => {
   const { sheets } = await roundTripAll({ columns: ["mission", "host"], groups: GROUPS });
-  assert.deepEqual(headerOf(sheets[0]), ["Mission", "Host"]);
-  assert.deepEqual(headerOf(sheets[1]), ["Name", "Leave Type"]);
-  assert.deepEqual(headerOf(sheets[2]), ["Name"]);
+  assert.deepEqual(headerOf(sheets[0]), ["TRIGO ID", "Mission", "Host"]);
+  assert.deepEqual(headerOf(sheets[1]), ["Name", "TRIGO ID", "Leave Type"]);
+  assert.deepEqual(headerOf(sheets[2]), ["Name", "TRIGO ID"]);
   const some = await roundTripAll({ columns: ["name", "position"], groups: GROUPS });
-  assert.deepEqual(headerOf(some.sheets[2]), ["Name", "Position"]);
+  assert.deepEqual(headerOf(some.sheets[2]), ["Name", "TRIGO ID", "Position"]);
 });
 
 test("an empty or missing group adds no sheet", async () => {
@@ -202,15 +202,26 @@ test("every sheet is free of single-cell merges and has a frozen, filterable hea
   }
 });
 
+test("TRIGO ID is on every sheet right after Name, filled in or blank, and never a picker column", async () => {
+  assert.ok(!X.ALL_KEYS.includes("trigoId"), "not offered in the column picker");
+  const rows = [row({ name: "Somchai", trigoId: "T329" }), row({ name: "Pichai" })];
+  const groups = { leave: [], standby: [person({ name: "Anan", trigoId: "T9" })], oncall: [] };
+  const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, rows, groups });
+  assert.equal(headerOf(sheets[0])[1], "TRIGO ID");
+  assert.equal(sheets[0].getCell(7, 2).value, "T329");
+  assert.equal(sheets[0].getCell(8, 2).value, "", "no ID yet: blank, not a dash");
+  assert.equal(sheets[1].getCell(7, 2).value, "T9");
+});
+
 test("Mobile Number is a picker column: shown on every sheet when ticked, on none when not", async () => {
   const withPhone = await roundTripAll({ columns: ["name", "phone"], groups: GROUPS });
-  assert.deepEqual(withPhone.sheets.map(headerOf), [["Name", "Mobile Number"], ["Name", "Mobile Number", "Leave Type"], ["Name", "Mobile Number"], ["Name", "Mobile Number"]]);
-  assert.equal(withPhone.sheets[0].getCell(7, 2).value, "081-111-1111");
+  assert.deepEqual(withPhone.sheets.map(headerOf), [["Name", "TRIGO ID", "Mobile Number"], ["Name", "TRIGO ID", "Mobile Number", "Leave Type"], ["Name", "TRIGO ID", "Mobile Number"], ["Name", "TRIGO ID", "Mobile Number"]]);
+  assert.equal(withPhone.sheets[0].getCell(7, 3).value, "081-111-1111");
   const without = await roundTripAll({ columns: X.ALL_KEYS.filter((k) => k !== "phone"), groups: GROUPS });
   for (const ws of without.sheets) assert.ok(!headerOf(ws).includes("Mobile Number"), ws.name);
   // a number with a leading zero stays text, not a number Excel would strip
   const lead = await roundTrip({ columns: ["name", "phone"], rows: [row({ name: "Z", phone: "0812345678" })] });
-  assert.equal(lead.ws.getCell(7, 2).value, "0812345678");
+  assert.equal(lead.ws.getCell(7, 3).value, "0812345678");
 });
 
 test("serviceLength counts whole calendar years, months and days up to today", () => {
@@ -232,22 +243,22 @@ test("Start Date is a real date cell and Years of Service reads from it, on ever
   const rows = [row({ name: "Old", startDate: "2023-04-20" }), row({ name: "New", startDate: "2026-09-23" }), row({ name: "None" }), row({ name: "Bad", startDate: "soon" })];
   const groups = { standby: [person({ name: "Suda", startDate: "2024-03-05" }), person({ name: "Niran" })] };
   const { sheets } = await roundTripAll({ columns: ["name", "startDate", "service"], rows, groups, today: "2026-10-02" });
-  assert.deepEqual(sheets.map(headerOf), [["Name", "Start Date", "Years of Service"], ["Name", "Start Date", "Years of Service"]]);
+  assert.deepEqual(sheets.map(headerOf), [["Name", "TRIGO ID", "Start Date", "Years of Service"], ["Name", "TRIGO ID", "Start Date", "Years of Service"]]);
   const [main, standby] = sheets;
-  assert.ok(main.getCell(7, 2).value instanceof Date);
-  assert.equal(main.getCell(7, 2).value.toISOString().slice(0, 10), "2023-04-20", "no time-zone shift");
-  assert.equal(main.getCell(7, 2).numFmt, "dd-mmm-yyyy");
-  assert.equal(main.getCell(7, 3).value, "3 years 5 months 12 days");
-  assert.equal(main.getCell(8, 3).value, "0 years 0 months 9 days");
-  for (const r of [9, 10]) { assert.equal(main.getCell(r, 2).value, "", "no start date"); assert.equal(main.getCell(r, 3).value, ""); }
-  assert.equal(standby.getCell(7, 3).value, "2 years 6 months 27 days");
-  assert.equal(standby.getCell(8, 3).value, "");
+  assert.ok(main.getCell(7, 3).value instanceof Date);
+  assert.equal(main.getCell(7, 3).value.toISOString().slice(0, 10), "2023-04-20", "no time-zone shift");
+  assert.equal(main.getCell(7, 3).numFmt, "dd-mmm-yyyy");
+  assert.equal(main.getCell(7, 4).value, "3 years 5 months 12 days");
+  assert.equal(main.getCell(8, 4).value, "0 years 0 months 9 days");
+  for (const r of [9, 10]) { assert.equal(main.getCell(r, 3).value, "", "no start date"); assert.equal(main.getCell(r, 4).value, ""); }
+  assert.equal(standby.getCell(7, 4).value, "2 years 6 months 27 days");
+  assert.equal(standby.getCell(8, 4).value, "");
   const without = await roundTripAll({ columns: X.ALL_KEYS.filter((k) => k !== "startDate" && k !== "service"), rows, groups, today: "2026-10-02" });
   for (const ws of without.sheets) assert.ok(!headerOf(ws).some((h) => h === "Start Date" || h === "Years of Service"), ws.name);
 });
 
 /* ---------- language: English / Thai ---------- */
-const THAI_HEAD = ["ชื่อ", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "กะ", "เริ่ม", "สิ้นสุด", "วิศวกร", "หมายเหตุ"];
+const THAI_HEAD = ["ชื่อ", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "กะ", "เริ่ม", "สิ้นสุด", "วิศวกร", "หมายเหตุ"];
 
 test("serviceLength speaks Thai on request, and parts are exposed for filtering", () => {
   assert.equal(X.serviceLength("2023-04-20", "2026-10-02", "th"), "3 ปี 5 เดือน 12 วัน");
@@ -265,23 +276,23 @@ test("a Thai board file: Thai headers, values, banner, footer and sheet names �
   const ws = sheets[0];
   assert.deepEqual(headerOf(ws), THAI_HEAD);
   assert.equal(ws.getCell(7, 1).value, "สมชาย");
-  assert.equal(ws.getCell(7, 2).value, "ประจำ");
-  assert.equal(ws.getCell(8, 2).value, "ออนคอล");
-  assert.equal(ws.getCell(7, 3).value, "ผู้ตรวจสอบ");
-  assert.equal(ws.getCell(8, 3).value, "หัวหน้าทีม");
-  assert.equal(ws.getCell(7, 6).value, "3 ปี 5 เดือน 12 วัน");
-  assert.equal(ws.getCell(7, 7).value, "FTM", "service area is the user's own data");
-  assert.equal(ws.getCell(7, 8).value, "M-101");
-  assert.equal(ws.getCell(7, 9).value, "AAT Rayong");
-  assert.equal(ws.getCell(7, 12).value, "กลางวัน");
-  assert.equal(ws.getCell(8, 12).value, "กลางคืน");
+  assert.equal(ws.getCell(7, 3).value, "ประจำ");
+  assert.equal(ws.getCell(8, 3).value, "ออนคอล");
+  assert.equal(ws.getCell(7, 4).value, "ผู้ตรวจสอบ");
+  assert.equal(ws.getCell(8, 4).value, "หัวหน้าทีม");
+  assert.equal(ws.getCell(7, 7).value, "3 ปี 5 เดือน 12 วัน");
+  assert.equal(ws.getCell(7, 8).value, "FTM", "service area is the user's own data");
+  assert.equal(ws.getCell(7, 9).value, "M-101");
+  assert.equal(ws.getCell(7, 10).value, "AAT Rayong");
+  assert.equal(ws.getCell(7, 13).value, "กลางวัน");
+  assert.equal(ws.getCell(8, 13).value, "กลางคืน");
   const banner = bannerTexts(ws);
   assert.ok(banner.includes("บอร์ดกำลังคน") && banner.includes("การวางแผนปฏิบัติการ") && banner.includes("พนักงานทั้งหมด"));
   assert.ok(banner.some((t) => t.includes("พฤหัสบดี") && !t.includes("Thu")), "Thai file: Thai date only");
   assert.equal(footerText(ws, 9).trim(), "พนักงานทั้งหมด: 2   (ประจำ 1 · ออนคอล 1)");
   const leave = sheets[1];
   assert.equal(headerOf(leave).at(-1), "ประเภทการลา");
-  assert.equal(leave.getCell(7, 8).value, "ลาพักร้อน");
+  assert.equal(leave.getCell(7, 9).value, "ลาพักร้อน");
   assert.match(footerText(leave, 10), /^รวม: 3\s+\(ลาพักร้อน 1 · ลาป่วย 1 · สลับวันหยุด 1\)/);
   assert.ok(bannerTexts(sheets[2]).includes("สแตนด์บาย"));
   assert.equal(summary.groups.leave.types[0].label, "ลาพักร้อน");
@@ -290,8 +301,8 @@ test("a Thai board file: Thai headers, values, banner, footer and sheet names �
 test("English stays the default and an unknown language falls back to it", async () => {
   for (const lang of [undefined, "en", "xx"]) {
     const { ws } = await roundTrip({ lang, columns: ["name", "contract", "shift"] });
-    assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Shift"]);
-    assert.equal(ws.getCell(7, 2).value, "Permanent");
+    assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Shift"]);
+    assert.equal(ws.getCell(7, 3).value, "Permanent");
   }
 });
 

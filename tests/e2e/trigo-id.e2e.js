@@ -34,22 +34,14 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     for (const id of ["btn-emplist-csv", "btn-hostlist-csv", "btn-users-csv", "btn-bulk-dl-csv"]) assert.equal(await p.locator("#" + id).count(), 0, id);
     console.log("ok - no CSV export buttons are left");
 
-    // ---- the card toggle ----
-    assert.equal(await p.locator(".emp-card .emp-tid").count(), 0, "off by default");
-    const title = await p.locator('.emp-card[data-emp-id="e1"]').first().getAttribute("title");
-    assert.match(title, /Person A \(T101\)/, "the ID is always in the hover title");
-    await p.click("#btn-trigo-id");
-    assert.equal(await p.getAttribute("#btn-trigo-id", "aria-pressed"), "true");
+    // ---- the card always shows the ID ----
+    assert.equal(await p.locator("#btn-trigo-id").count(), 0, "no show/hide button");
     const chips = await p.locator(".emp-card .emp-tid").allTextContents();
     assert.ok(chips.includes("T101") && chips.includes("T9") && chips.includes("T20"));
     assert.equal(await p.locator('.emp-card[data-emp-id="e4"] .emp-tid').count(), 0, "no chip for someone with no ID");
-    await p.reload();
-    await p.waitForSelector("#board-tabs .board-tab");
-    await p.waitForSelector(".emp-card .emp-tid");
-    assert.equal(await p.getAttribute("#btn-trigo-id", "aria-pressed"), "true", "remembered on this device");
-    await p.click("#btn-trigo-id");
-    assert.equal(await p.locator(".emp-card .emp-tid").count(), 0);
-    console.log("ok - the TRIGO ID shows on cards only when chosen, and the choice is remembered");
+    const title = await p.locator('.emp-card[data-emp-id="e1"]').first().getAttribute("title");
+    assert.match(title, /Person A \(T101\)/, "the ID is in the hover title too");
+    console.log("ok - every card shows its TRIGO ID, with no button to hide it");
 
     // ---- the form: full name only, ID in its own field ----
     const toasts = () => p.locator("#toast-stack .toast-msg").allTextContents();

@@ -75,7 +75,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
 
     await step("the file has the banner, the thirteen chosen columns and one row per person", async () => {
       const ws = await readSheet(file);
-      assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Engineer", "Remark"]);
+      assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Engineer", "Remark"]);
       const banner = [];
       ws.eachRow((r, n) => { if (n <= 3) r.eachCell((c) => banner.push(String(c.value))); });
       assert.ok(banner.includes("Manpower Board") && banner.includes("OPERATIONS PLANNING") && banner.includes("Board One"));
@@ -84,20 +84,20 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       const names = [];
       for (let r = 7; r <= 10; r++) names.push(ws.getCell(r, 1).value);
       assert.deepEqual(names, ["Person A", "Person B", "Person C", "Person D"]);   // missions 101,101,102,103
-      assert.equal(ws.getCell(7, 4).value, "081-234-5678");   // Person A's mobile, kept as text
-      assert.equal(ws.getCell(8, 4).value, "", "no number on file = empty cell");
+      assert.equal(ws.getCell(7, 5).value, "081-234-5678");   // Person A's mobile, kept as text
+      assert.equal(ws.getCell(8, 5).value, "", "no number on file = empty cell");
       // Start Date is a real Excel date; Years of Service counts from it up to the real today
-      const sd = ws.getCell(7, 5).value;
+      const sd = ws.getCell(7, 6).value;
       assert.ok(sd instanceof Date && sd.toISOString().slice(0, 10) === "2023-04-20", "Person A start date: " + sd);
-      assert.equal(ws.getCell(7, 5).numFmt, "dd-mmm-yyyy");
-      assert.equal(ws.getCell(7, 6).value, require("../../xlsx-export.js").serviceLength("2023-04-20", T));
-      assert.match(ws.getCell(7, 6).value, /^\d+ years? \d+ months? \d+ days?$/);
-      assert.equal(ws.getCell(8, 5).value, "", "no start date on file = empty cell");
-      assert.equal(ws.getCell(8, 6).value, "");
-      assert.equal(ws.getCell(7, 8).value, "101");
-      assert.equal(ws.getCell(7, 11).value, "Helmet, Boots");
-      assert.equal(ws.getCell(7, 13).value, "Bring torque tools");
-      assert.equal(ws.getCell(7, 12).value, "Eng One");
+      assert.equal(ws.getCell(7, 6).numFmt, "dd-mmm-yyyy");
+      assert.equal(ws.getCell(7, 7).value, require("../../xlsx-export.js").serviceLength("2023-04-20", T));
+      assert.match(ws.getCell(7, 7).value, /^\d+ years? \d+ months? \d+ days?$/);
+      assert.equal(ws.getCell(8, 6).value, "", "no start date on file = empty cell");
+      assert.equal(ws.getCell(8, 7).value, "");
+      assert.equal(ws.getCell(7, 9).value, "101");
+      assert.equal(ws.getCell(7, 12).value, "Helmet, Boots");
+      assert.equal(ws.getCell(7, 14).value, "Bring torque tools");
+      assert.equal(ws.getCell(7, 13).value, "Eng One");
       assert.equal(ws.getCell(11, 1).value.richText.map((x) => x.text).join("").includes("TOTAL EMPLOYEES: 4"), true);
       assert.equal(ws.getImages().length, 1, "TRIGO logo embedded");
     });
@@ -109,13 +109,13 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       const [, leave, standby, oncall] = wb.worksheets;
       const col = (ws, c, from, to) => { const o = []; for (let r = from; r <= to; r++) o.push(ws.getCell(r, c).value); return o; };
       const head = (ws) => { const o = []; ws.getRow(6).eachCell((c) => o.push(c.value)); return o; };
-      assert.deepEqual(head(leave), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Leave Type"]);
+      assert.deepEqual(head(leave), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Leave Type"]);
       assert.deepEqual(col(leave, 1, 7, 7), ["Person E"]);
-      assert.equal(leave.getCell(7, 8).value, "Annual Leave");
-      assert.equal(leave.getCell(7, 4).value, "", "Person E has no number on file");
+      assert.equal(leave.getCell(7, 9).value, "Annual Leave");
+      assert.equal(leave.getCell(7, 5).value, "", "Person E has no number on file");
       assert.deepEqual(col(standby, 1, 7, 7), ["Person F"]);
       assert.deepEqual(col(oncall, 1, 7, 8), ["Person G", "Person H"]);
-      assert.deepEqual(col(oncall, 2, 7, 8), ["On-call", "On-call"]);
+      assert.deepEqual(col(oncall, 3, 7, 8), ["On-call", "On-call"]);
       for (const ws of [leave, standby, oncall]) {
         const t = []; ws.eachRow((r, n) => { if (n <= 3) r.eachCell((c) => t.push(String(c.value))); });
         assert.ok(t.includes("Manpower Board") && t.includes("Board One") && t.some((x) => /^\w{3} \d\d-\w{3}-\d{4}/.test(x)), ws.name + " banner");
@@ -135,10 +135,10 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       await wb.xlsx.load(fs.readFileSync("/tmp/xlsx-e2e-th.xlsx"));
       assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "ลาและสลับวันหยุด", "สแตนด์บาย", "ออนคอลที่ว่าง"]);
       const ws = wb.worksheets[0];
-      assert.deepEqual(headerOf(ws), ["ชื่อ", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "วิศวกร", "หมายเหตุ"]);
+      assert.deepEqual(headerOf(ws), ["ชื่อ", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "วิศวกร", "หมายเหตุ"]);
       assert.equal(ws.getCell(7, 1).value, "Person A");
-      assert.equal(ws.getCell(7, 2).value, "ประจำ");
-      assert.match(ws.getCell(7, 6).value, /^\d+ ปี \d+ เดือน \d+ วัน$/);
+      assert.equal(ws.getCell(7, 3).value, "ประจำ");
+      assert.match(ws.getCell(7, 7).value, /^\d+ ปี \d+ เดือน \d+ วัน$/);
       await p.click("#btn-xlsx");
       await p.waitForSelector("#modal-xlsx:not(.hidden)");
       assert.equal(await p.locator("#xlsx-lang input[value=th]").isChecked(), true, "Thai remembered");
