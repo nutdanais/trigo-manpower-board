@@ -45,7 +45,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
 
 test("all columns come out in the agreed order", async () => {
   const { ws } = await roundTrip({ columns: X.ALL_KEYS });
-  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
+  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
 });
 
 test("ticked columns only, always in sheet order whatever order they were passed in", async () => {
@@ -58,9 +58,9 @@ test("ticked columns only, always in sheet order whatever order they were passed
 test("dropping Shift, Start and End leaves a sheet with no gaps", async () => {
   const keys = X.ALL_KEYS.filter((k) => !["shift", "start", "end"].includes(k));
   const { ws } = await roundTrip({ columns: keys });
-  assert.equal(headerOf(ws).length, 11);
+  assert.equal(headerOf(ws).length, 13);
   assert.ok(!headerOf(ws).includes("Shift"));
-  assert.equal(ws.getCell(7, 10).value, "K. Wichai");   // Engineer moved up
+  assert.equal(ws.getCell(7, 12).value, "K. Wichai");   // Engineer moved up
 });
 
 test("banner carries board, date and the total number of employees", async () => {
@@ -152,11 +152,11 @@ test("people not on a mission get one sheet per reason, after the mission sheet"
 test("leave sheet: leave type and mobile number as details, tinted, with a per-type total", async () => {
   const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, groups: GROUPS });
   const ws = sheets[1];
-  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area", "Leave Type"]);
+  assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Leave Type"]);
   assert.equal(ws.getCell(7, 1).value, "Anan");
-  assert.equal(ws.getCell(7, 6).value, "Annual Leave · ลาพักร้อน");
+  assert.equal(ws.getCell(7, 8).value, "Annual Leave · ลาพักร้อน");
   assert.equal(ws.getCell(7, 4).value, "081-000-0000");
-  assert.notEqual(ws.getCell(7, 6).fill.fgColor.argb, ws.getCell(9, 6).fill.fgColor.argb, "exchange reads differently from leave");
+  assert.notEqual(ws.getCell(7, 8).fill.fgColor.argb, ws.getCell(9, 8).fill.fgColor.argb, "exchange reads differently from leave");
   assert.match(footerText(ws, 10), /TOTAL: 3\s+\(Annual Leave 1 · Sick Leave 1 · Exchange Working Day 1\)/);
   assert.ok(bannerTexts(ws).includes("ON LEAVE / EXCHANGE"));
   assert.ok(bannerTexts(ws).includes("LEAVE & EXCHANGE WORKING DAY"));
@@ -164,7 +164,7 @@ test("leave sheet: leave type and mobile number as details, tinted, with a per-t
 
 test("standby and on-call sheets list their people with a total", async () => {
   const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, groups: GROUPS });
-  assert.deepEqual(headerOf(sheets[2]), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area"]);
+  assert.deepEqual(headerOf(sheets[2]), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area"]);
   assert.deepEqual([7, 8].map((r) => sheets[2].getCell(r, 1).value), ["Suda", "Niran"]);
   assert.equal(footerText(sheets[2], 9).trim(), "TOTAL: 2");
   assert.equal(sheets[3].getCell(7, 1).value, "Tawan");
@@ -211,4 +211,37 @@ test("Mobile Number is a picker column: shown on every sheet when ticked, on non
   // a number with a leading zero stays text, not a number Excel would strip
   const lead = await roundTrip({ columns: ["name", "phone"], rows: [row({ name: "Z", phone: "0812345678" })] });
   assert.equal(lead.ws.getCell(7, 2).value, "0812345678");
+});
+
+test("serviceLength counts whole calendar years, months and days up to today", () => {
+  const f = X.serviceLength;
+  assert.equal(f("2023-04-20", "2026-10-02"), "3 years 5 months 12 days");
+  assert.equal(f("2026-09-23", "2026-10-02"), "0 years 0 months 9 days");
+  assert.equal(f("2026-10-02", "2026-10-02"), "0 years 0 months 0 days", "first day");
+  assert.equal(f("2025-10-02", "2026-11-03"), "1 year 1 month 1 day", "singular for exactly 1");
+  assert.equal(f("2024-02-29", "2026-02-28"), "1 year 11 months 30 days", "leap-day start");
+  assert.equal(f("2026-01-31", "2026-03-01"), "0 years 1 month 1 day", "31st start, short month: never negative");
+  assert.equal(f("2025-12-31", "2026-02-28"), "0 years 1 month 28 days");
+  assert.equal(f("2020-03-15", "2026-03-15"), "6 years 0 months 0 days", "exact anniversary");
+  assert.equal(f("2026-10-03", "2026-10-02"), "", "start date in the future");
+  for (const bad of ["", null, undefined, "2026-02-30", "20/04/2023", "garbage"]) assert.equal(f(bad, "2026-10-02"), "", String(bad));
+  assert.equal(f("2023-04-20", undefined), "", "no today given");
+});
+
+test("Start Date is a real date cell and Years of Service reads from it, on every sheet; blank without a start date", async () => {
+  const rows = [row({ name: "Old", startDate: "2023-04-20" }), row({ name: "New", startDate: "2026-09-23" }), row({ name: "None" }), row({ name: "Bad", startDate: "soon" })];
+  const groups = { standby: [person({ name: "Suda", startDate: "2024-03-05" }), person({ name: "Niran" })] };
+  const { sheets } = await roundTripAll({ columns: ["name", "startDate", "service"], rows, groups, today: "2026-10-02" });
+  assert.deepEqual(sheets.map(headerOf), [["Name", "Start Date", "Years of Service"], ["Name", "Start Date", "Years of Service"]]);
+  const [main, standby] = sheets;
+  assert.ok(main.getCell(7, 2).value instanceof Date);
+  assert.equal(main.getCell(7, 2).value.toISOString().slice(0, 10), "2023-04-20", "no time-zone shift");
+  assert.equal(main.getCell(7, 2).numFmt, "dd-mmm-yyyy");
+  assert.equal(main.getCell(7, 3).value, "3 years 5 months 12 days");
+  assert.equal(main.getCell(8, 3).value, "0 years 0 months 9 days");
+  for (const r of [9, 10]) { assert.equal(main.getCell(r, 2).value, "", "no start date"); assert.equal(main.getCell(r, 3).value, ""); }
+  assert.equal(standby.getCell(7, 3).value, "2 years 6 months 27 days");
+  assert.equal(standby.getCell(8, 3).value, "");
+  const without = await roundTripAll({ columns: X.ALL_KEYS.filter((k) => k !== "startDate" && k !== "service"), rows, groups, today: "2026-10-02" });
+  for (const ws of without.sheets) assert.ok(!headerOf(ws).some((h) => h === "Start Date" || h === "Years of Service"), ws.name);
 });

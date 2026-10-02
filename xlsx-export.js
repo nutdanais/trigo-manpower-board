@@ -8,13 +8,15 @@
 "use strict";
 
 (function (root) {
-  /* The fourteen exportable columns, in sheet order. `width` is Excel's
+  /* The sixteen exportable columns, in sheet order. `width` is Excel's
      character width. `center` columns are the short ones (shift, times). */
   const COLUMNS = [
     { key: "name",     label: "Name",          width: 30 },
     { key: "contract", label: "Contract Type", width: 17 },
     { key: "position", label: "Position",      width: 25 },
     { key: "phone",    label: "Mobile Number", width: 16 },
+    { key: "startDate", label: "Start Date",    width: 14, center: true },
+    { key: "service",  label: "Years of Service", width: 26 },
     { key: "area",     label: "Service Area",  width: 16 },
     { key: "mission",  label: "Mission",       width: 11 },
     { key: "host",     label: "Host",          width: 22 },
@@ -38,6 +40,36 @@
   };
 
   const pxOf = (w) => w * 7 + 5;   // Excel column width (chars) -> approx. pixels
+
+  /* Start dates travel as "YYYY-MM-DD" text (what the database and the date
+     input use). Parsed to a UTC midnight so no time zone can move the day. */
+  function parseIso(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+    if (!m) return null;
+    const y = +m[1], mo = +m[2], d = +m[3];
+    const t = new Date(Date.UTC(y, mo - 1, d));
+    return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d ? t : null;
+  }
+
+  /* Length of service from a start date until `todayIso`, in whole calendar
+     years / months / days: "3 years 5 months 12 days". All three parts are
+     always shown ("0 years 0 months 5 days"); singular for exactly 1. Whole
+     months are counted from the start date (a start on the 31st lands on the
+     last day of a shorter month), and the days are what is left after them, so
+     nothing is ever negative. A missing, invalid or future start date gives "". */
+  function serviceLength(startIso, todayIso) {
+    const s = parseIso(startIso), t = parseIso(todayIso);
+    if (!s || !t || s > t) return "";
+    let months = (t.getUTCFullYear() - s.getUTCFullYear()) * 12 + (t.getUTCMonth() - s.getUTCMonth());
+    if (t.getUTCDate() < s.getUTCDate()) months--;
+    const anchorMonth = s.getUTCMonth() + months;
+    const lastDay = new Date(Date.UTC(s.getUTCFullYear(), anchorMonth + 1, 0)).getUTCDate();
+    const anchor = new Date(Date.UTC(s.getUTCFullYear(), anchorMonth, Math.min(s.getUTCDate(), lastDay)));
+    const days = Math.round((t - anchor) / 86400000);
+    const years = Math.floor(months / 12), mo = months % 12;
+    const unit = (n, one) => n + " " + one + (n === 1 ? "" : "s");
+    return unit(years, "year") + " " + unit(mo, "month") + " " + unit(days, "day");
+  }
 
   /* Keep only known keys, in sheet order, whatever order or junk was passed. */
   function normalizeColumns(keys) {
@@ -91,10 +123,10 @@
        standby  - permanent staff with no mission
        oncall   - on-call staff with no mission (Available On-call)
      Name is always there (a list without names is useless); Contract Type /
-     Position / Mobile Number / Service Area follow the same ticks as the main
+     Position / Mobile Number / Start Date / Years of Service / Service Area follow the same ticks as the main
      sheet (so unticking Mobile Number keeps phone numbers out of every sheet). */
   const LEAVE_ORDER = ["annual", "sick", "business", "unpaid", "exchange"];
-  const PICKER_SHARED = ["contract", "position", "phone", "area"];
+  const PICKER_SHARED = ["contract", "position", "phone", "startDate", "service", "area"];
   const LEAVE_TYPE_COL = { key: "leave", label: "Leave Type", width: 34 };
   /* what each extra sheet is called and says about itself */
   const GROUPS = {
@@ -132,7 +164,7 @@
 
   /* One sheet in the TRIGO layout: navy banner (logo, title, board + date, a
      big number), green rule, table, total row. spec: { sheetName, title,
-     subtitle, boardName, dateEn, dateTh, bigNumber, bigLabel, cols, rows,
+     subtitle, boardName, dateEn, dateTh, today, bigNumber, bigLabel, cols, rows,
      footer: {main, detail}, logoId, styleCell(col, row, cell, helpers) } */
   function addSheet(wb, spec) {
     const { cols, rows } = spec;
@@ -215,7 +247,16 @@
       row.height = 20;
       cols.forEach((col, i) => {
         const cell = row.getCell(i + 1);
-        cell.value = r[col.key] === undefined || r[col.key] === null ? "" : r[col.key];
+        if (col.key === "startDate") {
+          // a real Excel date (sorts and filters as one), shown like the app: 20-Apr-2023
+          const d = parseIso(r.startDate);
+          cell.value = d || "";
+          if (d) cell.numFmt = "dd-mmm-yyyy";
+        } else if (col.key === "service") {
+          cell.value = serviceLength(r.startDate, spec.today);
+        } else {
+          cell.value = r[col.key] === undefined || r[col.key] === null ? "" : r[col.key];
+        }
         cell.font = font({ bold: col.key === "name" });
         cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
         cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
@@ -261,10 +302,11 @@
   /* Builds the workbook. `ExcelJS` is passed in so the browser can lazy-load it.
      opts: { boardName, dateEn, dateTh, columns: [keys], rows: [row],
              groups: { leave: [pRow], standby: [pRow], oncall: [pRow] } (each optional),
+             today: "YYYY-MM-DD" (what Years of Service counts up to; the real today),
              logo: ArrayBuffer|Buffer|null }
      A row (sheet 1: people on missions) is { empId, name, contract: "Permanent"|"On-call",
-     position, phone, area, mission, host, customer, ppe, shift: "Day"|"Night", start, end, engineer, remark }.
-     A pRow (people not on a mission) is { empId, name, contract, position, area, phone }, and for
+     position, phone, startDate: "YYYY-MM-DD"|"", area, mission, host, customer, ppe, shift: "Day"|"Night", start, end, engineer, remark }.
+     A pRow (people not on a mission) is { empId, name, contract, position, area, phone, startDate }, and for
      the leave group also { leaveKey: one of LEAVE_ORDER, leave: "Annual Leave · ลาพักร้อน", leaveEn }.
      An empty or missing group adds no sheet. The header and the total row show only the
      total number of employees; the Permanent / On-call split appears only when the
@@ -278,7 +320,7 @@
     wb.creator = "TRIGO Manpower Board";
     wb.created = new Date();
     const logoId = await loadLogo(ExcelJS, wb, opts.logo);
-    const common = { boardName: opts.boardName, dateEn: opts.dateEn, dateTh: opts.dateTh, logoId, title: "Manpower Board" };
+    const common = { boardName: opts.boardName, dateEn: opts.dateEn, dateTh: opts.dateTh, today: opts.today, logoId, title: "Manpower Board" };
 
     const withContract = cols.some((c) => c.key === "contract");
     const used = new Set();
@@ -318,7 +360,7 @@
     return { workbook: wb, summary: Object.assign({}, sum, { groups: groupSummary }) };
   }
 
-  const api = { COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, buildWorkbook };
+  const api = { COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceLength, buildWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

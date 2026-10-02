@@ -414,7 +414,7 @@ const cloud = {
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
   },
   async _loadOverrides() {
     // tolerate the table not existing yet (before the workweek migration is run) —
@@ -957,6 +957,7 @@ const cloud = {
     // newest optional columns first, falling back to fewer columns if a migration
     // hasn't been run yet on this database — so saves keep working either way
     const candidates = [
+      { ...baseRow, position: vals.position || null, phone: vals.phone || null, start_date: vals.startDate || null },
       { ...baseRow, position: vals.position || null, phone: vals.phone || null },
       { ...baseRow, position: vals.position || null },
       baseRow,
@@ -968,6 +969,10 @@ const cloud = {
     for (const row of candidates) {
       ({ error } = await attempt(row));
       if (!error || !/column/i.test(error.message || "")) break;
+      // a start date someone typed must never be dropped silently by the fallback
+      if (vals.startDate && this._missingColumnFromError(error) === "start_date") {
+        throw new Error("Start dates need a one-time database update (migration-2026-10-02-start-date.sql) before they can be saved.");
+      }
     }
     if (error) throw error;
     await this._loadEmployees();

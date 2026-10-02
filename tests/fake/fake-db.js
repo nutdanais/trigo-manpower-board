@@ -30,7 +30,7 @@ const FORWARD_TABLES = new Set(["plan_day_stamps", "capacity_demand", "forecast_
 const DEFAULTS = {
   missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", hidden: false, ppe: null, remark: null, engineer_id: null }),
   forecast_missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", ppe: null, remark: null, engineer_id: null }),
-  employees: () => ({ active: true, position: null, phone: null }),
+  employees: () => ({ active: true, position: null, phone: null, start_date: null }),
   boards: () => ({ weekend_days: [0, 6] }),
 };
 const TIMESTAMPS = new Set(["missions", "assignments", "forecast_missions", "forecast_assignments", "capacity_demand", "boards", "employees", "deployment_history", "hosts", "employee_notes", "forecast_hold_events"]);

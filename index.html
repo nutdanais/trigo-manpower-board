@@ -380,6 +380,7 @@
             <th data-sort="contract">Contract type</th>
             <th data-sort="position">Position</th>
             <th data-sort="phone">Mobile number</th>
+            <th data-sort="startDate">Start date</th>
             <th data-sort="areaId">Service area</th>
             <th data-sort="boardId">Current board</th>
             <th data-sort="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for.">30D utilization</th>
@@ -554,6 +555,7 @@
             </select>
           </label>
           <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+          <label>Start date (optional) <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
           <label>Service area <select name="areaId" required></select></label>
           <label>Board <select name="boardId" required></select></label>
           <div class="modal-actions">
@@ -994,9 +996,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="planning.js?v=2026-09-24e"></script>
-<script src="cloud.js?v=2026-09-24f"></script>
+<script src="cloud.js?v=2026-10-02a"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="xlsx-export.js?v=2026-10-01a"></script>
-<script src="app.js?v=2026-10-01a"></script>
+<script src="xlsx-export.js?v=2026-10-02a"></script>
+<script src="app.js?v=2026-10-02a"></script>
 </body>
 </html>

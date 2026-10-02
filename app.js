@@ -3839,6 +3839,7 @@ function emplistFilteredSorted() {
       case "contract": return e.contract === "oncall" ? "On-call" : "Permanent";
       case "position": return e.position ? POSITIONS[e.position].label : "";
       case "phone": return e.phone || "";
+      case "startDate": return e.startDate || "";   // ISO text sorts in date order; people with none sort first
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
       case "active": return e.active === false ? "Inactive" : "Active";
@@ -3881,13 +3882,14 @@ function csvField(v) {
 }
 function exportEmplistCsv() {
   const emps = emplistFilteredSorted();   // same rows the table is showing right now
-  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board", "30D utilization", "Status"];
+  const header = ["Name", "Contract type", "Position", "Mobile number", "Start date", "Years of service", "Service area", "Current board", "30D utilization", "Status"];
   const rows = emps.map(e => {
     const area = D().areas.find(a => a.id === e.areaId);
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return [e.name, e.contract === "oncall" ? "On-call" : "Permanent", pos ? pos.label : "",
-      e.phone || "", area ? area.name : "", board ? board.name : "",
+      e.phone || "", e.startDate ? fmtDate(e.startDate) : "", ManpowerXlsx.serviceLength(e.startDate, todayStr()),
+      area ? area.name : "", board ? board.name : "",
       utilCsv(state.emplist.util ? state.emplist.util[e.id] : undefined),
       e.active === false ? "Inactive" : "Active"];
   });
@@ -3935,6 +3937,7 @@ function renderEmployeeRows() {
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
+      <td data-label="Start date"${e.startDate ? ` title="${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr()))}"` : ""}>${e.startDate ? fmtDate(e.startDate) : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
@@ -5129,6 +5132,7 @@ function openEmployeeModal(empId) {
     form.contract.value = e.contract;
     form.position.value = e.position || "";
     form.phone.value = e.phone || "";
+    form.startDate.value = e.startDate || "";
     form.areaId.value = e.areaId;
     form.boardId.value = e.boardId;
   } else if (!isNonBoardView()) {
@@ -5149,7 +5153,7 @@ function openEmployeeModal(empId) {
 function saveEmployee(ev) {
   ev.preventDefault();
   const form = $("#form-employee");
-  const vals = { name: form.name.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), areaId: form.areaId.value, boardId: form.boardId.value };
+  const vals = { name: form.name.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, areaId: form.areaId.value, boardId: form.boardId.value };
   // instant client-side check (same pattern as duplicate missions); the DB-cache
   // check in cloud.saveEmployee is the real guard, this just avoids a round trip
   const dup = D().employees.find(e =>
@@ -5960,7 +5964,7 @@ function xlsxRows() {
       const pos = e.position ? POSITIONS[e.position] : null;
       rows.push({
         empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
-        position: pos ? pos.label : "", phone: e.phone || "", area: area ? area.name : "", mission: m.number, host: m.host,
+        position: pos ? pos.label : "", phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", mission: m.number, host: m.host,
         customer: m.customer, ppe, shift: m.shift === "night" ? "Night" : "Day", start: m.startTime, end: m.endTime,
         engineer: eng ? eng.name : "", remark: m.remark || "",
       });
@@ -5980,7 +5984,7 @@ function xlsxGroups() {
     const pos = e.position ? POSITIONS[e.position] : null;
     return Object.assign({
       empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
-      position: pos ? pos.label : "", area: area ? area.name : "", phone: e.phone || "",
+      position: pos ? pos.label : "", area: area ? area.name : "", phone: e.phone || "", startDate: e.startDate || "",
     }, extra);
   };
   const leave = [];
@@ -6071,7 +6075,7 @@ async function exportXlsx() {
       fetch("logo-on-navy.png").then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),   // no logo = wordmark text instead
     ]);
     const { workbook, summary } = await ManpowerXlsx.buildWorkbook(ExcelJS, {
-      boardName, dateEn: `${fmtDow(state.date)} ${fmtDate(state.date)}`, dateTh: fmtDateThai(state.date),
+      boardName, dateEn: `${fmtDow(state.date)} ${fmtDate(state.date)}`, dateTh: fmtDateThai(state.date), today: todayStr(),
       columns: keys, rows, groups, logo,
     });
     const buf = await workbook.xlsx.writeBuffer();
