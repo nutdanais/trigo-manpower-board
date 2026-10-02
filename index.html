@@ -31,7 +31,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-02b">
+<link rel="stylesheet" href="styles.css?v=2026-10-02c">
 </head>
 <body>
 
@@ -294,8 +294,10 @@
     <span id="emplist-count" class="hidden"></span>
     <button type="button" class="btn hidden" id="btn-emplist-xlsx" title="Export the rows below as an Excel file — in English or Thai"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
     <button type="button" class="btn hidden" id="btn-emplist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+    <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
     <span id="hostlist-count" class="hidden"></span>
     <button type="button" class="btn hidden" id="btn-hostlist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+    <button type="button" class="btn hidden" id="btn-hostlist-bulk" title="Edit many hosts in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
     <button id="btn-export" class="btn"><svg class="ic" aria-hidden="true"><use href="#i-camera"></use></svg> Export</button>
     <!-- The sharp half of "share the plan": a JPG is re-encoded and downsized by
          whatever chat app carries it, and it cannot hold a link. This prints the
@@ -926,6 +928,32 @@
     </div>
   </div>
 
+  <!-- Bulk edit by file: Manpower List and Host List (see bulk-edit.js) -->
+  <div class="modal hidden" id="modal-bulk">
+    <h3><span id="bulk-title">Bulk edit</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note" id="bulk-intro"></p>
+    <div class="bulk-step">
+      <b>1. Get the file</b>
+      <div class="bulk-step-row">
+        <button type="button" class="btn" id="btn-bulk-dl-xlsx"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel template</button>
+        <button type="button" class="btn" id="btn-bulk-dl-csv"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+      </div>
+      <span class="import-note" id="bulk-dl-note"></span>
+    </div>
+    <div class="bulk-step">
+      <b>2. Upload it back</b>
+      <div class="bulk-step-row"><input type="file" id="bulk-file" accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+      <span class="import-note">Nothing is saved yet — you review every change first.</span>
+    </div>
+    <div id="bulk-preview" class="hidden"></div>
+    <div class="modal-actions">
+      <label id="bulk-backup-row" class="bulk-check"><input type="checkbox" id="bulk-backup" checked> Download a backup of the current list first</label>
+      <span class="toolbar-spacer"></span>
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-bulk-apply" disabled>Apply changes</button>
+    </div>
+  </div>
+
   <!-- PlanDiff: "Review changes" (stale carry-over) and "Review & merge" (forecast) -->
   <div class="modal hidden" id="modal-plandiff">
     <h3><span id="plandiff-title">Review changes</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
@@ -1020,9 +1048,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="planning.js?v=2026-09-24e"></script>
-<script src="cloud.js?v=2026-10-02a"></script>
+<script src="cloud.js?v=2026-10-02b"></script>
 <script src="charts.js?v=2026-09-07e"></script>
 <script src="xlsx-export.js?v=2026-10-02b"></script>
-<script src="app.js?v=2026-10-02b"></script>
+<script src="bulk-edit.js?v=2026-10-02a"></script>
+<script src="app.js?v=2026-10-02c"></script>
 </body>
 </html>

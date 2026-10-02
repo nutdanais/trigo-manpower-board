@@ -338,7 +338,7 @@ const CLOUD_WRITE_METHODS = [
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
   "saveEngineerField", "addEngineer", "deleteEngineer", "saveAreaField", "addArea", "deleteArea",
-  "saveHost", "deleteHost", "mergeHost",
+  "saveHost", "deleteHost", "mergeHost", "applyEmployeeImport", "applyHostImport",
   "addEmployeeNote", "deleteEmployeeNote",
 ];
 function wireSaveStatus() {
@@ -948,8 +948,10 @@ function render() {
   $("#emplist-count").classList.toggle("hidden", !eml);
   $("#btn-emplist-csv").classList.toggle("hidden", !eml);
   $("#btn-emplist-xlsx").classList.toggle("hidden", !eml);
+  $("#btn-emplist-bulk").classList.toggle("hidden", !eml || !can("emplist", "edit"));
   $("#hostlist-count").classList.toggle("hidden", !hl);
   $("#btn-hostlist-csv").classList.toggle("hidden", !hl);
+  $("#btn-hostlist-bulk").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
   // The two lists and the board bar carry their own create buttons; RLS would
   // refuse the write anyway, so hiding them is about not offering a dead end.
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
@@ -3978,6 +3980,243 @@ async function exportEmplistXlsx() {
   } finally {
     btn.disabled = false;
     btn.textContent = "Export";
+  }
+}
+
+/* ---------- Bulk edit by file (Manpower List and Host List) ----------
+   Download a template of the current rows, change many of them in a
+   spreadsheet, upload it back. The file is read and PLANNED here (bulk-edit.js
+   matches every row to a record, checks every cell, and works out the
+   from -> to diff); nothing is written until the person has read the preview
+   and pressed Apply. cloud.applyEmployeeImport / applyHostImport do the writing. */
+const bulk = { kind: null, table: null, plan: null, fileName: "", result: null };
+const bulkIsEmp = () => bulk.kind === "employees";
+
+function bulkHostRows() {
+  return allHostRows().map(r => ({
+    name: r.name, location: r.location, mapUrl: r.mapUrl, note: r.note,
+    areaId: r.area ? r.area.id : "", archived: r.archived, hasRecord: r.hasRecord,
+  }));
+}
+const bulkCtx = (kind, rows) => kind === "employees"
+  ? { employees: rows, areas: D().areas, boards: D().boards, positions: POSITIONS }
+  : { hosts: rows, areas: D().areas, similarKey: hostDupKey };
+/* the rows a template/backup holds: the list as it is shown (template) or everything (backup) */
+function bulkTemplateRows(kind, all) {
+  if (kind === "employees") return all ? [...D().employees].sort((a, b) => a.name.localeCompare(b.name)) : emplistFilteredSorted();
+  const hostsAll = bulkHostRows();
+  if (all) return hostsAll;
+  const shown = new Set(hostlistFilteredSorted().map(r => r.name));
+  return hostsAll.filter(h => shown.has(h.name));
+}
+function bulkSaveBlob(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function bulkWriteFile(kind, format, all, name) {
+  const ctx = bulkCtx(kind, bulkTemplateRows(kind, all));
+  if (format === "csv") {
+    const text = kind === "employees" ? BulkEdit.employeeCsv(ctx) : BulkEdit.hostCsv(ctx);
+    bulkSaveBlob(new Blob([text], { type: "text/csv;charset=utf-8" }), name + ".csv");
+  } else {
+    const ExcelJS = await loadExcelJS();
+    const wb = await BulkEdit.buildTemplateWorkbook(ExcelJS, kind, ctx);
+    const buf = await wb.xlsx.writeBuffer();
+    bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name + ".xlsx");
+  }
+}
+
+function openBulkModal(kind) {
+  const area = kind === "employees" ? "emplist" : "hostlist";
+  if (!can(area, "edit")) { toast("Your role can view this list but not change it.", "info"); return; }
+  Object.assign(bulk, { kind, table: null, plan: null, fileName: "", result: null });
+  const emp = kind === "employees";
+  $("#bulk-title").textContent = emp ? "Bulk edit employees" : "Bulk edit hosts";
+  $("#bulk-intro").textContent = emp
+    ? "Change many employees at once in a spreadsheet. Download the template (it holds everyone's current details), edit it, save it and upload it back. Rename people, change contract, position, phone, dates, service area, board or status, or add new people on the empty rows."
+    : "Change many hosts at once in a spreadsheet: Location, Google Maps link, Service area, Note and Status. Download the template, edit it and upload it back. A host's name is its key — renaming or merging hosts is still done from the Host List.";
+  const n = bulkTemplateRows(kind, false).length;
+  $("#bulk-dl-note").textContent = `${n} ${emp ? (n === 1 ? "employee" : "employees") : (n === 1 ? "host" : "hosts")} — the rows the list is showing now. Clear the search and filters first to include everyone. Excel is recommended (dropdowns, real dates, Thai text); CSV works too.`;
+  $("#bulk-file").value = "";
+  $("#bulk-preview").classList.add("hidden");
+  $("#bulk-preview").innerHTML = "";
+  $("#btn-bulk-apply").disabled = true;
+  $("#btn-bulk-apply").textContent = "Apply changes";
+  $("#bulk-backup-row").classList.remove("hidden");
+  openModal("#modal-bulk");
+}
+
+async function bulkDownload(format) {
+  const emp = bulkIsEmp();
+  await bulkWriteFile(bulk.kind, format, false, `${emp ? "manpower_edit" : "host_edit"}_${todayStr()}`);
+  toast("Template downloaded. Edit it, save it, then upload it in step 2.", "info");
+}
+
+/* a file -> rows of cells. Excel files via ExcelJS; CSV as UTF-8, falling back to
+   Windows-874 (what Excel's plain "CSV (Comma delimited)" writes on a Thai PC). */
+async function bulkReadFile(file) {
+  if (file.size > 5 * 1024 * 1024) throw new Error("That file is larger than 5 MB.");
+  const name = file.name.toLowerCase();
+  const buf = await file.arrayBuffer();
+  if (name.endsWith(".xlsx")) {
+    const ExcelJS = await loadExcelJS();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    return BulkEdit.rowsFromWorkbook(wb, bulk.kind);
+  }
+  if (name.endsWith(".csv") || name.endsWith(".txt")) {
+    let text;
+    try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); }
+    catch (e) { text = new TextDecoder("windows-874").decode(buf); }
+    return BulkEdit.parseCsv(text);
+  }
+  if (name.endsWith(".xls")) throw new Error("Old .xls files are not supported — open it in Excel and Save As .xlsx.");
+  throw new Error("Upload an .xlsx or .csv file.");
+}
+function bulkMakePlan() {
+  return bulkIsEmp()
+    ? BulkEdit.planEmployees(bulk.table, bulkCtx("employees", D().employees))
+    : BulkEdit.planHosts(bulk.table, bulkCtx("hosts", bulkHostRows()));
+}
+/* what a plan would write, as text — to notice that the data moved under an open dialog */
+const bulkSig = (plan) => JSON.stringify(plan.rows.map(r => [r.rowNumber, r.kind, r.patch, r.create]));
+
+async function onBulkFile(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  try {
+    const rows2d = await bulkReadFile(file);
+    bulk.table = BulkEdit.readTable(rows2d, bulkIsEmp() ? BulkEdit.EMP_COLUMNS : BulkEdit.HOST_COLUMNS);
+    bulk.plan = bulkMakePlan();
+    bulk.fileName = file.name;
+    bulk.result = null;
+    renderBulkPreview();
+  } catch (e) {
+    bulk.table = bulk.plan = null;
+    $("#bulk-preview").classList.add("hidden");
+    $("#btn-bulk-apply").disabled = true;
+    toast("Could not read that file: " + (e.message || e), "error");
+  }
+}
+
+const bulkNone = (v) => (v === "" || v == null ? "<i>(empty)</i>" : escapeHtml(v));
+function bulkCreateSummary(r) {
+  const c = r.create;
+  if (bulkIsEmp()) {
+    const board = D().boards.find(b => b.id === c.boardId), area = D().areas.find(a => a.id === c.areaId);
+    return [c.contract === "oncall" ? "On-call" : "Permanent", board ? board.name : "", area ? area.name : "", c.position && POSITIONS[c.position] ? POSITIONS[c.position].label : "", c.active === false ? "Inactive" : ""].filter(Boolean).join(" · ");
+  }
+  return [c.location, c.mapUrl, c.note].filter(Boolean).join(" · ");
+}
+function bulkApplyCount() {
+  const n = bulk.plan ? bulk.plan.counts : null;
+  if (!n) return 0;
+  const box = $("#bulk-create");
+  return n.update + (box && box.checked ? n.create : 0);
+}
+function bulkRefreshApplyButton() {
+  const n = bulkApplyCount();
+  const btn = $("#btn-bulk-apply");
+  btn.disabled = n === 0 || !!bulk.result;
+  btn.textContent = n ? `Apply ${n} ${n === 1 ? "change" : "changes"}` : "Apply changes";
+}
+function renderBulkPreview() {
+  const el = $("#bulk-preview");
+  el.classList.remove("hidden");
+  const plan = bulk.plan, n = plan.counts, emp = bulkIsEmp();
+  const noun = emp ? ["person", "people"] : ["host", "hosts"];
+  if (plan.fatal.length) {
+    el.innerHTML = `<div class="bulk-fatal"><b>This file can't be used.</b><ul>${plan.fatal.map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul></div>`;
+    bulkRefreshApplyButton();
+    return;
+  }
+  const chip = (label, v, color) => `<span class="stat-chip"><span class="dot" style="background:${color}"></span>${label}: <b>${v}</b></span>`;
+  let html = `<div class="bulk-chips">${chip("To update", n.update, "var(--chart-assigned)")}${chip(emp ? "New people" : "New hosts", n.create, "var(--ok-text)")}${chip("Unchanged", n.same, "#c3ccd6")}${chip("Problems", n.error, "var(--warn)")}</div>`;
+  const extra = [];
+  if (emp && n.moves) extra.push(`${n.moves} ${n.moves === 1 ? "person changes" : "people change"} board — their assignment on ${escapeHtml(fmtDate(state.date))} is cleared`);
+  if (emp && n.deactivate) extra.push(`${n.deactivate} will be set Inactive`);
+  if (emp && n.reactivate) extra.push(`${n.reactivate} will be set Active again`);
+  if (n.clears) extra.push(`${n.clears} filled-in ${n.clears === 1 ? "value is" : "values are"} being cleared`);
+  if (plan.ignored.length) extra.push(`Ignored columns: ${plan.ignored.map(escapeHtml).join(", ")}`);
+  extra.push(`${n.total} data ${n.total === 1 ? "row" : "rows"} read from ${escapeHtml(bulk.fileName)}. People missing from the file are left alone.`);
+  html += `<div class="bulk-extra">${extra.join(" · ")}</div>`;
+
+  const bad = plan.rows.filter(r => r.kind === "error");
+  if (bad.length) {
+    html += `<div class="bulk-problems"><b>${bad.length} ${bad.length === 1 ? "row has a problem and is" : "rows have problems and are"} skipped.</b> Fix them in the file and upload again — only what still differs will change.<ul>` +
+      bad.slice(0, 50).map(r => `<li>Row ${r.rowNumber}${r.name ? " · " + escapeHtml(r.name) : ""}: ${r.errors.map(escapeHtml).join("; ")}</li>`).join("") +
+      (bad.length > 50 ? `<li>…and ${bad.length - 50} more</li>` : "") + "</ul></div>";
+  }
+  if (n.create) {
+    html += `<label class="bulk-create"><input type="checkbox" id="bulk-create"> Also add ${n.create} new ${n.create === 1 ? noun[0] : noun[1]}` +
+      (emp ? " (rows with a name that isn't on the list yet — if one is a misspelt existing name, fix it in the file instead)" : " (names not in the Host List yet — a renamed host would show up here, so check for typos)") + "</label>";
+  }
+  const shown = plan.rows.filter(r => r.kind === "update" || r.kind === "create");
+  if (shown.length) {
+    html += `<table class="bulk-table"><thead><tr><th>Row</th><th>${emp ? "Employee" : "Host"}</th><th>What changes</th></tr></thead><tbody>` +
+      shown.slice(0, 200).map(r => {
+        const what = r.kind === "create"
+          ? `<span class="bulk-new">NEW</span>${escapeHtml(bulkCreateSummary(r))}`
+          : r.changes.map(c => `<span class="bulk-chg">${escapeHtml(c.label)}: <span class="bulk-from">${bulkNone(c.from)}</span> → <b>${bulkNone(c.to)}</b></span>`).join("");
+        const warn = r.warnings.map(w => `<span class="bulk-warn">⚠ ${escapeHtml(w)}</span>`).join("");
+        return `<tr data-kind="${r.kind}"><td class="bulk-row">${r.rowNumber}</td><td>${escapeHtml(r.name)}</td><td>${what}${warn}</td></tr>`;
+      }).join("") + `</tbody></table>` +
+      (shown.length > 200 ? `<p class="import-note">…and ${shown.length - 200} more rows (all of them are applied).</p>` : "");
+  } else if (!n.error) {
+    html += `<p class="import-note">Nothing to change — the file matches what the app already has.</p>`;
+  }
+  el.innerHTML = html;
+  const box = $("#bulk-create");
+  if (box) box.onchange = bulkRefreshApplyButton;
+  bulkRefreshApplyButton();
+}
+
+async function applyBulk() {
+  const kind = bulk.kind, area = kind === "employees" ? "emplist" : "hostlist";
+  if (!bulk.plan || !can(area, "edit")) return;
+  const btn = $("#btn-bulk-apply");
+  btn.disabled = true;
+  try {
+    // somebody else may have edited the list while this dialog was open: plan again
+    // against the data as it is now, and make the person look again if it differs
+    const fresh = bulkMakePlan();
+    if (bulkSig(fresh) !== bulkSig(bulk.plan)) {
+      const wasChecked = !!($("#bulk-create") && $("#bulk-create").checked);
+      bulk.plan = fresh;
+      renderBulkPreview();
+      const box = $("#bulk-create");
+      if (box) { box.checked = wasChecked; bulkRefreshApplyButton(); }
+      toast("The list changed while this window was open. Review the updated changes, then apply again.", "warn");
+      return;
+    }
+    const createNew = !!($("#bulk-create") && $("#bulk-create").checked);
+    btn.textContent = "Applying…";
+    if ($("#bulk-backup").checked) {
+      const t = new Date();
+      const stamp = todayStr() + "_" + String(t.getHours()).padStart(2, "0") + String(t.getMinutes()).padStart(2, "0");
+      await bulkWriteFile(kind, "xlsx", true, `${kind === "employees" ? "manpower" : "host"}_backup_before_import_${stamp}`);
+    }
+    const res = kind === "employees"
+      ? await cloud.applyEmployeeImport(bulk.plan, { moveDate: state.date, createNew })
+      : await cloud.applyHostImport(bulk.plan, { createNew });
+    bulk.result = res;
+    await refreshAndRender();
+    const done = `Updated ${res.updated}${res.created ? `, added ${res.created}` : ""}.`;
+    if (res.failed.length) {
+      $("#bulk-preview").innerHTML = `<div class="bulk-problems"><b>${done} ${res.failed.length} could not be saved:</b><ul>` +
+        res.failed.slice(0, 50).map(f => `<li>Row ${f.rowNumber} · ${escapeHtml(f.name)}: ${escapeHtml(f.message)}</li>`).join("") +
+        `</ul>Upload the same file again to retry just those — everything already saved will show as unchanged.</div>`;
+      toast(`${done} ${res.failed.length} failed — see the list.`, "warn");
+      btn.textContent = "Done";
+    } else {
+      closeModal();
+      toast(done, "info");
+    }
+  } finally {
+    if (!bulk.result) bulkRefreshApplyButton();
   }
 }
 
@@ -9611,6 +9850,12 @@ function wireApp() {
 
   // ---------- Manpower List tab ----------
   $("#btn-emplist-csv").onclick = exportEmplistCsv;
+  $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
+  $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
+  $("#btn-bulk-dl-xlsx").onclick = () => safely(() => bulkDownload("xlsx"));
+  $("#btn-bulk-dl-csv").onclick = () => safely(() => bulkDownload("csv"));
+  $("#bulk-file").onchange = (e) => safely(() => onBulkFile(e));
+  $("#btn-bulk-apply").onclick = () => safely(applyBulk);
   $("#btn-emplist-xlsx").onclick = openEmplistXlsxModal;
   $("#btn-emplist-xlsx-go").onclick = exportEmplistXlsx;
   $("#emplist-search").addEventListener("input", (e) => { state.emplist.search = e.target.value; renderEmployeeRows(); });

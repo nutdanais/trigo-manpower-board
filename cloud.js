@@ -1071,6 +1071,82 @@ const cloud = {
     this._invalidateForecast();
   },
 
+  /* ---------- bulk edit by file (Manpower List -> Bulk edit) ----------
+     `plan` is what bulk-edit.js's planEmployees() produced and the person
+     reviewed; only its "update" rows (and, when asked, its "create" rows) are
+     written. There is no transaction across rows in this client, so the safety
+     is elsewhere: the plan is fully validated first, every failure is reported
+     per row instead of aborting the batch, and the whole thing is idempotent -
+     re-uploading the same file only changes what still differs.
+     Board moves go through moveEmployeesToBoard (so the day on screen is
+     cleared exactly as a single move does) and Active/Inactive through
+     setEmployeesActive; everything else is one UPDATE per person. Returns
+     { updated, created, failed:[{rowNumber, name, message}] }. */
+  async applyEmployeeImport(plan, { moveDate, createNew = false } = {}) {
+    const rows = (plan && plan.rows) || [];
+    const updates = rows.filter((r) => r.kind === "update");
+    const creates = createNew ? rows.filter((r) => r.kind === "create") : [];
+    const failed = [];
+    const bad = new Set();
+    const fail = (r, e) => { bad.add(r.rowNumber); failed.push({ rowNumber: r.rowNumber, name: r.name, message: (e && e.message) || String(e) }); };
+
+    // 1. board moves, one call per destination board
+    const moves = new Map();
+    for (const r of updates) if (r.patch.boardId) { if (!moves.has(r.patch.boardId)) moves.set(r.patch.boardId, []); moves.get(r.patch.boardId).push(r); }
+    for (const [boardId, group] of moves) {
+      try { await this.moveEmployeesToBoard(group.map((r) => r.id), boardId, moveDate); }
+      catch (e) { group.forEach((r) => fail(r, e)); }
+    }
+    // 2. Active / Inactive, one call per direction
+    for (const flag of [false, true]) {
+      const group = updates.filter((r) => r.patch.active === flag && !bad.has(r.rowNumber));
+      if (!group.length) continue;
+      try { await this.setEmployeesActive(group.map((r) => r.id), flag); }
+      catch (e) { group.forEach((r) => fail(r, e)); }
+    }
+    // 3. the other fields: one UPDATE per person, a few at a time
+    const nz = (v) => (v === "" || v === undefined ? null : v);
+    const dbPatch = (p) => {
+      const o = {};
+      if (p.name !== undefined) o.name = p.name;
+      if (p.contract !== undefined) o.contract = p.contract;
+      if (p.position !== undefined) o.position = nz(p.position);
+      if (p.phone !== undefined) o.phone = nz(p.phone);
+      if (p.startDate !== undefined) o.start_date = nz(p.startDate);
+      if (p.addedOn !== undefined) o.added_on = nz(p.addedOn);
+      if (p.areaId !== undefined) o.area_id = p.areaId;
+      return o;
+    };
+    const pool = async (items, fn, n = 5) => {
+      let i = 0;
+      await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+        while (i < items.length) { const item = items[i++]; await fn(item); }
+      }));
+    };
+    await pool(updates.filter((r) => !bad.has(r.rowNumber)), async (r) => {
+      const patch = dbPatch(r.patch);
+      if (!Object.keys(patch).length) return;
+      const { error } = await sb.from("employees").update(patch).eq("id", r.id);
+      if (error) fail(r, error);
+    });
+    // 4. new people. A blank "on the board from" is left out so the column default (today) applies.
+    await pool(creates, async (r) => {
+      const c = r.create;
+      const row = { name: c.name, contract: c.contract, position: nz(c.position), phone: nz(c.phone), start_date: nz(c.startDate), area_id: c.areaId, board_id: c.boardId };
+      if (c.addedOn) row.added_on = c.addedOn;
+      if (c.active === false) row.active = false;
+      const { error } = await sb.from("employees").insert(row);
+      if (error) fail(r, error);
+    });
+    await this._loadEmployees();
+    this._invalidatePlans();
+    return {
+      updated: updates.filter((r) => !bad.has(r.rowNumber)).length,
+      created: creates.filter((r) => !bad.has(r.rowNumber)).length,
+      failed,
+    };
+  },
+
   async createBoard(name, weekendDays) {
     const { data, error } = await sb.from("boards")
       .insert({ name, weekend_days: weekendDays || [0, 6] }).select("*").single();
@@ -1596,6 +1672,54 @@ const cloud = {
     const { error } = await sb.from("hosts").delete().eq("id", id);
     if (error) throw error;
     await this._loadHosts();
+  },
+
+  /* Bulk edit by file for hosts (Host List -> Bulk edit). Same contract as
+     applyEmployeeImport: only reviewed rows are written, failures are reported
+     per row. The host NAME is the key and is never changed here (a rename has to
+     rewrite its missions - see renameHost), so every write is an upsert on the
+     name carrying only the columns the file set. */
+  async applyHostImport(plan, { createNew = false } = {}) {
+    const rows = (plan && plan.rows) || [];
+    const updates = rows.filter((r) => r.kind === "update");
+    const creates = createNew ? rows.filter((r) => r.kind === "create") : [];
+    const failed = [];
+    const nz = (v) => (v === "" || v === undefined ? null : v);
+    const dbPatch = (p) => {
+      const o = {};
+      if (p.location !== undefined) o.location = nz(p.location);
+      if (p.mapUrl !== undefined) o.map_url = nz(p.mapUrl);
+      if (p.note !== undefined) o.note = nz(p.note);
+      if (p.areaId !== undefined) o.area_id = p.areaId || null;
+      if (p.archived !== undefined) o.archived = !!p.archived;
+      return o;
+    };
+    const jobs = [
+      ...updates.map((r) => ({ r, row: { name: r.name, ...dbPatch(r.patch) } })),
+      ...creates.map((r) => ({ r, row: { name: r.name, ...dbPatch(r.create) } })),
+    ];
+    const bad = new Set();
+    let i = 0;
+    const now = new Date().toISOString();
+    await Promise.all(Array.from({ length: Math.min(5, jobs.length) }, async () => {
+      while (i < jobs.length) {
+        const { r, row } = jobs[i++];
+        const { error } = await sb.from("hosts").upsert({ ...row, updated_at: now }, { onConflict: "name" });
+        if (error) {
+          bad.add(r.rowNumber);
+          const msg = this._tableMissing(error)
+            ? "Saving hosts needs a one-time database update (migration-2026-09-02-hosts.sql) before it can be used."
+            : (error.message || String(error));
+          failed.push({ rowNumber: r.rowNumber, name: r.name, message: msg });
+        }
+      }
+    }));
+    await this._loadHosts();
+    return {
+      updated: updates.filter((r) => !bad.has(r.rowNumber)).length,
+      created: creates.filter((r) => !bad.has(r.rowNumber)).length,
+      failed,
+    };
   },
 
   /* ---------- host directory (Host List tab) ---------- */
