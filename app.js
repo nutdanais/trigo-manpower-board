@@ -1720,6 +1720,13 @@ function sortEmployeesDisplay(emps) {
     (a.contract === "oncall") - (b.contract === "oncall") || a.name.localeCompare(b.name));
 }
 
+/* "สมชาย ใจดี" → ["สมชาย", "ใจดี"]; everything after the first space is the surname */
+function splitFullName(name) {
+  const s = String(name || "").trim().replace(/\s+/g, " ");
+  const i = s.indexOf(" ");
+  return i < 0 ? [s, ""] : [s.slice(0, i), s.slice(i + 1)];
+}
+
 function empCard(emp) {
   const area = D().areas.find(a => a.id === emp.areaId);
   const pos = emp.position ? POSITIONS[emp.position] : null;
@@ -1735,12 +1742,22 @@ function empCard(emp) {
   // card by finger goes through tap-to-select then tap-a-mission, as before.
   card.draggable = !IS_TOUCH;
   card.dataset.empId = emp.id;
+  // Full name split for the card: first name on its own bold line (with the
+  // TRIGO ID in that line's corner), surname on a quieter line under it. One
+  // role slot: OC for on-call (who have no position), the position otherwise.
+  const [firstName, surname] = splitFullName(emp.name);
+  const role = emp.contract === "oncall" ? `<span class="emp-oc">OC</span>`
+    : pos ? `<span class="emp-pos">${pos.short}</span>` : "";
   card.innerHTML =
-    `<span class="emp-name">${escapeHtml(emp.name)}</span>` +
-    `<span class="emp-meta">` +
+    `<span class="emp-row1">` +
+      `<span class="emp-name">${escapeHtml(firstName)}</span>` +
       (showTrigoId && emp.trigoId ? `<span class="emp-tid">${escapeHtml(emp.trigoId)}</span>` : "") +
-      (pos ? `<span class="emp-pos">${pos.short}</span>` : "") +
-      (emp.contract === "oncall" ? `<span class="emp-oc">OC</span>` : "") +
+    `</span>` +
+    // the space keeps the card's text "first surname" (search, copy, screen
+    // readers); a flex container drops it from the layout
+    (surname ? ` <span class="emp-surname">${escapeHtml(surname)}</span>` : "") +
+    `<span class="emp-meta">` +
+      role +
       (area ? `<span class="emp-area" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
@@ -6047,10 +6064,10 @@ function buildExportPools() {
      card width W
      − 1px left border − 1px right border                 → W −  2
      − 8px body padding, both sides                        → W − 18
-     must hold 3 × 114px .emp-card + two 6px flex gaps = 354
-     → W ≥ 372
+     must hold 3 × 116px .emp-card + two 6px flex gaps = 360
+     → W ≥ 378
 
-   390 leaves an 18px cushion. If .emp-card's width goes above 118px this
+   390 leaves a 12px cushion. If .emp-card's width goes above 120px this
    silently drops back to two per row — the failure is quiet, so re-derive
    this sum rather than eyeballing the board. */
 const MASONRY_GAP = 12, MASONRY_MIN_CARD = 390;
