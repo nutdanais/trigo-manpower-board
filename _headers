@@ -16,3 +16,8 @@
   Cache-Control: no-cache
 /index.html
   Cache-Control: no-cache
+
+# The update check re-fetches this to see whether a newer release is out; it must
+# never be answered from a cache (the check also adds a ?cb= to defeat proxies).
+/version.js
+  Cache-Control: no-cache
