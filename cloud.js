@@ -414,7 +414,7 @@ const cloud = {
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
   },
   async _loadOverrides() {
     // tolerate the table not existing yet (before the workweek migration is run) —
@@ -944,23 +944,35 @@ const cloud = {
 
   async saveEmployee(employeeId, vals) {
     const name = vals.name.trim();
-    // guard against two employee cards for the same name (checked against the
-    // synced local cache, not a hard DB constraint — a real company can have two
-    // genuinely different people share a name, so this is a soft, app-level rule
-    // rather than something that could ever require merging real people's records)
-    const conflict = this.data.employees.find(
-      (e) => e.id !== employeeId && e.name.trim().toLowerCase() === name.toLowerCase());
-    if (conflict) {
-      throw new Error(`An employee named "${name}" already exists. Use a different name (e.g. add an ID/initial) to tell them apart.`);
+    const existing = employeeId ? this.data.employees.find((e) => e.id === employeeId) : null;
+    // The name is the FULL name only; the TRIGO ID has its own field. Checked for a new
+    // person and whenever the name is changed — someone saved earlier under a short name
+    // can still be edited (phone, board, ...) without being forced to retype it.
+    if (!existing || existing.name.trim() !== name) {
+      const why = EmployeeId.checkFullName(name);
+      if (why) throw new Error(why);
     }
+    const trigoId = vals.trigoId === undefined ? undefined : EmployeeId.normalizeTrigoId(vals.trigoId);
+    if (trigoId === null) throw new Error('The TRIGO ID must be the letter T and digits, like T329.');
+    // Two people may share a name only when both have a TRIGO ID to tell them apart
+    // (checked against the synced cache, not a hard DB constraint — the soft rule keeps
+    // a real pair of namesakes from ever needing their records merged). An ID is unique.
+    const finalId = trigoId === undefined ? (existing ? existing.trigoId : "") : trigoId;
+    if (EmployeeId.nameClash(this.data.employees, name, finalId, employeeId)) {
+      throw new Error(`An employee named "${name}" already exists. Give each of them their TRIGO ID to tell them apart.`);
+    }
+    const idOwner = trigoId ? EmployeeId.idClash(this.data.employees, trigoId, employeeId) : null;
+    if (idOwner) throw new Error(`The TRIGO ID ${trigoId} already belongs to ${idOwner.name}.`);
     const baseRow = { name, contract: vals.contract, area_id: vals.areaId, board_id: vals.boardId };
     // newest optional columns first, falling back to fewer columns if a migration
     // hasn't been run yet on this database — so saves keep working either way
     // added_on: blank on a NEW employee is left out so the column default (today)
     // applies; blank on an edit clears it ("counted on every date")
     const addedRow = (employeeId || vals.addedOn) ? { added_on: vals.addedOn || null } : {};
+    const trigoRow = (trigoId !== undefined && (employeeId || trigoId)) ? { trigo_id: trigoId || null } : {};
     const withStart = { ...baseRow, position: vals.position || null, phone: vals.phone || null, start_date: vals.startDate || null };
     const candidates = [
+      ...(Object.keys(trigoRow).length ? [{ ...withStart, ...addedRow, ...trigoRow }] : []),
       ...(addedRow.added_on !== undefined ? [{ ...withStart, ...addedRow }] : []),
       withStart,
       { ...baseRow, position: vals.position || null, phone: vals.phone || null },
@@ -981,8 +993,14 @@ const cloud = {
       if (vals.addedOn && this._missingColumnFromError(error) === "added_on") {
         throw new Error("The 'added to board' date needs a one-time database update (migration-2026-10-02b-added-on.sql) before it can be saved.");
       }
+      if (trigoId && this._missingColumnFromError(error) === "trigo_id") {
+        throw new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql) before they can be saved.");
+      }
     }
-    if (error) throw error;
+    if (error) {
+      if (error.code === "23505" && /trigo/i.test(error.message || "")) throw new Error(`The TRIGO ID ${trigoId} is already used by another employee.`);
+      throw error;
+    }
     await this._loadEmployees();
   },
   /* The single way an employee goes on/off the roster — the Manpower List's
@@ -1106,9 +1124,12 @@ const cloud = {
     }
     // 3. the other fields: one UPDATE per person, a few at a time
     const nz = (v) => (v === "" || v === undefined ? null : v);
+    const friendly = (e) => (e && e.code === "23505" && /trigo/i.test(e.message || "") ? new Error("That TRIGO ID is already used by another employee.")
+      : this._missingColumnFromError(e) === "trigo_id" ? new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql).") : e);
     const dbPatch = (p) => {
       const o = {};
       if (p.name !== undefined) o.name = p.name;
+      if (p.trigoId !== undefined) o.trigo_id = nz(p.trigoId);
       if (p.contract !== undefined) o.contract = p.contract;
       if (p.position !== undefined) o.position = nz(p.position);
       if (p.phone !== undefined) o.phone = nz(p.phone);
@@ -1127,16 +1148,16 @@ const cloud = {
       const patch = dbPatch(r.patch);
       if (!Object.keys(patch).length) return;
       const { error } = await sb.from("employees").update(patch).eq("id", r.id);
-      if (error) fail(r, error);
+      if (error) fail(r, friendly(error));
     });
     // 4. new people. A blank "on the board from" is left out so the column default (today) applies.
     await pool(creates, async (r) => {
       const c = r.create;
-      const row = { name: c.name, contract: c.contract, position: nz(c.position), phone: nz(c.phone), start_date: nz(c.startDate), area_id: c.areaId, board_id: c.boardId };
+      const row = { name: c.name, trigo_id: nz(c.trigoId), contract: c.contract, position: nz(c.position), phone: nz(c.phone), start_date: nz(c.startDate), area_id: c.areaId, board_id: c.boardId };
       if (c.addedOn) row.added_on = c.addedOn;
       if (c.active === false) row.active = false;
       const { error } = await sb.from("employees").insert(row);
-      if (error) fail(r, error);
+      if (error) fail(r, friendly(error));
     });
     await this._loadEmployees();
     this._invalidatePlans();

@@ -70,13 +70,13 @@ test("new people are only created when asked, and get today's date unless one is
 
 test("one failing row is reported with its row number and the rest still apply", async () => {
   const { cloud, db } = setup();
-  const plan = await planFrom(cloud, "ID,Name,Position\ne1,Boom,Technician\ne2,Malee 2,Inspector");
+  const plan = await planFrom(cloud, "ID,Name,Position\ne1,Boom Boom,Technician\ne2,Malee Two,Inspector");
   const orig = db.exec.bind(db);
-  db.exec = (q, u) => (q.table === "employees" && q.op === "update" && q.values && q.values.name === "Boom" ? { data: null, error: { message: "boom" } } : orig(q, u));
+  db.exec = (q, u) => (q.table === "employees" && q.op === "update" && q.values && q.values.name === "Boom Boom" ? { data: null, error: { message: "boom" } } : orig(q, u));
   const res = await cloud.applyEmployeeImport(plan, { moveDate: DAY });
-  assert.deepEqual(JSON.parse(JSON.stringify(res.failed)), [{ rowNumber: 2, name: "Boom", message: "boom" }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(res.failed)), [{ rowNumber: 2, name: "Boom Boom", message: "boom" }]);
   assert.equal(res.updated, 1);
-  assert.equal(db.t("employees").find((e) => e.id === "e2").name, "Malee 2");
+  assert.equal(db.t("employees").find((e) => e.id === "e2").name, "Malee Two");
   assert.equal(db.t("employees").find((e) => e.id === "e1").name, "Somchai");
 });
 

@@ -4456,3 +4456,12 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .bulk-table .bulk-warn { display: block; color: var(--warn-text, #7a5b00); font-size: 12px; }
 #modal-bulk label.bulk-check, #modal-bulk label.bulk-create { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 #modal-bulk input[type="checkbox"] { width: auto; margin: 0; flex: none; }
+
+/* ---------- TRIGO ID ---------- */
+/* chip on an employee card (opt-in, see #btn-trigo-id) */
+.emp-tid { font-family: var(--font-condensed); font-variant-numeric: tabular-nums; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; padding: 0 4px; border-radius: 4px; background: var(--chip-bg, rgba(0,73,131,.10)); color: var(--primary, #004983); }
+.oncall .emp-tid { background: rgba(0,0,0,.07); color: var(--text, #13222f); }
+.el-tid { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* a toggle button: pressed = on */
+.btn-toggle[aria-pressed="true"] { background: var(--primary, #004983); border-color: var(--primary, #004983); color: #fff; }
+.btn-toggle[aria-pressed="false"] .ic { opacity: .35; }

@@ -297,9 +297,9 @@ test("English stays the default and an unknown language falls back to it", async
 
 /* ---------- Manpower List sheet ---------- */
 const LIST_ROWS = [
-  { name: "สมชาย ใจดี", contract: "Permanent", position: "Inspector", phone: "0812345678", startDate: "2023-04-20", area: "FTM", board: "LCB Port", util: 42, active: true },
-  { name: "Pichai", contract: "On-call", position: "", phone: "", startDate: "", area: "LCB", board: "LCB Port", util: null, active: false },
-  { name: "Malee", contract: "Permanent", position: "Team Leader", phone: "", startDate: "2026-09-23", area: "", board: "", util: undefined, active: true },
+  { name: "สมชาย ใจดี", trigoId: "T329", contract: "Permanent", position: "Inspector", phone: "0812345678", startDate: "2023-04-20", area: "FTM", board: "LCB Port", util: 42, active: true },
+  { name: "Pichai", trigoId: "", contract: "On-call", position: "", phone: "", startDate: "", area: "LCB", board: "LCB Port", util: null, active: false },
+  { name: "Malee", trigoId: "", contract: "Permanent", position: "Team Leader", phone: "", startDate: "2026-09-23", area: "", board: "", util: undefined, active: true },
 ];
 async function listRoundTrip(opts) {
   const { workbook, summary } = await X.buildListWorkbook(ExcelJS, { rows: LIST_ROWS, today: "2026-10-02", ...opts });
@@ -312,14 +312,14 @@ const rowOf = (ws, n) => { const o = []; for (let c = 1; c <= X.LIST_COLUMNS.len
 test("Manpower List sheet: plain table from row 1 — no banner, no logo — in the board's navy/green design", async () => {
   const { ws, summary } = await listRoundTrip({});
   assert.equal(ws.name, "Manpower List");
-  assert.deepEqual(rowOf(ws, 1), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Current Board", "30D Utilization", "Status"]);
+  assert.deepEqual(rowOf(ws, 1), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Current Board", "30D Utilization", "Status"]);
   assert.equal(ws.getImages().length, 0, "no logo");
   assert.equal(Object.keys(ws._merges).length, 1, "only the total row label is merged");
   assert.equal(ws.getCell(1, 1).fill.fgColor.argb, "FF004983", "TRIGO navy header");
   assert.equal(ws.getCell(1, 1).border.bottom.color.argb, "FFA8C855", "TRIGO green rule");
   assert.equal(ws.getCell(1, 1).font.color.argb, "FFFFFFFF");
   assert.equal(ws.views[0].ySplit, 1, "header frozen");
-  assert.equal(ws.autoFilter, "A1:J4", "filter over the header and the people, not the total row");
+  assert.equal(ws.autoFilter, "A1:K4", "filter over the header and the people, not the total row");
   assert.equal(ws.getCell(3, 1).fill.fgColor.argb, "FFF2F5F8", "alternate rows tinted like the board");
   assert.equal(summary.total, 3);
 });
@@ -328,15 +328,16 @@ test("Manpower List sheet: values", async () => {
   const { ws } = await listRoundTrip({});
   const r2 = rowOf(ws, 2);
   assert.equal(r2[0], "สมชาย ใจดี");
-  assert.equal(r2[3], "0812345678", "phone stays text");
-  assert.ok(r2[4] instanceof Date && r2[4].toISOString().slice(0, 10) === "2023-04-20");
-  assert.equal(r2[5], "3 years 5 months 12 days");
-  assert.equal(r2[8], 0.42);
-  assert.equal(ws.getCell(2, 9).numFmt, "0%");
-  assert.equal(r2[9], "Active");
+  assert.equal(r2[1], "T329");
+  assert.equal(r2[4], "0812345678", "phone stays text");
+  assert.ok(r2[5] instanceof Date && r2[5].toISOString().slice(0, 10) === "2023-04-20");
+  assert.equal(r2[6], "3 years 5 months 12 days");
+  assert.equal(r2[9], 0.42);
+  assert.equal(ws.getCell(2, 10).numFmt, "0%");
+  assert.equal(r2[10], "Active");
   const r3 = rowOf(ws, 3);
-  assert.deepEqual([r3[4], r3[5], r3[8], r3[9]], ["", "", "", "Inactive"]);
-  assert.equal(rowOf(ws, 4)[8], "", "utilization still loading = blank");
+  assert.deepEqual([r3[1], r3[5], r3[6], r3[9], r3[10]], ["", "", "", "", "Inactive"]);
+  assert.equal(rowOf(ws, 4)[9], "", "utilization still loading = blank");
   const total = ws.getCell(5, 1).value.richText.map((x) => x.text).join("");
   assert.equal(total.trim(), "TOTAL EMPLOYEES: 3   (Permanent 2 · On-call 1)");
 });
@@ -344,11 +345,11 @@ test("Manpower List sheet: values", async () => {
 test("Manpower List sheet in Thai", async () => {
   const { ws } = await listRoundTrip({ lang: "th" });
   assert.equal(ws.name, "รายชื่อพนักงาน");
-  assert.deepEqual(rowOf(ws, 1), ["ชื่อ", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "บอร์ดปัจจุบัน", "การใช้งาน 30 วัน", "สถานะ"]);
+  assert.deepEqual(rowOf(ws, 1), ["ชื่อ", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "บอร์ดปัจจุบัน", "การใช้งาน 30 วัน", "สถานะ"]);
   const r2 = rowOf(ws, 2), r3 = rowOf(ws, 3);
-  assert.deepEqual([r2[1], r2[2], r2[5], r2[9]], ["ประจำ", "ผู้ตรวจสอบ", "3 ปี 5 เดือน 12 วัน", "ใช้งาน"]);
-  assert.deepEqual([r3[1], r3[9]], ["ออนคอล", "ไม่ใช้งาน"]);
-  assert.equal(r2[6], "FTM");
+  assert.deepEqual([r2[2], r2[3], r2[6], r2[10]], ["ประจำ", "ผู้ตรวจสอบ", "3 ปี 5 เดือน 12 วัน", "ใช้งาน"]);
+  assert.deepEqual([r3[2], r3[10]], ["ออนคอล", "ไม่ใช้งาน"]);
+  assert.equal(r2[7], "FTM");
   assert.equal(ws.getCell(5, 1).value.richText.map((x) => x.text).join("").trim(), "พนักงานทั้งหมด: 3   (ประจำ 2 · ออนคอล 1)");
 });
 
@@ -357,4 +358,27 @@ test("Manpower List sheet with nobody in it is just the header and a zero total"
   assert.equal(rowOf(ws, 1)[0], "Name");
   assert.equal(ws.getCell(2, 1).value.richText[0].text, "TOTAL EMPLOYEES: 0");
   assert.equal(ws.autoFilter, undefined);
+});
+
+/* ---------- generic table sheet (Host List, Users) ---------- */
+test("table sheet: header on row 1 in the list design, values as text (never formulas), filter and total", async () => {
+  const { workbook, summary } = await X.buildTableWorkbook(ExcelJS, {
+    sheetName: "Host List",
+    columns: [{ label: "Host name", width: 30 }, { label: "Missions", width: 10, center: true }, { label: "Note", width: 20 }],
+    rows: [["AAT Rayong", 12, "=HYPERLINK(\"x\")"], ["Fortune Co", 0, ""]],
+    totalText: "TOTAL HOSTS: 2",
+  });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await workbook.xlsx.writeBuffer());
+  const ws = wb.worksheets[0];
+  assert.equal(summary.total, 2);
+  assert.equal(ws.name, "Host List");
+  assert.deepEqual([1, 2, 3].map((c) => ws.getCell(1, c).value), ["Host name", "Missions", "Note"]);
+  assert.equal(ws.getCell(1, 1).fill.fgColor.argb, "FF004983");
+  assert.equal(ws.views[0].ySplit, 1);
+  assert.equal(ws.getCell(2, 2).value, 12, "numbers stay numbers");
+  assert.equal(ws.getCell(2, 3).value, '=HYPERLINK("x")', "text starting with = is kept as plain text");
+  assert.equal(typeof ws.getCell(2, 3).value, "string");
+  assert.equal(ws.autoFilter, "A1:C3");
+  assert.equal(ws.getCell(4, 1).value.richText.map((x) => x.text).join("").trim(), "TOTAL HOSTS: 2");
 });

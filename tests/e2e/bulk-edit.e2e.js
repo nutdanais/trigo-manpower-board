@@ -47,6 +47,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
     const ws = wb.getWorksheet("Employees");
     assert.deepEqual(wb.worksheets.map((s) => s.name), ["Employees", "Lists", "Read me"]);
     assert.equal(ws.getCell("A1").value, "ID");
+    assert.equal(ws.getCell("C1").value, "TRIGO ID");
     const rowOf = (name) => { for (let r = 2; r <= ws.rowCount; r++) if (ws.getCell(r, 2).value === name) return r; throw new Error("no row for " + name); };
     console.log("ok - the template downloads with an ID column, a Lists sheet and a Read me");
 
@@ -61,9 +62,9 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
     // edit: rename, phone, clear a position, move A to Board Two, deactivate someone
     const rA = rowOf("Person A"), rB = rowOf("Person B"), rC = rowOf("Person C");
     ws.getCell(rA, 2).value = "Person A Renamed";
-    ws.getCell(rA, 5).value = "081-000-0000";
-    ws.getCell(rB, 9).value = "Board Two";
-    ws.getCell(rC, 10).value = "Inactive";
+    ws.getCell(rA, 6).value = "081-000-0000";
+    ws.getCell(rB, 10).value = "Board Two";
+    ws.getCell(rC, 11).value = "Inactive";
     const edited = path.join(TMP, "emp-edited.xlsx");
     fs.writeFileSync(edited, Buffer.from(await wb.xlsx.writeBuffer()));
     await p.setInputFiles("#bulk-file", edited);
@@ -89,6 +90,35 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
     // the backup is itself a valid, unchanged template
     await backup.saveAs(path.join(TMP, "backup.xlsx"));
     console.log("ok - Excel edits are previewed, backed up and applied");
+
+    // ---- fill in TRIGO IDs next to the names, by name ----
+    await openEmp();
+    const [dl2] = await Promise.all([p.waitForEvent("download"), p.click("#btn-bulk-dl-xlsx")]);
+    const p2 = path.join(TMP, "emp2.xlsx");
+    await dl2.saveAs(p2);
+    const wb3 = new ExcelJS.Workbook();
+    await wb3.xlsx.load(fs.readFileSync(p2));
+    const ws3 = wb3.getWorksheet("Employees");
+    const rowOf3 = (name) => { for (let r = 2; r <= ws3.rowCount; r++) if (ws3.getCell(r, 2).value === name) return r; throw new Error("no row for " + name); };
+    ws3.getCell(rowOf3("Person D"), 3).value = "t 505";
+    ws3.getCell(rowOf3("Person E"), 3).value = "T505";
+    const ids = path.join(TMP, "emp-ids.xlsx");
+    fs.writeFileSync(ids, Buffer.from(await wb3.xlsx.writeBuffer()));
+    await p.setInputFiles("#bulk-file", ids);
+    await p.waitForSelector("#bulk-preview .bulk-problems");
+    assert.equal(await chip("To update"), 0, "the same TRIGO ID on two people is refused for both");
+    assert.match(await p.textContent("#bulk-preview .bulk-problems"), /TRIGO ID T505 would belong to more than one person/);
+    ws3.getCell(rowOf3("Person E"), 3).value = "T506";
+    const ids2 = path.join(TMP, "emp-ids-fixed.xlsx");
+    fs.writeFileSync(ids2, Buffer.from(await wb3.xlsx.writeBuffer()));
+    await p.setInputFiles("#bulk-file", ids2);
+    await p.waitForFunction(() => /TRIGO ID:\s*\(empty\)\s*→\s*T506/.test(document.querySelector("#bulk-preview").textContent));
+    assert.equal(await chip("To update"), 2);
+    await p.uncheck("#bulk-backup");
+    await p.click("#btn-bulk-apply");
+    await p.waitForSelector("#modal-bulk", { state: "hidden" });
+    assert.deepEqual([db.t("employees").find((e) => e.id === "e4").trigo_id, db.t("employees").find((e) => e.id === "e5").trigo_id], ["T505", "T506"]);
+    console.log("ok - TRIGO IDs are filled in next to the names, tidied, and kept unique");
 
     // ---- employees: CSV with a new person and a bad row ----
     await openEmp();

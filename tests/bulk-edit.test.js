@@ -39,17 +39,12 @@ test("round trip: the Excel template read straight back changes nothing", async 
   assert.deepEqual(p.rows.map((r) => r.errors), [[], [], []]);
 });
 
-test("round trip: the CSV template read straight back changes nothing", () => {
-  const p = B.planEmployees(B.readTable(B.parseCsv(B.employeeCsv(ctx())), B.EMP_COLUMNS), ctx());
-  assert.deepEqual(p.rows.map((r) => r.kind), ["same", "same", "same"]);
-});
-
 test("editing cells in the Excel template is picked up (dates, text phone, dropdown values)", async () => {
   const wb = await B.buildTemplateWorkbook(ExcelJS, "employees", ctx());
   const ws = wb.getWorksheet("Employees");
-  ws.getCell("E3").value = 812345678;                                // Excel ate the leading zero
-  ws.getCell("F3").value = new Date(Date.UTC(2024, 1, 29));          // a real date cell
-  ws.getCell("I2").value = "Rayong";
+  ws.getCell("F3").value = 812345678;                                // Excel ate the leading zero
+  ws.getCell("G3").value = new Date(Date.UTC(2024, 1, 29));          // a real date cell
+  ws.getCell("J2").value = "Rayong";
   const wb2 = new ExcelJS.Workbook();
   await wb2.xlsx.load(await wb.xlsx.writeBuffer());
   const p = B.planEmployees(B.readTable(B.rowsFromWorkbook(wb2, "employees"), B.EMP_COLUMNS), ctx());
@@ -121,11 +116,11 @@ test("a new person needs a contract and a board", () => {
 });
 
 test("duplicates: same ID twice, same name twice, a clash with someone else, but a swap is fine", () => {
-  const dupId = plan(`ID,Name\n${EMPS[0].id},A\n${EMPS[0].id},B`);
+  const dupId = plan(`ID,Name\n${EMPS[0].id},Anan Aaa\n${EMPS[0].id},Bobby Bbb`);
   assert.deepEqual(dupId.rows.map((r) => r.kind), ["update", "error"]);
   assert.match(dupId.rows[1].errors[0], /row 2/);
 
-  const dupNew = plan("Name,Contract type,Board\nTwin,Permanent,LCB Port\nTWIN,Permanent,LCB Port");
+  const dupNew = plan("Name,Contract type,Board\nTwin Peaks,Permanent,LCB Port\nTWIN PEAKS,Permanent,LCB Port");
   assert.deepEqual(dupNew.rows.map((r) => r.kind), ["error", "error"], "neither of two identical new names is guessed to be the right one");
 
   const clash = plan(`ID,Name\n${EMPS[0].id},malee sukjai`);
@@ -205,4 +200,94 @@ test("a Thai mobile that lost its leading 0 (number or text) gets it back; other
   assert.deepEqual(B.parsePhone("081-234-5678"), { value: "081-234-5678", warn: "" });
   assert.deepEqual(B.parsePhone("123456789"), { value: "123456789", warn: "" });
   assert.deepEqual(B.parsePhone(""), { value: "" });
+});
+
+/* ---------- TRIGO ID ---------- */
+const TEMPS = [
+  { id: "t-1", name: "Somchai Jaidee", trigoId: "T329", contract: "permanent", position: "", phone: "", startDate: "", addedOn: "", areaId: "a1", boardId: "b1", active: true },
+  { id: "t-2", name: "Somchai Jaidee", trigoId: "T330", contract: "permanent", position: "", phone: "", startDate: "", addedOn: "", areaId: "a1", boardId: "b1", active: true },   // a namesake, told apart by TRIGO ID
+  { id: "t-3", name: "Malee Sukjai", trigoId: "", contract: "oncall", position: "", phone: "", startDate: "", addedOn: "", areaId: "a2", boardId: "b1", active: true },
+  { id: "t-4", name: "Pichai", trigoId: "", contract: "permanent", position: "", phone: "", startDate: "", addedOn: "", areaId: "a2", boardId: "b1", active: true },   // grandfathered short name
+];
+const tctx = () => ({ employees: TEMPS.map((e) => ({ ...e })), areas: AREAS, boards: BOARDS, positions: POSITIONS });
+const tplan = (csv) => B.planEmployees(B.readTable(B.parseCsv(csv), B.EMP_COLUMNS), tctx());
+
+test("the template carries ID and TRIGO ID, and reads back unchanged", async () => {
+  const c = tctx();
+  const wb = await B.buildTemplateWorkbook(ExcelJS, "employees", c);
+  const wb2 = new ExcelJS.Workbook();
+  await wb2.xlsx.load(await wb.xlsx.writeBuffer());
+  const ws = wb2.getWorksheet("Employees");
+  assert.deepEqual([1, 2, 3].map((i) => ws.getCell(1, i).value), ["ID", "Name", "TRIGO ID"]);
+  assert.equal(ws.getCell(2, 3).value, "T329");
+  const p = B.planEmployees(B.readTable(B.rowsFromWorkbook(wb2, "employees"), B.EMP_COLUMNS), c);
+  assert.deepEqual(p.rows.map((r) => r.kind), ["same", "same", "same", "same"]);
+  assert.equal(p.counts.noTrigoId, 2);
+});
+
+test("TRIGO ID identifies a row: rename by TRIGO ID, fill IDs in by name", () => {
+  const p = tplan("TRIGO ID,Name\nT329,Somchai Jaidee Junior\nT555,Malee Sukjai");
+  assert.deepEqual(p.rows.map((r) => r.kind), ["update", "update"]);
+  assert.deepEqual(p.rows[0].patch, { name: "Somchai Jaidee Junior" });
+  assert.equal(p.rows[0].id, "t-1");
+  assert.deepEqual(p.rows[1].patch, { trigoId: "T555" }, "a person without an ID gets it by name");
+  assert.equal(p.rows[1].changes[0].label, "TRIGO ID");
+});
+
+test("TRIGO ID: lower case and spacing are tidied; a bad one is refused; blank leaves it alone", () => {
+  const ok = tplan("Name,TRIGO ID\nMalee Sukjai,t 777");
+  assert.deepEqual(ok.rows[0].patch, { trigoId: "T777" });
+  assert.match(tplan("Name,TRIGO ID\nMalee Sukjai,329").rows[0].errors[0], /must be the letter T and digits/);
+  assert.equal(tplan("Name,TRIGO ID\nSomchai Jaidee,").rows[0].errors.length, 1, "two Somchais and no ID to tell them apart");
+  assert.equal(tplan("ID,Name,TRIGO ID\nt-1,Somchai Jaidee,").rows[0].kind, "same");
+});
+
+test("two people with one name need their TRIGO ID; the right one is found by it", () => {
+  const p = tplan("Name,TRIGO ID,Position\nSomchai Jaidee,T330,Inspector\nSomchai Jaidee,T329,Technician");
+  assert.deepEqual(p.rows.map((r) => [r.kind, r.id]), [["update", "t-2"], ["update", "t-1"]]);
+  assert.deepEqual(p.rows.map((r) => r.patch.position), ["inspector", "technician"]);
+  const amb = tplan("Name,Position\nSomchai Jaidee,Inspector");
+  assert.match(amb.rows[0].errors[0], /fill in their TRIGO ID/);
+});
+
+test("a name that already has another TRIGO ID is not silently merged with a same-named newcomer", () => {
+  const p = tplan("Name,TRIGO ID\nMalee Sukjai,T700\nSomchai Jaidee,T999");
+  assert.equal(p.rows[0].kind, "update");
+  assert.equal(p.rows[1].kind, "error");
+  assert.match(p.rows[1].errors[0], /ambiguous|fill in their TRIGO ID|2 existing/);
+  const clash = tplan("ID,Name,TRIGO ID\nt-3,Malee Sukjai,T329");
+  assert.equal(clash.rows[0].kind, "error");
+  assert.match(clash.rows[0].errors[0], /TRIGO ID T329 would belong to more than one person/);
+  const dupInFile = tplan("Name,TRIGO ID\nMalee Sukjai,T800\nPichai,T800");
+  assert.deepEqual(dupInFile.rows.map((r) => r.kind), ["error", "error"]);
+  const conflict = tplan("ID,Name,TRIGO ID\nt-1,Somchai Jaidee,T330\n");
+  assert.equal(conflict.rows[0].kind, "error");
+});
+
+test("new people: full name enforced, namesakes need an ID, the ID is stored", () => {
+  const p = tplan("Name,TRIGO ID,Contract type,Board\nNew Person,T901,Permanent,LCB Port\nSolo,T902,Permanent,LCB Port\nMalee Sukjai,,Permanent,LCB Port\nSomchai Jaidee T903,,Permanent,LCB Port");
+  assert.deepEqual(p.rows.map((r) => r.kind), ["create", "error", "update", "error"]);
+  assert.equal(p.rows[0].create.trigoId, "T901");
+  assert.match(p.rows[1].errors[0], /full name/);
+  assert.match(p.rows[3].errors[0], /own field/);
+  const twin = tplan("Name,TRIGO ID,Contract type,Board\nMalee Sukjai,T910,On-call,LCB Port");
+  assert.equal(twin.rows[0].kind, "update", "matched to the existing Malee, who gets T910");
+  const newTwin = tplan("Name,TRIGO ID,Contract type,Board\nSomchai Jaidee,T911,Permanent,LCB Port");
+  assert.equal(newTwin.rows[0].kind, "error", "two Somchais exist and none has T911");
+});
+
+test("a rename must give a full name, but a short name that is left alone only earns a warning", () => {
+  const rename = tplan("ID,Name\nt-4,Pichai Sompong\nt-3,Malee");
+  assert.equal(rename.rows[0].kind, "update");
+  assert.equal(rename.rows[1].kind, "error");
+  assert.match(rename.rows[1].errors[0], /full name/);
+  const same = tplan("ID,Name,Position\nt-4,Pichai,Inspector");
+  assert.equal(same.rows[0].kind, "update");
+  assert.ok(same.rows[0].warnings.some((w) => /full name/.test(w)));
+  assert.equal(same.counts.shortName, 1);
+});
+
+test("the pasted CSV of the old list is still readable (TRIGO ID absent)", () => {
+  const p = tplan("Name,Contract type\nMalee Sukjai,Permanent");
+  assert.deepEqual(p.rows[0].patch, { contract: "permanent" });
 });

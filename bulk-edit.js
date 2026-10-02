@@ -2,7 +2,7 @@
    back and review exactly what would change before anything is written.
 
    This file is pure logic (no DOM, no network) so it can be tested in node:
-     - building the edit template (Excel, or CSV) from the rows the app holds;
+     - building the edit template (Excel) from the rows the app holds;
      - reading a file back (CSV text or an Excel worksheet) into a table;
      - planning: matching every row to an existing record, validating every
        cell, and producing the per-field "from -> to" diff the preview shows.
@@ -23,6 +23,8 @@
        differs (it is idempotent). */
 (function (root) {
   "use strict";
+
+  const EmployeeId = (typeof module !== "undefined" && module.exports) ? require("./employee-id.js") : root.EmployeeId;
 
   /* ---------- small helpers ---------- */
   const norm = (s) => String(s == null ? "" : s).normalize("NFC").replace(/\s+/g, " ").trim();
@@ -73,8 +75,6 @@
     if (field !== "" || row.length) { row.push(field); rows.push(row); }
     return rows;
   }
-  const csvField = (v) => { const s = String(v == null ? "" : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const toCsv = (rows2d) => "﻿" + rows2d.map((r) => r.map(csvField).join(",")).join("\r\n");
 
   /* an Excel worksheet -> rows of plain values; row N of the array is row N of
      the sheet, so "row 14" in a message is row 14 in the file */
@@ -93,6 +93,7 @@
   const EMP_COLUMNS = [
     { key: "id",        label: "ID",                 aliases: ["id", "employee id"], width: 12 },
     { key: "name",      label: "Name",               aliases: ["name", "employee name", "ชื่อ"], width: 30 },
+    { key: "trigoId",   label: "TRIGO ID",           aliases: ["trigo id", "trigoid", "trigo", "employee code", "รหัสพนักงาน", "รหัส trigo"], width: 12 },
     { key: "contract",  label: "Contract type",      aliases: ["contract type", "contract", "ประเภทสัญญา"], width: 15 },
     { key: "position",  label: "Position",           aliases: ["position", "ตำแหน่ง"], width: 24 },
     { key: "phone",     label: "Mobile number",      aliases: ["mobile number", "mobile", "phone", "เบอร์มือถือ"], width: 16 },
@@ -128,7 +129,7 @@
       if ("name" in map && Object.keys(map).length >= 2) { headerAt = r; colIndex = map; ignored = extra; break; }
     }
     if (headerAt < 0) {
-      return { cols: new Set(), records: [], ignored: [], fatal: ["Could not find a header row with at least a Name column and one more known column. Use the template from the Download button, or a CSV exported from this list."] };
+      return { cols: new Set(), records: [], ignored: [], fatal: ["Could not find a header row with at least a Name column and one more known column. Use the template from the Download button."] };
     }
     const records = [];
     for (let r = headerAt + 1; r < rows2d.length; r++) {
@@ -247,6 +248,7 @@
     const boardName = (id) => ((ctx.boards || []).find((b) => b.id === id) || {}).name || "";
     const posLabel = (k) => (k && ctx.positions && ctx.positions[k] ? ctx.positions[k].label : k || "");
     const byId = new Map(emps.map((e) => [e.id, e]));
+    const byTrigo = new Map(emps.filter((e) => e.trigoId).map((e) => [e.trigoId.toUpperCase(), e]));
     const byNameKey = new Map();
     for (const e of emps) { const k = lower(e.name); if (!byNameKey.has(k)) byNameKey.set(k, []); byNameKey.get(k).push(e); }
     const claimed = new Map();   // employee id -> first row that matched them
@@ -261,16 +263,25 @@
       if (!name) { err("Name is empty"); row.kind = "error"; continue; }
       if (name.length > 200) { err("Name is longer than 200 characters"); row.kind = "error"; continue; }
 
-      // --- who is this row? ---
+      // --- who is this row? ---  the ID column first, then the TRIGO ID, then the name
       let cur = null;
       const idRaw = has("id") ? str(c.id) : "";
-      if (idRaw) {
+      const tidRaw = has("trigoId") ? str(c.trigoId) : "";
+      const tid = tidRaw ? EmployeeId.normalizeTrigoId(tidRaw) : "";
+      if (tid === null) err(`TRIGO ID "${tidRaw}" must be the letter T and digits, like T329`);
+      else if (idRaw) {
         cur = byId.get(idRaw) || byId.get(idRaw.toLowerCase()) || null;
         if (!cur) err("ID not found — was this person deleted? Clear the ID cell to add them as a new person.");
       } else {
-        const hits = byNameKey.get(lower(name)) || [];
-        if (hits.length > 1) err(`${hits.length} existing employees are named "${name}" — add the ID column from the template to tell them apart`);
-        else if (hits.length === 1) cur = hits[0];
+        if (tid) cur = byTrigo.get(tid) || null;
+        if (!cur) {
+          const hits = byNameKey.get(lower(name)) || [];
+          if (hits.length > 1) err(`${hits.length} existing employees are named "${name}" — fill in their TRIGO ID (or keep the ID column from the template) to tell them apart`);
+          else if (hits.length === 1) {
+            if (tid && hits[0].trigoId && hits[0].trigoId !== tid) err(`${hits[0].name} already has the TRIGO ID ${hits[0].trigoId}, but this row says ${tid} — is this a different person with the same name?`);
+            else cur = hits[0];
+          }
+        }
       }
       if (row.errors.length) { row.kind = "error"; continue; }
       if (cur) {
@@ -283,6 +294,8 @@
       const next = {};      // field -> parsed new value (only for columns in the file)
       const note = (r) => { if (r.warn) row.warnings.push(r.warn); };
       next.name = name;
+      // blank = leave the TRIGO ID as it is (clearing an identity by accident is worse than not clearing)
+      if (tid) next.trigoId = tid;
 
       if (has("contract")) { const r = parseContract(c.contract); if (r.error) err(r.error); else next.contract = r.value; }
       if (has("position")) {
@@ -318,12 +331,12 @@
 
       if (cur) {
         const was = {
-          name: norm(cur.name), contract: cur.contract, position: cur.position || "", phone: cur.phone || "",
+          name: norm(cur.name), trigoId: cur.trigoId || "", contract: cur.contract, position: cur.position || "", phone: cur.phone || "",
           startDate: cur.startDate || "", addedOn: cur.addedOn || "", areaId: cur.areaId || null, boardId: cur.boardId,
           active: cur.active !== false,
         };
         const label = {
-          name: "Name", contract: "Contract type", position: "Position", phone: "Mobile number", startDate: "Start date",
+          name: "Name", trigoId: "TRIGO ID", contract: "Contract type", position: "Position", phone: "Mobile number", startDate: "Start date",
           addedOn: "On the board from", areaId: "Service area", boardId: "Board", active: "Status",
         };
         const text = {
@@ -337,13 +350,20 @@
           row.patch[f] = next[f];
         }
         row.kind = row.changes.length ? "update" : "same";
+        // the name is the full name only: enforced when it is being changed, flagged when it is not yet
+        const why = EmployeeId.checkFullName(next.name);
+        if (why && next.name !== was.name) err(why);
+        else if (why) row.warnings.push(why.charAt(0).toLowerCase() + why.slice(1));
+        if (row.errors.length) { row.kind = "error"; row.changes = []; row.patch = {}; continue; }
       } else {
         // a new person needs the fields the New Employee form requires
+        const why = EmployeeId.checkFullName(next.name);
+        if (why) err(why);
         if (!has("contract") || next.contract === undefined) err("A new person needs a Contract type");
         if (!has("board") || next.boardId === undefined) err("A new person needs a Board");
         if (row.errors.length) { row.kind = "error"; continue; }
         row.create = {
-          name, contract: next.contract, position: next.position || "", phone: next.phone || "",
+          name, trigoId: next.trigoId || "", contract: next.contract, position: next.position || "", phone: next.phone || "",
           startDate: next.startDate || "", addedOn: next.addedOn || "",   // blank addedOn = the database default (today)
           areaId: next.areaId || null, boardId: next.boardId, active: next.active !== false,
         };
@@ -351,26 +371,48 @@
       }
     }
 
-    // --- names must stay unique once everything is applied (a swap A<->B is fine) ---
-    const owners = new Map();
-    const own = (key, who) => { if (!owners.has(key)) owners.set(key, []); owners.get(key).push(who); };
-    const renamed = new Map();
-    for (const r of res.rows) if (r.kind === "update" && r.patch.name !== undefined) renamed.set(r.id, r.patch.name);
-    for (const e of emps) own(lower(renamed.has(e.id) ? renamed.get(e.id) : e.name), e.id);
-    for (const r of res.rows) if (r.kind === "create") own(lower(r.create.name), "row" + r.rowNumber);
+    // --- identity must stay clean once everything is applied (a swap A<->B is fine) ---
+    //   * a TRIGO ID belongs to one person;
+    //   * two people may share a name only when both have a TRIGO ID.
+    const fin = new Map();   // who -> { name, trigoId }
+    for (const e of emps) fin.set(e.id, { name: norm(e.name), trigoId: (e.trigoId || "").toUpperCase() });
+    for (const r of res.rows) {
+      if (r.kind === "update") { const f = fin.get(r.id); if (r.patch.name !== undefined) f.name = r.patch.name; if (r.patch.trigoId !== undefined) f.trigoId = r.patch.trigoId; }
+      else if (r.kind === "create") fin.set("row" + r.rowNumber, { name: r.create.name, trigoId: r.create.trigoId || "" });
+    }
+    const idOwners = new Map(), nameOwners = new Map();
+    for (const [who, f] of fin) {
+      if (f.trigoId) { if (!idOwners.has(f.trigoId)) idOwners.set(f.trigoId, []); idOwners.get(f.trigoId).push(who); }
+      const k = lower(f.name);
+      if (!nameOwners.has(k)) nameOwners.set(k, []);
+      nameOwners.get(k).push(who);
+    }
     for (const r of res.rows) {
       if (r.kind !== "update" && r.kind !== "create") continue;
-      if (r.kind === "update" && r.patch.name === undefined) continue;
-      const nm = r.kind === "create" ? r.create.name : r.patch.name;
-      const others = (owners.get(lower(nm)) || []).filter((w) => w !== (r.kind === "create" ? "row" + r.rowNumber : r.id));
-      if (others.length) { r.errors.push(`The name "${nm}" would be shared with another employee`); r.kind = "error"; r.changes = []; r.patch = {}; r.create = null; }
+      const who = r.kind === "create" ? "row" + r.rowNumber : r.id;
+      const f = fin.get(who);
+      const touchesName = r.kind === "create" || r.patch.name !== undefined;
+      const touchesId = r.kind === "create" || r.patch.trigoId !== undefined;
+      let bad = "";
+      if (touchesId && f.trigoId && idOwners.get(f.trigoId).length > 1) bad = `The TRIGO ID ${f.trigoId} would belong to more than one person`;
+      else if ((touchesName || touchesId) && (nameOwners.get(lower(f.name)) || []).some((w) => w !== who && !(f.trigoId && fin.get(w).trigoId))) {
+        bad = `The name "${f.name}" would be shared with another employee — give both people their TRIGO ID`;
+      }
+      if (bad) { r.errors.push(bad); r.kind = "error"; r.changes = []; r.patch = {}; r.create = null; }
     }
     return finish(res);
 
     function finish(out) {
-      const n = { update: 0, create: 0, same: 0, error: 0, moves: 0, clears: 0, deactivate: 0, reactivate: 0, total: out.rows.length };
+      const n = { update: 0, create: 0, same: 0, error: 0, moves: 0, clears: 0, deactivate: 0, reactivate: 0, noTrigoId: 0, shortName: 0, total: out.rows.length };
       for (const r of out.rows) {
         n[r.kind]++;
+        if (r.kind !== "error") {
+          const cur = r.id ? (emps.find((e) => e.id === r.id) || {}) : {};
+          const tidAfter = r.kind === "create" ? r.create.trigoId : (r.patch && r.patch.trigoId !== undefined ? r.patch.trigoId : cur.trigoId);
+          const nameAfter = r.kind === "create" ? r.create.name : (r.patch && r.patch.name !== undefined ? r.patch.name : cur.name);
+          if (!tidAfter) n.noTrigoId++;
+          if (EmployeeId.checkFullName(nameAfter)) n.shortName++;
+        }
         for (const ch of r.changes) {
           if (ch.field === "boardId") n.moves++;
           if (ch.field === "active") ch.to === "Inactive" ? n.deactivate++ : n.reactivate++;
@@ -473,14 +515,14 @@
     return finish();
   }
 
-  /* ---------- the template (rows -> Excel or CSV) ---------- */
+  /* ---------- the template (rows -> Excel) ---------- */
   const dateOut = (iso) => (iso ? iso : "");
   function employeeTable(ctx) {
     const cols = EMP_COLUMNS;
     const areaName = (id) => ((ctx.areas || []).find((a) => a.id === id) || {}).name || "";
     const boardName = (id) => ((ctx.boards || []).find((b) => b.id === id) || {}).name || "";
     const rows = (ctx.employees || []).map((e) => ({
-      id: e.id, name: e.name, contract: CONTRACT_LABEL[e.contract] || e.contract,
+      id: e.id, name: e.name, trigoId: e.trigoId || "", contract: CONTRACT_LABEL[e.contract] || e.contract,
       position: e.position && ctx.positions && ctx.positions[e.position] ? ctx.positions[e.position].label : "",
       phone: e.phone || "", startDate: dateOut(e.startDate), addedOn: dateOut(e.addedOn),
       area: areaName(e.areaId), board: boardName(e.boardId), status: e.active === false ? "Inactive" : "Active",
@@ -495,10 +537,7 @@
     }));
     return { cols: HOST_COLUMNS, rows };
   }
-  const tableToRows2d = (t) => [t.cols.map((c) => c.label), ...t.rows.map((r) => t.cols.map((c) => r[c.key] == null ? "" : r[c.key]))];
-  const employeeCsv = (ctx) => toCsv(tableToRows2d(employeeTable(ctx)));
-  const hostCsv = (ctx) => toCsv(tableToRows2d(hostTable(ctx)));
-
+  
   const NAVY = "FF004983", GREEN = "FFA8C855", GREY = "FFE6EAEE", GREY_TXT = "FF7A8794", INK = "FF13222F";
   const EXTRA_ROWS = 300;   // validated, formatted blank rows under the data, for people who add new rows
 
@@ -565,12 +604,15 @@
     const lines = isEmp ? [
       "BULK EDIT — EMPLOYEES",
       "1. Change the cells you need on the Employees sheet. You can also add new people on the empty rows at the bottom.",
-      "2. Save the file as .xlsx (or export the sheet as CSV UTF-8) and upload it with 'Bulk edit' on the Manpower List.",
+      "2. Save the file as .xlsx and upload it with 'Bulk edit' on the Manpower List.",
       "3. The app shows what would change and asks you to confirm before anything is saved.",
       "",
       "RULES",
-      "• Do not edit or delete the ID column. It is how the app knows who a row is, so you can rename someone safely.",
-      "  A row with an empty ID is matched by name; a name that does not exist yet adds a NEW person (you will be asked first).",
+      "• Name = the person's FULL name only (first name and surname). Never put the TRIGO ID, an initial or a nickname in it.",
+      "• TRIGO ID (T + digits, e.g. T329) goes in its own column. It must be unique. Two people may share a name only if both have a TRIGO ID.",
+      "  Leave it empty to keep the current one. To fill in IDs for people who have none, just type them next to the names.",
+      "• Do not edit or delete the grey ID column. It is how the app tracks a row, so you can rename someone safely.",
+      "  A row is matched by ID, then TRIGO ID, then name. A name that does not exist yet adds a NEW person (you will be asked first).",
       "• Only the columns present are updated. Delete a column you do not want touched. Keep the header names.",
       "• An empty cell clears that field (Position, Mobile number, Start date). Name, Contract type and Board cannot be empty. An empty 'On the board from' leaves it as it is.",
       "• Rows you delete from the file are NOT deleted in the app. To retire someone, set Status to Inactive.",
@@ -581,7 +623,7 @@
     ] : [
       "BULK EDIT — HOSTS",
       "1. Change the cells you need on the Hosts sheet (Location, Google Maps link, Service area, Note, Status).",
-      "2. Save as .xlsx (or CSV UTF-8) and upload it with 'Bulk edit' on the Host List. You confirm before anything is saved.",
+      "2. Save as .xlsx and upload it with 'Bulk edit' on the Host List. You confirm before anything is saved.",
       "",
       "RULES",
       "• The Host name is the key. Do NOT rename a host here: a changed name is treated as a different (new) host.",
@@ -603,8 +645,8 @@
   }
 
   const api = {
-    EMP_COLUMNS, HOST_COLUMNS, parseCsv, toCsv, plain, readTable, rowsFromWorksheet, rowsFromWorkbook,
-    parseDate, parsePhone, planEmployees, planHosts, employeeTable, hostTable, employeeCsv, hostCsv, buildTemplateWorkbook,
+    EMP_COLUMNS, HOST_COLUMNS, parseCsv, plain, readTable, rowsFromWorksheet, rowsFromWorkbook,
+    parseDate, parsePhone, planEmployees, planHosts, employeeTable, hostTable, buildTemplateWorkbook,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.BulkEdit = api;

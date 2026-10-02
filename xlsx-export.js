@@ -441,10 +441,11 @@
      board export (navy header with the green rule, tinted alternate rows, pale
      total row under the table), frozen, filterable and repeated on every
      printed page. One row per person in the order given. A row is { name, contract: "Permanent"|"On-call",
-     position (English label or ""), phone, startDate: "YYYY-MM-DD"|"", area,
+     position (English label or ""), phone, trigoId, startDate: "YYYY-MM-DD"|"", area,
      board, util: percent|null|undefined, active: boolean }. */
   const LIST_COLUMNS = [
     { key: "name",      label: "Name",            th: "ชื่อ",               width: 30 },
+    { key: "trigoId",   label: "TRIGO ID",        th: "รหัส TRIGO",         width: 11, center: true },
     { key: "contract",  label: "Contract Type",   th: "ประเภทสัญญา",       width: 17 },
     { key: "position",  label: "Position",        th: "ตำแหน่ง",           width: 25 },
     { key: "phone",     label: "Mobile Number",   th: "เบอร์มือถือ",        width: 16 },
@@ -494,7 +495,53 @@
     return { workbook: wb, summary: { total: rows.length, permanent: perm, oncall: oc } };
   }
 
-  const api = { COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook };
+  /* Any plain table (Host List, Users) in the Manpower List sheet's design: no
+     banner, header on row 1 (navy, green rule), frozen and filterable, tinted
+     alternate rows, a pale total row. spec: { sheetName, columns: [{label, width,
+     center?}], rows: [[cell, ...]], totalText }. Cells are written as values,
+     never as formulas, so text that starts with "=" stays text. */
+  async function buildTableWorkbook(ExcelJS, spec) {
+    const cols = spec.columns, rows = spec.rows || [];
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "TRIGO Manpower Board";
+    wb.created = new Date();
+    const ws = wb.addWorksheet(safeSheetName(spec.sheetName), {
+      views: [{ showGridLines: false, state: "frozen", ySplit: 1 }],
+      pageSetup: {
+        orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+        margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 },
+        printTitlesRow: "1:1",
+      },
+    });
+    cols.forEach((col, i) => {
+      ws.getColumn(i + 1).width = col.width || 16;
+      const cell = ws.getCell(1, i + 1);
+      cell.value = col.label;
+      cell.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
+      cell.fill = fillOf(C.navy);
+      cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
+      cell.border = { bottom: { style: "medium", color: { argb: C.green } } };
+    });
+    ws.getRow(1).height = 24;
+    rows.forEach((r, k) => {
+      const row = ws.getRow(2 + k);
+      row.height = 20;
+      cols.forEach((col, i) => {
+        const cell = row.getCell(i + 1);
+        const v = r[i];
+        cell.value = v === undefined || v === null ? "" : v;
+        cell.font = fontOf({ bold: i === 0 });
+        cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
+        cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
+        if (k % 2 === 1) cell.fill = fillOf(C.paper);
+      });
+    });
+    writeTotalRow(ws, 2 + rows.length, cols.length, { main: spec.totalText || "TOTAL: " + rows.length });
+    if (rows.length) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1 + rows.length, column: cols.length } };
+    return { workbook: wb, summary: { total: rows.length } };
+  }
+
+  const api = { COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

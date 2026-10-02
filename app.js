@@ -229,6 +229,17 @@ function restoreViewState() {
   state.date = defaultPlanningDate();
 }
 
+/* Whether employee cards show the TRIGO ID. A personal display choice, kept on
+   this device like the theme — it changes nothing for anyone else. The ID is
+   always in the card's hover title either way. */
+const TRIGO_ID_KEY = "mpm-show-trigo-id";
+let showTrigoId = (() => { try { return localStorage.getItem(TRIGO_ID_KEY) === "1"; } catch (e) { return false; } })();
+function setShowTrigoId(on) {
+  showTrigoId = !!on;
+  try { localStorage.setItem(TRIGO_ID_KEY, showTrigoId ? "1" : "0"); } catch (e) { /* private window: just this session */ }
+  render();
+}
+
 /* zone labels (keys come from ZONES in cloud.js) */
 const ZONE_LABELS = {
   annual: "Annual Leave", sick: "Sick Leave", business: "Business Leave",
@@ -933,6 +944,7 @@ function render() {
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   $("#filters").classList.toggle("hidden", !board);
+  $("#btn-trigo-id").setAttribute("aria-pressed", showTrigoId ? "true" : "false");
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
   // Manpower's and Host's search/filters group — each is a display:contents
   // wrapper (styles.css), so one class toggle here shows or hides that tab's
@@ -942,15 +954,14 @@ function render() {
   $("#capacity-toolbar").classList.toggle("hidden", !cap);
   if (cap) renderCapacityToolbar();
   // Row 2's export-type action is tab-specific — Board/Overview get Export+PDF
-  // (below), Manpower and Host each get their own count + CSV button instead.
+  // (below), Manpower and Host each get their own count + Excel button instead.
   // Each pair needs its own toggle: unlike the display:contents groups above,
   // these live directly in #toolbar-row2, not inside a shared wrapper.
   $("#emplist-count").classList.toggle("hidden", !eml);
-  $("#btn-emplist-csv").classList.toggle("hidden", !eml);
   $("#btn-emplist-xlsx").classList.toggle("hidden", !eml);
   $("#btn-emplist-bulk").classList.toggle("hidden", !eml || !can("emplist", "edit"));
   $("#hostlist-count").classList.toggle("hidden", !hl);
-  $("#btn-hostlist-csv").classList.toggle("hidden", !hl);
+  $("#btn-hostlist-xlsx").classList.toggle("hidden", !hl);
   $("#btn-hostlist-bulk").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
   // The two lists and the board bar carry their own create buttons; RLS would
   // refuse the write anyway, so hiding them is about not offering a dead end.
@@ -1727,11 +1738,12 @@ function empCard(emp) {
   card.innerHTML =
     `<span class="emp-name">${escapeHtml(emp.name)}</span>` +
     `<span class="emp-meta">` +
+      (showTrigoId && emp.trigoId ? `<span class="emp-tid">${escapeHtml(emp.trigoId)}</span>` : "") +
       (pos ? `<span class="emp-pos">${pos.short}</span>` : "") +
       (emp.contract === "oncall" ? `<span class="emp-oc">OC</span>` : "") +
       (area ? `<span class="emp-area" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
-  card.title = `${emp.name} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
+  card.title = `${emp.name}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
   card.addEventListener("click", (ev) => {
     // don't treat the tail end of a drag as a click
@@ -3853,7 +3865,7 @@ function emplistFilteredSorted() {
     if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
     if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
-    if (q && !e.name.toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q)) return false;
+    if (q && !e.name.toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q) && !(e.trigoId || "").toLowerCase().includes(q)) return false;
     return true;
   });
   const { sortKey, sortDir } = state.emplist;
@@ -3862,6 +3874,7 @@ function emplistFilteredSorted() {
       case "contract": return e.contract === "oncall" ? "On-call" : "Permanent";
       case "position": return e.position ? POSITIONS[e.position].label : "";
       case "phone": return e.phone || "";
+      case "trigoId": return e.trigoId ? "T" + e.trigoId.slice(1).padStart(6, "0") : "";   // T9 sorts before T10; people with none sort first
       case "startDate": return e.startDate || "";   // ISO text sorts in date order; people with none sort first
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
@@ -3897,8 +3910,6 @@ function emplistFilteredSorted() {
    fixed 0–100 limit, so the track carries the scale and the number is always
    printed beside it (never encoded by width alone). `undefined` = still
    loading, `null` = no working days in the window to divide by. */
-/* CSV wants a bare number so it stays sortable/averageable in Excel */
-function utilCsv(pct) { return (pct === undefined || pct === null) ? "" : String(pct); }
 function utilCell(pct) {
   if (pct === undefined) return `<span class="el-util-empty">…</span>`;
   if (pct === null) return `<span class="el-util-empty" title="No working days for this board in the last 30 days">—</span>`;
@@ -3906,36 +3917,8 @@ function utilCell(pct) {
     + `<b class="el-util-val">${pct}%</b>`;
 }
 
-/* RFC 4180: a field only needs quoting if it contains a comma, quote, or
-   newline — quoting everything is also correct, just noisier to read raw */
-function csvField(v) {
-  const s = String(v ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-function exportEmplistCsv() {
-  const emps = emplistFilteredSorted();   // same rows the table is showing right now
-  const header = ["Name", "Contract type", "Position", "Mobile number", "Start date", "Years of service", "Service area", "Current board", "30D utilization", "Status"];
-  const rows = emps.map(e => {
-    const area = D().areas.find(a => a.id === e.areaId);
-    const board = D().boards.find(b => b.id === e.boardId);
-    const pos = e.position ? POSITIONS[e.position] : null;
-    return [e.name, e.contract === "oncall" ? "On-call" : "Permanent", pos ? pos.label : "",
-      e.phone || "", e.startDate ? fmtDate(e.startDate) : "", ManpowerXlsx.serviceLength(e.startDate, todayStr()),
-      area ? area.name : "", board ? board.name : "",
-      utilCsv(state.emplist.util ? state.emplist.util[e.id] : undefined),
-      e.active === false ? "Inactive" : "Active"];
-  });
-  const csv = [header, ...rows].map(r => r.map(csvField).join(",")).join("\r\n");
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `manpower_list_${todayStr()}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 /* The Manpower List as an Excel file: the rows the table is showing right now
-   (same search, filters and sort as the CSV), English or Thai. The sheet itself
+   (same search, filters and sort as the table), English or Thai. The sheet itself
    is built by xlsx-export.js; ExcelJS is fetched on first use, like the board export. */
 function emplistXlsxRows() {
   return emplistFilteredSorted().map(e => {
@@ -3943,7 +3926,7 @@ function emplistXlsxRows() {
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return {
-      name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent", position: pos ? pos.label : "",
+      name: e.name, trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent", position: pos ? pos.label : "",
       phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", board: board ? board.name : "",
       util: state.emplist.util ? state.emplist.util[e.id] : undefined, active: e.active !== false,
     };
@@ -4016,17 +3999,12 @@ function bulkSaveBlob(blob, name) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-async function bulkWriteFile(kind, format, all, name) {
+async function bulkWriteFile(kind, all, name) {
   const ctx = bulkCtx(kind, bulkTemplateRows(kind, all));
-  if (format === "csv") {
-    const text = kind === "employees" ? BulkEdit.employeeCsv(ctx) : BulkEdit.hostCsv(ctx);
-    bulkSaveBlob(new Blob([text], { type: "text/csv;charset=utf-8" }), name + ".csv");
-  } else {
-    const ExcelJS = await loadExcelJS();
-    const wb = await BulkEdit.buildTemplateWorkbook(ExcelJS, kind, ctx);
-    const buf = await wb.xlsx.writeBuffer();
-    bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name + ".xlsx");
-  }
+  const ExcelJS = await loadExcelJS();
+  const wb = await BulkEdit.buildTemplateWorkbook(ExcelJS, kind, ctx);
+  const buf = await wb.xlsx.writeBuffer();
+  bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name + ".xlsx");
 }
 
 function openBulkModal(kind) {
@@ -4039,7 +4017,7 @@ function openBulkModal(kind) {
     ? "Change many employees at once in a spreadsheet. Download the template (it holds everyone's current details), edit it, save it and upload it back. Rename people, change contract, position, phone, dates, service area, board or status, or add new people on the empty rows."
     : "Change many hosts at once in a spreadsheet: Location, Google Maps link, Service area, Note and Status. Download the template, edit it and upload it back. A host's name is its key — renaming or merging hosts is still done from the Host List.";
   const n = bulkTemplateRows(kind, false).length;
-  $("#bulk-dl-note").textContent = `${n} ${emp ? (n === 1 ? "employee" : "employees") : (n === 1 ? "host" : "hosts")} — the rows the list is showing now. Clear the search and filters first to include everyone. Excel is recommended (dropdowns, real dates, Thai text); CSV works too.`;
+  $("#bulk-dl-note").textContent = `${n} ${emp ? (n === 1 ? "employee" : "employees") : (n === 1 ? "host" : "hosts")} — the rows the list is showing now. Clear the search and filters first to include everyone. The Excel file has dropdowns, real dates and keeps Thai text intact.`;
   $("#bulk-file").value = "";
   $("#bulk-preview").classList.add("hidden");
   $("#bulk-preview").innerHTML = "";
@@ -4049,9 +4027,9 @@ function openBulkModal(kind) {
   openModal("#modal-bulk");
 }
 
-async function bulkDownload(format) {
+async function bulkDownload() {
   const emp = bulkIsEmp();
-  await bulkWriteFile(bulk.kind, format, false, `${emp ? "manpower_edit" : "host_edit"}_${todayStr()}`);
+  await bulkWriteFile(bulk.kind, false, `${emp ? "manpower_edit" : "host_edit"}_${todayStr()}`);
   toast("Template downloaded. Edit it, save it, then upload it in step 2.", "info");
 }
 
@@ -4074,7 +4052,7 @@ async function bulkReadFile(file) {
     return BulkEdit.parseCsv(text);
   }
   if (name.endsWith(".xls")) throw new Error("Old .xls files are not supported — open it in Excel and Save As .xlsx.");
-  throw new Error("Upload an .xlsx or .csv file.");
+  throw new Error("Upload the edited .xlsx file.");
 }
 function bulkMakePlan() {
   return bulkIsEmp()
@@ -4137,6 +4115,13 @@ function renderBulkPreview() {
   let html = `<div class="bulk-chips">${chip("To update", n.update, "var(--chart-assigned)")}${chip(emp ? "New people" : "New hosts", n.create, "var(--ok-text)")}${chip("Unchanged", n.same, "#c3ccd6")}${chip("Problems", n.error, "var(--warn)")}</div>`;
   const extra = [];
   if (emp && n.moves) extra.push(`${n.moves} ${n.moves === 1 ? "person changes" : "people change"} board — their assignment on ${escapeHtml(fmtDate(state.date))} is cleared`);
+  if (emp && (n.noTrigoId || n.shortName)) {
+    // the clean-up worklist: after this upload, who in the file still lacks a TRIGO ID or a full name
+    const bits = [];
+    if (n.noTrigoId) bits.push(`${n.noTrigoId} still ${n.noTrigoId === 1 ? "has" : "have"} no TRIGO ID`);
+    if (n.shortName) bits.push(`${n.shortName} ${n.shortName === 1 ? "name is" : "names are"} not a full name yet`);
+    extra.push(bits.join(" · "));
+  }
   if (emp && n.deactivate) extra.push(`${n.deactivate} will be set Inactive`);
   if (emp && n.reactivate) extra.push(`${n.reactivate} will be set Active again`);
   if (n.clears) extra.push(`${n.clears} filled-in ${n.clears === 1 ? "value is" : "values are"} being cleared`);
@@ -4197,7 +4182,7 @@ async function applyBulk() {
     if ($("#bulk-backup").checked) {
       const t = new Date();
       const stamp = todayStr() + "_" + String(t.getHours()).padStart(2, "0") + String(t.getMinutes()).padStart(2, "0");
-      await bulkWriteFile(kind, "xlsx", true, `${kind === "employees" ? "manpower" : "host"}_backup_before_import_${stamp}`);
+      await bulkWriteFile(kind, true, `${kind === "employees" ? "manpower" : "host"}_backup_before_import_${stamp}`);
     }
     const res = kind === "employees"
       ? await cloud.applyEmployeeImport(bulk.plan, { moveDate: state.date, createNew })
@@ -4252,6 +4237,7 @@ function renderEmployeeRows() {
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
       <td data-label="Name">${escapeHtml(e.name)}</td>
+      <td data-label="TRIGO ID" class="el-tid">${e.trigoId ? escapeHtml(e.trigoId) : "—"}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
@@ -4814,13 +4800,26 @@ function renderHostList() {
   renderHostRows();
 }
 
-function exportHostlistCsv() {
+/* One Excel sheet, same rows and columns the table is showing right now.
+   (There is no CSV any more: Excel keeps Thai text, links and dates intact.) */
+async function downloadTableXlsx(sheetName, fileName, columns, rows, totalText) {
+  const ExcelJS = await loadExcelJS();
+  const { workbook } = await ManpowerXlsx.buildTableWorkbook(ExcelJS, { sheetName, columns, rows, totalText });
+  const buf = await workbook.xlsx.writeBuffer();
+  bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fileName);
+}
+async function exportHostlistXlsx() {
   const rows = hostlistFilteredSorted();   // same rows the table is showing right now
+  if (!rows.length) { toast("No hosts match the current filters, so there is nothing to export.", "info"); return; }
   // "seen" covers both sources the dates come from — a mission planned for the
   // host and a deployment recorded against it
-  const header = ["Host name", "Status", "Location", "Google Maps link", "Service area", "Note",
-    "Inspectors", "Inspector count",
-    "Deployment days", "Appear on board", "Missions", "First seen", "Last seen"];
+  const columns = [
+    { label: "Host name", width: 32 }, { label: "Status", width: 11 }, { label: "Location", width: 34 },
+    { label: "Google Maps link", width: 40 }, { label: "Service area", width: 16 }, { label: "Note", width: 34 },
+    { label: "Inspectors", width: 44 }, { label: "Inspector count", width: 12, center: true },
+    { label: "Deployment days", width: 12, center: true }, { label: "Appear on board", width: 22 },
+    { label: "Missions", width: 10, center: true }, { label: "First seen", width: 12, center: true }, { label: "Last seen", width: 12, center: true },
+  ];
   const out = rows.map(r => [
     r.name, r.archived ? "Archived" : "Active", r.location, r.mapUrl, r.area ? r.area.name : "", r.note,
     r.inspectors.map(i => `${i.name} (${i.days}d)`).join("; "),
@@ -4828,13 +4827,8 @@ function exportHostlistCsv() {
     r.boards.map(b => b.name).join("; "),
     r.missionCount, r.firstDate || "", r.lastDate || "",
   ]);
-  const csv = [header, ...out].map(r => r.map(csvField).join(",")).join("\r\n");
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `host_list_${todayStr()}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  await downloadTableXlsx("Host List", `host_list_${todayStr()}.xlsx`, columns, out, "TOTAL HOSTS: " + rows.length);
+  toast(`Exported ${rows.length} ${rows.length === 1 ? "host" : "hosts"}.`, "info");
 }
 
 /* Host modal — the location/map-link record for one host. The name is editable
@@ -5451,6 +5445,7 @@ function openEmployeeModal(empId) {
     form.contract.value = e.contract;
     form.position.value = e.position || "";
     form.phone.value = e.phone || "";
+    form.trigoId.value = e.trigoId || "";
     form.startDate.value = e.startDate || "";
     form.addedOn.value = e.addedOn || "";
     form.areaId.value = e.areaId;
@@ -5473,15 +5468,23 @@ function openEmployeeModal(empId) {
 function saveEmployee(ev) {
   ev.preventDefault();
   const form = $("#form-employee");
-  const vals = { name: form.name.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
-  // instant client-side check (same pattern as duplicate missions); the DB-cache
-  // check in cloud.saveEmployee is the real guard, this just avoids a round trip
-  const dup = D().employees.find(e =>
-    e.id !== state.editingEmployeeId && e.name.trim().toLowerCase() === vals.name.toLowerCase());
-  if (dup) {
-    toast(`An employee named "${vals.name}" already exists. Use a different name (e.g. add an ID/initial) to tell them apart.`, "warn");
+  const vals = { name: form.name.value.trim(), trigoId: form.trigoId.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
+  // instant client-side checks (the same rules cloud.saveEmployee enforces, which is the real
+  // guard): the name is the FULL name only, the TRIGO ID is T + digits and unique, and two people
+  // may share a name only when both have a TRIGO ID. A short name saved earlier can be left as it is.
+  const editing = state.editingEmployeeId ? D().employees.find(x => x.id === state.editingEmployeeId) : null;
+  const tid = EmployeeId.normalizeTrigoId(vals.trigoId);
+  if (tid === null) { toast("The TRIGO ID must be the letter T and digits, like T329.", "warn"); return; }
+  if (!editing || editing.name.trim() !== vals.name) {
+    const why = EmployeeId.checkFullName(vals.name);
+    if (why) { toast(why, "warn"); return; }
+  }
+  if (EmployeeId.nameClash(D().employees, vals.name, tid, state.editingEmployeeId)) {
+    toast(`An employee named "${vals.name}" already exists. Give each of them their TRIGO ID to tell them apart.`, "warn");
     return;
   }
+  const idOwner = EmployeeId.idClash(D().employees, tid, state.editingEmployeeId);
+  if (idOwner) { toast(`The TRIGO ID ${tid} already belongs to ${idOwner.name}.`, "warn"); return; }
   safely(async () => {
     if (state.editingEmployeeId) {
       const emp = D().employees.find(x => x.id === state.editingEmployeeId);
@@ -9369,21 +9372,20 @@ function showTempPassword(email, password, headline, warning) {
   openModal("#modal-temp-password");
 }
 
-function exportUsersCsv() {
+async function exportUsersXlsx() {
   const rows = usersFilteredSorted();   // the same rows the table is showing right now
-  const header = ["Name", "Display name", "Email", "Role", "Status", "Last seen", "Requested", "Approved", "Approved by"];
+  if (!rows.length) { toast("No users match the current filters, so there is nothing to export.", "info"); return; }
+  const columns = [
+    { label: "Name", width: 28 }, { label: "Display name", width: 18 }, { label: "Email", width: 34 }, { label: "Role", width: 12 },
+    { label: "Status", width: 12 }, { label: "Last seen", width: 22 }, { label: "Requested", width: 22 }, { label: "Approved", width: 22 }, { label: "Approved by", width: 28 },
+  ];
   const out = rows.map(u => [
     u.fullName || "", u.displayName || "", u.email || "", roleLabel(u.roleKey),
     (USER_STATUS[u.status] || {}).label || u.status,
     u.lastSeenAt || "", u.requestedAt || "", u.approvedAt || "", u.approvedBy || "",
   ]);
-  const csv = [header, ...out].map(r => r.map(csvField).join(",")).join("\r\n");
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });   // BOM so Excel picks up UTF-8 (Thai names)
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `users_${todayStr()}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  await downloadTableXlsx("Users", `users_${todayStr()}.xlsx`, columns, out, "TOTAL USERS: " + rows.length);
+  toast(`Exported ${rows.length} ${rows.length === 1 ? "user" : "users"}.`, "info");
 }
 
 /* ---------- Roles & permissions ---------- */
@@ -9448,7 +9450,7 @@ function renderRolesMatrix() {
 function wireUserManagement() {
   $("#users-search").addEventListener("input", (e) => { state.users.search = e.target.value; renderUserRows(); });
   $("#btn-users-pending").onclick = () => { state.users.pendingOnly = !state.users.pendingOnly; renderUserRows(); };
-  $("#btn-users-csv").onclick = exportUsersCsv;
+  $("#btn-users-xlsx").onclick = () => safely(exportUsersXlsx);
   $("#btn-add-user").onclick = openAddUserModal;
   $("#form-add-user").onsubmit = addUser;
   $("#form-user").onsubmit = saveUserModal;
@@ -9826,6 +9828,7 @@ function wireApp() {
   $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });
   // undo + selection controls
   $("#btn-undo").onclick = undoLast;
+  $("#btn-trigo-id").onclick = () => setShowTrigoId(!showTrigoId);
   $("#btn-clear-selection").onclick = clearSelection;
 
   // touch action bar: mark the device so CSS can reveal touch-only affordances,
@@ -9849,11 +9852,9 @@ function wireApp() {
   };
 
   // ---------- Manpower List tab ----------
-  $("#btn-emplist-csv").onclick = exportEmplistCsv;
   $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
   $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
-  $("#btn-bulk-dl-xlsx").onclick = () => safely(() => bulkDownload("xlsx"));
-  $("#btn-bulk-dl-csv").onclick = () => safely(() => bulkDownload("csv"));
+  $("#btn-bulk-dl-xlsx").onclick = () => safely(bulkDownload);
   $("#bulk-file").onchange = (e) => safely(() => onBulkFile(e));
   $("#btn-bulk-apply").onclick = () => safely(applyBulk);
   $("#btn-emplist-xlsx").onclick = openEmplistXlsxModal;
@@ -9906,7 +9907,7 @@ function wireApp() {
   $("#emplist-bulk-clear").onclick = clearSelection;
 
   // ---------- Host List tab ----------
-  $("#btn-hostlist-csv").onclick = exportHostlistCsv;
+  $("#btn-hostlist-xlsx").onclick = () => safely(exportHostlistXlsx);
   $("#btn-add-host").onclick = () => openHostModal(null);
   $("#hostlist-search").addEventListener("input", (e) => { state.hostlist.search = e.target.value; renderHostRows(); });
   for (const th of $$("#hostlist-table th[data-sort]")) {
