@@ -5,6 +5,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { loadCloud, FakeDb } = require("./fake/load-cloud");
 const B = require("../bulk-edit.js");
+const { parseCsv } = require("./helpers/csv");
 
 function setup() {
   const db = new FakeDb();
@@ -59,7 +60,7 @@ test("bulk apply writes the TRIGO ID on updates and on new people", async () => 
   const { cloud, db } = setup();
   await cloud._loadEmployees(); await cloud._loadBoards(); await cloud._loadAreas();
   const d = cloud.data;
-  const table = B.readTable(B.parseCsv("Name,TRIGO ID,Contract type,Board\nMalee Sukjai,T400,On-call,LCB Port\nNew Person,T401,Permanent,LCB Port"), B.EMP_COLUMNS);
+  const table = B.readTable(parseCsv("Name,TRIGO ID,Contract type,Board\nMalee Sukjai,T400,On-call,LCB Port\nNew Person,T401,Permanent,LCB Port"), B.EMP_COLUMNS);
   const plan = B.planEmployees(table, { employees: d.employees, areas: d.areas, boards: d.boards, positions: {} });
   assert.deepEqual(plan.rows.map((r) => r.kind), ["update", "create"]);
   const res = await cloud.applyEmployeeImport(plan, { moveDate: "2026-10-05", createNew: true });

@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { loadCloud, FakeDb } = require("./fake/load-cloud");
 const B = require("../bulk-edit.js");
+const { parseCsv } = require("./helpers/csv");
 
 const POSITIONS = { inspector: { label: "Inspector", short: "Ins" }, technician: { label: "Technician", short: "Tec" } };
 const DAY = "2026-10-05", OTHER_DAY = "2026-10-06";
@@ -27,7 +28,7 @@ function setup() {
 async function planFrom(cloud, csv) {
   await cloud._loadEmployees(); await cloud._loadAreas(); await cloud._loadBoards();
   const d = cloud.data;
-  return B.planEmployees(B.readTable(B.parseCsv(csv), B.EMP_COLUMNS), { employees: d.employees, areas: d.areas, boards: d.boards, positions: POSITIONS });
+  return B.planEmployees(B.readTable(parseCsv(csv), B.EMP_COLUMNS), { employees: d.employees, areas: d.areas, boards: d.boards, positions: POSITIONS });
 }
 
 test("applies renames, field changes, clears, board moves and status in one go", async () => {
@@ -85,7 +86,7 @@ test("hosts: updates keep the columns the file did not mention; new hosts need t
   db.seed("hosts", [{ name: "Fortune", location: "Rayong", map_url: "https://m.example/1", area_id: "a1", archived: false, note: "keep me" }]);
   await cloud._loadHosts(); await cloud._loadAreas();
   const hosts = cloud.data.hosts.map((h) => ({ ...h, hasRecord: true }));
-  const plan = B.planHosts(B.readTable(B.parseCsv("Host name,Location,Status\nFortune,Map Ta Phut,Archived\nMissions Only,Bangkok,Active\nBrand New,Chonburi,Active"), B.HOST_COLUMNS),
+  const plan = B.planHosts(B.readTable(parseCsv("Host name,Location,Status\nFortune,Map Ta Phut,Archived\nMissions Only,Bangkok,Active\nBrand New,Chonburi,Active"), B.HOST_COLUMNS),
     { hosts: [...hosts, { name: "Missions Only", hasRecord: false, location: "", mapUrl: "", areaId: "", archived: false, note: "" }], areas: cloud.data.areas });
   assert.deepEqual(plan.rows.map((r) => r.kind), ["update", "update", "create"]);
   let res = await cloud.applyHostImport(plan, { createNew: false });

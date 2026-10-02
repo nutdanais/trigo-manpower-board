@@ -13,6 +13,13 @@ const h = require("./harness");
 const ExcelJS = require("../../vendor/exceljs.min.js");
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
+/* a small table -> a real .xlsx file, the only thing the app accepts */
+async function writeXlsx(file, sheet, rows2d) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(sheet);
+  rows2d.forEach((r, i) => r.forEach((v, j) => { if (v !== "") ws.getCell(i + 1, j + 1).value = v; }));
+  fs.writeFileSync(file, Buffer.from(await wb.xlsx.writeBuffer()));
+}
 
 (async () => {
   const env = await h.launch();
@@ -120,15 +127,16 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
     assert.deepEqual([db.t("employees").find((e) => e.id === "e4").trigo_id, db.t("employees").find((e) => e.id === "e5").trigo_id], ["T505", "T506"]);
     console.log("ok - TRIGO IDs are filled in next to the names, tidied, and kept unique");
 
-    // ---- employees: CSV with a new person and a bad row ----
+    // ---- employees: a new person and a bad row ----
     await openEmp();
-    const csv = "Name,Contract type,Board,Service area,Position\r\n" +
-      "Brand New Person,On-call,Board Two,AREA1,Technician\r\n" +
-      "Bad Row,Sometimes,Board One,AREA1,\r\n" +
-      "Person E,Permanent,Board One,AREA1,Senior Inspector\r\n";
-    const csvPath = path.join(TMP, "emp.csv");
-    fs.writeFileSync(csvPath, "﻿" + csv);
-    await p.setInputFiles("#bulk-file", csvPath);
+    const newPath = path.join(TMP, "emp-new.xlsx");
+    await writeXlsx(newPath, "Employees", [
+      ["Name", "Contract type", "Board", "Service area", "Position"],
+      ["Brand New Person", "On-call", "Board Two", "AREA1", "Technician"],
+      ["Bad Row", "Sometimes", "Board One", "AREA1", ""],
+      ["Person E", "Permanent", "Board One", "AREA1", "Senior Inspector"],
+    ]);
+    await p.setInputFiles("#bulk-file", newPath);
     await p.waitForSelector("#bulk-preview .bulk-problems");
     assert.equal(await chip("To update"), 1);
     assert.equal(await chip("New people"), 1);
@@ -142,7 +150,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
     assert.equal(db.t("employees").find((e) => e.id === "e5").position, "senior_inspector");
 
     await openEmp();
-    await p.setInputFiles("#bulk-file", csvPath);
+    await p.setInputFiles("#bulk-file", newPath);
     await p.waitForSelector("#bulk-preview .bulk-create");
     await p.check("#bulk-create");
     assert.equal(await p.textContent("#btn-bulk-apply"), "Apply 1 change");
@@ -151,20 +159,21 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
     await p.waitForSelector("#modal-bulk", { state: "hidden" });
     const created = db.t("employees").find((e) => e.name === "Brand New Person");
     assert.deepEqual([created.contract, created.board_id, created.position, created.added_on], ["oncall", "b2", "technician", T]);
-    console.log("ok - CSV: a bad row is skipped with its row number, and new people only join when ticked");
+    console.log("ok - a bad row is skipped with its row number, and new people only join when ticked");
 
     // ---- hosts ----
     await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
     await p.waitForFunction(() => allHostRows().length >= 2);
     await p.click("#btn-hostlist-bulk");
     await p.waitForSelector("#modal-bulk:not(.hidden)");
-    const hostCsv = "Host name,Status,Location,Google Maps link,Service area,Note\r\n" +
-      "Host Alpha,Archived,Rayong,https://maps.example/a,AREA1,gate 3\r\n" +
-      "host beta,Active,Chonburi,https://maps.example/b,AREA1,\r\n" +
-      "Hoost Gamma,Active,Bangkok,javascript:alert(1),,\r\n" +
-      "Totally New,Active,Phuket,,,hello\r\n";
-    const hostPath = path.join(TMP, "hosts.csv");
-    fs.writeFileSync(hostPath, hostCsv);
+    const hostPath = path.join(TMP, "hosts-edit.xlsx");
+    await writeXlsx(hostPath, "Hosts", [
+      ["Host name", "Status", "Location", "Google Maps link", "Service area", "Note"],
+      ["Host Alpha", "Archived", "Rayong", "https://maps.example/a", "AREA1", "gate 3"],
+      ["host beta", "Active", "Chonburi", "https://maps.example/b", "AREA1", ""],
+      ["Hoost Gamma", "Active", "Bangkok", "javascript:alert(1)", "", ""],
+      ["Totally New", "Active", "Phuket", "", "", "hello"],
+    ]);
     await p.setInputFiles("#bulk-file", hostPath);
     await p.waitForSelector("#bulk-preview .stat-chip");
     assert.equal(await chip("To update"), 2);
@@ -181,6 +190,18 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "bulk-"));
     assert.deepEqual([hosts.find((x) => x.name === "Host Beta").location, hosts.find((x) => x.name === "Host Beta").map_url], ["Chonburi", "https://maps.example/b"]);
     assert.equal(hosts.some((x) => x.name === "Totally New"), false, "new hosts need the tick");
     console.log("ok - hosts: matched by name, unsafe links refused, new hosts held back until ticked");
+
+    // ---- only .xlsx is accepted ----
+    await openEmp();
+    assert.match(await p.getAttribute("#bulk-file", "accept"), /^\.xlsx,/);
+    const csvPath = path.join(TMP, "emp.csv");
+    fs.writeFileSync(csvPath, "Name,Contract type\nPerson A Renamed,Permanent\n");
+    await p.setInputFiles("#bulk-file", csvPath);
+    await p.waitForFunction(() => /CSV files are not accepted/.test(document.querySelector("#toast-stack").textContent));
+    assert.equal(await p.locator("#bulk-preview:not(.hidden)").count(), 0);
+    assert.equal(await p.isDisabled("#btn-bulk-apply"), true);
+    await closeDlg();
+    console.log("ok - a CSV is refused: the upload accepts the Excel file only");
 
     // ---- a viewer never sees the buttons ----
     const v = await env.openAs(db, h.USERS.v);

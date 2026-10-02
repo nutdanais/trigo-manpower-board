@@ -3,7 +3,7 @@
 
    This file is pure logic (no DOM, no network) so it can be tested in node:
      - building the edit template (Excel) from the rows the app holds;
-     - reading a file back (CSV text or an Excel worksheet) into a table;
+     - reading a file back (an Excel worksheet) into a table;
      - planning: matching every row to an existing record, validating every
        cell, and producing the per-field "from -> to" diff the preview shows.
    Nothing here writes. app.js shows the plan and cloud.js applies it.
@@ -46,35 +46,6 @@
     return String(v);
   }
   const str = (v) => { const p = plain(v); return p instanceof Date ? "" : norm(p); };
-
-  /* ---------- CSV ---------- */
-  /* RFC 4180 reader: quoted fields, doubled quotes, newlines inside quotes, a
-     leading BOM. The delimiter is sniffed from the first line because Excel in
-     some regional settings writes ';' (or tab) instead of ','. */
-  function parseCsv(text) {
-    text = String(text || "").replace(/^﻿/, "");
-    const firstLine = text.split(/\r\n|\n|\r/, 1)[0] || "";
-    const count = (c) => { let n = 0, q = false; for (const ch of firstLine) { if (ch === '"') q = !q; else if (!q && ch === c) n++; } return n; };
-    const delim = [",", ";", "\t"].map((c) => [c, count(c)]).sort((a, b) => b[1] - a[1])[0];
-    const d = delim[1] ? delim[0] : ",";
-    const rows = [];
-    let row = [], field = "", q = false, i = 0;
-    while (i < text.length) {
-      const ch = text[i];
-      if (q) {
-        if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
-        else field += ch;
-      } else if (ch === '"') q = true;
-      else if (ch === d) { row.push(field); field = ""; }
-      else if (ch === "\r" || ch === "\n") {
-        if (ch === "\r" && text[i + 1] === "\n") i++;
-        row.push(field); field = ""; rows.push(row); row = [];
-      } else field += ch;
-      i++;
-    }
-    if (field !== "" || row.length) { row.push(field); rows.push(row); }
-    return rows;
-  }
 
   /* an Excel worksheet -> rows of plain values; row N of the array is row N of
      the sheet, so "row 14" in a message is row 14 in the file */
@@ -192,8 +163,8 @@
     if (p instanceof Date) return { error: "a date was found in the mobile number cell" };
     let s = typeof p === "number" ? String(Math.round(p)) : norm(p);
     let warn = "";
-    // Excel turns 0812345678 into the number 812345678 (and a CSV that passed through
-    // it comes back the same way): nine digits starting 6, 8 or 9 is a Thai mobile that lost its 0
+    // Excel turns 0812345678 into the number 812345678 when the cell is not text:
+    // nine digits starting 6, 8 or 9 is a Thai mobile that lost its 0
     if (/^[689]\d{8}$/.test(s)) { s = "0" + s; warn = "leading 0 restored"; }
     if (s.length > 40) return { error: "mobile number is too long" };
     return { value: s, warn };
@@ -645,7 +616,7 @@
   }
 
   const api = {
-    EMP_COLUMNS, HOST_COLUMNS, parseCsv, plain, readTable, rowsFromWorksheet, rowsFromWorkbook,
+    EMP_COLUMNS, HOST_COLUMNS, plain, readTable, rowsFromWorksheet, rowsFromWorkbook,
     parseDate, parsePhone, planEmployees, planHosts, employeeTable, hostTable, buildTemplateWorkbook,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

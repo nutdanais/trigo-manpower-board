@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const ExcelJS = require("../vendor/exceljs.min.js");
 const B = require("../bulk-edit.js");
+const { parseCsv } = require("./helpers/csv");
 
 const POSITIONS = {
   inspector: { label: "Inspector", short: "Ins" },
@@ -19,12 +20,7 @@ const EMPS = [
 ];
 const ctx = () => ({ employees: EMPS.map((e) => ({ ...e })), areas: AREAS, boards: BOARDS, positions: POSITIONS });
 const HEAD = "ID,Name,Contract type,Position,Mobile number,Start date,On the board from,Service area,Board,Status";
-const plan = (csv, c = ctx()) => B.planEmployees(B.readTable(B.parseCsv(csv), B.EMP_COLUMNS), c);
-
-test("CSV: quotes, embedded newline, BOM, CRLF, and a semicolon-delimited file", () => {
-  assert.deepEqual(B.parseCsv('﻿a,"b,1","c ""q"""\r\nx,"line\nbreak",z\r\n'), [["a", "b,1", 'c "q"'], ["x", "line\nbreak", "z"]]);
-  assert.deepEqual(B.parseCsv("a;b;c\n1;2;3"), [["a", "b", "c"], ["1", "2", "3"]]);
-});
+const plan = (csv, c = ctx()) => B.planEmployees(B.readTable(parseCsv(csv), B.EMP_COLUMNS), c);
 
 test("round trip: the Excel template read straight back changes nothing", async () => {
   const wb = await B.buildTemplateWorkbook(ExcelJS, "employees", ctx());
@@ -145,7 +141,7 @@ test("a service area can't be blanked on someone who has one, but stays blank wh
 });
 
 test("structural problems stop the whole file", () => {
-  assert.match(B.planEmployees(B.readTable(B.parseCsv("foo,bar\n1,2"), B.EMP_COLUMNS), ctx()).fatal[0], /header row/);
+  assert.match(B.planEmployees(B.readTable(parseCsv("foo,bar\n1,2"), B.EMP_COLUMNS), ctx()).fatal[0], /header row/);
   const big = B.readTable([["Name", "Board"], ...Array.from({ length: 6 }, (_, i) => ["P" + i, "LCB Port"])], B.EMP_COLUMNS, { maxRows: 5 });
   assert.match(big.fatal[0], /limit is 5/);
 });
@@ -167,7 +163,7 @@ test("hosts: update by name, new hosts are flagged, links are checked, the name 
     "Fortune-Co,Active,,,,\n" +
     "Bad Link Ltd,Active,,javascript:alert(1),,\n" +
     "Brand New Host,Active,Bangkok,https://example.com/m,LCB,hello";
-  const p = B.planHosts(B.readTable(B.parseCsv(csv), B.HOST_COLUMNS), hctx);
+  const p = B.planHosts(B.readTable(parseCsv(csv), B.HOST_COLUMNS), hctx);
   assert.deepEqual(p.rows.map((r) => r.kind), ["update", "update", "create", "error", "create"]);
   assert.deepEqual(p.rows[0].patch, { mapUrl: "https://maps.app.goo.gl/x", areaId: "a2", note: "", archived: true });
   assert.equal(p.rows[1].name, "Plant 7");
@@ -210,7 +206,7 @@ const TEMPS = [
   { id: "t-4", name: "Pichai", trigoId: "", contract: "permanent", position: "", phone: "", startDate: "", addedOn: "", areaId: "a2", boardId: "b1", active: true },   // grandfathered short name
 ];
 const tctx = () => ({ employees: TEMPS.map((e) => ({ ...e })), areas: AREAS, boards: BOARDS, positions: POSITIONS });
-const tplan = (csv) => B.planEmployees(B.readTable(B.parseCsv(csv), B.EMP_COLUMNS), tctx());
+const tplan = (csv) => B.planEmployees(B.readTable(parseCsv(csv), B.EMP_COLUMNS), tctx());
 
 test("the template carries ID and TRIGO ID, and reads back unchanged", async () => {
   const c = tctx();

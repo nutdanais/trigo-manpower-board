@@ -4033,26 +4033,17 @@ async function bulkDownload() {
   toast("Template downloaded. Edit it, save it, then upload it in step 2.", "info");
 }
 
-/* a file -> rows of cells. Excel files via ExcelJS; CSV as UTF-8, falling back to
-   Windows-874 (what Excel's plain "CSV (Comma delimited)" writes on a Thai PC). */
+/* a file -> rows of cells: the edited Excel template, read with ExcelJS. Only .xlsx is
+   accepted (a CSV would lose leading zeros, dates and Thai text on its way through Excel). */
 async function bulkReadFile(file) {
-  if (file.size > 5 * 1024 * 1024) throw new Error("That file is larger than 5 MB.");
   const name = file.name.toLowerCase();
-  const buf = await file.arrayBuffer();
-  if (name.endsWith(".xlsx")) {
-    const ExcelJS = await loadExcelJS();
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buf);
-    return BulkEdit.rowsFromWorkbook(wb, bulk.kind);
-  }
-  if (name.endsWith(".csv") || name.endsWith(".txt")) {
-    let text;
-    try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); }
-    catch (e) { text = new TextDecoder("windows-874").decode(buf); }
-    return BulkEdit.parseCsv(text);
-  }
   if (name.endsWith(".xls")) throw new Error("Old .xls files are not supported — open it in Excel and Save As .xlsx.");
-  throw new Error("Upload the edited .xlsx file.");
+  if (!name.endsWith(".xlsx")) throw new Error("Upload the edited Excel file (.xlsx). CSV files are not accepted.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("That file is larger than 5 MB.");
+  const ExcelJS = await loadExcelJS();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  return BulkEdit.rowsFromWorkbook(wb, bulk.kind);
 }
 function bulkMakePlan() {
   return bulkIsEmp()
