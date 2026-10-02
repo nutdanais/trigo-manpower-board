@@ -111,7 +111,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       const head = (ws) => { const o = []; ws.getRow(6).eachCell((c) => o.push(c.value)); return o; };
       assert.deepEqual(head(leave), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Leave Type"]);
       assert.deepEqual(col(leave, 1, 7, 7), ["Person E"]);
-      assert.equal(leave.getCell(7, 8).value, "Annual Leave · ลาพักร้อน");
+      assert.equal(leave.getCell(7, 8).value, "Annual Leave");
       assert.equal(leave.getCell(7, 4).value, "", "Person E has no number on file");
       assert.deepEqual(col(standby, 1, 7, 7), ["Person F"]);
       assert.deepEqual(col(oncall, 1, 7, 8), ["Person G", "Person H"]);
@@ -123,11 +123,34 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       }
     });
 
+    await step("choosing Thai in the dialog downloads a Thai file, and the choice is remembered", async () => {
+      await p.click("#btn-xlsx");
+      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      assert.equal(await p.locator("#xlsx-lang input[value=en]").isChecked(), true, "English by default");
+      await p.check("#xlsx-lang input[value=th]");
+      const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
+      assert.equal(dl.suggestedFilename(), `Board_One_${SRC}_TH.xlsx`);
+      await dl.saveAs("/tmp/xlsx-e2e-th.xlsx");
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(fs.readFileSync("/tmp/xlsx-e2e-th.xlsx"));
+      assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "ลาและสลับวันหยุด", "สแตนด์บาย", "ออนคอลที่ว่าง"]);
+      const ws = wb.worksheets[0];
+      assert.deepEqual(headerOf(ws), ["ชื่อ", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "วิศวกร", "หมายเหตุ"]);
+      assert.equal(ws.getCell(7, 1).value, "Person A");
+      assert.equal(ws.getCell(7, 2).value, "ประจำ");
+      assert.match(ws.getCell(7, 6).value, /^\d+ ปี \d+ เดือน \d+ วัน$/);
+      await p.click("#btn-xlsx");
+      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      assert.equal(await p.locator("#xlsx-lang input[value=th]").isChecked(), true, "Thai remembered");
+      await p.click("#modal-xlsx [data-close].btn");
+    });
+
     await step("the column choice is remembered next time the dialog opens", async () => {
       await p.click("#btn-xlsx");
       await p.waitForSelector("#modal-xlsx:not(.hidden)");
       assert.equal(await p.locator("#xlsx-cols input:checked").count(), 13);
       assert.equal(await p.locator("#xlsx-cols input[value=shift]").isChecked(), false);
+      await p.check("#xlsx-lang input[value=en]");   // the Thai choice was remembered; this step checks the English sheet names
       await p.uncheck("#xlsx-sheets input[value=standby]");
       await p.uncheck("#xlsx-sheets input[value=oncall]");
       const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
