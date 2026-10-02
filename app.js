@@ -229,17 +229,6 @@ function restoreViewState() {
   state.date = defaultPlanningDate();
 }
 
-/* Whether employee cards show the TRIGO ID. A personal display choice, kept on
-   this device like the theme — it changes nothing for anyone else. The ID is
-   always in the card's hover title either way. */
-const TRIGO_ID_KEY = "mpm-show-trigo-id";
-let showTrigoId = (() => { try { return localStorage.getItem(TRIGO_ID_KEY) === "1"; } catch (e) { return false; } })();
-function setShowTrigoId(on) {
-  showTrigoId = !!on;
-  try { localStorage.setItem(TRIGO_ID_KEY, showTrigoId ? "1" : "0"); } catch (e) { /* private window: just this session */ }
-  render();
-}
-
 /* zone labels (keys come from ZONES in cloud.js) */
 const ZONE_LABELS = {
   annual: "Annual Leave", sick: "Sick Leave", business: "Business Leave",
@@ -944,7 +933,6 @@ function render() {
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   $("#filters").classList.toggle("hidden", !board);
-  $("#btn-trigo-id").setAttribute("aria-pressed", showTrigoId ? "true" : "false");
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
   // Manpower's and Host's search/filters group — each is a display:contents
   // wrapper (styles.css), so one class toggle here shows or hides that tab's
@@ -1743,7 +1731,7 @@ function empCard(emp) {
   card.draggable = !IS_TOUCH;
   card.dataset.empId = emp.id;
   // Full name split for the card: first name on its own bold line (with the
-  // TRIGO ID in that line's corner), surname on a quieter line under it. One
+  // TRIGO ID, always shown, in that line's corner), surname on a quieter line under it. One
   // role slot: OC for on-call (who have no position), the position otherwise.
   const [firstName, surname] = splitFullName(emp.name);
   const role = emp.contract === "oncall" ? `<span class="emp-oc">OC</span>`
@@ -1751,7 +1739,7 @@ function empCard(emp) {
   card.innerHTML =
     `<span class="emp-row1">` +
       `<span class="emp-name">${escapeHtml(firstName)}</span>` +
-      (showTrigoId && emp.trigoId ? `<span class="emp-tid">${escapeHtml(emp.trigoId)}</span>` : "") +
+      (emp.trigoId ? `<span class="emp-tid">${escapeHtml(emp.trigoId)}</span>` : "") +
     `</span>` +
     // the space keeps the card's text "first surname" (search, copy, screen
     // readers); a flex container drops it from the layout
@@ -6310,7 +6298,7 @@ function xlsxRows() {
       const area = D().areas.find(a => a.id === e.areaId);
       const pos = e.position ? POSITIONS[e.position] : null;
       rows.push({
-        empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
+        empId: e.id, name: e.name, trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
         position: pos ? pos.label : "", phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", mission: m.number, host: m.host,
         customer: m.customer, ppe, shift: m.shift === "night" ? "Night" : "Day", start: m.startTime, end: m.endTime,
         engineer: eng ? eng.name : "", remark: m.remark || "",
@@ -6330,7 +6318,7 @@ function xlsxGroups() {
     const area = D().areas.find(a => a.id === e.areaId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return Object.assign({
-      empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
+      empId: e.id, name: e.name, trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
       position: pos ? pos.label : "", area: area ? area.name : "", phone: e.phone || "", startDate: e.startDate || "",
     }, extra);
   };
@@ -9836,7 +9824,6 @@ function wireApp() {
   $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });
   // undo + selection controls
   $("#btn-undo").onclick = undoLast;
-  $("#btn-trigo-id").onclick = () => setShowTrigoId(!showTrigoId);
   $("#btn-clear-selection").onclick = clearSelection;
 
   // touch action bar: mark the device so CSS can reveal touch-only affordances,

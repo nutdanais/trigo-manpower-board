@@ -4463,10 +4463,8 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 #modal-bulk input[type="checkbox"] { width: auto; margin: 0; flex: none; }
 
 /* ---------- TRIGO ID ---------- */
-/* chip on an employee card (opt-in, see #btn-trigo-id) */
+/* chip in the corner of every employee card that has an ID */
 .emp-tid { flex: none; font-family: var(--font-condensed); font-variant-numeric: tabular-nums; font-size: 10px; font-weight: 700; line-height: 1.6; letter-spacing: .02em; padding: 0 4px; border-radius: 4px; background: var(--emp-pos-bg); color: var(--primary-text); }
 .oncall .emp-tid { background: rgba(0,0,0,.07); color: var(--emp-ink); }
 .el-tid { font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* a toggle button: pressed = on */
-.btn-toggle[aria-pressed="true"] { background: var(--primary, #004983); border-color: var(--primary, #004983); color: #fff; }
-.btn-toggle[aria-pressed="false"] .ic { opacity: .35; }
