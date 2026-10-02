@@ -20,6 +20,7 @@ function loadCloud({ db = new FakeDb(), user = { id: "u-a", email: "eng.a@exampl
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(ROOT, "planning.js"), "utf8"), context, { filename: "planning.js" });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "employee-id.js"), "utf8"), context, { filename: "employee-id.js" });
   vm.runInContext(fs.readFileSync(path.join(ROOT, "cloud.js"), "utf8") + "\n;globalThis.__cloud = cloud;", context, { filename: "cloud.js" });
   return { cloud: context.__cloud, sb, db, context };
 }

@@ -414,7 +414,7 @@ const cloud = {
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
   },
   async _loadOverrides() {
     // tolerate the table not existing yet (before the workweek migration is run) —
@@ -944,20 +944,37 @@ const cloud = {
 
   async saveEmployee(employeeId, vals) {
     const name = vals.name.trim();
-    // guard against two employee cards for the same name (checked against the
-    // synced local cache, not a hard DB constraint — a real company can have two
-    // genuinely different people share a name, so this is a soft, app-level rule
-    // rather than something that could ever require merging real people's records)
-    const conflict = this.data.employees.find(
-      (e) => e.id !== employeeId && e.name.trim().toLowerCase() === name.toLowerCase());
-    if (conflict) {
-      throw new Error(`An employee named "${name}" already exists. Use a different name (e.g. add an ID/initial) to tell them apart.`);
+    const existing = employeeId ? this.data.employees.find((e) => e.id === employeeId) : null;
+    // The name is the FULL name only; the TRIGO ID has its own field. Checked for a new
+    // person and whenever the name is changed — someone saved earlier under a short name
+    // can still be edited (phone, board, ...) without being forced to retype it.
+    if (!existing || existing.name.trim() !== name) {
+      const why = EmployeeId.checkFullName(name);
+      if (why) throw new Error(why);
     }
+    const trigoId = vals.trigoId === undefined ? undefined : EmployeeId.normalizeTrigoId(vals.trigoId);
+    if (trigoId === null) throw new Error('The TRIGO ID must be the letter T and digits, like T329.');
+    // Two people may share a name only when both have a TRIGO ID to tell them apart
+    // (checked against the synced cache, not a hard DB constraint — the soft rule keeps
+    // a real pair of namesakes from ever needing their records merged). An ID is unique.
+    const finalId = trigoId === undefined ? (existing ? existing.trigoId : "") : trigoId;
+    if (EmployeeId.nameClash(this.data.employees, name, finalId, employeeId)) {
+      throw new Error(`An employee named "${name}" already exists. Give each of them their TRIGO ID to tell them apart.`);
+    }
+    const idOwner = trigoId ? EmployeeId.idClash(this.data.employees, trigoId, employeeId) : null;
+    if (idOwner) throw new Error(`The TRIGO ID ${trigoId} already belongs to ${idOwner.name}.`);
     const baseRow = { name, contract: vals.contract, area_id: vals.areaId, board_id: vals.boardId };
     // newest optional columns first, falling back to fewer columns if a migration
     // hasn't been run yet on this database — so saves keep working either way
+    // added_on: blank on a NEW employee is left out so the column default (today)
+    // applies; blank on an edit clears it ("counted on every date")
+    const addedRow = (employeeId || vals.addedOn) ? { added_on: vals.addedOn || null } : {};
+    const trigoRow = (trigoId !== undefined && (employeeId || trigoId)) ? { trigo_id: trigoId || null } : {};
+    const withStart = { ...baseRow, position: vals.position || null, phone: vals.phone || null, start_date: vals.startDate || null };
     const candidates = [
-      { ...baseRow, position: vals.position || null, phone: vals.phone || null, start_date: vals.startDate || null },
+      ...(Object.keys(trigoRow).length ? [{ ...withStart, ...addedRow, ...trigoRow }] : []),
+      ...(addedRow.added_on !== undefined ? [{ ...withStart, ...addedRow }] : []),
+      withStart,
       { ...baseRow, position: vals.position || null, phone: vals.phone || null },
       { ...baseRow, position: vals.position || null },
       baseRow,
@@ -973,8 +990,17 @@ const cloud = {
       if (vals.startDate && this._missingColumnFromError(error) === "start_date") {
         throw new Error("Start dates need a one-time database update (migration-2026-10-02-start-date.sql) before they can be saved.");
       }
+      if (vals.addedOn && this._missingColumnFromError(error) === "added_on") {
+        throw new Error("The 'added to board' date needs a one-time database update (migration-2026-10-02b-added-on.sql) before it can be saved.");
+      }
+      if (trigoId && this._missingColumnFromError(error) === "trigo_id") {
+        throw new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql) before they can be saved.");
+      }
     }
-    if (error) throw error;
+    if (error) {
+      if (error.code === "23505" && /trigo/i.test(error.message || "")) throw new Error(`The TRIGO ID ${trigoId} is already used by another employee.`);
+      throw error;
+    }
     await this._loadEmployees();
   },
   /* The single way an employee goes on/off the roster — the Manpower List's
@@ -1061,6 +1087,85 @@ const cloud = {
     const { error } = await sb.from("forecast_assignments").delete().in("employee_id", ids).eq("plan_date", date);
     if (error) console.warn("forecast placement not cleared on board move:", error.message || error);
     this._invalidateForecast();
+  },
+
+  /* ---------- bulk edit by file (Manpower List -> Bulk edit) ----------
+     `plan` is what bulk-edit.js's planEmployees() produced and the person
+     reviewed; only its "update" rows (and, when asked, its "create" rows) are
+     written. There is no transaction across rows in this client, so the safety
+     is elsewhere: the plan is fully validated first, every failure is reported
+     per row instead of aborting the batch, and the whole thing is idempotent -
+     re-uploading the same file only changes what still differs.
+     Board moves go through moveEmployeesToBoard (so the day on screen is
+     cleared exactly as a single move does) and Active/Inactive through
+     setEmployeesActive; everything else is one UPDATE per person. Returns
+     { updated, created, failed:[{rowNumber, name, message}] }. */
+  async applyEmployeeImport(plan, { moveDate, createNew = false } = {}) {
+    const rows = (plan && plan.rows) || [];
+    const updates = rows.filter((r) => r.kind === "update");
+    const creates = createNew ? rows.filter((r) => r.kind === "create") : [];
+    const failed = [];
+    const bad = new Set();
+    const fail = (r, e) => { bad.add(r.rowNumber); failed.push({ rowNumber: r.rowNumber, name: r.name, message: (e && e.message) || String(e) }); };
+
+    // 1. board moves, one call per destination board
+    const moves = new Map();
+    for (const r of updates) if (r.patch.boardId) { if (!moves.has(r.patch.boardId)) moves.set(r.patch.boardId, []); moves.get(r.patch.boardId).push(r); }
+    for (const [boardId, group] of moves) {
+      try { await this.moveEmployeesToBoard(group.map((r) => r.id), boardId, moveDate); }
+      catch (e) { group.forEach((r) => fail(r, e)); }
+    }
+    // 2. Active / Inactive, one call per direction
+    for (const flag of [false, true]) {
+      const group = updates.filter((r) => r.patch.active === flag && !bad.has(r.rowNumber));
+      if (!group.length) continue;
+      try { await this.setEmployeesActive(group.map((r) => r.id), flag); }
+      catch (e) { group.forEach((r) => fail(r, e)); }
+    }
+    // 3. the other fields: one UPDATE per person, a few at a time
+    const nz = (v) => (v === "" || v === undefined ? null : v);
+    const friendly = (e) => (e && e.code === "23505" && /trigo/i.test(e.message || "") ? new Error("That TRIGO ID is already used by another employee.")
+      : this._missingColumnFromError(e) === "trigo_id" ? new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql).") : e);
+    const dbPatch = (p) => {
+      const o = {};
+      if (p.name !== undefined) o.name = p.name;
+      if (p.trigoId !== undefined) o.trigo_id = nz(p.trigoId);
+      if (p.contract !== undefined) o.contract = p.contract;
+      if (p.position !== undefined) o.position = nz(p.position);
+      if (p.phone !== undefined) o.phone = nz(p.phone);
+      if (p.startDate !== undefined) o.start_date = nz(p.startDate);
+      if (p.addedOn !== undefined) o.added_on = nz(p.addedOn);
+      if (p.areaId !== undefined) o.area_id = p.areaId;
+      return o;
+    };
+    const pool = async (items, fn, n = 5) => {
+      let i = 0;
+      await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+        while (i < items.length) { const item = items[i++]; await fn(item); }
+      }));
+    };
+    await pool(updates.filter((r) => !bad.has(r.rowNumber)), async (r) => {
+      const patch = dbPatch(r.patch);
+      if (!Object.keys(patch).length) return;
+      const { error } = await sb.from("employees").update(patch).eq("id", r.id);
+      if (error) fail(r, friendly(error));
+    });
+    // 4. new people. A blank "on the board from" is left out so the column default (today) applies.
+    await pool(creates, async (r) => {
+      const c = r.create;
+      const row = { name: c.name, trigo_id: nz(c.trigoId), contract: c.contract, position: nz(c.position), phone: nz(c.phone), start_date: nz(c.startDate), area_id: c.areaId, board_id: c.boardId };
+      if (c.addedOn) row.added_on = c.addedOn;
+      if (c.active === false) row.active = false;
+      const { error } = await sb.from("employees").insert(row);
+      if (error) fail(r, friendly(error));
+    });
+    await this._loadEmployees();
+    this._invalidatePlans();
+    return {
+      updated: updates.filter((r) => !bad.has(r.rowNumber)).length,
+      created: creates.filter((r) => !bad.has(r.rowNumber)).length,
+      failed,
+    };
   },
 
   async createBoard(name, weekendDays) {
@@ -1151,9 +1256,10 @@ const cloud = {
      charts; an EMPTY mission counts for neither, since "a mission nobody
      was sent to" is not deployment.
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
-     use each employee's CURRENT board membership for the whole window - board
-     moves aren't tracked historically - and hidden missions on that date are
-     excluded from `assigned`/`oncallAssigned`, matching what the board
+     use each employee's CURRENT board membership - board moves aren't tracked
+     historically - but only from the day they were added to the app
+     (employees.added_on), so a bulk add never rewrites earlier days - and
+     hidden missions on that date are excluded from `assigned`/`oncallAssigned`, matching what the board
      itself shows today. `byEngineer` is the one genuinely historical
      dimension in here: engineer_id lives on the mission row for that date,
      so it is who actually ran the job, not who runs it now. */
@@ -1190,28 +1296,31 @@ const cloud = {
     const isActiveEmp = (id) => includeInactive || activeEmpIds.has(id);
     const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
     const empContract = new Map(this.data.employees.map((e) => [e.id, e.contract]));
-    const headcountByBoard = {};
-    const oncallHeadcountByBoard = {};
-    for (const id of boardIds) {
-      const emps = this.data.employees.filter((e) => e.boardId === id && isActiveEmp(e.id));
-      headcountByBoard[id] = emps.length;
-      oncallHeadcountByBoard[id] = emps.filter((e) => e.contract === "oncall").length;
-    }
+    // An employee only counts from the day they were added to the app
+    // (employees.added_on; blank = always counted), so people added later
+    // don't inflate headcount — and therefore Standby — for earlier days.
+    // Same per-day rule as onRoster() in app.js.
+    const empAddedOn = new Map(this.data.employees.filter((e) => e.addedOn).map((e) => [e.id, e.addedOn]));
+    const isCounted = (id, date) => isActiveEmp(id) && !(empAddedOn.has(id) && empAddedOn.get(id) > date);
+    const rosterByBoard = {};
+    for (const id of boardIds) rosterByBoard[id] = this.data.employees.filter((e) => e.boardId === id && isActiveEmp(e.id));
+    const headcountOn = (boardId, date) => rosterByBoard[boardId].filter((e) => !e.addedOn || e.addedOn <= date);
 
     // seed every calendar date for every requested board so each chart has a
     // full axis to work from, even on dates with zero assignments
     const result = Object.fromEntries(boardIds.map((id) => [id, {}]));
     for (let d = fromDate; d <= toDate; d = addDaysISO(d, 1)) {
       for (const boardId of boardIds) {
+        const emps = headcountOn(boardId, d);
         result[boardId][d] = {
-          assigned: 0, leave: 0, headcount: headcountByBoard[boardId],
-          oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: oncallHeadcountByBoard[boardId],
+          assigned: 0, leave: 0, headcount: emps.length,
+          oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: emps.filter((e) => e.contract === "oncall").length,
           staffedMissions: 0, byEngineer: {},
         };
       }
     }
     for (const a of assignRows) {
-      if (!isActiveEmp(a.employee_id)) continue;   // keep the numerator consistent with the headcount denominator above
+      if (!isCounted(a.employee_id, a.plan_date)) continue;   // keep the numerator consistent with the headcount denominator above
       const isOncall = empContract.get(a.employee_id) === "oncall";
       if (a.mission_id) {
         // Bucket by the MISSION's own board, not the employee's current one —
@@ -1249,7 +1358,7 @@ const cloud = {
        engineer" table already show it. */
     const crewByMission = new Map();   // mission id -> {crew, permCrew, oncallCrew}
     for (const a of assignRows) {
-      if (!a.mission_id || !isActiveEmp(a.employee_id)) continue;
+      if (!a.mission_id || !isCounted(a.employee_id, a.plan_date)) continue;
       if (missionHidden.has(a.mission_id)) continue;
       const m = crewByMission.get(a.mission_id) || { crew: 0, permCrew: 0, oncallCrew: 0 };
       m.crew++;
@@ -1584,6 +1693,54 @@ const cloud = {
     const { error } = await sb.from("hosts").delete().eq("id", id);
     if (error) throw error;
     await this._loadHosts();
+  },
+
+  /* Bulk edit by file for hosts (Host List -> Bulk edit). Same contract as
+     applyEmployeeImport: only reviewed rows are written, failures are reported
+     per row. The host NAME is the key and is never changed here (a rename has to
+     rewrite its missions - see renameHost), so every write is an upsert on the
+     name carrying only the columns the file set. */
+  async applyHostImport(plan, { createNew = false } = {}) {
+    const rows = (plan && plan.rows) || [];
+    const updates = rows.filter((r) => r.kind === "update");
+    const creates = createNew ? rows.filter((r) => r.kind === "create") : [];
+    const failed = [];
+    const nz = (v) => (v === "" || v === undefined ? null : v);
+    const dbPatch = (p) => {
+      const o = {};
+      if (p.location !== undefined) o.location = nz(p.location);
+      if (p.mapUrl !== undefined) o.map_url = nz(p.mapUrl);
+      if (p.note !== undefined) o.note = nz(p.note);
+      if (p.areaId !== undefined) o.area_id = p.areaId || null;
+      if (p.archived !== undefined) o.archived = !!p.archived;
+      return o;
+    };
+    const jobs = [
+      ...updates.map((r) => ({ r, row: { name: r.name, ...dbPatch(r.patch) } })),
+      ...creates.map((r) => ({ r, row: { name: r.name, ...dbPatch(r.create) } })),
+    ];
+    const bad = new Set();
+    let i = 0;
+    const now = new Date().toISOString();
+    await Promise.all(Array.from({ length: Math.min(5, jobs.length) }, async () => {
+      while (i < jobs.length) {
+        const { r, row } = jobs[i++];
+        const { error } = await sb.from("hosts").upsert({ ...row, updated_at: now }, { onConflict: "name" });
+        if (error) {
+          bad.add(r.rowNumber);
+          const msg = this._tableMissing(error)
+            ? "Saving hosts needs a one-time database update (migration-2026-09-02-hosts.sql) before it can be used."
+            : (error.message || String(error));
+          failed.push({ rowNumber: r.rowNumber, name: r.name, message: msg });
+        }
+      }
+    }));
+    await this._loadHosts();
+    return {
+      updated: updates.filter((r) => !bad.has(r.rowNumber)).length,
+      created: creates.filter((r) => !bad.has(r.rowNumber)).length,
+      failed,
+    };
   },
 
   /* ---------- host directory (Host List tab) ---------- */

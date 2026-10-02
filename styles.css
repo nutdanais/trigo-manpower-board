@@ -4430,3 +4430,38 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .xlsx-lang { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; font-size: 13px; }
 .modal .xlsx-lang label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; white-space: nowrap; cursor: pointer; }
 .modal .xlsx-lang input { width: auto; margin: 0; }
+
+/* ---------- Bulk edit by file (bulk-edit.js) ---------- */
+#modal-bulk { width: 780px; max-width: calc(100vw - 24px); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+#modal-bulk > h3 { position: relative; top: 0; flex: none; }
+#modal-bulk > .modal-actions { flex: none; align-items: center; }
+.bulk-step { margin-bottom: 12px; flex: none; }
+.bulk-step > b { display: block; margin-bottom: 6px; }
+.bulk-step-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.bulk-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+#bulk-preview { flex: 1 1 auto; min-height: 80px; overflow-y: auto; margin: 0 -20px 8px; padding: 0 20px; border-top: 1px solid var(--line, #d8e0e7); padding-top: 10px; }
+#bulk-preview.hidden { display: none; }
+.bulk-chips { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; }
+.bulk-extra { color: var(--muted); font-size: 12.5px; margin: 2px 0 8px; }
+.bulk-fatal, .bulk-problems { margin: 6px 0 10px; padding: 8px 10px; border-radius: 6px; background: var(--warn-bg, #fff3cd); font-size: 13px; }
+.bulk-problems ul { margin: 4px 0 0; padding-left: 18px; }
+.bulk-create { display: flex; align-items: center; gap: 6px; margin: 6px 0 10px; font-weight: 600; }
+.bulk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bulk-table th { text-align: left; font-size: 12px; color: var(--muted); padding: 4px 6px; position: sticky; top: 0; background: var(--panel); }
+.bulk-table td { padding: 5px 6px; border-top: 1px solid var(--line, #e3e9ee); vertical-align: top; }
+.bulk-table .bulk-row { color: var(--muted); font-variant-numeric: tabular-nums; width: 44px; }
+.bulk-table .bulk-chg { display: block; }
+.bulk-table .bulk-from { color: var(--muted); text-decoration: line-through; }
+.bulk-table .bulk-new { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 6px; border-radius: 8px; background: var(--ok-bg, #eaf4d5); color: var(--ok-text, #40610a); margin-right: 6px; }
+.bulk-table .bulk-warn { display: block; color: var(--warn-text, #7a5b00); font-size: 12px; }
+#modal-bulk label.bulk-check, #modal-bulk label.bulk-create { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+#modal-bulk input[type="checkbox"] { width: auto; margin: 0; flex: none; }
+
+/* ---------- TRIGO ID ---------- */
+/* chip on an employee card (opt-in, see #btn-trigo-id) */
+.emp-tid { font-family: var(--font-condensed); font-variant-numeric: tabular-nums; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; padding: 0 4px; border-radius: 4px; background: var(--chip-bg, rgba(0,73,131,.10)); color: var(--primary, #004983); }
+.oncall .emp-tid { background: rgba(0,0,0,.07); color: var(--text, #13222f); }
+.el-tid { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* a toggle button: pressed = on */
+.btn-toggle[aria-pressed="true"] { background: var(--primary, #004983); border-color: var(--primary, #004983); color: #fff; }
+.btn-toggle[aria-pressed="false"] .ic { opacity: .35; }

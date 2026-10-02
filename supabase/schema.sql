@@ -53,10 +53,17 @@ create table if not exists employees (
   position text check (position in ('inspector', 'senior_inspector', 'technician', 'team_leader', 'assistant_site_engineer')),
   phone text,
   start_date date,   -- first day of work; optional, drives Years of Service in the Excel export
+  -- the day this person was added to the app; headcount/Standby/utilization count them only from
+  -- this date on. NULL = always counted (people who predate the column). See migration-2026-10-02b.
+  added_on date default ((now() at time zone 'Asia/Bangkok')::date),
+  -- the TRIGO ID (T + digits, e.g. T329), kept apart from the full name; unique when set. See migration-2026-10-03.
+  trigo_id text,
   area_id uuid references service_areas(id) on delete restrict,
   board_id uuid not null references boards(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+create unique index if not exists employees_trigo_id_key
+  on employees (upper(trigo_id)) where trigo_id is not null and trigo_id <> '';
 
 -- ===== Missions: scoped to one board + one date =====
 

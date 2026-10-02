@@ -31,7 +31,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-02b">
+<link rel="stylesheet" href="styles.css?v=2026-10-03a">
 </head>
 <body>
 
@@ -191,7 +191,7 @@
      (each one's own hidden toggle lives in render()/renderStats() in app.js).
      Row 1 is what you DO here — create button, then filters/search — pinned
      left. Row 2 is what you're LOOKING AT — that tab's stat chips pinned left,
-     then its export-type action (Export/PDF or CSV) pinned right. Splitting
+     then its export-type action (Export/PDF or Excel) pinned right. Splitting
      these keeps the stats from crowding filters onto a wrapped second line, as
      one combined row did once enough boards/areas were in play. -->
 <div id="toolbar">
@@ -234,7 +234,7 @@
       <!-- Manpower's search/filters — a display:contents group so it folds into
            this row; render() shows/hides the whole group with one class. -->
       <div id="emplist-toolbar">
-        <input id="emplist-search" type="search" placeholder="Search name or mobile…" autocomplete="off">
+        <input id="emplist-search" type="search" placeholder="Search name, TRIGO ID or mobile…" autocomplete="off">
         <div id="emplist-filters">
           <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
@@ -280,6 +280,7 @@
           <option value="customer">Sort: Customer</option>
           <option value="shift">Sort: Shift</option>
         </select>
+        <button type="button" class="btn btn-quiet btn-toggle" id="btn-trigo-id" aria-pressed="false" title="Show each person's TRIGO ID on their card (remembered on this device)"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg> TRIGO ID</button>
       </div>
       <button id="btn-reset-board" class="btn btn-reset" title="Replace this day's plan with a copy of the last working day"><svg class="ic" aria-hidden="true"><use href="#i-reset"></use></svg> Reset Board</button>
       <button id="btn-forecast-copy" class="btn btn-quiet hidden" title="Copy this forecast onto the next working days that have none yet"><svg class="ic" aria-hidden="true"><use href="#i-arrow-right"></use></svg> Copy forecast</button>
@@ -293,9 +294,10 @@
     <div class="toolbar-spacer"></div>
     <span id="emplist-count" class="hidden"></span>
     <button type="button" class="btn hidden" id="btn-emplist-xlsx" title="Export the rows below as an Excel file — in English or Thai"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
-    <button type="button" class="btn hidden" id="btn-emplist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+    <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
     <span id="hostlist-count" class="hidden"></span>
-    <button type="button" class="btn hidden" id="btn-hostlist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+    <button type="button" class="btn hidden" id="btn-hostlist-xlsx" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
+    <button type="button" class="btn hidden" id="btn-hostlist-bulk" title="Edit many hosts in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
     <button id="btn-export" class="btn"><svg class="ic" aria-hidden="true"><use href="#i-camera"></use></svg> Export</button>
     <!-- The sharp half of "share the plan": a JPG is re-encoded and downsized by
          whatever chat app carries it, and it cannot hold a link. This prints the
@@ -379,6 +381,7 @@
           <tr>
             <th class="el-check"><input type="checkbox" id="emplist-select-all" title="Select all"></th>
             <th data-sort="name">Name</th>
+            <th data-sort="trigoId">TRIGO ID</th>
             <th data-sort="contract">Contract type</th>
             <th data-sort="position">Position</th>
             <th data-sort="phone">Mobile number</th>
@@ -540,7 +543,8 @@
       </div>
       <div class="settings-pane" data-pane="edit">
         <form id="form-employee">
-          <label>Employee name <input name="name" required placeholder="e.g. สุริยา"></label>
+          <label>Full name <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
+          <label>TRIGO ID (optional) <input name="trigoId" placeholder="e.g. T329" maxlength="8" autocomplete="off" title="The letter T and digits, like T329. Must be unique; two people may share a name only when both have a TRIGO ID."></label>
           <label>Contract type
             <select name="contract">
               <option value="permanent">Permanent</option>
@@ -559,6 +563,7 @@
           </label>
           <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
           <label>Start date (optional) <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
+          <label>On the board from (optional) <input name="addedOn" type="date" min="2000-01-01" max="2099-12-31" title="The day this person was added to the app. Dashboard headcount and Standby count them only from this date. Blank on a new employee = today; clear it on an existing one = counted on every date."></label>
           <label>Service area <select name="areaId" required></select></label>
           <label>Board <select name="boardId" required></select></label>
           <div class="modal-actions">
@@ -728,7 +733,7 @@
             <div class="toolbar-spacer"></div>
             <span id="users-count"></span>
             <button type="button" class="btn btn-small btn-primary" id="btn-add-user" title="Create an account and get a temporary password to hand over">+ Add user</button>
-            <button type="button" class="btn btn-small" id="btn-users-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
+            <button type="button" class="btn btn-small" id="btn-users-xlsx" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
           </div>
           <div class="table-wrap">
             <table id="users-table">
@@ -925,6 +930,31 @@
     </div>
   </div>
 
+  <!-- Bulk edit by file: Manpower List and Host List (see bulk-edit.js) -->
+  <div class="modal hidden" id="modal-bulk">
+    <h3><span id="bulk-title">Bulk edit</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note" id="bulk-intro"></p>
+    <div class="bulk-step">
+      <b>1. Get the file</b>
+      <div class="bulk-step-row">
+        <button type="button" class="btn" id="btn-bulk-dl-xlsx"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Download Excel template</button>
+      </div>
+      <span class="import-note" id="bulk-dl-note"></span>
+    </div>
+    <div class="bulk-step">
+      <b>2. Upload it back</b>
+      <div class="bulk-step-row"><input type="file" id="bulk-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+      <span class="import-note">Nothing is saved yet — you review every change first.</span>
+    </div>
+    <div id="bulk-preview" class="hidden"></div>
+    <div class="modal-actions">
+      <label id="bulk-backup-row" class="bulk-check"><input type="checkbox" id="bulk-backup" checked> Download a backup of the current list first</label>
+      <span class="toolbar-spacer"></span>
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-bulk-apply" disabled>Apply changes</button>
+    </div>
+  </div>
+
   <!-- PlanDiff: "Review changes" (stale carry-over) and "Review & merge" (forecast) -->
   <div class="modal hidden" id="modal-plandiff">
     <h3><span id="plandiff-title">Review changes</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
@@ -1019,9 +1049,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="planning.js?v=2026-09-24e"></script>
-<script src="cloud.js?v=2026-10-02a"></script>
+<script src="employee-id.js?v=2026-10-03a"></script>
+<script src="cloud.js?v=2026-10-03a"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="xlsx-export.js?v=2026-10-02b"></script>
-<script src="app.js?v=2026-10-02b"></script>
+<script src="xlsx-export.js?v=2026-10-03a"></script>
+<script src="bulk-edit.js?v=2026-10-03a"></script>
+<script src="app.js?v=2026-10-03a"></script>
 </body>
 </html>
