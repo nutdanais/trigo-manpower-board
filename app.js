@@ -9262,8 +9262,76 @@ function wireReset() {
   };
 }
 
+/* ---------- adjustable width of the floating employee panel ----------
+   The panel's width is the --fp-w CSS variable (it also drives #app-root's right
+   margin, so the board reflows around it). Wider panel = the flex-wrap cards in
+   it fall into more columns. Persisted per browser. */
+const FP_WIDTH_KEY = "mpm-pool-width";
+const FP_MIN_W = 264;   // the original fixed width — never narrower than that
+function fpMaxWidth() { return Math.max(FP_MIN_W, Math.min(760, Math.floor(window.innerWidth * 0.6))); }
+function clampFpWidth(w) { return Math.max(FP_MIN_W, Math.min(fpMaxWidth(), Math.round(w))); }
+
+function wireFloatPoolResize() {
+  const handle = $("#fp-resizer");
+  if (!handle) return;
+  const root = document.documentElement;
+  let width = FP_MIN_W;
+  try {
+    const saved = parseInt(localStorage.getItem(FP_WIDTH_KEY), 10);
+    if (saved > 0) width = saved;
+  } catch { /* storage unavailable — fall back to the default width */ }
+
+  let raf = 0;
+  const apply = (w, persist) => {
+    width = clampFpWidth(w);
+    root.style.setProperty("--fp-w", width + "px");
+    handle.setAttribute("aria-valuenow", String(width));
+    handle.setAttribute("aria-valuemin", String(FP_MIN_W));
+    handle.setAttribute("aria-valuemax", String(fpMaxWidth()));
+    // the board's width just changed, but window "resize" doesn't fire for that —
+    // re-pack the mission masonry ourselves (at most once per frame)
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; layoutMasonry(); });   // no-ops off a board view
+    if (persist) {
+      try { localStorage.setItem(FP_WIDTH_KEY, String(width)); } catch { /* skip persisting */ }
+    }
+  };
+  apply(width, false);
+
+  handle.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    handle.setPointerCapture(ev.pointerId);
+    document.body.classList.add("fp-resizing");
+  });
+  handle.addEventListener("pointermove", (ev) => {
+    if (!handle.hasPointerCapture(ev.pointerId)) return;
+    apply(window.innerWidth - ev.clientX, false);   // panel hugs the right edge
+  });
+  const end = (ev) => {
+    if (!handle.hasPointerCapture(ev.pointerId)) return;
+    handle.releasePointerCapture(ev.pointerId);
+    document.body.classList.remove("fp-resizing");
+    apply(width, true);
+  };
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+  handle.addEventListener("dblclick", () => apply(FP_MIN_W, true));
+  handle.addEventListener("keydown", (ev) => {
+    const step = ev.shiftKey ? 120 : 24;
+    if (ev.key === "ArrowLeft") apply(width + step, true);          // handle moves left = panel grows
+    else if (ev.key === "ArrowRight") apply(width - step, true);
+    else if (ev.key === "Home") apply(FP_MIN_W, true);
+    else if (ev.key === "End") apply(fpMaxWidth(), true);
+    else return;
+    ev.preventDefault();
+  });
+  // a smaller window may no longer have room for the saved width
+  window.addEventListener("resize", () => { if (clampFpWidth(width) !== width) apply(width, false); });
+}
+
 /* ---------- wiring ---------- */
 function wireApp() {
+  wireFloatPoolResize();
   $("#btn-toolbar-more").onclick = (ev) => {
     ev.stopPropagation();   // don't let the outside-click handler close it immediately
     const panel = $("#toolbar-more");
