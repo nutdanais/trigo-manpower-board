@@ -32,18 +32,19 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     db.t("missions").find((m) => m.id === "s101").ppe = "Helmet, Boots";
     db.t("missions").find((m) => m.id === "s101").remark = "Bring torque tools";
     db.t("employees").find((e) => e.id === "e1").phone = "081-234-5678";
+    db.t("employees").find((e) => e.id === "e1").start_date = "2023-04-20";
     const a = await env.openAs(db, h.USERS.a);
     const p = a.page;
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
 
-    await step("the Excel button is on a board, and the dialog lists all 14 columns ticked", async () => {
+    await step("the Excel button is on a board, and the dialog lists all 16 columns ticked", async () => {
       assert.equal(await p.locator("#btn-xlsx").isVisible(), true);
       await p.click("#btn-xlsx");
       await p.waitForSelector("#modal-xlsx:not(.hidden)");
       const labels = await p.locator("#xlsx-cols .import-info").allTextContents();
-      assert.deepEqual(labels, ["Name", "Contract Type", "Position", "Mobile Number", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
-      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 14);
-      assert.match(await p.textContent("#xlsx-count"), /14 of 14/);
+      assert.deepEqual(labels, ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
+      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 16);
+      assert.match(await p.textContent("#xlsx-count"), /16 of 16/);
       assert.match(await p.textContent("#xlsx-summary"), /Board One .* 4 employees on 3 missions/);
       const sheets = await p.locator("#xlsx-sheets .import-row").allTextContents();
       assert.deepEqual(sheets.map((t) => t.replace(/\s+/g, " ").trim()), [
@@ -55,7 +56,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     await step("Untick all disables Export; ticking one re-enables it", async () => {
       await p.click("#btn-xlsx-none");
       assert.equal(await p.locator("#btn-xlsx-go").isDisabled(), true);
-      assert.match(await p.textContent("#xlsx-count"), /0 of 14/);
+      assert.match(await p.textContent("#xlsx-count"), /0 of 16/);
       await p.click("#btn-xlsx-all");
       assert.equal(await p.locator("#btn-xlsx-go").isDisabled(), false);
     });
@@ -63,7 +64,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     let file;
     await step("exporting with Shift, Start and End unticked downloads a sheet without them", async () => {
       for (const k of ["shift", "start", "end"]) await p.uncheck(`#xlsx-cols input[value=${k}]`);
-      assert.match(await p.textContent("#xlsx-count"), /11 of 14/);
+      assert.match(await p.textContent("#xlsx-count"), /13 of 16/);
       const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
       assert.equal(dl.suggestedFilename(), `Board_One_${SRC}.xlsx`);
       file = "/tmp/xlsx-e2e.xlsx";
@@ -72,9 +73,9 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       await p.waitForSelector("#modal-xlsx", { state: "hidden" });
     });
 
-    await step("the file has the banner, the eleven chosen columns and one row per person", async () => {
+    await step("the file has the banner, the thirteen chosen columns and one row per person", async () => {
       const ws = await readSheet(file);
-      assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area", "Mission", "Host", "Customer", "PPE", "Engineer", "Remark"]);
+      assert.deepEqual(headerOf(ws), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Engineer", "Remark"]);
       const banner = [];
       ws.eachRow((r, n) => { if (n <= 3) r.eachCell((c) => banner.push(String(c.value))); });
       assert.ok(banner.includes("Manpower Board") && banner.includes("OPERATIONS PLANNING") && banner.includes("Board One"));
@@ -85,10 +86,18 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       assert.deepEqual(names, ["Person A", "Person B", "Person C", "Person D"]);   // missions 101,101,102,103
       assert.equal(ws.getCell(7, 4).value, "081-234-5678");   // Person A's mobile, kept as text
       assert.equal(ws.getCell(8, 4).value, "", "no number on file = empty cell");
-      assert.equal(ws.getCell(7, 6).value, "101");
-      assert.equal(ws.getCell(7, 9).value, "Helmet, Boots");
-      assert.equal(ws.getCell(7, 11).value, "Bring torque tools");
-      assert.equal(ws.getCell(7, 10).value, "Eng One");
+      // Start Date is a real Excel date; Years of Service counts from it up to the real today
+      const sd = ws.getCell(7, 5).value;
+      assert.ok(sd instanceof Date && sd.toISOString().slice(0, 10) === "2023-04-20", "Person A start date: " + sd);
+      assert.equal(ws.getCell(7, 5).numFmt, "dd-mmm-yyyy");
+      assert.equal(ws.getCell(7, 6).value, require("../../xlsx-export.js").serviceLength("2023-04-20", T));
+      assert.match(ws.getCell(7, 6).value, /^\d+ years? \d+ months? \d+ days?$/);
+      assert.equal(ws.getCell(8, 5).value, "", "no start date on file = empty cell");
+      assert.equal(ws.getCell(8, 6).value, "");
+      assert.equal(ws.getCell(7, 8).value, "101");
+      assert.equal(ws.getCell(7, 11).value, "Helmet, Boots");
+      assert.equal(ws.getCell(7, 13).value, "Bring torque tools");
+      assert.equal(ws.getCell(7, 12).value, "Eng One");
       assert.equal(ws.getCell(11, 1).value.richText.map((x) => x.text).join("").includes("TOTAL EMPLOYEES: 4"), true);
       assert.equal(ws.getImages().length, 1, "TRIGO logo embedded");
     });
@@ -100,9 +109,9 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       const [, leave, standby, oncall] = wb.worksheets;
       const col = (ws, c, from, to) => { const o = []; for (let r = from; r <= to; r++) o.push(ws.getCell(r, c).value); return o; };
       const head = (ws) => { const o = []; ws.getRow(6).eachCell((c) => o.push(c.value)); return o; };
-      assert.deepEqual(head(leave), ["Name", "Contract Type", "Position", "Mobile Number", "Service Area", "Leave Type"]);
+      assert.deepEqual(head(leave), ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Leave Type"]);
       assert.deepEqual(col(leave, 1, 7, 7), ["Person E"]);
-      assert.equal(leave.getCell(7, 6).value, "Annual Leave · ลาพักร้อน");
+      assert.equal(leave.getCell(7, 8).value, "Annual Leave");
       assert.equal(leave.getCell(7, 4).value, "", "Person E has no number on file");
       assert.deepEqual(col(standby, 1, 7, 7), ["Person F"]);
       assert.deepEqual(col(oncall, 1, 7, 8), ["Person G", "Person H"]);
@@ -114,11 +123,34 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       }
     });
 
+    await step("choosing Thai in the dialog downloads a Thai file, and the choice is remembered", async () => {
+      await p.click("#btn-xlsx");
+      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      assert.equal(await p.locator("#xlsx-lang input[value=en]").isChecked(), true, "English by default");
+      await p.check("#xlsx-lang input[value=th]");
+      const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
+      assert.equal(dl.suggestedFilename(), `Board_One_${SRC}_TH.xlsx`);
+      await dl.saveAs("/tmp/xlsx-e2e-th.xlsx");
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(fs.readFileSync("/tmp/xlsx-e2e-th.xlsx"));
+      assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "ลาและสลับวันหยุด", "สแตนด์บาย", "ออนคอลที่ว่าง"]);
+      const ws = wb.worksheets[0];
+      assert.deepEqual(headerOf(ws), ["ชื่อ", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "วิศวกร", "หมายเหตุ"]);
+      assert.equal(ws.getCell(7, 1).value, "Person A");
+      assert.equal(ws.getCell(7, 2).value, "ประจำ");
+      assert.match(ws.getCell(7, 6).value, /^\d+ ปี \d+ เดือน \d+ วัน$/);
+      await p.click("#btn-xlsx");
+      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      assert.equal(await p.locator("#xlsx-lang input[value=th]").isChecked(), true, "Thai remembered");
+      await p.click("#modal-xlsx [data-close].btn");
+    });
+
     await step("the column choice is remembered next time the dialog opens", async () => {
       await p.click("#btn-xlsx");
       await p.waitForSelector("#modal-xlsx:not(.hidden)");
-      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 11);
+      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 13);
       assert.equal(await p.locator("#xlsx-cols input[value=shift]").isChecked(), false);
+      await p.check("#xlsx-lang input[value=en]");   // the Thai choice was remembered; this step checks the English sheet names
       await p.uncheck("#xlsx-sheets input[value=standby]");
       await p.uncheck("#xlsx-sheets input[value=oncall]");
       const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);

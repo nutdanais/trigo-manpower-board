@@ -4425,3 +4425,8 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 #xlsx-sheets .import-row input { margin-top: 0; }
 #xlsx-sheets .import-info small { display: inline; margin-left: 2px; }
 #xlsx-hint { margin-bottom: 0; }
+
+/* Excel export dialogs: English / Thai file language */
+.xlsx-lang { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; font-size: 13px; }
+.modal .xlsx-lang label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; white-space: nowrap; cursor: pointer; }
+.modal .xlsx-lang input { width: auto; margin: 0; }

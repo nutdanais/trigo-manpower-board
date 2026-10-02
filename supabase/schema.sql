@@ -52,6 +52,7 @@ create table if not exists employees (
   contract text not null check (contract in ('permanent', 'oncall')),
   position text check (position in ('inspector', 'senior_inspector', 'technician', 'team_leader', 'assistant_site_engineer')),
   phone text,
+  start_date date,   -- first day of work; optional, drives Years of Service in the Excel export
   area_id uuid references service_areas(id) on delete restrict,
   board_id uuid not null references boards(id) on delete cascade,
   created_at timestamptz not null default now()

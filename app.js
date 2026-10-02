@@ -380,7 +380,7 @@ const state = {
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
-    filters: { contract: [], position: [], areaId: [], boardId: [], status: [] },
+    filters: { contract: [], position: [], service: [], areaId: [], boardId: [], status: [] },
     sortKey: "name",
     sortDir: 1,
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
@@ -943,6 +943,7 @@ function render() {
   // these live directly in #toolbar-row2, not inside a shared wrapper.
   $("#emplist-count").classList.toggle("hidden", !eml);
   $("#btn-emplist-csv").classList.toggle("hidden", !eml);
+  $("#btn-emplist-xlsx").classList.toggle("hidden", !eml);
   $("#hostlist-count").classList.toggle("hidden", !hl);
   $("#btn-hostlist-csv").classList.toggle("hidden", !hl);
   // The two lists and the board bar carry their own create buttons; RLS would
@@ -3769,13 +3770,28 @@ function renderFilterOptions() {
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
-const EMPLIST_FILTER_LABELS = { contract: "Contract", position: "Position", areaId: "Service area", boardId: "Board", status: "Status" };
+const EMPLIST_FILTER_LABELS = { contract: "Contract", position: "Position", service: "Years of service", areaId: "Service area", boardId: "Board", status: "Status" };
+
+/* Years-of-service filter: whole completed years from the start date to today */
+const SERVICE_BUCKETS = [
+  { value: "lt1", label: "Under 1 year", test: y => y !== null && y < 1 },
+  { value: "1to2", label: "1 to under 2 years", test: y => y >= 1 && y < 2 },
+  { value: "2to3", label: "2 to under 3 years", test: y => y >= 2 && y < 3 },
+  { value: "3plus", label: "3 years or more", test: y => y >= 3 },
+  { value: "__none__", label: "— no start date —", test: y => y === null },
+];
+function serviceBucketOf(e) {
+  const p = ManpowerXlsx.serviceParts(e.startDate, todayStr());
+  const y = p ? p.years : null;
+  return SERVICE_BUCKETS.find(b => b.test(y)).value;
+}
 
 function emplistFilterOptions(key) {
   if (key === "contract") return [{ value: "permanent", label: "Permanent" }, { value: "oncall", label: "On-call" }];
   if (key === "position") {
     return [...Object.keys(POSITIONS).map(k => ({ value: k, label: POSITIONS[k].label })), { value: "__none__", label: "— none —" }];
   }
+  if (key === "service") return SERVICE_BUCKETS.map(b => ({ value: b.value, label: b.label }));
   if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name }));
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
   if (key === "status") return [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }];
@@ -3827,6 +3843,7 @@ function emplistFilteredSorted() {
   const emps = D().employees.filter(e => {
     if (f.contract.length && !f.contract.includes(e.contract)) return false;
     if (f.position.length && !f.position.includes(e.position || "__none__")) return false;
+    if (f.service.length && !f.service.includes(serviceBucketOf(e))) return false;
     if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
     if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
@@ -3839,6 +3856,7 @@ function emplistFilteredSorted() {
       case "contract": return e.contract === "oncall" ? "On-call" : "Permanent";
       case "position": return e.position ? POSITIONS[e.position].label : "";
       case "phone": return e.phone || "";
+      case "startDate": return e.startDate || "";   // ISO text sorts in date order; people with none sort first
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
       case "active": return e.active === false ? "Inactive" : "Active";
@@ -3848,6 +3866,15 @@ function emplistFilteredSorted() {
   // utilization is the one numeric column — "100" vs "9" sorts wrong as text.
   // Unknown/no-working-days sorts to the bottom either way rather than as 0%,
   // which would read as "never deployed" and isn't the same claim.
+  // ascending = shortest service first (latest start date); people with no start date stay at the bottom either way
+  if (sortKey === "service") {
+    emps.sort((a, b) => {
+      const x = a.startDate || "", y = b.startDate || "";
+      if (!x || !y) return ((x ? 0 : 1) - (y ? 0 : 1)) || a.name.localeCompare(b.name);
+      return -x.localeCompare(y) * sortDir || a.name.localeCompare(b.name);
+    });
+    return emps;
+  }
   if (sortKey === "util") {
     const u = (e) => {
       const v = state.emplist.util ? state.emplist.util[e.id] : undefined;
@@ -3881,13 +3908,14 @@ function csvField(v) {
 }
 function exportEmplistCsv() {
   const emps = emplistFilteredSorted();   // same rows the table is showing right now
-  const header = ["Name", "Contract type", "Position", "Mobile number", "Service area", "Current board", "30D utilization", "Status"];
+  const header = ["Name", "Contract type", "Position", "Mobile number", "Start date", "Years of service", "Service area", "Current board", "30D utilization", "Status"];
   const rows = emps.map(e => {
     const area = D().areas.find(a => a.id === e.areaId);
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return [e.name, e.contract === "oncall" ? "On-call" : "Permanent", pos ? pos.label : "",
-      e.phone || "", area ? area.name : "", board ? board.name : "",
+      e.phone || "", e.startDate ? fmtDate(e.startDate) : "", ManpowerXlsx.serviceLength(e.startDate, todayStr()),
+      area ? area.name : "", board ? board.name : "",
       utilCsv(state.emplist.util ? state.emplist.util[e.id] : undefined),
       e.active === false ? "Inactive" : "Active"];
   });
@@ -3898,6 +3926,55 @@ function exportEmplistCsv() {
   a.download = `manpower_list_${todayStr()}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* The Manpower List as an Excel file: the rows the table is showing right now
+   (same search, filters and sort as the CSV), English or Thai. The sheet itself
+   is built by xlsx-export.js; ExcelJS is fetched on first use, like the board export. */
+function emplistXlsxRows() {
+  return emplistFilteredSorted().map(e => {
+    const area = D().areas.find(a => a.id === e.areaId);
+    const board = D().boards.find(b => b.id === e.boardId);
+    const pos = e.position ? POSITIONS[e.position] : null;
+    return {
+      name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent", position: pos ? pos.label : "",
+      phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", board: board ? board.name : "",
+      util: state.emplist.util ? state.emplist.util[e.id] : undefined, active: e.active !== false,
+    };
+  });
+}
+function openEmplistXlsxModal() {
+  const n = emplistFilteredSorted().length;
+  if (!n) { toast("No employees match the current filters, so there is nothing to export.", "info"); return; }
+  $("#emplist-xlsx-summary").textContent = `${n} ${n === 1 ? "employee" : "employees"} — the rows the table is showing now (search and filters apply).`;
+  setXlsxLangRadios("emplist-xlsx-lang", xlsxSavedLang());
+  openModal("#modal-emplist-xlsx");
+}
+async function exportEmplistXlsx() {
+  const btn = $("#btn-emplist-xlsx-go");
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try {
+    const lang = takeXlsxLang("emplist-xlsx-lang");
+    const rows = emplistXlsxRows();   // read again: the list may have changed while the dialog was open
+    const ExcelJS = await loadExcelJS();
+    const { workbook } = await ManpowerXlsx.buildListWorkbook(ExcelJS, { rows, lang, today: todayStr() });
+    const buf = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const name = `manpower_list_${todayStr()}${lang === "th" ? "_TH" : ""}.xlsx`;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    closeModal();
+    toast(`Exported ${rows.length} ${rows.length === 1 ? "employee" : "employees"} to ${name}.`, "info");
+  } catch (e) {
+    toast("Excel export failed: " + (e.message || e), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Export";
+  }
 }
 
 function updateEmplistBulkBar() {
@@ -3935,6 +4012,8 @@ function renderEmployeeRows() {
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
+      <td data-label="Start date">${e.startDate ? fmtDate(e.startDate) : "—"}</td>
+      <td data-label="Years of service">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
@@ -5129,6 +5208,7 @@ function openEmployeeModal(empId) {
     form.contract.value = e.contract;
     form.position.value = e.position || "";
     form.phone.value = e.phone || "";
+    form.startDate.value = e.startDate || "";
     form.areaId.value = e.areaId;
     form.boardId.value = e.boardId;
   } else if (!isNonBoardView()) {
@@ -5149,7 +5229,7 @@ function openEmployeeModal(empId) {
 function saveEmployee(ev) {
   ev.preventDefault();
   const form = $("#form-employee");
-  const vals = { name: form.name.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), areaId: form.areaId.value, boardId: form.boardId.value };
+  const vals = { name: form.name.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, areaId: form.areaId.value, boardId: form.boardId.value };
   // instant client-side check (same pattern as duplicate missions); the DB-cache
   // check in cloud.saveEmployee is the real guard, this just avoids a round trip
   const dup = D().employees.find(e =>
@@ -5910,6 +5990,7 @@ async function exportBoard() {
    ExcelJS is ~1 MB and almost nobody opens this dialog, so it is fetched on the
    first export, not at page load. */
 const XLSX_PREF_KEY = "manpower.xlsxColumns";
+const XLSX_LANG_KEY = "manpower.xlsxLang";   // "en" | "th" — the file language, shared by both Excel exports
 const XLSX_SHEETS_OFF_KEY = "manpower.xlsxSheetsOff";   // sheets the user switched off; default is all on
 const XLSX_SHEET_LABELS = { leave: "Leave & Exchange Working Day", standby: "Standby (permanent, unassigned)", oncall: "Available On-call (unassigned)" };
 let xlsxLibPromise = null;
@@ -5938,6 +6019,21 @@ function xlsxSavedColumns() {
   return ManpowerXlsx.ALL_KEYS;
 }
 
+/* File language for the Excel exports. English unless Thai was picked before. */
+function xlsxSavedLang() {
+  try { return localStorage.getItem(XLSX_LANG_KEY) === "th" ? "th" : "en"; } catch (e) { return "en"; }
+}
+function setXlsxLangRadios(name, lang) {
+  for (const r of $$(`input[name="${name}"]`)) r.checked = r.value === lang;
+}
+/* reads the picked language back and remembers it */
+function takeXlsxLang(name) {
+  const picked = $(`input[name="${name}"]:checked`);
+  const lang = picked && picked.value === "th" ? "th" : "en";
+  try { localStorage.setItem(XLSX_LANG_KEY, lang); } catch (e) { /* remembering is a courtesy */ }
+  return lang;
+}
+
 /* one row per person on a mission, missions in the order the board shows them,
    people permanent-first then by name (same as the cards) */
 function xlsxRows() {
@@ -5960,7 +6056,7 @@ function xlsxRows() {
       const pos = e.position ? POSITIONS[e.position] : null;
       rows.push({
         empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
-        position: pos ? pos.label : "", phone: e.phone || "", area: area ? area.name : "", mission: m.number, host: m.host,
+        position: pos ? pos.label : "", phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", mission: m.number, host: m.host,
         customer: m.customer, ppe, shift: m.shift === "night" ? "Night" : "Day", start: m.startTime, end: m.endTime,
         engineer: eng ? eng.name : "", remark: m.remark || "",
       });
@@ -5980,7 +6076,7 @@ function xlsxGroups() {
     const pos = e.position ? POSITIONS[e.position] : null;
     return Object.assign({
       empId: e.id, name: e.name, contract: e.contract === "oncall" ? "On-call" : "Permanent",
-      position: pos ? pos.label : "", area: area ? area.name : "", phone: e.phone || "",
+      position: pos ? pos.label : "", area: area ? area.name : "", phone: e.phone || "", startDate: e.startDate || "",
     }, extra);
   };
   const leave = [];
@@ -5989,7 +6085,7 @@ function xlsxGroups() {
       .map(id => D().employees.find(e => e.id === id))
       .filter(e => e && e.boardId === boardId && onRoster(e));
     for (const e of sortEmployeesDisplay(emps)) {
-      leave.push(person(e, { leaveKey: z, leave: `${ZONE_LABELS[z]} · ${ZONE_LABELS_TH[z]}`, leaveEn: ZONE_LABELS[z] }));
+      leave.push(person(e, { leaveKey: z, leaveEn: ZONE_LABELS[z], leaveTh: ZONE_LABELS_TH[z] }));
     }
   }
   const off = isNonWorkingDate(state.date);
@@ -6042,6 +6138,7 @@ function openXlsxModal() {
     `<label class="import-row"><input type="checkbox" value="${c.key}"${saved.has(c.key) ? " checked" : ""}><span class="import-info">${c.label}</span></label>`).join("");
   for (const b of $$("#xlsx-cols input")) b.onchange = updateXlsxCount;
   updateXlsxCount();
+  setXlsxLangRadios("xlsx-lang", xlsxSavedLang());
   openModal("#modal-xlsx");
 }
 
@@ -6066,17 +6163,18 @@ async function exportXlsx() {
     for (const g of ManpowerXlsx.GROUP_KEYS) groups[g] = picked.has(g) ? all[g] : [];
     const board = D().boards.find(b => b.id === D().activeBoardId);
     const boardName = board ? board.name : "Board";
+    const lang = takeXlsxLang("xlsx-lang");
     const [ExcelJS, logo] = await Promise.all([
       loadExcelJS(),
       fetch("logo-on-navy.png").then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),   // no logo = wordmark text instead
     ]);
     const { workbook, summary } = await ManpowerXlsx.buildWorkbook(ExcelJS, {
-      boardName, dateEn: `${fmtDow(state.date)} ${fmtDate(state.date)}`, dateTh: fmtDateThai(state.date),
+      boardName, dateEn: `${fmtDow(state.date)} ${fmtDate(state.date)}`, dateTh: fmtDateThai(state.date), today: todayStr(), lang,
       columns: keys, rows, groups, logo,
     });
     const buf = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const name = `${boardName.replace(/\s+/g, "_")}_${state.date}.xlsx`;
+    const name = `${boardName.replace(/\s+/g, "_")}_${state.date}${lang === "th" ? "_TH" : ""}.xlsx`;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = name;
@@ -9508,6 +9606,8 @@ function wireApp() {
 
   // ---------- Manpower List tab ----------
   $("#btn-emplist-csv").onclick = exportEmplistCsv;
+  $("#btn-emplist-xlsx").onclick = openEmplistXlsxModal;
+  $("#btn-emplist-xlsx-go").onclick = exportEmplistXlsx;
   $("#emplist-search").addEventListener("input", (e) => { state.emplist.search = e.target.value; renderEmployeeRows(); });
   for (const th of $$("#emplist-table th[data-sort]")) {
     th.onclick = () => {

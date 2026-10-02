@@ -31,7 +31,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-01a">
+<link rel="stylesheet" href="styles.css?v=2026-10-02b">
 </head>
 <body>
 
@@ -238,6 +238,7 @@
         <div id="emplist-filters">
           <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
+          <div class="ms" data-filter="service"><button type="button" class="ms-btn">Years of service: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
@@ -291,6 +292,7 @@
     <div id="emplist-area-bar" class="hidden"></div>
     <div class="toolbar-spacer"></div>
     <span id="emplist-count" class="hidden"></span>
+    <button type="button" class="btn hidden" id="btn-emplist-xlsx" title="Export the rows below as an Excel file — in English or Thai"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
     <button type="button" class="btn hidden" id="btn-emplist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
     <span id="hostlist-count" class="hidden"></span>
     <button type="button" class="btn hidden" id="btn-hostlist-csv" title="Export the rows below as a CSV file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> CSV</button>
@@ -380,6 +382,8 @@
             <th data-sort="contract">Contract type</th>
             <th data-sort="position">Position</th>
             <th data-sort="phone">Mobile number</th>
+            <th data-sort="startDate">Start date</th>
+            <th data-sort="service">Years of service</th>
             <th data-sort="areaId">Service area</th>
             <th data-sort="boardId">Current board</th>
             <th data-sort="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for.">30D utilization</th>
@@ -554,6 +558,7 @@
             </select>
           </label>
           <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+          <label>Start date (optional) <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
           <label>Service area <select name="areaId" required></select></label>
           <label>Board <select name="boardId" required></select></label>
           <div class="modal-actions">
@@ -883,6 +888,11 @@
   <div class="modal hidden" id="modal-xlsx">
     <h3>Export to Excel<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p class="import-note" id="xlsx-summary"></p>
+    <div class="xlsx-lang" id="xlsx-lang" role="radiogroup" aria-label="File language">
+      <b>File language</b>
+      <label><input type="radio" name="xlsx-lang" value="en"> English</label>
+      <label><input type="radio" name="xlsx-lang" value="th"> ไทย (Thai)</label>
+    </div>
     <div id="xlsx-tools">
       <button type="button" class="btn btn-small" id="btn-xlsx-all">Tick all</button>
       <button type="button" class="btn btn-small" id="btn-xlsx-none">Untick all</button>
@@ -893,10 +903,25 @@
       <h4 id="xlsx-sheets-title">Extra sheets for people not on a mission</h4>
       <div id="xlsx-sheets"></div>
     </div>
-    <p class="import-note" id="xlsx-hint">Sheet 1 has one row per person on a mission, in mission order. Every sheet carries the TRIGO header, board name, date and total. The columns above also apply to the extra sheets (Name is always kept). Your choices are remembered on this device.</p>
+    <p class="import-note" id="xlsx-hint">Sheet 1 has one row per person on a mission, in mission order. Every sheet carries the TRIGO header, board name, date and total. The columns above also apply to the extra sheets (Name is always kept). The file language (English / Thai) changes the headers and wording in the file; names, hosts and customers stay as typed. Your choices are remembered on this device.</p>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-xlsx-go">Export</button>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="modal-emplist-xlsx">
+    <h3>Export Manpower List to Excel<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note" id="emplist-xlsx-summary"></p>
+    <div class="xlsx-lang" id="emplist-xlsx-lang" role="radiogroup" aria-label="File language">
+      <b>File language</b>
+      <label><input type="radio" name="emplist-xlsx-lang" value="en"> English</label>
+      <label><input type="radio" name="emplist-xlsx-lang" value="th"> ไทย (Thai)</label>
+    </div>
+    <p class="import-note">One sheet with the same columns as the table (plus Years of Service, counted up to today), in the order shown. Only the table header — no banner. The language choice is remembered on this device.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-emplist-xlsx-go">Export</button>
     </div>
   </div>
 
@@ -994,9 +1019,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="planning.js?v=2026-09-24e"></script>
-<script src="cloud.js?v=2026-09-24f"></script>
+<script src="cloud.js?v=2026-10-02a"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="xlsx-export.js?v=2026-10-01a"></script>
-<script src="app.js?v=2026-10-01a"></script>
+<script src="xlsx-export.js?v=2026-10-02b"></script>
+<script src="app.js?v=2026-10-02b"></script>
 </body>
 </html>

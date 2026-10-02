@@ -3,28 +3,33 @@
    loaded, see vendor/exceljs.min.js) and in the node tests. app.js gathers the
    data (who is on which mission) and hands it over as flat rows; this file
    owns everything about the sheet: the column set, the navy banner that
-   mirrors the app's top bar, the table and the totals. Defines ManpowerXlsx. */
+   mirrors the app's top bar, the table and the totals. It also builds the
+   plain Manpower List sheet (header row only, no banner). Everything in the
+   file can come out in English or Thai (opts.lang: "en" | "th"). Defines
+   ManpowerXlsx. */
 
 "use strict";
 
 (function (root) {
-  /* The fourteen exportable columns, in sheet order. `width` is Excel's
+  /* The sixteen exportable columns, in sheet order. `width` is Excel's
      character width. `center` columns are the short ones (shift, times). */
   const COLUMNS = [
-    { key: "name",     label: "Name",          width: 30 },
-    { key: "contract", label: "Contract Type", width: 17 },
-    { key: "position", label: "Position",      width: 25 },
-    { key: "phone",    label: "Mobile Number", width: 16 },
-    { key: "area",     label: "Service Area",  width: 16 },
-    { key: "mission",  label: "Mission",       width: 11 },
-    { key: "host",     label: "Host",          width: 22 },
-    { key: "customer", label: "Customer",      width: 24 },
-    { key: "ppe",      label: "PPE",           width: 31 },
-    { key: "shift",    label: "Shift",         width: 8, center: true },
-    { key: "start",    label: "Start",         width: 8, center: true },
-    { key: "end",      label: "End",           width: 8, center: true },
-    { key: "engineer", label: "Engineer",      width: 18 },
-    { key: "remark",   label: "Remark",        width: 28 },
+    { key: "name",     label: "Name",          th: "ชื่อ",             width: 30 },
+    { key: "contract", label: "Contract Type", th: "ประเภทสัญญา",     width: 17 },
+    { key: "position", label: "Position",      th: "ตำแหน่ง",         width: 25 },
+    { key: "phone",    label: "Mobile Number", th: "เบอร์มือถือ",      width: 16 },
+    { key: "startDate", label: "Start Date",   th: "วันที่เริ่มงาน",   width: 14, center: true },
+    { key: "service",  label: "Years of Service", th: "อายุงาน",      width: 26 },
+    { key: "area",     label: "Service Area",  th: "พื้นที่บริการ",    width: 16 },
+    { key: "mission",  label: "Mission",       th: "ภารกิจ",          width: 11 },
+    { key: "host",     label: "Host",          th: "โฮสต์",           width: 22 },
+    { key: "customer", label: "Customer",      th: "ลูกค้า",          width: 24 },
+    { key: "ppe",      label: "PPE",           th: "PPE",             width: 31 },
+    { key: "shift",    label: "Shift",         th: "กะ",              width: 8, center: true },
+    { key: "start",    label: "Start",         th: "เริ่ม",            width: 8, center: true },
+    { key: "end",      label: "End",           th: "สิ้นสุด",          width: 8, center: true },
+    { key: "engineer", label: "Engineer",      th: "วิศวกร",          width: 18 },
+    { key: "remark",   label: "Remark",        th: "หมายเหตุ",        width: 28 },
   ];
   const ALL_KEYS = COLUMNS.map((c) => c.key);
 
@@ -38,6 +43,76 @@
   };
 
   const pxOf = (w) => w * 7 + 5;   // Excel column width (chars) -> approx. pixels
+
+  /* ---------- language ----------
+     Rows always arrive in English (that is what app.js and the tests speak);
+     the words in the file are chosen here. Names, hosts, customers, service
+     areas and free text are the user's own data and are never translated. */
+  const normLang = (l) => (l === "th" ? "th" : "en");
+  const labelOf = (col, lang) => (normLang(lang) === "th" && col.th ? col.th : col.label);
+  const TEXT = {
+    en: {
+      title: "Manpower Board", subtitle: "OPERATIONS PLANNING", totalEmployees: "TOTAL EMPLOYEES", total: "TOTAL",
+      permanent: "Permanent", oncall: "On-call", page: "Page &P of &N", listSheet: "Manpower List",
+    },
+    th: {
+      title: "บอร์ดกำลังคน", subtitle: "การวางแผนปฏิบัติการ", totalEmployees: "พนักงานทั้งหมด", total: "รวม",
+      permanent: "ประจำ", oncall: "ออนคอล", page: "หน้า &P จาก &N", listSheet: "รายชื่อพนักงาน",
+    },
+  };
+  const VALUES = {
+    th: {
+      contract: { "Permanent": "ประจำ", "On-call": "ออนคอล" },
+      shift: { "Day": "กลางวัน", "Night": "กลางคืน" },
+      position: {
+        "Inspector": "ผู้ตรวจสอบ", "Senior Inspector": "ผู้ตรวจสอบอาวุโส", "Technician": "ช่างเทคนิค",
+        "Team Leader": "หัวหน้าทีม", "Assistant Site Engineer": "ผู้ช่วยวิศวกรหน้างาน",
+      },
+      status: { "Active": "ใช้งาน", "Inactive": "ไม่ใช้งาน" },
+    },
+  };
+  /* one English value -> the file's language; anything unknown is left as it is */
+  function say(kind, value, lang) {
+    const m = VALUES[normLang(lang)];
+    return (m && m[kind] && m[kind][value]) || value;
+  }
+
+  /* Start dates travel as "YYYY-MM-DD" text (what the database and the date
+     input use). Parsed to a UTC midnight so no time zone can move the day. */
+  function parseIso(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+    if (!m) return null;
+    const y = +m[1], mo = +m[2], d = +m[3];
+    const t = new Date(Date.UTC(y, mo - 1, d));
+    return t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d ? t : null;
+  }
+
+  /* Length of service from a start date until `todayIso`, in whole calendar
+     years / months / days. Whole months are counted from the start date (a
+     start on the 31st lands on the last day of a shorter month), and the days
+     are what is left after them, so nothing is ever negative. A missing,
+     invalid or future start date gives null. */
+  function serviceParts(startIso, todayIso) {
+    const s = parseIso(startIso), t = parseIso(todayIso);
+    if (!s || !t || s > t) return null;
+    let months = (t.getUTCFullYear() - s.getUTCFullYear()) * 12 + (t.getUTCMonth() - s.getUTCMonth());
+    if (t.getUTCDate() < s.getUTCDate()) months--;
+    const anchorMonth = s.getUTCMonth() + months;
+    const lastDay = new Date(Date.UTC(s.getUTCFullYear(), anchorMonth + 1, 0)).getUTCDate();
+    const anchor = new Date(Date.UTC(s.getUTCFullYear(), anchorMonth, Math.min(s.getUTCDate(), lastDay)));
+    return { years: Math.floor(months / 12), months: months % 12, days: Math.round((t - anchor) / 86400000) };
+  }
+
+  /* "3 years 5 months 12 days" (Thai: "3 ปี 5 เดือน 12 วัน"). All three parts
+     are always shown ("0 years 0 months 5 days"); English is singular for
+     exactly 1. "" when there is no usable start date. */
+  function serviceLength(startIso, todayIso, lang) {
+    const p = serviceParts(startIso, todayIso);
+    if (!p) return "";
+    if (normLang(lang) === "th") return p.years + " ปี " + p.months + " เดือน " + p.days + " วัน";
+    const unit = (n, one) => n + " " + one + (n === 1 ? "" : "s");
+    return unit(p.years, "year") + " " + unit(p.months, "month") + " " + unit(p.days, "day");
+  }
 
   /* Keep only known keys, in sheet order, whatever order or junk was passed. */
   function normalizeColumns(keys) {
@@ -91,17 +166,21 @@
        standby  - permanent staff with no mission
        oncall   - on-call staff with no mission (Available On-call)
      Name is always there (a list without names is useless); Contract Type /
-     Position / Mobile Number / Service Area follow the same ticks as the main
+     Position / Mobile Number / Start Date / Years of Service / Service Area follow the same ticks as the main
      sheet (so unticking Mobile Number keeps phone numbers out of every sheet). */
   const LEAVE_ORDER = ["annual", "sick", "business", "unpaid", "exchange"];
-  const PICKER_SHARED = ["contract", "position", "phone", "area"];
-  const LEAVE_TYPE_COL = { key: "leave", label: "Leave Type", width: 34 };
+  const PICKER_SHARED = ["contract", "position", "phone", "startDate", "service", "area"];
+  const LEAVE_TYPE_COL = { key: "leave", label: "Leave Type", th: "ประเภทการลา", width: 34 };
   /* what each extra sheet is called and says about itself */
   const GROUPS = {
-    leave:   { sheetName: "Leave & Exchange",  subtitle: "LEAVE & EXCHANGE WORKING DAY", bigLabel: "ON LEAVE / EXCHANGE", extra: [LEAVE_TYPE_COL] },
-    standby: { sheetName: "Standby",           subtitle: "STANDBY · PERMANENT, UNASSIGNED", bigLabel: "ON STANDBY", extra: [] },
-    oncall:  { sheetName: "Available On-call", subtitle: "AVAILABLE ON-CALL · UNASSIGNED", bigLabel: "AVAILABLE ON-CALL", extra: [] },
+    leave:   { sheetName: "Leave & Exchange",  subtitle: "LEAVE & EXCHANGE WORKING DAY", bigLabel: "ON LEAVE / EXCHANGE", extra: [LEAVE_TYPE_COL],
+               th: { sheetName: "ลาและสลับวันหยุด", subtitle: "วันลาและสลับวันหยุด", bigLabel: "ลา / สลับวันหยุด" } },
+    standby: { sheetName: "Standby",           subtitle: "STANDBY · PERMANENT, UNASSIGNED", bigLabel: "ON STANDBY", extra: [],
+               th: { sheetName: "สแตนด์บาย", subtitle: "สแตนด์บาย · พนักงานประจำที่ยังไม่มีภารกิจ", bigLabel: "สแตนด์บาย" } },
+    oncall:  { sheetName: "Available On-call", subtitle: "AVAILABLE ON-CALL · UNASSIGNED", bigLabel: "AVAILABLE ON-CALL", extra: [],
+               th: { sheetName: "ออนคอลที่ว่าง", subtitle: "ออนคอลที่ว่าง · ยังไม่มีภารกิจ", bigLabel: "ออนคอลที่ว่าง" } },
   };
+  const groupText = (g, lang) => (normLang(lang) === "th" ? GROUPS[g].th : GROUPS[g]);
   const GROUP_KEYS = Object.keys(GROUPS);
   /* leave type cell tints: Exchange Working Day is a worked day so it reads green,
      every real leave reads amber */
@@ -111,14 +190,16 @@
     const base = COLUMNS.filter((c) => c.key === "name" || (PICKER_SHARED.includes(c.key) && want.has(c.key)));
     return base.concat(GROUPS[group].extra);
   }
+  /* the leave type in the file's language (a row may carry only a combined `leave`) */
+  const leaveLabel = (r, lang) => (normLang(lang) === "th" ? (r.leaveTh || r.leave) : (r.leaveEn || r.leave)) || "";
   /* people once each; for leave, per-type counts in leave-zone order */
-  function summarizeLeave(rows) {
+  function summarizeLeave(rows, lang) {
     const seen = new Set();
     const byType = new Map();
     for (const r of rows) {
       if (seen.has(r.empId)) continue;
       seen.add(r.empId);
-      byType.set(r.leaveKey, { label: r.leaveEn, n: (byType.has(r.leaveKey) ? byType.get(r.leaveKey).n : 0) + 1 });
+      byType.set(r.leaveKey, { label: leaveLabel(r, lang), n: (byType.has(r.leaveKey) ? byType.get(r.leaveKey).n : 0) + 1 });
     }
     const types = LEAVE_ORDER.filter((k) => byType.has(k)).map((k) => byType.get(k));
     return { total: seen.size, types };
@@ -130,9 +211,74 @@
     return wb.addImage({ buffer: logo, extension: "png" });
   }
 
+  const fillOf = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
+  const fontOf = (o) => Object.assign({ name: "Calibri", size: 11, color: { argb: C.ink } }, o);
+
+  /* The value and look of one body cell, shared by the board sheets and the
+     Manpower List sheet. `k` is the row index (odd rows get a light tint).
+     spec: { lang, today } */
+  function writeBodyCell(cell, col, r, k, spec) {
+    const lang = normLang(spec.lang);
+    let v = r[col.key];
+    if (col.key === "startDate") {
+      // a real Excel date (sorts and filters as one), shown like the app: 20-Apr-2023
+      const d = parseIso(r.startDate);
+      v = d || "";
+      if (d) cell.numFmt = "dd-mmm-yyyy";
+    } else if (col.key === "service") {
+      v = serviceLength(r.startDate, spec.today, lang);
+    } else if (col.key === "contract" || col.key === "shift" || col.key === "position") {
+      v = say(col.key, v, lang);
+    } else if (col.key === "leave") {
+      v = leaveLabel(r, lang);
+    } else if (col.key === "status") {
+      v = say("status", r.active === false ? "Inactive" : "Active", lang);
+    } else if (col.key === "util") {
+      // a real percentage (0.05 shows as 5%); blank while unknown or no working days
+      v = typeof r.util === "number" ? r.util / 100 : "";
+      if (v !== "") cell.numFmt = "0%";
+    }
+    cell.value = v === undefined || v === null ? "" : v;
+    cell.font = fontOf({ bold: col.key === "name" });
+    cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
+    cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
+    if (k % 2 === 1) cell.fill = fillOf(C.paper);
+    if (col.key === "contract" && r.contract === "On-call") cell.font = fontOf({ bold: true, color: { argb: C.oncall } });
+    if (col.key === "status" && r.active === false) cell.font = fontOf({ color: { argb: C.mut } });
+    if (col.key === "shift") {
+      const night = r.shift === "Night";
+      cell.fill = fillOf(night ? C.nightBg : C.dayBg);
+      cell.font = fontOf({ bold: true, color: { argb: night ? C.nightFg : C.dayFg } });
+    }
+    if (col.key === "leave") {
+      const t = LEAVE_TINT[r.leaveKey] || [C.dayBg, C.dayFg];
+      cell.fill = fillOf(t[0]);
+      cell.font = fontOf({ bold: true, color: { argb: t[1] } });
+    }
+    if (col.key === "remark") cell.font = fontOf({ italic: true, color: { argb: C.mut } });
+  }
+
+  /* The pale total row under a table: label (and a muted detail) merged over
+     the first columns. Same on the board sheets and the Manpower List. */
+  function writeTotalRow(ws, rowNo, nTable, footer) {
+    ws.getRow(rowNo).height = 26;
+    for (let c = 1; c <= nTable; c++) {
+      const cell = ws.getCell(rowNo, c);
+      cell.fill = fillOf(C.pale);
+      cell.border = { top: { style: "medium", color: { argb: C.navy } } };
+    }
+    const labelSpan = Math.min(nTable, 4);
+    if (labelSpan > 1) ws.mergeCells(rowNo, 1, rowNo, labelSpan);
+    const tc = ws.getCell(rowNo, 1);
+    const rich = [{ text: footer.main, font: fontOf({ size: 12, bold: true, color: { argb: C.navy } }) }];
+    if (footer.detail) rich.push({ text: "   " + footer.detail, font: fontOf({ size: 10.5, color: { argb: C.mut } }) });
+    tc.value = { richText: rich };
+    tc.alignment = { vertical: "middle", indent: 1 };
+  }
+
   /* One sheet in the TRIGO layout: navy banner (logo, title, board + date, a
      big number), green rule, table, total row. spec: { sheetName, title,
-     subtitle, boardName, dateEn, dateTh, bigNumber, bigLabel, cols, rows,
+     subtitle, boardName, dateLine, lang, today, bigNumber, bigLabel, cols, rows,
      footer: {main, detail}, logoId, styleCell(col, row, cell, helpers) } */
   function addSheet(wb, spec) {
     const { cols, rows } = spec;
@@ -142,7 +288,7 @@
         orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
         margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 },
       },
-      headerFooter: { oddFooter: "&L&8Manpower Board — " + String(spec.boardName || "").replace(/&/g, "&&") + "&R&8Page &P of &N" },
+      headerFooter: { oddFooter: "&L&8" + TEXT[normLang(spec.lang)].title + " — " + String(spec.boardName || "").replace(/&/g, "&&") + "&R&8" + TEXT[normLang(spec.lang)].page },
     });
 
     const widths = cols.map((c) => c.width);
@@ -153,8 +299,7 @@
     // anything past the four blocks (spare table columns) is blank navy; widths of fillers come after table columns
     for (let c = 0; c < nCols; c++) ws.getColumn(c + 1).width = allWidths[c] || 14;
 
-    const fill = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
-    const font = (o) => Object.assign({ name: "Calibri", size: 11, color: { argb: C.ink } }, o);
+    const fill = fillOf, font = fontOf;
 
     // ---- banner: rows 1-3 navy, 4 green rule, 5 spacer ----
     const heights = [14, 26, 18, 4, 10];
@@ -182,7 +327,7 @@
     const white = { argb: "FFFFFFFF" };
     block(sTitle, sBoard - 1, spec.title, spec.subtitle,
       { font: font({ size: 20, bold: true, color: white }) }, { font: font({ size: 10, color: { argb: C.onNavy } }) });
-    block(sBoard, sTotal - 1, spec.boardName || "", [spec.dateEn, spec.dateTh].filter(Boolean).join("  ·  "),
+    block(sBoard, sTotal - 1, spec.boardName || "", spec.dateLine,
       { font: font({ size: 18, bold: true, color: white }) }, { font: font({ size: 10.5, color: { argb: C.onNavy } }) });
     block(sTotal, sEnd - 1, spec.bigNumber, spec.bigLabel,
       { font: font({ size: 20, bold: true, color: { argb: C.green } }), align: { horizontal: "left" } },
@@ -202,7 +347,7 @@
     ws.getRow(HEAD).height = 24;
     cols.forEach((col, i) => {
       const cell = ws.getCell(HEAD, i + 1);
-      cell.value = col.label;
+      cell.value = labelOf(col, spec.lang);
       cell.font = font({ bold: true, color: white });
       cell.fill = fill(C.navy);
       cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
@@ -213,44 +358,12 @@
     rows.forEach((r, k) => {
       const row = ws.getRow(HEAD + 1 + k);
       row.height = 20;
-      cols.forEach((col, i) => {
-        const cell = row.getCell(i + 1);
-        cell.value = r[col.key] === undefined || r[col.key] === null ? "" : r[col.key];
-        cell.font = font({ bold: col.key === "name" });
-        cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
-        cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
-        if (k % 2 === 1) cell.fill = fill(C.paper);
-        if (col.key === "contract" && r.contract === "On-call") cell.font = font({ bold: true, color: { argb: C.oncall } });
-        if (col.key === "shift") {
-          const night = r.shift === "Night";
-          cell.fill = fill(night ? C.nightBg : C.dayBg);
-          cell.font = font({ bold: true, color: { argb: night ? C.nightFg : C.dayFg } });
-        }
-        if (col.key === "leave") {
-          const t = LEAVE_TINT[r.leaveKey] || [C.dayBg, C.dayFg];
-          cell.fill = fill(t[0]);
-          cell.font = font({ bold: true, color: { argb: t[1] } });
-        }
-        if (col.key === "remark") cell.font = font({ italic: true, color: { argb: C.mut } });
-      });
+      cols.forEach((col, i) => writeBodyCell(row.getCell(i + 1), col, r, k, spec));
     });
 
     // ---- total row ----
     const lastData = HEAD + rows.length;
-    const TOT = lastData + 1;
-    ws.getRow(TOT).height = 26;
-    for (let c = 1; c <= nTable; c++) {
-      const cell = ws.getCell(TOT, c);
-      cell.fill = fill(C.pale);
-      cell.border = { top: { style: "medium", color: { argb: C.navy } } };
-    }
-    const labelSpan = Math.min(nTable, 4);
-    if (labelSpan > 1) ws.mergeCells(TOT, 1, TOT, labelSpan);
-    const tc = ws.getCell(TOT, 1);
-    const rich = [{ text: spec.footer.main, font: font({ size: 12, bold: true, color: { argb: C.navy } }) }];
-    if (spec.footer.detail) rich.push({ text: "   " + spec.footer.detail, font: font({ size: 10.5, color: { argb: C.mut } }) });
-    tc.value = { richText: rich };
-    tc.alignment = { vertical: "middle", indent: 1 };
+    writeTotalRow(ws, lastData + 1, nTable, spec.footer);
 
     ws.views = [{ showGridLines: false, state: "frozen", ySplit: HEAD }];
     ws.pageSetup.printTitlesRow = HEAD + ":" + HEAD;
@@ -261,10 +374,11 @@
   /* Builds the workbook. `ExcelJS` is passed in so the browser can lazy-load it.
      opts: { boardName, dateEn, dateTh, columns: [keys], rows: [row],
              groups: { leave: [pRow], standby: [pRow], oncall: [pRow] } (each optional),
+             today: "YYYY-MM-DD" (what Years of Service counts up to; the real today),
              logo: ArrayBuffer|Buffer|null }
      A row (sheet 1: people on missions) is { empId, name, contract: "Permanent"|"On-call",
-     position, phone, area, mission, host, customer, ppe, shift: "Day"|"Night", start, end, engineer, remark }.
-     A pRow (people not on a mission) is { empId, name, contract, position, area, phone }, and for
+     position, phone, startDate: "YYYY-MM-DD"|"", area, mission, host, customer, ppe, shift: "Day"|"Night", start, end, engineer, remark }.
+     A pRow (people not on a mission) is { empId, name, contract, position, area, phone, startDate }, and for
      the leave group also { leaveKey: one of LEAVE_ORDER, leave: "Annual Leave · ลาพักร้อน", leaveEn }.
      An empty or missing group adds no sheet. The header and the total row show only the
      total number of employees; the Permanent / On-call split appears only when the
@@ -272,24 +386,27 @@
   async function buildWorkbook(ExcelJS, opts) {
     const cols = normalizeColumns(opts.columns);
     if (!cols.length) throw new Error("Pick at least one column to export.");
+    const lang = normLang(opts.lang), T = TEXT[lang];
     const rows = opts.rows || [];
     const sum = summarize(rows);
     const wb = new ExcelJS.Workbook();
     wb.creator = "TRIGO Manpower Board";
     wb.created = new Date();
     const logoId = await loadLogo(ExcelJS, wb, opts.logo);
-    const common = { boardName: opts.boardName, dateEn: opts.dateEn, dateTh: opts.dateTh, logoId, title: "Manpower Board" };
+    // one language per file: the banner carries the date in that language only
+    const dateLine = lang === "th" ? (opts.dateTh || opts.dateEn || "") : (opts.dateEn || "");
+    const common = { boardName: opts.boardName, dateLine, lang, today: opts.today, logoId, title: T.title };
 
     const withContract = cols.some((c) => c.key === "contract");
     const used = new Set();
     const mainName = safeSheetName(opts.boardName);
     used.add(mainName.toLowerCase());
     addSheet(wb, Object.assign({}, common, {
-      sheetName: mainName, subtitle: "OPERATIONS PLANNING",
-      bigNumber: sum.total, bigLabel: "TOTAL EMPLOYEES", cols, rows,
+      sheetName: mainName, subtitle: T.subtitle,
+      bigNumber: sum.total, bigLabel: T.totalEmployees, cols, rows,
       footer: {
-        main: "TOTAL EMPLOYEES: " + sum.total,
-        detail: withContract ? "(Permanent " + sum.permanent + " · On-call " + sum.oncall + ")" : "",
+        main: T.totalEmployees + ": " + sum.total,
+        detail: withContract ? "(" + T.permanent + " " + sum.permanent + " · " + T.oncall + " " + sum.oncall + ")" : "",
       },
     }));
 
@@ -297,28 +414,87 @@
     for (const g of GROUP_KEYS) {
       const grows = (opts.groups && opts.groups[g]) || [];
       if (!grows.length) { groupSummary[g] = null; continue; }
-      let name = GROUPS[g].sheetName;
+      const gt = groupText(g, lang);
+      let name = safeSheetName(gt.sheetName);
       if (used.has(name.toLowerCase())) name += " (2)";   // a board literally named "Standby" must not collide
       used.add(name.toLowerCase());
       let footer;
       if (g === "leave") {
-        const ls = summarizeLeave(grows);
+        const ls = summarizeLeave(grows, lang);
         groupSummary[g] = ls;
-        footer = { main: "TOTAL: " + ls.total, detail: "(" + ls.types.map((t) => t.label + " " + t.n).join(" · ") + ")" };
+        footer = { main: T.total + ": " + ls.total, detail: "(" + ls.types.map((t) => t.label + " " + t.n).join(" · ") + ")" };
       } else {
         const n = countPeople(grows);
         groupSummary[g] = { total: n };
-        footer = { main: "TOTAL: " + n, detail: "" };
+        footer = { main: T.total + ": " + n, detail: "" };
       }
       addSheet(wb, Object.assign({}, common, {
-        sheetName: name, subtitle: GROUPS[g].subtitle, bigNumber: groupSummary[g].total, bigLabel: GROUPS[g].bigLabel,
+        sheetName: name, subtitle: gt.subtitle, bigNumber: groupSummary[g].total, bigLabel: gt.bigLabel,
         cols: groupColumns(g, opts.columns), rows: grows, footer,
       }));
     }
     return { workbook: wb, summary: Object.assign({}, sum, { groups: groupSummary }) };
   }
 
-  const api = { COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, buildWorkbook };
+  /* ---------- the Manpower List: one plain sheet ----------
+     No banner or logo: row 1 is the header, in the same table design as the
+     board export (navy header with the green rule, tinted alternate rows, pale
+     total row under the table), frozen, filterable and repeated on every
+     printed page. One row per person in the order given. A row is { name, contract: "Permanent"|"On-call",
+     position (English label or ""), phone, startDate: "YYYY-MM-DD"|"", area,
+     board, util: percent|null|undefined, active: boolean }. */
+  const LIST_COLUMNS = [
+    { key: "name",      label: "Name",            th: "ชื่อ",               width: 30 },
+    { key: "contract",  label: "Contract Type",   th: "ประเภทสัญญา",       width: 17 },
+    { key: "position",  label: "Position",        th: "ตำแหน่ง",           width: 25 },
+    { key: "phone",     label: "Mobile Number",   th: "เบอร์มือถือ",        width: 16 },
+    { key: "startDate", label: "Start Date",      th: "วันที่เริ่มงาน",     width: 14, center: true },
+    { key: "service",   label: "Years of Service", th: "อายุงาน",          width: 26 },
+    { key: "area",      label: "Service Area",    th: "พื้นที่บริการ",      width: 16 },
+    { key: "board",     label: "Current Board",   th: "บอร์ดปัจจุบัน",      width: 20 },
+    { key: "util",      label: "30D Utilization", th: "การใช้งาน 30 วัน",   width: 17, center: true },
+    { key: "status",    label: "Status",          th: "สถานะ",             width: 12, center: true },
+  ];
+  async function buildListWorkbook(ExcelJS, opts) {
+    const lang = normLang(opts.lang), T = TEXT[lang];
+    const rows = opts.rows || [];
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "TRIGO Manpower Board";
+    wb.created = new Date();
+    const ws = wb.addWorksheet(safeSheetName(T.listSheet), {
+      views: [{ showGridLines: false, state: "frozen", ySplit: 1 }],
+      pageSetup: {
+        orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+        margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 },
+        printTitlesRow: "1:1",
+      },
+      headerFooter: { oddFooter: "&L&8" + T.listSheet + "&R&8" + T.page },
+    });
+    LIST_COLUMNS.forEach((col, i) => {
+      ws.getColumn(i + 1).width = col.width;
+      const cell = ws.getCell(1, i + 1);
+      cell.value = labelOf(col, lang);
+      cell.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
+      cell.fill = fillOf(C.navy);
+      cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
+      cell.border = { bottom: { style: "medium", color: { argb: C.green } } };
+    });
+    ws.getRow(1).height = 24;
+    rows.forEach((r, k) => {
+      const row = ws.getRow(2 + k);
+      row.height = 20;
+      LIST_COLUMNS.forEach((col, i) => writeBodyCell(row.getCell(i + 1), col, r, k, { lang, today: opts.today }));
+    });
+    const perm = rows.filter((r) => r.contract !== "On-call").length, oc = rows.length - perm;
+    writeTotalRow(ws, 2 + rows.length, LIST_COLUMNS.length, {
+      main: T.totalEmployees + ": " + rows.length,
+      detail: "(" + T.permanent + " " + perm + " · " + T.oncall + " " + oc + ")",
+    });
+    if (rows.length) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1 + rows.length, column: LIST_COLUMNS.length } };
+    return { workbook: wb, summary: { total: rows.length, permanent: perm, oncall: oc } };
+  }
+
+  const api = { COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);
