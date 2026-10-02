@@ -53,6 +53,9 @@ create table if not exists employees (
   position text check (position in ('inspector', 'senior_inspector', 'technician', 'team_leader', 'assistant_site_engineer')),
   phone text,
   start_date date,   -- first day of work; optional, drives Years of Service in the Excel export
+  -- the day this person was added to the app; headcount/Standby/utilization count them only from
+  -- this date on. NULL = always counted (people who predate the column). See migration-2026-10-02b.
+  added_on date default ((now() at time zone 'Asia/Bangkok')::date),
   area_id uuid references service_areas(id) on delete restrict,
   board_id uuid not null references boards(id) on delete cascade,
   created_at timestamptz not null default now()

@@ -581,7 +581,11 @@ const boardEmployees = (boardId) => D().employees.filter(e => e.boardId === boar
    flag rather than a delete. boardEmployees() above stays unfiltered on
    purpose — it's the raw lookup history rendering depends on. */
 const showsDeactivated = () => state.date < todayStr();
-const onRoster = (e) => showsDeactivated() || e.active !== false;
+/* Day-level join date: someone added to the app on the 1st doesn't exist on
+   the board before that date, so a bulk add never inflates Standby/headcount for
+   earlier days. Blank addedOn = predates the column = always counted. */
+const hasJoined = (e) => !e.addedOn || e.addedOn <= state.date;
+const onRoster = (e) => hasJoined(e) && (showsDeactivated() || e.active !== false);
 const rosterEmployees = (boardId) => boardEmployees(boardId).filter(onRoster);
 
 /* ---------- plan access (reads the cache cloud.js keeps warm) ---------- */
@@ -2414,7 +2418,7 @@ function renderStats() {
   bar.appendChild(statChip("Night", s.nightMissions, null, "stat-chip-night"));
   // per-service-area counts, right after the chips above in the same row
   for (const a of D().areas) {
-    const n = boardEmployees(D().activeBoardId).filter(e => e.areaId === a.id).length;
+    const n = boardEmployees(D().activeBoardId).filter(e => e.areaId === a.id && hasJoined(e)).length;
     if (n) areaBar.appendChild(statChip(a.name, n));
   }
 }
@@ -5209,6 +5213,7 @@ function openEmployeeModal(empId) {
     form.position.value = e.position || "";
     form.phone.value = e.phone || "";
     form.startDate.value = e.startDate || "";
+    form.addedOn.value = e.addedOn || "";
     form.areaId.value = e.areaId;
     form.boardId.value = e.boardId;
   } else if (!isNonBoardView()) {
@@ -5229,7 +5234,7 @@ function openEmployeeModal(empId) {
 function saveEmployee(ev) {
   ev.preventDefault();
   const form = $("#form-employee");
-  const vals = { name: form.name.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, areaId: form.areaId.value, boardId: form.boardId.value };
+  const vals = { name: form.name.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
   // instant client-side check (same pattern as duplicate missions); the DB-cache
   // check in cloud.saveEmployee is the real guard, this just avoids a round trip
   const dup = D().employees.find(e =>
