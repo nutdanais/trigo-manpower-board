@@ -179,7 +179,7 @@ async function sheetOf(path) {
     };
 
     await step("the Manpower List Excel has both name columns, in an English and in a Thai file", async () => {
-      const both = (ws) => { const o = {}; for (let r = 2; r <= ws.rowCount; r++) if (ws.getCell(r, 1).value) o[ws.getCell(r, 1).value] = ws.getCell(r, 2).value || ""; return o; };
+      const both = (ws) => { const o = {}; for (let r = 2; r <= ws.rowCount; r++) if (typeof ws.getCell(r, 1).value === "string") o[ws.getCell(r, 1).value] = ws.getCell(r, 2).value || ""; return o; };
       const en = await exportList("en", "/tmp/names-en.xlsx");
       assert.deepEqual([1, 2].map((c) => en.getCell(1, c).value), ["Thai Name", "English Name"]);
       const e = both(en);
