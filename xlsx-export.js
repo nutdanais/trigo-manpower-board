@@ -560,28 +560,51 @@
     return { workbook: wb, summary: { total: rows.length } };
   }
 
-  /* The Capacity tab as a workbook: one sheet per board. Each is the grid as
-     the screen shows it — a navy banner, the days across (CONFIRMED or
-     FORECAST under each date), the Available / Demand / Gap / Named rows, then
-     one row per host x shift with the host columns the user ticked. Numbers
-     are real numbers. spec: { boards: [Capacity.exportBoard(...)], rangeText,
-     generatedOn, note } */
+  /* The Capacity tab as a WORKING workbook: one sheet per board that keeps
+     planning in Excel. Yellow cells are inputs (host demand, Available people,
+     host / shift names in the spare rows); Demand, Gap and Total are real
+     formulas over them, the Gap colours are conditional formatting, and each
+     sheet carries a native Excel chart (Available and Demand as columns, Gap
+     as a line) reading the same cells — change a number and all of it follows.
+     ExcelJS cannot write charts, so the chart is added afterwards by
+     addCapacityCharts (JSZip). Layout per sheet:
+       1 banner · 2 range · 3 dates · 4 CONFIRMED / FORECAST
+       5 Available · 6 Demand · 7 Gap · 8 Named on board · 9 section title
+       10.. one row per host x shift, then CAP_SPARE_ROWS blank rows
+       a note, then the chart.
+     spec: { boards: [Capacity.exportBoard(...)], rangeText, generatedOn, note }
+     -> { workbook, charts: [chart spec per sheet, for addCapacityCharts] } */
+  const CAP_SPARE_ROWS = 5;
+  const CAP_INPUT = "FFFFFBE6";   // pale yellow: "type here"
+  function colLetter(n) {
+    let s = "";
+    for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+    return s;
+  }
   async function buildCapacityWorkbook(ExcelJS, spec) {
     const wb = new ExcelJS.Workbook();
     wb.creator = "TRIGO Manpower Board";
     wb.created = new Date();
+    wb.calcProperties = { fullCalcOnLoad: true };
     const used = new Set();
+    const charts = [];
     const KIND = {
       short: { bg: "FFFBE4E4", fg: "FFB42318" },
       tight: { bg: C.dayBg, fg: C.dayFg },
       ok: { bg: C.okBg, fg: C.okFg },
     };
+    const R_AV = 5, R_DEM = 6, R_GAP = 7, R_NAMED = 8, R_SEC = 9, R_HOST = 10;
     for (const b of spec.boards) {
       let name = safeSheetName(b.name), n = 2;
       while (used.has(name.toLowerCase())) name = safeSheetName(b.name).slice(0, 28) + " " + n++;
       used.add(name.toLowerCase());
       const fixed = 1 + b.extras.length + 1;                  // Host, host columns, Shift
-      const last = fixed + b.dates.length;
+      const nd = b.dates.length;
+      const c0 = fixed + 1, c1 = fixed + nd;                  // the day columns
+      const cTot = c1 + 1;                                    // Total
+      const last = cTot;
+      const L = colLetter;
+      const hostLast = R_HOST + b.rows.length + CAP_SPARE_ROWS - 1;
       const ws = wb.addWorksheet(name, {
         views: [{ showGridLines: false, state: "frozen", xSplit: fixed, ySplit: 4 }],
         pageSetup: { orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
@@ -591,10 +614,11 @@
       ws.getColumn(1).width = 30;
       b.extras.forEach((c, i) => { ws.getColumn(2 + i).width = WIDTH[c.key] || 20; });
       ws.getColumn(fixed).width = 9;
-      for (let c = fixed + 1; c <= last; c++) ws.getColumn(c).width = 9.5;
+      for (let c = c0; c <= c1; c++) ws.getColumn(c).width = 11;
+      ws.getColumn(cTot).width = 10;
 
       const span = (row, text, style) => {
-        if (last > 1) ws.mergeCells(row, 1, row, last);
+        ws.mergeCells(row, 1, row, last);
         const cell = ws.getCell(row, 1);
         cell.value = text;
         Object.assign(cell, style);
@@ -606,119 +630,282 @@
         alignment: { vertical: "middle", indent: 1 },
       });
       ws.getRow(2).height = 20;
-      span(2, [spec.rangeText, spec.generatedOn ? "exported " + spec.generatedOn : ""].filter(Boolean).join("  ·  "), {
+      span(2, [spec.rangeText, spec.generatedOn ? "exported " + spec.generatedOn : "", "yellow cells are inputs — Demand, Gap, Total and the chart recalculate"].filter(Boolean).join("  ·  "), {
         font: fontOf({ size: 10.5, color: { argb: C.mut } }), fill: fillOf(C.pale),
         alignment: { vertical: "middle", indent: 1 },
       });
       // header: labels on row 3, CONFIRMED / FORECAST on row 4
+      const navyHead = (cell, text, center) => {
+        cell.value = text;
+        cell.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
+        cell.fill = fillOf(C.navy);
+        cell.alignment = { vertical: "middle", horizontal: center ? "center" : "left", indent: center ? 0 : 1 };
+      };
       const heads = ["Host", ...b.extras.map((c) => c.label), "Shift"];
       heads.forEach((t, i) => {
         ws.mergeCells(3, i + 1, 4, i + 1);
-        const cell = ws.getCell(3, i + 1);
-        cell.value = t;
-        cell.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
-        cell.fill = fillOf(C.navy);
-        cell.alignment = { vertical: "middle", horizontal: i === heads.length - 1 ? "center" : "left", indent: i === heads.length - 1 ? 0 : 1 };
-        ws.getCell(4, i + 1).fill = fillOf(C.navy);
+        navyHead(ws.getCell(3, i + 1), t, i === heads.length - 1);
       });
       b.dates.forEach((d, i) => {
-        const c1 = ws.getCell(3, fixed + 1 + i), c2 = ws.getCell(4, fixed + 1 + i);
-        c1.value = d.label;
-        c1.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
-        c1.fill = fillOf(C.navy);
-        c1.alignment = { vertical: "middle", horizontal: "center" };
+        navyHead(ws.getCell(3, c0 + i), d.label, true);
+        const c2 = ws.getCell(4, c0 + i);
         c2.value = d.forecast ? "FORECAST" : "CONFIRMED";
         c2.font = fontOf({ size: 8, bold: true, color: { argb: d.forecast ? C.green : C.onNavy } });
         c2.fill = fillOf(C.navy);
         c2.alignment = { vertical: "middle", horizontal: "center" };
-        c2.border = { bottom: { style: "medium", color: { argb: C.green } } };
       });
-      for (let c = 1; c <= fixed; c++) ws.getCell(4, c).border = { bottom: { style: "medium", color: { argb: C.green } } };
+      ws.mergeCells(3, cTot, 4, cTot);
+      navyHead(ws.getCell(3, cTot), "Total", true);
+      for (let c = 1; c <= last; c++) ws.getCell(4, c).border = { bottom: { style: "medium", color: { argb: C.green } } };
       ws.getRow(3).height = 22;
       ws.getRow(4).height = 16;
 
-      let r = 5;
-      const sumRow = (label, vals, kinds) => {
+      const wholeNumber = { type: "whole", operator: "greaterThanOrEqual", formulae: [0], allowBlank: true,
+        showErrorMessage: true, errorTitle: "Whole number", error: "Type a whole number of people (0 or more), or leave it empty." };
+      const label = (r, text) => {
         ws.getRow(r).height = 20;
         ws.mergeCells(r, 1, r, fixed);
         const lc = ws.getCell(r, 1);
-        lc.value = label;
+        lc.value = text;
         lc.font = fontOf({ bold: true, color: { argb: C.navy } });
         lc.alignment = { vertical: "middle", indent: 1 };
         for (let c = 1; c <= fixed; c++) ws.getCell(r, c).fill = fillOf(C.pale);
-        vals.forEach((v, i) => {
-          const cell = ws.getCell(r, fixed + 1 + i);
-          cell.value = v == null ? "" : v;
-          cell.alignment = { vertical: "middle", horizontal: "center" };
-          cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
-          const k = kinds && kinds[i] && KIND[kinds[i]];
-          cell.font = fontOf({ bold: true, color: { argb: k ? k.fg : C.ink } });
-          cell.fill = fillOf(k ? k.bg : C.pale);
-          if (kinds && typeof v === "number") cell.numFmt = "+0;-0;0";
-        });
-        r++;
       };
-      sumRow("Available people", b.summary.available);
-      sumRow("Demand (all hosts)", b.summary.demand);
-      sumRow("Gap  (available − demand)", b.summary.gap, b.summary.kind);
-      sumRow("Named on board", b.summary.named);
+      const sumCell = (cell, value, o = {}) => {
+        cell.value = value;
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
+        cell.font = fontOf({ bold: true });
+        cell.fill = fillOf(o.input ? CAP_INPUT : C.pale);
+        if (o.numFmt) cell.numFmt = o.numFmt;
+        if (o.input) cell.dataValidation = wholeNumber;
+      };
+      // demand per day, for the formula results the file opens with
+      const demandOf = (i) => b.rows.reduce((t, r) => t + (Number(r.values[i]) || 0), 0);
+      const hostRange = (c) => `${L(c)}${R_HOST}:${L(c)}${hostLast}`;
 
-      ws.getRow(r).height = 22;
-      ws.mergeCells(r, 1, r, last);
-      const sh = ws.getCell(r, 1);
-      sh.value = "Demand by host · shift";
+      label(R_AV, "Available people  (editable)");
+      label(R_DEM, "Demand (all hosts)");
+      label(R_GAP, "Gap  (available − demand)");
+      label(R_NAMED, "Named on board");
+      b.dates.forEach((d, i) => {
+        const c = c0 + i, col = L(c);
+        const av = b.summary.available[i];
+        sumCell(ws.getCell(R_AV, c), av == null ? null : av, { input: true });
+        const dem = demandOf(i);
+        sumCell(ws.getCell(R_DEM, c), { formula: `SUM(${hostRange(c)})`, result: dem });
+        sumCell(ws.getCell(R_GAP, c), { formula: `IF(${col}${R_AV}="","",${col}${R_AV}-${col}${R_DEM})`, result: av == null ? "" : av - dem }, { numFmt: "+0;-0;0" });
+        const named = b.summary.named[i];
+        sumCell(ws.getCell(R_NAMED, c), named == null ? null : named);
+      });
+      // Total column: demand over the whole range; blank for the per-day rows
+      for (const r of [R_AV, R_GAP, R_NAMED]) sumCell(ws.getCell(r, cTot), null);
+      const allDem = b.dates.reduce((t, d, i) => t + demandOf(i), 0);
+      sumCell(ws.getCell(R_DEM, cTot), { formula: `SUM(${L(c0)}${R_DEM}:${L(c1)}${R_DEM})`, result: allDem });
+      // the gap colours follow the numbers: red short, amber 0-1 spare, green more
+      const gapRef = `${L(c0)}${R_GAP}:${L(c1)}${R_GAP}`;
+      const cf = (k) => ({ fill: { type: "pattern", pattern: "solid", bgColor: { argb: KIND[k].bg } }, font: { bold: true, color: { argb: KIND[k].fg } } });
+      ws.addConditionalFormatting({ ref: gapRef, rules: [
+        { type: "cellIs", operator: "lessThan", formulae: ["0"], style: cf("short"), priority: 1 },
+        { type: "cellIs", operator: "between", formulae: ["0", "1"], style: cf("tight"), priority: 2 },
+        { type: "cellIs", operator: "greaterThan", formulae: ["1"], style: cf("ok"), priority: 3 },
+      ] });
+
+      ws.getRow(R_SEC).height = 22;
+      ws.mergeCells(R_SEC, 1, R_SEC, last);
+      const sh = ws.getCell(R_SEC, 1);
+      sh.value = "Demand by host · shift  —  type in the yellow cells; the spare rows at the bottom are for new hosts";
       sh.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
-      for (let c = 1; c <= last; c++) ws.getCell(r, c).fill = fillOf(C.divider);
+      for (let c = 1; c <= last; c++) ws.getCell(R_SEC, c).fill = fillOf(C.divider);
       sh.alignment = { vertical: "middle", indent: 1 };
-      r++;
 
-      if (!b.rows.length) {
-        ws.mergeCells(r, 1, r, last);
-        ws.getCell(r, 1).value = "No demand entered.";
-        ws.getCell(r, 1).font = fontOf({ italic: true, color: { argb: C.mut } });
-        ws.getCell(r, 1).alignment = { indent: 1 };
-        r++;
-      }
-      b.rows.forEach((row, k) => {
+      const shiftRule = { type: "list", allowBlank: true, formulae: ['"DAY,NIGHT"'],
+        showErrorMessage: true, errorTitle: "Shift", error: "Pick DAY or NIGHT." };
+      const rows = [...b.rows, ...Array.from({ length: CAP_SPARE_ROWS }, () => null)];
+      rows.forEach((row, k) => {
+        const r = R_HOST + k;
         ws.getRow(r).height = 20;
         const tint = k % 2 === 1 ? fillOf(C.paper) : null;
-        const put = (c, v, o) => {
+        const put = (c, v, o = {}) => {
           const cell = ws.getCell(r, c);
           cell.value = v;
           cell.font = fontOf(o.font || {});
           cell.alignment = Object.assign({ vertical: "middle" }, o.align);
           cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
           if (o.fill || tint) cell.fill = o.fill || tint;
+          if (o.validation) cell.dataValidation = o.validation;
         };
-        put(1, row.host, { font: { bold: true }, align: { indent: 1 } });
+        const spare = !row;
+        put(1, spare ? null : row.host, { font: { bold: true }, align: { indent: 1 }, fill: spare ? fillOf(CAP_INPUT) : null });
         b.extras.forEach((c, i) => {
-          const v = row.extra[c.key] || "";
+          const v = spare ? "" : row.extra[c.key] || "";
           if (c.key === "mapUrl" && /^https?:\/\//i.test(v)) {
             put(2 + i, { text: v, hyperlink: v }, { font: { color: { argb: "FF0563C1" }, underline: true }, align: { indent: 1 } });
-          } else put(2 + i, v, { align: { indent: 1 } });
+          } else put(2 + i, v || null, { align: { indent: 1 } });
         });
-        const night = row.shift === "night";
-        put(fixed, night ? "NIGHT" : "DAY", {
+        const night = !spare && row.shift === "night";
+        put(fixed, spare ? null : night ? "NIGHT" : "DAY", {
           font: { bold: true, size: 9, color: { argb: night ? C.nightFg : C.dayFg } },
-          fill: fillOf(night ? C.nightBg : C.dayBg), align: { horizontal: "center" },
+          fill: spare ? fillOf(CAP_INPUT) : fillOf(night ? C.nightBg : C.dayBg), align: { horizontal: "center" }, validation: shiftRule,
         });
-        row.values.forEach((v, i) => put(fixed + 1 + i, v == null ? "" : v, { align: { horizontal: "center" } }));
-        r++;
+        b.dates.forEach((d, i) => {
+          const v = spare ? null : row.values[i];
+          put(c0 + i, v == null ? null : v, { align: { horizontal: "center" }, fill: fillOf(CAP_INPUT), validation: wholeNumber });
+        });
+        const rng = `${L(c0)}${r}:${L(c1)}${r}`;
+        const tot = spare ? 0 : row.values.reduce((t, v) => t + (Number(v) || 0), 0);
+        const has = !spare && row.values.some((v) => v != null);
+        put(cTot, { formula: `IF(COUNT(${rng})=0,"",SUM(${rng}))`, result: has ? tot : "" }, { font: { bold: true }, align: { horizontal: "center" } });
       });
+      let r = hostLast + 2;
       if (spec.note) {
-        r++;
         ws.mergeCells(r, 1, r, last);
         const nc = ws.getCell(r, 1);
         nc.value = spec.note;
         nc.font = fontOf({ size: 9, italic: true, color: { argb: C.mut } });
         nc.alignment = { wrapText: true, vertical: "top", indent: 1 };
         ws.getRow(r).height = 28;
+        r += 2;
       }
+      // the chart goes under the table, over the day columns (at least ~12 wide)
+      const q = "'" + name.replace(/'/g, "''") + "'!";
+      const abs = (c, row) => `$${L(c)}$${row}`;
+      const gapVals = b.dates.map((d, i) => (b.summary.available[i] == null ? null : b.summary.available[i] - demandOf(i)));
+      charts.push({
+        sheetName: name,
+        title: `Demand against available people — ${b.name}`,
+        categories: { ref: `${q}${abs(c0, 3)}:${abs(c1, 3)}`, values: b.dates.map((d) => d.label) },
+        series: [
+          { name: "Available", ref: `${q}${abs(c0, R_AV)}:${abs(c1, R_AV)}`, values: b.summary.available, color: "C3CCD6", type: "bar" },
+          { name: "Demand", ref: `${q}${abs(c0, R_DEM)}:${abs(c1, R_DEM)}`, values: b.dates.map((d, i) => demandOf(i)), color: "004983", type: "bar" },
+          { name: "Gap", ref: `${q}${abs(c0, R_GAP)}:${abs(c1, R_GAP)}`, values: gapVals, color: "E0701F", type: "line" },
+        ],
+        anchor: { fromCol: 0, fromRow: r - 1, toCol: Math.max(last, fixed + 12), toRow: r - 1 + 20 },
+      });
     }
-    return { workbook: wb };
+    return { workbook: wb, charts };
   }
 
-  const api = { buildCapacityWorkbook, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
+  /* ----- native Excel charts, added to an ExcelJS workbook after the fact -----
+     ExcelJS writes no charts, so this opens the finished .xlsx (a zip) with
+     JSZip and adds, per chart: the chart part, a drawing that anchors it to
+     cells, the relationships tying sheet -> drawing -> chart, and their content
+     types. Pure string work on the package; nothing else in it is touched.
+     charts: [{ sheetName, title, categories: {ref, values}, series: [{name,
+     ref, values, color, type: "bar"|"line"}], anchor: {fromCol, fromRow,
+     toCol, toRow} }] (0-based cells). Returns the new file as a Uint8Array. */
+  const xmlEsc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  function chartXml(ch) {
+    const strCache = (vals) => `<c:strCache><c:ptCount val="${vals.length}"/>` +
+      vals.map((v, i) => `<c:pt idx="${i}"><c:v>${xmlEsc(v)}</c:v></c:pt>`).join("") + `</c:strCache>`;
+    const numCache = (vals) => `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${vals.length}"/>` +
+      vals.map((v, i) => (v == null || v === "" ? "" : `<c:pt idx="${i}"><c:v>${Number(v)}</c:v></c:pt>`)).join("") + `</c:numCache>`;
+    const fill = (rgb) => `<a:solidFill><a:srgbClr val="${rgb}"/></a:solidFill>`;
+    const ser = (s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>` +
+      `<c:tx><c:v>${xmlEsc(s.name)}</c:v></c:tx>` +
+      (s.type === "line"
+        ? `<c:spPr><a:ln w="28575" cap="rnd">${fill(s.color)}<a:round/></a:ln></c:spPr>` +
+          `<c:marker><c:symbol val="circle"/><c:size val="6"/><c:spPr>${fill(s.color)}<a:ln>${fill(s.color)}</a:ln></c:spPr></c:marker>`
+        : `<c:spPr>${fill(s.color)}</c:spPr><c:invertIfNegative val="0"/>`) +
+      `<c:cat><c:strRef><c:f>${xmlEsc(ch.categories.ref)}</c:f>${strCache(ch.categories.values)}</c:strRef></c:cat>` +
+      `<c:val><c:numRef><c:f>${xmlEsc(s.ref)}</c:f>${numCache(s.values)}</c:numRef></c:val>` +
+      (s.type === "line" ? `<c:smooth val="0"/>` : "") + `</c:ser>`;
+    const bars = ch.series.map((s, i) => [s, i]).filter(([s]) => s.type !== "line");
+    const lines = ch.series.map((s, i) => [s, i]).filter(([s]) => s.type === "line");
+    const AX = `<c:axId val="50010"/><c:axId val="50020"/>`;
+    const text = (sz, b) => `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz}"${b ? ' b="1"' : ""}><a:solidFill><a:srgbClr val="13222F"/></a:solidFill></a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>`;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+      `<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+      `<c:roundedCorners val="0"/><c:chart>` +
+      `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200" b="1"/></a:pPr><a:r><a:rPr lang="en-US" sz="1200" b="1"><a:solidFill><a:srgbClr val="004983"/></a:solidFill></a:rPr><a:t>${xmlEsc(ch.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` +
+      `<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>` +
+      (bars.length ? `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>` +
+        bars.map(([s, i]) => ser(s, i)).join("") + `<c:gapWidth val="60"/><c:overlap val="-10"/>${AX}</c:barChart>` : "") +
+      (lines.length ? `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>` +
+        lines.map(([s, i]) => ser(s, i)).join("") + `<c:marker val="1"/>${AX}</c:lineChart>` : "") +
+      `<c:catAx><c:axId val="50010"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/>` +
+      `<c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="low"/>` +
+      `<c:spPr><a:ln w="9525">${fill("8A9AA8")}</a:ln></c:spPr>${text(900)}` +
+      `<c:crossAx val="50020"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>` +
+      `<c:valAx><c:axId val="50020"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/>` +
+      `<c:majorGridlines><c:spPr><a:ln w="6350">${fill("D8E0E7")}</a:ln></c:spPr></c:majorGridlines>` +
+      `<c:title><c:tx><c:rich><a:bodyPr rot="-5400000" vert="horz"/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="900"/></a:pPr><a:r><a:rPr lang="en-US" sz="900"/><a:t>People</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` +
+      `<c:numFmt formatCode="0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/>` +
+      `<c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${text(900)}` +
+      `<c:crossAx val="50010"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>` +
+      `</c:plotArea><c:legend><c:legendPos val="b"/><c:overlay val="0"/>${text(1000)}</c:legend>` +
+      `<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart>` +
+      `<c:spPr>${fill("FFFFFF")}<a:ln w="9525">${fill("D8E0E7")}</a:ln></c:spPr></c:chartSpace>`;
+  }
+  function drawingXml(ch) {
+    const a = ch.anchor;
+    const pt = (tag, col, row) => `<xdr:${tag}><xdr:col>${col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:${tag}>`;
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+      `<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">` +
+      `<xdr:twoCellAnchor editAs="oneCell">${pt("from", a.fromCol, a.fromRow)}${pt("to", a.toCol, a.toRow)}` +
+      `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="2" name="Capacity chart"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>` +
+      `<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>` +
+      `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">` +
+      `<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/>` +
+      `</a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>`;
+  }
+  const REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
+  const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
+  async function addCapacityCharts(JSZip, data, charts) {
+    const zip = await JSZip.loadAsync(data);
+    const read = async (p) => { const f = zip.file(p); return f ? f.async("string") : null; };
+    // sheet name -> its part, from the workbook and its relationships
+    const wbXml = await read("xl/workbook.xml");
+    const wbRels = await read("xl/_rels/workbook.xml.rels");
+    const target = {};
+    for (const m of wbRels.matchAll(/<Relationship\b[^>]*>/g)) {
+      const id = /\bId="([^"]+)"/.exec(m[0]), t = /\bTarget="([^"]+)"/.exec(m[0]);
+      if (id && t) target[id[1]] = t[1].replace(/^\/?xl\//, "");
+    }
+    const unesc = (s) => s.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    const sheetPart = {};
+    for (const m of wbXml.matchAll(/<sheet\b[^>]*>/g)) {
+      const nm = /\bname="([^"]*)"/.exec(m[0]), rid = /\br:id="([^"]+)"/.exec(m[0]);
+      if (nm && rid && target[rid[1]]) sheetPart[unesc(nm[1])] = "xl/" + target[rid[1]];
+    }
+    let types = await read("[Content_Types].xml");
+    let k = 0;
+    for (const ch of charts) {
+      const sheet = sheetPart[ch.sheetName];
+      if (!sheet) throw new Error("no sheet named " + ch.sheetName);
+      k++;
+      const chartPart = `xl/charts/capchart${k}.xml`, drawPart = `xl/drawings/capdrawing${k}.xml`;
+      zip.file(chartPart, chartXml(ch));
+      zip.file(drawPart, drawingXml(ch));
+      zip.file(`xl/drawings/_rels/capdrawing${k}.xml.rels`,
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${REL_NS}">` +
+        `<Relationship Id="rId1" Type="${REL}chart" Target="../charts/capchart${k}.xml"/></Relationships>`);
+      // sheet -> drawing relationship (the sheet may already have rels, e.g. hyperlinks)
+      const dir = sheet.slice(0, sheet.lastIndexOf("/") + 1), file = sheet.slice(sheet.lastIndexOf("/") + 1);
+      const relsPath = `${dir}_rels/${file}.rels`;
+      let rels = (await read(relsPath)) || `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${REL_NS}"></Relationships>`;
+      let n = 1;
+      while (new RegExp(`\\bId="rIdCap${n}"`).test(rels)) n++;
+      const rid = `rIdCap${n}`;
+      rels = rels.replace("</Relationships>", `<Relationship Id="${rid}" Type="${REL}drawing" Target="../drawings/capdrawing${k}.xml"/></Relationships>`);
+      zip.file(relsPath, rels);
+      // <drawing> has a fixed place in a worksheet: before these, after everything else
+      let xml = await read(sheet);
+      if (!/xmlns:r="/.test(xml.slice(0, xml.indexOf(">", xml.indexOf("<worksheet")))))
+        xml = xml.replace("<worksheet", `<worksheet xmlns:r="${REL.replace(/\/$/, "")}"`);
+      const at = ["<legacyDrawing", "<legacyDrawingHF", "<drawingHF", "<picture", "<oleObjects", "<controls", "<webPublishItems", "<tableParts", "<extLst", "</worksheet>"]
+        .map((t) => xml.indexOf(t)).filter((i) => i >= 0).reduce((a, b) => Math.min(a, b));
+      xml = xml.slice(0, at) + `<drawing r:id="${rid}"/>` + xml.slice(at);
+      zip.file(sheet, xml);
+      types = types.replace("</Types>",
+        `<Override PartName="/${chartPart}" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>` +
+        `<Override PartName="/${drawPart}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>`);
+    }
+    zip.file("[Content_Types].xml", types);
+    return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+  }
+
+  const api = { buildCapacityWorkbook, addCapacityCharts, colLetter, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

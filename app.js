@@ -6293,6 +6293,22 @@ const XLSX_SHEETS_OFF_KEY = "manpower.xlsxSheetsOff";   // sheets the user switc
 const XLSX_SHEET_LABELS = { leave: "Leave & Exchange Working Day", standby: "Standby (permanent, unassigned)", oncall: "Available On-call (unassigned)" };
 let xlsxLibPromise = null;
 
+/* JSZip (~100 KB) adds the native chart to the Capacity workbook (ExcelJS
+   cannot write charts); like ExcelJS it is fetched on first use only. */
+let jszipLibPromise = null;
+function loadJSZip() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  if (!jszipLibPromise) {
+    jszipLibPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "vendor/jszip.min.js";
+      s.onload = () => resolve(window.JSZip);
+      s.onerror = () => { jszipLibPromise = null; reject(new Error("Could not load the Excel chart library. Check the connection and try again.")); };
+      document.head.appendChild(s);
+    });
+  }
+  return jszipLibPromise;
+}
 function loadExcelJS() {
   if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
   if (!xlsxLibPromise) {
@@ -8856,7 +8872,7 @@ const CAP_EXPORT_KEY = "manpower.capExport";   // { extras } — the ticked host
 const CAP_EXPORT_NOTE = "Tentative plan, not the confirmed board. Available uses the current roster, so future hires and leavers are not reflected. " +
   "Leave and named people come from the confirmed board up to the next working day and from forecasts after it.";
 const CAP_EXPORT_HINTS = {
-  xlsx: "One workbook with a sheet per board. Numbers stay numbers, so they can be summed and filtered.",
+  xlsx: "A working Excel file, one sheet per board: type in the yellow cells (host demand, available people, spare rows for new hosts) and Demand, Gap, Total, the gap colours and the chart all recalculate.",
   jpg: "One image with the boards one under another. Send it as a file, not a photo, so it stays sharp.",
   pdf: "Opens the print dialog — choose Save as PDF. One page with the boards one under another; Google Maps links stay clickable.",
 };
@@ -8974,9 +8990,10 @@ async function runCapExport() {
     const who = models.length === 1 ? models[0].name : models.length === D().boards.length ? "All_boards" : `${models.length}_boards`;
     const fileBase = `Capacity_${who.replace(/[\s\\/:*?"<>|]+/g, "_")}_${from}`;
     if (fmt === "xlsx") {
-      const ExcelJS = await loadExcelJS();
-      const { workbook } = await ManpowerXlsx.buildCapacityWorkbook(ExcelJS, { boards: models, rangeText, generatedOn, note: CAP_EXPORT_NOTE });
-      const buf = await workbook.xlsx.writeBuffer();
+      const [ExcelJS, JSZip] = await Promise.all([loadExcelJS(), loadJSZip()]);
+      const { workbook, charts } = await ManpowerXlsx.buildCapacityWorkbook(ExcelJS, { boards: models, rangeText, generatedOn, note: CAP_EXPORT_NOTE });
+      // a working file: formulas from ExcelJS, then the native chart on each sheet
+      const buf = await ManpowerXlsx.addCapacityCharts(JSZip, await workbook.xlsx.writeBuffer(), charts);
       bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fileBase + ".xlsx");
       closeModal();
       toast(`Exported ${models.length === 1 ? models[0].name : models.length + " boards"} to ${fileBase}.xlsx`, "info");

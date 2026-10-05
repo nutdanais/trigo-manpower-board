@@ -26,4 +26,5 @@ if (Test-Path (Join-Path $root "logo.png")) { Copy-Item (Join-Path $root "logo.p
 if (Test-Path (Join-Path $root "logo-on-navy.png")) { Copy-Item (Join-Path $root "logo-on-navy.png") $deploy -Force }
 Copy-Item (Join-Path $root "vendor\html2canvas.min.js") $vendor -Force
 Copy-Item (Join-Path $root "vendor\exceljs.min.js") $vendor -Force
+Copy-Item (Join-Path $root "vendor\jszip.min.js") $vendor -Force
 Write-Host "deploy/ folder rebuilt. Drag it onto Netlify to publish." -ForegroundColor Green

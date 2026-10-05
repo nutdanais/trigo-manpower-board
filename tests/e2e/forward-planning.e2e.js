@@ -684,6 +684,11 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         assert.equal(alpha.getCell(3).value, "Rayong Plant 2");
         assert.equal(alpha.getCell(4).value.hyperlink, "https://maps.example.com/alpha");
         assert.equal(alpha.getCell(7).value, 2, "numbers stay numbers");
+        // a working file: Demand is a formula over the host rows, and each sheet has a native chart
+        assert.match(ws.getCell(6, 7).value.formula, /^SUM\(G10:G\d+\)$/);
+        const zip = await require("../../vendor/jszip.min.js").loadAsync(require("node:fs").readFileSync(await dl.path()));
+        assert.ok(zip.file("xl/charts/capchart1.xml") && zip.file("xl/charts/capchart2.xml"), "a chart per board");
+        assert.match(await zip.file("xl/charts/capchart1.xml").async("string"), /'Board One'!\$F\$6:/, "the chart reads the Demand row");
         // remembered on this device
         await pa.click("#btn-export");
         assert.equal(await pa.isChecked('#cap-export-extras input[value="location"]'), true);
