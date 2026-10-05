@@ -18,7 +18,7 @@ const h = require("./harness");
     const db = new h.FakeDb();
     h.seedBase(db, { src: SRC });
     // three people on Board One who joined the app on SRC (like the LCB Port import)
-    db.seed("employees", ["X", "Y", "Z"].map((n, i) => ({ id: "n" + i, name: "Newcomer " + n, contract: "permanent", area_id: "area-1", board_id: "b1", added_on: SRC })));
+    db.seed("employees", ["X", "Y", "Z"].map((n, i) => ({ id: "n" + i, name_th: "Newcomer " + n, contract: "permanent", area_id: "area-1", board_id: "b1", added_on: SRC })));
     const a = await env.openAs(db, h.USERS.a);
     const p = a.page;
     const stat = (label) => p.evaluate((l) => {

@@ -63,7 +63,8 @@
   /* ---------- columns ---------- */
   const EMP_COLUMNS = [
     { key: "id",        label: "ID",                 aliases: ["id", "employee id"], width: 12 },
-    { key: "name",      label: "Name",               aliases: ["name", "employee name", "ชื่อ"], width: 30 },
+    { key: "name",      label: "Thai name",          aliases: ["name", "employee name", "thai name", "name (thai)", "ชื่อ", "ชื่อไทย", "ชื่อ (ไทย)"], width: 30 },
+    { key: "nameEn",    label: "English name",       aliases: ["english name", "name (english)", "eng name", "ชื่ออังกฤษ", "ชื่อ (อังกฤษ)"], width: 30 },
     { key: "trigoId",   label: "TRIGO ID",           aliases: ["trigo id", "trigoid", "trigo", "employee code", "รหัสพนักงาน", "รหัส trigo"], width: 12 },
     { key: "contract",  label: "Contract type",      aliases: ["contract type", "contract", "ประเภทสัญญา"], width: 15 },
     { key: "position",  label: "Position",           aliases: ["position", "ตำแหน่ง"], width: 24 },
@@ -87,20 +88,24 @@
      read every row under it. rows2d: arrays of cell values. */
   function readTable(rows2d, columns, opts = {}) {
     const alias = new Map();
-    for (const c of columns) for (const a of [c.label, ...c.aliases]) alias.set(headerKey(a), c.key);
+    // a header is first matched as typed ("Name (English)" is the English name), then without a
+    // trailing "(note)" like "Start date (dd/mm/yyyy)"
+    const exact = new Map();
+    const asTyped = (s) => lower(s).replace(/\s+/g, " ").trim();
+    for (const c of columns) for (const a of [c.label, ...c.aliases]) { if (headerKey(a) === asTyped(a)) alias.set(headerKey(a), c.key); exact.set(asTyped(a), c.key); }
     let headerAt = -1, colIndex = null, ignored = [];
     for (let r = 0; r < Math.min(rows2d.length, 15); r++) {
       const map = {}, extra = [];
       (rows2d[r] || []).forEach((cell, i) => {
         const h = headerKey(str(cell));
         if (!h) return;
-        const k = alias.get(h);
+        const k = exact.get(asTyped(str(cell))) || alias.get(h);
         if (k && !(k in map)) map[k] = i; else extra.push(norm(str(cell)));
       });
       if ("name" in map && Object.keys(map).length >= 2) { headerAt = r; colIndex = map; ignored = extra; break; }
     }
     if (headerAt < 0) {
-      return { cols: new Set(), records: [], ignored: [], fatal: ["Could not find a header row with at least a Name column and one more known column. Use the template from the Download button."] };
+      return { cols: new Set(), records: [], ignored: [], fatal: ["Could not find a header row with at least a Thai name (or Name) column and one more known column. Use the template from the Download button."] };
     }
     const records = [];
     for (let r = headerAt + 1; r < rows2d.length; r++) {
@@ -265,6 +270,12 @@
       const next = {};      // field -> parsed new value (only for columns in the file)
       const note = (r) => { if (r.warn) row.warnings.push(r.warn); };
       next.name = name;
+      // English name: optional, an empty cell clears it
+      if (has("nameEn")) {
+        const en = norm(str(c.nameEn));
+        if (en.length > 200) { err("English name is longer than 200 characters"); row.kind = "error"; continue; }
+        next.nameEn = en;
+      }
       // blank = leave the TRIGO ID as it is (clearing an identity by accident is worse than not clearing)
       if (tid) next.trigoId = tid;
 
@@ -302,12 +313,12 @@
 
       if (cur) {
         const was = {
-          name: norm(cur.name), trigoId: cur.trigoId || "", contract: cur.contract, position: cur.position || "", phone: cur.phone || "",
+          name: norm(cur.name), nameEn: norm(cur.nameEn || ""), trigoId: cur.trigoId || "", contract: cur.contract, position: cur.position || "", phone: cur.phone || "",
           startDate: cur.startDate || "", addedOn: cur.addedOn || "", areaId: cur.areaId || null, boardId: cur.boardId,
           active: cur.active !== false,
         };
         const label = {
-          name: "Name", trigoId: "TRIGO ID", contract: "Contract type", position: "Position", phone: "Mobile number", startDate: "Start date",
+          name: "Thai name", nameEn: "English name", trigoId: "TRIGO ID", contract: "Contract type", position: "Position", phone: "Mobile number", startDate: "Start date",
           addedOn: "On the board from", areaId: "Service area", boardId: "Board", active: "Status",
         };
         const text = {
@@ -334,7 +345,7 @@
         if (!has("board") || next.boardId === undefined) err("A new person needs a Board");
         if (row.errors.length) { row.kind = "error"; continue; }
         row.create = {
-          name, trigoId: next.trigoId || "", contract: next.contract, position: next.position || "", phone: next.phone || "",
+          name, nameEn: next.nameEn || "", trigoId: next.trigoId || "", contract: next.contract, position: next.position || "", phone: next.phone || "",
           startDate: next.startDate || "", addedOn: next.addedOn || "",   // blank addedOn = the database default (today)
           areaId: next.areaId || null, boardId: next.boardId, active: next.active !== false,
         };
@@ -493,7 +504,7 @@
     const areaName = (id) => ((ctx.areas || []).find((a) => a.id === id) || {}).name || "";
     const boardName = (id) => ((ctx.boards || []).find((b) => b.id === id) || {}).name || "";
     const rows = (ctx.employees || []).map((e) => ({
-      id: e.id, name: e.name, trigoId: e.trigoId || "", contract: CONTRACT_LABEL[e.contract] || e.contract,
+      id: e.id, name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: CONTRACT_LABEL[e.contract] || e.contract,
       position: e.position && ctx.positions && ctx.positions[e.position] ? ctx.positions[e.position].label : "",
       phone: e.phone || "", startDate: dateOut(e.startDate), addedOn: dateOut(e.addedOn),
       area: areaName(e.areaId), board: boardName(e.boardId), status: e.active === false ? "Inactive" : "Active",
@@ -579,13 +590,14 @@
       "3. The app shows what would change and asks you to confirm before anything is saved.",
       "",
       "RULES",
-      "• Name = the person's FULL name only (first name and surname). Never put the TRIGO ID, an initial or a nickname in it.",
+      "• Thai name = the person's FULL name in Thai (first name and surname), required. It is the name the app shows by default. Never put the TRIGO ID, an initial or a nickname in it.",
+      "• English name = the same name in English, optional; it is what an English Excel export uses. An empty cell clears it. If it is empty, the Thai name is used.",
       "• TRIGO ID (T + digits, e.g. T329) goes in its own column. It must be unique. Two people may share a name only if both have a TRIGO ID.",
       "  Leave it empty to keep the current one. To fill in IDs for people who have none, just type them next to the names.",
       "• Do not edit or delete the grey ID column. It is how the app tracks a row, so you can rename someone safely.",
       "  A row is matched by ID, then TRIGO ID, then name. A name that does not exist yet adds a NEW person (you will be asked first).",
       "• Only the columns present are updated. Delete a column you do not want touched. Keep the header names.",
-      "• An empty cell clears that field (Position, Mobile number, Start date). Name, Contract type and Board cannot be empty. An empty 'On the board from' leaves it as it is.",
+      "• An empty cell clears that field (Position, Mobile number, Start date). Thai name, Contract type and Board cannot be empty. An empty 'On the board from' leaves it as it is.",
       "• Rows you delete from the file are NOT deleted in the app. To retire someone, set Status to Inactive.",
       "• Contract type, Position, Service area, Board and Status must match the Lists sheet (use the dropdowns).",
       "• Dates: 2023-04-20 (also 20-Apr-2023 or 20/04/2023, day first). Buddhist-era years are converted.",

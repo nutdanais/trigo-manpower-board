@@ -14,8 +14,8 @@ async function setup(dbOpts) {
   const x = loadCloud({ db: new FakeDb(dbOpts) });
   const db = x.db;
   db.seed("boards", [{ id: "b1", name: "Board One", weekend_days: [0, 6] }, { id: "b2", name: "Board Two", weekend_days: [0, 6] }]);
-  db.seed("employees", [...["e1", "e2", "e3", "e4"].map((id) => ({ id, name: id, contract: "permanent", board_id: "b1" })),
-                         { id: "e9", name: "e9", contract: "permanent", board_id: "b2" }]);
+  db.seed("employees", [...["e1", "e2", "e3", "e4"].map((id) => ({ id, name_th: id, contract: "permanent", board_id: "b1" })),
+                         { id: "e9", name_th: "e9", contract: "permanent", board_id: "b2" }]);
   // the confirmed day, as carried over: e1 + e2 on 101, e3 on 102, e4 on standby
   db.seed("missions", [
     { id: "m101", board_id: "b1", plan_date: DAY, number: "101", host: "H1", customer: "C1", shift: "day" },

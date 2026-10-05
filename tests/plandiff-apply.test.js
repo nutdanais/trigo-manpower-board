@@ -11,7 +11,7 @@ const SRC = "2026-09-21", DEST = "2026-09-22";
 async function setup() {
   const x = loadCloud({ db: new FakeDb() });
   x.db.seed("boards", [{ id: "b1", name: "Board One", weekend_days: [0, 6] }]);
-  x.db.seed("employees", ["e1", "e2", "e3"].map((id) => ({ id, name: id, contract: "permanent", board_id: "b1" })));
+  x.db.seed("employees", ["e1", "e2", "e3"].map((id) => ({ id, name_th: id, contract: "permanent", board_id: "b1" })));
   x.db.seed("missions", [
     { id: "s1", board_id: "b1", plan_date: SRC, number: "1", host: "H", customer: "C", shift: "day" },
     { id: "s2", board_id: "b1", plan_date: SRC, number: "2", host: "H", customer: "C", shift: "day" },

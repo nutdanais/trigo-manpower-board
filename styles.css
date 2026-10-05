@@ -1642,6 +1642,7 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   #toolbar-more .btn { width: 100%; }
   #toolbar-more .toggle { width: 100%; justify-content: center; }
   #toolbar-more #emplist-search,
+  #toolbar-more #emplist-name-view,
   #toolbar-more #hostlist-search { width: 100%; }
 }
 
@@ -1721,6 +1722,8 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 }
 .modal h3 .modal-close:hover { color: var(--text); background: var(--bg-soft); }
 .modal label { display: block; margin-bottom: 10px; font-size: 13px; font-weight: 600; }
+.modal .req { color: var(--danger-text); font-weight: 700; }
+.modal .field-hint { margin: -6px 0 10px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .modal input, .modal select, .modal textarea {
   display: block;
   width: 100%;
@@ -2619,7 +2622,8 @@ body.exporting #app-root { margin-right: 0; }
    whole group with one class since display:none on a contents element
    removes its children from layout too. */
 #emplist-toolbar { display: contents; }
-#emplist-search {
+#emplist-search,
+#emplist-name-view {
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2628,6 +2632,8 @@ body.exporting #app-root { margin-right: 0; }
   font-size: 13px;
   min-width: 200px;
 }
+#emplist-name-view { min-width: 0; }
+#emplist-table .el-name-en { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
 #emplist-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 #emplist-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 

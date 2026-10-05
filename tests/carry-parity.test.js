@@ -14,12 +14,12 @@ const SRC = "2026-09-21", DEST = "2026-09-22";   // Mon -> Tue
 function seed(db, { destMissions = [] } = {}) {
   db.seed("boards", [{ id: B1, name: "Board One", weekend_days: [0, 6] }, { id: B2, name: "Board Two", weekend_days: [0, 6] }]);
   db.seed("employees", [
-    { id: "e1", name: "P1", contract: "permanent", board_id: B1 },
-    { id: "e2", name: "P2", contract: "permanent", board_id: B1 },
-    { id: "e3", name: "P3", contract: "oncall", board_id: B1 },
-    { id: "e4", name: "P4", contract: "permanent", board_id: B1, active: false },   // deactivated: never carried
-    { id: "e5", name: "P5", contract: "permanent", board_id: B2 },                  // other board: never carried
-    { id: "e6", name: "P6", contract: "permanent", board_id: B1 },
+    { id: "e1", name_th: "P1", contract: "permanent", board_id: B1 },
+    { id: "e2", name_th: "P2", contract: "permanent", board_id: B1 },
+    { id: "e3", name_th: "P3", contract: "oncall", board_id: B1 },
+    { id: "e4", name_th: "P4", contract: "permanent", board_id: B1, active: false },   // deactivated: never carried
+    { id: "e5", name_th: "P5", contract: "permanent", board_id: B2 },                  // other board: never carried
+    { id: "e6", name_th: "P6", contract: "permanent", board_id: B1 },
   ]);
   db.seed("missions", [
     { id: "m1", board_id: B1, plan_date: SRC, number: "101", host: "Host A", customer: "Cust A", shift: "day", start_time: "07:00:00", end_time: "16:00:00", engineer_id: "eng1", ppe: "Helmet", remark: "Gate 3" },

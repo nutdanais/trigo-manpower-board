@@ -30,14 +30,14 @@ const X = require("../../xlsx-export.js");
     await p.fill("#form-employee input[name=name]", "Dated Person");
     await p.fill("#form-employee input[name=startDate]", "2024-02-29");
     await save();
-    const dated = db.t("employees").find((e) => e.name === "Dated Person");
+    const dated = db.t("employees").find((e) => e.name_th === "Dated Person");
     assert.equal(dated.start_date, "2024-02-29");
     console.log("ok - a new employee is saved with a start date");
 
     await p.evaluate(() => openEmployeeModal(null));
     await p.fill("#form-employee input[name=name]", "Undated Person");
     await save();
-    assert.equal(db.t("employees").find((e) => e.name === "Undated Person").start_date, null);
+    assert.equal(db.t("employees").find((e) => e.name_th === "Undated Person").start_date, null);
     console.log("ok - the start date is optional");
 
     await p.evaluate((id) => { openEmployeeModal(id); state.employeeTab = "edit"; applyEmployeeTab(); }, dated.id);
@@ -61,7 +61,7 @@ const X = require("../../xlsx-export.js");
 
     // ---- Years of service, its filter, and the Excel export of the list ----
     const ago = (y, m, d) => { const t = new Date(); t.setFullYear(t.getFullYear() - y, t.getMonth() - m, t.getDate() - d); return h.iso(t); };
-    const set = (name, start) => { db.t("employees").find((e) => e.name === name).start_date = start; };
+    const set = (name, start) => { db.t("employees").find((e) => e.name_th === name).start_date = start; };
     set("Dated Person", ago(3, 5, 12));
     set("Undated Person", null);
     set("Person A", ago(0, 3, 0));

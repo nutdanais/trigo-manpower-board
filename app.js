@@ -383,6 +383,7 @@ const state = {
     filters: { contract: [], position: [], service: [], areaId: [], boardId: [], status: [] },
     sortKey: "name",
     sortDir: 1,
+    nameView: "th",      // which name the list shows: "th" | "en" | "both" (remembered per device)
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
   },
@@ -3860,6 +3861,21 @@ function renderEmplistFilterOptions() {
     D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
 }
 
+/* Manpower List name display: the Thai name (the app's default), the English name, or both.
+   An empty English name falls back to the Thai one, so a row is never blank. */
+const EMPLIST_NAME_VIEW_KEY = "manpower.emplistNameView";
+function emplistNameViewSaved() {
+  try { const v = localStorage.getItem(EMPLIST_NAME_VIEW_KEY); return v === "en" || v === "both" ? v : "th"; } catch (e) { return "th"; }
+}
+function emplistShownName(e) { return state.emplist.nameView === "en" ? (e.nameEn || e.name) : e.name; }
+function emplistNameHtml(e) {
+  const v = state.emplist.nameView;
+  if (v === "both" && e.nameEn && e.nameEn !== e.name) {
+    return `${escapeHtml(e.name)}<small class="el-name-en">${escapeHtml(e.nameEn)}</small>`;
+  }
+  return escapeHtml(emplistShownName(e));
+}
+
 function emplistFilteredSorted() {
   const f = state.emplist.filters;
   const q = state.emplist.search.trim().toLowerCase();
@@ -3870,7 +3886,7 @@ function emplistFilteredSorted() {
     if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
     if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
-    if (q && !e.name.toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q) && !(e.trigoId || "").toLowerCase().includes(q)) return false;
+    if (q && !e.name.toLowerCase().includes(q) && !(e.nameEn || "").toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q) && !(e.trigoId || "").toLowerCase().includes(q)) return false;
     return true;
   });
   const { sortKey, sortDir } = state.emplist;
@@ -3884,7 +3900,7 @@ function emplistFilteredSorted() {
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
       case "active": return e.active === false ? "Inactive" : "Active";
-      default: return e.name;
+      default: return emplistShownName(e);
     }
   };
   // utilization is the one numeric column — "100" vs "9" sorts wrong as text.
@@ -3931,7 +3947,7 @@ function emplistXlsxRows() {
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return {
-      name: e.name, trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent", position: pos ? pos.label : "",
+      name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent", position: pos ? pos.label : "",
       phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", board: board ? board.name : "",
       util: state.emplist.util ? state.emplist.util[e.id] : undefined, active: e.active !== false,
     };
@@ -4232,7 +4248,7 @@ function renderEmployeeRows() {
     // card list on phone with no separate render path
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td data-label="Name">${escapeHtml(e.name)}</td>
+      <td data-label="Name" class="el-name">${emplistNameHtml(e)}</td>
       <td data-label="TRIGO ID" class="el-tid">${e.trigoId ? escapeHtml(e.trigoId) : "—"}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position">${pos ? pos.label : "—"}</td>
@@ -4290,6 +4306,8 @@ function renderEmployeeRows() {
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
 function renderEmployeeList() {
   $("#emplist-search").value = state.emplist.search;
+  state.emplist.nameView = emplistNameViewSaved();
+  $("#emplist-name-view").value = state.emplist.nameView;
   renderEmplistFilterOptions();
   renderEmployeeRows();
 }
@@ -5438,6 +5456,7 @@ function openEmployeeModal(empId) {
   if (empId) {
     const e = D().employees.find(x => x.id === empId);
     form.name.value = e.name;
+    form.nameEn.value = e.nameEn || "";
     form.contract.value = e.contract;
     form.position.value = e.position || "";
     form.phone.value = e.phone || "";
@@ -5464,7 +5483,7 @@ function openEmployeeModal(empId) {
 function saveEmployee(ev) {
   ev.preventDefault();
   const form = $("#form-employee");
-  const vals = { name: form.name.value.trim(), trigoId: form.trigoId.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
+  const vals = { name: form.name.value.trim(), nameEn: form.nameEn.value.trim(), trigoId: form.trigoId.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
   // instant client-side checks (the same rules cloud.saveEmployee enforces, which is the real
   // guard): the name is the FULL name only, the TRIGO ID is T + digits and unique, and two people
   // may share a name only when both have a TRIGO ID. A short name saved earlier can be left as it is.
@@ -6298,7 +6317,7 @@ function xlsxRows() {
       const area = D().areas.find(a => a.id === e.areaId);
       const pos = e.position ? POSITIONS[e.position] : null;
       rows.push({
-        empId: e.id, name: e.name, trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
+        empId: e.id, name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
         position: pos ? pos.label : "", phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", mission: m.number, host: m.host,
         customer: m.customer, ppe, shift: m.shift === "night" ? "Night" : "Day", start: m.startTime, end: m.endTime,
         engineer: eng ? eng.name : "", remark: m.remark || "",
@@ -6318,7 +6337,7 @@ function xlsxGroups() {
     const area = D().areas.find(a => a.id === e.areaId);
     const pos = e.position ? POSITIONS[e.position] : null;
     return Object.assign({
-      empId: e.id, name: e.name, trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
+      empId: e.id, name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
       position: pos ? pos.label : "", area: area ? area.name : "", phone: e.phone || "", startDate: e.startDate || "",
     }, extra);
   };
@@ -9854,6 +9873,11 @@ function wireApp() {
   $("#btn-bulk-apply").onclick = () => safely(applyBulk);
   $("#btn-emplist-xlsx").onclick = openEmplistXlsxModal;
   $("#btn-emplist-xlsx-go").onclick = exportEmplistXlsx;
+  $("#emplist-name-view").addEventListener("change", (e) => {
+    state.emplist.nameView = e.target.value;
+    try { localStorage.setItem(EMPLIST_NAME_VIEW_KEY, state.emplist.nameView); } catch (err) { /* remembering is a courtesy */ }
+    renderEmployeeRows();
+  });
   $("#emplist-search").addEventListener("input", (e) => { state.emplist.search = e.target.value; renderEmployeeRows(); });
   for (const th of $$("#emplist-table th[data-sort]")) {
     th.onclick = () => {

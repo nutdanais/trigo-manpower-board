@@ -21,7 +21,7 @@ grep -q "true              as do_move" "$MOVE" || fail "could not flip do_move"
 
 psql -X -v ON_ERROR_STOP=1 -q -d "$DB" <<SQL
 insert into boards (id, name) values ('10000000-0000-0000-0000-000000000001', 'Board One');
-insert into employees (id, name, contract, board_id) values
+insert into employees (id, name_th, contract, board_id) values
   ('20000000-0000-0000-0000-000000000001', 'P1', 'permanent', '10000000-0000-0000-0000-000000000001'),
   ('20000000-0000-0000-0000-000000000002', 'P2', 'permanent', '10000000-0000-0000-0000-000000000001'),
   ('20000000-0000-0000-0000-000000000003', 'P3', 'oncall',    '10000000-0000-0000-0000-000000000001');

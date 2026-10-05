@@ -31,7 +31,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-03a">
+<link rel="stylesheet" href="styles.css?v=2026-10-05a">
 </head>
 <body>
 
@@ -234,7 +234,12 @@
       <!-- Manpower's search/filters — a display:contents group so it folds into
            this row; render() shows/hides the whole group with one class. -->
       <div id="emplist-toolbar">
-        <input id="emplist-search" type="search" placeholder="Search name, TRIGO ID or mobile…" autocomplete="off">
+        <input id="emplist-search" type="search" placeholder="Search name (Thai or English), TRIGO ID or mobile…" autocomplete="off">
+        <select id="emplist-name-view" aria-label="Names shown" title="Which name the list shows. The app shows the Thai name by default.">
+          <option value="th">Names: Thai</option>
+          <option value="en">Names: English</option>
+          <option value="both">Names: Thai + English</option>
+        </select>
         <div id="emplist-filters">
           <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
@@ -542,7 +547,10 @@
       </div>
       <div class="settings-pane" data-pane="edit">
         <form id="form-employee">
-          <label>Full name <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
+          <label>Thai name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
+          <p class="field-hint" id="hint-name-th">Required. This is the name shown in the app by default.</p>
+          <label>English name (optional) <input name="nameEn" maxlength="200" autocomplete="off" placeholder="e.g. Somchai Jaidee" title="Used when you export to Excel in English. If it is empty, the Thai name is used."></label>
+          <p class="field-hint" id="hint-name-en">Used when you export to Excel in English. If it is empty, the Thai name is used.</p>
           <label>TRIGO ID (optional) <input name="trigoId" placeholder="e.g. T329" maxlength="8" autocomplete="off" title="The letter T and digits, like T329. Must be unique; two people may share a name only when both have a TRIGO ID."></label>
           <label>Contract type
             <select name="contract">
@@ -1049,10 +1057,10 @@
 <script src="config.js"></script>
 <script src="planning.js?v=2026-09-24e"></script>
 <script src="employee-id.js?v=2026-10-03a"></script>
-<script src="cloud.js?v=2026-10-03a"></script>
+<script src="cloud.js?v=2026-10-05a"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="xlsx-export.js?v=2026-10-03a"></script>
-<script src="bulk-edit.js?v=2026-10-03a"></script>
-<script src="app.js?v=2026-10-03a"></script>
+<script src="xlsx-export.js?v=2026-10-05a"></script>
+<script src="bulk-edit.js?v=2026-10-05a"></script>
+<script src="app.js?v=2026-10-05a"></script>
 </body>
 </html>

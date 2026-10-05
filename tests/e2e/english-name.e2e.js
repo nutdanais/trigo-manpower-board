@@ -1,0 +1,155 @@
+/* Acceptance run for the employee English name: the New / Edit Employee form (Thai name required and
+   explained, English name optional), the Manpower List's Thai / English / both display (Thai by default,
+   remembered, searchable in both languages), and the Excel exports using the English name in an English
+   file and the Thai name in a Thai one.
+     NODE_PATH=$(npm root -g) node tests/e2e/english-name.e2e.js
+   Exits non-zero on the first failed check. */
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const h = require("./harness");
+const ExcelJS = require("../../vendor/exceljs.min.js");
+
+async function step(name, fn) {
+  try { await fn(); console.log("ok - " + name); }
+  catch (e) { console.log("FAIL - " + name + "\n   " + (e && e.stack || e).split("\n").slice(0, 6).join("\n   ")); throw e; }
+}
+async function sheetOf(path) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(fs.readFileSync(path));
+  return wb;
+}
+
+(async () => {
+  const env = await h.launch();
+  try {
+    const T = h.iso(new Date());
+    const SRC = h.isWeekend(T) ? h.prevWorking(T) : T;
+    const db = new h.FakeDb();
+    h.seedBase(db, { src: SRC });
+    // e1 has both names, e2 only a Thai one, e3 an English-only person whose Thai column holds the same text
+    Object.assign(db.t("employees").find((e) => e.id === "e1"), { name_th: "สมชาย ใจดี", name_en: "Somchai Jaidee" });
+    Object.assign(db.t("employees").find((e) => e.id === "e2"), { name_th: "มาลี สุขใจ", name_en: null });
+    Object.assign(db.t("employees").find((e) => e.id === "e3"), { name_th: "Pichai Rakdee", name_en: "Pichai Rakdee" });
+    const a = await env.openAs(db, h.USERS.a);
+    const p = a.page;
+    await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
+
+    await step("the form: Thai name is required and explained, English name is optional", async () => {
+      await p.evaluate(() => openEmployeeModal(null));
+      assert.equal(await p.locator("#form-employee input[name=name]").getAttribute("required"), "");
+      assert.equal(await p.locator("#form-employee input[name=nameEn]").getAttribute("required"), null);
+      assert.match(await p.textContent("#hint-name-th"), /Required.*shown in the app by default/);
+      assert.match(await p.textContent("#hint-name-en"), /English.*Thai name is used/);
+      assert.match(await p.textContent("#form-employee"), /Thai name\s*\*/);
+      await p.locator("#modal-employee [data-close].btn:visible").first().click();
+    });
+
+    await step("a new employee is saved with both names; the English one can be left empty", async () => {
+      const save = async () => { await p.click("#form-employee button[type=submit]"); await p.waitForSelector("#modal-employee", { state: "hidden" }); };
+      await p.evaluate(() => openEmployeeModal(null));
+      await p.fill("#form-employee input[name=name]", "สมหญิง รักงาน");
+      await p.fill("#form-employee input[name=nameEn]", "  Somying   Rakngan ");
+      await save();
+      let row = db.t("employees").find((e) => e.name_th === "สมหญิง รักงาน");
+      assert.equal(row.name_en, "Somying Rakngan");
+      await p.evaluate(() => openEmployeeModal(null));
+      await p.fill("#form-employee input[name=name]", "วิชัย ทดสอบ");
+      await save();
+      row = db.t("employees").find((e) => e.name_th === "วิชัย ทดสอบ");
+      assert.equal(row.name_en, null, "left empty -> nothing stored");
+      // editing shows the stored English name, and clearing it clears it
+      const id = db.t("employees").find((e) => e.name_th === "สมหญิง รักงาน").id;
+      await p.evaluate((i) => { openEmployeeModal(i); state.employeeTab = "edit"; applyEmployeeTab(); }, id);
+      assert.equal(await p.inputValue("#form-employee input[name=nameEn]"), "Somying Rakngan");
+      await p.fill("#form-employee input[name=nameEn]", "");
+      await save();
+      assert.equal(db.t("employees").find((e) => e.id === id).name_en, null);
+    });
+
+    await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return cloud._loadEmployees().then(refreshAndRender); });
+    const names = () => p.locator("#emplist-body tr td[data-label=Name]").allTextContents();
+    const cellOf = (thai) => p.locator(`#emplist-body tr:has(td[data-label=Name]:has-text("${thai}")) td[data-label=Name]`).first();
+
+    await step("the Manpower List shows Thai names by default", async () => {
+      assert.equal(await p.inputValue("#emplist-name-view"), "th");
+      const all = await names();
+      assert.ok(all.includes("สมชาย ใจดี") && all.includes("มาลี สุขใจ"));
+      assert.ok(!all.some((n) => n.includes("Somchai")));
+    });
+
+    await step("English shows the English name, falling back to the Thai one when there is none", async () => {
+      await p.selectOption("#emplist-name-view", "en");
+      const all = await names();
+      assert.ok(all.includes("Somchai Jaidee"), "e1 in English");
+      assert.ok(all.includes("มาลี สุขใจ"), "e2 has no English name: Thai is shown rather than a blank");
+      assert.ok(!all.includes("สมชาย ใจดี"));
+      assert.ok(all.every((n) => n.trim() !== ""));
+    });
+
+    await step("Thai + English shows both (English only where it adds something)", async () => {
+      await p.selectOption("#emplist-name-view", "both");
+      assert.equal((await cellOf("สมชาย").textContent()).replace(/\s+/g, " ").trim(), "สมชาย ใจดีSomchai Jaidee");
+      assert.equal(await cellOf("สมชาย").locator(".el-name-en").textContent(), "Somchai Jaidee");
+      assert.equal(await cellOf("มาลี").locator(".el-name-en").count(), 0, "no English name: nothing extra");
+      assert.equal(await cellOf("Pichai").locator(".el-name-en").count(), 0, "same text in both: shown once");
+    });
+
+    await step("the choice is remembered, and search finds a person by either name", async () => {
+      await p.reload();
+      await p.waitForSelector("#btn-new-employee, #emplist-name-view", { state: "attached" });
+      await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
+      assert.equal(await p.inputValue("#emplist-name-view"), "both");
+      await p.fill("#emplist-search", "somchai");
+      assert.equal((await names()).length, 1);
+      await p.fill("#emplist-search", "สมชาย");
+      assert.equal((await names()).length, 1);
+      await p.fill("#emplist-search", "");
+      await p.selectOption("#emplist-name-view", "th");
+    });
+
+    const exportList = async (lang, file) => {
+      await p.click("#btn-emplist-xlsx");
+      await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");
+      await p.check(`#emplist-xlsx-lang input[value=${lang}]`);
+      const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-emplist-xlsx-go")]);
+      await dl.saveAs(file);
+      return (await sheetOf(file)).worksheets[0];
+    };
+    const col1 = (ws) => { const o = []; for (let r = 2; r <= ws.rowCount; r++) if (ws.getCell(r, 1).value) o.push(ws.getCell(r, 1).value); return o; };
+
+    await step("the Manpower List Excel: an English file uses English names, a Thai file Thai names (whatever exists as fallback)", async () => {
+      const en = col1(await exportList("en", "/tmp/names-en.xlsx"));
+      assert.ok(en.includes("Somchai Jaidee") && !en.includes("สมชาย ใจดี"), "English file, English name");
+      assert.ok(en.includes("มาลี สุขใจ"), "no English name -> the Thai one is used");
+      const th = col1(await exportList("th", "/tmp/names-th.xlsx"));
+      assert.ok(th.includes("สมชาย ใจดี") && !th.includes("Somchai Jaidee"), "Thai file, Thai name");
+    });
+
+    await step("the board Excel uses the same rule", async () => {
+      await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
+      const board = async (lang, file) => {
+        await p.click("#btn-xlsx");
+        await p.waitForSelector("#modal-xlsx:not(.hidden)");
+        await p.check(`#xlsx-lang input[value=${lang}]`);
+        const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
+        await dl.saveAs(file);
+        const wb = await sheetOf(file);
+        const out = [];
+        for (const ws of wb.worksheets) ws.eachRow((row) => row.eachCell((c) => { if (typeof c.value === "string") out.push(c.value); }));
+        return out;
+      };
+      const en = await board("en", "/tmp/board-en.xlsx");
+      assert.ok(en.includes("Somchai Jaidee"), "English board file has the English name");
+      assert.ok(!en.includes("สมชาย ใจดี"));
+      assert.ok(en.includes("มาลี สุขใจ"), "fallback to Thai where there is no English name");
+      const th = await board("th", "/tmp/board-th.xlsx");
+      assert.ok(th.includes("สมชาย ใจดี") && !th.includes("Somchai Jaidee"), "Thai board file has the Thai name");
+    });
+
+    console.log("all English name checks passed");
+  } finally {
+    await env.close();
+  }
+})().catch((e) => { console.error(e); process.exit(1); });

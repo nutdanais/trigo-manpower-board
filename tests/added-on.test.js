@@ -12,11 +12,11 @@ function setup() {
   const db = new FakeDb();
   db.seed("boards", [{ id: B1, name: "LCB Port", weekend_days: [0, 6] }]);
   db.seed("employees", [
-    { id: "old1", name: "Old 1", contract: "permanent", board_id: B1 },                       // predates the column: always counted
-    { id: "old2", name: "Old 2", contract: "oncall", board_id: B1 },
-    { id: "new1", name: "New 1", contract: "permanent", board_id: B1, added_on: "2026-10-01" },
-    { id: "new2", name: "New 2", contract: "oncall", board_id: B1, added_on: "2026-10-01" },
-    { id: "mid", name: "Mid", contract: "permanent", board_id: B1, added_on: "2026-09-23" },   // added part-way through the month
+    { id: "old1", name_th: "Old 1", contract: "permanent", board_id: B1 },                       // predates the column: always counted
+    { id: "old2", name_th: "Old 2", contract: "oncall", board_id: B1 },
+    { id: "new1", name_th: "New 1", contract: "permanent", board_id: B1, added_on: "2026-10-01" },
+    { id: "new2", name_th: "New 2", contract: "oncall", board_id: B1, added_on: "2026-10-01" },
+    { id: "mid", name_th: "Mid", contract: "permanent", board_id: B1, added_on: "2026-09-23" },   // added part-way through the month
   ]);
   db.seed("missions", [{ id: "m1", board_id: B1, plan_date: "2026-09-30", number: "1", host: "H", customer: "C", shift: "day" }]);
   db.seed("assignments", [
@@ -56,10 +56,10 @@ test("saveEmployee: a new employee defaults to today, can be back-dated, and an 
   const today = (() => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })();
 
   await cloud.saveEmployee(null, { ...base, name: "Fresh Person", addedOn: "" });
-  assert.equal(db.t("employees").find((e) => e.name === "Fresh Person").added_on, today);
+  assert.equal(db.t("employees").find((e) => e.name_th === "Fresh Person").added_on, today);
 
   await cloud.saveEmployee(null, { ...base, name: "Backdated Person", addedOn: "2026-08-15" });
-  assert.equal(db.t("employees").find((e) => e.name === "Backdated Person").added_on, "2026-08-15");
+  assert.equal(db.t("employees").find((e) => e.name_th === "Backdated Person").added_on, "2026-08-15");
   assert.equal(cloud.data.employees.find((e) => e.name === "Backdated Person").addedOn, "2026-08-15");
 
   await cloud.saveEmployee("new1", { ...base, name: "New 1", addedOn: "" });

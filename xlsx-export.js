@@ -54,9 +54,14 @@
 
   /* ---------- language ----------
      Rows always arrive in English (that is what app.js and the tests speak);
-     the words in the file are chosen here. Names, hosts, customers, service
-     areas and free text are the user's own data and are never translated. */
+     the words in the file are chosen here. Hosts, customers, service areas and
+     free text are the user's own data and are never translated; a person's name
+     comes out as their English name in an English file and their Thai name in a
+     Thai one (rows carry both: name = Thai, nameEn = English). */
   const normLang = (l) => (l === "th" ? "th" : "en");
+  /* a person's name in the file's language: English file -> the English name, Thai file -> the
+     Thai name (row.name); whichever one exists when the wanted one is empty */
+  const personName = (r, lang) => (normLang(lang) === "en" ? (r.nameEn || r.name) : (r.name || r.nameEn)) || "";
   const labelOf = (col, lang) => (normLang(lang) === "th" && col.th ? col.th : col.label);
   const TEXT = {
     en: {
@@ -235,6 +240,8 @@
       if (d) cell.numFmt = "dd-mmm-yyyy";
     } else if (col.key === "service") {
       v = serviceLength(r.startDate, spec.today, lang);
+    } else if (col.key === "name") {
+      v = personName(r, lang);
     } else if (col.key === "contract" || col.key === "shift" || col.key === "position") {
       v = say(col.key, v, lang);
     } else if (col.key === "leave") {
@@ -550,7 +557,7 @@
     return { workbook: wb, summary: { total: rows.length } };
   }
 
-  const api = { COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
+  const api = { personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

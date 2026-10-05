@@ -74,8 +74,8 @@ function seedBase(db, { src }) {
   db.seed("hosts", [{ name: "Host Alpha" }, { name: "Host Beta" }, { name: "Host Gamma" }].map((h) => ({ ...h, archived: false })));
   db.seed("boards", [{ id: "b1", name: "Board One", weekend_days: [0, 6] }, { id: "b2", name: "Board Two", weekend_days: [0, 6] }]);
   const emps = [];
-  for (let i = 1; i <= 8; i++) emps.push({ id: "e" + i, name: `Person ${String.fromCharCode(64 + i)}`, contract: i >= 7 ? "oncall" : "permanent", area_id: "area-1", board_id: "b1" });
-  for (let i = 9; i <= 10; i++) emps.push({ id: "e" + i, name: `Person ${String.fromCharCode(64 + i)}`, contract: "permanent", area_id: "area-1", board_id: "b2" });
+  for (let i = 1; i <= 8; i++) emps.push({ id: "e" + i, name_th: `Person ${String.fromCharCode(64 + i)}`, contract: i >= 7 ? "oncall" : "permanent", area_id: "area-1", board_id: "b1" });
+  for (let i = 9; i <= 10; i++) emps.push({ id: "e" + i, name_th: `Person ${String.fromCharCode(64 + i)}`, contract: "permanent", area_id: "area-1", board_id: "b2" });
   db.seed("employees", emps);
   db.seed("missions", [
     { id: "s101", board_id: "b1", plan_date: src, number: "101", host: "Host Alpha", customer: "Cust Alpha", shift: "day", engineer_id: "eng-1" },
