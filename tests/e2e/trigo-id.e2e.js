@@ -109,7 +109,10 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     // ---- Excel exports replace CSV ----
     await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
     await p.waitForFunction(() => allHostRows().length >= 2);
-    const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-hostlist-xlsx")]);
+    await p.click("#btn-export");
+    await p.waitForSelector("#modal-hostlist-export:not(.hidden)");
+    assert.equal(await p.locator('#hostlist-export-type input[value="xlsx"]').isChecked(), true, "Excel is the file type");
+    const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-hostlist-export-go")]);
     assert.match(dl.suggestedFilename(), /^host_list_\d{4}-\d{2}-\d{2}\.xlsx$/);
     const hp = path.join(TMP, "hosts.xlsx");
     await dl.saveAs(hp);
@@ -135,7 +138,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
 
     // ---- the Excel list carries the ID ----
     await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
-    await p.click("#btn-emplist-xlsx");
+    await p.click("#btn-export");
     await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");
     const [dl2] = await Promise.all([p.waitForEvent("download"), p.click("#btn-emplist-xlsx-go")]);
     const lp = path.join(TMP, "list.xlsx");

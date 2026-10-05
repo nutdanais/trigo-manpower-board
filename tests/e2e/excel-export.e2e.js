@@ -12,6 +12,13 @@ const ExcelJS = require("../../vendor/exceljs.min.js");
 const T = h.iso(new Date());
 const SRC = h.isWeekend(T) ? h.prevWorking(T) : T;   // a day the seed has missions on
 
+/* the board's one Export button, then "Excel" as the file type */
+async function openBoardXlsx(page) {
+  await page.click("#btn-export");
+  await page.waitForSelector("#modal-xlsx:not(.hidden)");
+  await page.check('#board-export-type input[value="xlsx"]');
+}
+
 async function step(name, fn) {
   try { await fn(); console.log("ok - " + name); }
   catch (e) { console.log("FAIL - " + name + "\n   " + (e && e.stack || e).split("\n").slice(0, 5).join("\n   ")); throw e; }
@@ -37,10 +44,9 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     const p = a.page;
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
 
-    await step("the Excel button is on a board, and the dialog lists all 16 columns ticked", async () => {
-      assert.equal(await p.locator("#btn-xlsx").isVisible(), true);
-      await p.click("#btn-xlsx");
-      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+    await step("the Export button is on a board, Excel is a file type, and the dialog lists all 16 columns ticked", async () => {
+      assert.equal(await p.locator("#btn-export").isVisible(), true);
+      await openBoardXlsx(p);
       const labels = await p.locator("#xlsx-cols .import-info").allTextContents();
       assert.deepEqual(labels, ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
       assert.equal(await p.locator("#xlsx-cols input:checked").count(), 16);
@@ -124,8 +130,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     });
 
     await step("choosing Thai in the dialog downloads a Thai file, and the choice is remembered", async () => {
-      await p.click("#btn-xlsx");
-      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      await openBoardXlsx(p);
       assert.equal(await p.locator("#xlsx-lang input[value=en]").isChecked(), true, "English by default");
       await p.check("#xlsx-lang input[value=th]");
       const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
@@ -139,15 +144,13 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       assert.equal(ws.getCell(7, 1).value, "Person A");
       assert.equal(ws.getCell(7, 3).value, "ประจำ");
       assert.match(ws.getCell(7, 7).value, /^\d+ ปี \d+ เดือน \d+ วัน$/);
-      await p.click("#btn-xlsx");
-      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      await openBoardXlsx(p);
       assert.equal(await p.locator("#xlsx-lang input[value=th]").isChecked(), true, "Thai remembered");
       await p.click("#modal-xlsx [data-close].btn");
     });
 
     await step("the column choice is remembered next time the dialog opens", async () => {
-      await p.click("#btn-xlsx");
-      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      await openBoardXlsx(p);
       assert.equal(await p.locator("#xlsx-cols input:checked").count(), 13);
       assert.equal(await p.locator("#xlsx-cols input[value=shift]").isChecked(), false);
       await p.check("#xlsx-lang input[value=en]");   // the Thai choice was remembered; this step checks the English sheet names
@@ -158,31 +161,36 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.load(fs.readFileSync("/tmp/xlsx-e2e-2.xlsx"));
       assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "Leave & Exchange"], "unticked sheets are left out");
-      await p.click("#btn-xlsx");   // and that choice is remembered too
-      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      await openBoardXlsx(p);   // and that choice is remembered too
       assert.equal(await p.locator("#xlsx-sheets input[value=leave]").isChecked(), true);
       assert.equal(await p.locator("#xlsx-sheets input[value=standby]").isChecked(), false);
       assert.equal(await p.locator("#xlsx-sheets input[value=oncall]").isChecked(), false);
       await p.click("#modal-xlsx [data-close].btn");
     });
 
-    await step("Excel is not offered on Overview; a non-working day with nobody on leave says so instead of opening", async () => {
+    await step("Excel is not offered on Overview; a non-working day with nobody on leave says Excel has nothing to write", async () => {
       await p.evaluate(() => { D().activeBoardId = OVERVIEW_ID; return refreshAndRender(); });
-      assert.equal(await p.locator("#btn-xlsx").isVisible(), false);
+      await p.click("#btn-export");
+      await p.waitForSelector("#modal-xlsx:not(.hidden)");
+      assert.equal(await p.locator('#board-export-type input[value="xlsx"]').count(), 0, "no Excel on Overview");
+      assert.equal(await p.locator('#board-export-type input[value="jpg"]').count(), 1, "JPG / PDF are");
+      await p.click("#modal-xlsx [data-close].btn");
       let weekend = SRC;   // a past weekend: confirmed (not a forecast), and nobody is expected in
       while (!h.isWeekend(weekend)) weekend = h.addDays(weekend, -1);
       await p.evaluate((d) => { D().activeBoardId = "b2"; state.date = d; return refreshAndRender(); }, weekend);
-      await p.click("#btn-xlsx");
-      await p.waitForSelector(".toast, #toast-stack > *");
-      assert.equal(await p.locator("#modal-xlsx:not(.hidden)").count(), 0);
+      await openBoardXlsx(p);
+      assert.match(await p.textContent("#xlsx-summary"), /Nobody is on this board/);
+      assert.equal(await p.locator("#btn-xlsx-go").isDisabled(), true, "Excel has nothing to write");
+      await p.check('#board-export-type input[value="jpg"]');
+      assert.equal(await p.locator("#btn-xlsx-go").isDisabled(), false, "a JPG can still be taken");
+      await p.click("#modal-xlsx [data-close].btn");
     });
 
     await step("a read-only viewer can export", async () => {
       const v = await env.openAs(db, h.USERS.v);
       await v.page.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
-      assert.equal(await v.page.locator("#btn-xlsx").isVisible(), true);
-      await v.page.click("#btn-xlsx");
-      await v.page.waitForSelector("#modal-xlsx:not(.hidden)");
+      assert.equal(await v.page.locator("#btn-export").isVisible(), true);
+      await openBoardXlsx(v.page);
       const [dl] = await Promise.all([v.page.waitForEvent("download"), v.page.click("#btn-xlsx-go")]);
       assert.ok(dl.suggestedFilename().endsWith(".xlsx"));
       assert.deepEqual(v.errors, []);

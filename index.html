@@ -31,7 +31,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-05d">
+<link rel="stylesheet" href="styles.css?v=2026-10-05e">
 </head>
 <body>
 
@@ -234,7 +234,6 @@
       <button type="button" id="btn-cap-seed" class="btn" title="Fill empty cells with the latest confirmed day's deployment — people per host and shift">Start from confirmed plan</button>
       <button type="button" id="btn-cap-copy-week" class="btn" title="Copy this board's demand for the current week onto next week">Copy this week → next week</button>
       <button type="button" id="btn-cap-reset" class="btn" title="Set every number on this board to 0 from today on — the host rows stay">Reset to 0</button>
-      <button type="button" id="btn-cap-export" class="btn" title="Export the Capacity grid as Excel, JPG or PDF — one board or several">Export</button>
     </div>
     <button id="btn-toolbar-more" class="btn toolbar-more-toggle" type="button" title="More actions" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"></use></svg> More</button>
     <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
@@ -309,26 +308,19 @@
     <div id="emplist-area-bar" class="hidden"></div>
     <div class="toolbar-spacer"></div>
     <span id="emplist-count" class="hidden"></span>
-    <button type="button" class="btn hidden" id="btn-emplist-xlsx" title="Export the rows below as an Excel file — in English or Thai"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
     <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
     <span id="hostlist-count" class="hidden"></span>
-    <button type="button" class="btn hidden" id="btn-hostlist-xlsx" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
     <button type="button" class="btn hidden" id="btn-hostlist-bulk" title="Edit many hosts in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
-    <button id="btn-export" class="btn"><svg class="ic" aria-hidden="true"><use href="#i-camera"></use></svg> Export</button>
-    <!-- The sharp half of "share the plan": a JPG is re-encoded and downsized by
-         whatever chat app carries it, and it cannot hold a link. This prints the
-         same board as vector text (sharp at any zoom) with the host name and the
-         engineer phone still tappable inside the PDF. See printBoard in app.js. -->
     <select id="card-names" class="hidden" aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
       <option value="th">Names: Thai</option>
       <option value="en">Names: English</option>
       <option value="both">Names: Thai + English</option>
     </select>
-    <button id="btn-print" class="btn" title="Save as PDF — stays sharp at any zoom, and the location links stay tappable"><svg class="ic" aria-hidden="true"><use href="#i-printer"></use></svg> PDF</button>
-    <!-- The editable half of "share the plan": the same board as rows in a spreadsheet,
-         with the columns the planner picks first. See openXlsxModal in app.js. -->
-    <button id="btn-xlsx" class="btn" title="Export this board as an Excel file — you choose the columns"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
     <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
+    <!-- One Export button for every tab, always at the right edge. It opens that
+         tab's export dialog, where the file type (JPG / PDF / Excel — whichever
+         the tab offers) is picked. See openExportModal in app.js. -->
+    <button id="btn-export" class="btn" title="Export — pick the file type (JPG, PDF or Excel) in the next step"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Export</button>
   </div>
 </div>
 
@@ -918,8 +910,11 @@
   </div>
 
   <div class="modal hidden" id="modal-xlsx">
-    <h3>Export to Excel<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <h3><span id="board-export-title">Export</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="xlsx-lang export-type" id="board-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="xlsx-summary"></p>
+    <p class="import-note" id="board-export-hint"></p>
+    <div id="xlsx-part">
     <div class="xlsx-lang" id="xlsx-lang" role="radiogroup" aria-label="File language">
       <b>File language</b>
       <label><input type="radio" name="xlsx-lang" value="en"> English</label>
@@ -936,6 +931,7 @@
       <div id="xlsx-sheets"></div>
     </div>
     <p class="import-note" id="xlsx-hint">Sheet 1 has one row per person on a mission, in mission order. Every sheet carries the TRIGO header, board name, date and total. The columns above also apply to the extra sheets (Name is always kept). The file language (English / Thai) changes the headers and wording in the file; names, hosts and customers stay as typed. Your choices are remembered on this device.</p>
+    </div>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-xlsx-go">Export</button>
@@ -945,13 +941,8 @@
   <!-- Capacity tab export: format, which boards, which Host-list columns -->
   <div class="modal hidden" id="modal-cap-export">
     <h3>Export Capacity<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="xlsx-lang export-type" id="cap-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="cap-export-summary"></p>
-    <div class="xlsx-lang" role="radiogroup" aria-label="Format">
-      <b>Format</b>
-      <label><input type="radio" name="cap-export-fmt" value="xlsx"> Excel</label>
-      <label><input type="radio" name="cap-export-fmt" value="jpg"> JPG image</label>
-      <label><input type="radio" name="cap-export-fmt" value="pdf"> PDF</label>
-    </div>
     <h4>Boards</h4>
     <div class="cap-export-tools">
       <button type="button" class="btn btn-small" id="btn-cap-export-all">All boards</button>
@@ -967,8 +958,20 @@
     </div>
   </div>
 
+  <div class="modal hidden" id="modal-hostlist-export">
+    <h3>Export Host List<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="xlsx-lang export-type" id="hostlist-export-type" role="radiogroup" aria-label="File type"></div>
+    <p class="import-note" id="hostlist-export-summary"></p>
+    <p class="import-note">One sheet with every column of the list: location, Google Maps link, service area, note, inspectors, deployment days, boards, missions and first / last seen.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-hostlist-export-go">Export</button>
+    </div>
+  </div>
+
   <div class="modal hidden" id="modal-emplist-xlsx">
-    <h3>Export Manpower List to Excel<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <h3>Export Manpower List<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="xlsx-lang export-type" id="emplist-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="emplist-xlsx-summary"></p>
     <div class="xlsx-lang" id="emplist-xlsx-lang" role="radiogroup" aria-label="File language">
       <b>File language</b>
@@ -1102,13 +1105,13 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="version.js?v=2026-10-05d"></script>
-<script src="planning.js?v=2026-10-05d"></script>
-<script src="employee-id.js?v=2026-10-05d"></script>
-<script src="cloud.js?v=2026-10-05d"></script>
-<script src="charts.js?v=2026-10-05d"></script>
-<script src="xlsx-export.js?v=2026-10-05d"></script>
-<script src="bulk-edit.js?v=2026-10-05d"></script>
-<script src="app.js?v=2026-10-05d"></script>
+<script src="version.js?v=2026-10-05e"></script>
+<script src="planning.js?v=2026-10-05e"></script>
+<script src="employee-id.js?v=2026-10-05e"></script>
+<script src="cloud.js?v=2026-10-05e"></script>
+<script src="charts.js?v=2026-10-05e"></script>
+<script src="xlsx-export.js?v=2026-10-05e"></script>
+<script src="bulk-edit.js?v=2026-10-05e"></script>
+<script src="app.js?v=2026-10-05e"></script>
 </body>
 </html>

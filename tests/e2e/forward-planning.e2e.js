@@ -136,7 +136,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       await step("C1: a date beyond the horizon opens in Forecast mode — no export, no PDF, no lock", async () => {
         assert.equal((await pa.textContent("#mode-pill")).trim(), "FORECAST");
         assert.ok(await pa.evaluate(() => document.body.classList.contains("forecast-mode")));
-        for (const sel of ["#btn-export", "#btn-print", "#btn-lock"]) assert.equal(await pa.isVisible(sel), false, sel + " hidden");
+        for (const sel of ["#btn-export", "#btn-lock"]) assert.equal(await pa.isVisible(sel), false, sel + " hidden");
         assert.equal((await pa.textContent("#btn-reset-board")).trim(), "Start from confirmed");
       });
 
@@ -663,13 +663,13 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       });
 
       await step("B13: Export — Excel for all boards with host columns, a JPG, and a one-page PDF", async () => {
-        await pa.click("#btn-cap-export");
+        await pa.click("#btn-export");
         await until(() => pa.isVisible("#modal-cap-export"), "export dialog");
         assert.deepEqual(await pa.$$eval("#cap-export-boards input:checked", (els) => els.map((e) => e.value)), ["b1"], "this board to begin with");
         await pa.click("#btn-cap-export-all");
         await pa.check('#cap-export-extras input[value="location"]');
         await pa.check('#cap-export-extras input[value="mapUrl"]');
-        await pa.check('input[name="cap-export-fmt"][value="xlsx"]');
+        await pa.check('#cap-export-type input[value="xlsx"]');
         const [dl] = await Promise.all([pa.waitForEvent("download"), pa.click("#btn-cap-export-go")]);
         assert.match(dl.suggestedFilename(), /^Capacity_All_boards_.*\.xlsx$/);
         const wb = new ExcelJS.Workbook();
@@ -685,19 +685,19 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         assert.equal(alpha.getCell(4).value.hyperlink, "https://maps.example.com/alpha");
         assert.equal(alpha.getCell(7).value, 2, "numbers stay numbers");
         // remembered on this device
-        await pa.click("#btn-cap-export");
+        await pa.click("#btn-export");
         assert.equal(await pa.isChecked('#cap-export-extras input[value="location"]'), true);
-        assert.equal(await pa.isChecked('input[name="cap-export-fmt"][value="xlsx"]'), true);
+        assert.equal(await pa.isChecked('#cap-export-type input[value="xlsx"]'), true);
         // JPG
-        await pa.check('input[name="cap-export-fmt"][value="jpg"]');
+        await pa.check('#cap-export-type input[value="jpg"]');
         const [jpg] = await Promise.all([pa.waitForEvent("download"), pa.click("#btn-cap-export-go")]);
         assert.match(jpg.suggestedFilename(), /^Capacity_Board_One_.*\.jpg$/);
         assert.ok(require("node:fs").statSync(await jpg.path()).size > 5000, "a real image");
         assert.equal(await pa.locator("#cap-export-sheet").count(), 0, "sheet cleaned up");
         // PDF: window.print is the browser's; stand in for its dialog
         await pa.evaluate(() => { window.__printed = 0; window.print = () => { window.__printed++; window.dispatchEvent(new Event("beforeprint")); }; });
-        await pa.click("#btn-cap-export");
-        await pa.check('input[name="cap-export-fmt"][value="pdf"]');
+        await pa.click("#btn-export");
+        await pa.check('#cap-export-type input[value="pdf"]');
         await pa.click("#btn-cap-export-go");
         await until(() => pa.evaluate(() => window.__printed === 1), "print called");
         assert.equal(await pa.evaluate(() => document.title), await pa.evaluate(() => "Capacity_Board_One_" + document.querySelector(".cap-gapchip").dataset.date));

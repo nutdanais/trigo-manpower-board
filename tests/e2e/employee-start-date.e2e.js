@@ -105,7 +105,7 @@ const X = require("../../xlsx-export.js");
 
     // Excel export: the rows on screen, English then Thai
     await p.fill("#emplist-search", "Person");
-    await p.click("#btn-emplist-xlsx");
+    await p.click("#btn-export");
     await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");
     assert.match(await p.textContent("#emplist-xlsx-summary"), /^\d+ employees/);
     assert.equal(await p.locator("#emplist-xlsx-lang input[value=en]").isChecked(), true);
@@ -124,7 +124,7 @@ const X = require("../../xlsx-export.js");
     assert.equal(ws.getImages().length, 0, "no banner or logo");
     console.log("ok - the Manpower List exports to Excel in English");
 
-    await p.click("#btn-emplist-xlsx");
+    await p.click("#btn-export");
     await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");
     await p.check("#emplist-xlsx-lang input[value=th]");
     [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-emplist-xlsx-go")]);
@@ -140,12 +140,12 @@ const X = require("../../xlsx-export.js");
     assert.equal(ws.getCell(row["Dated Person"], 8).value, X.serviceLength(ago(3, 5, 12), T, "th"));
     assert.equal(ws.getCell(row["Dated Person"], 12).value, "ใช้งาน");
     // the Thai choice is remembered by both exports
-    await p.click("#btn-emplist-xlsx");
+    await p.click("#btn-export");
     await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");
     assert.equal(await p.locator("#emplist-xlsx-lang input[value=th]").isChecked(), true);
     await p.click("#modal-emplist-xlsx [data-close].btn");
     await p.fill("#emplist-search", "zzzz-nobody");
-    await p.click("#btn-emplist-xlsx");
+    await p.click("#btn-export");
     await p.waitForSelector(".toast, #toast-stack > *");
     assert.equal(await p.locator("#modal-emplist-xlsx:not(.hidden)").count(), 0, "nothing to export opens no dialog");
     console.log("ok - the Manpower List exports to Excel in Thai");
