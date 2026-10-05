@@ -8349,6 +8349,7 @@ function renderCapacityToolbar() {
   $("#cap-range").value = String(state.capacity.weeks);
   $("#btn-cap-copy-week").classList.toggle("hidden", !can("capacity", "edit"));
   $("#btn-cap-seed").classList.toggle("hidden", !can("capacity", "edit"));
+  $("#btn-cap-reset").classList.toggle("hidden", !can("capacity", "edit"));
 }
 
 const CAP_CHART_H = 190, CAP_CHART_TOP = 30, CAP_COL_H = 232;
@@ -8718,6 +8719,26 @@ function seedCapacityFromConfirmed() {
       `It goes into ${cells.length} empty cell${cells.length === 1 ? "" : "s"} across the next ${state.capacity.weeks} week${state.capacity.weeks === 1 ? "" : "s"}. Cells that already have a number are kept. Then adjust the hosts you look after.`,
       () => saveCapacityCells(cells));
   });
+}
+/* "Reset to 0": every number on the board on screen, over the weeks shown,
+   becomes 0. The host x shift rows stay — a zero is written, not a delete. */
+function resetCapacityToZero() {
+  if (!can("capacity", "edit")) return;
+  const boardId = capBoardId();
+  const board = D().boards.find(b => b.id === boardId);
+  const demand = ((D().capacity && D().capacity.rows) || []).filter(r => r.board_id === boardId);
+  const rows = capacityRowsFor(boardId, demand);
+  if (!rows.length) { toast(`${board.name} has no hosts in the Capacity grid yet.`, "info"); return; }
+  const cells = new Map();
+  for (const r of rows) for (const d of capacityDates(boardId)) {
+    cells.set(capKey(boardId, d, r.host, r.shift), { boardId, date: d, host: r.host, shift: r.shift, headcount: 0 });
+  }
+  for (const r of demand) {
+    if (r.headcount) cells.set(capKey(boardId, r.plan_date, r.host, r.shift), { boardId, date: r.plan_date, host: r.host, shift: r.shift, headcount: 0 });
+  }
+  showConfirm("Reset all numbers to 0?",
+    `Every number on ${board.name} for the next ${state.capacity.weeks} week${state.capacity.weeks === 1 ? "" : "s"} is set to 0. All ${rows.length} host row${rows.length === 1 ? "" : "s"} stay as they are.`,
+    () => saveCapacityCells([...cells.values()]));
 }
 /* the board on screen only — "one board at a time" goes for the copy too */
 function copyCapacityWeek() {
@@ -9875,6 +9896,7 @@ function wireApp() {
   $("#cap-range").onchange = (ev) => { state.capacity.weeks = Number(ev.target.value); state.capacity.cacheKey = null; refreshAndRender(); };
   $("#btn-cap-copy-week").onclick = copyCapacityWeek;
   $("#btn-cap-seed").onclick = seedCapacityFromConfirmed;
+  $("#btn-cap-reset").onclick = resetCapacityToZero;
 
   // employee search (floating panel) — filter as you type, keep selection
   $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });
