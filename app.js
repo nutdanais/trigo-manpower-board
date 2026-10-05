@@ -378,6 +378,7 @@ const state = {
   settingsTab: "engineers",   // Settings modal: which sub-menu is showing. applySettingsTab falls
                               // back to the first pane this role may open (My account, at worst)
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
+  cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
     filters: { contract: [], position: [], service: [], areaId: [], boardId: [], status: [] },
@@ -963,6 +964,8 @@ function render() {
   $("#btn-print").classList.toggle("hidden", eml || hl || cap || fc);
   // Excel is one board's rows, so — unlike Export/PDF — it has nothing to offer on Overview or Org Chart
   $("#btn-xlsx").classList.toggle("hidden", !board || fc);
+  // the cards only exist on a board (not Overview, Org Chart, lists or Capacity)
+  $("#card-names").classList.toggle("hidden", !board);
   // Carry over / Reset Board on a confirmed day; "Start from confirmed" on an
   // empty forecast day (and nothing once a forecast exists — that is somebody's
   // work, not something to replace wholesale)
@@ -1716,6 +1719,12 @@ function splitFullName(name) {
   return i < 0 ? [s, ""] : [s.slice(0, i), s.slice(i + 1)];
 }
 
+/* Which name the board's employee cards show: the Thai name (the app's default), the English name
+   (the Thai one where there is none) or both, the English on a third small line. Remembered per device. */
+function cardNamesSaved() {   // also called while `state` is built, so the key is spelled out here
+  try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" || v === "both" ? v : "th"; } catch (e) { return "th"; }
+}
+
 function empCard(emp) {
   const area = D().areas.find(a => a.id === emp.areaId);
   const pos = emp.position ? POSITIONS[emp.position] : null;
@@ -1734,7 +1743,9 @@ function empCard(emp) {
   // Full name split for the card: first name on its own bold line (with the
   // TRIGO ID, always shown, in that line's corner), surname on a quieter line under it. One
   // role slot: OC for on-call (who have no position), the position otherwise.
-  const [firstName, surname] = splitFullName(emp.name);
+  const view = state.cardNames;
+  const [firstName, surname] = splitFullName(view === "en" ? (emp.nameEn || emp.name) : emp.name);
+  const alsoEn = view === "both" && emp.nameEn && emp.nameEn !== emp.name ? emp.nameEn : "";
   const role = emp.contract === "oncall" ? `<span class="emp-oc">OC</span>`
     : pos ? `<span class="emp-pos">${pos.short}</span>` : "";
   card.innerHTML =
@@ -1745,11 +1756,12 @@ function empCard(emp) {
     // the space keeps the card's text "first surname" (search, copy, screen
     // readers); a flex container drops it from the layout
     (surname ? ` <span class="emp-surname">${escapeHtml(surname)}</span>` : "") +
+    (alsoEn ? ` <span class="emp-name-en">${escapeHtml(alsoEn)}</span>` : "") +
     `<span class="emp-meta">` +
       role +
       (area ? `<span class="emp-area" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
-  card.title = `${emp.name}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
+  card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
   card.addEventListener("click", (ev) => {
     // don't treat the tail end of a drag as a click
@@ -9812,6 +9824,12 @@ function wireApp() {
   $("#btn-export").onclick = exportBoard;
   $("#btn-print").onclick = printBoard;
   $("#btn-xlsx").onclick = openXlsxModal;
+  $("#card-names").value = state.cardNames;
+  $("#card-names").addEventListener("change", (e) => {
+    state.cardNames = e.target.value;
+    try { localStorage.setItem("manpower.cardNames", state.cardNames); } catch (err) { /* remembering is a courtesy */ }
+    render();
+  });
   $("#btn-xlsx-all").onclick = () => setXlsxTicks(true);
   $("#btn-xlsx-none").onclick = () => setXlsxTicks(false);
   $("#btn-xlsx-go").onclick = exportXlsx;

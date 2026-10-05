@@ -31,7 +31,7 @@
      Date of the release; add a letter (b, c, ...) for a second release the
      same day. config.js and the vendor bundle are deliberately left off: one
      isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-05a">
+<link rel="stylesheet" href="styles.css?v=2026-10-05b">
 </head>
 <body>
 
@@ -307,6 +307,11 @@
          whatever chat app carries it, and it cannot hold a link. This prints the
          same board as vector text (sharp at any zoom) with the host name and the
          engineer phone still tappable inside the PDF. See printBoard in app.js. -->
+    <select id="card-names" class="hidden" aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
+      <option value="th">Names: Thai</option>
+      <option value="en">Names: English</option>
+      <option value="both">Names: Thai + English</option>
+    </select>
     <button id="btn-print" class="btn" title="Save as PDF — stays sharp at any zoom, and the location links stay tappable"><svg class="ic" aria-hidden="true"><use href="#i-printer"></use></svg> PDF</button>
     <!-- The editable half of "share the plan": the same board as rows in a spreadsheet,
          with the columns the planner picks first. See openXlsxModal in app.js. -->
@@ -1057,10 +1062,10 @@
 <script src="config.js"></script>
 <script src="planning.js?v=2026-09-24e"></script>
 <script src="employee-id.js?v=2026-10-03a"></script>
-<script src="cloud.js?v=2026-10-05a"></script>
+<script src="cloud.js?v=2026-10-05b"></script>
 <script src="charts.js?v=2026-09-07e"></script>
-<script src="xlsx-export.js?v=2026-10-05a"></script>
-<script src="bulk-edit.js?v=2026-10-05a"></script>
-<script src="app.js?v=2026-10-05a"></script>
+<script src="xlsx-export.js?v=2026-10-05b"></script>
+<script src="bulk-edit.js?v=2026-10-05b"></script>
+<script src="app.js?v=2026-10-05b"></script>
 </body>
 </html>

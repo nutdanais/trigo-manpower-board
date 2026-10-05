@@ -98,7 +98,7 @@ async function sheetOf(path) {
 
     await step("the choice is remembered, and search finds a person by either name", async () => {
       await p.reload();
-      await p.waitForSelector("#btn-new-employee, #emplist-name-view", { state: "attached" });
+      await p.waitForFunction(() => { try { return D().employees.length > 0; } catch (e) { return false; } });   // the app has started and loaded
       await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       assert.equal(await p.inputValue("#emplist-name-view"), "both");
       await p.fill("#emplist-search", "somchai");
@@ -146,6 +146,34 @@ async function sheetOf(path) {
       assert.ok(en.includes("มาลี สุขใจ"), "fallback to Thai where there is no English name");
       const th = await board("th", "/tmp/board-th.xlsx");
       assert.ok(th.includes("สมชาย ใจดี") && !th.includes("Somchai Jaidee"), "Thai board file has the Thai name");
+    });
+
+    await step("board cards: Thai by default, English / both on request, remembered, hidden outside a board", async () => {
+      await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
+      const card = (thai) => p.locator(`.emp-card[data-emp-id="e1"]`).first();
+      assert.equal(await p.locator("#card-names").isVisible(), true);
+      assert.equal(await p.inputValue("#card-names"), "th");
+      assert.match(await card().textContent(), /สมชาย\s*ใจดี/);
+      assert.ok(!/Somchai/.test(await card().textContent()));
+      await p.selectOption("#card-names", "en");
+      assert.match(await card().textContent(), /Somchai\s*Jaidee/);
+      assert.ok(!/สมชาย/.test(await card().textContent()));
+      assert.match(await p.locator('.emp-card[data-emp-id="e2"]').first().textContent(), /มาลี/, "no English name: the Thai one, not a blank card");
+      await p.selectOption("#card-names", "both");
+      assert.equal(await card().locator(".emp-name-en").textContent(), "Somchai Jaidee");
+      assert.match(await card().textContent(), /สมชาย/);
+      assert.equal(await p.locator('.emp-card[data-emp-id="e3"] .emp-name-en').count(), 0, "same text in both: shown once");
+      assert.match(await card().getAttribute("title"), /สมชาย ใจดี \/ Somchai Jaidee/);
+      await p.reload();
+      await p.waitForFunction(() => { try { return D().employees.length > 0; } catch (e) { return false; } });   // the app has started and loaded
+      await p.waitForSelector(".emp-card");
+      await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
+      assert.equal(await p.inputValue("#card-names"), "both");
+      assert.equal(await card().locator(".emp-name-en").count(), 1, "still both after a reload");
+      await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
+      assert.equal(await p.locator("#card-names").isVisible(), false, "not offered on the Manpower List");
+      await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
+      await p.selectOption("#card-names", "th");
     });
 
     console.log("all English name checks passed");
