@@ -406,3 +406,25 @@ test("personName: English file -> English name, Thai file -> Thai name, the othe
   assert.equal(X.personName({ name: "A", nameEn: "" }, "en"), "A");
   assert.equal(X.personName({}, "en"), "");
 });
+
+test("capacity workbook: a sheet per board, header with the host columns, numbers as numbers, safe link", async () => {
+  const board = (name) => ({
+    name, extras: [{ key: "location", label: "Location" }, { key: "mapUrl", label: "Google Maps link" }],
+    dates: [{ date: "2026-10-05", label: "Mon 05/10", forecast: false }, { date: "2026-10-06", label: "Tue 06/10", forecast: true }],
+    summary: { available: [5, 5], demand: [6, 0], gap: [-1, 5], kind: ["short", "ok"], named: [2, 0] },
+    rows: [{ host: "Host A", shift: "night", extra: { location: "Plant 2", mapUrl: "javascript:alert(1)" }, values: [6, 0] }],
+  });
+  const { workbook } = await X.buildCapacityWorkbook(ExcelJS, { boards: [board("LCB: Port"), board("LCB  Port")], rangeText: "r", generatedOn: "g" });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await workbook.xlsx.writeBuffer());
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ["LCB Port", "LCB Port 2"], "safe, unique sheet names");
+  const ws = wb.worksheets[0];
+  assert.deepEqual(ws.getRow(3).values.slice(1), ["Host", "Location", "Google Maps link", "Shift", "Mon 05/10", "Tue 06/10"]);
+  assert.deepEqual(ws.getRow(4).values.slice(5), ["CONFIRMED", "FORECAST"]);
+  let host = null;
+  ws.eachRow((row) => { if (row.getCell(1).value === "Host A") host = row; });
+  assert.equal(host.getCell(3).value, "javascript:alert(1)", "not an http(s) link: plain text, never a hyperlink");
+  assert.equal(host.getCell(4).value, "NIGHT");
+  assert.equal(host.getCell(5).value, 6);
+  assert.equal(host.getCell(6).value, 0);
+});

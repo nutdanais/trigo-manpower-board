@@ -31,7 +31,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-05c">
+<link rel="stylesheet" href="styles.css?v=2026-10-05d">
 </head>
 <body>
 
@@ -233,7 +233,8 @@
       </select>
       <button type="button" id="btn-cap-seed" class="btn" title="Fill empty cells with the latest confirmed day's deployment — people per host and shift">Start from confirmed plan</button>
       <button type="button" id="btn-cap-copy-week" class="btn" title="Copy this board's demand for the current week onto next week">Copy this week → next week</button>
-      <button type="button" id="btn-cap-reset" class="btn" title="Set every number on this board to 0 — the hosts stay">Reset to 0</button>
+      <button type="button" id="btn-cap-reset" class="btn" title="Set every number on this board to 0 from today on — the host rows stay">Reset to 0</button>
+      <button type="button" id="btn-cap-export" class="btn" title="Export the Capacity grid as Excel, JPG or PDF — one board or several">Export</button>
     </div>
     <button id="btn-toolbar-more" class="btn toolbar-more-toggle" type="button" title="More actions" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"></use></svg> More</button>
     <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
@@ -941,6 +942,31 @@
     </div>
   </div>
 
+  <!-- Capacity tab export: format, which boards, which Host-list columns -->
+  <div class="modal hidden" id="modal-cap-export">
+    <h3>Export Capacity<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note" id="cap-export-summary"></p>
+    <div class="xlsx-lang" role="radiogroup" aria-label="Format">
+      <b>Format</b>
+      <label><input type="radio" name="cap-export-fmt" value="xlsx"> Excel</label>
+      <label><input type="radio" name="cap-export-fmt" value="jpg"> JPG image</label>
+      <label><input type="radio" name="cap-export-fmt" value="pdf"> PDF</label>
+    </div>
+    <h4>Boards</h4>
+    <div class="cap-export-tools">
+      <button type="button" class="btn btn-small" id="btn-cap-export-all">All boards</button>
+      <button type="button" class="btn btn-small" id="btn-cap-export-this">This board only</button>
+    </div>
+    <div id="cap-export-boards" class="cap-export-list"></div>
+    <h4>Host columns</h4>
+    <div id="cap-export-extras" class="cap-export-list"></div>
+    <p class="import-note" id="cap-export-hint"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-cap-export-go">Export</button>
+    </div>
+  </div>
+
   <div class="modal hidden" id="modal-emplist-xlsx">
     <h3>Export Manpower List to Excel<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p class="import-note" id="emplist-xlsx-summary"></p>
@@ -1076,13 +1102,13 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="version.js?v=2026-10-05c"></script>
-<script src="planning.js?v=2026-10-05c"></script>
-<script src="employee-id.js?v=2026-10-05c"></script>
-<script src="cloud.js?v=2026-10-05c"></script>
-<script src="charts.js?v=2026-10-05c"></script>
-<script src="xlsx-export.js?v=2026-10-05c"></script>
-<script src="bulk-edit.js?v=2026-10-05c"></script>
-<script src="app.js?v=2026-10-05c"></script>
+<script src="version.js?v=2026-10-05d"></script>
+<script src="planning.js?v=2026-10-05d"></script>
+<script src="employee-id.js?v=2026-10-05d"></script>
+<script src="cloud.js?v=2026-10-05d"></script>
+<script src="charts.js?v=2026-10-05d"></script>
+<script src="xlsx-export.js?v=2026-10-05d"></script>
+<script src="bulk-edit.js?v=2026-10-05d"></script>
+<script src="app.js?v=2026-10-05d"></script>
 </body>
 </html>

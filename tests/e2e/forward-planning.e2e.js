@@ -7,6 +7,7 @@
 
 const assert = require("node:assert/strict");
 const h = require("./harness");
+const ExcelJS = require("../../vendor/exceljs.min.js");
 
 const T = h.iso(new Date());
 const SRC = h.isWeekend(T) ? h.prevWorking(T) : T;   // the day carried from
@@ -504,6 +505,8 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
     {
       const db = new h.FakeDb();
       h.seedBase(db, { src: SRC });
+      // Host Alpha has a location and map link in the Host list (for the export's host columns)
+      Object.assign(db.t("hosts").find((x) => x.name === "Host Alpha"), { location: "Rayong Plant 2", map_url: "https://maps.example.com/alpha" });
       // someone already typed Host Alpha for tomorrow: must survive the seeding
       db.seed("capacity_demand", [{ board_id: "b1", plan_date: H, host: "Host Alpha", shift: "day", headcount: 9 }]);
       const a = await env.openAs(db, h.USERS.a);
@@ -631,6 +634,85 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await pa.click('.cap-row-del[aria-label="Remove the Host Gamma day row"]');
         await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 0, "empty row removed");
         assert.equal(await pa.isVisible("#modal-confirm"), false);
+      });
+
+      await step("B12: Reset to 0 zeroes this board from today on (beyond the range too), keeps host rows and history; Start from confirmed plan then refills", async () => {
+        const past = h.addDays(dates[0], -1);
+        const far = h.addDays(dates[dates.length - 1], 21);
+        db.seed("capacity_demand", [
+          { board_id: "b1", plan_date: far, host: "Host Alpha", shift: "day", headcount: 6 },
+          { board_id: "b2", plan_date: dates[0], host: "Host Beta", shift: "day", headcount: 3 },
+        ]);
+        const hostsBefore = await pa.$$eval(".cap-hostname", (els) => els.map((e) => e.textContent));
+        await pa.click("#btn-cap-reset");
+        await until(() => pa.isVisible("#modal-confirm"), "confirmation");
+        assert.match(await pa.textContent("#confirm-message"), /cannot be undone/);
+        await pa.click("#btn-confirm-yes");
+        await until(() => db.t("capacity_demand").filter((r) => r.board_id === "b1" && r.plan_date >= dates[0]).every((r) => r.headcount === 0), "b1 zeroed");
+        assert.equal(at(far, "Host Alpha", "day"), 0, "beyond the range shown too");
+        assert.equal(at(past, "Host Gamma", "night"), 4, "past days kept");
+        assert.equal(db.t("capacity_demand").find((r) => r.board_id === "b2").headcount, 3, "other boards untouched");
+        await until(async () => (await pa.$$eval(".cap-gapchip", (els) => els.length)) > 0, "grid back");
+        assert.deepEqual(await pa.$$eval(".cap-hostname", (els) => els.map((e) => e.textContent)), hostsBefore, "host rows stay");
+        // the bug this fixes: a 0 counts as empty, so seeding works again after a reset
+        await pa.click("#btn-cap-seed");
+        await until(() => pa.isVisible("#modal-confirm"), "seed confirmation");
+        await pa.click("#btn-confirm-yes");
+        await until(() => at(dates[1], "Host Alpha", "day") === 2 && at(dates[1], "Host Beta", "day") === 1, "refilled from the confirmed plan");
+        assert.equal(at(dates[0], "Host Gamma", "night"), 1, "a row Reset left at 0 is refilled too");
+      });
+
+      await step("B13: Export — Excel for all boards with host columns, a JPG, and a one-page PDF", async () => {
+        await pa.click("#btn-cap-export");
+        await until(() => pa.isVisible("#modal-cap-export"), "export dialog");
+        assert.deepEqual(await pa.$$eval("#cap-export-boards input:checked", (els) => els.map((e) => e.value)), ["b1"], "this board to begin with");
+        await pa.click("#btn-cap-export-all");
+        await pa.check('#cap-export-extras input[value="location"]');
+        await pa.check('#cap-export-extras input[value="mapUrl"]');
+        await pa.check('input[name="cap-export-fmt"][value="xlsx"]');
+        const [dl] = await Promise.all([pa.waitForEvent("download"), pa.click("#btn-cap-export-go")]);
+        assert.match(dl.suggestedFilename(), /^Capacity_All_boards_.*\.xlsx$/);
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(require("node:fs").readFileSync(await dl.path()));
+        assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "Board Two"]);
+        const ws = wb.getWorksheet("Board One");
+        const header = ws.getRow(3).values.slice(1);
+        assert.deepEqual(header.slice(0, 5), ["Host", "Service area", "Location", "Google Maps link", "Shift"]);
+        let alpha = null;
+        ws.eachRow((row) => { if (row.getCell(1).value === "Host Alpha") alpha = row; });
+        assert.ok(alpha, "Host Alpha row");
+        assert.equal(alpha.getCell(3).value, "Rayong Plant 2");
+        assert.equal(alpha.getCell(4).value.hyperlink, "https://maps.example.com/alpha");
+        assert.equal(alpha.getCell(7).value, 2, "numbers stay numbers");
+        // remembered on this device
+        await pa.click("#btn-cap-export");
+        assert.equal(await pa.isChecked('#cap-export-extras input[value="location"]'), true);
+        assert.equal(await pa.isChecked('input[name="cap-export-fmt"][value="xlsx"]'), true);
+        // JPG
+        await pa.check('input[name="cap-export-fmt"][value="jpg"]');
+        const [jpg] = await Promise.all([pa.waitForEvent("download"), pa.click("#btn-cap-export-go")]);
+        assert.match(jpg.suggestedFilename(), /^Capacity_Board_One_.*\.jpg$/);
+        assert.ok(require("node:fs").statSync(await jpg.path()).size > 5000, "a real image");
+        assert.equal(await pa.locator("#cap-export-sheet").count(), 0, "sheet cleaned up");
+        // PDF: window.print is the browser's; stand in for its dialog
+        await pa.evaluate(() => { window.__printed = 0; window.print = () => { window.__printed++; window.dispatchEvent(new Event("beforeprint")); }; });
+        await pa.click("#btn-cap-export");
+        await pa.check('input[name="cap-export-fmt"][value="pdf"]');
+        await pa.click("#btn-cap-export-go");
+        await until(() => pa.evaluate(() => window.__printed === 1), "print called");
+        assert.equal(await pa.evaluate(() => document.title), await pa.evaluate(() => "Capacity_Board_One_" + document.querySelector(".cap-gapchip").dataset.date));
+        assert.match(await pa.evaluate(() => document.getElementById("print-page-size").textContent), /@page \{ size: [\d.]+mm [\d.]+mm/);
+        await pa.emulateMedia({ media: "print" });
+        const pdf = await pa.pdf({ preferCSSPageSize: true, printBackground: true });
+        await pa.emulateMedia({ media: "screen" });
+        assert.equal((pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length, 1, "one page");
+        await pa.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+        assert.equal(await pa.locator("#cap-export-sheet").count(), 0, "sheet removed after printing");
+        assert.equal(await pa.evaluate(() => document.body.classList.contains("printing-cap")), false);
+        // Ctrl+P on the grid itself is still the notice, not the tentative plan
+        await pa.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
+        assert.equal(await pa.evaluate(() => document.body.classList.contains("print-blocked")), true);
+        await pa.evaluate(() => window.dispatchEvent(new Event("afterprint")));
       });
       assert.deepEqual(a.errors, [], "no console errors");
       await a.close();

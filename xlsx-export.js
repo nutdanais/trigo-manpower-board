@@ -560,7 +560,165 @@
     return { workbook: wb, summary: { total: rows.length } };
   }
 
-  const api = { personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
+  /* The Capacity tab as a workbook: one sheet per board. Each is the grid as
+     the screen shows it — a navy banner, the days across (CONFIRMED or
+     FORECAST under each date), the Available / Demand / Gap / Named rows, then
+     one row per host x shift with the host columns the user ticked. Numbers
+     are real numbers. spec: { boards: [Capacity.exportBoard(...)], rangeText,
+     generatedOn, note } */
+  async function buildCapacityWorkbook(ExcelJS, spec) {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "TRIGO Manpower Board";
+    wb.created = new Date();
+    const used = new Set();
+    const KIND = {
+      short: { bg: "FFFBE4E4", fg: "FFB42318" },
+      tight: { bg: C.dayBg, fg: C.dayFg },
+      ok: { bg: C.okBg, fg: C.okFg },
+    };
+    for (const b of spec.boards) {
+      let name = safeSheetName(b.name), n = 2;
+      while (used.has(name.toLowerCase())) name = safeSheetName(b.name).slice(0, 28) + " " + n++;
+      used.add(name.toLowerCase());
+      const fixed = 1 + b.extras.length + 1;                  // Host, host columns, Shift
+      const last = fixed + b.dates.length;
+      const ws = wb.addWorksheet(name, {
+        views: [{ showGridLines: false, state: "frozen", xSplit: fixed, ySplit: 4 }],
+        pageSetup: { orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+          margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 } },
+      });
+      const WIDTH = { area: 16, location: 30, note: 30, mapUrl: 36 };
+      ws.getColumn(1).width = 30;
+      b.extras.forEach((c, i) => { ws.getColumn(2 + i).width = WIDTH[c.key] || 20; });
+      ws.getColumn(fixed).width = 9;
+      for (let c = fixed + 1; c <= last; c++) ws.getColumn(c).width = 9.5;
+
+      const span = (row, text, style) => {
+        if (last > 1) ws.mergeCells(row, 1, row, last);
+        const cell = ws.getCell(row, 1);
+        cell.value = text;
+        Object.assign(cell, style);
+        for (let c = 1; c <= last; c++) if (style.fill) ws.getCell(row, c).fill = style.fill;
+      };
+      ws.getRow(1).height = 30;
+      span(1, "TRIGO  ·  Capacity  —  " + b.name, {
+        font: fontOf({ size: 15, bold: true, color: { argb: "FFFFFFFF" } }), fill: fillOf(C.navy),
+        alignment: { vertical: "middle", indent: 1 },
+      });
+      ws.getRow(2).height = 20;
+      span(2, [spec.rangeText, spec.generatedOn ? "exported " + spec.generatedOn : ""].filter(Boolean).join("  ·  "), {
+        font: fontOf({ size: 10.5, color: { argb: C.mut } }), fill: fillOf(C.pale),
+        alignment: { vertical: "middle", indent: 1 },
+      });
+      // header: labels on row 3, CONFIRMED / FORECAST on row 4
+      const heads = ["Host", ...b.extras.map((c) => c.label), "Shift"];
+      heads.forEach((t, i) => {
+        ws.mergeCells(3, i + 1, 4, i + 1);
+        const cell = ws.getCell(3, i + 1);
+        cell.value = t;
+        cell.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
+        cell.fill = fillOf(C.navy);
+        cell.alignment = { vertical: "middle", horizontal: i === heads.length - 1 ? "center" : "left", indent: i === heads.length - 1 ? 0 : 1 };
+        ws.getCell(4, i + 1).fill = fillOf(C.navy);
+      });
+      b.dates.forEach((d, i) => {
+        const c1 = ws.getCell(3, fixed + 1 + i), c2 = ws.getCell(4, fixed + 1 + i);
+        c1.value = d.label;
+        c1.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
+        c1.fill = fillOf(C.navy);
+        c1.alignment = { vertical: "middle", horizontal: "center" };
+        c2.value = d.forecast ? "FORECAST" : "CONFIRMED";
+        c2.font = fontOf({ size: 8, bold: true, color: { argb: d.forecast ? C.green : C.onNavy } });
+        c2.fill = fillOf(C.navy);
+        c2.alignment = { vertical: "middle", horizontal: "center" };
+        c2.border = { bottom: { style: "medium", color: { argb: C.green } } };
+      });
+      for (let c = 1; c <= fixed; c++) ws.getCell(4, c).border = { bottom: { style: "medium", color: { argb: C.green } } };
+      ws.getRow(3).height = 22;
+      ws.getRow(4).height = 16;
+
+      let r = 5;
+      const sumRow = (label, vals, kinds) => {
+        ws.getRow(r).height = 20;
+        ws.mergeCells(r, 1, r, fixed);
+        const lc = ws.getCell(r, 1);
+        lc.value = label;
+        lc.font = fontOf({ bold: true, color: { argb: C.navy } });
+        lc.alignment = { vertical: "middle", indent: 1 };
+        for (let c = 1; c <= fixed; c++) ws.getCell(r, c).fill = fillOf(C.pale);
+        vals.forEach((v, i) => {
+          const cell = ws.getCell(r, fixed + 1 + i);
+          cell.value = v == null ? "" : v;
+          cell.alignment = { vertical: "middle", horizontal: "center" };
+          cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
+          const k = kinds && kinds[i] && KIND[kinds[i]];
+          cell.font = fontOf({ bold: true, color: { argb: k ? k.fg : C.ink } });
+          cell.fill = fillOf(k ? k.bg : C.pale);
+          if (kinds && typeof v === "number") cell.numFmt = "+0;-0;0";
+        });
+        r++;
+      };
+      sumRow("Available people", b.summary.available);
+      sumRow("Demand (all hosts)", b.summary.demand);
+      sumRow("Gap  (available − demand)", b.summary.gap, b.summary.kind);
+      sumRow("Named on board", b.summary.named);
+
+      ws.getRow(r).height = 22;
+      ws.mergeCells(r, 1, r, last);
+      const sh = ws.getCell(r, 1);
+      sh.value = "Demand by host · shift";
+      sh.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
+      for (let c = 1; c <= last; c++) ws.getCell(r, c).fill = fillOf(C.divider);
+      sh.alignment = { vertical: "middle", indent: 1 };
+      r++;
+
+      if (!b.rows.length) {
+        ws.mergeCells(r, 1, r, last);
+        ws.getCell(r, 1).value = "No demand entered.";
+        ws.getCell(r, 1).font = fontOf({ italic: true, color: { argb: C.mut } });
+        ws.getCell(r, 1).alignment = { indent: 1 };
+        r++;
+      }
+      b.rows.forEach((row, k) => {
+        ws.getRow(r).height = 20;
+        const tint = k % 2 === 1 ? fillOf(C.paper) : null;
+        const put = (c, v, o) => {
+          const cell = ws.getCell(r, c);
+          cell.value = v;
+          cell.font = fontOf(o.font || {});
+          cell.alignment = Object.assign({ vertical: "middle" }, o.align);
+          cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
+          if (o.fill || tint) cell.fill = o.fill || tint;
+        };
+        put(1, row.host, { font: { bold: true }, align: { indent: 1 } });
+        b.extras.forEach((c, i) => {
+          const v = row.extra[c.key] || "";
+          if (c.key === "mapUrl" && /^https?:\/\//i.test(v)) {
+            put(2 + i, { text: v, hyperlink: v }, { font: { color: { argb: "FF0563C1" }, underline: true }, align: { indent: 1 } });
+          } else put(2 + i, v, { align: { indent: 1 } });
+        });
+        const night = row.shift === "night";
+        put(fixed, night ? "NIGHT" : "DAY", {
+          font: { bold: true, size: 9, color: { argb: night ? C.nightFg : C.dayFg } },
+          fill: fillOf(night ? C.nightBg : C.dayBg), align: { horizontal: "center" },
+        });
+        row.values.forEach((v, i) => put(fixed + 1 + i, v == null ? "" : v, { align: { horizontal: "center" } }));
+        r++;
+      });
+      if (spec.note) {
+        r++;
+        ws.mergeCells(r, 1, r, last);
+        const nc = ws.getCell(r, 1);
+        nc.value = spec.note;
+        nc.font = fontOf({ size: 9, italic: true, color: { argb: C.mut } });
+        nc.alignment = { wrapText: true, vertical: "top", indent: 1 };
+        ws.getRow(r).height = 28;
+      }
+    }
+    return { workbook: wb };
+  }
+
+  const api = { buildCapacityWorkbook, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

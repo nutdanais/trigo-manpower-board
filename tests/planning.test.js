@@ -277,3 +277,22 @@ test("merge: decisionRows logs every decision with both sides and the reason", (
   const f = rows.find((x) => x.type === "field");
   assert.deepEqual([f.mission_number, f.field, f.carry_value, f.forecast_value, f.reason], ["205", "startTime", "startTime=08:00", "startTime=07:00", null]);
 });
+
+test("capacity export: one board's grid as data, with only the ticked host columns, in a fixed order", () => {
+  const days = [
+    { date: "2026-10-05", forecast: false, demand: 3, gap: -1, kind: "short", a: { available: 2, named: 1 } },
+    { date: "2026-10-06", forecast: true, demand: 0, gap: null, kind: null, a: null },
+  ];
+  const vals = { "2026-10-05|Host A|day": 3, "2026-10-06|Host A|day": 0 };
+  const out = Capacity.exportBoard({
+    name: "Board One", days, rows: [{ host: "Host A", shift: "day" }, { host: "Host Z", shift: "night" }],
+    value: (d, h, s) => vals[d + "|" + h + "|" + s],
+    hostInfo: (h) => (h === "Host A" ? { area: "LCB", location: "Plant 2", note: "Gate 3", mapUrl: "https://m.example.com" } : null),
+    extras: ["mapUrl", "area"], dateLabel: (d) => "L" + d.slice(8),
+  });
+  assert.deepEqual(out.extras.map((c) => c.key), ["area", "mapUrl"], "fixed order, only the ticked ones");
+  assert.deepEqual(out.dates, [{ date: "2026-10-05", label: "L05", forecast: false }, { date: "2026-10-06", label: "L06", forecast: true }]);
+  assert.deepEqual(out.summary, { available: [2, null], demand: [3, 0], gap: [-1, null], kind: ["short", null], named: [1, null] });
+  assert.deepEqual(out.rows[0], { host: "Host A", shift: "day", extra: { area: "LCB", mapUrl: "https://m.example.com" }, values: [3, 0] }, "a 0 stays 0");
+  assert.deepEqual(out.rows[1], { host: "Host Z", shift: "night", extra: { area: "", mapUrl: "" }, values: [null, null] }, "no Host-list record: blank columns");
+});

@@ -1970,6 +1970,18 @@ const cloud = {
     if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
   },
 
+  /* "Reset to 0": every number this board has on fromDate or later becomes 0,
+     whatever range the grid happens to show. The rows stay (as zeros), so the
+     host rows stay on the grid; dates before fromDate are history and untouched. */
+  async resetCapacityDemand(boardId, fromDate) {
+    const updatedBy = await this._currentEmail();
+    const { error } = await sb.from("capacity_demand")
+      .update({ headcount: 0, updated_by: updatedBy, updated_at: new Date().toISOString() })
+      .eq("board_id", boardId).gte("plan_date", fromDate).neq("headcount", 0);
+    if (error) throw error;
+    if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
+  },
+
   /* The raw rows the Capacity grid derives Leave and "Named on board" from:
      confirmed rows and forecast rows over the whole range. Which of the two
      counts for a given date is decided per board by Capacity.aggregate — the
