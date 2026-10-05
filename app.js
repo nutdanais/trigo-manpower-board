@@ -5191,9 +5191,10 @@ function closeModal() {
   if (_confirmCancel) { const c = _confirmCancel; _confirmCancel = null; c(); }
 }
 
-function showConfirm(title, message, onYes, onCancel) {
+function showConfirm(title, message, onYes, onCancel, yesLabel) {
   $("#confirm-title").textContent = title;
   $("#confirm-message").textContent = message;
+  $("#btn-confirm-yes").textContent = yesLabel || "Yes";
   _confirmCancel = onCancel || null;
   openModal("#modal-confirm");
   $("#btn-confirm-yes").onclick = () => { _confirmCancel = null; closeModal(); onYes(); };
@@ -5512,7 +5513,7 @@ function saveEmployee(ev) {
   }
   const idOwner = EmployeeId.idClash(D().employees, tid, state.editingEmployeeId);
   if (idOwner) { toast(`The TRIGO ID ${tid} already belongs to ${idOwner.name}.`, "warn"); return; }
-  safely(async () => {
+  const doSave = () => safely(async () => {
     if (state.editingEmployeeId) {
       const emp = D().employees.find(x => x.id === state.editingEmployeeId);
       if (emp.boardId !== vals.boardId) await cloud.moveEmployeeToBoard(emp.id, vals.boardId, state.date);
@@ -5523,6 +5524,24 @@ function saveEmployee(ev) {
     closeModal();
     await refreshAndRender();
   });
+  // A name typed into the wrong field: no Thai letters in the Thai name, or Thai letters in the English
+  // name. A warning, not a block (a Thai name may be spelled in English for now), and on an edit only
+  // for a field that was changed, so a person whose Thai column still holds the English copy from the
+  // migration is not nagged every time their phone number is edited.
+  const hasThai = (t) => /[\u0E00-\u0E7F]/.test(t);
+  const mixUps = [];
+  if (vals.name && !hasThai(vals.name) && (!editing || editing.name !== vals.name)) {
+    mixUps.push(`The Thai name "${vals.name}" has no Thai letters. It is the name the app shows by default.`);
+  }
+  if (vals.nameEn && hasThai(vals.nameEn) && (!editing || (editing.nameEn || "") !== vals.nameEn)) {
+    mixUps.push(`The English name "${vals.nameEn}" has Thai letters. It is the name an English Excel export uses.`);
+  }
+  if (mixUps.length) {
+    // Cancel goes back to the form with everything still typed in
+    showConfirm("Check the names", mixUps.join("\n\n") + "\n\nSave anyway?", doSave, () => openModal("#modal-employee"), "Save anyway");
+    return;
+  }
+  doSave();
 }
 
 function deactivateEmployee() {

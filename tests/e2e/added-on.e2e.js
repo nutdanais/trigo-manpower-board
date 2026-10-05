@@ -62,7 +62,7 @@ const h = require("./harness");
     await p.evaluate(() => { openEmployeeModal("n0"); state.employeeTab = "edit"; applyEmployeeTab(); });
     assert.equal(await p.inputValue("#form-employee input[name=addedOn]"), SRC);
     await p.fill("#form-employee input[name=addedOn]", PAST);
-    await p.click("#form-employee button[type=submit]");
+    await h.submitEmployeeForm(p);
     await p.waitForSelector("#modal-employee", { state: "hidden" });
     assert.equal(db.t("employees").find((e) => e.id === "n0").added_on, PAST);
     await go(PAST);

@@ -128,4 +128,11 @@ async function launch() {
   return { openAs, close, base };
 }
 
-module.exports = { launch, seedBase, FakeDb, USERS, iso, addDays, nextWorking, prevWorking, isWeekend };
+/* Submit the New / Edit Employee form. Most tests type English into the Thai name field, which now earns a
+   "Check the names" warning; they are not testing that, so it is answered with "Save anyway". */
+async function submitEmployeeForm(page) {
+  await page.click("#form-employee button[type=submit]");
+  if (await page.locator("#modal-confirm:not(.hidden)").count()) await page.click("#btn-confirm-yes");
+}
+
+module.exports = { submitEmployeeForm, launch, seedBase, FakeDb, USERS, iso, addDays, nextWorking, prevWorking, isWeekend };

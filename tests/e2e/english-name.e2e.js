@@ -68,6 +68,66 @@ async function sheetOf(path) {
       assert.equal(db.t("employees").find((e) => e.id === id).name_en, null);
     });
 
+    await step("a name typed into the wrong field earns a warning (Cancel keeps the form), but can be saved anyway", async () => {
+      const confirmUp = async () => (await p.locator("#modal-confirm:not(.hidden)").count()) === 1;
+      const submit = () => p.click("#form-employee button[type=submit]");
+      // English in the Thai field
+      await p.evaluate(() => openEmployeeModal(null));
+      await p.fill("#form-employee input[name=name]", "Plain English");
+      await submit();
+      assert.equal(await confirmUp(), true, "warned");
+      assert.match(await p.textContent("#confirm-message"), /Thai name "Plain English" has no Thai letters/);
+      assert.equal(await p.textContent("#btn-confirm-yes"), "Save anyway");
+      await p.click("#btn-confirm-no");
+      assert.equal(await p.locator("#modal-employee:not(.hidden)").count(), 1, "Cancel returns to the form");
+      assert.equal(await p.inputValue("#form-employee input[name=name]"), "Plain English", "what was typed is still there");
+      assert.equal(db.t("employees").some((e) => e.name_th === "Plain English"), false, "nothing saved yet");
+      await submit();
+      await p.click("#btn-confirm-yes");
+      await p.waitForSelector("#modal-employee", { state: "hidden" });
+      assert.equal(db.t("employees").some((e) => e.name_th === "Plain English"), true, "saved anyway");
+      // Thai in the English field
+      await p.evaluate(() => openEmployeeModal(null));
+      await p.fill("#form-employee input[name=name]", "สมศรี มีสุข");
+      await p.fill("#form-employee input[name=nameEn]", "สมศรี");
+      await submit();
+      assert.match(await p.textContent("#confirm-message"), /English name "สมศรี" has Thai letters/);
+      await p.click("#btn-confirm-yes");
+      await p.waitForSelector("#modal-employee", { state: "hidden" });
+      assert.equal(db.t("employees").find((e) => e.name_th === "สมศรี มีสุข").name_en, "สมศรี");
+      // both wrong: one dialog, two lines
+      await p.evaluate(() => openEmployeeModal(null));
+      await p.fill("#form-employee input[name=name]", "Both Wrong");
+      await p.fill("#form-employee input[name=nameEn]", "ทั้งคู่");
+      await submit();
+      assert.match(await p.textContent("#confirm-message"), /no Thai letters[\s\S]*has Thai letters/);
+      await p.click("#btn-confirm-no");
+      await p.locator("#modal-employee [data-close].btn:visible").first().click();
+      // each in its own field: no dialog
+      await p.evaluate(() => openEmployeeModal(null));
+      await p.fill("#form-employee input[name=name]", "ถูกต้อง ครบถ้วน");
+      await p.fill("#form-employee input[name=nameEn]", "Correct Complete");
+      await submit();
+      assert.equal(await confirmUp(), false, "no warning when each name is in its own language");
+      await p.waitForSelector("#modal-employee", { state: "hidden" });
+    });
+
+    await step("editing: only a name that was changed is checked (the migration's English copies are not nagged)", async () => {
+      // e3's Thai column still holds the English copy; changing only the phone must save without a dialog
+      await p.evaluate(() => { openEmployeeModal("e3"); state.employeeTab = "edit"; applyEmployeeTab(); });
+      await p.fill("#form-employee input[name=phone]", "081-999-9999");
+      await p.click("#form-employee button[type=submit]");
+      await p.waitForSelector("#modal-employee", { state: "hidden" });
+      assert.equal(db.t("employees").find((e) => e.id === "e3").phone, "081-999-9999");
+      // changing that English-in-Thai name to another English one does warn
+      await p.evaluate(() => { openEmployeeModal("e3"); state.employeeTab = "edit"; applyEmployeeTab(); });
+      await p.fill("#form-employee input[name=name]", "Pichai R.");
+      await p.click("#form-employee button[type=submit]");
+      assert.equal(await p.locator("#modal-confirm:not(.hidden)").count(), 1);
+      await p.click("#btn-confirm-no");
+      await p.locator("#modal-employee [data-close].btn:visible").first().click();
+    });
+
     await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return cloud._loadEmployees().then(refreshAndRender); });
     const names = () => p.locator("#emplist-body tr td[data-label=Name]").allTextContents();
     const cellOf = (thai) => p.locator(`#emplist-body tr:has(td[data-label=Name]:has-text("${thai}")) td[data-label=Name]`).first();

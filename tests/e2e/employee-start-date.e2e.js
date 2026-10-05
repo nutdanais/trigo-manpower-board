@@ -22,7 +22,7 @@ const X = require("../../xlsx-export.js");
     const p = a.page;
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
     const save = async () => {
-      await p.click("#form-employee button[type=submit]");
+      await h.submitEmployeeForm(p);
       await p.waitForSelector("#modal-employee", { state: "hidden" });
     };
 
