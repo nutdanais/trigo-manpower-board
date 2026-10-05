@@ -240,7 +240,7 @@
       if (d) cell.numFmt = "dd-mmm-yyyy";
     } else if (col.key === "service") {
       v = serviceLength(r.startDate, spec.today, lang);
-    } else if (col.key === "name") {
+    } else if (col.key === "name" && !col.exact) {
       v = personName(r, lang);
     } else if (col.key === "contract" || col.key === "shift" || col.key === "position") {
       v = say(col.key, v, lang);
@@ -460,7 +460,10 @@
      position (English label or ""), phone, trigoId, startDate: "YYYY-MM-DD"|"", area,
      board, util: percent|null|undefined, active: boolean }. */
   const LIST_COLUMNS = [
-    { key: "name",      label: "Name",            th: "ชื่อ",               width: 30 },
+    // the list carries both names whatever the file language: the language only changes the headers
+    // and the words (the English column stays empty for someone with no English name yet)
+    { key: "name",      label: "Thai Name",       th: "ชื่อ (ไทย)",         width: 30, exact: true },
+    { key: "nameEn",    label: "English Name",    th: "ชื่อ (อังกฤษ)",      width: 30 },
     { key: "trigoId",   label: "TRIGO ID",        th: "รหัส TRIGO",         width: 11, center: true },
     { key: "contract",  label: "Contract Type",   th: "ประเภทสัญญา",       width: 17 },
     { key: "position",  label: "Position",        th: "ตำแหน่ง",           width: 25 },

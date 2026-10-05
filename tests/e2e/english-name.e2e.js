@@ -177,14 +177,18 @@ async function sheetOf(path) {
       await dl.saveAs(file);
       return (await sheetOf(file)).worksheets[0];
     };
-    const col1 = (ws) => { const o = []; for (let r = 2; r <= ws.rowCount; r++) if (ws.getCell(r, 1).value) o.push(ws.getCell(r, 1).value); return o; };
 
-    await step("the Manpower List Excel: an English file uses English names, a Thai file Thai names (whatever exists as fallback)", async () => {
-      const en = col1(await exportList("en", "/tmp/names-en.xlsx"));
-      assert.ok(en.includes("Somchai Jaidee") && !en.includes("สมชาย ใจดี"), "English file, English name");
-      assert.ok(en.includes("มาลี สุขใจ"), "no English name -> the Thai one is used");
-      const th = col1(await exportList("th", "/tmp/names-th.xlsx"));
-      assert.ok(th.includes("สมชาย ใจดี") && !th.includes("Somchai Jaidee"), "Thai file, Thai name");
+    await step("the Manpower List Excel has both name columns, in an English and in a Thai file", async () => {
+      const both = (ws) => { const o = {}; for (let r = 2; r <= ws.rowCount; r++) if (typeof ws.getCell(r, 1).value === "string") o[ws.getCell(r, 1).value] = ws.getCell(r, 2).value || ""; return o; };
+      const en = await exportList("en", "/tmp/names-en.xlsx");
+      assert.deepEqual([1, 2].map((c) => en.getCell(1, c).value), ["Thai Name", "English Name"]);
+      const e = both(en);
+      assert.equal(e["สมชาย ใจดี"], "Somchai Jaidee", "Thai name beside its English name");
+      assert.equal(e["มาลี สุขใจ"], "", "no English name yet: left empty, not copied from the Thai one");
+      assert.equal(e["Pichai Rakdee"], "Pichai Rakdee");
+      const th = await exportList("th", "/tmp/names-th.xlsx");
+      assert.deepEqual([1, 2].map((c) => th.getCell(1, c).value), ["ชื่อ (ไทย)", "ชื่อ (อังกฤษ)"]);
+      assert.deepEqual(both(th), e, "the same two columns in the Thai file");
     });
 
     await step("the board Excel uses the same rule", async () => {

@@ -143,8 +143,8 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     const wb2 = new ExcelJS.Workbook();
     await wb2.xlsx.load(fs.readFileSync(lp));
     const ws2 = wb2.worksheets[0];
-    assert.deepEqual([1, 2].map((c) => ws2.getCell(1, c).value), ["Name", "TRIGO ID"]);
-    const idsInSheet = []; for (let r = 2; r < ws2.rowCount; r++) idsInSheet.push(ws2.getCell(r, 2).value);
+    assert.deepEqual([1, 2, 3].map((c) => ws2.getCell(1, c).value), ["Thai Name", "English Name", "TRIGO ID"]);
+    const idsInSheet = []; for (let r = 2; r < ws2.rowCount; r++) idsInSheet.push(ws2.getCell(r, 3).value);
     assert.ok(idsInSheet.includes("T101") && idsInSheet.includes("T777"));
     console.log("ok - the Manpower List Excel has a TRIGO ID column");
 
