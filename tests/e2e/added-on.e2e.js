@@ -18,7 +18,7 @@ const h = require("./harness");
     const db = new h.FakeDb();
     h.seedBase(db, { src: SRC });
     // three people on Board One who joined the app on SRC (like the LCB Port import)
-    db.seed("employees", ["X", "Y", "Z"].map((n, i) => ({ id: "n" + i, name: "Newcomer " + n, contract: "permanent", area_id: "area-1", board_id: "b1", added_on: SRC })));
+    db.seed("employees", ["X", "Y", "Z"].map((n, i) => ({ id: "n" + i, name_th: "Newcomer " + n, contract: "permanent", area_id: "area-1", board_id: "b1", added_on: SRC })));
     const a = await env.openAs(db, h.USERS.a);
     const p = a.page;
     const stat = (label) => p.evaluate((l) => {
@@ -62,7 +62,7 @@ const h = require("./harness");
     await p.evaluate(() => { openEmployeeModal("n0"); state.employeeTab = "edit"; applyEmployeeTab(); });
     assert.equal(await p.inputValue("#form-employee input[name=addedOn]"), SRC);
     await p.fill("#form-employee input[name=addedOn]", PAST);
-    await p.click("#form-employee button[type=submit]");
+    await h.submitEmployeeForm(p);
     await p.waitForSelector("#modal-employee", { state: "hidden" });
     assert.equal(db.t("employees").find((e) => e.id === "n0").added_on, PAST);
     await go(PAST);

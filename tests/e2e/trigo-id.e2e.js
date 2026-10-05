@@ -25,7 +25,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     db.t("employees").find((e) => e.id === "e1").trigo_id = "T101";
     db.t("employees").find((e) => e.id === "e2").trigo_id = "T9";
     db.t("employees").find((e) => e.id === "e3").trigo_id = "T20";
-    db.seed("employees", [{ id: "short1", name: "Pichai", contract: "permanent", area_id: "area-1", board_id: "b1" }]);   // saved before the full-name rule
+    db.seed("employees", [{ id: "short1", name_th: "Pichai", contract: "permanent", area_id: "area-1", board_id: "b1" }]);   // saved before the full-name rule
     const a = await env.openAs(db, h.USERS.a);
     const p = a.page;
     await p.evaluate((d) => { state.date = d; D().activeBoardId = "b1"; return cloud._loadEmployees().then(refreshAndRender); }, SRC);
@@ -49,7 +49,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
       await p.evaluate(() => openEmployeeModal(null));
       await p.fill("#form-employee input[name=name]", name);
       await p.fill("#form-employee input[name=trigoId]", tid);
-      await p.click("#form-employee button[type=submit]");
+      await h.submitEmployeeForm(p);
     };
     await fill("Somchai", "");
     await p.waitForFunction(() => /full name/.test(document.querySelector("#toast-stack").textContent));
@@ -63,32 +63,32 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     await fill("Somchai Newname", "t101");
     await p.waitForFunction(() => /T101 already belongs to Person A/.test(document.querySelector("#toast-stack").textContent));
     await p.evaluate(() => closeModal());
-    assert.equal(db.t("employees").some((e) => e.name.startsWith("Somchai")), false, "nothing was saved");
+    assert.equal(db.t("employees").some((e) => e.name_th.startsWith("Somchai")), false, "nothing was saved");
     console.log("ok - a short name, an ID in the name, a malformed ID and a taken ID are all refused");
 
     await fill("Somchai Newname", " t-777 ");
     await p.waitForSelector("#modal-employee", { state: "hidden" });
-    const created = db.t("employees").find((e) => e.name === "Somchai Newname");
+    const created = db.t("employees").find((e) => e.name_th === "Somchai Newname");
     assert.equal(created.trigo_id, "T777", "tidied to T777");
     await fill("Somchai Newname", "");
     await p.waitForFunction(() => /already exists/.test(document.querySelector("#toast-stack").textContent));
     await p.evaluate(() => closeModal());
     await fill("somchai newname", "T778");
     await p.waitForSelector("#modal-employee", { state: "hidden" });
-    assert.equal(db.t("employees").filter((e) => e.name.toLowerCase() === "somchai newname").length, 2, "namesakes are fine once both have a TRIGO ID");
+    assert.equal(db.t("employees").filter((e) => e.name_th.toLowerCase() === "somchai newname").length, 2, "namesakes are fine once both have a TRIGO ID");
     console.log("ok - the ID is saved tidied, and namesakes need a TRIGO ID each");
 
     // a short name saved earlier can still be edited, but not renamed to another short name
     await p.evaluate(() => { openEmployeeModal("short1"); state.employeeTab = "edit"; applyEmployeeTab(); });
     await p.fill("#form-employee input[name=phone]", "081-222-2222");
     await p.fill("#form-employee input[name=trigoId]", "T555");
-    await p.click("#form-employee button[type=submit]");
+    await h.submitEmployeeForm(p);
     await p.waitForSelector("#modal-employee", { state: "hidden" });
     const short = db.t("employees").find((e) => e.id === "short1");
-    assert.deepEqual([short.name, short.phone, short.trigo_id], ["Pichai", "081-222-2222", "T555"]);
+    assert.deepEqual([short.name_th, short.phone, short.trigo_id], ["Pichai", "081-222-2222", "T555"]);
     await p.evaluate(() => { openEmployeeModal("short1"); state.employeeTab = "edit"; applyEmployeeTab(); });
     await p.fill("#form-employee input[name=name]", "Pichai2");
-    await p.click("#form-employee button[type=submit]");
+    await h.submitEmployeeForm(p);
     await p.waitForFunction(() => /full name/.test(document.querySelector("#toast-stack").textContent));
     await p.evaluate(() => closeModal());
     console.log("ok - an existing short name is grandfathered until someone changes it");

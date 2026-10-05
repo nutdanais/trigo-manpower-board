@@ -393,3 +393,14 @@ test("table sheet: header on row 1 in the list design, values as text (never for
   assert.equal(ws.autoFilter, "A1:C3");
   assert.equal(ws.getCell(4, 1).value.richText.map((x) => x.text).join("").trim(), "TOTAL HOSTS: 2");
 });
+
+test("personName: English file -> English name, Thai file -> Thai name, the other one when it is missing", () => {
+  const X = require("../xlsx-export.js");
+  const both = { name: "สมชาย ใจดี", nameEn: "Somchai Jaidee" };
+  assert.equal(X.personName(both, "en"), "Somchai Jaidee");
+  assert.equal(X.personName(both, "th"), "สมชาย ใจดี");
+  assert.equal(X.personName({ name: "มาลี" }, "en"), "มาลี");
+  assert.equal(X.personName({ name: "", nameEn: "Malee" }, "th"), "Malee");
+  assert.equal(X.personName({ name: "A", nameEn: "" }, "en"), "A");
+  assert.equal(X.personName({}, "en"), "");
+});

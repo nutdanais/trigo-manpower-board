@@ -407,14 +407,17 @@ const cloud = {
     this.data.boards = data.map((b) => ({ id: b.id, name: b.name, weekendDays: b.weekend_days || [0, 6] }));
   },
   async _loadEmployees() {
-    const { data, error } = await sb.from("employees").select("*").order("name");
-    if (error) throw error;
+    const { data, error } = await sb.from("employees").select("*").order("name_th");
+    if (error) {
+      if (/name_th/.test(error.message || "")) throw new Error("The database needs a one-time update before this version of the app can run: run supabase/migration-2026-10-05-employee-english-name.sql in the Supabase SQL Editor.");
+      throw error;
+    }
     // active is carried through as-is (undefined pre-migration, true/false after)
     // and NOT filtered out here — a deactivated employee's past mission/zone
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name, contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
   },
   async _loadOverrides() {
     // tolerate the table not existing yet (before the workweek migration is run) —
@@ -963,7 +966,9 @@ const cloud = {
     }
     const idOwner = trigoId ? EmployeeId.idClash(this.data.employees, trigoId, employeeId) : null;
     if (idOwner) throw new Error(`The TRIGO ID ${trigoId} already belongs to ${idOwner.name}.`);
-    const baseRow = { name, contract: vals.contract, area_id: vals.areaId, board_id: vals.boardId };
+    // name is the Thai name (employees.name_th, required); the English name is optional and blank clears it
+    const nameEn = vals.nameEn === undefined ? undefined : String(vals.nameEn).replace(/\s+/g, " ").trim();
+    const baseRow = { name_th: name, ...(nameEn === undefined ? {} : { name_en: nameEn || null }), contract: vals.contract, area_id: vals.areaId, board_id: vals.boardId };
     // newest optional columns first, falling back to fewer columns if a migration
     // hasn't been run yet on this database — so saves keep working either way
     // added_on: blank on a NEW employee is left out so the column default (today)
@@ -1128,7 +1133,8 @@ const cloud = {
       : this._missingColumnFromError(e) === "trigo_id" ? new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql).") : e);
     const dbPatch = (p) => {
       const o = {};
-      if (p.name !== undefined) o.name = p.name;
+      if (p.name !== undefined) o.name_th = p.name;
+      if (p.nameEn !== undefined) o.name_en = nz(p.nameEn);
       if (p.trigoId !== undefined) o.trigo_id = nz(p.trigoId);
       if (p.contract !== undefined) o.contract = p.contract;
       if (p.position !== undefined) o.position = nz(p.position);
@@ -1153,7 +1159,7 @@ const cloud = {
     // 4. new people. A blank "on the board from" is left out so the column default (today) applies.
     await pool(creates, async (r) => {
       const c = r.create;
-      const row = { name: c.name, trigo_id: nz(c.trigoId), contract: c.contract, position: nz(c.position), phone: nz(c.phone), start_date: nz(c.startDate), area_id: c.areaId, board_id: c.boardId };
+      const row = { name_th: c.name, name_en: nz(c.nameEn), trigo_id: nz(c.trigoId), contract: c.contract, position: nz(c.position), phone: nz(c.phone), start_date: nz(c.startDate), area_id: c.areaId, board_id: c.boardId };
       if (c.addedOn) row.added_on = c.addedOn;
       if (c.active === false) row.active = false;
       const { error } = await sb.from("employees").insert(row);

@@ -54,7 +54,7 @@ async function writeXlsx(file, sheet, rows2d) {
     const ws = wb.getWorksheet("Employees");
     assert.deepEqual(wb.worksheets.map((s) => s.name), ["Employees", "Lists", "Read me"]);
     assert.equal(ws.getCell("A1").value, "ID");
-    assert.equal(ws.getCell("C1").value, "TRIGO ID");
+    assert.equal(ws.getCell("D1").value, "TRIGO ID");
     const rowOf = (name) => { for (let r = 2; r <= ws.rowCount; r++) if (ws.getCell(r, 2).value === name) return r; throw new Error("no row for " + name); };
     console.log("ok - the template downloads with an ID column, a Lists sheet and a Read me");
 
@@ -69,9 +69,9 @@ async function writeXlsx(file, sheet, rows2d) {
     // edit: rename, phone, clear a position, move A to Board Two, deactivate someone
     const rA = rowOf("Person A"), rB = rowOf("Person B"), rC = rowOf("Person C");
     ws.getCell(rA, 2).value = "Person A Renamed";
-    ws.getCell(rA, 6).value = "081-000-0000";
-    ws.getCell(rB, 10).value = "Board Two";
-    ws.getCell(rC, 11).value = "Inactive";
+    ws.getCell(rA, 7).value = "081-000-0000";
+    ws.getCell(rB, 11).value = "Board Two";
+    ws.getCell(rC, 12).value = "Inactive";
     const edited = path.join(TMP, "emp-edited.xlsx");
     fs.writeFileSync(edited, Buffer.from(await wb.xlsx.writeBuffer()));
     await p.setInputFiles("#bulk-file", edited);
@@ -79,7 +79,7 @@ async function writeXlsx(file, sheet, rows2d) {
     assert.equal(await chip("To update"), 3);
     assert.equal(await chip("Problems"), 0);
     const preview = await p.textContent("#bulk-preview");
-    assert.match(preview, /Name:\s*Person A\s*→\s*Person A Renamed/);
+    assert.match(preview, /Thai name:\s*Person A\s*→\s*Person A Renamed/);
     assert.match(preview, /Board:\s*Board One\s*→\s*Board Two/);
     assert.match(preview, /assignment on .* is cleared/);
     assert.match(preview, /1 will be set Inactive/);
@@ -89,11 +89,11 @@ async function writeXlsx(file, sheet, rows2d) {
     assert.match(backup.suggestedFilename(), /^manpower_backup_before_import_.*\.xlsx$/);
     await p.waitForSelector("#modal-bulk", { state: "hidden" });
     const emps = db.t("employees");
-    assert.equal(emps.find((e) => e.id === "e1").name, "Person A Renamed");
+    assert.equal(emps.find((e) => e.id === "e1").name_th, "Person A Renamed");
     assert.equal(emps.find((e) => e.id === "e1").phone, "081-000-0000");
     assert.equal(emps.find((e) => e.id === "e2").board_id, "b2");
     assert.equal(emps.find((e) => e.id === "e3").active, false);
-    assert.equal(emps.find((e) => e.id === "e4").name, "Person D", "untouched people stay untouched");
+    assert.equal(emps.find((e) => e.id === "e4").name_th, "Person D", "untouched people stay untouched");
     // the backup is itself a valid, unchanged template
     await backup.saveAs(path.join(TMP, "backup.xlsx"));
     console.log("ok - Excel edits are previewed, backed up and applied");
@@ -107,15 +107,15 @@ async function writeXlsx(file, sheet, rows2d) {
     await wb3.xlsx.load(fs.readFileSync(p2));
     const ws3 = wb3.getWorksheet("Employees");
     const rowOf3 = (name) => { for (let r = 2; r <= ws3.rowCount; r++) if (ws3.getCell(r, 2).value === name) return r; throw new Error("no row for " + name); };
-    ws3.getCell(rowOf3("Person D"), 3).value = "t 505";
-    ws3.getCell(rowOf3("Person E"), 3).value = "T505";
+    ws3.getCell(rowOf3("Person D"), 4).value = "t 505";
+    ws3.getCell(rowOf3("Person E"), 4).value = "T505";
     const ids = path.join(TMP, "emp-ids.xlsx");
     fs.writeFileSync(ids, Buffer.from(await wb3.xlsx.writeBuffer()));
     await p.setInputFiles("#bulk-file", ids);
     await p.waitForSelector("#bulk-preview .bulk-problems");
     assert.equal(await chip("To update"), 0, "the same TRIGO ID on two people is refused for both");
     assert.match(await p.textContent("#bulk-preview .bulk-problems"), /TRIGO ID T505 would belong to more than one person/);
-    ws3.getCell(rowOf3("Person E"), 3).value = "T506";
+    ws3.getCell(rowOf3("Person E"), 4).value = "T506";
     const ids2 = path.join(TMP, "emp-ids-fixed.xlsx");
     fs.writeFileSync(ids2, Buffer.from(await wb3.xlsx.writeBuffer()));
     await p.setInputFiles("#bulk-file", ids2);
@@ -146,7 +146,7 @@ async function writeXlsx(file, sheet, rows2d) {
     await p.uncheck("#bulk-backup");
     await p.click("#btn-bulk-apply");
     await p.waitForSelector("#modal-bulk", { state: "hidden" });
-    assert.equal(db.t("employees").some((e) => e.name === "Brand New Person"), false);
+    assert.equal(db.t("employees").some((e) => e.name_th === "Brand New Person"), false);
     assert.equal(db.t("employees").find((e) => e.id === "e5").position, "senior_inspector");
 
     await openEmp();
@@ -157,7 +157,7 @@ async function writeXlsx(file, sheet, rows2d) {
     await p.uncheck("#bulk-backup");
     await p.click("#btn-bulk-apply");
     await p.waitForSelector("#modal-bulk", { state: "hidden" });
-    const created = db.t("employees").find((e) => e.name === "Brand New Person");
+    const created = db.t("employees").find((e) => e.name_th === "Brand New Person");
     assert.deepEqual([created.contract, created.board_id, created.position, created.added_on], ["oncall", "b2", "technician", T]);
     console.log("ok - a bad row is skipped with its row number, and new people only join when ticked");
 

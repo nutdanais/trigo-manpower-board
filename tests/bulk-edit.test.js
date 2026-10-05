@@ -38,9 +38,9 @@ test("round trip: the Excel template read straight back changes nothing", async 
 test("editing cells in the Excel template is picked up (dates, text phone, dropdown values)", async () => {
   const wb = await B.buildTemplateWorkbook(ExcelJS, "employees", ctx());
   const ws = wb.getWorksheet("Employees");
-  ws.getCell("F3").value = 812345678;                                // Excel ate the leading zero
-  ws.getCell("G3").value = new Date(Date.UTC(2024, 1, 29));          // a real date cell
-  ws.getCell("J2").value = "Rayong";
+  ws.getCell("G3").value = 812345678;                                // Excel ate the leading zero
+  ws.getCell("H3").value = new Date(Date.UTC(2024, 1, 29));          // a real date cell
+  ws.getCell("K2").value = "Rayong";
   const wb2 = new ExcelJS.Workbook();
   await wb2.xlsx.load(await wb.xlsx.writeBuffer());
   const p = B.planEmployees(B.readTable(B.rowsFromWorkbook(wb2, "employees"), B.EMP_COLUMNS), ctx());
@@ -54,7 +54,7 @@ test("matches by ID first, so a rename updates the person instead of adding a du
   const p = plan(`${HEAD}\n${EMPS[0].id},สมชาย ใจเย็น,Permanent,Inspector,081-111-1111,2023-04-20,2026-10-01,ESIE1,LCB Port,Active`);
   assert.equal(p.rows[0].kind, "update");
   assert.deepEqual(p.rows[0].patch, { name: "สมชาย ใจเย็น" });
-  assert.deepEqual(p.rows[0].changes, [{ field: "name", label: "Name", from: "สมชาย ใจดี", to: "สมชาย ใจเย็น" }]);
+  assert.deepEqual(p.rows[0].changes, [{ field: "name", label: "Thai name", from: "สมชาย ใจดี", to: "สมชาย ใจเย็น" }]);
 });
 
 test("without an ID column it matches by name (the app's own CSV works as it is)", () => {
@@ -214,8 +214,8 @@ test("the template carries ID and TRIGO ID, and reads back unchanged", async () 
   const wb2 = new ExcelJS.Workbook();
   await wb2.xlsx.load(await wb.xlsx.writeBuffer());
   const ws = wb2.getWorksheet("Employees");
-  assert.deepEqual([1, 2, 3].map((i) => ws.getCell(1, i).value), ["ID", "Name", "TRIGO ID"]);
-  assert.equal(ws.getCell(2, 3).value, "T329");
+  assert.deepEqual([1, 2, 3, 4].map((i) => ws.getCell(1, i).value), ["ID", "Thai name", "English name", "TRIGO ID"]);
+  assert.equal(ws.getCell(2, 4).value, "T329");
   const p = B.planEmployees(B.readTable(B.rowsFromWorkbook(wb2, "employees"), B.EMP_COLUMNS), c);
   assert.deepEqual(p.rows.map((r) => r.kind), ["same", "same", "same", "same"]);
   assert.equal(p.counts.noTrigoId, 2);
@@ -286,4 +286,35 @@ test("a rename must give a full name, but a short name that is left alone only e
 test("the pasted CSV of the old list is still readable (TRIGO ID absent)", () => {
   const p = tplan("Name,Contract type\nMalee Sukjai,Permanent");
   assert.deepEqual(p.rows[0].patch, { contract: "permanent" });
+});
+
+test("English name: a column in the template, read back unchanged, set / changed / cleared by a file, and a bare Name header is still the Thai name", async () => {
+  const c = ctx(); c.employees[1].nameEn = "Malee Sukjai";
+  const wb = await B.buildTemplateWorkbook(ExcelJS, "employees", c);
+  const wb2 = new ExcelJS.Workbook();
+  await wb2.xlsx.load(await wb.xlsx.writeBuffer());
+  const ws = wb2.getWorksheet("Employees");
+  assert.equal(ws.getCell(1, 3).value, "English name");
+  assert.equal(ws.getCell(3, 3).value, "Malee Sukjai");
+  const same = B.planEmployees(B.readTable(B.rowsFromWorkbook(wb2, "employees"), B.EMP_COLUMNS), c);
+  assert.deepEqual(same.rows.map((r) => r.kind), ["same", "same", "same"]);
+
+  const head = "ID,Thai name,English name,Contract type,Board";
+  const p = B.planEmployees(B.readTable(parseCsv(
+    `${head}\n${EMPS[0].id},สมชาย ใจดี,Somchai Jaidee,Permanent,LCB Port\n${EMPS[1].id},Malee Sukjai,,On-call,LCB Port`), B.EMP_COLUMNS), c);
+  assert.deepEqual(p.rows[0].patch, { nameEn: "Somchai Jaidee" });
+  assert.deepEqual(p.rows[0].changes, [{ field: "nameEn", label: "English name", from: "", to: "Somchai Jaidee" }]);
+  assert.deepEqual(p.rows[1].patch, { nameEn: "" }, "an empty cell clears it");
+
+  // "Name (English)" is the English name, never the Thai one; a file without the column leaves it alone
+  const t = B.readTable(parseCsv("Name (English),Name (Thai),Contract type\nSomchai,สมชาย ใจดี,Permanent"), B.EMP_COLUMNS);
+  assert.deepEqual(t.records[0].cells.nameEn, "Somchai");
+  assert.deepEqual(t.records[0].cells.name, "สมชาย ใจดี");
+  const none = plan("Name,Contract type\nMalee Sukjai,On-call", c);
+  assert.equal(none.rows[0].kind, "same");
+
+  // a new person carries it
+  const n = B.planEmployees(B.readTable(parseCsv(`${head}\n,คนใหม่ ทดสอบ,Khon Mai,Permanent,LCB Port`), B.EMP_COLUMNS), c);
+  assert.equal(n.rows[0].kind, "create");
+  assert.equal(n.rows[0].create.nameEn, "Khon Mai");
 });

@@ -30,7 +30,7 @@ const panelWidth = (p) => p.evaluate(() => document.querySelector("#float-pool")
     h.seedBase(db, { src: SRC });
     // plenty of unassigned permanent staff so Standby is a long list
     const extra = [];
-    for (let i = 20; i < 60; i++) extra.push({ id: "x" + i, name: "Spare " + i, contract: "permanent", area_id: "area-1", board_id: "b1" });
+    for (let i = 20; i < 60; i++) extra.push({ id: "x" + i, name_th: "Spare " + i, contract: "permanent", area_id: "area-1", board_id: "b1" });
     db.seed("employees", db.t("employees").concat(extra));
     const a = await env.openAs(db, h.USERS.a, { viewport: { width: 2000, height: 1000 } });
     const p = a.page;

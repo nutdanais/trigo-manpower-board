@@ -20,7 +20,7 @@ update profiles set status = 'active', role_key = 'viewer'   where email = 'view
 
 insert into boards (id, name) values ('10000000-0000-0000-0000-000000000001', 'Board One'),
                                      ('10000000-0000-0000-0000-000000000002', 'Board Two');
-insert into employees (id, name, contract, board_id) values
+insert into employees (id, name_th, contract, board_id) values
   ('20000000-0000-0000-0000-000000000001', 'Test Person 1', 'permanent', '10000000-0000-0000-0000-000000000001'),
   ('20000000-0000-0000-0000-000000000002', 'Test Person 2', 'oncall',    '10000000-0000-0000-0000-000000000001'),
   ('20000000-0000-0000-0000-000000000003', 'Test Person 3', 'permanent', '10000000-0000-0000-0000-000000000001'),

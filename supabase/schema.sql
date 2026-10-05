@@ -48,7 +48,10 @@ create table if not exists day_overrides (
 
 create table if not exists employees (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
+  -- the Thai name: required, and the one the app shows by default; name_en is the optional English
+  -- spelling (Excel exports in English). See migration-2026-10-05-employee-english-name.sql.
+  name_th text not null,
+  name_en text,
   contract text not null check (contract in ('permanent', 'oncall')),
   position text check (position in ('inspector', 'senior_inspector', 'technician', 'team_leader', 'assistant_site_engineer')),
   phone text,
