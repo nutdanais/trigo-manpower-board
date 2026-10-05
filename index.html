@@ -22,16 +22,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- ?v= on every file that changes with a release. Netlify already sends
-     "must-revalidate", so a forgotten bump degrades to today's behaviour (the
-     browser revalidates and gets the new file) rather than pinning anyone to a
-     stale one — but a caching proxy between a factory PC and the internet can
-     ignore that header, and a changed URL it cannot ignore.
-     BUMP THIS whenever styles.css / cloud.js / charts.js / app.js change.
-     Date of the release; add a letter (b, c, ...) for a second release the
-     same day. config.js and the vendor bundle are deliberately left off: one
-     isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-05b">
+<!-- ?v= on every local script and stylesheet is the release version from
+     version.js. Netlify already sends "must-revalidate", so a stale ?v= degrades
+     to the browser revalidating and getting the new file — but a caching proxy
+     between a factory PC and the internet can ignore that header, and a changed
+     URL it cannot ignore.
+     DON'T EDIT THESE BY HAND: run `node bump-version.js`, which rewrites
+     version.js and every ?v= below in one go (tests/version.test.js fails if
+     they disagree). config.js and the vendor bundle are deliberately left off:
+     one isn't in the repo, the other never changes. -->
+<link rel="stylesheet" href="styles.css?v=2026-10-05a">
 </head>
 <body>
 
@@ -121,6 +121,7 @@
       <p class="login-sub" id="login-blocked-text"></p>
       <button type="button" class="btn btn-primary login-submit" id="btn-blocked-signout">Sign out</button>
     </div>
+    <p class="app-version">Version <span data-app-version></span></p>
   </div>
 </div>
 
@@ -150,6 +151,15 @@
      board" stays visible while a long board scrolls — #toolbar stays in normal
      flow below it so the sticky footprint stays small. -->
 <div id="sticky-header">
+<!-- Shown by app.js when version.js on the server no longer matches the one
+     this page loaded — a tab left open for days is the usual way to run an old
+     release. Refreshing is the user's call, never automatic: they may be midway
+     through a form. -->
+<div id="update-banner" class="hidden" role="status">
+  <span id="update-banner-text"></span>
+  <button type="button" class="btn btn-primary" id="btn-update-reload">Refresh now</button>
+  <button type="button" class="update-banner-close" id="btn-update-dismiss" aria-label="Dismiss">&times;</button>
+</div>
 <header id="topbar">
   <div class="topbar-left">
     <img id="app-logo" src="logo-on-navy.png" alt="TRIGO" onerror="this.onerror=null;this.src='logo.svg'">
@@ -649,6 +659,9 @@
         <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin">Users</button>
         <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit" data-group="admin">Roles</button>
       </nav>
+      <!-- Where a bug report quotes the version from. Pinned to the bottom of
+           the rail (the strip on a phone drops it — the footer has it too). -->
+      <p class="app-version" id="settings-version">Version <span data-app-version></span></p>
     </aside>
     <div id="settings-body">
       <!-- My account: the one pane every role can open, which is why user
@@ -1055,17 +1068,20 @@
 <div id="chart-tip" class="hidden"></div>
 <div id="toast-stack" aria-live="polite"></div>
 
+<footer id="app-footer">Manpower Board · Version <span data-app-version></span></footer>
+
 </div> <!-- /#app-root -->
 
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-09-24e"></script>
-<script src="employee-id.js?v=2026-10-03a"></script>
-<script src="cloud.js?v=2026-10-05b"></script>
-<script src="charts.js?v=2026-09-07e"></script>
-<script src="xlsx-export.js?v=2026-10-05b"></script>
-<script src="bulk-edit.js?v=2026-10-05b"></script>
-<script src="app.js?v=2026-10-05b"></script>
+<script src="version.js?v=2026-10-05a"></script>
+<script src="planning.js?v=2026-10-05a"></script>
+<script src="employee-id.js?v=2026-10-05a"></script>
+<script src="cloud.js?v=2026-10-05a"></script>
+<script src="charts.js?v=2026-10-05a"></script>
+<script src="xlsx-export.js?v=2026-10-05a"></script>
+<script src="bulk-edit.js?v=2026-10-05a"></script>
+<script src="app.js?v=2026-10-05a"></script>
 </body>
 </html>

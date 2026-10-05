@@ -96,11 +96,19 @@ Once `config.js` has real Supabase credentials, double-click **index.html** to o
 
 ## Releasing a change
 
-There's no build step, so the only release chore is one line. `index.html` loads
-`styles.css`, `planning.js`, `cloud.js`, `charts.js` and `app.js` with a `?v=` version string —
-**bump it in all five tags whenever you change any of those files** (use the
-date; add a letter for a second release the same day). A changed URL is the one
-thing a caching proxy between a factory PC and the internet cannot ignore.
+There's no build step, so the only release chore is one command:
+
+```
+node bump-version.js
+```
+
+That sets the new release version — today's date, or the next letter (`2026-10-04a`,
+`2026-10-04b`) if today already had a release; pass one explicitly to override
+(`node bump-version.js 2026-10-04a`) — in `version.js` and in every `?v=` on the
+local scripts and stylesheet in `index.html`. Run it whenever you change any of those
+files, then push. A changed URL is the one thing a caching proxy between a factory PC
+and the internet cannot ignore. Don't edit the strings by hand: `node --test
+tests/version.test.js` fails if `index.html` and `version.js` disagree.
 
 Forgetting it is not a disaster: `_headers` tells every cache to revalidate on
 each load, so the browser still picks the new file up. The version string is
@@ -108,11 +116,24 @@ there for the caches that ignore that instruction. If a deploy ever looks
 half-updated — new page, old behaviour — check the version string first, then
 hard-refresh.
 
+### Where users see the version
+
+`version.js` is the one place the version is written, and the app shows it so a bug
+report can quote it: under the sign-in box, at the foot of the page, and at the bottom of
+the **Settings** rail (hidden on a phone, where the footer has it).
+
+While someone is signed in, the app re-reads `version.js` (bypassing every cache) every
+10 minutes and whenever they return to the tab. If the server's version differs from the
+one the page loaded, a **"A new version of the board is available"** banner appears at the
+top with a **Refresh now** button. It never reloads by itself — they may be midway through
+a form — and closing it stays closed until a *different* release appears. Anyone who has
+the tab open for days therefore finds out; no one is left on an old version unknowingly.
+
 ## Tests
 
 Nothing here is needed to run the app; they are for checking a change.
 
-- `node --test tests/*.test.js` — the plan diff, capacity and horizon logic, and the carry-over **parity** test: the refactored carry is held to writing exactly the rows the previous code did (`tests/fixtures/copy-plan-forward.reference.js` is that previous code, frozen).
+- `node --test tests/*.test.js` — the release version (every `?v=` in `index.html` matches `version.js`, and `bump-version.js` rewrites only those), the plan diff, capacity and horizon logic, and the carry-over **parity** test: the refactored carry is held to writing exactly the rows the previous code did (`tests/fixtures/copy-plan-forward.reference.js` is that previous code, frozen).
 - `node tests/e2e/excel-export.e2e.js` — the Excel export in a real browser: the column and sheet pickers, the downloaded file's four sheets, the remembered choices, who can see the button.
 - `node tests/e2e/bulk-edit.e2e.js` — bulk edit by file: the Excel template (ID, dropdown sheet, Read me), an unedited file changing nothing, a rename / phone / board move / deactivate applied after the preview with the backup download, CSV with a bad row (skipped with its row number) and new people held back until ticked, the host version (case-insensitive match, `javascript:` link refused, new hosts held back), and no button for a read-only role.
 - `node tests/e2e/trigo-id.e2e.js` — the TRIGO ID: the Edit Employee form (full name only, ID tidied and unique, namesakes only with IDs, a short name saved earlier grandfathered), the ID on every card (no show/hide button), the Manpower List column / search / numeric sort, the Excel exports that replaced CSV (Manpower, Host, Users), and no CSV button left anywhere.
@@ -121,6 +142,7 @@ Nothing here is needed to run the app; they are for checking a change.
 - `bash tests/sql/trigo-id-split.test.sh` (needs a local Postgres like the other `tests/sql` scripts) — the migration's SQL split of IDs out of names agrees with `splitNameAndId()` on 26 names, a second run changes nothing and preview mode changes nothing.
 - `node tests/e2e/added-on.e2e.js` — the "On the board from" date: people added on a given day are absent from earlier days' board, stats, Overview roster and Trend headcount, appear on the day itself, and the Edit Employee form shows and corrects it.
 - `node tests/e2e/employee-start-date.e2e.js` — the optional employee start date: saved from the New / Edit Employee form, cleared again, shown in the Manpower List with Years of service, its filter and sort, and the list's Excel export in English and Thai.
+- `node tests/e2e/app-version.e2e.js` — the version in the footer, the Settings rail and the sign-in slot, and the update banner against a faked server `version.js`: no banner when it matches, raised and naming both versions when it differs, sticky while scrolling, dismissal staying put until a different release, clearing itself on rollback, silent on an unreadable reply, and Refresh now reloading.
 - `node tests/e2e/pool-resize.e2e.js` — the adjustable available-employee panel in a real browser: dragging, wrapping into columns, min/max clamping, persistence, reset.
 - `node tests/e2e/forward-planning.e2e.js` — the forward-planning acceptance run in a real browser (needs Playwright + Chromium; set `NODE_PATH` to your global `node_modules`). The app runs unmodified; only Supabase is swapped for an in-memory fake (`tests/fake/`) shared by several signed-in "users", so Realtime between two people is tested too.
 - `tests/sql/setup-db.sh <db>` then `psql -d <db> -f tests/sql/forward-planning.test.sql` and `psql -d <db> -f tests/sql/forecast-merge-review.test.sql` (each on a fresh database), and `tests/sql/data-migration.test.sh` — the migrations against a real local Postgres, with `tests/sql/supabase-shim.sql` standing in for Supabase's `auth` schema.
