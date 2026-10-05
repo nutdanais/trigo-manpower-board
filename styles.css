@@ -4462,7 +4462,7 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 @media print {
   body.print-blocked #app-root > * { display: none !important; }
   body.print-blocked #app-root::before {
-    content: "Forecasts and the Capacity grid are tentative and are not printed or exported.";
+    content: "Forecasts and the Capacity grid are tentative and are not printed. On the Capacity tab, use Export for a PDF, JPG or Excel copy.";
     display: block;
     padding: 40px;
     font: 16px var(--font-ui);
@@ -4520,3 +4520,56 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .oncall .emp-tid { background: rgba(0,0,0,.07); color: var(--emp-ink); }
 .el-tid { font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* a toggle button: pressed = on */
+
+/* ===== Capacity export: the dialog, and the sheet the JPG and PDF are made of =====
+   The sheet (#cap-export-sheet) is built only for the moment of an export, as a
+   direct child of <body>, and removed straight after. Plain hex colours only —
+   html2canvas cannot parse color-mix() — and fixed light colours whatever the
+   viewer's theme, like every other export. */
+#modal-cap-export h4 { margin: 4px 0 6px; font-size: 13px; font-weight: 600; }
+.cap-export-tools { display: flex; gap: 6px; margin-bottom: 8px; }
+.cap-export-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.cap-export-list .import-row { margin-bottom: 0; align-items: center; }
+.cap-export-list .import-row input { margin-top: 0; }
+.cap-export-list .import-info small { display: inline; margin-left: 4px; }
+.cap-export-list .import-row.is-off { opacity: .5; }
+#cap-export-hint { margin-bottom: 0; }
+
+#cap-export-sheet {
+  position: fixed; left: 0; top: 0; z-index: -1;
+  width: max-content; padding: 24px; background: #ffffff; color: #13222f;
+  font-family: var(--font-ui); font-size: 12px;
+}
+#cap-export-sheet .ce-top { display: flex; align-items: baseline; gap: 16px; background: #004983; color: #ffffff; padding: 12px 16px; border-bottom: 3px solid #a8c855; }
+#cap-export-sheet .ce-brand { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+#cap-export-sheet .ce-sub { color: #b8ccdd; font-size: 12px; }
+#cap-export-sheet .ce-board { margin-top: 18px; }
+#cap-export-sheet .ce-board h2 { margin: 0 0 6px; font-size: 15px; color: #004983; }
+#cap-export-sheet table { border-collapse: collapse; }
+#cap-export-sheet th, #cap-export-sheet td { border-bottom: 1px solid #d8e0e7; padding: 4px 8px; white-space: nowrap; text-align: center; min-width: 44px; }
+#cap-export-sheet .ce-l { text-align: left; }
+#cap-export-sheet .ce-wrap { white-space: normal; min-width: 140px; max-width: 260px; }
+#cap-export-sheet thead th { background: #004983; color: #ffffff; font-weight: 700; }
+#cap-export-sheet thead .ce-mode th { font-size: 9px; color: #b8ccdd; border-bottom: 2px solid #a8c855; }
+#cap-export-sheet thead .ce-mode th.fc { color: #a8c855; }
+#cap-export-sheet th .ce-dow { display: block; font-size: 10px; font-weight: 400; color: #b8ccdd; }
+#cap-export-sheet .ce-fc { background: #f6f8fb; }
+#cap-export-sheet .ce-sum td { background: #eaf1f7; font-weight: 700; }
+#cap-export-sheet .ce-sum td.ce-l { color: #004983; }
+#cap-export-sheet .ce-short { background: #fbe4e4 !important; color: #b42318; }
+#cap-export-sheet .ce-tight { background: #fff3cc !important; color: #7a5b00; }
+#cap-export-sheet .ce-ok { background: #eaf4d5 !important; color: #40610a; }
+#cap-export-sheet .ce-sec td { background: #6f93b2; color: #ffffff; font-weight: 700; text-align: left; }
+#cap-export-sheet .ce-host { font-weight: 700; }
+#cap-export-sheet .ce-alt td { background: #f2f5f8; }
+#cap-export-sheet .ce-shift { font-size: 10px; font-weight: 700; background: #fff3cc; color: #7a5b00; }
+#cap-export-sheet .ce-shift.night { background: #e4e5f7; color: #31357d; }
+#cap-export-sheet .ce-area { display: inline-block; padding: 1px 8px; border-radius: 9px; font-size: 11px; font-weight: 600; }
+#cap-export-sheet a { color: #0563c1; }
+#cap-export-sheet .ce-note { margin-top: 14px; max-width: 900px; color: #5c707f; font-size: 11px; }
+
+@media print {
+  body.printing-cap > *:not(#cap-export-sheet) { display: none !important; }
+  body.printing-cap { margin: 0 !important; padding: 0 !important; background: #ffffff !important; min-height: 0 !important; }
+  body.printing-cap #cap-export-sheet { position: static; z-index: auto; }
+}

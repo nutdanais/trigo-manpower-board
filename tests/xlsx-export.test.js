@@ -406,3 +406,88 @@ test("personName: English file -> English name, Thai file -> Thai name, the othe
   assert.equal(X.personName({ name: "A", nameEn: "" }, "en"), "A");
   assert.equal(X.personName({}, "en"), "");
 });
+
+test("capacity workbook: a sheet per board, header with the host columns, numbers as numbers, safe link", async () => {
+  const board = (name) => ({
+    name, extras: [{ key: "location", label: "Location" }, { key: "mapUrl", label: "Google Maps link" }],
+    dates: [{ date: "2026-10-05", label: "Mon 05/10", forecast: false }, { date: "2026-10-06", label: "Tue 06/10", forecast: true }],
+    summary: { available: [5, 5], demand: [6, 0], gap: [-1, 5], kind: ["short", "ok"], named: [2, 0] },
+    rows: [{ host: "Host A", shift: "night", extra: { location: "Plant 2", mapUrl: "javascript:alert(1)" }, values: [6, 0] }],
+  });
+  const { workbook } = await X.buildCapacityWorkbook(ExcelJS, { boards: [board("LCB: Port"), board("LCB  Port")], rangeText: "r", generatedOn: "g" });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await workbook.xlsx.writeBuffer());
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ["LCB Port", "LCB Port 2"], "safe, unique sheet names");
+  const ws = wb.worksheets[0];
+  assert.deepEqual(ws.getRow(3).values.slice(1), ["Host", "Location", "Google Maps link", "Shift", "Mon 05/10", "Tue 06/10", "Total"]);
+  assert.deepEqual(ws.getRow(4).values.slice(5), ["CONFIRMED", "FORECAST", "Total"], "Total spans rows 3-4");
+  let host = null;
+  ws.eachRow((row) => { if (row.getCell(1).value === "Host A") host = row; });
+  assert.equal(host.getCell(3).value, "javascript:alert(1)", "not an http(s) link: plain text, never a hyperlink");
+  assert.equal(host.getCell(4).value, "NIGHT");
+  assert.equal(host.getCell(5).value, 6);
+  assert.equal(host.getCell(6).value, 0);
+});
+
+test("capacity workbook is a working file: input cells, Demand / Gap / Total formulas, gap colours, spare rows", async () => {
+  const b = {
+    name: "Board One", extras: [],
+    dates: [{ date: "2026-10-05", label: "05/10", forecast: false }, { date: "2026-10-06", label: "06/10", forecast: true }],
+    summary: { available: [5, 4], demand: [6, 3], gap: [-1, 1], kind: ["short", "tight"], named: [2, 0] },
+    rows: [
+      { host: "Host A", shift: "day", extra: {}, values: [4, 2] },
+      { host: "Host B", shift: "night", extra: {}, values: [2, 1] },
+    ],
+  };
+  const { workbook, charts } = await X.buildCapacityWorkbook(ExcelJS, { boards: [b], rangeText: "r", generatedOn: "g" });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await workbook.xlsx.writeBuffer());
+  const ws = wb.worksheets[0];
+  // columns: A Host, B Shift, C-D days, E Total; rows: 5 Available, 6 Demand, 7 Gap, 10-11 hosts, 12-16 spare
+  assert.deepEqual(ws.getCell("C6").value, { formula: "SUM(C10:C16)", result: 6 }, "Demand sums every host row, spare rows included");
+  assert.deepEqual(ws.getCell("C7").value, { formula: 'IF(C5="","",C5-C6)', result: -1 });
+  assert.deepEqual(ws.getCell("E10").value, { formula: 'IF(COUNT(C10:D10)=0,"",SUM(C10:D10))', result: 6 });
+  assert.deepEqual(ws.getCell("E6").value, { formula: "SUM(C6:D6)", result: 9 });
+  assert.equal(ws.getCell("C5").value, 5, "Available is a plain input");
+  assert.equal(ws.getCell("C10").value, 4, "host demand is a plain input");
+  assert.equal(ws.getCell("A12").value, null, "spare rows start empty");
+  assert.equal(ws.getCell("C16").dataValidation.type, "whole", "inputs only take whole numbers");
+  assert.deepEqual(ws.getCell("B12").dataValidation.formulae, ['"DAY,NIGHT"']);
+  const cf = ws.conditionalFormattings.find((c) => c.ref === "C7:D7");
+  assert.deepEqual(cf.rules.map((r) => r.operator), ["lessThan", "between", "greaterThan"], "gap colours follow the numbers");
+  assert.equal(charts.length, 1);
+  assert.equal(charts[0].series[1].ref, "'Board One'!$C$6:$D$6", "the chart reads the Demand formulas");
+});
+
+test("addCapacityCharts: a native chart per sheet, wired through sheet -> drawing -> chart, other parts untouched", async () => {
+  const JSZip = require("../vendor/jszip.min.js");
+  const board = (name) => ({
+    name, extras: [{ key: "mapUrl", label: "Google Maps link" }],
+    dates: [{ date: "2026-10-05", label: "05/10", forecast: false }],
+    summary: { available: [5], demand: [2], gap: [3], kind: ["ok"], named: [1] },
+    rows: [{ host: "Host & Co", shift: "day", extra: { mapUrl: "https://m.example.com" }, values: [2] }],
+  });
+  const { workbook, charts } = await X.buildCapacityWorkbook(ExcelJS, { boards: [board("One"), board("O'Brien <Two>")], rangeText: "r" });
+  const out = await X.addCapacityCharts(JSZip, await workbook.xlsx.writeBuffer(), charts);
+  const zip = await JSZip.loadAsync(out);
+  const txt = (p) => zip.file(p).async("string");
+  const types = await txt("[Content_Types].xml");
+  for (const k of [1, 2]) {
+    assert.match(types, new RegExp(`PartName="/xl/charts/capchart${k}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart\\+xml"`));
+    assert.match(types, new RegExp(`PartName="/xl/drawings/capdrawing${k}.xml"`));
+    assert.match(await txt(`xl/drawings/_rels/capdrawing${k}.xml.rels`), new RegExp(`Target="../charts/capchart${k}.xml"`));
+  }
+  const sheet2 = await txt("xl/worksheets/sheet2.xml");
+  assert.match(sheet2, /<drawing r:id="rIdCap1"\/><\/worksheet>$|<drawing r:id="rIdCap1"\/>/);
+  assert.ok(sheet2.indexOf("<drawing") > sheet2.indexOf("<pageMargins"), "<drawing> after the page setup, as the schema orders it");
+  const rels2 = await txt("xl/worksheets/_rels/sheet2.xml.rels");
+  assert.match(rels2, /Id="rIdCap1" Type="[^"]*\/drawing" Target="..\/drawings\/capdrawing2.xml"/);
+  assert.match(rels2, /hyperlink/, "the sheet's own links are kept");
+  const chart2 = await txt("xl/charts/capchart2.xml");
+  assert.match(chart2, /<c:f>'O''Brien &lt;Two&gt;'!\$D\$5:\$D\$5<\/c:f>/, "quoted, escaped sheet reference");
+  assert.match(chart2, /<c:barChart>[\s\S]*Available[\s\S]*Demand[\s\S]*<\/c:barChart><c:lineChart>[\s\S]*Gap/);
+  // and ExcelJS still reads the result as a normal workbook
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(Buffer.from(out));
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ["One", "O'Brien <Two>"]);
+});

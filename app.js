@@ -331,7 +331,7 @@ function setSaveStatus(kind) {
 }
 const CLOUD_WRITE_METHODS = [
   "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff", "applyForecastMerge",
-  "setCapacityCells", "deleteCapacityRow", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
+  "setCapacityCells", "deleteCapacityRow", "resetCapacityDemand", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
   "startForecastFromConfirmed", "addForecastMissionsFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
   "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
   "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
@@ -943,27 +943,23 @@ function render() {
   $("#hostlist-toolbar").classList.toggle("hidden", !hl);
   $("#capacity-toolbar").classList.toggle("hidden", !cap);
   if (cap) renderCapacityToolbar();
-  // Row 2's export-type action is tab-specific — Board/Overview get Export+PDF
-  // (below), Manpower and Host each get their own count + Excel button instead.
-  // Each pair needs its own toggle: unlike the display:contents groups above,
-  // these live directly in #toolbar-row2, not inside a shared wrapper.
+  // Row 2: Manpower and Host each get their count + Bulk edit; every tab
+  // shares the one Export button at the right edge (below). These live
+  // directly in #toolbar-row2, not inside a shared wrapper, so each has its
+  // own toggle.
   $("#emplist-count").classList.toggle("hidden", !eml);
-  $("#btn-emplist-xlsx").classList.toggle("hidden", !eml);
   $("#btn-emplist-bulk").classList.toggle("hidden", !eml || !can("emplist", "edit"));
   $("#hostlist-count").classList.toggle("hidden", !hl);
-  $("#btn-hostlist-xlsx").classList.toggle("hidden", !hl);
   $("#btn-hostlist-bulk").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
   // The two lists and the board bar carry their own create buttons; RLS would
   // refuse the write anyway, so hiding them is about not offering a dead end.
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
   $("#btn-add-host").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
+  // One Export button on every tab (the file type is picked in its dialog).
   // A forecast is never exported: the JPG and the PDF are what goes to LINE,
   // and a tentative plan must not reach it (exportBoard refuses as well).
-  $("#btn-export").classList.toggle("hidden", eml || hl || cap || fc);
-  // Print, like Export, is a read: a Viewer may take the board away with them.
-  $("#btn-print").classList.toggle("hidden", eml || hl || cap || fc);
-  // Excel is one board's rows, so — unlike Export/PDF — it has nothing to offer on Overview or Org Chart
-  $("#btn-xlsx").classList.toggle("hidden", !board || fc);
+  // Export is a read: a Viewer may take the board away with them.
+  $("#btn-export").classList.toggle("hidden", fc);
   // the cards only exist on a board (not Overview, Org Chart, lists or Capacity)
   $("#card-names").classList.toggle("hidden", !board);
   // Carry over / Reset Board on a confirmed day; "Start from confirmed" on an
@@ -3970,6 +3966,7 @@ function openEmplistXlsxModal() {
   if (!n) { toast("No employees match the current filters, so there is nothing to export.", "info"); return; }
   $("#emplist-xlsx-summary").textContent = `${n} ${n === 1 ? "employee" : "employees"} — the rows the table is showing now (search and filters apply).`;
   setXlsxLangRadios("emplist-xlsx-lang", xlsxSavedLang());
+  renderExportTypes($("#emplist-export-type"), "manpower", ["xlsx"]);
   openModal("#modal-emplist-xlsx");
 }
 async function exportEmplistXlsx() {
@@ -4833,6 +4830,14 @@ async function downloadTableXlsx(sheetName, fileName, columns, rows, totalText) 
   const { workbook } = await ManpowerXlsx.buildTableWorkbook(ExcelJS, { sheetName, columns, rows, totalText });
   const buf = await workbook.xlsx.writeBuffer();
   bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fileName);
+}
+/* Host List: Excel only, but through the same Export button and dialog as every tab */
+function openHostlistExportModal() {
+  const n = hostlistFilteredSorted().length;
+  if (!n) { toast("No hosts match the current filters, so there is nothing to export.", "info"); return; }
+  $("#hostlist-export-summary").textContent = `${n} ${n === 1 ? "host" : "hosts"} — the rows the table is showing now (search and filters apply).`;
+  renderExportTypes($("#hostlist-export-type"), "hostlist", ["xlsx"]);
+  openModal("#modal-hostlist-export");
 }
 async function exportHostlistXlsx() {
   const rows = hostlistFilteredSorted();   // same rows the table is showing right now
@@ -6267,7 +6272,7 @@ async function exportBoard() {
     document.body.classList.remove("exporting", "org-capturing");
     if (wasDark) document.documentElement.setAttribute("data-theme", "dark");
     btn.disabled = false;
-    setIconLabel(btn, "camera", "Export");
+    setIconLabel(btn, "download", "Export");
     if (!isOverview() && !isOrgChart()) layoutMasonry();   // re-pack at the normal on-screen width
   }
 }
@@ -6288,6 +6293,22 @@ const XLSX_SHEETS_OFF_KEY = "manpower.xlsxSheetsOff";   // sheets the user switc
 const XLSX_SHEET_LABELS = { leave: "Leave & Exchange Working Day", standby: "Standby (permanent, unassigned)", oncall: "Available On-call (unassigned)" };
 let xlsxLibPromise = null;
 
+/* JSZip (~100 KB) adds the native chart to the Capacity workbook (ExcelJS
+   cannot write charts); like ExcelJS it is fetched on first use only. */
+let jszipLibPromise = null;
+function loadJSZip() {
+  if (window.JSZip) return Promise.resolve(window.JSZip);
+  if (!jszipLibPromise) {
+    jszipLibPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "vendor/jszip.min.js";
+      s.onload = () => resolve(window.JSZip);
+      s.onerror = () => { jszipLibPromise = null; reject(new Error("Could not load the Excel chart library. Check the connection and try again.")); };
+      document.head.appendChild(s);
+    });
+  }
+  return jszipLibPromise;
+}
 function loadExcelJS() {
   if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
   if (!xlsxLibPromise) {
@@ -6398,27 +6419,86 @@ function updateXlsxCount() {
   const boxes = $$("#xlsx-cols input[type=checkbox]");
   const n = boxes.filter(b => b.checked).length;
   $("#xlsx-count").textContent = `${n} of ${boxes.length} columns`;
-  $("#btn-xlsx-go").disabled = n === 0;
+  // only Excel needs columns (and somebody on the board)
+  const xlsx = pickedExportType($("#board-export-type")) === "xlsx";
+  $("#btn-xlsx-go").disabled = xlsx && (n === 0 || xlsxEmpty);
 }
 function setXlsxTicks(on) {
   for (const b of $$("#xlsx-cols input[type=checkbox]")) b.checked = on;
   updateXlsxCount();
 }
 
-function openXlsxModal() {
+/* ---------- the one Export button ----------
+   Every tab has the same Export button at the right edge of the toolbar. It
+   opens that tab's export dialog, which starts with the file type: JPG, PDF
+   and/or Excel, whichever the tab offers. The last type picked is remembered
+   per tab on this device. */
+const EXPORT_TYPES = { jpg: "JPG image", pdf: "PDF", xlsx: "Excel" };
+const EXPORT_TYPE_KEY = "manpower.exportType.";   // + tab
+function exportTypeSaved(tab, types) {
+  try { const t = localStorage.getItem(EXPORT_TYPE_KEY + tab); if (types.includes(t)) return t; } catch (e) { /* remembering is a courtesy */ }
+  return types[0];
+}
+/* the File type radios at the top of an export dialog */
+function renderExportTypes(el, tab, types, onChange) {
+  const selected = exportTypeSaved(tab, types);
+  el.innerHTML = "<b>File type</b>" + types.map(t =>
+    `<label><input type="radio" name="${tab}-export-type" value="${t}"${t === selected ? " checked" : ""}> ${EXPORT_TYPES[t]}</label>`).join("");
+  for (const r of el.querySelectorAll("input")) {
+    r.onchange = () => {
+      try { localStorage.setItem(EXPORT_TYPE_KEY + tab, r.value); } catch (e) { /* remembering is a courtesy */ }
+      if (onChange) onChange(r.value);
+    };
+  }
+}
+function pickedExportType(el) {
+  const r = el.querySelector("input:checked");
+  return r ? r.value : null;
+}
+function openExportModal() {
+  if (isEmployeeList()) return openEmplistXlsxModal();
+  if (isHostList()) return openHostlistExportModal();
+  if (isCapacity()) return openCapExportModal();
+  return openBoardExportModal();
+}
+
+/* Board, Overview and Org Chart: JPG or PDF of what is on screen, and on a
+   board also Excel (the columns and extra sheets below the file type). */
+let xlsxSummaryText = "";   // what the summary line says while Excel is picked
+let xlsxEmpty = false;      // nobody on the board: Excel has nothing to write
+function openBoardExportModal() {
   if (isForecastView()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
+  const board = isOverview() || isOrgChart() ? null : D().boards.find(b => b.id === D().activeBoardId);
+  $("#board-export-title").textContent = "Export — " + (isOrgChart() ? "Org Chart" : board ? board.name : "Overview");
+  const types = board ? ["jpg", "pdf", "xlsx"] : ["jpg", "pdf"];
+  if (board) prepareXlsxPart(board);
+  renderExportTypes($("#board-export-type"), board ? "board" : isOrgChart() ? "orgchart" : "overview", types, updateBoardExportModal);
+  updateBoardExportModal();
+  openModal("#modal-xlsx");
+}
+function updateBoardExportModal() {
+  const type = pickedExportType($("#board-export-type")) || "jpg";
+  const xlsx = type === "xlsx";
+  $("#xlsx-part").classList.toggle("hidden", !xlsx);
+  $("#board-export-hint").classList.toggle("hidden", xlsx);
+  const what = `${isOrgChart() ? "Org Chart" : isOverview() ? "Overview" : (D().boards.find(b => b.id === D().activeBoardId) || {}).name} · ${fmtDow(state.date)} ${fmtDate(state.date)}.`;
+  $("#xlsx-summary").textContent = xlsx ? xlsxSummaryText : what;
+  $("#board-export-hint").textContent = type === "pdf"
+    ? "Opens the print dialog — choose Save as PDF. Sharp at any zoom, and the host and phone links stay tappable. Send it as a file."
+    : "Saves a high-resolution image. Use it where only an image will do; send it as a file, not a photo, so it stays sharp.";
+  updateXlsxCount();
+}
+/* the Excel half of the dialog: summary, extra sheets and column ticks */
+function prepareXlsxPart(board) {
   const rows = xlsxRows();
   const groups = xlsxGroups();
   const extra = ManpowerXlsx.GROUP_KEYS.filter(g => groups[g].length);
-  if (!rows.length && !extra.length) {
-    toast("Nobody is on this board for this date, so there is nothing to export.", "info");
-    return;
-  }
-  const board = D().boards.find(b => b.id === D().activeBoardId);
+  xlsxEmpty = !rows.length && !extra.length;
   const sum = ManpowerXlsx.summarize(rows);
   const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  $("#xlsx-summary").textContent =
-    `${board ? board.name : "Board"} · ${fmtDow(state.date)} ${fmtDate(state.date)} · ${pl(sum.total, "employee", "employees")} on ${pl(sum.missions, "mission", "missions")}. Tick the columns to include.`;
+  xlsxSummaryText = xlsxEmpty
+    ? "Nobody is on this board for this date, so there is nothing to put in an Excel file."
+    : `${board.name} · ${fmtDow(state.date)} ${fmtDate(state.date)} · ${pl(sum.total, "employee", "employees")} on ${pl(sum.missions, "mission", "missions")}. Tick the columns to include.`;
   // the extra sheets: only reasons somebody is actually in today, each with its head-count
   const off = xlsxSheetsOff();
   $("#xlsx-sheets-wrap").classList.toggle("hidden", !extra.length);
@@ -6430,9 +6510,13 @@ function openXlsxModal() {
   $("#xlsx-cols").innerHTML = ManpowerXlsx.COLUMNS.map(c =>
     `<label class="import-row"><input type="checkbox" value="${c.key}"${saved.has(c.key) ? " checked" : ""}><span class="import-info">${c.label}</span></label>`).join("");
   for (const b of $$("#xlsx-cols input")) b.onchange = updateXlsxCount;
-  updateXlsxCount();
   setXlsxLangRadios("xlsx-lang", xlsxSavedLang());
-  openModal("#modal-xlsx");
+}
+function runBoardExport() {
+  const type = pickedExportType($("#board-export-type")) || "jpg";
+  if (type === "xlsx") return exportXlsx();
+  closeModal();
+  if (type === "pdf") printBoard(); else exportBoard();
 }
 
 async function exportXlsx() {
@@ -6513,6 +6597,23 @@ let printRestore = null;   // set while the DOM is in its printable state
 
 function prepareForPrint() {
   if (printRestore) return;   // beforeprint can fire more than once per dialog
+  // the Capacity export's PDF: print its sheet, nothing else (see runCapExport)
+  if (capPrintJob) {
+    const job = capPrintJob;
+    const prevTitle = document.title;
+    document.title = job.title;
+    const r = job.sheet.getBoundingClientRect();
+    setPrintPageSize({ width: r.width, height: Math.max(r.height, job.sheet.scrollHeight) });
+    document.body.classList.add("printing-cap");
+    printRestore = () => {
+      capPrintJob = null;
+      job.sheet.remove();
+      document.title = prevTitle;
+      document.body.classList.remove("printing-cap");
+      clearPrintPageSize();
+    };
+    return;
+  }
   // Ctrl+P reaches here without the (hidden) PDF button: a forecast or the
   // capacity grid prints a one-line notice instead of the tentative plan
   if (isForecastView() || isCapacity()) {
@@ -6655,7 +6756,7 @@ function restoreAfterPrint() {
     // measures an already-exporting DOM and spills onto a second sheet. These
     // are the two that must come off no matter what.
     console.error("print restore failed", err);
-    document.body.classList.remove("exporting", "printing", "org-capturing");
+    document.body.classList.remove("exporting", "printing", "org-capturing", "printing-cap");
     clearPrintPageSize();
   }
 }
@@ -8349,6 +8450,7 @@ function renderCapacityToolbar() {
   $("#cap-range").value = String(state.capacity.weeks);
   $("#btn-cap-copy-week").classList.toggle("hidden", !can("capacity", "edit"));
   $("#btn-cap-seed").classList.toggle("hidden", !can("capacity", "edit"));
+  $("#btn-cap-reset").classList.toggle("hidden", !can("capacity", "edit"));
 }
 
 const CAP_CHART_H = 190, CAP_CHART_TOP = 30, CAP_COL_H = 232;
@@ -8706,18 +8808,39 @@ function seedCapacityFromConfirmed() {
     const seed = Capacity.seedFromPlan(plan, active);
     if (!seed.length) { toast(`Nobody is placed on a mission on ${board.name} on ${fmtShort(src)}, so there is nothing to start from.`, "info"); return; }
     const dates = capacityDates(boardId);
-    const have = new Set(((D().capacity && D().capacity.rows) || []).filter(r => r.board_id === boardId)
+    // a 0 is "nothing planned" (that is what Reset leaves behind), so it counts as empty
+    const have = new Set(((D().capacity && D().capacity.rows) || []).filter(r => r.board_id === boardId && r.headcount > 0)
       .map(r => r.plan_date + "\u0001" + r.host + "\u0001" + r.shift));
     const cells = Capacity.fillEmpty(seed, dates, (d, h, sh) => have.has(d + "\u0001" + h + "\u0001" + sh))
       .map(c => ({ boardId, ...c }));
-    if (!cells.length) { toast("Every one of those cells already has a number — nothing was changed.", "info"); return; }
+    if (!cells.length) { toast("Every one of those cells already has a number above 0 — nothing was changed.", "info"); return; }
     const list = seed.slice(0, 6).map(x => `${x.host}${x.shift === "night" ? " (night)" : ""}: ${x.headcount}`).join(", ") +
       (seed.length > 6 ? `, and ${seed.length - 6} more` : "");
     showConfirm("Start from the confirmed plan?",
       `Use ${board.name}'s deployment on ${fmtShort(src)} as the starting demand: ${list}.\n\n` +
-      `It goes into ${cells.length} empty cell${cells.length === 1 ? "" : "s"} across the next ${state.capacity.weeks} week${state.capacity.weeks === 1 ? "" : "s"}. Cells that already have a number are kept. Then adjust the hosts you look after.`,
+      `It goes into ${cells.length} empty cell${cells.length === 1 ? "" : "s"} across the next ${state.capacity.weeks} week${state.capacity.weeks === 1 ? "" : "s"}. Cells that already have a number above 0 are kept (a 0 counts as empty). Then adjust the hosts you look after.`,
       () => saveCapacityCells(cells));
   });
+}
+/* "Reset to 0": a clean sheet for the next planner. Every number the board on
+   screen has from today on becomes 0 — in the weeks shown and beyond them, so
+   nothing is left behind when the range is changed afterwards. The host rows
+   stay (a zero is written, never a delete), and "Start from confirmed plan"
+   treats a 0 as empty, so the flow can start over. Past days are history. */
+function resetCapacityToZero() {
+  if (!can("capacity", "edit")) return;
+  const boardId = capBoardId();
+  const board = D().boards.find(b => b.id === boardId);
+  const demand = ((D().capacity && D().capacity.rows) || []).filter(r => r.board_id === boardId);
+  const live = demand.filter(r => r.headcount > 0);
+  if (!live.length) { toast(`${board.name} has no numbers in the weeks shown — it is already a clean sheet.`, "info"); return; }
+  const last = live.reduce((l, r) => (!l || String(r.updated_at || "") > String(l.updated_at || "") ? r : l), null);
+  const who = last && last.updated_by ? ` Last change: ${last.updated_by}${last.updated_at ? ", " + fmtShort(String(last.updated_at).slice(0, 10)) : ""}.` : "";
+  const hosts = new Set(capacityRowsFor(boardId, demand).map(r => r.host + "\u0001" + r.shift)).size;
+  showConfirm("Reset all numbers to 0?",
+    `Every number on ${board.name} from today on is set to 0 — ${live.length} in the weeks shown, and any entered further ahead. All ${hosts} host row${hosts === 1 ? "" : "s"} stay. Past days are kept.${who}\n\n` +
+    `This cannot be undone. Use Export first if anyone still needs this plan.`,
+    () => safely(async () => { await cloud.resetCapacityDemand(boardId, todayStr()); render(); toast(`${board.name} reset to 0.`, "info"); }));
 }
 /* the board on screen only — "one board at a time" goes for the copy too */
 function copyCapacityWeek() {
@@ -8736,6 +8859,175 @@ function copyCapacityWeek() {
       `Copy ${cells.length} entr${cells.length === 1 ? "y" : "ies"} for ${board.name} from the week of ${fmtShort(ws)} to the week of ${fmtShort(addDays(ws, 7))}? The same host/shift cells next week are overwritten; everything else is left alone.`,
       () => saveCapacityCells(cells));
   });
+}
+
+/* ---------- Capacity export ----------
+   The grid off the screen, for one board, several, or all of them: Excel (one
+   sheet per board), a JPG, or a PDF (the print dialog, Save as PDF — one page,
+   sized to the content, like the board's PDF). The same days the grid shows,
+   plus whichever Host-list columns are ticked. Built by Capacity.exportBoard
+   (planning.js) so all three formats say the same thing; the Excel side is
+   ManpowerXlsx.buildCapacityWorkbook. It is a tentative plan, and says so. */
+const CAP_EXPORT_KEY = "manpower.capExport";   // { extras } — the ticked host columns, remembered per device
+const CAP_EXPORT_NOTE = "Tentative plan, not the confirmed board. Available uses the current roster, so future hires and leavers are not reflected. " +
+  "Leave and named people come from the confirmed board up to the next working day and from forecasts after it.";
+const CAP_EXPORT_HINTS = {
+  xlsx: "A working Excel file, one sheet per board: type in the yellow cells (host demand, available people, spare rows for new hosts) and Demand, Gap, Total, the gap colours and the chart all recalculate.",
+  jpg: "One image with the boards one under another. Send it as a file, not a photo, so it stays sharp.",
+  pdf: "Opens the print dialog — choose Save as PDF. One page with the boards one under another; Google Maps links stay clickable.",
+};
+let capPrintJob = null;   // the sheet prepareForPrint should print instead of the notice
+function capExportPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(CAP_EXPORT_KEY) || "{}");
+    return { extras: Array.isArray(p.extras) ? p.extras : ["area"] };
+  } catch (e) { return { extras: ["area"] }; }
+}
+function openCapExportModal() {
+  if (!D().boards.length) { toast("No boards yet.", "info"); return; }
+  const prefs = capExportPrefs();
+  const current = capBoardId();
+  const { from, to } = capacityRange();
+  const w = state.capacity.weeks;
+  $("#cap-export-summary").textContent = `${fmtShort(from)} – ${fmtShort(to)}: the next ${w} week${w === 1 ? "" : "s"}, the same days the grid shows (change Range to export more or fewer).`;
+  $("#cap-export-boards").innerHTML = D().boards.map(b =>
+    `<label class="import-row"><input type="checkbox" value="${escapeHtml(b.id)}"${b.id === current ? " checked" : ""}><span class="import-info">${escapeHtml(b.name)}</span></label>`).join("");
+  $("#cap-export-extras").innerHTML = Capacity.EXPORT_HOST_COLUMNS.map(c =>
+    `<label class="import-row"><input type="checkbox" value="${c.key}"${prefs.extras.includes(c.key) ? " checked" : ""}><span class="import-info">${c.label}</span></label>`).join("");
+  renderExportTypes($("#cap-export-type"), "capacity", ["jpg", "pdf", "xlsx"], updateCapExportHint);
+  updateCapExportHint();
+  openModal("#modal-cap-export");
+}
+function updateCapExportHint() {
+  const fmt = pickedExportType($("#cap-export-type")) || "xlsx";
+  $("#cap-export-hint").textContent = CAP_EXPORT_HINTS[fmt] + " The file type and host columns are remembered on this device.";
+}
+function capExportPick(all) {
+  const current = capBoardId();
+  for (const b of $$("#cap-export-boards input")) b.checked = all || b.value === current;
+}
+/* one board's grid as export data (see Capacity.exportBoard) */
+function capExportModel(boardId, extras) {
+  const board = D().boards.find(b => b.id === boardId);
+  const m = capacityModel(boardId);
+  const cellVal = new Map(m.demand.map(r => [capKey(r.board_id, r.plan_date, r.host, r.shift), r.headcount]));
+  return Capacity.exportBoard({
+    name: board.name, days: m.days, rows: capacityRowsFor(boardId, m.demand), extras,
+    value: (d, h, sh) => cellVal.get(capKey(boardId, d, h, sh)),
+    hostInfo: (h) => {
+      const rec = hostRecordOf(h);
+      if (!rec) return null;
+      const area = hostAreaOf(h);
+      return { area: area ? area.name : "", location: rec.location, note: rec.note, mapUrl: safeHttpUrl(rec.mapUrl) };
+    },
+    dateLabel: (d) => `${fmtDow(d)} ${shortDateLabel(d)}`,
+  });
+}
+/* the JPG / PDF page: a plain table per board on a white sheet */
+function buildCapExportSheet(models, rangeText, generatedOn) {
+  const esc = escapeHtml;
+  let html = `<div class="ce-top"><span class="ce-brand">TRIGO · Capacity</span>` +
+    `<span class="ce-sub">${esc(rangeText)} · exported ${esc(generatedOn)} · tentative plan</span></div>`;
+  for (const b of models) {
+    const fixed = 2 + b.extras.length;
+    const fc = (i) => (b.dates[i].forecast ? " ce-fc" : "");
+    html += `<section class="ce-board"><h2>${esc(b.name)}</h2><table><thead><tr>` +
+      `<th class="ce-l" rowspan="2">Host</th>` + b.extras.map(c => `<th class="ce-l" rowspan="2">${esc(c.label)}</th>`).join("") +
+      `<th rowspan="2">Shift</th>` +
+      b.dates.map(d => `<th><span class="ce-dow">${fmtDow(d.date)}</span>${shortDateLabel(d.date)}</th>`).join("") +
+      `</tr><tr class="ce-mode">` + b.dates.map(d => `<th class="${d.forecast ? "fc" : ""}">${d.forecast ? "FORECAST" : "CONFIRMED"}</th>`).join("") +
+      `</tr></thead><tbody>`;
+    const sum = (label, vals, kinds) => {
+      html += `<tr class="ce-sum"><td class="ce-l" colspan="${fixed}">${label}</td>` + vals.map((v, i) => {
+        const k = kinds && kinds[i] ? " ce-" + kinds[i] : "";
+        return `<td class="${(fc(i) + k).trim()}">${v == null ? "" : kinds ? fmtGap(v) : v}</td>`;
+      }).join("") + `</tr>`;
+    };
+    sum("Available people", b.summary.available);
+    sum("Demand (all hosts)", b.summary.demand);
+    sum("Gap (available − demand)", b.summary.gap, b.summary.kind);
+    sum("Named on board", b.summary.named);
+    html += `<tr class="ce-sec"><td colspan="${fixed + b.dates.length}">Demand by host · shift</td></tr>`;
+    if (!b.rows.length) html += `<tr><td class="ce-l" colspan="${fixed + b.dates.length}">No demand entered.</td></tr>`;
+    b.rows.forEach((r, k) => {
+      html += `<tr class="${k % 2 ? "ce-alt" : ""}"><td class="ce-l ce-host">${esc(r.host)}</td>`;
+      for (const c of b.extras) {
+        const v = r.extra[c.key];
+        if (c.key === "area") html += `<td class="ce-l">${v ? areaPillHtml(hostAreaOf(r.host), "ce-area") : ""}</td>`;
+        else if (c.key === "mapUrl") html += `<td class="ce-l">${v ? `<a href="${esc(v)}">Google Maps</a>` : ""}</td>`;
+        else html += `<td class="ce-l ce-wrap">${esc(v)}</td>`;
+      }
+      const night = r.shift === "night";
+      html += `<td class="ce-shift${night ? " night" : ""}">${night ? "NIGHT" : "DAY"}</td>` +
+        r.values.map((v, i) => `<td class="${fc(i).trim()}">${v == null ? "" : v}</td>`).join("") + `</tr>`;
+    });
+    html += `</tbody></table></section>`;
+  }
+  html += `<p class="ce-note">${esc(CAP_EXPORT_NOTE)}</p>`;
+  const el = document.createElement("div");
+  el.id = "cap-export-sheet";
+  el.innerHTML = html;
+  return el;
+}
+async function runCapExport() {
+  const ids = $$("#cap-export-boards input:checked").map(b => b.value);
+  if (!ids.length) { toast("Tick at least one board to export.", "warn"); return; }
+  const extras = $$("#cap-export-extras input:checked").map(b => b.value);
+  const fmt = pickedExportType($("#cap-export-type")) || "xlsx";
+  try { localStorage.setItem(CAP_EXPORT_KEY, JSON.stringify({ extras })); } catch (e) { /* remembering is a courtesy */ }
+  const btn = $("#btn-cap-export-go");
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try {
+    await ensureCapacityLoaded();
+    const order = D().boards.map(b => b.id).filter(id => ids.includes(id));   // the toolbar's board order
+    const models = order.map(id => capExportModel(id, extras));
+    const { from, to } = capacityRange();
+    const w = state.capacity.weeks;
+    const rangeText = `${fmtShort(from)} – ${fmtShort(to)} (${w} week${w === 1 ? "" : "s"})`;
+    const today = todayStr();
+    const generatedOn = `${fmtDow(today)} ${fmtDate(today)}`;
+    const who = models.length === 1 ? models[0].name : models.length === D().boards.length ? "All_boards" : `${models.length}_boards`;
+    const fileBase = `Capacity_${who.replace(/[\s\\/:*?"<>|]+/g, "_")}_${from}`;
+    if (fmt === "xlsx") {
+      const [ExcelJS, JSZip] = await Promise.all([loadExcelJS(), loadJSZip()]);
+      const { workbook, charts } = await ManpowerXlsx.buildCapacityWorkbook(ExcelJS, { boards: models, rangeText, generatedOn, note: CAP_EXPORT_NOTE });
+      // a working file: formulas from ExcelJS, then the native chart on each sheet
+      const buf = await ManpowerXlsx.addCapacityCharts(JSZip, await workbook.xlsx.writeBuffer(), charts);
+      bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), fileBase + ".xlsx");
+      closeModal();
+      toast(`Exported ${models.length === 1 ? models[0].name : models.length + " boards"} to ${fileBase}.xlsx`, "info");
+      return;
+    }
+    const sheet = buildCapExportSheet(models, rangeText, generatedOn);
+    document.body.appendChild(sheet);
+    if (fmt === "pdf") {
+      closeModal();
+      capPrintJob = { sheet, title: fileBase };
+      window.print();   // prepareForPrint picks capPrintJob up; restoreAfterPrint removes the sheet
+      return;
+    }
+    try {
+      await document.fonts.ready;
+      const windowWidth = Math.ceil(sheet.scrollWidth);
+      const probe = await html2canvas(sheet, { scale: 1, backgroundColor: "#ffffff", windowWidth });
+      // same blank-canvas guard as the board's JPG (see exportBoard)
+      const scale = Math.max(1, Math.min(3, 4000 / probe.width, 4000 / probe.height));
+      const canvas = scale === 1 ? probe : await html2canvas(sheet, { scale, backgroundColor: "#ffffff", windowWidth });
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/jpeg", 0.92);
+      a.download = fileBase + ".jpg";
+      a.click();
+    } finally {
+      sheet.remove();
+    }
+    closeModal();
+  } catch (e) {
+    toast("Export failed: " + (e.message || e), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Export";
+  }
 }
 
 /* Remove a host x shift row: all of its numbers from today on (past days are
@@ -9840,9 +10132,7 @@ function wireApp() {
   }
   $("#sort-by").onchange = (e) => { state.sort = e.target.value; render(); };
 
-  $("#btn-export").onclick = exportBoard;
-  $("#btn-print").onclick = printBoard;
-  $("#btn-xlsx").onclick = openXlsxModal;
+  $("#btn-export").onclick = openExportModal;
   $("#card-names").value = state.cardNames;
   $("#card-names").addEventListener("change", (e) => {
     state.cardNames = e.target.value;
@@ -9851,7 +10141,7 @@ function wireApp() {
   });
   $("#btn-xlsx-all").onclick = () => setXlsxTicks(true);
   $("#btn-xlsx-none").onclick = () => setXlsxTicks(false);
-  $("#btn-xlsx-go").onclick = exportXlsx;
+  $("#btn-xlsx-go").onclick = runBoardExport;
   // on the window, not the button: Ctrl+P has to get the same page as the click
   window.addEventListener("beforeprint", prepareForPrint);
   window.addEventListener("afterprint", restoreAfterPrint);
@@ -9875,6 +10165,10 @@ function wireApp() {
   $("#cap-range").onchange = (ev) => { state.capacity.weeks = Number(ev.target.value); state.capacity.cacheKey = null; refreshAndRender(); };
   $("#btn-cap-copy-week").onclick = copyCapacityWeek;
   $("#btn-cap-seed").onclick = seedCapacityFromConfirmed;
+  $("#btn-cap-reset").onclick = resetCapacityToZero;
+  $("#btn-cap-export-go").onclick = runCapExport;
+  $("#btn-cap-export-all").onclick = () => capExportPick(true);
+  $("#btn-cap-export-this").onclick = () => capExportPick(false);
 
   // employee search (floating panel) — filter as you type, keep selection
   $("#emp-search").addEventListener("input", (e) => { state.empSearch = e.target.value; renderFloatPool(); applySearchHighlight(); });
@@ -9908,7 +10202,6 @@ function wireApp() {
   $("#btn-bulk-dl-xlsx").onclick = () => safely(bulkDownload);
   $("#bulk-file").onchange = (e) => safely(() => onBulkFile(e));
   $("#btn-bulk-apply").onclick = () => safely(applyBulk);
-  $("#btn-emplist-xlsx").onclick = openEmplistXlsxModal;
   $("#btn-emplist-xlsx-go").onclick = exportEmplistXlsx;
   $("#emplist-name-view").addEventListener("change", (e) => {
     state.emplist.nameView = e.target.value;
@@ -9963,7 +10256,7 @@ function wireApp() {
   $("#emplist-bulk-clear").onclick = clearSelection;
 
   // ---------- Host List tab ----------
-  $("#btn-hostlist-xlsx").onclick = () => safely(exportHostlistXlsx);
+  $("#btn-hostlist-export-go").onclick = () => safely(async () => { await exportHostlistXlsx(); closeModal(); });
   $("#btn-add-host").onclick = () => openHostModal(null);
   $("#hostlist-search").addEventListener("input", (e) => { state.hostlist.search = e.target.value; renderHostRows(); });
   for (const th of $$("#hostlist-table th[data-sort]")) {

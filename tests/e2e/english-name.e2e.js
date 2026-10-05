@@ -11,6 +11,13 @@ const fs = require("node:fs");
 const h = require("./harness");
 const ExcelJS = require("../../vendor/exceljs.min.js");
 
+/* the board's one Export button, then "Excel" as the file type */
+async function openBoardXlsx(page) {
+  await page.click("#btn-export");
+  await page.waitForSelector("#modal-xlsx:not(.hidden)");
+  await page.check('#board-export-type input[value="xlsx"]');
+}
+
 async function step(name, fn) {
   try { await fn(); console.log("ok - " + name); }
   catch (e) { console.log("FAIL - " + name + "\n   " + (e && e.stack || e).split("\n").slice(0, 6).join("\n   ")); throw e; }
@@ -170,7 +177,7 @@ async function sheetOf(path) {
     });
 
     const exportList = async (lang, file) => {
-      await p.click("#btn-emplist-xlsx");
+      await p.click("#btn-export");
       await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");
       await p.check(`#emplist-xlsx-lang input[value=${lang}]`);
       const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-emplist-xlsx-go")]);
@@ -194,8 +201,7 @@ async function sheetOf(path) {
     await step("the board Excel uses the same rule", async () => {
       await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
       const board = async (lang, file) => {
-        await p.click("#btn-xlsx");
-        await p.waitForSelector("#modal-xlsx:not(.hidden)");
+        await openBoardXlsx(p);
         await p.check(`#xlsx-lang input[value=${lang}]`);
         const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
         await dl.saveAs(file);

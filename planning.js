@@ -524,7 +524,43 @@
     return { cells, dropped, r0: sel.r0, c0: sel.c0, r1: Math.min(sel.r0 + h, nRows) - 1, c1: Math.min(sel.c0 + w, nCols) - 1 };
   }
 
-  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, seedFromPlan, fillEmpty, parseClip, pastePlan };
+  /* ----- Capacity export -----
+     One board's grid as plain data, for the Excel, JPG and PDF writers alike.
+     The host columns an export may add, in the order they appear: */
+  const EXPORT_HOST_COLUMNS = [
+    { key: "area", label: "Service area" },
+    { key: "location", label: "Location" },
+    { key: "note", label: "Note" },
+    { key: "mapUrl", label: "Google Maps link" },
+  ];
+  /* days      [{date, forecast, demand, gap, kind, a: {available, named}|null}]
+     rows      [{host, shift}]            value(date, host, shift) -> number|null
+     hostInfo  (host) -> {area, location, note, mapUrl}|null
+     extras    keys of EXPORT_HOST_COLUMNS to add after the host name
+     dateLabel (iso) -> text */
+  function exportBoard({ name, days, rows, value, hostInfo, extras, dateLabel }) {
+    const cols = EXPORT_HOST_COLUMNS.filter((c) => (extras || []).includes(c.key));
+    return {
+      name,
+      extras: cols,
+      dates: days.map((x) => ({ date: x.date, label: dateLabel ? dateLabel(x.date) : x.date, forecast: !!x.forecast })),
+      summary: {
+        available: days.map((x) => (x.a ? x.a.available : null)),
+        demand: days.map((x) => x.demand),
+        gap: days.map((x) => (x.gap == null ? null : x.gap)),
+        kind: days.map((x) => x.kind || null),
+        named: days.map((x) => (x.a ? x.a.named : null)),
+      },
+      rows: rows.map((r) => {
+        const info = (hostInfo && hostInfo(r.host)) || {};
+        const extra = {};
+        for (const c of cols) extra[c.key] = info[c.key] || "";
+        return { host: r.host, shift: r.shift, extra, values: days.map((x) => { const v = value(x.date, r.host, r.shift); return v == null ? null : v; }) };
+      }),
+    };
+  }
+
+  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, seedFromPlan, fillEmpty, parseClip, pastePlan, exportBoard, EXPORT_HOST_COLUMNS };
 
   const api = { PlanDiff, Horizon, Capacity };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
