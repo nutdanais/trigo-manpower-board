@@ -1458,10 +1458,11 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
 
-  /* One line, no wrapping: the bar holds the three fixed tabs and a board
-     picker, and the picker is the flexible item that takes what is left.
-     (Below 380px it wraps instead — see that breakpoint.) */
-  #board-bar { flex-wrap: nowrap; gap: 4px; padding: 4px 8px; align-items: center; }
+  /* Two rows: the fixed tabs (Overview / Org Chart / Manpower / Host /
+     Capacity — more than a phone is wide) on the first, the board picker full
+     width on the second. The tab strip scrolls sideways inside itself (see
+     #board-tabs below) so it can never widen the page. */
+  #board-bar { flex-wrap: wrap; gap: 4px; padding: 4px 8px; align-items: center; }
   /* The per-board tabs and "+ Board" become one native <select> (populated by
      renderBoardSelect in app.js, which carries "+ New board…" as its last
      option). Any number of boards then costs one control instead of a wrapping
@@ -1470,10 +1471,28 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   #board-tabs .tab-board,
   .board-tab-sep,
   #btn-add-board { display: none; }
-  #board-tabs { flex: 0 0 auto; flex-wrap: nowrap; gap: 2px; }
+  /* The strip is wider than the screen, so it scrolls on its own: a finger
+     swipe along it moves the tabs, not the page. min-width:0 lets it shrink to
+     the bar instead of forcing the bar (and the page) wider; overflow-x:auto
+     with overflow-y:hidden is the pinned pair, and overscroll-behavior stops a
+     swipe at either end from chaining to the page. No scrollbar — a tab cut off
+     at the right edge is the cue that there is more. */
+  #board-tabs {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #board-tabs::-webkit-scrollbar { display: none; }
+  #board-tabs .board-tab { flex: none; white-space: nowrap; margin-bottom: 0; }
   #board-select {
     display: block;
-    flex: 1 1 auto;
+    flex: 1 0 100%;
     min-width: 0;
     min-height: 34px;
     padding: 6px 8px;
@@ -1695,13 +1714,11 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   #topbar .btn-date { font-size: 12px; padding: 0 6px; }
   .date-nav .btn-top.btn-icon { width: 30px; }
   .topbar-right > .btn-top { width: 30px; }
-  /* Three fixed tabs (Overview / Manpower / Host) plus the board picker no
-     longer fit one line at this width, so the bar wraps: the tabs keep their
-     own row and the picker takes a full-width one below, rather than every
-     control being squeezed to an ellipsis. */
-  #board-bar { padding: 4px 6px; flex-wrap: wrap; }
+  /* The bar already wraps (see the phone pass above); this just tightens the
+     tabs and the picker a little more. */
+  #board-bar { padding: 4px 6px; }
   .board-tab { padding: 8px 7px; font-size: 12.5px; }
-  #board-select { font-size: 12.5px; padding: 6px 6px; flex: 1 0 100%; }
+  #board-select { font-size: 12.5px; padding: 6px 6px; }
 }
 
 /* ===== Modals ===== */
