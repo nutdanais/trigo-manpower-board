@@ -1558,6 +1558,9 @@ function renderBoardEmptyState() {
 
 function renderTabs() {
   const el = $("#board-tabs");
+  // On a phone the strip scrolls sideways; rebuilding it would snap it back to
+  // the start, so remember where it was and make sure the active tab is in view.
+  const keepScroll = el.scrollLeft;
   el.innerHTML = "";
   if (can("overview")) {
   const ov = document.createElement("div");
@@ -1621,6 +1624,13 @@ function renderTabs() {
       if (name && name.trim()) safely(async () => { await cloud.renameBoard(b.id, name.trim()); render(); });
     };
     el.appendChild(t);
+  }
+  el.scrollLeft = keepScroll;
+  const act = el.querySelector(".board-tab.active");
+  if (act && act.offsetParent) {
+    const a = act.getBoundingClientRect(), e = el.getBoundingClientRect();
+    if (a.left < e.left) el.scrollLeft += a.left - e.left - 8;
+    else if (a.right > e.right) el.scrollLeft += a.right - e.right + 8;
   }
   renderBoardSelect();
 }
