@@ -10515,6 +10515,17 @@ function isRecoveryLink() {
   return /(^|[#&])type=recovery(&|$)/.test(h);
 }
 
+/* The loading screen (#splash, top of index.html) stays up until the app knows
+   what to show: the sign-in box, the reset form, or a board that has finished
+   its first load. It is removed after its fade, not just hidden, so nothing of
+   it is left to catch a click or an export. */
+function hideSplash() {
+  const el = document.getElementById("splash");
+  if (!el) return;
+  el.classList.add("splash-out");
+  setTimeout(() => el.remove(), 400);
+}
+
 async function main() {
   showAppVersion();
   wireLogin();
@@ -10524,12 +10535,16 @@ async function main() {
   let hadSession = !!session;
   let recovering = isRecoveryLink();
 
-  if (recovering) {
-    showResetScreen(session);
-  } else if (session) {
-    await boot();
-  } else {
-    showLogin();
+  try {
+    if (recovering) {
+      showResetScreen(session);
+    } else if (session) {
+      await boot();
+    } else {
+      showLogin();
+    }
+  } finally {
+    hideSplash();   // also when boot() throws, so a failure shows its own state, not a splash forever
   }
   // onAuthStateChange always fires once on load (even with no session ever set) —
   // only reload on a genuine sign-out transition, not that initial null event.

@@ -2134,6 +2134,54 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 /* the cell shows focus on behalf of the input it hides */
 .weekday-chip:focus-within { outline: 2px solid var(--primary-text); outline-offset: -2px; }
 
+/* ===== Loading screen =====
+   The markup is at the top of index.html and is on screen before any script
+   runs; app.js adds .splash-out once it knows where to send the person. Design
+   B2: the app icon's shift grid fills in diagonally. Fixed blue (not themed) so
+   it matches the launch screen the phone draws from the manifest. */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 24px 84px;
+  background: var(--primary);
+  color: #fff;
+  text-align: center;
+  transition: opacity .25s ease;
+}
+#splash.splash-out { opacity: 0; pointer-events: none; }
+.splash-grid { display: grid; grid-template-columns: repeat(4, 20px); gap: 5px; }
+.splash-grid i {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  background: #fff;
+  opacity: 0;
+  animation: splash-pop 2.4s infinite;
+  animation-delay: var(--d, 0s);
+}
+.splash-grid i.g { background: var(--brand-green); }
+.splash-grid i.o { background: none; box-shadow: inset 0 0 0 3px #fff; }
+@keyframes splash-pop {
+  0% { opacity: 0; transform: scale(.6); }
+  12%, 80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+.splash-name { margin-top: 28px; font-size: 28px; font-weight: 700; letter-spacing: -.01em; }
+.splash-version { margin-top: 6px; font-size: 11px; letter-spacing: .06em; opacity: .7; }
+.splash-sub { margin-top: 14px; font-size: 13px; opacity: .85; }
+.splash-logo { position: absolute; bottom: 34px; height: 26px; width: auto; display: block; }
+/* no motion: show the finished grid instead of the fill-in */
+@media (prefers-reduced-motion: reduce) {
+  .splash-grid i { animation: none; opacity: 1; }
+  #splash { transition: none; }
+}
+@media print { #splash { display: none !important; } }
+
 /* ===== Login ===== */
 #login-screen {
   position: fixed;

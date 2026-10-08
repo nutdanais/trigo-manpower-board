@@ -20,8 +20,8 @@ Copy-Item (Join-Path $root "employee-id.js") $deploy -Force
 Copy-Item (Join-Path $root "config.js") $deploy -Force
 Copy-Item (Join-Path $root "version.js") $deploy -Force
 Copy-Item (Join-Path $root "logo.svg") $deploy -Force
-Copy-Item (Join-Path $root "favicon.svg") $deploy -Force
-Copy-Item (Join-Path $root "favicon.png") $deploy -Force
+Copy-Item (Join-Path $root "manifest.webmanifest") $deploy -Force
+Copy-Item (Join-Path $root "icons") $deploy -Recurse -Force
 if (Test-Path (Join-Path $root "logo.png")) { Copy-Item (Join-Path $root "logo.png") $deploy -Force }
 if (Test-Path (Join-Path $root "logo-on-navy.png")) { Copy-Item (Join-Path $root "logo-on-navy.png") $deploy -Force }
 Copy-Item (Join-Path $root "vendor\html2canvas.min.js") $vendor -Force

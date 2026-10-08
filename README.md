@@ -120,8 +120,9 @@ hard-refresh.
 ### Where users see the version
 
 `version.js` is the one place the version is written, and the app shows it so a bug
-report can quote it: under the sign-in box, at the foot of the page, and at the bottom of
-the **Settings** rail (hidden on a phone, where the footer has it).
+report can quote it: on the loading screen (small text under the name), under the sign-in
+box, at the foot of the page, and at the bottom of the **Settings** rail (hidden on a phone,
+where the footer has it).
 
 While someone is signed in, the app re-reads `version.js` (bypassing every cache) every
 10 minutes and whenever they return to the tab. If the server's version differs from the
@@ -134,7 +135,7 @@ the tab open for days therefore finds out; no one is left on an old version unkn
 
 Nothing here is needed to run the app; they are for checking a change.
 
-- `node --test tests/*.test.js` — the release version (every `?v=` in `index.html` matches `version.js`, and `bump-version.js` rewrites only those), the plan diff, capacity and horizon logic, and the carry-over **parity** test: the refactored carry is held to writing exactly the rows the previous code did (`tests/fixtures/copy-plan-forward.reference.js` is that previous code, frozen).
+- `node --test tests/*.test.js` — the icon links, manifest and loading screen (`tests/icons.test.js`), the release version (every `?v=` in `index.html` matches `version.js`, and `bump-version.js` rewrites only those), the plan diff, capacity and horizon logic, and the carry-over **parity** test: the refactored carry is held to writing exactly the rows the previous code did (`tests/fixtures/copy-plan-forward.reference.js` is that previous code, frozen).
 - `node tests/e2e/excel-export.e2e.js` — the Excel export in a real browser: the column and sheet pickers, the downloaded file's four sheets, the remembered choices, who can see the button.
 - `node tests/e2e/bulk-edit.e2e.js` — bulk edit by file: the Excel template (ID, dropdown sheet, Read me), an unedited file changing nothing, a rename / phone / board move / deactivate applied after the preview with the backup download, CSV with a bad row (skipped with its row number) and new people held back until ticked, the host version (case-insensitive match, `javascript:` link refused, new hosts held back), and no button for a read-only role.
 - `node tests/e2e/trigo-id.e2e.js` — the TRIGO ID: the Edit Employee form (full name only, ID tidied and unique, namesakes only with IDs, a short name saved earlier grandfathered), the ID on every card (no show/hide button), the Manpower List column / search / numeric sort, the Excel exports that replaced CSV (Manpower, Host, Users), and no CSV button left anywhere.
@@ -165,6 +166,8 @@ within a second or two via Supabase Realtime.
 - `supabase/schema.sql` — database schema, security rules, and seed data — run once in the Supabase SQL editor
 - `supabase/migration-*.sql` — incremental schema changes; run any you haven't yet in the Supabase SQL editor (each is safe to run more than once)
 - `supabase/functions/admin-users/index.ts` — the one server-side function, and the only place the service-role key is used: creating a sign-in account, reissuing its password, and deleting it. Everything else on the Users screen is a plain table write under RLS and works without it.
+- `icons/` + `manifest.webmanifest` — the app icon (design B2, the 4×4 shift grid on TRIGO blue): browser-tab favicons (a 2×2 version at 48 px and below), the iOS home-screen icon, and the 192 / 512 px and maskable icons the manifest hands to Android for the home screen and launch screen. Rebuilt by `design/icons/build-icons.js`; after changing them, bump the `?v=` on the icon links in `index.html`
+- the **loading screen** is `#splash` at the top of `index.html` (styled in `styles.css`): plain HTML/CSS so it paints before any script, removed by `app.js` (`hideSplash`) once it knows whether to show sign-in or the board
 - `_headers` — Netlify caching rules. Everything is set to revalidate on every load; nothing is cached hard.
 - `vendor/html2canvas.min.js` — library used for JPG export
 - `vendor/exceljs.min.js` — ExcelJS 4.4 (MIT, licence in `vendor/exceljs.LICENSE.txt`), the library behind **Excel** export; loaded on first use
