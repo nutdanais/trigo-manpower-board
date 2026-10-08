@@ -4,7 +4,7 @@ $listener.Prefixes.Add('http://localhost:4173/')
 $listener.Start()
 Write-Host "Serving on http://localhost:4173/"
 $root = $PSScriptRoot
-$mime = @{ '.html'='text/html'; '.js'='application/javascript'; '.css'='text/css'; '.png'='image/png'; '.jpg'='image/jpeg'; '.svg'='image/svg+xml'; '.json'='application/json' }
+$mime = @{ '.html'='text/html'; '.js'='application/javascript'; '.css'='text/css'; '.png'='image/png'; '.jpg'='image/jpeg'; '.svg'='image/svg+xml'; '.json'='application/json'; '.webmanifest'='application/manifest+json' }
 while ($listener.IsListening) {
   $ctx = $listener.GetContext()
   try {

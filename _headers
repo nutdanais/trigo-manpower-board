@@ -21,3 +21,8 @@
 # never be answered from a cache (the check also adds a ?cb= to defeat proxies).
 /version.js
   Cache-Control: no-cache
+
+# Browsers want the manifest as application/manifest+json; say so rather than
+# rely on the host's extension table.
+/manifest.webmanifest
+  Content-Type: application/manifest+json
