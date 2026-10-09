@@ -1016,8 +1016,10 @@ const org = {
   collapsed: new Set(),     // node _id -> children hidden
   seeded: false,            // first paint collapses missions + pools
   pz: { scale: 1, tx: 24, ty: 24, fitted: false },   // org-chart canvas transform
-  filters: { boards: new Set(), engineers: new Set(), areas: new Set() },  // keys the user hid
-  filterOpts: { boards: [], engineers: [], areas: [] },   // what's available to filter this render
+  // keys the user hid. statuses: "standby" or a leave zone key — who in each
+  // board's Standby / Leave pool is left out of the chart
+  filters: { boards: new Set(), engineers: new Set(), areas: new Set(), statuses: new Set() },
+  filterOpts: { boards: [], engineers: [], areas: [], statuses: [] },   // what's available to filter this render
   tree: null,               // the filtered tree currently on screen (both views read it)
   closer: null,             // document click handler that closes open filter pops
 };
@@ -1173,13 +1175,23 @@ function orgFilterOptions(fullTree) {
       }
     }
   }
+  // Standby and every leave type are always offered, with today's headcount,
+  // so a choice made on one day still reads the same on a day with none of them
+  const statusCount = new Map();
+  for (const b of fullTree.children) for (const n of b.children) {
+    if (n.type === "bucket") for (const e of n.children) statusCount.set(e.status, (statusCount.get(e.status) || 0) + 1);
+  }
+  const statuses = ["standby", ...LEAVE_ZONES].map(key => ({
+    key, name: `${key === "standby" ? "Standby" : ZONE_LABELS[key]} (${statusCount.get(key) || 0})`,
+  }));
   return {
     boards,
     engineers: [...engMap].map(([key, name]) => ({ key, name })),
     areas: [...areaMap].map(([key, name]) => ({ key, name })),
+    statuses,
   };
 }
-/* Drop the boards / engineers / service areas the user has hidden. Mutates the
+/* Drop the boards / engineers / service areas / standby-leave statuses the user has hidden. Mutates the
    passed tree; counts recompute from what's left, so the visible tallies match
    the visible tree. Engineers emptied by an area filter are dropped too. */
 function orgPrune(tree, f) {
@@ -1190,7 +1202,12 @@ function orgPrune(tree, f) {
       if (e.type !== "engineer") continue;
       e.children = e.children.filter(a => !(a.type === "area" && f.areas.has(a._id.split("/a:")[1])));
     }
-    b.children = b.children.filter(n => n.type !== "engineer" || n.children.length);
+    // the Standby / Leave pool keeps only the statuses still ticked, and goes
+    // when nobody is left in it
+    for (const n of b.children) {
+      if (n.type === "bucket") n.children = n.children.filter(e => !f.statuses.has(e.status));
+    }
+    b.children = b.children.filter(n => (n.type !== "engineer" && n.type !== "bucket") || n.children.length);
   }
 }
 function orgFilterDropdown(dim, label, items) {
@@ -1252,6 +1269,7 @@ function renderOrgChart() {
           ${orgFilterDropdown("boards", "Board", org.filterOpts.boards)}
           ${orgFilterDropdown("engineers", "Engineer", org.filterOpts.engineers)}
           ${orgFilterDropdown("areas", "Service area", org.filterOpts.areas)}
+          ${orgFilterDropdown("statuses", "Standby / Leave", org.filterOpts.statuses)}
         </div>
         <label class="oc-levelctl">Show to
           <select id="oc-level" class="oc-select">${levelOpts}</select>
@@ -2049,6 +2067,8 @@ function renderZones() {
       .map(empId => D().employees.find(e => e.id === empId))
       .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
     for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
+    // headcount in the label, like a mission card's — it also goes out in the JPG export
+    body.closest(".zone").querySelector(".zone-count").textContent = emps.length;
     // an empty leave zone collapses to a thin one-line drop target instead of
     // a fixed-height card — most days only 1-2 of the 5 types are ever used,
     // so the other 3-4 were costing ~175px of screen space for nothing.
