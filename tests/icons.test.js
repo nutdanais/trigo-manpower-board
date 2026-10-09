@@ -35,8 +35,8 @@ test("the manifest is linked and each of its icons exists at its stated size", (
   assert.equal(man.background_color, "#004983");
   assert.ok(man.icons.some((i) => i.sizes === "192x192") && man.icons.some((i) => i.sizes === "512x512"));
   assert.ok(man.icons.some((i) => i.purpose === "maskable"), "an Android adaptive icon");
-  assert.equal(man.name, "TRIGO Manpower Board", "the name a phone or desktop install shows");
-  assert.equal(man.short_name, "TRIGO Manpower Board");
+  assert.equal(man.name, "Manpower Board", "the name a phone or desktop install shows");
+  assert.equal(man.short_name, "Manpower Board");
   for (const i of man.icons) {
     assert.ok(exists(i.src), i.src + " is in the manifest but missing");
     const [w, h] = i.sizes.split("x").map(Number);
@@ -45,7 +45,7 @@ test("the manifest is linked and each of its icons exists at its stated size", (
 });
 
 test("iOS gets the same home-screen name as the manifest", () => {
-  assert.match(html, /<meta name="apple-mobile-web-app-title" content="TRIGO Manpower Board">/);
+  assert.match(html, /<meta name="apple-mobile-web-app-title" content="Manpower Board">/);
 });
 
 test("the loading screen is the first thing in <body>, shows the version, and is dismissed by app.js", () => {

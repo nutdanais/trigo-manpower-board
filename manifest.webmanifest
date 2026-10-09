@@ -1,6 +1,6 @@
 {
-  "name": "TRIGO Manpower Board",
-  "short_name": "TRIGO Manpower Board",
+  "name": "Manpower Board",
+  "short_name": "Manpower Board",
   "description": "TRIGO manpower planning board",
   "start_url": "./",
   "scope": "./",
