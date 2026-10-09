@@ -5,4 +5,4 @@
    Don't edit this by hand — `node bump-version.js` rewrites it together with
    every ?v= string in index.html (tests/version.test.js fails if they drift).
    Format: the release date, plus a letter for a second release the same day. */
-window.APP_VERSION = "2026-10-08b";
+window.APP_VERSION = "2026-10-09a";

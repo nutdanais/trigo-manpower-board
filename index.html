@@ -4,19 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Manpower Management Board</title>
-<!-- App icon (design B2: the shift grid on TRIGO blue). Browser tab: the SVG, with
-     16/32/48 px PNGs as fallback — those use a 2x2 version of the grid so it
-     stays readable that small. Home screen: 180 px Apple touch icon, and the
-     web manifest's 192/512 px icons (the 512 is what Android scales for its
-     launch screen) plus a maskable one for adaptive icons. Everything lives in
-     icons/, rebuilt by design/icons/build-icons.js. Bump ?v= here if the icons
-     change (browsers cache favicons hard). -->
-<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=2">
-<link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png?v=2">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=2">
-<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png?v=2">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-180.png?v=2">
-<link rel="manifest" href="manifest.webmanifest?v=2">
+<!-- App icon: four tiles on TRIGO blue, three white (people) and one green
+     (today). One mark everywhere. Browser tab: the SVG, with 16/32/48 px PNGs as
+     fallback. Home screen: 180 px Apple touch icon, and the web manifest's
+     192/512 px icons (the 512 is what Android scales for its launch screen) plus
+     a maskable one for adaptive icons. Everything lives in icons/, rebuilt by
+     design/icons/build-icons.js. Bump ?v= here if the icons change (browsers
+     cache favicons hard). The name a phone gives the app when it is added to the
+     home screen is "Manpower Board": the manifest's name for Android and
+     desktop installs, apple-mobile-web-app-title for iOS. -->
+<link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=3">
+<link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png?v=3">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png?v=3">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png?v=3">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-180.png?v=3">
+<link rel="manifest" href="manifest.webmanifest?v=3">
+<meta name="apple-mobile-web-app-title" content="Manpower Board">
+<meta name="application-name" content="Manpower Board">
 <meta name="theme-color" content="#004983">
 <script>
   // applied before first paint so the page never flashes the wrong theme
@@ -40,29 +44,27 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-08b">
+<link rel="stylesheet" href="styles.css?v=2026-10-09a">
 </head>
 <body>
 
 <!-- ===== Loading screen =====
      Plain HTML and CSS, so it paints before any script has loaded, and app.js
      takes it away (hideSplash) once it has decided between sign-in and the
-     board. The cells are the app icon's grid (design B2), filling in
-     diagonally. The version comes from version.js, loaded right here rather
-     than with the other scripts so it shows on the first frame. -->
+     board. The tiles are the app icon, filling in one after another. The
+     version comes from version.js, loaded right here rather than with the
+     other scripts so it shows on the first frame. -->
 <div id="splash" role="status" aria-live="polite" aria-label="Loading Manpower Board">
   <div class="splash-grid" aria-hidden="true">
-    <i style="--d:0s"></i><i class="g" style="--d:.12s"></i><i style="--d:.24s"></i><i style="--d:.36s"></i>
-    <i style="--d:.12s"></i><i class="g" style="--d:.24s"></i><i class="o" style="--d:.36s"></i><i style="--d:.48s"></i>
-    <i style="--d:.24s"></i><i class="g" style="--d:.36s"></i><i style="--d:.48s"></i><i style="--d:.6s"></i>
-    <i class="o" style="--d:.36s"></i><i style="--d:.48s"></i><i style="--d:.6s"></i><i style="--d:.72s"></i>
+    <i style="--d:0s"></i><i class="g" style="--d:.15s"></i>
+    <i style="--d:.15s"></i><i style="--d:.3s"></i>
   </div>
   <div class="splash-name">Manpower Board</div>
   <div class="splash-version">Version <span data-app-version></span></div>
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-08b"></script>
+<script src="version.js?v=2026-10-09a"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -371,23 +373,23 @@
   </div>
   <section id="status-zones">
     <div class="zone zone-leave" data-zone="annual">
-      <div class="zone-label">Annual Leave<small class="zone-th">ลาพักร้อน</small></div>
+      <div class="zone-label">Annual Leave<small class="zone-th">ลาพักร้อน</small><span class="zone-count"></span></div>
       <div class="zone-body dropzone" data-drop="zone:annual"></div>
     </div>
     <div class="zone zone-leave" data-zone="sick">
-      <div class="zone-label">Sick Leave<small class="zone-th">ลาป่วย</small></div>
+      <div class="zone-label">Sick Leave<small class="zone-th">ลาป่วย</small><span class="zone-count"></span></div>
       <div class="zone-body dropzone" data-drop="zone:sick"></div>
     </div>
     <div class="zone zone-leave" data-zone="business">
-      <div class="zone-label">Business Leave<small class="zone-th">ลากิจ</small></div>
+      <div class="zone-label">Business Leave<small class="zone-th">ลากิจ</small><span class="zone-count"></span></div>
       <div class="zone-body dropzone" data-drop="zone:business"></div>
     </div>
     <div class="zone zone-leave" data-zone="unpaid">
-      <div class="zone-label">Unpaid Leave<small class="zone-th">ลาไม่รับค่าจ้าง</small></div>
+      <div class="zone-label">Unpaid Leave<small class="zone-th">ลาไม่รับค่าจ้าง</small><span class="zone-count"></span></div>
       <div class="zone-body dropzone" data-drop="zone:unpaid"></div>
     </div>
     <div class="zone zone-leave" data-zone="exchange">
-      <div class="zone-label">Exchange Working Day<small class="zone-th">สลับวันหยุด</small></div>
+      <div class="zone-label">Exchange Working Day<small class="zone-th">สลับวันหยุด</small><span class="zone-count"></span></div>
       <div class="zone-body dropzone" data-drop="zone:exchange"></div>
     </div>
   </section>
@@ -1138,12 +1140,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-08b"></script>
-<script src="employee-id.js?v=2026-10-08b"></script>
-<script src="cloud.js?v=2026-10-08b"></script>
-<script src="charts.js?v=2026-10-08b"></script>
-<script src="xlsx-export.js?v=2026-10-08b"></script>
-<script src="bulk-edit.js?v=2026-10-08b"></script>
-<script src="app.js?v=2026-10-08b"></script>
+<script src="planning.js?v=2026-10-09a"></script>
+<script src="employee-id.js?v=2026-10-09a"></script>
+<script src="cloud.js?v=2026-10-09a"></script>
+<script src="charts.js?v=2026-10-09a"></script>
+<script src="xlsx-export.js?v=2026-10-09a"></script>
+<script src="bulk-edit.js?v=2026-10-09a"></script>
+<script src="app.js?v=2026-10-09a"></script>
 </body>
 </html>
