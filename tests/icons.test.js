@@ -35,11 +35,17 @@ test("the manifest is linked and each of its icons exists at its stated size", (
   assert.equal(man.background_color, "#004983");
   assert.ok(man.icons.some((i) => i.sizes === "192x192") && man.icons.some((i) => i.sizes === "512x512"));
   assert.ok(man.icons.some((i) => i.purpose === "maskable"), "an Android adaptive icon");
+  assert.equal(man.name, "TRIGO Manpower Board", "the name a phone or desktop install shows");
+  assert.equal(man.short_name, "TRIGO Manpower Board");
   for (const i of man.icons) {
     assert.ok(exists(i.src), i.src + " is in the manifest but missing");
     const [w, h] = i.sizes.split("x").map(Number);
     assert.deepEqual(pngSize(i.src), [w, h], i.src);
   }
+});
+
+test("iOS gets the same home-screen name as the manifest", () => {
+  assert.match(html, /<meta name="apple-mobile-web-app-title" content="TRIGO Manpower Board">/);
 });
 
 test("the loading screen is the first thing in <body>, shows the version, and is dismissed by app.js", () => {
@@ -48,6 +54,9 @@ test("the loading screen is the first thing in <body>, shows the version, and is
   const splash = /<div id="splash"[\s\S]*?<img class="splash-logo"[^>]*>\s*<\/div>/.exec(body);
   assert.ok(splash, "splash block");
   assert.match(splash[0], /Version <span data-app-version><\/span>/, "version line under the name");
+  const tiles = splash[0].match(/<i\b[^>]*>/g) || [];
+  assert.equal(tiles.length, 4, "the app icon's four tiles");
+  assert.equal(tiles.filter((t) => /class="g"/.test(t)).length, 1, "one of them green");
   assert.ok(splash[0].indexOf("splash-grid") < splash[0].indexOf("splash-version"), "the version sits below the icon");
   assert.ok(body.indexOf('src="version.js') < body.indexOf("planning.js"), "version.js loads early so the version shows on first paint");
   const app = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
