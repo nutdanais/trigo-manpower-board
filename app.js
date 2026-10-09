@@ -693,8 +693,8 @@ async function ensureHistoryLoaded() {
 }
 
 /* Manpower List's 30D column. Per employee: days actually deployed on a mission
-   / working days available to them (their board's working days in the window,
-   minus their own leave). So leave doesn't punish the figure, and someone whose
+   / working days available to them (their board's working days in the window
+   from the day they were added to the app, minus their own leave). So leave doesn't punish the figure, and someone whose
    board was shut all month reads "—" rather than a misleading 0%.
    Note this is deliberately NOT the board-level rule, where free on-call is
    dropped from the denominator: at board level "we didn't need to call anyone"
@@ -711,23 +711,28 @@ async function ensureEmplistUtilLoaded() {
   const seq = ++emplistUtilFetchSeq;
   const raw = await cloud.getEmployeeUtilization(fromDate, toDate);
   if (seq !== emplistUtilFetchSeq) return;   // a newer request has since superseded this one
-  // working days per board across the window, computed once rather than per employee
-  const workingByBoard = {};
+  // working days per board, counted from each day of the window to its end —
+  // someone added to the app part-way through the window is only measured from
+  // the day they were added (employees.added_on); the days before they existed
+  // here must not read as days they could have worked
+  const workingFrom = {};
   for (const b of D().boards) {
+    const byDay = {};
     let n = 0;
-    for (let d = fromDate; d <= toDate; d = addDays(d, 1)) if (!isNonWorkingDate(d, b.id)) n++;
-    workingByBoard[b.id] = n;
+    for (let d = toDate; d >= fromDate; d = addDays(d, -1)) { if (!isNonWorkingDate(d, b.id)) n++; byDay[d] = n; }
+    workingFrom[b.id] = byDay;
   }
   const out = {};
   for (const e of D().employees) {
     const r = raw[e.id];
-    const working = workingByBoard[e.boardId] || 0;
+    const start = e.addedOn && e.addedOn > fromDate ? e.addedOn : fromDate;
+    const working = start > toDate ? 0 : ((workingFrom[e.boardId] || {})[start] || 0);
     // only leave that lands on a working day shrinks the denominator
     let leaveOnWorkdays = 0;
-    if (r) for (const d of r.leaveDates) if (!isNonWorkingDate(d, e.boardId)) leaveOnWorkdays++;
+    if (r) for (const d of r.leaveDates) if (d >= start && !isNonWorkingDate(d, e.boardId)) leaveOnWorkdays++;
     const denom = working - leaveOnWorkdays;
     let worked = 0;
-    if (r) for (const d of r.workedDates) if (!isNonWorkingDate(d, e.boardId)) worked++;
+    if (r) for (const d of r.workedDates) if (d >= start && !isNonWorkingDate(d, e.boardId)) worked++;
     out[e.id] = denom > 0 ? Math.round((worked / denom) * 100) : null;
   }
   state.emplist.util = out;
