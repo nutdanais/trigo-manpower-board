@@ -260,18 +260,18 @@ const POSITIONS = {
    and KPI tile use, on-call deployment is the same orange as every contract
    split, deployed-total is the assigned blue. Only the two series with no
    prior meaning (permanent split, missions) take a categorical slot. */
-const HISTORY_MEASURES = [
-  { key: "deployed",       label: "Deployed (total)",     color: "var(--chart-assigned)", value: (r) => r.assigned },
-  { key: "deployedPerm",   label: "Deployed — permanent", color: "var(--chart-cat-7)",    value: (r) => r.assigned - r.oncallAssigned },
-  { key: "deployedOncall", label: "Deployed — on-call",   color: "var(--chart-oncall)",   value: (r) => r.oncallAssigned },
-  { key: "oncallFree",     label: "On-call free",         color: "var(--chart-cat-3)",    value: (r) => trendMetricValue("oncallFree", r) },
-  { key: "idle",           label: "Idle staff",           color: "var(--chart-standby)",  value: (r) => trendMetricValue("idle", r) },
-  { key: "missions",       label: "Missions staffed",     color: "var(--chart-cat-5)",    value: (r) => r.staffedMissions },
+/* Overview History: four measures, ONE charted at a time — each on its own
+   axis, so Missions (~4) is never squashed flat under Idle (~28). */
+const OV_HISTORY_MEASURES = [
+  { key: "util",     label: "Utilization",    suffix: "%", value: (r) => trendMetricValue("util", r) },
+  { key: "deployed", label: "Deployed / day", suffix: "",  value: (r) => r.assigned },
+  { key: "idle",     label: "Idle / day",     suffix: "",  value: (r) => trendMetricValue("idle", r) },
+  { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions },
 ];
-/* The two deployment splits start hidden: they add up to "Deployed (total)",
-   so showing all six by default draws the same people twice and makes the
-   chart look busier than the data is. */
-const HISTORY_DEFAULT_HIDDEN = ["deployedPerm", "deployedOncall"];
+const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
+/* the utilization formula, said once behind an ⓘ (hover / focus) instead of
+   printed under two sections */
+const OV_UTIL_INFO = '<span class="ov-info chart-mark" tabindex="0" data-tip-value="Utilization" data-tip-label="deployed ÷ (headcount − leave − holiday − free on-call). Free on-call staff are surge capacity, so they are left out.">i</span>';
 const HISTORY_SUM_KEYS = ["assigned", "headcount", "leave", "oncallAssigned", "oncallHeadcount", "oncallLeave", "staffedMissions"];
 async function safely(fn) {
   try { await fn(); } catch (e) { toast("Something went wrong: " + (e.message || e), "error"); }
@@ -417,7 +417,8 @@ const state = {
     utilCacheKey: null,
     hostCoverage: null,       // cloud.getHostCoverageForHosts() result, keyed by hostCoverageCacheKey below
     hostCoverageCacheKey: null,
-    oncallQueueOpen: false,   // Action queue: the on-call-free list is collapsed by default (calm, not urgent)
+    oncallQueueOpen: false,   // attention card: the on-call-free names are collapsed by default (calm, not urgent)
+    idleOpen: new Set(),      // attention card: board ids whose idle list is expanded past OV_IDLE_SHOWN
 
     /* History + Engineer workload: one date range, one fetch, two charts.
        Deliberately NOT sharing state.overview.util above — Trend is 7/14/30
@@ -426,11 +427,9 @@ const state = {
     historyPreset: "thisMonth",   // thisMonth | lastMonth | last30 | last90 | ytd | custom
     historyFrom: null,            // resolved by resolveHistoryRange() on first render
     historyTo: null,
-    historyBoardId: "",           // "" = all boards summed; otherwise one board id
-    historyHidden: new Set(HISTORY_DEFAULT_HIDDEN),   // measure keys toggled off via the History legend
-    engMetric: "missions",        // "missions" | "crew" — Engineer workload chart
-    engHidden: new Set(),         // engineer ids toggled off via that chart's legend
-    historyShowUtil: false,       // false = the 6 deployment measures; true = a single Utilization % line
+    boardId: ovBoardSaved(),      // the board selector at the top: "" = all boards; otherwise one
+                                  // board id. Scopes EVERY section, History included (ovScopeBoards)
+    historyMeasure: "util",       // the History tile charted day by day (OV_HISTORY_MEASURES key)
     history: null,                // cloud.getUtilizationRange() over the History range
     historyCacheKey: null,
   },
@@ -508,16 +507,17 @@ const PERM_AREAS = [
     { key: "users",    label: "Users & roles",  hint: "This screen, and who may sign in" },
   ]},
   { group: "Overview sections", viewOnly: true, items: [
-    { key: "ov.status",      label: "Status bar" },
-    { key: "ov.kpi",         label: "KPI strip" },
-    { key: "ov.actionQueue", label: "Action queue" },
+    // the attention card keeps the two keys its halves had before they were
+    // merged, so a role sees exactly what it could see then
+    { key: "ov.status",      label: "Attention card: headline" },
+    { key: "ov.actionQueue", label: "Attention card: idle names" },
+    { key: "ov.kpi",         label: "KPI tiles" },
     { key: "ov.byBoard",     label: "By board" },
-    { key: "ov.history",     label: "History + Engineer workload" },
     { key: "ov.byEngineer",  label: "By engineer" },
-    { key: "ov.dayNight",    label: "Day / night split" },
-    { key: "ov.hostRisk",    label: "Host coverage risk" },
     { key: "ov.byArea",      label: "By service area" },
-    { key: "ov.leave",       label: "Leave today" },
+    { key: "ov.dayNight",    label: "Shifts" },
+    { key: "ov.hostRisk",    label: "Host coverage" },
+    { key: "ov.history",     label: "History + Engineer workload" },
   ]},
 ];
 /* The first tab this user is actually allowed to open — used when a saved view
@@ -771,7 +771,9 @@ async function ensureHostCoverageLoaded() {
   const cacheKey = state.date + "|" + hosts.slice().sort().join(",");
   if (state.overview.hostCoverageCacheKey === cacheKey) return;
   const seq = ++hostCoverageFetchSeq;
-  const result = hosts.length ? await cloud.getHostCoverageForHosts(hosts) : {};
+  // only deployments up to the date on screen: a past day's risk list must not
+  // change because someone added later has since worked one of its hosts
+  const result = hosts.length ? await cloud.getHostCoverageForHosts(hosts, state.date) : {};
   if (seq !== hostCoverageFetchSeq) return;   // a newer request has since superseded this one
   state.overview.hostCoverage = result;
   state.overview.hostCoverageCacheKey = cacheKey;
@@ -965,6 +967,9 @@ function render() {
   // and a tentative plan must not reach it (exportBoard refuses as well).
   // Export is a read: a Viewer may take the board away with them.
   $("#btn-export").classList.toggle("hidden", fc);
+  // the phone's "More" dropdown only holds other tabs' controls — on Overview it
+  // would open empty
+  $("#btn-toolbar-more").classList.toggle("hidden", ov);
   // the cards only exist on a board (not Overview, Org Chart, lists or Capacity)
   $("#card-names").classList.toggle("hidden", !board);
   // Carry over / Reset Board on a confirmed day; "Start from confirmed" on an
@@ -2408,11 +2413,8 @@ function renderStats() {
   const areaBar = $("#area-bar");
   bar.innerHTML = "";
   areaBar.innerHTML = "";
-  if (isOverview()) {
-    bar.appendChild(statChip("All employees", D().employees.filter(onRoster).length));
-    for (const b of D().boards) bar.appendChild(statChip(b.name, rosterEmployees(b.id).length));
-    return;
-  }
+  // Overview: no chips — its board selector already carries every headcount
+  if (isOverview()) return;
   if (isOrgChart()) {
     let missions = 0, crew = 0; const engs = new Set();
     for (const b of D().boards) {
@@ -2514,7 +2516,9 @@ function utilizationPct(assigned, headcount, leave, onHoliday = 0, oncallFree = 
    container and draw at that width instead. Callers queue these until the whole
    panel is in the document, since an unattached element measures 0. */
 function fillLineChart(wrap, opts) {
-  const w = Math.max(520, Math.round(wrap.clientWidth) || 720);
+  // a floor, not a fixed size: on a phone the chart draws at the phone's width
+  // rather than at 520 and being shrunk to unreadable text
+  const w = Math.max(300, Math.round(wrap.clientWidth) || 720);
   wrap.innerHTML = Charts.lineChart({ ...opts, width: w });
 }
 
@@ -2533,184 +2537,14 @@ function ovSection(title, subtitle) {
   return sec;
 }
 
-/* Comparison table with an inline bar in every numeric cell — the Overview's
-   answer to "this has to stay readable at 6+ boards". A per-board line of text
-   ("Non-Rayong 103 · Rayong 2") stops working past two or three; rows grow
-   forever. It also doubles as the table view the colour palette owes us: every
-   value is printed as a number, so nothing is encoded by colour alone.
-
-   `rows`: [{ key, label, color, sub, onClick, isTotal, values: {colKey: number} }]
-     `isTotal: true` marks the all-boards summary row: it prints numbers only
-     (no bars) and is excluded from the per-column max, since a total is always
-     the largest value and would otherwise squash every real row's bar.
-   `cols`: [{ key, label, meter, plain, warn }] —
-     `meter: true`  scales the bar 0–100 (a ratio against a fixed limit, e.g.
-                    utilization %) and appends "%";
-     `plain: true`  prints the number with no bar. For an exception COUNT, a
-                    bar scaled to the column max is actively misleading — one
-                    board with 1 unstaffed mission would draw a full-width bar
-                    just for being the worst of a tiny set;
-     `warn: true`   tints a non-zero value with the warning status colour (and
-                    keeps the number, so it is never colour-alone).
-   Otherwise the bar is scaled against the largest value in that column. */
-function ovCompareTable({ rows, cols }) {
-  const wrap = document.createElement("div");
-  wrap.className = "ov-table-wrap";
-  const table = document.createElement("table");
-  table.className = "ov-table";
-  const maxOf = {};
-  const scaleRows = rows.filter(r => !r.isTotal);
-  // a c.render column supplies its own cell (see below) and isn't a plain
-  // number in r.values, so it has no column max to compute
-  for (const c of cols) if (!c.render) maxOf[c.key] = Math.max(1, ...scaleRows.map(r => r.values[c.key] || 0));
-
-  const thead = document.createElement("thead");
-  const htr = document.createElement("tr");
-  htr.appendChild(Object.assign(document.createElement("th"), { textContent: cols.nameLabel || "" }));
-  for (const c of cols) {
-    const th = document.createElement("th");
-    th.className = "ov-table-numhead";
-    // share a fixed 60% of the table between the numeric columns however many
-    // there are, so the name column stays ~40% whether a table has two metric
-    // columns or five — otherwise two columns get shoved to the far right.
-    th.style.width = (60 / cols.length).toFixed(1) + "%";
-    th.textContent = c.label;
-    htr.appendChild(th);
-  }
-  thead.appendChild(htr);
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  for (const r of rows) {
-    const tr = document.createElement("tr");
-    if (r.isTotal) tr.className = "ov-table-totalrow";
-    const nameTd = document.createElement("td");
-    nameTd.className = "ov-table-name";
-    // the dot+label live in an inner flex box rather than making the <td>
-    // itself display:flex — a flex td drops out of table-cell layout and its
-    // row border no longer lines up with the numeric cells' borders
-    const nameInner = document.createElement("div");
-    nameInner.className = "ov-table-nameinner";
-    if (!r.isTotal) {          // the summary row is every board at once — no single colour identifies it
-      const dot = document.createElement("span");
-      dot.className = "ov-table-dot";
-      dot.style.background = r.color;
-      nameInner.appendChild(dot);
-    }
-    const nameText = document.createElement("span");
-    nameText.className = "ov-table-label";
-    nameText.textContent = r.label;   // board/engineer names are user data — textContent, never innerHTML
-    if (r.sub) {
-      const sub = document.createElement("small");
-      sub.textContent = r.sub;
-      nameText.appendChild(sub);
-    }
-    nameInner.appendChild(nameText);
-    nameTd.appendChild(nameInner);
-    if (r.onClick) {
-      nameTd.classList.add("clickable");
-      nameTd.title = `Open ${r.label}`;
-      nameTd.onclick = r.onClick;
-    }
-    tr.appendChild(nameTd);
-
-    for (const c of cols) {
-      const td = document.createElement("td");
-      td.className = "ov-table-num";
-      if (c.render) {
-        td.appendChild(c.render(r));
-        tr.appendChild(td);
-        continue;
-      }
-      const v = r.values[c.key] || 0;
-      const cell = document.createElement("div");
-      const noBar = c.plain || r.isTotal;
-      cell.className = "ov-cell" + (noBar ? " plain" : "");
-      if (!noBar) {
-        const pct = c.meter ? Math.max(0, Math.min(100, v)) : (v / maxOf[c.key]) * 100;
-        const track = document.createElement("div");
-        track.className = "ov-cell-bar" + (c.meter ? " meter" : "");
-        const fill = document.createElement("i");
-        fill.style.width = pct.toFixed(1) + "%";
-        // one colour per row entity, never per rank — filtering or re-sorting
-        // must never repaint a row (see the dataviz "colour follows the entity" rule)
-        fill.style.background = r.color;
-        track.appendChild(fill);
-        cell.appendChild(track);
-      }
-      const num = document.createElement("span");
-      num.className = "ov-cell-val" + (c.warn && v > 0 ? " warn" : "");
-      num.textContent = c.meter ? v + "%" : String(v);
-      cell.appendChild(num);
-      td.appendChild(cell);
-      tr.appendChild(td);
-    }
-    tbody.appendChild(tr);
-  }
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-  return wrap;
-}
-
-/* "By board" table's Contract mix column: a permanent/on-call stacked bar plus
-   the exact count and share on each side. The total row prints the same text
-   with no bar — a bar for "every board combined" would just be full-width by
-   definition, same reasoning as ovCompareTable's own noBar-for-isTotal rule. */
-function contractMixCell(perm, oncall, isTotal) {
-  const total = perm + oncall;
-  const pctPerm = total ? Math.round((perm / total) * 100) : 0;
-  const pctOncall = total ? 100 - pctPerm : 0;
-  const wrap = document.createElement("div");
-  wrap.className = "ov-cell" + (isTotal ? " plain" : "");
-  if (!isTotal) {
-    const bar = document.createElement("div");
-    bar.className = "ov-mix-bar";
-    bar.innerHTML = Charts.stackedBarH({
-      segments: [
-        { label: "Permanent", value: perm, color: "var(--chart-permanent)" },
-        { label: "On-call", value: oncall, color: "var(--chart-oncall)" },
-      ],
-      height: 12,
-    });
-    wrap.appendChild(bar);
-  }
-  const label = document.createElement("span");
-  label.className = "ov-cell-val ov-mix-label" + (isTotal ? "" : "");
-  label.textContent = `${perm} (${pctPerm}%) / ${oncall} (${pctOncall}%)`;
-  wrap.appendChild(label);
-  return wrap;
-}
-
-/* "By service area"'s pattern, generalised for a table column: bar length ~
-   total value, comparable across rows via a shared `scaleMax` (same
-   convention ovCompareTable's own plain numeric columns use — the column's
-   own max, computed by the caller since a custom `render` column bypasses
-   ovCompareTable's built-in maxOf pass). Segments split permanent/on-call;
-   the printed number is the plain TOTAL only — the per-type count and share
-   live in the bar's hover tooltip (Charts.stackedBarH already wires
-   data-tip-* into the shared #chart-tip panel), not as always-on text, so a
-   dense table doesn't repeat the same split as text in every row. */
-function splitCell(perm, oncall, scaleMax, isTotal, decimals) {
-  const total = perm + oncall;
-  const wrap = document.createElement("div");
-  wrap.className = "ov-cell" + (isTotal ? " plain" : "");
-  if (!isTotal) {
-    const bar = document.createElement("div");
-    bar.className = "ov-cell-bar";
-    bar.innerHTML = Charts.stackedBarH({
-      segments: [
-        { label: "Permanent", value: perm, color: "var(--chart-permanent)" },
-        { label: "On-call", value: oncall, color: "var(--chart-oncall)" },
-      ],
-      scaleMax, height: 8,
-    });
-    wrap.appendChild(bar);
-  }
-  const val = document.createElement("span");
-  val.className = "ov-cell-val";
-  val.textContent = decimals ? total.toFixed(decimals) : String(Math.round(total));
-  wrap.appendChild(val);
-  return wrap;
+/* A plain heading between Overview's groups of cards ("In detail", "Over
+   time"): tells the reader the time frame changes, without another box. */
+function ovGroupHead(title, subtitle) {
+  const head = document.createElement("div");
+  head.className = "ov-group-head";
+  head.appendChild(Object.assign(document.createElement("h2"), { textContent: title }));
+  if (subtitle) head.appendChild(Object.assign(document.createElement("span"), { className: "ov-group-sub", textContent: subtitle }));
+  return head;
 }
 
 /* ---------- Overview trend metrics: shared by the KPI sparkline and the
@@ -2758,20 +2592,61 @@ function aggregateMetricPoint(metric, d, boards, util) {
 function trendWindowDelta(series) {
   const vals = series.filter((v) => v != null);
   if (vals.length < 4) return null;
-  const k = Math.min(7, Math.floor(vals.length / 2));
+  const k = Math.min(5, Math.floor(vals.length / 2));
   const avg = (a) => a.reduce((s, x) => s + x, 0) / a.length;
   return { delta: Math.round(avg(vals.slice(-k)) - avg(vals.slice(-2 * k, -k))), k };
 }
 
 
-/* "" = every board summed. A board id that no longer exists (deleted in
-   another tab mid-session) falls back to all boards rather than an empty
-   chart. */
-function historyBoardsInScope(boards) {
-  const pick = state.overview.historyBoardId;
+/* ---------- Overview board scope (the selector at the top of the tab) ----------
+   "" = every board summed. A board id that no longer exists (deleted in
+   another tab mid-session, or remembered from an older session) falls back
+   to all boards rather than an empty dashboard. Remembered per device. */
+function ovBoardSaved() {   // also called while `state` is built, so the key is spelled out here
+  try { return localStorage.getItem("manpower.ovBoard") || ""; } catch (e) { return ""; }
+}
+function setOvBoard(id) {
+  state.overview.boardId = id;
+  try { localStorage.setItem("manpower.ovBoard", id); } catch (e) { /* storage unavailable — just don't remember it */ }
+  render();
+}
+function ovScopeBoards() {
+  const boards = D().boards;
+  const pick = state.overview.boardId;
   if (!pick) return boards;
   const one = boards.filter(b => b.id === pick);
   return one.length ? one : boards;
+}
+const ovScopeName = (boards) => boards.length === 1 && D().boards.length > 1 ? boards[0].name : "all boards";
+
+/* The selector itself: one pill per board plus "All boards", each with its
+   roster count for the date on screen. Pills rather than a <select> — with a
+   handful of boards every choice is visible and one tap away; past that the
+   row scrolls sideways on its own (styles.css) instead of wrapping into a wall. */
+function ovScopeBar(scope) {
+  const bar = document.createElement("div");
+  bar.className = "ov-scope-bar";
+  bar.setAttribute("role", "group");
+  bar.setAttribute("aria-label", "Board shown on the dashboard");
+  bar.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-label", textContent: "Board" }));
+  const pills = document.createElement("div");
+  pills.className = "ov-scope-pills";
+  const current = scope.length === 1 ? scope[0].id : "";
+  const pill = (id, label, count, color) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ov-scope-pill" + (id === current ? " active" : "");
+    btn.setAttribute("aria-pressed", id === current ? "true" : "false");
+    if (color) btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-table-dot" })).style.background = color;
+    btn.appendChild(document.createTextNode(label));   // board names are user data — never innerHTML
+    btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-count", textContent: String(count) }));
+    btn.onclick = () => { if (id !== current) setOvBoard(id); };
+    pills.appendChild(btn);
+  };
+  pill("", "All boards", D().employees.filter(onRoster).length);
+  D().boards.forEach((b, i) => pill(b.id, b.name, rosterEmployees(b.id).length, Charts.catColor(i)));
+  bar.appendChild(pills);
+  return bar;
 }
 /* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
    works carries no information, so it's dropped from the axis entirely
@@ -2882,35 +2757,11 @@ function historyControls() {
   dates.appendChild(mkDate("to", ov.historyTo));
   wrap.appendChild(dates);
 
-  const sel = document.createElement("select");
-  sel.className = "ov-history-board";
-  sel.setAttribute("aria-label", "History board scope");
-  const all = document.createElement("option");
-  all.value = ""; all.textContent = "All boards";
-  sel.appendChild(all);
-  for (const b of D().boards) {
-    const opt = document.createElement("option");
-    opt.value = b.id;
-    opt.textContent = b.name;      // board names are user data — textContent, never innerHTML
-    sel.appendChild(opt);
-  }
-  sel.value = ov.historyBoardId;
-  // no cache reset: ensureHistoryLoaded always fetches every board for the
-  // range, so narrowing the scope is a redraw, not a round trip
-  sel.onchange = () => { ov.historyBoardId = sel.value; render(); };
-  wrap.appendChild(sel);
+  // No board <select> here any more: the board selector at the top of the tab
+  // scopes History too, so the page can't show one board above and another
+  // here. ensureHistoryLoaded still fetches every board for the range, so
+  // switching boards up there is a redraw, not a round trip.
 
-  // Utilization is a % (0-100), not a headcount — it can't share an axis with
-  // the other six measures without either one becoming unreadable, so it's a
-  // MODE switch rather than a seventh toggleable legend entry: on, the chart
-  // is one Utilization line; off, it's back to the deployment measures.
-  const utilBtn = document.createElement("button");
-  utilBtn.type = "button";
-  utilBtn.className = "btn btn-small ov-history-util-toggle" + (ov.historyShowUtil ? " active" : "");
-  utilBtn.textContent = "% Utilization";
-  utilBtn.title = ov.historyShowUtil ? "Back to deployment measures" : "Show utilization instead of headcounts";
-  utilBtn.onclick = () => { ov.historyShowUtil = !ov.historyShowUtil; render(); };
-  wrap.appendChild(utilBtn);
   return wrap;
 }
 
@@ -2918,870 +2769,628 @@ function historyControls() {
 function historyRangeCaption(dates) {
   const ov = state.overview;
   const span = `${fmtDate(ov.historyFrom)} → ${fmtDate(ov.historyTo)}`;
-  const scope = ov.historyBoardId
-    ? (D().boards.find(b => b.id === ov.historyBoardId) || {}).name || "one board"
-    : "all boards";
-  return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${scope}`;
+  return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${ovScopeName(ovScopeBoards())}`;
 }
 
-/* ---------- History chart (measures + colours: HISTORY_MEASURES, top of file) ---------- */
+/* ---------- History: four average tiles, one measure charted at a time ----------
+   One measure per chart, on its own axis: six lines on one scale squashed
+   Missions (~4) flat under Idle (~28). The tiles answer most visits on their
+   own; picking one draws that measure day by day with its average as a rule. */
 function historySection(dates, recs, pendingCharts) {
   const ov = state.overview;
-  const sec = document.createElement("section");
-  sec.className = "ov-section";
-  const head = document.createElement("div");
-  head.className = "ov-trend-head";
-  const introText = ov.historyShowUtil
-    ? `Daily utilization over a chosen range. ${escapeHtml(historyRangeCaption(dates))}. Weekends and holidays are left off the axis and out of the average.`
-    : `Daily deployment over a chosen range. ${escapeHtml(historyRangeCaption(dates))}. Weekends and holidays are left off the axis and out of the averages.`;
-  head.innerHTML = `<div class="ov-trend-intro"><h3>History</h3><p class="ov-section-sub">${introText}</p></div>`;
-  head.appendChild(historyControls());
-  sec.appendChild(head);
+  const sec = ovSection("History", null);
+  sec.querySelector("h3").insertAdjacentHTML("afterend",
+    `<p class="ov-section-sub">Daily averages over the range. Pick a tile to see that measure day by day. Weekends and holidays are left out.</p>`);
+  sec.appendChild(historyControls());
+  if (!dates.length) {
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No working days in this range — every date was a weekend or a holiday." }));
+    return sec;
+  }
+  const lastIdx = recs.map((r, i) => (r ? i : -1)).filter(i => i >= 0).pop();
+  const latestWord = ov.historyTo === todayStr() ? "today" : `on ${fmtDate(dates[dates.length - 1])}`;
+  const tiles = document.createElement("div");
+  tiles.className = "ov-htiles";
+  tiles.setAttribute("role", "group");
+  tiles.setAttribute("aria-label", "History measure");
+  for (const m of OV_HISTORY_MEASURES) {
+    const values = recs.map(r => (r ? m.value(r) : null));
+    const mean = historyMean(values);
+    const latest = lastIdx != null ? values[lastIdx] : null;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ov-htile";
+    btn.setAttribute("aria-pressed", String(ov.historyMeasure === m.key));
+    btn.innerHTML = `<span class="ov-htile-label">${m.label}</span>
+      <span class="ov-htile-value">${mean == null ? "—" : mean + m.suffix}<small> avg</small></span>
+      <span class="ov-htile-sub">${latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}`}</span>`;
+    btn.onclick = () => { if (ov.historyMeasure !== m.key) { ov.historyMeasure = m.key; render(); } };
+    tiles.appendChild(btn);
+  }
+  sec.appendChild(tiles);
 
+  const m = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
+  const values = recs.map(r => (r ? m.value(r) : null));
+  const mean = historyMean(values);
+  const box = document.createElement("div");
+  box.className = "ov-hchart";
+  box.innerHTML = `<div class="ov-hchart-head"><b>${m.label}, day by day</b></div>`;
   const wrap = document.createElement("div");
   wrap.className = "ov-trend-chart";
-  sec.appendChild(wrap);
-
-  if (!dates.length) {
-    wrap.innerHTML = `<p class="import-note">No working days in this range — every date was a weekend or a holiday.</p>`;
-    return sec;
-  }
-
-  if (ov.historyShowUtil) {
-    // Single fixed line, not a legend-toggleable measure — utilizationPct's
-    // own free-on-call exclusion already lives inside trendMetricValue, so
-    // this is the exact same number the KPI tile and By-board table show for
-    // any date in range, just plotted across the whole window.
-    const values = recs.map(r => (r ? trendMetricValue("util", r) : null));
-    const mean = historyMean(values);
-    pendingCharts.push(() => fillLineChart(wrap, {
-      series: [{ key: "util", label: "Utilization", color: "var(--chart-assigned)", visible: true,
-                 points: values.map(y => ({ y, suffix: "%" })) }],
-      xLabels: dates.map(shortDateLabel), yMax: 100, height: 240,
-      refLines: mean != null ? [{ y: mean, color: "var(--chart-assigned)", label: "avg" }] : [],
-      emptyLabel: "No data in this range",
-    }));
-    const utilAvgs = document.createElement("div");
-    utilAvgs.className = "ov-history-avgs";
-    utilAvgs.appendChild(Object.assign(document.createElement("span"),
-      { className: "ov-history-avgs-label", textContent: "Daily average" }));
-    utilAvgs.appendChild(statChip("Utilization", mean == null ? "—" : mean + "%", "var(--chart-assigned)"));
-    sec.appendChild(utilAvgs);
-    return sec;
-  }
-
-  const visibleMeasures = HISTORY_MEASURES.filter(m => !ov.historyHidden.has(m.key));
-  const valuesOf = (m) => recs.map(r => (r ? m.value(r) : null));
-  const series = HISTORY_MEASURES.map(m => ({
-    key: m.key, label: m.label, color: m.color,
-    visible: !ov.historyHidden.has(m.key),
-    points: valuesOf(m).map(y => ({ y })),
-  }));
-  const yMax = Charts.niceMax(series.filter(s => s.visible).flatMap(s => s.points.map(p => p.y)));
-  // A dashed mean rule only when ONE measure is on screen: with four lines up,
-  // four dashed rules is another four lines to read. The chips below carry
-  // every visible measure's average either way.
-  const refLines = visibleMeasures.length === 1
-    ? [{ y: historyMean(valuesOf(visibleMeasures[0])), color: visibleMeasures[0].color, label: "avg" }]
-    : [];
+  box.appendChild(wrap);
+  sec.appendChild(box);
   pendingCharts.push(() => fillLineChart(wrap, {
-    series, xLabels: dates.map(shortDateLabel), yMax, height: 240, refLines,
-    emptyLabel: "No measures selected — click a legend entry to show one",
+    series: [{ key: m.key, label: m.label, color: "var(--chart-assigned)", visible: true, points: values.map(y => ({ y, suffix: m.suffix })) }],
+    xLabels: dates.map(shortDateLabel), yMax: Charts.niceMax(values.filter(v => v != null)), height: 220,
+    refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: "avg" }] : [],
+    emptyLabel: "No data in this range",
   }));
-
-  sec.appendChild(Charts.legendEl(
-    HISTORY_MEASURES.map(m => ({ key: m.key, label: m.label, color: m.color, muted: ov.historyHidden.has(m.key) })),
-    (key) => {
-      ov.historyHidden.has(key) ? ov.historyHidden.delete(key) : ov.historyHidden.add(key);
-      render();
-    }
-  ));
-
-  const avgs = document.createElement("div");
-  avgs.className = "ov-history-avgs";
-  avgs.appendChild(Object.assign(document.createElement("span"),
-    { className: "ov-history-avgs-label", textContent: "Daily average" }));
-  for (const m of visibleMeasures) {
-    const mean = historyMean(valuesOf(m));
-    avgs.appendChild(statChip(m.label, mean == null ? "—" : mean, m.color));
-  }
-  if (visibleMeasures.length) sec.appendChild(avgs);
   return sec;
 }
 
-/* ---------- Engineer workload chart ----------
-   Deliberately its OWN chart rather than more series on History above: the
-   question is different (how load is spread BETWEEN people, not how the
-   operation moved as a whole), and merging them would put six org measures
-   and every engineer on one axis. It shares History's range control and
-   History's single fetch, so the two still read as one block.
-   This is also the only genuinely historical breakdown on the page: an
+/* A small crew-per-day trend for one engineer row: area + line + today's dot,
+   on a scale shared by every row, with a hover/focus target per day (the
+   tooltip says that day's missions and crew split). */
+function ovTrendSvg(values, tips, yMax, width = 120, height = 28) {
+  const pad = 4, n = values.length;
+  const x = (i) => pad + (n <= 1 ? 0 : (i * (width - 2 * pad)) / (n - 1));
+  const y = (v) => pad + (height - 2 * pad) * (1 - v / (yMax || 1));
+  const d = values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  let out = `<line x1="${pad}" x2="${width - pad}" y1="${height - pad}" y2="${height - pad}" class="chart-grid"/>`;
+  if (n > 1) out += `<path d="${d} L${x(n - 1).toFixed(1)} ${height - pad} L${x(0).toFixed(1)} ${height - pad} Z" fill="var(--chart-assigned)" opacity=".13"/>`
+    + `<path d="${d}" fill="none" stroke="var(--chart-assigned)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" class="chart-line"/>`;
+  if (n) out += `<circle cx="${x(n - 1).toFixed(1)}" cy="${y(values[n - 1]).toFixed(1)}" r="3" fill="var(--chart-assigned)" stroke="var(--panel)" stroke-width="1.5"/>`;
+  const step = n > 1 ? (width - 2 * pad) / (n - 1) : width;
+  values.forEach((v, i) => {
+    out += `<rect class="chart-mark" x="${(x(i) - step / 2).toFixed(1)}" y="0" width="${step.toFixed(1)}" height="${height}" fill="transparent"
+      data-tip-value="${escapeHtml(tips[i].value)}" data-tip-label="${escapeHtml(tips[i].label)}"><title>${escapeHtml(tips[i].label)}: ${escapeHtml(tips[i].value)}</title></rect>`;
+  });
+  return `<svg class="chart-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="crew per day">${out}</svg>`;
+}
+
+/* Shares that always add up to 100 (largest remainder) — plain rounding gave
+   88% + 13% on a two-engineer board. */
+function shares100(raw) {
+  const total = raw.reduce((a, b) => a + b, 0);
+  if (!total) return raw.map(() => 0);
+  const exact = raw.map(v => (v / total) * 100), out = exact.map(Math.floor);
+  exact.map((v, i) => [v - out[i], i]).sort((a, b) => b[0] - a[0])
+    .slice(0, 100 - out.reduce((a, b) => a + b, 0)).forEach(([, i]) => out[i]++);
+  return out;
+}
+
+/* ---------- Engineer workload: ranked bars + trend, missions and crew together ----------
+   One row per engineer over the History range, busiest first: missions per
+   day, crew per day split permanent / on-call (the team mix a manager asks
+   about), crew per mission, a crew trend, active days and share of missions.
    engineer_id lives on the mission row for its own date, so these are the
-   people who actually ran those jobs — unlike headcount, which
-   getUtilizationRange can only reconstruct from today's board membership. */
-const ENG_METRICS = { missions: "Missions", crew: "Crew deployed" };
-function engineerHistorySection(dates, recs, pendingCharts) {
-  const ov = state.overview;
-  const sec = document.createElement("section");
-  sec.className = "ov-section";
-  const head = document.createElement("div");
-  head.className = "ov-trend-head";
-  head.innerHTML = `<div class="ov-trend-intro"><h3>Engineer workload</h3>` +
-    `<p class="ov-section-sub">Same range as History above. A mission counts on the day it ran, ` +
-    `for the engineer it was assigned to at the time.</p></div>`;
-  const metricBtns = document.createElement("div");
-  metricBtns.className = "ov-trend-btns";
-  for (const key of Object.keys(ENG_METRICS)) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn btn-small" + (ov.engMetric === key ? " active" : "");
-    btn.textContent = ENG_METRICS[key];
-    btn.onclick = () => { if (ov.engMetric === key) return; ov.engMetric = key; render(); };
-    metricBtns.appendChild(btn);
-  }
-  head.appendChild(metricBtns);
-  sec.appendChild(head);
-
-  // every engineer gets a line, including a flat zero — "who was free all
-  // month" is the other half of "who was loaded". The no-engineer entry
-  // appears only if some staffed mission in the range genuinely had none.
-  const entities = D().engineers.map(e => ({ id: e.id, label: e.name, color: e.color }));
-  if (recs.some(r => r && r.byEngineer[""])) {
-    entities.push({ id: "", label: "— no engineer set —", color: "var(--muted)" });
-  }
-  if (!entities.length) {
-    sec.appendChild(Object.assign(document.createElement("p"),
-      { className: "import-note", textContent: "No engineers defined yet — add them under Settings." }));
-    return sec;
-  }
-
-  const wrap = document.createElement("div");
-  wrap.className = "ov-trend-chart";
-  sec.appendChild(wrap);
-  if (!dates.length) {
-    wrap.innerHTML = `<p class="import-note">No working days in this range — every date was a weekend or a holiday.</p>`;
-    return sec;
-  }
-
-  // one pass: per-engineer daily series for the chart, and the totals the
-  // summary table needs, rather than walking `recs` once per column
-  const daily = {};      // engineer id -> number[] aligned to `dates`
-  const totals = {};     // engineer id -> {missions, crew, permCrew, oncallCrew, activeDays, peak, peakDate}
-  for (const ent of entities) {
-    daily[ent.id] = [];
-    totals[ent.id] = { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0, activeDays: 0, peak: 0, peakDate: null };
-  }
-  dates.forEach((d, i) => {
-    for (const ent of entities) {
-      const rec = recs[i];
-      const v = (rec && rec.byEngineer[ent.id]) || { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0 };
-      daily[ent.id].push(rec ? v[ov.engMetric] : null);
-      const t = totals[ent.id];
-      t.missions += v.missions;
-      t.crew += v.crew;
-      t.permCrew += v.permCrew || 0;
-      t.oncallCrew += v.oncallCrew || 0;
-      if (v.missions > 0) t.activeDays++;
-      if (v.missions > t.peak) { t.peak = v.missions; t.peakDate = d; }
-    }
-  });
-
-  const series = entities.map(ent => ({
-    key: ent.id, label: ent.label, color: ent.color,
-    visible: !ov.engHidden.has(ent.id),
-    points: daily[ent.id].map(y => ({ y })),
-  }));
-  const yMax = Charts.niceMax(series.filter(s => s.visible).flatMap(s => s.points.map(p => p.y)));
-  pendingCharts.push(() => fillLineChart(wrap, {
-    series, xLabels: dates.map(shortDateLabel), yMax, height: 240,
-    emptyLabel: "No engineers selected — click a legend entry to show one",
-  }));
-  sec.appendChild(Charts.legendEl(
-    entities.map(ent => ({ key: ent.id, label: ent.label, color: ent.color, muted: ov.engHidden.has(ent.id) })),
-    (key) => {
-      ov.engHidden.has(key) ? ov.engHidden.delete(key) : ov.engHidden.add(key);
-      render();
-    }
-  ));
-
-  /* Summary table. Averages alone rank people; the other three columns say
-     what the ranking is made of — crew/mission separates "many small jobs"
-     from "a few big ones" (two engineers on the same mission count can be
-     carrying very different loads), active days separates steady from
-     spiky, and share is the load-balance read. */
+   people who actually ran those jobs — and byEngineer already carries the
+   permanent / on-call split, so nothing extra is fetched. */
+function engineerHistorySection(dates, recs) {
+  const sec = ovSection("Engineer workload", "Missions each engineer ran and the people they had out, per working day, busiest first. Same range and board as History.");
   const n = dates.length;
-  const grandMissions = Object.values(totals).reduce((a, t) => a + t.missions, 0);
-  const round1 = (x) => Math.round(x * 10) / 10;
-  const engRows = entities.map(ent => {
-    const t = totals[ent.id];
+  const engById = new Map(D().engineers.map(e => [e.id, e]));
+  const ids = new Set();
+  for (const r of recs) if (r) for (const id in r.byEngineer) if (r.byEngineer[id].missions) ids.add(id);
+  if (!n || !ids.size) {
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions in this range." }));
+    return sec;
+  }
+  const tot = (a) => a.reduce((s, v) => s + v, 0);
+  const rows = [...ids].map(id => {
+    const e = engById.get(id);
+    const day = (k) => recs.map(r => (r && r.byEngineer[id] ? r.byEngineer[id][k] || 0 : 0));
+    const m = day("missions"), c = day("crew"), p = day("permCrew"), o = day("oncallCrew");
     return {
-      key: ent.id, label: ent.label, color: ent.color,
-      sub: t.peakDate ? `peak ${t.peak} mission${t.peak === 1 ? "" : "s"} on ${shortDateLabel(t.peakDate)}` : "no missions in range",
-      values: {
-        avgMissions: round1(t.missions / n),
-        avgCrew: round1(t.crew / n),
-        avgPermCrew: round1(t.permCrew / n),
-        avgOncallCrew: round1(t.oncallCrew / n),
-        crewPer: t.missions ? round1(t.crew / t.missions) : 0,
-        activeDays: t.activeDays,
-        share: grandMissions ? Math.round((t.missions / grandMissions) * 100) : 0,
-      },
-      _sort: t.missions,
+      id, name: e ? e.name : (id ? "Removed engineer" : "— no engineer set —"), color: e ? e.color : "var(--muted)",
+      m, c, p, o, totM: tot(m), totC: tot(c),
+      avgM: tot(m) / n, avgC: tot(c) / n, avgP: tot(p) / n, avgO: tot(o) / n,
+      active: m.filter(v => v > 0).length,
     };
-  });
-  // shared scale for the Avg crew/day bar — computed BEFORE the total row is
-  // pushed below, same convention ovCompareTable's own numeric columns use
-  // (a total's bar would be full-width by definition, so it's excluded)
-  const avgCrewMax = Math.max(1, ...engRows.map(r => r.values.avgCrew));
-  engRows.sort((a, b) => b._sort - a._sort || b.values.avgCrew - a.values.avgCrew || a.label.localeCompare(b.label));
-  const grandCrew = Object.values(totals).reduce((a, t) => a + t.crew, 0);
-  const grandPermCrew = Object.values(totals).reduce((a, t) => a + t.permCrew, 0);
-  const grandOncallCrew = Object.values(totals).reduce((a, t) => a + t.oncallCrew, 0);
-  engRows.push({
-    key: "__total__", label: "All engineers", isTotal: true,
-    sub: `${n} working day${n === 1 ? "" : "s"}`,
-    values: {
-      avgMissions: round1(grandMissions / n),
-      avgCrew: round1(grandCrew / n),
-      avgPermCrew: round1(grandPermCrew / n),
-      avgOncallCrew: round1(grandOncallCrew / n),
-      crewPer: grandMissions ? round1(grandCrew / grandMissions) : 0,
-      activeDays: dates.filter((d, i) => recs[i] && recs[i].staffedMissions > 0).length,
-      share: grandMissions ? 100 : 0,
-    },
-  });
-  sec.appendChild(ovCompareTable({
-    cols: Object.assign([
-      { key: "avgMissions", label: "Avg missions/day" },
-      // Permanent/on-call split, not a bare average: two engineers with the
-      // same crew/day can be leaning on very different mixes of their own
-      // people vs. surge on-call. Bar length ~ avg crew (comparable across
-      // engineers, same convention "By service area" uses below); the count
-      // and share per type live in the bar's hover tooltip rather than as
-      // always-on text, so this stays a glanceable table, not a denser one.
-      { key: "avgCrew", label: "Avg crew/day", render: (r) => splitCell(r.values.avgPermCrew, r.values.avgOncallCrew, avgCrewMax, r.isTotal, 1) },
-      { key: "crewPer", label: "Crew / mission" },
-      // a count, not a rate: a bar scaled to the column max would draw the
-      // busiest engineer full-width whatever the real numbers were
-      { key: "activeDays", label: "Active days", plain: true },
-      { key: "share", label: "Share", meter: true },
-    ], { nameLabel: "Engineer" }),
-    rows: engRows,
-  }));
+  }).sort((a, b) => b.avgM - a.avgM || b.avgC - a.avgC || a.name.localeCompare(b.name));
+  const r1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
+  const maxM = Math.max(0.1, ...rows.map(r => r.avgM)), maxC = Math.max(0.1, ...rows.map(r => r.avgC));
+  const share = shares100(rows.map(r => r.totM));
+  const yMax = Math.max(1, ...rows.flatMap(r => r.c));
+  const bar = (frac) => `style="width:max(4px, calc(var(--ov-rkmax) * ${frac.toFixed(3)}))"`;
+  const T = rows.reduce((a, r) => ({ m: a.m + r.avgM, c: a.c + r.avgC, p: a.p + r.avgP, o: a.o + r.avgO, tm: a.tm + r.totM, tc: a.tc + r.totC }),
+    { m: 0, c: 0, p: 0, o: 0, tm: 0, tc: 0 });
+  const wrap = document.createElement("div");
+  wrap.className = "ov-table-wrap";
+  wrap.innerHTML = `<table class="ov-table ov-rank"><thead><tr>
+      <th>Engineer</th><th>Missions / day</th><th>Crew / day</th><th class="r ov-wide">Crew per mission</th>
+      <th class="ov-wide">Trend · crew per day</th><th class="r ov-wide">Active days</th><th class="r ov-wide">Share of missions</th></tr></thead><tbody>`
+    + rows.map((r, i) => `<tr>
+      <td><span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${escapeHtml(r.color)}"></span><span class="ov-table-label">${escapeHtml(r.name)}</span></span></td>
+      <td><span class="ov-rk-bar"><span ${bar(r.avgM / maxM)}>${Charts.stackedBarH({ segments: [{ label: `${r.name}: missions per day`, value: +r1(r.avgM), color: "var(--muted)" }], height: 10 })}</span><b>${r1(r.avgM)}</b></span>
+        <span class="ov-rk-sub">${r.totM} mission${r.totM === 1 ? "" : "s"} in the range</span></td>
+      <td><span class="ov-rk-bar"><span ${bar(r.avgC / maxC)}>${Charts.stackedBarH({ segments: [
+          { label: `${r.name}: permanent crew per day`, value: +r1(r.avgP), color: "var(--chart-permanent)" },
+          { label: `${r.name}: on-call crew per day`, value: +r1(r.avgO), color: "var(--chart-oncall)" }], height: 10 })}</span><b>${r1(r.avgC)}</b></span>
+        <span class="ov-rk-sub">${r1(r.avgP)} permanent · ${r1(r.avgO)} on-call</span></td>
+      <td class="r ov-wide">${r.totM ? r1(r.totC / r.totM) : "—"}</td>
+      <td class="ov-wide">${ovTrendSvg(r.c, dates.map((d, k) => ({
+          value: `${r.m[k]} mission${r.m[k] === 1 ? "" : "s"} · ${r.c[k]} crew`,
+          label: `${r.name} · ${fmtDate(d)} — ${r.p[k]} permanent · ${r.o[k]} on-call`,
+        })), yMax)}</td>
+      <td class="r ov-wide">${r.active} <span class="ov-muted">of ${n}</span></td>
+      <td class="r ov-wide">${share[i]}%</td></tr>`).join("")
+    + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td><b>${r1(T.m)}</b></td>
+      <td><b>${r1(T.c)}</b> <span class="ov-muted">· ${r1(T.p)} permanent · ${r1(T.o)} on-call</span></td>
+      <td class="r ov-wide"><b>${T.tm ? r1(T.tc / T.tm) : "—"}</b></td><td class="ov-wide"></td><td class="ov-wide"></td><td class="r ov-wide"><b>100%</b></td></tr>`
+    + `</tbody></table>`;
+  sec.appendChild(wrap);
+  sec.appendChild(ovLegend([
+    { label: "Missions", color: "var(--muted)" },
+    { label: "Permanent crew", color: "var(--chart-permanent)" },
+    { label: "On-call crew", color: "var(--chart-oncall)" },
+  ]));
   return sec;
+}
+
+/* A plain, non-interactive legend: a swatch and a label (optionally a count). */
+function ovLegend(items) {
+  const el = document.createElement("div");
+  el.className = "ov-legend";
+  el.innerHTML = items.map(it => `<span><i style="background:${escapeHtml(it.color)}"></i>${
+    it.count == null ? escapeHtml(it.label) : it.countFirst ? `<b>${it.count}</b> ${escapeHtml(it.label)}` : `${escapeHtml(it.label)} <b>${it.count}</b>`}</span>`).join("");
+  return el;
 }
 
 function renderOverview() {
   const panel = $("#overview-panel");
   panel.innerHTML = "";
-  const boards = D().boards;
-  if (!boards.length) {
+  const allBoards = D().boards;
+  if (!allBoards.length) {
     panel.innerHTML = '<p class="import-note">Create a board (+ Board, top left) to see the Overview dashboard.</p>';
     return;
   }
+  // The board selector at the top scopes the WHOLE page: every section below
+  // reads `boards`, never D().boards, so picking one board can't leave a
+  // stray all-boards number somewhere further down.
+  const boards = ovScopeBoards();
+  const scoped = boards.length !== allBoards.length;
+  const scopeName = ovScopeName(boards);
+  const dayLabel = `${fmtDow(state.date)} ${fmtDate(state.date)}`;
   const stats = Object.fromEntries(boards.map(b => [b.id, boardStats(b.id)]));
-  const boardColor = (i) => Charts.catColor(i);
-  // charts that need their container's real width are drawn after the whole
-  // panel is in the document (see fillLineChart)
+  // a board keeps its colour whichever board is picked (index in the full list)
+  const boardColor = (b) => Charts.catColor(allBoards.indexOf(b));
+  const sum = (k) => boards.reduce((s, b) => s + stats[b.id][k], 0);
   const pendingCharts = [];
-  const makeMini = (emp, b) => {
-    const area = D().areas.find(a => a.id === emp.areaId);
-    const mini = document.createElement("span");
-    // same identity rule as the board cards: white = permanent, grey dashed = on-call
-    mini.className = "ov-mini" + (emp.contract === "oncall" ? " oncall" : "");
-    mini.textContent = area ? `${emp.name} · ${area.name}` : emp.name;
-    mini.title = `${emp.contract === "oncall" ? "On-call" : "Permanent"} • ${area ? area.name : "?"} — click to open ${b.name}`;
-    mini.onclick = () => { D().activeBoardId = b.id; refreshAndRender(); };
-    return mini;
+  const openBoard = (boardId) => { D().activeBoardId = boardId; refreshAndRender(); };
+  const multiArea = D().areas.length > 1;
+  const areaById = new Map(D().areas.map(a => [a.id, a]));
+  // a name chip: same identity rule as the board cards (white = permanent,
+  // grey dashed = on-call); the service area rides along only when there is
+  // more than one area to tell apart
+  const nameChip = (emp, b) => {
+    const area = areaById.get(emp.areaId);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "ov-mini" + (emp.contract === "oncall" ? " oncall" : "");
+    chip.textContent = emp.name;
+    if (multiArea && area) chip.appendChild(Object.assign(document.createElement("small"), { textContent: area.name }));
+    chip.title = `${emp.contract === "oncall" ? "On-call" : "Permanent"}${area ? " · " + area.name : ""} — click to open ${b.name}`;
+    chip.onclick = () => openBoard(b.id);
+    return chip;
   };
 
   // roster for the date on screen — boardStats() is already roster-filtered, so
-  // these global totals have to use the same set or the KPI strip, the By board
-  // table and every utilization denominator disagree by however many people are
+  // these totals have to use the same set or the KPI strip, the By board table
+  // and every utilization denominator disagree by however many people are
   // currently deactivated. (Past dates keep everyone; see onRoster().)
-  const rosterAll = D().employees.filter(onRoster);
+  const rosterAll = scoped ? boards.flatMap(b => rosterEmployees(b.id)) : D().employees.filter(onRoster);
   const totalEmp = rosterAll.length;
-  const totalAssigned = boards.reduce((s, b) => s + stats[b.id].assigned, 0);
-  const totalLeave = boards.reduce((s, b) => s + stats[b.id].leave, 0);
-  const totalStandby = boards.reduce((s, b) => s + stats[b.id].standby, 0);
-  const totalOnHoliday = boards.reduce((s, b) => s + stats[b.id].onHoliday, 0);
-  const totalOncallFree = boards.reduce((s, b) => s + stats[b.id].oncallAvailable, 0);
-  const totalMissions = boards.reduce((s, b) => s + stats[b.id].missions, 0);
+  const totalAssigned = sum("assigned"), totalLeave = sum("leave"), totalStandby = sum("standby");
+  const totalOnHoliday = sum("onHoliday"), totalOncallFree = sum("oncallAvailable"), totalMissions = sum("missions");
   const totalPerm = rosterAll.filter(e => e.contract === "permanent").length;
   const totalOncall = totalEmp - totalPerm;
   const overallUtil = utilizationPct(totalAssigned, totalEmp, totalLeave, totalOnHoliday, totalOncallFree);
-  const totalDayCrew = boards.reduce((s, b) => s + stats[b.id].dayMissions, 0);     // headcount, not mission count — see boardStats
-  const totalNightCrew = boards.reduce((s, b) => s + stats[b.id].nightMissions, 0);
+  const totalDayCrew = sum("dayMissions"), totalNightCrew = sum("nightMissions");   // headcount, not mission count — see boardStats
 
-  // today's missions, read straight from the plan cache (no extra query) —
-  // used by the KPI strip, the status bar's shift chips, Day/night split and
-  // Host coverage risk below.
-  const todaysMissions = boards.flatMap(b => peekPlan(b.id).missions.filter(m => !m.hidden));
+  // today's missions, read straight from the plan cache (no extra query)
+  const missionsOf = (b) => peekPlan(b.id).missions.filter(m => !m.hidden);
+  const todaysMissions = boards.flatMap(missionsOf);
   const todaysDayCount = todaysMissions.filter(m => m.shift !== "night").length;
-  const todaysNightCount = todaysMissions.filter(m => m.shift === "night").length;
+  const todaysNightCount = todaysMissions.length - todaysDayCount;
   const todaysHosts = [...new Set(todaysMissions.map(m => m.host))];
   const todaysEngineers = new Set(todaysMissions.filter(m => m.engineerId).map(m => m.engineerId));
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-  /* ---------- trend data for the KPI tile's sparkline ----------
-     Ends on state.date, not real-world "today" — the KPI headline above it
-     and every other number on this page (By board, Action queue, ...) are
-     already state.date's numbers, so anchoring the sparkline to a DIFFERENT
-     date (real today) would make it silently describe a different timeline
-     the moment someone browsed to another day. One date for the whole page. */
+  /* ---------- KPI sparkline data ----------
+     Ends on state.date, not real-world "today" — every other number on this
+     page is state.date's, so the sparkline must describe the same timeline. A
+     date nobody in scope works is left off the axis entirely. */
   const util = state.overview.util || {};
   const toDate = state.date;
   const fromDate = addDays(toDate, -(state.overview.trendRange - 1));
-  // A date nobody works — every board's weekend or a shared holiday — is left
-  // OUT of the x-axis entirely, so the line runs straight from Friday to Monday
-  // instead of leaving a weekly hole that carries no information. A date where
-  // at least one board works stays on the axis: that board plots its point and
-  // the boards that are off gap individually (their y is null below), which is
-  // real information — one site working while another is closed.
   const xDates = [];
   for (let d = fromDate; d <= toDate; d = addDays(d, 1)) {
     if (boards.every(b => isNonWorkingDate(d, b.id))) continue;
     xDates.push(d);
   }
-  const noWorkingDays = !xDates.length;
   const utilSpark = xDates.map(d => aggregateMetricPoint("util", d, boards, util));
   const utilDelta = trendWindowDelta(utilSpark);
 
-  /* ---------- 1. status bar: the verdict, before any number ----------
-     Amber + "needs attention" only when someone is actually idle; otherwise a
-     calm confirmation, same tone as the tick empty-state elsewhere on this page. */
-  const statusBar = document.createElement("div");
-  statusBar.className = "ov-status-bar";
-  statusBar.style.borderLeftColor = totalStandby ? "var(--warn)" : "var(--ok-text)";
-  const statusMain = document.createElement("div");
-  statusMain.className = "ov-status-main";
-  const statusHeading = document.createElement("div");
-  statusHeading.className = "ov-status-heading";
-  statusHeading.innerHTML = `<span class="ov-status-title">${totalStandby ? "Needs attention today" : "All permanent staff assigned"}</span>` +
-    `<span class="ov-status-date">${fmtDow(state.date)} ${fmtDate(state.date)} · ${boards.length} board${boards.length === 1 ? "" : "s"}</span>`;
-  statusMain.appendChild(statusHeading);
-  const statusLine = document.createElement("div");
-  statusLine.className = "ov-status-line";
-  statusLine.innerHTML = totalStandby
-    ? `<b>${totalStandby} permanent staff idle</b> · ${totalOncallFree} on-call available (normal)`
-    : `${totalOncallFree} on-call available (normal)`;
-  statusMain.appendChild(statusLine);
-  statusBar.appendChild(statusMain);
-  const statusShifts = document.createElement("div");
-  statusShifts.className = "ov-status-shifts";
-  statusShifts.appendChild(statChip("Day", todaysDayCount));
-  statusShifts.appendChild(statChip("Night", todaysNightCount, null, "stat-chip-night"));
-  statusBar.appendChild(statusShifts);
-  if (can("ov.status")) panel.appendChild(statusBar);
-
-  /* ---------- 2. KPI strip: four numbers, each with something to judge it
-     against — a sparkline+delta, a segmented bar, or a plain breakdown line.
-     A bare "89%" can't be read as good or bad; the 14 days behind it are
-     already fetched for the Trend chart below, so spending a few of those
-     pixels on a sparkline is free. ---------- */
-  const kpiRow = document.createElement("div");
-  kpiRow.className = "ov-kpi-row";
-
-  // tile 1: overall utilization
-  const utilTile = document.createElement("div");
-  utilTile.className = "ov-kpi-tile";
-  utilTile.innerHTML = `
-    <div class="ov-kpi-head">
-      <div><div class="ov-kpi-value">${overallUtil}%</div><div class="ov-kpi-label">Overall utilization</div></div>
-    </div>
-    <div class="ov-kpi-breakdown"></div>`;
-  if (!noWorkingDays && utilSpark.some(v => v != null)) {
-    utilTile.querySelector(".ov-kpi-head").appendChild(
-      Object.assign(document.createElement("div"), { innerHTML: Charts.sparkline({ points: utilSpark }) }).firstChild);
-  }
-  const utilSubEl = utilTile.querySelector(".ov-kpi-breakdown");
-  if (utilDelta) {
-    const dir = utilDelta.delta > 0 ? "up" : utilDelta.delta < 0 ? "down" : "";
-    const arrow = utilDelta.delta > 0 ? "▲" : utilDelta.delta < 0 ? "▼" : "▬";
-    utilSubEl.innerHTML = `<b class="${dir}">${arrow} ${Math.abs(utilDelta.delta)} pt${Math.abs(utilDelta.delta) === 1 ? "" : "s"}</b> vs the previous ${utilDelta.k} days · ${state.overview.trendRange}-day trend`;
-  } else {
-    utilSubEl.textContent = "assigned ÷ (headcount − leave − holiday − free on-call)";
-  }
-  kpiRow.appendChild(utilTile);
-
-  // tile 2: deployed on a mission — segmented by what's keeping the rest away
-  const deployTile = document.createElement("div");
-  deployTile.className = "ov-kpi-tile";
-  const deploySegs = [
-    { label: "Deployed", value: totalAssigned, color: "var(--chart-assigned)" },
-    { label: "Leave", value: totalLeave, color: "var(--chart-leave)" },
-    { label: "Idle", value: totalStandby, color: "var(--chart-standby)" },
-  ];
-  if (totalOnHoliday) deploySegs.push({ label: "Holiday", value: totalOnHoliday, color: "var(--chart-holiday)" });
-  deploySegs.push({ label: "On-call free", value: totalOncallFree, color: "var(--muted)" });
-  const deploySubParts = [`${totalAssigned} deployed`, `${totalLeave} leave`, `${totalStandby} idle`];
-  if (totalOnHoliday) deploySubParts.push(`${totalOnHoliday} holiday`);
-  deploySubParts.push(`${totalOncallFree} on-call free`);
-  deployTile.innerHTML = `
-    <div class="ov-kpi-value">${totalAssigned}<span class="ov-kpi-value-sub"> / ${totalEmp}</span></div>
-    <div class="ov-kpi-label">Deployed on a mission</div>
-    <div class="ov-kpi-mixbar"></div>
-    <div class="ov-kpi-breakdown">${escapeHtml(deploySubParts.join(" · "))}</div>`;
-  deployTile.querySelector(".ov-kpi-mixbar").innerHTML = Charts.stackedBarH({ segments: deploySegs, height: 8 });
-  kpiRow.appendChild(deployTile);
-
-  // tile 3: missions today — no unstaffed callout here (see Action queue note below)
-  const missionsTile = document.createElement("div");
-  missionsTile.className = "ov-kpi-tile";
-  missionsTile.innerHTML = `
-    <div class="ov-kpi-value">${totalMissions}</div>
-    <div class="ov-kpi-label">Missions today</div>
-    <div class="ov-kpi-breakdown">${todaysDayCount} day · ${todaysNightCount} night · ${todaysHosts.length} host${todaysHosts.length === 1 ? "" : "s"} · ${todaysEngineers.size} engineer${todaysEngineers.size === 1 ? "" : "s"}</div>`;
-  kpiRow.appendChild(missionsTile);
-
-  // tile 4: on-call available — "not free" (deployed or on leave) vs free
-  const oncallNotFree = Math.max(0, totalOncall - totalOncallFree);
-  const oncallTile = document.createElement("div");
-  oncallTile.className = "ov-kpi-tile";
-  oncallTile.innerHTML = `
-    <div class="ov-kpi-value">${totalOncallFree}</div>
-    <div class="ov-kpi-label">On-call available</div>
-    <div class="ov-kpi-meter">
-      <div class="ov-kpi-meter-track"></div>
-      <span class="ov-kpi-meter-val">${oncallNotFree}/${totalOncall} not free</span>
-    </div>
-    <div class="ov-kpi-breakdown">Surge capacity — uncalled is normal, not idle</div>`;
-  oncallTile.querySelector(".ov-kpi-meter-track").innerHTML = Charts.stackedBarH({
-    segments: [
-      { label: "Not free", value: oncallNotFree, color: "var(--chart-oncall)" },
-      { label: "Free", value: totalOncallFree, color: "var(--muted)" },
-    ], height: 8,
-  });
-  kpiRow.appendChild(oncallTile);
-  if (can("ov.kpi")) panel.appendChild(kpiRow);
-
-  /* ---------- 3. action queue: permanent staff with no mission today. On-call
-     free is surge capacity working as intended, not an exception — it stays
-     calm and collapsed rather than sharing top billing with the amber box.
-     Missions with no crew are NOT listed here on purpose: for this team an
-     unstaffed mission is normal, not something the dashboard should flag. ---------- */
-  const actionSec = ovSection("Action queue", "Permanent staff with no mission today. Click any chip to jump to their board.");
-  if (totalStandby) {
-    const box = document.createElement("div");
-    box.className = "ov-avail";
-    const idleSub = boards.filter(b => stats[b.id].standby)
-      .map(b => `${b.name} ${stats[b.id].standby}`).join(" · ");
-    box.innerHTML = `
-      <div class="ov-avail-head">
-        <span class="ov-avail-title">${icon("alert")}${totalStandby} permanent staff not assigned yet</span>
-        <span class="ov-avail-sub">${escapeHtml(idleSub)}</span>
-      </div>
-      <div class="ov-avail-cards"></div>`;
-    const cardsBox = box.querySelector(".ov-avail-cards");
-    const idleAll = boards.flatMap(b => stats[b.id].availableList.map(emp => ({ emp, board: b })))
-      .sort((a, b) => a.emp.name.localeCompare(b.emp.name));
-    for (const { emp, board } of idleAll) cardsBox.appendChild(makeMini(emp, board));
-    actionSec.appendChild(box);
-  } else {
-    actionSec.appendChild(Object.assign(document.createElement("p"),
-      { className: "ov-avail ov-avail-ok", textContent: "Everyone permanent is placed on every board." }));
-  }
-  const oncallAll = boards.flatMap(b => stats[b.id].oncallAvailableList.map(emp => ({ emp, board: b })))
-    .sort((a, b) => a.emp.name.localeCompare(b.emp.name));
-  if (oncallAll.length) {
-    const calmBox = document.createElement("div");
-    calmBox.className = "ov-avail ov-avail-calm";
-    const open = state.overview.oncallQueueOpen;
-    calmBox.innerHTML = `
-      <div class="ov-avail-calm-row">
-        <span class="ov-avail-calm-text">${oncallAll.length} on-call staff available and not called — surge capacity, no action needed</span>
-        <button type="button" class="ov-avail-toggle">${open ? "Hide ▴" : "Show ▾"}</button>
-      </div>
-      <div class="ov-avail-cards${open ? "" : " hidden"}"></div>`;
-    calmBox.querySelector(".ov-avail-toggle").onclick = () => {
-      state.overview.oncallQueueOpen = !state.overview.oncallQueueOpen;
-      render();
-    };
-    if (open) {
-      const cardsBox = calmBox.querySelector(".ov-avail-cards");
-      for (const { emp, board } of oncallAll) cardsBox.appendChild(makeMini(emp, board));
+  /* ---------- 2. attention card: the verdict, the day's shifts, and who is idle ----------
+     Was two boxes (status bar + Action queue) both saying "20 idle". The
+     headline is "Status bar" in the role matrix, the name lists "Action
+     queue", so a role keeps exactly what it could see before. */
+  const showHead = can("ov.status"), showNames = can("ov.actionQueue");
+  if (showHead || showNames) {
+    const attn = document.createElement("section");
+    attn.className = "ov-attn" + (totalStandby ? "" : " ok");
+    const shiftsHtml = `<span class="ov-attn-shift"><b>Day:</b> ${plural(todaysDayCount, "mission", "missions")} · <b>${totalDayCrew}</b> crew</span>`
+      + `<span class="ov-attn-shift"><b>Night:</b> ${plural(todaysNightCount, "mission", "missions")} · <b>${totalNightCrew}</b> crew</span>`;
+    const title = !totalStandby ? "All permanent staff are on a mission"
+      : totalStandby === 1 ? "1 permanent staff member has no mission" : `${totalStandby} permanent staff have no mission`;
+    attn.innerHTML = `<div class="ov-attn-top">
+        <div class="ov-attn-main"><div class="ov-attn-title">${totalStandby ? icon("alert") : ""}<span>${title}</span></div>
+          <div class="ov-attn-sub">${dayLabel} · ${escapeHtml(scoped ? scopeName : plural(boards.length, "board", "boards"))}${totalStandby && showNames ? " · click a name to open that person's board" : ""}</div></div>
+        <div class="ov-attn-shifts">${shiftsHtml}</div></div>`;
+    if (showNames && totalStandby) {
+      const groups = document.createElement("div");
+      groups.className = "ov-attn-groups";
+      for (const b of boards) {
+        const list = stats[b.id].availableList.slice().sort((x, y) => x.name.localeCompare(y.name));
+        if (!list.length) continue;
+        const open = state.overview.idleOpen.has(b.id);
+        const g = document.createElement("div");
+        g.className = "ov-attn-group";
+        g.innerHTML = `<h4><span class="ov-table-dot" style="background:${boardColor(b)}"></span><span></span><span class="ov-tag warn">${list.length} idle</span></h4><div class="ov-chips"></div>`;
+        g.querySelector("h4 span:nth-child(2)").textContent = b.name;
+        const chips = g.querySelector(".ov-chips");
+        for (const emp of (open ? list : list.slice(0, OV_IDLE_SHOWN))) chips.appendChild(nameChip(emp, b));
+        if (list.length > OV_IDLE_SHOWN) {
+          const more = document.createElement("button");
+          more.type = "button";
+          more.className = "ov-linkbtn";
+          more.setAttribute("aria-expanded", String(open));
+          more.textContent = open ? "Show fewer" : `+${list.length - OV_IDLE_SHOWN} more`;
+          more.onclick = () => { open ? state.overview.idleOpen.delete(b.id) : state.overview.idleOpen.add(b.id); render(); };
+          chips.appendChild(more);
+        }
+        groups.appendChild(g);
+      }
+      attn.appendChild(groups);
     }
-    actionSec.appendChild(calmBox);
+    if (showNames && totalOncallFree) {
+      const open = state.overview.oncallQueueOpen;
+      const calm = document.createElement("div");
+      calm.className = "ov-attn-calm";
+      calm.innerHTML = `<span>${plural(totalOncallFree, "on-call person is", "on-call staff are")} free. That is surge capacity, so no action is needed.</span><button type="button" class="ov-linkbtn" aria-expanded="${open}">${open ? "Hide names" : "Show names"}</button>`;
+      calm.querySelector("button").onclick = () => { state.overview.oncallQueueOpen = !open; render(); };
+      attn.appendChild(calm);
+      if (open) {
+        const chips = document.createElement("div");
+        chips.className = "ov-chips";
+        for (const b of boards) for (const emp of stats[b.id].oncallAvailableList.slice().sort((x, y) => x.name.localeCompare(y.name))) chips.appendChild(nameChip(emp, b));
+        attn.appendChild(chips);
+      }
+    }
+    panel.appendChild(attn);
   }
-  if (can("ov.actionQueue")) panel.appendChild(actionSec);
 
-  /* ---------- 4. by board: the per-board comparison, as rows not a sentence.
-     Contract mix folded in as one column (was a donut per board plus an
-     all-boards donut — 7 shapes saying what one column can); Idle replaces
-     Leave/On-call-free, since those two now live in the KPI strip's bar and
-     "idle" is the one board-level number that can actually need attention. ---------- */
-  const boardSec = ovSection("By board", `${fmtDow(state.date)} ${fmtDate(state.date)} — click a board name to open it. Utilized = assigned ÷ (headcount − leave − holiday − free on-call).`);
-  const boardRows = boards.map((b, i) => {
-    const s = stats[b.id];
-    return {
-      key: b.id, label: b.name, color: boardColor(i),
-      sub: s.isHoliday ? "holiday" : null,
-      onClick: () => { D().activeBoardId = b.id; refreshAndRender(); },
-      mixPerm: s.permanent, mixOncall: s.oncall,
-      values: {
-        util: utilizationPct(s.assigned, s.total, s.leave, s.onHoliday, s.oncallAvailable),
-        missions: s.missions, total: s.total, assigned: s.assigned, idle: s.standby,
-      },
-    };
-  });
-  boardRows.push({
-    key: "__total__", label: "All boards", isTotal: true,
-    sub: `${boards.length} board${boards.length === 1 ? "" : "s"}`,
-    mixPerm: totalPerm, mixOncall: totalOncall,
-    values: { util: overallUtil, missions: totalMissions, total: totalEmp, assigned: totalAssigned, idle: totalStandby },
-  });
-  boardSec.appendChild(ovCompareTable({
-    cols: Object.assign(
-      [
-        { key: "util", label: "Utilized", meter: true },
-        { key: "missions", label: "Missions" },
-        { key: "total", label: "Headcount" },
-        { key: "assigned", label: "Assigned" },
-        { key: "idle", label: "Idle", plain: true, warn: true },
-        { key: "mix", label: "Contract mix", render: (r) => contractMixCell(r.mixPerm, r.mixOncall, r.isTotal) },
-      ],
-      { nameLabel: "Board" }
-    ),
-    rows: boardRows,
-  }));
-  if (can("ov.byBoard")) panel.appendChild(boardSec);
+  /* ---------- 3. KPI tiles: each number says its unit and what to judge it by ---------- */
+  if (can("ov.kpi")) {
+    const kpiRow = document.createElement("div");
+    kpiRow.className = "ov-kpi-row";
+    const utilTile = document.createElement("div");
+    utilTile.className = "ov-kpi-tile";
+    utilTile.innerHTML = `<div class="ov-kpi-head"><div><div class="ov-kpi-value">${overallUtil}%</div>
+        <div class="ov-kpi-label">Utilization ${OV_UTIL_INFO}</div></div></div><div class="ov-kpi-breakdown"></div>`;
+    if (utilSpark.some(v => v != null)) {
+      utilTile.querySelector(".ov-kpi-head").appendChild(
+        Object.assign(document.createElement("div"), { innerHTML: Charts.sparkline({ points: utilSpark, color: "var(--chart-assigned)" }) }).firstChild);
+    }
+    const utilSub = utilTile.querySelector(".ov-kpi-breakdown");
+    if (utilDelta) {
+      const dir = utilDelta.delta > 0 ? "up" : utilDelta.delta < 0 ? "down" : "";
+      const arrow = utilDelta.delta > 0 ? "▲" : utilDelta.delta < 0 ? "▼" : "▬";
+      utilSub.innerHTML = `<b class="${dir}">${arrow} ${Math.abs(utilDelta.delta)} pt${Math.abs(utilDelta.delta) === 1 ? "" : "s"}</b>: average of the last ${utilDelta.k} working days vs the ${utilDelta.k} before`;
+    } else {
+      utilSub.textContent = "Not enough working days yet to show a trend";
+    }
+    kpiRow.appendChild(utilTile);
 
-  /* ---------- day/night split (built here, masonry-packed near the bottom
-     of this function — see layoutOverviewMasonry) ---------- */
-  const daynightSec = ovSection("Day / night split", "Crew and missions by shift — the last thing to check before the night crew goes out.");
-  if (!totalMissions) {
-    daynightSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
-  } else {
-    const totalCrew = totalDayCrew + totalNightCrew || 1;
-    daynightSec.innerHTML += `
-      <div class="ov-daynight-tiles">
-        <div class="ov-daynight-tile">
-          <div class="ov-daynight-num"><span class="num">${totalDayCrew}</span><span class="ov-shift-chip day">DAY</span></div>
-          <div class="ov-daynight-sub">${todaysDayCount} mission${todaysDayCount === 1 ? "" : "s"} · ${Math.round(totalDayCrew / totalCrew * 100)}% of crew</div>
-        </div>
-        <div class="ov-daynight-tile">
-          <div class="ov-daynight-num"><span class="num">${totalNightCrew}</span><span class="ov-shift-chip night">NIGHT</span></div>
-          <div class="ov-daynight-sub">${todaysNightCount} mission${todaysNightCount === 1 ? "" : "s"} · ${Math.round(totalNightCrew / totalCrew * 100)}% of crew</div>
-        </div>
-      </div>
-      <div class="ov-daynight-rows"></div>
-      <div class="ov-daynight-legend"></div>`;
-    const rowsWrap = daynightSec.querySelector(".ov-daynight-rows");
-    boards.forEach((b, i) => {
+    const deploySegs = [
+      { label: "on a mission", value: totalAssigned, color: "var(--chart-assigned)" },
+      { label: "on leave", value: totalLeave, color: "var(--chart-leave)" },
+      { label: "idle", value: totalStandby, color: "var(--chart-standby)" },
+    ];
+    if (totalOnHoliday) deploySegs.push({ label: "day off (holiday)", value: totalOnHoliday, color: "var(--chart-holiday)" });
+    deploySegs.push({ label: "on-call free", value: totalOncallFree, color: "var(--muted)" });
+    const deployTile = document.createElement("div");
+    deployTile.className = "ov-kpi-tile";
+    deployTile.innerHTML = `<div class="ov-kpi-value">${totalAssigned}<span class="ov-kpi-value-sub"> / ${totalEmp}</span></div>
+      <div class="ov-kpi-label">Deployed on a mission</div><div class="ov-kpi-mixbar"></div>`;
+    deployTile.querySelector(".ov-kpi-mixbar").innerHTML = Charts.stackedBarH({ segments: deploySegs, height: 8 });
+    deployTile.appendChild(ovLegend(deploySegs.map(s => ({ label: s.label, color: s.color, count: s.value, countFirst: true }))));
+    kpiRow.appendChild(deployTile);
+
+    const missionsTile = document.createElement("div");
+    missionsTile.className = "ov-kpi-tile";
+    missionsTile.innerHTML = `<div class="ov-kpi-value">${totalMissions}</div><div class="ov-kpi-label">Missions</div>
+      <div class="ov-kpi-breakdown">${todaysDayCount} day · ${todaysNightCount} night<br>on ${plural(todaysHosts.length, "host", "hosts")}, run by ${plural(todaysEngineers.size, "engineer", "engineers")}</div>`;
+    kpiRow.appendChild(missionsTile);
+
+    const oncallTile = document.createElement("div");
+    oncallTile.className = "ov-kpi-tile";
+    oncallTile.innerHTML = `<div class="ov-kpi-value">${totalOncallFree}<span class="ov-kpi-value-sub"> of ${totalOncall}</span></div>
+      <div class="ov-kpi-label">On-call free</div>
+      <div class="ov-kpi-breakdown">${Math.max(0, totalOncall - totalOncallFree)} called in or on leave. Free on-call staff are left out of utilization.</div>`;
+    kpiRow.appendChild(oncallTile);
+    panel.appendChild(kpiRow);
+  }
+
+  /* ---------- 4. by board: exact values, one bar (Utilized) ----------
+     Row click scopes this page to the board; the arrow opens the board itself.
+     On a phone the same rows render as cards (styles.css swaps them). */
+  if (can("ov.byBoard")) {
+    const sec = ovSection("By board", `${dayLabel}. ${boards.length > 1 ? "Click a row to show only that board here; the" : "The"} arrow opens the board itself.`);
+    sec.querySelector("h3").insertAdjacentHTML("beforeend", " " + OV_UTIL_INFO);
+    const rows = boards.map(b => {
       const s = stats[b.id];
-      const row = document.createElement("div");
-      row.className = "ov-daynight-row";
-      row.innerHTML = `
-        <span class="ov-daynight-row-label"><span class="ov-table-dot" style="background:${boardColor(i)}"></span>${escapeHtml(b.name)}</span>
-        <div class="ov-daynight-row-bar"></div>
-        <span class="ov-daynight-row-total">${s.dayMissions} / ${s.nightMissions}</span>`;
-      row.querySelector(".ov-daynight-row-bar").innerHTML = Charts.stackedBarH({
-        segments: [
-          { label: "Day crew", value: s.dayMissions, color: "var(--chart-assigned)" },
-          { label: "Night crew", value: s.nightMissions, color: "var(--night)" },
-        ], height: 18,
-      });
-      rowsWrap.appendChild(row);
+      return { b, name: b.name, color: boardColor(b), holiday: s.isHoliday, util: utilizationPct(s.assigned, s.total, s.leave, s.onHoliday, s.oncallAvailable),
+        missions: s.missions, total: s.total, assigned: s.assigned, leave: s.leave, idle: s.standby, free: s.oncallAvailable, perm: s.permanent, oncall: s.oncall };
     });
-    daynightSec.querySelector(".ov-daynight-legend").appendChild(Charts.legendEl([
-      { key: "day", label: `Day crew (${totalDayCrew})`, color: "var(--chart-assigned)" },
-      { key: "night", label: `Night crew (${totalNightCrew})`, color: "var(--night)" },
-    ]));
+    if (rows.length > 1) rows.push({ b: null, name: "All boards", util: overallUtil, missions: totalMissions, total: totalEmp, assigned: totalAssigned,
+      leave: totalLeave, idle: totalStandby, free: totalOncallFree, perm: totalPerm, oncall: totalOncall });
+    const mix = (r) => {
+      const pp = r.total ? Math.round((r.perm / r.total) * 100) : 0;
+      return `<span class="chart-mark ov-mix" tabindex="0" data-tip-value="${r.perm} permanent · ${r.oncall} on-call" data-tip-label="${pp}% / ${100 - pp}%">${r.perm} / ${r.oncall}</span>`;
+    };
+    const idleCell = (r) => (r.idle ? `<span class="ov-tag warn">${r.idle}</span>` : "0");
+    const tbl = document.createElement("div");
+    tbl.className = "ov-table-wrap ov-boards-table";
+    tbl.innerHTML = `<table class="ov-table"><thead><tr><th>Board</th><th class="r">Utilized</th><th class="r">Missions</th><th class="r">Headcount</th>
+        <th class="r">Deployed</th><th class="r">Leave</th><th class="r">Idle</th><th class="r">On-call free</th><th class="r">Permanent / on-call</th><th></th></tr></thead><tbody>`
+      + rows.map((r, i) => `<tr class="${r.b ? "ov-row-click" : "ov-table-totalrow"}" ${r.b ? `data-i="${i}" tabindex="0"` : ""}>
+        <td><span class="ov-table-nameinner">${r.b ? `<span class="ov-table-dot" style="background:${r.color}"></span>` : ""}<span class="ov-table-label">${escapeHtml(r.name)}${r.holiday ? "<small>holiday</small>" : r.b ? "" : `<small>${plural(boards.length, "board", "boards")}</small>`}</span></span></td>
+        <td class="r"><span class="ov-util">${r.b ? `<span class="ov-util-track"><i style="width:${Math.min(100, r.util)}%"></i></span>` : ""}<b>${r.util}%</b></span></td>
+        <td class="r">${r.missions}</td><td class="r">${r.total}</td><td class="r">${r.assigned}</td><td class="r">${r.leave}</td>
+        <td class="r">${idleCell(r)}</td><td class="r">${r.free}</td><td class="r">${mix(r)}</td>
+        <td class="r">${r.b ? `<button type="button" class="ov-linkbtn ov-open" data-open="${i}" title="Open ${escapeHtml(r.name)}" aria-label="Open ${escapeHtml(r.name)}">→</button>` : ""}</td></tr>`).join("")
+      + `</tbody></table>`;
+    tbl.querySelectorAll("tr[data-i]").forEach(tr => {
+      const r = rows[+tr.dataset.i];
+      tr.onclick = (ev) => { if (ev.target.closest(".ov-open")) return; if (boards.length > 1) setOvBoard(r.b.id); };
+      tr.onkeydown = (ev) => { if (ev.key === "Enter" && boards.length > 1) setOvBoard(r.b.id); };
+    });
+    tbl.querySelectorAll("[data-open]").forEach(btn => { btn.onclick = () => openBoard(rows[+btn.dataset.open].b.id); });
+    sec.appendChild(tbl);
+    const cards = document.createElement("div");
+    cards.className = "ov-board-cards";
+    cards.innerHTML = rows.map(r => `<div class="ov-bcard"><span class="ov-table-nameinner">${r.b ? `<span class="ov-table-dot" style="background:${r.color}"></span>` : ""}<span class="ov-table-label">${escapeHtml(r.name)}</span></span>
+      <span class="ov-bcard-util"><b>${r.util}%</b> utilized</span>
+      <div class="ov-bcard-kv"><div><b>${r.missions}</b><span>missions</span></div><div><b>${r.assigned}<small> / ${r.total}</small></b><span>deployed</span></div><div><b class="${r.idle ? "warn" : ""}">${r.idle}</b><span>idle</span></div>
+      <div><b>${r.leave}</b><span>leave</span></div><div><b>${r.free}</b><span>on-call free</span></div><div><b>${r.perm} / ${r.oncall}</b><span>perm / on-call</span></div></div></div>`).join("");
+    sec.appendChild(cards);
+    panel.appendChild(sec);
   }
 
-  /* ---------- host coverage risk (built here, masonry-packed near the
-     bottom of this function — see layoutOverviewMasonry) ----------
-     Only hosts with exactly 1 or 2 people ever deployed there are shown —
-     a host nobody has been to yet, or one with a healthy bench (3+), isn't
-     a risk worth a row here. */
-  const hostRiskSec = ovSection("Host coverage risk", "Hosts only one or two people have ever worked. If that person is on leave, nobody on the roster knows the site.");
-  const riskyHosts = todaysHosts.length
-    ? todaysHosts
-        .map(host => ({ host, ...(state.overview.hostCoverage || {})[host] || { count: 0, names: [] } }))
-        .filter(r => r.count >= 1 && r.count <= 2)
-        .sort((a, b) => a.count - b.count || a.host.localeCompare(b.host))
-    : [];
-  if (!todaysHosts.length) {
-    hostRiskSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
-  } else if (!riskyHosts.length) {
-    hostRiskSec.appendChild(Object.assign(document.createElement("p"),
-      { className: "ov-avail ov-avail-ok", textContent: "No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about." }));
-  } else {
-    // "people ever" is said once, in the header, instead of on all six rows
-    const head = document.createElement("div");
-    head.className = "ov-hostrisk-head";
-    head.innerHTML = `<span></span><span>Host</span><span class="r">People</span><span class="r">Inspectors</span>`;
-    hostRiskSec.appendChild(head);
-
-    const rowsWrap = document.createElement("div");
-    rowsWrap.className = "ov-hostrisk-rows";
-    for (const r of riskyHosts) {
-      const row = document.createElement("div");
-      // Only a host with a SINGLE trained inspector is the emergency — that is
-      // the one nobody can cover if they take leave. Two is thin, not urgent.
-      row.className = "ov-hostrisk-row" + (r.count === 1 ? " risk" : "");
-      const who = r.names.join(", ") + (r.count > r.names.length ? ` +${r.count - r.names.length}` : "");
-      row.innerHTML = `
-        <span class="ov-hostrisk-rail" aria-hidden="true"></span>
-        <span class="ov-hostrisk-name">${escapeHtml(r.host)}</span>
-        <span class="ov-hostrisk-count">${r.count}</span>
-        <span class="ov-hostrisk-who">${escapeHtml(who)}</span>`;
-      rowsWrap.appendChild(row);
+  /* ---------- 5. by engineer: today's missions and crew per responsible engineer ----------
+     Crew counts only members on the roster of the mission's board for this
+     date — the same rule boardStats uses, so a stale membership or someone
+     added to the app after this date never inflates the number. */
+  const engSec = ovSection("By engineer", `Who is running ${dayLabel}'s missions, and how many people they have out — ${scoped ? "on " + scopeName : "across all boards"}. Click a row to open the board filtered to that engineer.`);
+  {
+    const load = new Map();   // engineerId ("" = none set) -> {day, night, perm, oncall, boards:Map(id->name)}
+    for (const b of boards) {
+      const empById = new Map(rosterEmployees(b.id).map(e => [e.id, e]));
+      for (const m of missionsOf(b)) {
+        const id = m.engineerId || "";
+        const rec = load.get(id) || { day: 0, night: 0, perm: 0, oncall: 0, boards: new Map() };
+        rec[m.shift === "night" ? "night" : "day"]++;
+        for (const emp of m.members.map(x => empById.get(x)).filter(Boolean)) rec[emp.contract === "oncall" ? "oncall" : "perm"]++;
+        rec.boards.set(b.id, b.name);
+        load.set(id, rec);
+      }
     }
-    hostRiskSec.appendChild(rowsWrap);
-    hostRiskSec.appendChild(Object.assign(document.createElement("p"), {
-      className: "ov-hostrisk-note",
-      innerHTML: "Built from <b>deployment_history</b> — the same rows behind the Host Record tab, counted by host instead of by employee.",
-    }));
+    const engById = new Map(D().engineers.map(e => [e.id, e]));
+    const rows = [...load.entries()].map(([id, r]) => ({ id, r, e: engById.get(id), crew: r.perm + r.oncall, missions: r.day + r.night }))
+      .sort((a, b) => b.missions - a.missions || b.crew - a.crew || (a.e ? a.e.name : "").localeCompare(b.e ? b.e.name : ""));
+    if (!rows.length) {
+      engSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
+    } else {
+      const crewMax = Math.max(1, ...rows.map(x => x.crew));
+      const wrap = document.createElement("div");
+      wrap.className = "ov-table-wrap";
+      wrap.innerHTML = `<table class="ov-table"><thead><tr><th>Engineer</th><th class="r">Missions</th><th class="r">Crew</th></tr></thead><tbody>`
+        + rows.map((x, i) => `<tr class="${x.e ? "ov-row-click" : ""}" data-i="${i}" ${x.e ? 'tabindex="0"' : ""}>
+          <td><span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${escapeHtml(x.e ? x.e.color : "var(--muted)")}"></span>
+            <span class="ov-table-label">${escapeHtml(x.e ? x.e.name : (x.id ? "Removed engineer" : "— no engineer set —"))}<small>${escapeHtml([...x.r.boards.values()].join(" · "))}</small></span></span></td>
+          <td class="r"><b>${x.missions}</b> ${x.r.day ? `<span class="ov-shift-tag day">D ${x.r.day}</span>` : ""}${x.r.night ? `<span class="ov-shift-tag night">N ${x.r.night}</span>` : ""}</td>
+          <td class="r"><span class="ov-crewcell"><span class="ov-crewbar" style="width:${Math.max(12, (x.crew / crewMax) * 100)}px">${Charts.stackedBarH({ segments: [
+              { label: "permanent", value: x.r.perm, color: "var(--chart-permanent)" }, { label: "on-call", value: x.r.oncall, color: "var(--chart-oncall)" }], height: 8 })}</span><b>${x.crew}</b></span>
+            <span class="ov-rk-sub">${x.r.perm} permanent${x.r.oncall ? ` · ${x.r.oncall} on-call` : ""}</span></td></tr>`).join("")
+        + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td class="r"><b>${totalMissions}</b></td><td class="r"><b>${rows.reduce((s, x) => s + x.crew, 0)}</b></td></tr></tbody></table>`;
+      // open the first in-scope board this engineer has a mission on, with the
+      // board's Engineer filter set to them
+      wrap.querySelectorAll("tr.ov-row-click").forEach(tr => {
+        const x = rows[+tr.dataset.i];
+        const go = () => { state.filters.engineer = [x.id]; openBoard([...x.r.boards.keys()][0]); };
+        tr.onclick = go;
+        tr.onkeydown = (ev) => { if (ev.key === "Enter") go(); };
+      });
+      engSec.appendChild(wrap);
+    }
+    const free = D().engineers.filter(e => !load.has(e.id));
+    if (free.length) {
+      const line = document.createElement("div");
+      line.className = "ov-eng-free";
+      line.innerHTML = `<span class="ov-tag mute">Free today${scoped ? " on " + escapeHtml(scopeName) : ""}</span> `
+        + free.map(e => `<span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${escapeHtml(e.color)}"></span>${escapeHtml(e.name)}</span>`).join(", ");
+      engSec.appendChild(line);
+    }
   }
-  // daynightSec and hostRiskSec are appended further down — see the bottom
-  // of this function.
 
-  /* ---------- 5. History + Engineer workload ----------
-     Both read one fetch (state.overview.history) over one user-chosen range,
-     computed here once and handed to both so the day records aren't summed
-     twice. Wrapped in one .ov-history-group with no gap between them (see
-     styles.css) so the two read as a single connected block — they already
-     share this one range/board control, rendered once in History's header. */
-  // Built only when it is going to be shown: refreshData skips the range fetch
-  // for a role without ov.history, so state.overview.history would be stale or
-  // empty here anyway.
+  /* ---------- 6. by service area: headcount per area by contract type ---------- */
+  const areaSec = ovSection("By service area", "Headcount per area by contract type. Bar length is the area's headcount; biggest area first.");
+  {
+    const rows = D().areas.map(a => {
+      const emps = rosterAll.filter(e => e.areaId === a.id);
+      const perm = emps.filter(e => e.contract === "permanent").length;
+      return { name: a.name, color: a.color, perm, oncall: emps.length - perm, total: emps.length };
+    });
+    const noArea = rosterAll.filter(e => !areaById.has(e.areaId));
+    if (noArea.length) {
+      const perm = noArea.filter(e => e.contract === "permanent").length;
+      rows.push({ name: "No area set", color: "var(--border)", perm, oncall: noArea.length - perm, total: noArea.length });
+    }
+    const shown = rows.filter(r => r.total).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+    if (!shown.length) {
+      areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "Nobody on the roster for this date." }));
+    } else {
+      const max = Math.max(...shown.map(r => r.total));
+      const P = shown.reduce((s, r) => s + r.perm, 0), O = shown.reduce((s, r) => s + r.oncall, 0);
+      const pct = (v) => Math.round((v / (P + O)) * 100);
+      const list = document.createElement("div");
+      list.className = "ov-area-rows";
+      list.innerHTML = shown.map(r => `<div class="ov-area-row"><span class="ov-area-row-label" title="${escapeHtml(r.name)}"><span class="ov-area-dot" style="background:${escapeHtml(r.color)}"></span><span class="ov-area-row-name">${escapeHtml(r.name)}</span></span>
+          <div>${Charts.stackedBarH({ segments: [{ label: `${r.name}: permanent`, value: r.perm, color: "var(--chart-permanent)" }, { label: `${r.name}: on-call`, value: r.oncall, color: "var(--chart-oncall)" }], scaleMax: max, height: 16 })}</div>
+          <span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${r.total}</span><span class="ov-area-row-pct">${r.perm} P · ${r.oncall} OC</span></span></div>`).join("")
+        + `<div class="ov-area-row ov-area-row-grandtotal"><span class="ov-area-row-label"><span class="ov-area-row-name">All areas</span></span>
+          <span class="ov-muted">${P} permanent (${pct(P)}%) · ${O} on-call (${pct(O)}%)</span><span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${P + O}</span></span></div>`;
+      areaSec.appendChild(list);
+      areaSec.appendChild(ovLegend([{ label: "Permanent", color: "var(--chart-permanent)", count: P }, { label: "On-call", color: "var(--chart-oncall)", count: O }]));
+    }
+  }
+
+  /* ---------- 7. shifts: crew first, missions second, one unit everywhere ---------- */
+  const shiftSec = ovSection("Shifts", "People on missions by shift. Crew is the headline, missions the detail.");
+  if (!totalMissions) {
+    shiftSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
+  } else {
+    const crewAll = totalDayCrew + totalNightCrew || 1;
+    shiftSec.insertAdjacentHTML("beforeend", `<div class="ov-daynight-tiles">
+      <div class="ov-daynight-tile"><div class="ov-daynight-num"><span class="num">${totalDayCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip day">DAY</span></div>
+        <div class="ov-daynight-sub">on ${plural(todaysDayCount, "mission", "missions")} · ${Math.round((totalDayCrew / crewAll) * 100)}% of today's crew</div></div>
+      <div class="ov-daynight-tile"><div class="ov-daynight-num"><span class="num">${totalNightCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip night">NIGHT</span></div>
+        <div class="ov-daynight-sub">on ${plural(todaysNightCount, "mission", "missions")} · ${Math.round((totalNightCrew / crewAll) * 100)}% of today's crew</div></div></div>`);
+    if (boards.length > 1) {
+      const max = Math.max(1, ...boards.map(b => stats[b.id].dayMissions + stats[b.id].nightMissions));
+      const rowsWrap = document.createElement("div");
+      rowsWrap.className = "ov-daynight-rows";
+      for (const b of boards) {
+        const s = stats[b.id];
+        const row = document.createElement("div");
+        row.className = "ov-daynight-row";
+        row.innerHTML = `<span class="ov-daynight-row-label"><span class="ov-table-dot" style="background:${boardColor(b)}"></span><span></span></span>
+          <div>${Charts.stackedBarH({ segments: [{ label: `${b.name}: day crew`, value: s.dayMissions, color: "var(--chart-assigned)" }, { label: `${b.name}: night crew`, value: s.nightMissions, color: "var(--night)" }], scaleMax: max, height: 14 })}</div>
+          <span class="ov-daynight-row-total">Day ${s.dayMissions} · Night ${s.nightMissions} crew</span>`;
+        row.querySelector(".ov-daynight-row-label span:last-child").textContent = b.name;
+        rowsWrap.appendChild(row);
+      }
+      shiftSec.appendChild(rowsWrap);
+    }
+  }
+
+  /* ---------- 8. host coverage: thin hosts, and where their people are today ----------
+     A host only one or two people have ever worked (deployment_history, up to
+     the date on screen) is only at risk when those people are away — so each
+     one is listed with where they are today, read from every board's plan. */
+  const hostSec = ovSection("Host coverage", "Today's hosts that only one or two people have ever worked, and where those people are today.");
+  {
+    const cov = state.overview.hostCoverage || {};
+    const empById = new Map(D().employees.map(e => [e.id, e]));
+    const where = new Map();   // employee id -> {away, text}
+    for (const b of allBoards) {
+      const plan = peekPlan(b.id);
+      for (const m of plan.missions) if (!m.hidden) for (const id of m.members) where.set(id, { away: false, text: `on mission ${m.number}${m.shift === "night" ? " tonight" : ""}` });
+      for (const z of ZONES) for (const id of (plan.zones && plan.zones[z]) || []) where.set(id, { away: true, text: `${(ZONE_LABELS[z] || z).toLowerCase()} today` });
+    }
+    const statusOf = (id) => {
+      if (where.has(id)) return where.get(id);
+      const e = empById.get(id);
+      if (!e || !onRoster(e)) return { away: true, text: "no longer active" };
+      if (isNonWorkingDate(state.date, e.boardId)) return { away: false, text: "day off" };
+      return { away: false, text: e.contract === "oncall" ? "on-call, free today" : "free today" };
+    };
+    const thin = todaysHosts.map(h => ({ host: h, ...(cov[h] || { count: 0, ids: [] }) }))
+      .filter(r => r.count >= 1 && r.count <= 2)
+      .map(r => ({ ...r, people: (r.ids || []).map(id => ({ id, name: (empById.get(id) || {}).name || "Unknown", ...statusOf(id) })) }))
+      .map(r => ({ ...r, away: r.people.filter(p => p.away).length }))
+      .sort((a, b) => b.away - a.away || a.count - b.count || a.host.localeCompare(b.host));
+    const covered = todaysHosts.map(h => ({ host: h, count: (cov[h] || {}).count || 0 })).filter(r => r.count >= 3).sort((a, b) => a.host.localeCompare(b.host));
+    if (!todaysHosts.length) {
+      hostSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
+    }
+    for (const r of thin) {
+      const el = document.createElement("div");
+      el.className = "ov-host" + (r.away ? " risk" : "");
+      const avail = r.people.filter(p => !p.away).map(p => p.name);
+      const note = r.away
+        ? (avail.length ? `If ${avail.join(" and ")} ${avail.length === 1 ? "is" : "are"} off, nobody else on the roster knows this site.` : "Nobody who knows this site is available today.")
+        : `Only ${r.count === 1 ? "one person has" : `${r.count} people have`} ever worked this host.`;
+      el.innerHTML = `<div class="ov-host-head"><span class="ov-host-name"></span><span class="ov-tag ${r.away ? "bad" : "warn"}">${r.away ? `${r.away} of ${r.count} away today` : "thin"}</span></div>
+        <div class="ov-chips">${r.people.map(p => `<span class="ov-person"><span class="ov-table-dot" style="background:${p.away ? "var(--chart-leave)" : "var(--chart-assigned)"}"></span>${escapeHtml(p.name)} <small>${escapeHtml(p.text)}</small></span>`).join("")}</div>
+        <p class="ov-host-note">${escapeHtml(note)}</p>`;
+      el.querySelector(".ov-host-name").textContent = r.host;
+      hostSec.appendChild(el);
+    }
+    if (todaysHosts.length) {
+      const ok = document.createElement("p");
+      ok.className = "ov-avail ov-avail-ok";
+      ok.textContent = !thin.length
+        ? "No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about."
+        : covered.length
+          ? (covered.length <= 4
+            ? `${covered.map(c => `${c.host} (${c.count} people)`).join(", ").replace(/, ([^,]*)$/, " and $1")} ${covered.length === 1 ? "is" : "are"} well covered.`
+            : `The other ${covered.length} hosts have 3+ people who've worked them.`)
+          : "";
+      if (ok.textContent) hostSec.appendChild(ok);
+    }
+  }
+
+  // "In detail" — two fixed pairs, in this order: By engineer | By service
+  // area, then Shifts | Host coverage (a plain 2-column grid, one column on a
+  // narrow screen)
+  const detail = [["ov.byEngineer", engSec], ["ov.byArea", areaSec], ["ov.dayNight", shiftSec], ["ov.hostRisk", hostSec]]
+    .filter(([area]) => can(area)).map(([, sec]) => sec);
+  if (detail.length) {
+    panel.appendChild(ovGroupHead("In detail", `${dayLabel} · ${scopeName}`));
+    const grid = document.createElement("div");
+    grid.className = "ov-detail-grid";
+    for (const sec of detail) grid.appendChild(sec);
+    panel.appendChild(grid);
+  }
+
+  /* ---------- Over time: History + Engineer workload ----------
+     Both read one fetch (state.overview.history) over one user-chosen range.
+     Built only when shown: refreshData skips the range fetch for a role
+     without ov.history. */
   if (can("ov.history")) {
     resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
-    const histBoards = historyBoardsInScope(boards);
-    const histDates = historyDates(histBoards);
-    const histRecs = histDates.map(d => historyDayRec(d, histBoards, state.overview.history || {}));
-    const historyGroup = document.createElement("div");
-    historyGroup.className = "ov-history-group";
-    historyGroup.appendChild(historySection(histDates, histRecs, pendingCharts));
-    historyGroup.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
-    panel.appendChild(historyGroup);
+    const histDates = historyDates(boards);
+    const histRecs = histDates.map(d => historyDayRec(d, boards, state.overview.history || {}));
+    panel.appendChild(ovGroupHead("Over time", `${historyRangeCaption(histDates)}`));
+    panel.appendChild(historySection(histDates, histRecs, pendingCharts));
+    panel.appendChild(engineerHistorySection(histDates, histRecs));
   }
 
-  /* ---------- 6. by engineer (first of six cards masonry-packed further
-     down — see layoutOverviewMasonry) ----------
-     By engineer: workload per responsible engineer, across all boards.
-     Missions carry an engineerId, so this is the one view that answers "who is
-     carrying how much today" — the board sections all slice by board instead.
-     Crew counts only members who still belong to the board the mission is on,
-     the same rule boardStats/renderMissions use, so a stale membership never
-     inflates the number. */
-  const engSec = ovSection("By engineer",
-    `Missions each engineer is responsible for on ${fmtDow(state.date)} ${fmtDate(state.date)}, and how many people are deployed under them — across all boards`);
-  const engLoad = new Map();   // engineerId (or "" = unassigned) -> {missions, crew, permCrew, oncallCrew, boards:Set}
-  const bump = (id, crewEmps, boardName) => {
-    const rec = engLoad.get(id) || { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0, boards: new Set() };
-    rec.missions += 1;
-    rec.crew += crewEmps.length;
-    for (const e of crewEmps) { if (e.contract === "oncall") rec.oncallCrew++; else rec.permCrew++; }
-    rec.boards.add(boardName);
-    engLoad.set(id, rec);
-  };
-  for (const b of boards) {
-    const empById = new Map(boardEmployees(b.id).map(e => [e.id, e]));
-    for (const m of peekPlan(b.id).missions) {
-      if (m.hidden) continue;
-      bump(m.engineerId || "", m.members.map(id => empById.get(id)).filter(Boolean), b.name);
-    }
-  }
-  // every engineer gets a row (a zero tells you who is free today, which is the
-  // other half of "who is loaded"); an "unassigned" row appears only if some
-  // mission genuinely has no engineer on it.
-  // naming every board stops fitting once an engineer covers 4+ of them —
-  // past three, the count is the useful part
-  const boardsSub = (set) => set.size > 3 ? `${set.size} boards` : [...set].join(" · ");
-  const engRows = D().engineers.map(e => {
-    const rec = engLoad.get(e.id) || { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0, boards: new Set() };
-    return {
-      key: e.id, label: e.name, color: e.color,
-      sub: rec.boards.size ? boardsSub(rec.boards) : "no missions today",
-      values: { missions: rec.missions, crew: rec.crew, permCrew: rec.permCrew, oncallCrew: rec.oncallCrew },
-    };
-  });
-  const noEng = engLoad.get("");
-  if (noEng) {
-    engRows.push({
-      key: "__none__", label: "— no engineer set —", color: "var(--muted)",
-      sub: boardsSub(noEng.boards),
-      values: { missions: noEng.missions, crew: noEng.crew, permCrew: noEng.permCrew, oncallCrew: noEng.oncallCrew },
-    });
-  }
-  // shared scale for the Crew deployed bar, computed before the total row
-  // below joins the array — same convention as Engineer workload's avgCrewMax
-  const crewMax = Math.max(1, ...engRows.map(r => r.values.crew));
-  engRows.sort((a, b) => b.values.missions - a.values.missions || b.values.crew - a.values.crew
-    || a.label.localeCompare(b.label));
-  if (engRows.length) {
-    // Summed from engLoad, not from the rows above — the rows include a zero
-    // entry for every engineer, and (when present) the "no engineer set" row,
-    // so summing them would be right only by luck. This counts each mission
-    // once regardless of who it's attributed to.
-    const engTotals = [...engLoad.values()].reduce(
-      (acc, r) => ({ missions: acc.missions + r.missions, crew: acc.crew + r.crew,
-                      permCrew: acc.permCrew + r.permCrew, oncallCrew: acc.oncallCrew + r.oncallCrew }),
-      { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0 });
-    engRows.push({
-      key: "__total__", label: "All engineers", isTotal: true,
-      sub: `${boards.length} board${boards.length === 1 ? "" : "s"}`,
-      values: engTotals,
-    });
-    engSec.appendChild(ovCompareTable({
-      cols: Object.assign(
-        [{ key: "missions", label: "Missions" },
-         // Permanent/on-call split — same splitCell as Engineer workload's
-         // Avg crew/day and "By service area" below: bar length ~ total crew,
-         // segments split by contract, the count and share per type live in
-         // the bar's hover tooltip rather than as always-on text.
-         { key: "crew", label: "Crew deployed", render: (r) => splitCell(r.values.permCrew, r.values.oncallCrew, crewMax, r.isTotal, 0) }],
-        { nameLabel: "Engineer" }
-      ),
-      rows: engRows,
-    }));
-  } else {
-    engSec.appendChild(Object.assign(document.createElement("p"),
-      { className: "import-note", textContent: "No engineers defined yet — add them under Settings." }));
-  }
-
-  /* ---------- by service area (masonry-packed, see above) ----------
-     One row per area on a shared scale, split permanent / on-call: the bar's
-     full length is the area's total headcount (so areas stay ranked by size and
-     comparable to each other), the two segments are its contract mix, and the
-     hover tooltip gives each segment's share of that area. Deliberately one
-     chart rather than three separate total/permanent/on-call charts — three
-     would cost three times the space and still make "how much of NPT is
-     on-call?" a cross-chart comparison instead of a glance. Same two colours as
-     the contract donuts beside it, so blue = permanent holds across the row. */
-  const areaSec = ovSection("By service area", "Bar length is total headcount; segments split permanent / on-call");
-  const areaData = D().areas.map(a => {
-    const emps = rosterAll.filter(e => e.areaId === a.id);
-    const perm = emps.filter(e => e.contract === "permanent").length;
-    return { area: a, perm, oncall: emps.length - perm, total: emps.length };
-  }).filter(r => r.total > 0).sort((a, b) => b.total - a.total);
-  if (areaData.length) {
-    const areaMax = Math.max(...areaData.map(r => r.total));
-    const areaWrap = document.createElement("div");
-    areaWrap.className = "ov-area-rows";
-    // Same count/percent text as contractMixCell's "42 (68%) / 20 (32%)" pattern
-    // (see below) — the bold total stays the headline figure, this is a second,
-    // smaller line under it so each row's contract mix is a glance, not a hover.
-    const pctSplit = (perm, total) => {
-      const pctPerm = total ? Math.round((perm / total) * 100) : 0;
-      return `${pctPerm}% / ${100 - pctPerm}%`;
-    };
-    for (const r of areaData) {
-      const row = document.createElement("div");
-      row.className = "ov-area-row";
-      row.innerHTML = `<span class="ov-area-row-label" title="${escapeHtml(r.area.name)}"><span class="ov-area-dot" style="background:${escapeHtml(r.area.color)}"></span><span class="ov-area-row-name">${escapeHtml(r.area.name)}</span></span>
-        <div class="ov-area-row-track"></div>
-        <span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${r.total}</span><span class="ov-area-row-pct">${pctSplit(r.perm, r.total)}</span></span>`;
-      row.querySelector(".ov-area-row-track").innerHTML = Charts.stackedBarH({
-        segments: [
-          { label: "Permanent", value: r.perm, color: "var(--chart-permanent)" },
-          { label: "On-call", value: r.oncall, color: "var(--chart-oncall)" },
-        ],
-        scaleMax: areaMax, height: 18,
-      });
-      areaWrap.appendChild(row);
-    }
-    const permTotal = areaData.reduce((n, r) => n + r.perm, 0);
-    const oncallTotal = areaData.reduce((n, r) => n + r.oncall, 0);
-    // Grand-total row: no bar (it would be full-width by definition, same
-    // reasoning as the isTotal/noBar rows in ovCompareTable), just the two-line
-    // total + split, set off by a top border.
-    const totalRow = document.createElement("div");
-    totalRow.className = "ov-area-row ov-area-row-grandtotal";
-    totalRow.innerHTML = `<span class="ov-area-row-label"><span class="ov-area-row-name">All areas</span></span>
-      <div></div>
-      <span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${permTotal + oncallTotal}</span><span class="ov-area-row-pct">${pctSplit(permTotal, permTotal + oncallTotal)}</span></span>`;
-    areaWrap.appendChild(totalRow);
-    areaSec.appendChild(areaWrap);
-    areaSec.appendChild(Charts.legendEl([
-      { key: "perm", label: `Permanent (${permTotal})`, color: "var(--chart-permanent)" },
-      { key: "oncall", label: `On-call (${oncallTotal})`, color: "var(--chart-oncall)" },
-    ]));
-  } else {
-    areaSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No employees have a service area set yet." }));
-  }
-
-  /* ---------- 8. leave today (masonry-packed, see above) ----------
-     Broken down by board on a shared scale ---------- */
-  const leaveSec = ovSection("Leave today", `${totalLeave} people on leave. Segments break each type down by board.`);
-  const leaveRows = document.createElement("div");
-  leaveRows.className = "ov-leave-rows";
-  const leaveTotals = LEAVE_ZONES.map(z => boards.reduce((sum, b) => sum + stats[b.id].zones[z], 0));
-  const leaveMax = Math.max(1, ...leaveTotals);
-  LEAVE_ZONES.forEach((z, zi) => {
-    const segs = boards.map((b, i) => ({ key: b.id, label: b.name, value: stats[b.id].zones[z], color: boardColor(i) }));
-    const row = document.createElement("div");
-    row.className = "ov-leave-row";
-    row.innerHTML = `<span class="ov-leave-row-label">${ZONE_LABELS[z]}<small>${ZONE_LABELS_TH[z]}</small></span>
-      <div class="ov-leave-row-track"></div><span class="ov-leave-row-total">${leaveTotals[zi]}</span>`;
-    row.querySelector(".ov-leave-row-track").innerHTML = Charts.stackedBarH({ segments: segs, scaleMax: leaveMax, height: 18 });
-    leaveRows.appendChild(row);
-  });
-  leaveSec.appendChild(leaveRows);
-  if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
-
-  // These five cards are still meant to read as pairs — By engineer + By
-  // service area, Host coverage risk + Day/night split, then Leave today —
-  // but a FIXED 50/50 row forces each pair's row to
-  // the height of its taller card, leaving the shorter card sitting in a
-  // block of dead space before the next row can start (e.g. a short By
-  // service area under a long By engineer). A 2-column masonry keeps the
-  // same left-to-right reading order (so the first pair still lands side by
-  // side exactly as before) but lets every card after that rise into
-  // whichever column is currently shortest, closing that gap instead of
-  // reserving it.
-  const masonry = document.createElement("div");
-  masonry.id = "overview-masonry";
-  const masonryCards = [
-    ["ov.byEngineer", engSec], ["ov.byArea", areaSec], ["ov.hostRisk", hostRiskSec],
-    ["ov.dayNight", daynightSec], ["ov.leave", leaveSec],
-  ].filter(([area]) => can(area)).map(([, sec]) => sec);
-  for (const sec of masonryCards) masonry.appendChild(sec);
-  if (masonryCards.length) panel.appendChild(masonry);
   // A role with every section switched off would otherwise get a blank tab with
   // no explanation.
   if (!panel.children.length) {
     panel.innerHTML = '<p class="import-note">Your role doesn\'t have access to any of the Overview sections. Ask an admin if you think that\'s wrong.</p>';
     return;
   }
+  // Board selector first, above the attention card. Added last so the
+  // empty-page check above still sees only real sections; pointless with a
+  // single board, where "All boards" and that board are the same thing.
+  if (allBoards.length > 1) {
+    panel.prepend(ovScopeBar(boards));
+    // on a phone the pill row scrolls sideways: keep the picked board in view
+    // (set on the row itself, not scrollIntoView, which could move the page)
+    const pills = panel.querySelector(".ov-scope-pills");
+    const act = pills.querySelector(".ov-scope-pill.active");
+    if (act && pills.scrollWidth > pills.clientWidth) {
+      pills.scrollLeft = Math.max(0, act.offsetLeft + act.offsetWidth - pills.clientWidth + 8);
+    }
+  }
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(panel);
-  layoutOverviewMasonry();
-}
-
-/* JS masonry for Overview's five lower detail cards (see renderOverview
-   above) — absolutely positions each into whichever column is currently
-   shortest, so a short card doesn't leave a gap matching its taller
-   row-mate. Same shortest-column algorithm as layoutMasonry() for the
-   mission grid, just column-count-by-width instead of a fixed card width,
-   and capped at 2 columns so the cards still read as side-by-side pairs on
-   anything wide enough to show two. */
-const OV_MASONRY_GAP = 18, OV_MASONRY_MIN_COL = 340, OV_MASONRY_MAX_COLS = 2;
-function layoutOverviewMasonry() {
-  const grid = $("#overview-masonry");
-  if (!grid) return;
-  const W = grid.clientWidth;
-  if (!W) return;
-  const cards = [...grid.children];
-  const cols = Math.min(OV_MASONRY_MAX_COLS, Math.max(1, Math.floor((W + OV_MASONRY_GAP) / (OV_MASONRY_MIN_COL + OV_MASONRY_GAP))));
-  const colW = cols === 1 ? W : Math.floor((W - OV_MASONRY_GAP * (cols - 1)) / cols);
-  cards.forEach(c => {
-    c.style.position = "absolute"; c.style.width = colW + "px";
-    c.style.left = "0px"; c.style.top = "0px"; c.style.height = "auto";
-  });
-  if (!cards.length) { grid.style.height = "0px"; return; }
-  void grid.offsetWidth;   // reflow so each card's natural height is final at colW
-  const colH = new Array(cols).fill(0);
-  cards.forEach((c, i) => {
-    const j = i < cols ? i : colH.indexOf(Math.min(...colH));
-    c.style.left = (j * (colW + OV_MASONRY_GAP)) + "px";
-    c.style.top = colH[j] + "px";
-    colH[j] += c.offsetHeight + OV_MASONRY_GAP;
-  });
-  grid.style.height = (Math.max(...colH) - OV_MASONRY_GAP) + "px";
 }
 
 const FILTER_LABELS = { engineer: "Engineer", host: "Host", customer: "Customer", shift: "Shift" };
@@ -6239,7 +5848,11 @@ async function exportBoard() {
   btn.disabled = true;
   btn.textContent = "Exporting…";
   const board = D().boards.find(b => b.id === D().activeBoardId);
-  const boardName = isOrgChart() ? "Org_Chart" : (board ? board.name : "Overview");
+  // the Overview names the board its selector is on, so a one-board export
+  // can't be mistaken for the all-boards picture
+  const ovScope = isOverview() ? ovScopeBoards() : [];
+  const boardName = isOrgChart() ? "Org_Chart" : board ? board.name
+    : ovScope.length === 1 && D().boards.length > 1 ? `${ovScope[0].name} Overview` : "Overview";
   $("#capture-title").textContent = isOrgChart() ? "Organisation Chart" : boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");
@@ -6657,7 +6270,11 @@ function prepareForPrint() {
     return;
   }
   const board = D().boards.find(b => b.id === D().activeBoardId);
-  const boardName = isOrgChart() ? "Org_Chart" : (board ? board.name : "Overview");
+  // the Overview names the board its selector is on, so a one-board export
+  // can't be mistaken for the all-boards picture
+  const ovScope = isOverview() ? ovScopeBoards() : [];
+  const boardName = isOrgChart() ? "Org_Chart" : board ? board.name
+    : ovScope.length === 1 && D().boards.length > 1 ? `${ovScope[0].name} Overview` : "Overview";
   $("#capture-title").textContent = isOrgChart() ? "Organisation Chart" : boardName + " Manpower Board";
   $("#capture-date").innerHTML = `${fmtDow(state.date)} ${fmtDate(state.date)}<small>${fmtDateThai(state.date)}</small>`;
   $("#capture-header").classList.remove("hidden");

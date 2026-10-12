@@ -459,7 +459,6 @@ button, input, select, textarea, optgroup {
 #readonly-badge,
 .ctx-item,
 .hl-loc-link,
-.ov-avail-title,
 .ov-avail-ok {
   display: inline-flex;
   align-items: center;
@@ -2340,26 +2339,48 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 /* ===== Overview ===== */
 #overview-panel { display: flex; flex-direction: column; gap: 18px; }
 
-/* ===== status bar: the verdict, before any number. Amber when someone is
-   idle, calm green when everyone permanent is placed — same two colours as
-   .ov-avail / .ov-avail-ok below, so the page uses one warning vocabulary. ===== */
-.ov-status-bar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-left-width: 5px;
-  border-left-style: solid;
-  border-radius: var(--r-box);
-  padding: 12px 18px;
+
+/* ===== board selector: the first row of the tab. Pills, one per board plus
+   "All boards", each with that board's roster count; the picked one is a
+   solid navy fill. Past a handful of boards the row scrolls sideways on its
+   own (like the phone tab strip) rather than wrapping into a wall. ===== */
+.ov-scope-bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ov-scope-label { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; flex: none; }
+.ov-scope-pills {
+  display: flex; gap: 6px; min-width: 0;
+  overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; padding: 2px;   /* room for the focus ring */
+  position: relative;                    /* offsetParent for keeping the picked pill in view (app.js) */
 }
-.ov-status-main { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
-.ov-status-heading { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.ov-status-title { font-size: 17px; font-weight: 700; }
-.ov-status-date { font-size: 12.5px; color: var(--muted); }
-.ov-status-line { font-size: 13px; }
-.ov-status-shifts { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ov-scope-pills::-webkit-scrollbar { display: none; }
+.ov-scope-pill {
+  flex: none; display: inline-flex; align-items: center; gap: 7px;
+  min-height: 36px; padding: 0 14px;
+  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
+  color: var(--text); background: var(--panel);
+  border: 1px solid var(--border); border-radius: 999px;
+  cursor: pointer; transition: background-color .15s, border-color .15s, color .15s;
+}
+.ov-scope-pill:hover { background: var(--hover-tint); }
+.ov-scope-pill:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-scope-pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ov-scope-pill .ov-table-dot { margin: 0; }
+.ov-scope-pill.active .ov-table-dot { box-shadow: 0 0 0 2px #fff; }
+.ov-scope-count {
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--bg); color: var(--muted);
+}
+.ov-scope-pill.active .ov-scope-count { background: rgba(255, 255, 255, .2); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .ov-scope-pill { transition: none; } }
+@media (max-width: 640px) { .ov-scope-label { display: none; } }
+
+/* ===== group headings between the Overview's blocks ("In detail", "Over
+   time"): plain text on the page ground, no box — they mark a change of time
+   frame, they are not another card to read. ===== */
+.ov-group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 8px 2px -6px; }
+.ov-group-head h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--primary-text); }
+.ov-group-sub { font-size: 12px; color: var(--muted); }
 
 /* ===== Overview dashboard: KPI strip + chart sections ===== */
 .ov-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -2383,17 +2404,6 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-kpi-meter-track { flex-grow: 1; height: 8px; border-radius: 999px; overflow: hidden; }
 .ov-kpi-meter-val { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
 
-/* Overview's six lower detail cards (By engineer, By service area, Position
-   coverage, Host coverage risk, Day/night split, Leave today) read as three
-   pairs, but a fixed 50/50 row forces each pair's row to its taller card's
-   height, stranding the shorter card above a block of dead space — so
-   layoutOverviewMasonry() (app.js) absolutely positions them into a JS
-   masonry pack instead (max 2 columns, so the common case still reads as
-   side-by-side pairs): each card rises into whichever column is currently
-   shortest. This container just needs to be a positioning root; its height
-   is set inline once the cards are measured and packed. */
-#overview-masonry { position: relative; }
-#overview-masonry > .ov-section { position: absolute; }
 
 .ov-section {
   background: var(--panel);
@@ -2404,7 +2414,102 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-section h3 { font-size: 15px; margin-bottom: 2px; }
 .ov-section-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; max-width: 760px; }
 
-/* ===== Overview comparison table (By board / By engineer) =====
+/* ===== Overview: the parts added with the direction-A layout ===== */
+.ov-muted { color: var(--muted); font-size: 12px; font-weight: 500; }
+.ov-linkbtn { border: 0; background: none; padding: 2px 4px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--primary-text); cursor: pointer; }
+.ov-linkbtn:hover { text-decoration: underline; }
+.ov-linkbtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; border-radius: 4px; }
+.ov-tag { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; border: 1px solid; font-size: 11.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ov-tag.warn { color: var(--warn-text); background: var(--warn-surface); border-color: var(--warn-line); }
+.ov-tag.bad { color: var(--danger-text); background: var(--danger-tint); border-color: var(--danger-line); }
+.ov-tag.mute { color: var(--muted); background: var(--bg-soft); border-color: var(--border); }
+.ov-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.ov-mini small { font-weight: 500; color: var(--muted); font-size: 11px; margin-left: 5px; }
+.ov-info { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--border);
+  font-size: 10.5px; font-weight: 700; color: var(--muted); background: var(--panel); vertical-align: 1px; cursor: help; }
+.ov-legend { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.ov-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ov-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.ov-legend b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* attention card: the status bar and Action queue merged — one fact, said once */
+.ov-attn { background: var(--panel); border: 1px solid var(--warn-line); border-left: 5px solid var(--warn); border-radius: var(--r-box); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.ov-attn.ok { border-color: var(--border); border-left-color: var(--ok-text); }
+.ov-attn-top { display: flex; align-items: flex-start; gap: 10px 16px; flex-wrap: wrap; }
+.ov-attn-main { flex: 1 1 280px; min-width: 0; }
+.ov-attn-title { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; }
+.ov-attn-title .ic { color: var(--warn-text); }
+.ov-attn-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.ov-attn-shifts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ov-attn-shift { font-size: 12.5px; border: 1px solid var(--border); background: var(--bg-soft); border-radius: 6px; padding: 2px 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ov-attn-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 18px; }
+.ov-attn-group h4 { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 0 0 6px; }
+.ov-attn-calm { display: flex; align-items: center; gap: 10px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); }
+.ov-attn-calm span { flex: 1 1 auto; }
+
+/* "In detail": two fixed pairs — By engineer | By service area, Shifts | Host coverage */
+.ov-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .ov-detail-grid { grid-template-columns: 1fr; } }
+
+.ov-table th.r, .ov-table td.r { text-align: right; padding-right: 10px; }
+.ov-row-click { cursor: pointer; }
+.ov-row-click:hover td { background: var(--hover-tint); }
+.ov-row-click:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ov-util { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.ov-util-track { width: 70px; height: 8px; border-radius: 999px; background: var(--bg-soft); overflow: hidden; }
+.ov-util-track i { display: block; height: 100%; border-radius: 999px; background: var(--chart-assigned); }
+.ov-mix { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ov-board-cards { display: none; flex-direction: column; gap: 8px; }
+.ov-bcard { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; }
+.ov-bcard-util { font-size: 12px; color: var(--muted); }
+.ov-bcard-util b { color: var(--text); font-size: 15px; }
+.ov-bcard-kv { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 8px; font-size: 12px; }
+.ov-bcard-kv b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+.ov-bcard-kv b.warn { color: var(--warn-text); }
+.ov-bcard-kv small { font-size: 12px; color: var(--muted); font-weight: 600; }
+.ov-bcard-kv span { color: var(--muted); }
+@media (max-width: 640px) { .ov-boards-table { display: none; } .ov-board-cards { display: flex; } }
+
+/* by engineer (today) */
+.ov-shift-tag { display: inline-flex; padding: 0 6px; margin-left: 3px; border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .3px; }
+.ov-shift-tag.day { color: var(--primary-text); background: var(--emp-pos-bg); }
+.ov-shift-tag.night { color: #fff; background: var(--night); }
+.ov-crewcell { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.ov-crewbar { display: block; }
+.ov-rk-sub { display: block; font-size: 11.5px; color: var(--muted); }
+.ov-eng-free { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.ov-eng-free .ov-table-nameinner { display: inline-flex; gap: 5px; }
+
+/* host coverage: one row per thin host, its people and where they are today */
+.ov-host { border: 1px solid var(--border); border-left: 4px solid var(--warn); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ov-host.risk { border-left-color: var(--danger); }
+.ov-host-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ov-host-name { font-weight: 700; font-size: 13.5px; }
+.ov-person { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; border: 1px solid var(--border); background: var(--bg-soft); border-radius: 6px; padding: 2px 8px; }
+.ov-person small { color: var(--muted); font-size: 11px; }
+.ov-host-note { font-size: 12px; color: var(--muted); margin: 0; }
+
+/* History: four average tiles; the picked one is charted below */
+.ov-htiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+@media (max-width: 720px) { .ov-htiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ov-htile { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+.ov-htile:hover { background: var(--hover-tint); }
+.ov-htile[aria-pressed="true"] { border-color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-text); }
+.ov-htile:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-htile-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ov-htile-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ov-htile-value small, .ov-htile-sub { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.ov-hchart { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ov-hchart-head { font-size: 13px; margin-bottom: 4px; }
+
+/* Engineer workload: ranked bars + trend — missions and crew in one table */
+.ov-rank { --ov-rkmax: 150px; }
+.ov-rank td { vertical-align: top; }
+.ov-rk-bar { display: inline-flex; align-items: center; gap: 8px; }
+.ov-rk-bar > span { display: block; }
+@media (max-width: 640px) { .ov-rank { --ov-rkmax: 64px; } .ov-rank .ov-wide { display: none; } }
+
+/* ===== Overview tables (By board / By engineer / Engineer workload) =====
    Rows scale where a per-board sentence didn't: 6+ boards just add rows. Each
    numeric cell pairs an inline bar (quick visual ranking) with the printed
    number (exact value, and the table view the palette owes us — nothing here
@@ -2422,7 +2527,6 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
-.ov-table th.ov-table-numhead { min-width: 96px; }   /* width itself is set per-table in ovCompareTable */
 .ov-table td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .ov-table tr:last-child td { border-bottom: none; }
 /* the <td> stays a real table-cell (so row borders align across the row); the
@@ -2436,51 +2540,7 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-table-label { font-weight: 600; line-height: 1.25; }
 .ov-table-label small { display: block; font-weight: 400; font-size: 10.5px; color: var(--muted); }
 .ov-cell { display: flex; align-items: center; gap: 8px; }
-/* a bar-less cell: the number is the whole story (an exception count, or the
-   all-boards total whose bar would be full-width by definition) */
-.ov-cell.plain { justify-content: flex-start; }
-/* all-boards summary row: reads as a sum, not as another board */
-.ov-table-totalrow td { border-top: 2px solid var(--border); border-bottom: none; padding-top: 10px; }
-.ov-table-totalrow .ov-table-label { font-weight: 700; }
-.ov-table-totalrow .ov-cell-val { font-weight: 700; color: var(--primary-text); }
-.ov-cell-val.warn { color: var(--warn-text); }
-:root[data-theme="dark"] .ov-cell-val.warn { color: #e0a94a; }
-.ov-cell-bar {
-  flex: 1 1 auto;
-  min-width: 34px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bg-soft);
-  overflow: hidden;
-}
-/* a meter is a ratio against a fixed 100 limit, so give it a visible full-scale
-   track — a plain bar is scaled against the column's own max instead */
-.ov-cell-bar.meter { background: var(--track-off); opacity: .45; }
-.ov-cell-bar i { display: block; height: 100%; border-radius: 999px; }
-.ov-cell-val {
-  flex: none;
-  min-width: 30px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;   /* these DO align vertically down a column */
-  font-weight: 600;
-}
 
-/* (the .ov-deploy-* rules lived here for the Deployment donut + per-board
-   stacked bars, dropped in favour of the "By board" table's utilization meter
-   and all-boards total row) */
-
-/* "By board" table's Contract mix cell: a small stacked bar plus its own
-   count/share text (see contractMixCell() in app.js) — reuses .ov-cell's
-   flex row, just needs the bar to size itself and the label to stay put. */
-.ov-mix-bar { flex: 1 1 auto; min-width: 60px; }
-.ov-mix-label { flex: none; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-/* leave-by-type rows: label | stacked bar (shared scale) | total */
-.ov-leave-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
-.ov-leave-row { display: grid; grid-template-columns: 130px 1fr 32px; align-items: center; gap: 10px; }
-.ov-leave-row-label { font-size: 13px; font-weight: 600; }
-.ov-leave-row-label small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
-.ov-leave-row-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
 
 .ov-area-rows { display: flex; flex-direction: column; gap: 10px; max-width: 640px; margin-bottom: 10px; }
 .ov-area-row { display: grid; grid-template-columns: minmax(0, 132px) 1fr 64px; align-items: center; gap: 10px; }
@@ -2509,13 +2569,12 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 /* day/night split: two headline tiles, then a per-board breakdown row */
 .ov-daynight-tiles { display: flex; gap: 10px; margin-bottom: 14px; }
 .ov-daynight-tile { flex: 1 1 0; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
-.ov-daynight-num { display: flex; align-items: baseline; gap: 7px; }
+.ov-daynight-num { display: flex; align-items: center; gap: 7px; }
 .ov-daynight-num .num { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ov-daynight-sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
 .ov-daynight-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
-.ov-daynight-row { display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 10px; }
+.ov-daynight-row { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 10px; }
 .ov-daynight-row-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
-.ov-daynight-row-bar { display: flex; height: 18px; border-radius: 3px; overflow: hidden; }
 .ov-daynight-row-total { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
 /* DAY/NIGHT chips — same convention as the board view's Day/Night stat chips
    (statChip/.stat-chip-night): NIGHT is the fixed --night pill, DAY is the
@@ -2524,56 +2583,8 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-shift-chip.day { color: var(--primary-text); background: var(--emp-pos-bg); }
 .ov-shift-chip.night { color: #fff; background: var(--night); }
 
-/* host coverage risk: only 1-2-person-ever hosts are shown (see
-   renderOverview), so every row rendered here is a .risk row — amber. */
-/* flex-wrap so a narrow column drops "who" onto its own line instead of
-   squeezing the host name into a cramped, overlapping wrap — at full width
-   all three still sit on one line. */
-/* Host coverage risk — one grid, so the columns stop wandering.
-   Before: the host name was `flex: 1 1 140px` and the inspector list
-   `flex: 1 1 auto`, so BOTH outer columns were flexible and the count in the
-   middle landed wherever their text lengths left it — a different x on every
-   row. A grid gives the three columns fixed tracks and the raggedness goes.
 
-   Two other things changed with it. The count is a bare number now, with the
-   word said once in the column header instead of repeated down the list. And
-   severity is real: the rail is amber only for a host with a SINGLE trained
-   inspector. Every row used to be `risk`, which spent the warning colour on
-   all six and therefore marked none of them. */
-.ov-hostrisk-head,
-.ov-hostrisk-row {
-  display: grid;
-  grid-template-columns: 3px 1fr 62px minmax(130px, 1.1fr);
-  align-items: center;
-  gap: 0 12px;
-}
-.ov-hostrisk-head {
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: .11em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding-bottom: 7px;
-}
-.ov-hostrisk-head .r { text-align: right; }
-.ov-hostrisk-rows { border-top: 1px solid var(--border); }
-.ov-hostrisk-row { padding: 9px 0; border-bottom: 1px solid var(--border); }
-/* the rail carries severity, so the row itself needs no fill */
-.ov-hostrisk-rail { width: 3px; height: 22px; border-radius: 2px; background: var(--border); }
-.ov-hostrisk-row.risk .ov-hostrisk-rail { background: var(--warn); }
-.ov-hostrisk-name { font-size: 13px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-hostrisk-count { font-size: 12.5px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
-.ov-hostrisk-row.risk .ov-hostrisk-count { color: var(--warn-text); }
-.ov-hostrisk-who { font-size: 11px; color: var(--muted); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-hostrisk-note { font-size: 11.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
-
-/* trend: title+caption on the left, metric switcher + range switcher on the
-   right — two independent .ov-trend-btns groups (a button row, no wrapping
-   .ov-trend-controls margin needed since both now live inside .ov-trend-head) */
-.ov-trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
-.ov-trend-intro h3 { font-size: 15px; margin: 0 0 2px; }
-.ov-trend-intro .ov-section-sub { margin: 0; }
-.ov-trend-btns { display: flex; gap: 6px; }
+.ov-trend-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .ov-trend-btns .btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 /* no max-width: the chart is drawn at the container's measured width
    (fillLineChart in app.js), and 6 boards over 30 days needs the whole row */
@@ -2582,20 +2593,16 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 /* ===== Overview History + Engineer workload =====
    The range control reuses .ov-trend-btns for its preset row so the two
    header control strips read as the same kind of thing, and adds a native
-   date pair and a board <select> beside it. Wraps onto its own line on a
+   date pair (the board comes from the selector at the top of the tab). Wraps onto its own line on a
    narrow panel rather than squeezing the heading — it's five presets plus
    two date fields, not the two small groups the Trend header carries. */
 .ov-history-controls { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
-/* Utilization is a MODE switch, not another preset — visually separated from
-   the range controls by pushing it to the far right of the row (wraps onto
-   its own line first on a narrow panel, same as everything else here). */
-.ov-history-util-toggle { margin-left: auto; }
 .ov-history-dates { display: flex; align-items: center; gap: 6px; }
 .ov-history-dash { color: var(--muted); font-size: 12px; }
 /* matched to .btn-small so the whole strip sits on one baseline; the native
    picker indicator is left alone (it is the affordance) but recoloured for
    dark mode, where the default black glyph disappears into the field */
-.ov-history-date, .ov-history-board {
+.ov-history-date {
   font: inherit;
   font-size: 12px;
   padding: 2px 8px;
@@ -2605,36 +2612,17 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   border-radius: 6px;
   min-height: 26px;
 }
-.ov-history-board { max-width: 180px; }
-.ov-history-date:focus-visible, .ov-history-board:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-history-date:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 [data-theme="dark"] .ov-history-date::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.7); }
-/* the range averages, under the legend: one chip per VISIBLE measure, so the
-   chip row and the chart always describe the same set of lines */
-.ov-history-avgs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.ov-history-avgs-label { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
 /* The Overview is exportable too (see the isOverview() branch in exportBoard),
    and #board-capture takes the whole panel with it. A native date input and a
    <select> are the two controls html2canvas reproduces least predictably, and
    they carry nothing the export needs: the section subtitle already prints the
-   resolved range, working-day count and board scope as plain text. */
-body.exporting .ov-history-controls { display: none; }
-/* Engineer workload is the first section to put a chart legend directly above
-   a table; without this the legend row collides with the table's column heads. */
-.ov-section .chart-legend + .ov-table-wrap { margin-top: 14px; }
+   resolved range, working-day count and board scope as plain text — as do the
+   status bar and the group headings for the board selector. */
+body.exporting .ov-history-controls,
+body.exporting .ov-scope-bar { display: none; }
 
-/* History + Engineer workload read as one connected block (they already
-   share this one range/board control): one rounded, shadowed box instead of
-   two, with a single hairline seam where Engineer workload's own top border
-   sits. overflow:hidden lets the group's radius clip both children instead
-   of each section needing its own corner rules. */
-.ov-history-group {
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--r-box);
-  overflow: hidden;
-}
-.ov-history-group > .ov-section { border-radius: 0; box-shadow: none; }
-.ov-history-group > .ov-section:first-child { border-bottom: none; }
 
 /* ===== chart marks (SVG, shared by every Overview chart) ===== */
 .chart-svg { display: block; overflow: visible; }
@@ -2684,21 +2672,6 @@ button.chart-legend-item:hover { text-decoration: underline; }
   border-radius: var(--r);
   padding: 9px 11px;
 }
-.ov-avail-title { font-size: 12px; font-weight: 700; color: var(--warn-text); margin-bottom: 6px; }
-/* Action queue's header row: the amber count on the left, the per-board
-   breakdown ("Non-Rayong 7 · Rayong 3") on the right — one aggregated box
-   instead of a repeated card per board. */
-.ov-avail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
-.ov-avail-head .ov-avail-title { margin-bottom: 0; }
-.ov-avail-sub { font-size: 11px; color: var(--muted); }
-.ov-avail-cards { display: flex; flex-wrap: wrap; gap: 5px; }
-/* calm on-call box: collapsed by default, a plain-text toggle instead of a
-   second heading — on-call being uncalled is surge capacity working as
-   intended, not an exception that deserves its own always-open chip list */
-.ov-avail-calm-row { display: flex; align-items: center; gap: 10px; }
-.ov-avail-calm-text { font-size: 12.5px; color: var(--muted); flex-grow: 1; }
-.ov-avail-toggle { font-size: 11.5px; font-weight: 700; color: var(--primary-text); background: none; border: none; cursor: pointer; padding: 0; flex: none; }
-.ov-avail-calm .ov-avail-cards { margin-top: 8px; }
 .ov-mini {
   display: inline-block;
   padding: 3px 8px;
@@ -2719,12 +2692,6 @@ button.chart-legend-item:hover { text-decoration: underline; }
   font-size: 12.5px;
   font-weight: 700;
 }
-/* on-call being unassigned is normal, not a warning — plain/neutral, not amber */
-.ov-avail-calm {
-  border-color: var(--border);
-  background: var(--bg-soft);
-}
-.ov-avail-calm .ov-avail-title { color: var(--muted); }
 
 /* export mode: freeze layout width for consistent capture; drop the panel margin */
 /* Pinned, not just floored: with only a min-width, a 1920px monitor laid the
