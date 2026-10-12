@@ -3437,7 +3437,9 @@ function msButtonLabel(key) {
    span so "All" can go quiet and a real selection can take the active tint */
 function setMsLabel(btn, key) {
   const sel = state.filters[key];
-  btn.innerHTML = `${FILTER_LABELS[key]}: <span class="ms-val">${sel.length ? sel.length + " selected" : "All"}</span>`;
+  btn.innerHTML = sel.length
+    ? `${FILTER_LABELS[key]}: <span class="ms-val">${sel.length}<span class="ms-all"> selected</span></span>`
+    : `${FILTER_LABELS[key]}<span class="ms-val ms-all">: All</span>`;
   btn.classList.toggle("ms-active", sel.length > 0);
 }
 

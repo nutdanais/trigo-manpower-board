@@ -127,6 +127,31 @@ async function step(name, fn) {
       assert.ok(undo.x < reset.x, "Undo then Reset Board");
     });
 
+    await step("row 1 stays on ONE line at laptop width on an editable future day (Holiday toggle showing)", async () => {
+      await go(FUTURE);
+      await p.setViewportSize({ width: 1520, height: 900 });   // about 1250px of toolbar beside the right-hand panel
+      assert.equal(await p.isVisible("#holiday-toggle"), true, "the widest case: Holiday toggle visible");
+      const tops = await p.evaluate(() => [...document.querySelectorAll("#toolbar-row1 button:not(.hidden), #toolbar-row1 label:not(.hidden), #toolbar-row1 select")]
+        .filter((e) => e.offsetWidth && e.offsetParent).map((e) => { const r = e.getBoundingClientRect(); return Math.round((r.top + r.height / 2) / 8) * 8; }));   // centres, bucketed: controls differ a little in height
+      assert.ok(tops.length >= 9, "all the controls are there: " + tops.length);
+      assert.equal(new Set(tops).size, 1, "every control on the same line, centres: " + [...new Set(tops)]);
+      assert.equal((await p.innerText("#btn-undo")).trim(), "Undo", "the Undo word is still there for screen readers");
+      // and with a couple of filters switched on (they are wider while active)
+      await p.evaluate(() => { state.filters.engineer = ["eng-1"]; state.filters.host = ["Host Alpha"]; renderFilterOptions(); });
+      const tops2 = await p.evaluate(() => [...document.querySelectorAll("#toolbar-row1 button:not(.hidden), #toolbar-row1 label:not(.hidden), #toolbar-row1 select")]
+        .filter((e) => e.offsetWidth && e.offsetParent).map((e) => { const r = e.getBoundingClientRect(); return Math.round((r.top + r.height / 2) / 8) * 8; }));
+      assert.equal(new Set(tops2).size, 1, "still one line with two filters on, centres: " + [...new Set(tops2)]);
+      assert.equal((await p.locator('#filters .ms[data-filter="engineer"] .ms-btn').textContent()).trim(), "Engineer: 1 selected", "full text kept");
+      await p.evaluate(() => { state.filters.engineer = []; state.filters.host = []; renderFilterOptions(); });
+      await p.setViewportSize({ width: 1400, height: 900 });
+      await go(SRC);
+    });
+
+    await step("the tiles are compact (under 44px tall)", async () => {
+      const hgt = await p.evaluate(() => Math.max(...[...document.querySelectorAll("#stats-bar .stat-tile")].map((t) => t.getBoundingClientRect().height)));
+      assert.ok(hgt < 44, "tile height " + hgt);
+    });
+
     for (const width of [1400, 1100, 900]) {
       await step("Export stays at the right edge of row 2 at " + width + "px, even when the row wraps", async () => {
         await p.setViewportSize({ width, height: 900 });

@@ -590,20 +590,20 @@ button, input, select, textarea, optgroup {
    so the tiles show that structure instead of a flat run of numbers. State is never
    colour alone: every tile carries its label, and Standby adds an icon when it is
    not 0 (the one count a planner acts on). Zero fades. */
-#stats-bar.stats-tiles { gap: 8px; align-items: stretch; }
-.stat-lead { display: flex; flex-direction: column; justify-content: center; padding: 0 10px 0 2px; }
-.st-l { font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+#stats-bar.stats-tiles { gap: 6px; align-items: stretch; }
+.stat-lead { display: flex; flex-direction: column; justify-content: center; padding: 0 8px 0 2px; }
+.st-l { font-size: 10.5px; font-weight: 600; line-height: 1.2; color: var(--muted); white-space: nowrap; }
 .stat-lead b, .stat-tile .st-main b {
   font-family: var(--font-condensed);
-  font-size: 22px; line-height: 1.1; font-weight: 700;
+  font-size: 17px; line-height: 1.1; font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
 .stat-tile {
-  display: flex; align-items: center; gap: 14px;
-  min-width: 96px; padding: 6px 13px 6px 10px;
+  display: flex; align-items: center; gap: 10px;
+  min-width: 72px; padding: 3px 10px 3px 8px;
   border: 1px solid var(--border); border-left: 3px solid var(--tc, var(--border));
-  border-radius: 8px; background: var(--panel);
+  border-radius: 6px; background: var(--panel);
 }
 .stat-tile .st-main { display: flex; flex-direction: column; }
 .st-asg { --tc: var(--stat-asg); }
@@ -615,10 +615,11 @@ button, input, select, textarea, optgroup {
 .st-alert { background: var(--danger-tint); border-color: var(--danger-line); border-left-color: var(--stat-standby); }
 .st-alert .st-main b, .st-alert .st-l { color: var(--danger-text); }
 .st-ico { display: inline-flex; color: var(--danger-text); }
-.st-shift { display: flex; flex-direction: column; gap: 2px; padding-left: 12px; border-left: 1px solid var(--border); }
-.st-shift span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; }
-.st-shift b { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
-.st-shift .ic { width: 14px; height: 14px; }
+.st-ico .ic { width: 14px; height: 14px; }
+.st-shift { display: flex; flex-direction: column; gap: 0; padding-left: 9px; border-left: 1px solid var(--border); }
+.st-shift span { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; line-height: 1.35; color: var(--muted); white-space: nowrap; }
+.st-shift b { font-size: 12px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.st-shift .ic { width: 12px; height: 12px; }
 
 /* "By area": the same people as Total, cut by service area (so it adds up to Total,
    with a "No area" chip for anyone without one). A quiet line of its own under the
@@ -626,8 +627,8 @@ button, input, select, textarea, optgroup {
 body.board-view #toolbar-row2 #area-bar { order: 5; flex: 0 0 100%; gap: 3px 14px; margin-top: -2px; }
 #area-bar:empty { display: none; }
 .ar-cap { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
-.area-chip { display: inline-flex; align-items: baseline; gap: 4px; font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
-.area-chip b { font-size: 12.5px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.area-chip { display: inline-flex; align-items: baseline; gap: 4px; font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.area-chip b { font-size: 12px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 
 /* ===== Toolbar =====
    Two rows stacked in one bordered block: row 1 is what you DO (action →
@@ -673,8 +674,14 @@ body.board-view #toolbar-row2 #area-bar { order: 5; flex: 0 0 100%; gap: 3px 14p
   color: var(--primary-text);
   font-weight: 600;
 }
-/* an unfiltered filter shows its value quietly */
+/* an unfiltered filter shows just its name, a filtered one its count ("Engineer: 2"):
+   ": All" / " selected" stay in the text for screen readers (and textContent) but are
+   not drawn, which is what keeps row 1 on one line */
 .ms-btn .ms-val { color: var(--muted); }
+.ms-btn .ms-all { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Undo is an icon on a desktop (it has Ctrl+Z and a tooltip); the word comes back in the phone's dropdown */
+#btn-undo .undo-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+#btn-undo { width: var(--ctl-h); padding: 0; }
 .ms-btn.ms-active .ms-val { color: inherit; font-weight: 700; }
 /* #toolbar-more is a no-op wrapper above ~640px — display:contents makes its
    children ordinary flex items of #toolbar-row1 itself, so nothing about the
@@ -1530,6 +1537,8 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   #stats-bar.stats-tiles .stat-tile { flex: 1 1 calc(50% - 4px); min-width: 0; }
   #stats-bar.stats-tiles .stat-lead { flex: 0 0 100%; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: 8px; padding: 0 2px; }
   #toolbar-more #row1-end { display: contents; }
+  #toolbar-more #btn-undo { padding: 0 13px; }
+  #toolbar-more #btn-undo .undo-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
   #toolbar-right { margin-left: 0; width: 100%; justify-content: flex-start; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
