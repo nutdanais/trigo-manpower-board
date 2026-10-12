@@ -52,3 +52,13 @@ Then republish that file to the same artifact URL so the link keeps working.
 Each `.dc.html` is a self-contained static page; the `<script src="./support.js">`
 line in the head is a placeholder the canvas runtime swaps at render time — leave
 it alone.
+
+## Stats bar directions (2026-10-12)
+
+`stats-bar-directions.html` is a standalone page (open it in any browser): a review of the
+Board tab's toolbar (findings S1–S9), then four directions for the stats bar — A Grouped &
+hushed, B Headline + composition bar, C KPI tiles, D Summary line + details popover — as
+live mockups driven by one scenario object (normal / short-staffed / holiday day, four
+widths, row-1 as-is or tidied, light/dark), a comparison table with live toolbar heights,
+and a recommendation (B plus the row-1 tidy). Like the rest of this folder it is not loaded
+by the app.
