@@ -32,6 +32,8 @@
 
   --bg-soft: #eef1f5;        /* subtle fills: inactive tabs, stat chips, zone labels */
   --hover-tint: #eef3fb;     /* hover highlight for menu/dropdown rows */
+  /* stats tiles: each is >= 3:1 on the panel, and always paired with its label */
+  --stat-asg: #2a78d6; --stat-leave: #b87800; --stat-standby: #cf3a39; --stat-free: #78808a; --stat-hol: #7c6fd0;
   --track-off: #929496;      /* toggle switch, off state — CI guide neutral grey */
   --pool-tint: #e0f2fe;      /* "Available" zone label tint (export pools) */
   /* leave rails: neutral, not pink — every rail on the board is a leave type now,
@@ -149,6 +151,7 @@
   --warn-line: #6a5426;
   --bg-soft: #232a33;
   --hover-tint: #232c38;
+  --stat-asg: #3987e5; --stat-leave: #c98500; --stat-standby: #d0334f;
   --track-off: #3a424b;
   /* employee card surface, a step lighter than --panel/--bg-soft so cards
      read as distinct from the board underneath them (was previously fixed
@@ -575,25 +578,56 @@ button, input, select, textarea, optgroup {
   content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   width: 1px; height: 14px; background: var(--border);
 }
-/* Night keeps a mark so it still reads at a glance, but a small dark dot
-   rather than a filled black pill — a pill in the middle of a row of plain
-   counters drew the eye to a label, not to anything that needed attention.
-   --night is untouched: the mission card still uses it at full strength. */
-.stat-chip-night::after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--night);
-  align-self: center;
-  flex: none;
-}
-:root[data-theme="dark"] .stat-chip-night::after { background: var(--text); }
 #area-bar .stat-chip { gap: 6px; }
 /* Manpower's per-area counts — same stats cluster as #stats-bar/#area-bar,
    in row 2 of the shared #toolbar. */
 #emplist-area-bar { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
 #emplist-area-bar .stat-chip { gap: 6px; }
+
+/* ===== Board stats: KPI tiles =====
+   Total, then Assigned (with Day / Night inside it), Leave, Standby, [Holiday],
+   On-call free. Status counts add up to Total and Day + Night add up to Assigned,
+   so the tiles show that structure instead of a flat run of numbers. State is never
+   colour alone: every tile carries its label, and Standby adds an icon when it is
+   not 0 (the one count a planner acts on). Zero fades. */
+#stats-bar.stats-tiles { gap: 8px; align-items: stretch; }
+.stat-lead { display: flex; flex-direction: column; justify-content: center; padding: 0 10px 0 2px; }
+.st-l { font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.stat-lead b, .stat-tile .st-main b {
+  font-family: var(--font-condensed);
+  font-size: 22px; line-height: 1.1; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.stat-tile {
+  display: flex; align-items: center; gap: 14px;
+  min-width: 96px; padding: 6px 13px 6px 10px;
+  border: 1px solid var(--border); border-left: 3px solid var(--tc, var(--border));
+  border-radius: 8px; background: var(--panel);
+}
+.stat-tile .st-main { display: flex; flex-direction: column; }
+.st-asg { --tc: var(--stat-asg); }
+.st-leave { --tc: var(--stat-leave); }
+.st-standby { --tc: var(--stat-standby); }
+.st-free { --tc: var(--stat-free); }
+.st-hol { --tc: var(--stat-hol); }
+.st-zero .st-main b { color: var(--muted); font-weight: 600; }
+.st-alert { background: var(--danger-tint); border-color: var(--danger-line); border-left-color: var(--stat-standby); }
+.st-alert .st-main b, .st-alert .st-l { color: var(--danger-text); }
+.st-ico { display: inline-flex; color: var(--danger-text); }
+.st-shift { display: flex; flex-direction: column; gap: 2px; padding-left: 12px; border-left: 1px solid var(--border); }
+.st-shift span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.st-shift b { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.st-shift .ic { width: 14px; height: 14px; }
+
+/* "By area": the same people as Total, cut by service area (so it adds up to Total,
+   with a "No area" chip for anyone without one). A quiet line of its own under the
+   tiles and the right-hand cluster, never mixed in with them. */
+body.board-view #toolbar-row2 #area-bar { order: 5; flex: 0 0 100%; gap: 3px 14px; margin-top: -2px; }
+#area-bar:empty { display: none; }
+.ar-cap { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+.area-chip { display: inline-flex; align-items: baseline; gap: 4px; font-size: 11.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.area-chip b { font-size: 12.5px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 
 /* ===== Toolbar =====
    Two rows stacked in one bordered block: row 1 is what you DO (action →
@@ -618,6 +652,30 @@ button, input, select, textarea, optgroup {
    row it belongs to. */
 #toolbar-row1 { position: relative; }
 .toolbar-spacer { flex: 1; }
+/* Row 1 reads as three zones: make (create buttons) | narrow (filters, Hidden, sort) |
+   fix (Undo, Reset Board), the last pinned right. Row 2: stats on the left, one
+   cluster (count / bulk edit / names / read-only / export) pinned right, even when it
+   wraps onto a line of its own. */
+#row1-end, #toolbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+#toolbar-right { flex-wrap: wrap; justify-content: flex-end; }
+/* a native select sizes to its LONGEST option ("Names: Thai + English"); size it to the
+   one showing instead. Browsers without field-sizing keep the wider select. */
+#card-names { field-sizing: content; }
+/* the outline stands in for a second filled button next to New Mission */
+.btn-outline-primary { color: var(--primary-text); border-color: color-mix(in srgb, var(--primary-text) 40%, transparent); font-weight: 600; }
+/* Hide/Unhide: quiet until something is hidden, then the same tint as an active filter */
+.btn-hidden-chip { border-color: transparent; background: transparent; color: var(--muted); }
+.btn-hidden-chip:hover { background: var(--hover-tint); color: var(--text); }
+.btn-hidden-chip.is-on,
+.ms-btn.ms-active {
+  background: color-mix(in srgb, var(--primary-text) 10%, var(--panel));
+  border-color: color-mix(in srgb, var(--primary-text) 35%, transparent);
+  color: var(--primary-text);
+  font-weight: 600;
+}
+/* an unfiltered filter shows its value quietly */
+.ms-btn .ms-val { color: var(--muted); }
+.ms-btn.ms-active .ms-val { color: inherit; font-weight: 700; }
 /* #toolbar-more is a no-op wrapper above ~640px — display:contents makes its
    children ordinary flex items of #toolbar-row1 itself, so nothing about the
    desktop layout changes. Below that width (see the phone block) it becomes
@@ -1469,6 +1527,10 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
      just tightens the spacing so more chips fit per row */
   #toolbar-row1, #toolbar-row2 { gap: 8px 14px; }
   #area-bar { gap: 10px; }
+  #stats-bar.stats-tiles .stat-tile { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  #stats-bar.stats-tiles .stat-lead { flex: 0 0 100%; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: 8px; padding: 0 2px; }
+  #toolbar-more #row1-end { display: contents; }
+  #toolbar-right { margin-left: 0; width: 100%; justify-content: flex-start; }
   #stats-bar .stat-chip { padding: 2px 8px; }
   #stats-bar .stat-chip:not(:first-child)::before { left: 0; }
 
@@ -2576,9 +2638,9 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-daynight-row { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 10px; }
 .ov-daynight-row-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
 .ov-daynight-row-total { font-size: 12px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
-/* DAY/NIGHT chips — same convention as the board view's Day/Night stat chips
-   (statChip/.stat-chip-night): NIGHT is the fixed --night pill, DAY is the
-   lighter themed-navy tint used for position pills elsewhere on the board. */
+/* DAY/NIGHT chips: NIGHT is the fixed --night pill, DAY is the lighter
+   themed-navy tint used for position pills elsewhere on the board. (The board's
+   own stats show Day / Night as sun and moon icons inside the Assigned tile.) */
 .ov-shift-chip { font-size: 11px; font-weight: 700; letter-spacing: .3px; border-radius: 999px; padding: 2px 8px; flex: none; }
 .ov-shift-chip.day { color: var(--primary-text); background: var(--emp-pos-bg); }
 .ov-shift-chip.night { color: #fff; background: var(--night); }

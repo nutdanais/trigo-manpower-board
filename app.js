@@ -930,6 +930,10 @@ function render() {
   // "Add Mission" (only the missions an engineer picks) or by hand
   $("#btn-hide-missions").classList.toggle("hidden", !boardEdit || fc);
   $("#btn-new-employee").classList.toggle("hidden", ov || org || hl || cap || !can("emplist", "edit"));
+  // a view has ONE filled action: on a board that is New Mission, so New Employee
+  // steps back to an outline; on Manpower it is the only create button, so it stays solid
+  $("#btn-new-employee").classList.toggle("btn-primary", eml);
+  $("#btn-new-employee").classList.toggle("btn-outline-primary", !eml);
   // "Add Mission": on a holiday/weekend (import mission definitions), and on
   // every forecast day (pick missions from the latest confirmed day)
   $("#btn-import-mission").classList.toggle("hidden", fc ? !planEdit : (!boardEdit || !isNonWorkingDate(state.date)));
@@ -1510,7 +1514,10 @@ function updateHideMissionsButton() {
   const btn = $("#btn-hide-missions");
   if (!btn) return;
   const n = getPlan().missions.filter(m => m.hidden).length;
-  setIconLabel(btn, "eye-off", n ? `Hide/Unhide (${n})` : "Hide/Unhide");
+  // "Hidden 7" is a filter in effect (tinted, like an active filter); with nothing
+  // hidden it is just the way in to the dialog
+  setIconLabel(btn, "eye-off", n ? `Hidden ${n}` : "Hide/Unhide");
+  btn.classList.toggle("is-on", n > 0);
 }
 
 /* A plan is "empty" when it has no missions and nobody in any leave zone —
@@ -2412,6 +2419,7 @@ function renderStats() {
   const bar = $("#stats-bar");
   const areaBar = $("#area-bar");
   bar.innerHTML = "";
+  bar.classList.remove("stats-tiles");
   areaBar.innerHTML = "";
   // Overview: no chips — its board selector already carries every headcount
   if (isOverview()) return;
@@ -2472,20 +2480,38 @@ function renderStats() {
     return;
   }
   const s = boardStats(D().activeBoardId);
-  const chips = [
-    ["Total", s.total], ["Assigned", s.assigned], ["Leave", s.leave],
-    ["Standby", s.standby],
-  ];
-  if (s.isHoliday) chips.push(["Holiday", s.onHoliday]);
-  chips.push(["On-call free", s.oncallAvailable]);
-  for (const [label, n] of chips) bar.appendChild(statChip(label, n));
-  bar.appendChild(statChip("Day", s.dayMissions));
-  bar.appendChild(statChip("Night", s.nightMissions, null, "stat-chip-night"));
-  // per-service-area counts, right after the chips above in the same row
+  // Tiles, not chips: the status counts split the whole board (Assigned + Leave +
+  // Standby [+ Holiday] + On-call free = Total) and Day + Night split Assigned, so
+  // they read as one structure instead of a flat run of 14 numbers. Standby is the
+  // count a planner acts on: it is flagged (colour + icon) only when it is not 0.
+  const lead = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${s.total}</b></div>`;
+  const tile = (label, n, kind, extra = "", alert = false, title = "") =>
+    `<div class="stat-tile st-${kind}${n === 0 && !alert ? " st-zero" : ""}${alert ? " st-alert" : ""}" data-stat="${label}"${title ? ` title="${title}"` : ""}>` +
+    `<div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div>${extra}</div>`;
+  const shift = `<div class="st-shift"><span data-stat="Day">${icon("sun")}<b>${s.dayMissions}</b> Day</span>` +
+    `<span data-stat="Night">${icon("moon")}<b>${s.nightMissions}</b> Night</span></div>`;
+  bar.classList.add("stats-tiles");
+  bar.innerHTML = lead +
+    tile("Assigned", s.assigned, "asg", shift) +
+    tile("Leave", s.leave, "leave") +
+    tile("Standby", s.standby, "standby", s.standby > 0 ? `<span class="st-ico">${icon("alert")}</span>` : "", s.standby > 0,
+      "Permanent staff on no mission and no leave") +
+    (s.isHoliday ? tile("Holiday", s.onHoliday, "hol") : "") +
+    tile("On-call free", s.oncallAvailable, "free");
+  // Service area is a different cut of the SAME people as Total (the board's roster),
+  // so the chips must add up to it: anyone without a known area is counted as
+  // "No area" instead of silently dropping out of the sum.
+  const roster = rosterEmployees(D().activeBoardId);
+  const known = new Set(D().areas.map(a => a.id));
+  const areaChip = (name, n) => `<span class="area-chip" data-area="${escapeHtml(name)}"><b>${n}</b> ${escapeHtml(name)}</span>`;
+  let areaHtml = "";
   for (const a of D().areas) {
-    const n = boardEmployees(D().activeBoardId).filter(e => e.areaId === a.id && hasJoined(e)).length;
-    if (n) areaBar.appendChild(statChip(a.name, n));
+    const n = roster.filter(e => e.areaId === a.id).length;
+    if (n) areaHtml += areaChip(a.name, n);
   }
+  const noArea = roster.filter(e => !known.has(e.areaId)).length;
+  if (noArea) areaHtml += areaChip("No area", noArea);
+  areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
 }
 
 /* ---------- overview tab ---------- */
@@ -3407,12 +3433,19 @@ function msButtonLabel(key) {
   const sel = state.filters[key];
   return `${FILTER_LABELS[key]}: ${sel.length ? sel.length + " selected" : "All"}`;
 }
+/* same text as msButtonLabel (textContent is unchanged), with the value in its own
+   span so "All" can go quiet and a real selection can take the active tint */
+function setMsLabel(btn, key) {
+  const sel = state.filters[key];
+  btn.innerHTML = `${FILTER_LABELS[key]}: <span class="ms-val">${sel.length ? sel.length + " selected" : "All"}</span>`;
+  btn.classList.toggle("ms-active", sel.length > 0);
+}
 
 /* build/refresh the multi-select filter dropdowns */
 function renderFilterOptions() {
   for (const ms of $$("#filters .ms")) {
     const key = ms.dataset.filter;
-    ms.querySelector(".ms-btn").textContent = msButtonLabel(key);
+    setMsLabel(ms.querySelector(".ms-btn"), key);
     const pop = ms.querySelector(".ms-pop");
     pop.innerHTML = "";
     const opts = filterOptions(key);
@@ -3436,7 +3469,7 @@ function renderFilterOptions() {
         const set = new Set(state.filters[key]);
         e.target.checked ? set.add(o.value) : set.delete(o.value);
         state.filters[key] = [...set];
-        ms.querySelector(".ms-btn").textContent = msButtonLabel(key);   // keep dropdown open
+        setMsLabel(ms.querySelector(".ms-btn"), key);   // keep dropdown open
         renderMissions();
       };
       pop.appendChild(row);

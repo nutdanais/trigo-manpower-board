@@ -22,8 +22,8 @@ const h = require("./harness");
     const a = await env.openAs(db, h.USERS.a);
     const p = a.page;
     const stat = (label) => p.evaluate((l) => {
-      const chip = [...document.querySelectorAll("#stats-bar .stat-chip")].find((c) => c.textContent.trim().startsWith(l + ":"));
-      return chip ? Number(chip.querySelector("b").textContent) : null;
+      const tile = document.querySelector('#stats-bar [data-stat="' + l + '"]');
+      return tile ? Number(tile.querySelector("b").textContent) : null;
     }, label);
     const go = (d) => p.evaluate((x) => { state.date = x; return refreshAndRender(); }, d);
 
