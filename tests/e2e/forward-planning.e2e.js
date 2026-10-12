@@ -418,12 +418,12 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       for (const p of [a.page, b.page, v.page]) await p.click("#board-tabs .tab-capacity");
       const pa = a.page, pb = b.page;
       const cell = (p, date) => p.locator(`input[data-cap-key^="b1\u0001${date}\u0001Host Alpha\u0001day"]`);
-      const gapChip = async (p, date) => ((await p.textContent(`.cap-gapchip[data-date="${date}"]`)) || "").trim();
+      const gapChip = async (p, date) => ((await p.textContent(`.cap-gaprow .cap-gapchip[data-date="${date}"]`)) || "").trim();
 
       await step("B0: the board to plan is picked in the toolbar, one board at a time", async () => {
         assert.ok(await pa.isVisible("#capacity-toolbar #cap-board-switch"));
         const btns = await pa.$$eval("#cap-board-switch .cap-board-btn", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-pressed")]));
-        assert.deepEqual(btns, [["Board One· 8", "true"], ["Board Two· 2", "false"]]);
+        assert.deepEqual(btns, [["Board One", "true"], ["Board Two", "false"]], "no short days yet, so no badges");
         assert.match(await pa.textContent(".cap-card-title"), /Board One/);
       });
 
@@ -443,10 +443,13 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         // 8 on the roster, nobody on leave on H yet: 8 - 15 = -7
         await until(async () => (await gapChip(pa, H)) === "▼ −7", "gap for A");
         await until(async () => (await gapChip(pb, H)) === "▼ −7", "gap for B, via Realtime");
-        assert.ok(await pa.$eval(`.cap-gapchip[data-date="${H}"]`, (el) => el.classList.contains("short")), "short day is flagged");
-        assert.equal(await pa.locator(".cap-col .cap-bar-over").count(), 1, "uncovered demand drawn in red on the chart");
-        assert.match(await pa.textContent("#stats-bar"), /Short days: 1/);
-        assert.match(await pa.textContent("#stats-bar"), /Biggest gap: −7/);
+        assert.ok(await pa.$eval(`.cap-gaprow .cap-gapchip[data-date="${H}"]`, (el) => el.classList.contains("short") && el.classList.contains("crit")), "7 short is flagged as critical");
+        assert.equal(await pa.locator(".cap-strip .cap-gb.dn").count(), 1, "the shortfall hangs below the zero line");
+        assert.match(await pa.textContent("#stats-bar"), /1 short day\b/);
+        assert.match(await pa.textContent("#stats-bar"), /Worst.*−7/);
+        assert.equal(await pa.textContent("#cap-board-switch .cap-board-btn:nth-child(1) .cap-board-badge"), "1", "Board One's switch counts its short day");
+        assert.equal(await pa.locator("#cap-board-switch .cap-board-btn:nth-child(2) .cap-board-badge").count(), 0);
+        assert.match(await pa.textContent(".cap-demrow"), /15/, "Demand row sums the hosts");
         assert.equal(await gapChip(pa, F), "▲ +8", "a day with no demand shows its spare people");
       });
 
@@ -485,6 +488,8 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         assert.equal(await v.page.locator(".cap-grid2 input").count(), 0, "no inputs");
         assert.equal(await v.page.locator("#cap-add").count(), 0, "no add-row form");
         assert.equal(await v.page.isVisible("#btn-cap-copy-week"), false);
+        assert.equal(await v.page.isVisible("#btn-cap-more"), false, "no Reset menu for a viewer");
+        assert.equal(await v.page.locator(".cap-row-menu").count(), 0, "no row menus");
       });
 
       await step("B5 / layout: the wide grid scrolls in its own container, not the page", async () => {
@@ -496,6 +501,15 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         });
         assert.ok(m.scrollW > m.clientW, "grid overflows its container");
         assert.ok(m.docW <= m.winW, "page itself has no horizontal scroll");
+        // the pinned rows (dates .. Gap) stay at the top of the grid while it scrolls
+        const pin = await pa.evaluate(() => {
+          const s = document.querySelector(".cap-scroll"), p = document.querySelector(".cap-pinned");
+          s.scrollTop = 0; const before = p.getBoundingClientRect().top - s.getBoundingClientRect().top;
+          s.scrollTop = 200; const after = p.getBoundingClientRect().top - s.getBoundingClientRect().top;
+          return { before, after, pos: getComputedStyle(p).position };
+        });
+        assert.equal(pin.pos, "sticky");
+        assert.equal(pin.before, pin.after, "pinned rows do not scroll away");
       });
       for (const p of [a, b, v]) assert.deepEqual(p.errors, [], "no console errors");
       await a.close(); await b.close(); await v.close();
@@ -514,11 +528,12 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       await pa.click("#board-tabs .tab-capacity");
       await pa.waitForSelector(".cap-gapchip");
 
-      await step("B6: every day carries a CONFIRMED or FORECAST chip", async () => {
-        const chips = await pa.$$eval(".cap-dayhead .cap-day", (els) => els.map((e) => e.querySelector(".cap-mode").textContent));
-        const dates = await pa.$$eval(".cap-gapchip", (els) => els.map((e) => e.dataset.date));
-        dates.forEach((d, i) => assert.equal(chips[i], d <= H ? "CONFIRMED" : "FORECAST", d));
-        assert.ok(chips.includes("FORECAST") && chips.includes("CONFIRMED"));
+      await step("B6: every day is marked confirmed or forecast, under one band", async () => {
+        const modes = await pa.$$eval(".cap-dayhead .cap-day", (els) => els.map((e) => e.dataset.mode));
+        const dates = await pa.$$eval(".cap-gaprow .cap-gapchip", (els) => els.map((e) => e.dataset.date));
+        dates.forEach((d, i) => assert.equal(modes[i], d <= H ? "confirmed" : "forecast", d));
+        const band = await pa.$$eval(".cap-band .cap-band-seg", (els) => els.map((e) => e.textContent));
+        assert.deepEqual(band, ["CONFIRMED", "FORECAST · tentative"], "one segment each, not a chip per day");
       });
 
       await step("B7: Start from confirmed plan fills empty cells from the latest confirmed day, keeping typed numbers", async () => {
@@ -527,7 +542,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         const msg = await pa.textContent("#confirm-message");
         assert.match(msg, /Host Alpha: 2, Host Beta: 1, Host Gamma \(night\): 1/);
         await pa.click("#btn-confirm-yes");
-        const days = (await pa.$$eval(".cap-gapchip", (els) => els.length));
+        const days = (await pa.$$eval(".cap-gaprow .cap-gapchip", (els) => els.length));
         await until(() => db.t("capacity_demand").length === days * 3, "every host x day filled");
         const at = (d, host, shift) => (db.t("capacity_demand").find((r) => r.plan_date === d && r.host === host && r.shift === shift) || {}).headcount;
         assert.equal(at(H, "Host Alpha", "day"), 9, "a number someone typed is kept");
@@ -536,13 +551,17 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await until(async () => (await pa.locator(".cap-hostrow .cap-cell input").count()) === days * 3, "three host rows on screen");
       });
 
-      await step("B8: Named on board explains itself", async () => {
-        const tip = await pa.getAttribute(".cap-namedrow .cap-left", "title");
-        assert.match(tip, /already put on a mission/);
+      await step("B8: clicking an Available number explains it (permanent, on-call, leave, named)", async () => {
+        await pa.click(".cap-availrow .cap-avail-btn");
+        await until(() => pa.isVisible(".cap-pop"), "popover");
+        const t = await pa.textContent(".cap-pop");
+        assert.match(t, /Permanent/); assert.match(t, /On-call/); assert.match(t, /Available/); assert.match(t, /already named on a mission/);
+        await pa.keyboard.press("Escape");
+        assert.equal(await pa.locator(".cap-pop").count(), 0, "Escape closes it");
       });
 
       // rows: 0 Host Alpha day, 1 Host Beta day, 2 Host Gamma night
-      const dates = await pa.$$eval(".cap-gapchip", (els) => els.map((e) => e.dataset.date));
+      const dates = await pa.$$eval(".cap-gaprow .cap-gapchip", (els) => els.map((e) => e.dataset.date));
       const at = (d, host, shift) => (db.t("capacity_demand").find((r) => r.plan_date === d && r.host === host && r.shift === shift) || {}).headcount;
       const cellAt = (i, j) => pa.locator(`.cap-cell[data-r="${i}"][data-c="${j}"]`);
       // a save redraws the grid, so a cell can be swapped out between lookups: retry
@@ -620,7 +639,8 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       await step("B11: a row can be deleted: its numbers go from today on, after a confirmation", async () => {
         const past = h.addDays(dates[0], -1);
         db.seed("capacity_demand", [{ board_id: "b1", plan_date: past, host: "Host Gamma", shift: "night", headcount: 4 }]);
-        await pa.click('.cap-row-del[aria-label="Remove the Host Gamma night row"]');
+        await pa.click('.cap-row-menu[aria-label="Row actions for Host Gamma night"]');
+        await pa.click("#context-menu >> text=Remove this row…");
         await until(() => pa.isVisible("#modal-confirm"), "confirmation");
         assert.match(await pa.textContent("#confirm-message"), /Past days are kept/);
         await pa.click("#btn-confirm-yes");
@@ -631,7 +651,8 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await pa.fill("#cap-add input", "Host Gamma");
         await pa.click("#cap-add button");
         await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 1, "re-added");
-        await pa.click('.cap-row-del[aria-label="Remove the Host Gamma day row"]');
+        await pa.click('.cap-row-menu[aria-label="Row actions for Host Gamma day"]');
+        await pa.click("#context-menu >> text=Remove this row…");
         await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 0, "empty row removed");
         assert.equal(await pa.isVisible("#modal-confirm"), false);
       });
@@ -644,7 +665,8 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
           { board_id: "b2", plan_date: dates[0], host: "Host Beta", shift: "day", headcount: 3 },
         ]);
         const hostsBefore = await pa.$$eval(".cap-hostname", (els) => els.map((e) => e.textContent));
-        await pa.click("#btn-cap-reset");
+        await pa.click("#btn-cap-more");
+        await pa.click("#context-menu >> text=Reset this board to 0…");
         await until(() => pa.isVisible("#modal-confirm"), "confirmation");
         assert.match(await pa.textContent("#confirm-message"), /cannot be undone/);
         await pa.click("#btn-confirm-yes");
@@ -652,7 +674,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         assert.equal(at(far, "Host Alpha", "day"), 0, "beyond the range shown too");
         assert.equal(at(past, "Host Gamma", "night"), 4, "past days kept");
         assert.equal(db.t("capacity_demand").find((r) => r.board_id === "b2").headcount, 3, "other boards untouched");
-        await until(async () => (await pa.$$eval(".cap-gapchip", (els) => els.length)) > 0, "grid back");
+        await until(async () => (await pa.$$eval(".cap-gaprow .cap-gapchip", (els) => els.length)) > 0, "grid back");
         assert.deepEqual(await pa.$$eval(".cap-hostname", (els) => els.map((e) => e.textContent)), hostsBefore, "host rows stay");
         // the bug this fixes: a 0 counts as empty, so seeding works again after a reset
         await pa.click("#btn-cap-seed");
@@ -705,7 +727,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await pa.check('#cap-export-type input[value="pdf"]');
         await pa.click("#btn-cap-export-go");
         await until(() => pa.evaluate(() => window.__printed === 1), "print called");
-        assert.equal(await pa.evaluate(() => document.title), await pa.evaluate(() => "Capacity_Board_One_" + document.querySelector(".cap-gapchip").dataset.date));
+        assert.equal(await pa.evaluate(() => document.title), await pa.evaluate(() => "Capacity_Board_One_" + document.querySelector(".cap-gaprow .cap-gapchip").dataset.date));
         assert.match(await pa.evaluate(() => document.getElementById("print-page-size").textContent), /@page \{ size: [\d.]+mm [\d.]+mm/);
         await pa.emulateMedia({ media: "print" });
         const pdf = await pa.pdf({ preferCSSPageSize: true, printBackground: true });
@@ -721,6 +743,63 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       });
       assert.deepEqual(a.errors, [], "no console errors");
       await a.close();
+    }
+
+    /* ================= Part B: Capacity on a phone ================= */
+    {
+      const db = new h.FakeDb();
+      h.seedBase(db, { src: SRC });
+      db.seed("capacity_demand", [
+        { board_id: "b1", plan_date: H, host: "Host Alpha", shift: "day", headcount: 5 },
+        { board_id: "b1", plan_date: H, host: "Host Beta", shift: "night", headcount: 2 },
+      ]);
+      const phone = { viewport: { width: 390, height: 844 } };
+      const a = await env.openAs(db, h.USERS.a, phone);
+      const v = await env.openAs(db, h.USERS.v, phone);
+      const pa = a.page;
+      for (const p of [pa, v.page]) { await p.click("#board-tabs .tab-capacity"); await p.waitForSelector(".cap-phone"); }
+      const stepIn = (date) => pa.locator(`.cap-stepper input[data-cap-key^="b1\u0001${date}\u0001"]`);
+
+      await step("B14: a phone shows one host at a time with a stepper per day, not the grid", async () => {
+        assert.equal(await pa.locator(".cap-grid2").count(), 0, "no grid");
+        assert.match(await pa.inputValue(".cap-ph-host"), /^0$/);
+        assert.match(await pa.textContent(".cap-ph-host option:checked"), /Host Alpha · Day/);
+        assert.equal(await stepIn(H).inputValue(), "5");
+        assert.equal(await pa.isVisible("#btn-cap-seed"), false, "toolbar actions fold into ⋯");
+        assert.ok(await pa.isVisible("#btn-cap-more"));
+        assert.equal(await pa.isVisible("#btn-toolbar-more"), false, "no empty app-wide More next to it");
+        const m = await pa.evaluate(() => ({ docW: document.documentElement.scrollWidth, winW: document.documentElement.clientWidth }));
+        assert.ok(m.docW <= m.winW, "no sideways scroll on the page");
+      });
+
+      await step("B15: + and − save the number; the gap chip follows", async () => {
+        await pa.click(`[data-cap-step="b1\u0001${H}\u0001Host Alpha\u0001day\u00011"]`);
+        await until(() => db.t("capacity_demand").some((r) => r.plan_date === H && r.host === "Host Alpha" && r.headcount === 6), "plus saved");
+        await pa.click(`[data-cap-step="b1\u0001${H}\u0001Host Alpha\u0001day\u0001-1"]`);
+        await pa.click(`[data-cap-step="b1\u0001${H}\u0001Host Alpha\u0001day\u0001-1"]`);
+        await until(() => db.t("capacity_demand").some((r) => r.plan_date === H && r.host === "Host Alpha" && r.headcount === 4), "minus saved");
+        // 8 people, 4 + 2 demand: 2 spare
+        await until(async () => ((await pa.textContent(`.cap-ph-day .cap-gapchip[data-date="${H}"]`)) || "").trim() === "▲ +2", "chip");
+      });
+
+      await step("B16: next host and the week pager move through the plan", async () => {
+        await pa.click(".cap-ph-next");
+        await until(async () => /Host Beta · Night/.test(await pa.textContent(".cap-ph-host option:checked")), "next host");
+        assert.equal(await stepIn(H).inputValue(), "2");
+        await pa.click('.cap-ph-weekbar [aria-label="Next week"]');
+        await until(async () => /2 of 2/.test(await pa.textContent(".cap-ph-weeklabel")), "week 2");
+        await pa.click("#btn-cap-more");
+        assert.ok(await pa.isVisible("#context-menu >> text=Start from confirmed plan"), "Start from confirmed plan in ⋯");
+        await pa.keyboard.press("Escape");
+      });
+
+      await step("B17: a viewer on a phone sees the numbers, no steppers", async () => {
+        assert.equal(await v.page.locator(".cap-stepper").count(), 0);
+        assert.ok(await v.page.locator(".cap-ph-val").count() > 0);
+        assert.equal(await v.page.locator("#cap-add").count(), 0);
+      });
+      for (const p of [a, v]) assert.deepEqual(p.errors, [], "no console errors");
+      await a.close(); await v.close();
     }
 
     /* ================= Missing-migration tolerance ================= */

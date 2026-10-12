@@ -73,3 +73,16 @@ frame, all suggesting the missions with no crew first. It also proposes three
 places for a "Hide" action on an empty mission card (H1 empty-state row, H2
 count chip, H3 corner icon), with a comparison and a decision picker. Not
 loaded by the app.
+
+## Capacity tab directions (2026-10-12)
+
+`capacity-directions.html` is a standalone, interactive review page for the
+Capacity tab. It contains annotated screenshots of the current release (desktop and
+phone) with findings F1–F12; the planner and manager flows as they work today; a
+proposed four-stage flow (Read, Explain, Plan, Hand over); and four directions as
+working mockups on one shared sample (Board One, 32 people, 6 host rows, 2 weeks):
+A Refined grid, B Answer first (gap timeline + day panel), C All boards heatmap,
+D Guided planner. Each has a desktop frame and a phone frame, and editing a number in
+one mockup updates every gap on the page. A comparison table follows, then a
+recommendation (A now, B's day panel next, C later) and a decision picker. Not
+loaded by the app.
