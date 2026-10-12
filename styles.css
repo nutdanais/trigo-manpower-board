@@ -4601,28 +4601,31 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   .alert-acts, .alert-bubble { grid-column: auto; grid-row: auto; justify-content: flex-start; }
 }
 
-/* Capacity tab — one board at a time: a demand-vs-available chart per
-   working day, the gap under it as a coloured chip (the arrow and the sign
-   carry it too, never colour alone), then demand by host on the same columns.
-   Everything shares one scroll container so the columns never drift apart. */
+/* Capacity tab — one board at a time. Desktop: a grid whose top rows (dates, the
+   gap drawn to scale around zero, Demand, Available, Gap) stay pinned while the
+   host rows scroll under them, so every number typed shows its effect without
+   scrolling. Gap chips carry an arrow, a sign and the number, never colour
+   alone. Everything shares one scroll container so the columns never drift
+   apart. Phone (<=640px): one host at a time, a stepper per day. */
 :root {
-  --cap-left: 250px;
-  --cap-avail: #d6e0eb;
-  --cap-dem: #003a66;
+  --cap-left: 260px;
   --cap-over: #d0342c;
+  --cap-spare: #9cb85a;
   --cap-stripe: rgba(0, 73, 131, .05);
   --cap-sel: rgba(0, 73, 131, .12);
 }
 :root[data-theme="dark"] {
-  --cap-avail: #34414f;
-  --cap-dem: #6fb1e0;
   --cap-over: #ef5b52;
+  --cap-spare: #6f8a3a;
   --cap-stripe: rgba(111, 177, 224, .07);
   --cap-sel: rgba(111, 177, 224, .2);
 }
 #capacity-toolbar { display: contents; }
 #cap-board-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-soft); flex-wrap: wrap; }
 .cap-board-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 30px;
   padding: 0 14px;
   border: 0;
@@ -4636,34 +4639,53 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 }
 .cap-board-btn:hover { background: var(--hover-tint); }
 .cap-board-btn.on { background: var(--primary); color: #fff; font-weight: 700; }
-.cap-board-n { margin-left: 5px; font-weight: 500; opacity: .75; }
-.cap-tool-label { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); margin-left: 6px; }
-#cap-range {
+/* this board's short days in the range: a red count, absent when there are none */
+.cap-board-badge { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--cap-over); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.cap-field {
+  display: inline-flex;
+  align-items: center;
   height: var(--ctl-h);
-  padding: 0 8px;
+  padding-left: 10px;
   border: 1px solid var(--border);
   border-radius: var(--r);
   background: var(--panel);
+}
+.cap-tool-label { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+#cap-range {
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: 13.5px;
 }
-.stat-chip-bad b { color: var(--danger-text); }
+#btn-cap-more { padding: 0 9px; }
+
+/* stats row: one line in place of four chips */
+.cap-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; }
+.cap-summary > span { display: inline-flex; align-items: center; gap: 6px; }
+.cap-summary > span + span::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--border); margin-right: 8px; }
+.cap-summary .cap-sum-big + span::before { display: none; }
+.cap-sum-big { font-size: 17px; font-weight: 700; }
+.cap-sum-big.bad { color: var(--danger-text); }
+.cap-sum-big.ok { color: var(--ok-text); }
+.cap-sum-mut { color: var(--muted); }
+.cap-summary .cap-gapchip { height: 24px; min-width: 0; font-size: 12.5px; }
 
 #capacity-panel { display: flex; flex-direction: column; gap: 10px; }
 #capacity-panel.hidden { display: none; }
 .cap-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; }
-.cap-card-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px 6px; }
-.cap-card-title { font-size: 15px; font-weight: 700; margin-right: 6px; }
-.cap-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
-.cap-key i { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
-.cap-key-avail { background: var(--cap-avail); }
-.cap-key-dem { background: var(--cap-dem); }
-.cap-key-over { background: var(--cap-over); }
-.cap-key-fc { border: 1px dashed var(--primary-text); background: repeating-linear-gradient(135deg, transparent 0 3px, var(--cap-stripe) 3px 6px); }
-.cap-scroll { overflow-x: auto; }
+.cap-card-head { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; padding: 12px 16px 10px; }
+.cap-card-title { font-size: 15px; font-weight: 700; margin-right: auto; }
+.cap-hint { font-size: 12px; color: var(--muted); }
+.cap-hint kbd { font: inherit; font-size: 11px; padding: 0 4px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-soft); }
+/* scrolls both ways, so the pinned rows stick to its top and the host column
+   to its left; capped at about a screen so the pinned rows stay in view */
+.cap-scroll { overflow: auto; max-height: max(380px, calc(100dvh - 140px)); border-top: 1px solid var(--border); }
 .cap-grid2 { font-variant-numeric: tabular-nums; }
 .cap-row { display: grid; }
+.cap-pinned { position: sticky; top: 0; z-index: 4; background: var(--panel); box-shadow: 0 2px 0 var(--border); }
 .cap-left {
   position: sticky;
   left: 0;
@@ -4673,7 +4695,7 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   justify-content: center;
   padding: 6px 16px;
   background: var(--panel);
-  border-right: 1px solid var(--border);
+  border-right: 2px solid var(--border);
   min-width: 0;
 }
 .cap-left-title { font-size: 13.5px; font-weight: 700; }
@@ -4691,33 +4713,53 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-day.cap-wk { border-left: 2px solid var(--border); }
 .cap-fc { background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--cap-stripe) 6px 12px); }
 
-/* the chart */
-.cap-axis { position: sticky; }
-.cap-tick-label { position: absolute; right: 12px; font-size: 11px; color: var(--muted); }
-.cap-col { justify-content: flex-end; }
-.cap-tick { position: absolute; left: 0; right: 0; height: 1px; background: var(--bg-soft); }
-.cap-tick0 { background: var(--border); }
-.cap-bar-avail, .cap-bar-dem, .cap-bar-over { position: absolute; display: block; border-radius: 4px 4px 0 0; }
-.cap-bar-avail { left: 20%; right: 20%; background: var(--cap-avail); }
-.cap-bar-dem { left: 35%; right: 35%; background: var(--cap-dem); border-radius: 3px 3px 0 0; }
-.cap-bar-over { left: 35%; right: 35%; background: var(--cap-over); border-radius: 3px 3px 0 0; }
-.cap-bar-label { position: absolute; left: 0; right: 0; font-size: 11.5px; font-weight: 700; color: var(--text); white-space: nowrap; }
-.cap-bar-label.short { color: var(--danger-text); }
-
-/* day header, gap, named */
-.cap-dayhead { background: var(--bg-soft); border-top: 1px solid var(--border); }
+/* one Confirmed | Forecast band over the dates */
+.cap-band .cap-left { padding: 0; }
+.cap-band-seg { padding: 3px 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; white-space: nowrap; overflow: hidden; }
+.cap-band-seg.cf { color: var(--ok-text); background: var(--ok-surface); border-bottom: 2px solid var(--ok-line); }
+.cap-band-seg.fc { color: var(--primary-text); border-bottom: 2px dashed var(--primary-text); background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--cap-stripe) 6px 12px); }
+.cap-dayhead { background: var(--bg-soft); }
 .cap-dayhead .cap-left { background: var(--bg-soft); }
 .cap-dayhead .cap-left-title { font-size: 11.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
 .cap-dayhead .cap-day { padding: 5px 2px; }
 .cap-dow { font-size: 11px; color: var(--muted); }
 .cap-dm { font-size: 13.5px; font-weight: 700; }
 .cap-dm.today { color: var(--primary-text); }
-.cap-mode { margin-top: 3px; padding: 0 4px; border-radius: 5px; font-size: 9px; font-weight: 700; letter-spacing: .3px; line-height: 15px; }
-.cap-mode.cf { color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); }
-.cap-mode.fc { color: var(--primary-text); background: var(--panel); border: 1px dashed var(--primary-text); }
-.cap-namedrow .cap-left { cursor: help; }
-.cap-gaprow { border-top: 1px solid var(--border); }
-.cap-gaprow .cap-day { padding: 8px 4px; }
+
+/* the gap drawn to scale around a zero line */
+.cap-stripcell { overflow: hidden; }
+.cap-zero { position: absolute; left: 8px; right: 8px; top: 50%; height: 1px; background: var(--border); }
+.cap-gb { position: absolute; left: 34%; right: 34%; border-radius: 3px; }
+.cap-gb.up { bottom: 50%; background: var(--cap-spare); }
+.cap-gb.up.tight { background: var(--warn-line); }
+.cap-gb.dn { top: 50%; background: var(--danger-line); }
+.cap-gb.dn.crit { background: var(--cap-over); }
+.cap-gv { position: absolute; left: 0; right: 0; font-size: 11px; font-weight: 700; line-height: 14px; }
+.cap-gv.short { color: var(--danger-text); }
+.cap-gv.tight { color: var(--warn-text); }
+.cap-gv.ok { color: var(--ok-text); }
+
+.cap-demrow, .cap-availrow, .cap-gaprow { border-top: 1px solid var(--bg-soft); }
+.cap-demrow .cap-day { font-size: 14px; font-weight: 700; padding: 7px 2px; }
+.cap-availrow .cap-day { padding: 3px 2px; }
+.cap-avail-btn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cap-avail-btn b { font-weight: 600; }
+.cap-avail-btn small { font-size: 11px; color: var(--muted); }
+.cap-avail-btn:hover { background: var(--hover-tint); border-color: var(--border); }
+.cap-gaprow .cap-day { padding: 6px 4px; }
 .cap-gaprow .cap-left-title { font-size: 15px; }
 .cap-gapchip {
   display: inline-flex;
@@ -4725,30 +4767,49 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   justify-content: center;
   gap: 3px;
   min-width: 54px;
-  height: 30px;
+  height: 28px;
   padding: 0 8px;
   box-sizing: border-box;
-  border-radius: 15px;
-  font-size: 14.5px;
+  border-radius: 14px;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.cap-gapchip.short { background: var(--cap-over); color: #fff; }
+.cap-gapchip.short { background: var(--danger-tint); color: var(--danger-text); border-color: var(--danger-line); }
+.cap-gapchip.short.crit { background: var(--cap-over); color: #fff; border-color: var(--cap-over); }
 .cap-gapchip.tight { background: var(--warn-surface); color: var(--warn-text); border-color: var(--warn-line); }
 .cap-gapchip.ok { background: var(--ok-surface); color: var(--ok-text); border-color: var(--ok-line); }
-.cap-namedrow { border-top: 1px solid var(--bg-soft); }
-.cap-namedrow .cap-day { font-size: 13px; color: var(--muted); padding: 6px 2px; }
-.cap-namedrow .cap-left-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+/* Available: why that day has the people it has (click, not hover) */
+.cap-pop {
+  position: fixed;
+  z-index: 95;
+  width: 250px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-box);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.cap-pop-title { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-weight: 700; }
+.cap-pop-mode { font-size: 11px; font-weight: 600; color: var(--muted); }
+.cap-pop-ln { display: flex; justify-content: space-between; align-items: center; gap: 10px; line-height: 22px; }
+.cap-pop-ln small { color: var(--muted); }
+.cap-pop-ln.sub { padding-left: 12px; color: var(--muted); }
+.cap-pop-ln.tot { border-top: 1px solid var(--border); margin-top: 2px; padding-top: 3px; font-weight: 700; }
+.cap-pop-ln .cap-gapchip { height: 22px; min-width: 0; font-size: 12px; }
+.cap-pop-note { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 
 /* demand by host */
-.cap-sechead { background: var(--bg-soft); border-top: 2px solid var(--border); }
+.cap-sechead { background: var(--bg-soft); }
 .cap-sechead .cap-left { background: var(--bg-soft); }
 .cap-sechead-title { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--primary-text); }
-.cap-sechead .cap-day { font-size: 11.5px; color: var(--muted); padding: 5px 2px; }
 .cap-hostrow { border-top: 1px solid var(--bg-soft); min-height: 38px; }
 .cap-hosthead { flex-direction: row; align-items: center; justify-content: flex-start; gap: 7px; }
-.cap-hostname { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.cap-hostname { font-size: 13.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cap-area { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 16px; flex: none; }
 .cap-shift { flex: none; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); }
 .cap-shift.night { background: var(--night); border-color: var(--night); color: #fff; }
@@ -4767,7 +4828,9 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   -moz-appearance: textfield;
 }
 .cap-cell input::-webkit-outer-spin-button,
-.cap-cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cap-cell input::-webkit-inner-spin-button,
+.cap-stepper input::-webkit-outer-spin-button,
+.cap-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .cap-cell input:focus { outline: 2px solid var(--primary-text); outline-offset: -2px; background: var(--hover-tint); }
 /* Excel-style range selection: tinted cells, one outline round the block */
 .cap-grid2.cap-dragging { user-select: none; -webkit-user-select: none; }
@@ -4781,23 +4844,28 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-cell.cap-sel-l::before { left: 0; }
 .cap-cell.cap-sel-r::after { right: 0; }
 .cap-clip { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
-.cap-row-del {
+/* ⋯ on a host row: quiet until the row is hovered or the button focused */
+.cap-row-menu {
   flex: none;
+  display: inline-grid;
+  place-items: center;
   margin-left: auto;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
-  font-size: 15px;
-  line-height: 1;
   cursor: pointer;
+  opacity: .45;
 }
-.cap-row-del:hover, .cap-row-del:focus-visible { color: var(--danger-text); border-color: var(--border); background: var(--panel); }
-.cap-card-foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--border); }
-.cap-add { display: flex; gap: 6px; align-items: center; }
+.cap-hostrow:hover .cap-row-menu, .cap-row-menu:focus-visible, body.touch-mode .cap-row-menu { opacity: 1; }
+.cap-row-menu:hover { color: var(--text); border-color: var(--border); background: var(--panel); }
+.ctx-item.ctx-danger { color: var(--danger-text); }
+.cap-addrow { border-top: 1px solid var(--bg-soft); }
+.cap-addrow .cap-left { padding: 6px 10px; }
+.cap-add { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .cap-add input, .cap-add select {
   height: var(--ctl-h-sm);
   padding: 0 8px;
@@ -4808,8 +4876,44 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   font: inherit;
   font-size: 12.5px;
 }
-.cap-add input { width: 200px; }
-.cap-note { flex: 1 1 320px; color: var(--muted); font-size: 12px; }
+.cap-add input { flex: 1 1 auto; min-width: 0; width: 120px; }
+.cap-add input::placeholder { color: var(--primary-text); font-weight: 600; }
+.cap-card-foot { padding: 10px 16px; border-top: 1px solid var(--border); }
+.cap-note { margin: 0; color: var(--muted); font-size: 12px; }
+
+/* phone: one host at a time, a stepper per working day of one week */
+.cap-phone .cap-card-head { padding-bottom: 6px; }
+.cap-ph-pager { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
+.cap-ph-hostbar { border-top: 1px solid var(--border); }
+.cap-ph-weekbar { background: var(--bg-soft); }
+.cap-ph-nav { flex: none; min-width: 40px; min-height: 40px; padding: 0; justify-content: center; font-size: 20px; line-height: 1; }
+.cap-ph-host { flex: 1 1 auto; min-width: 0; height: 40px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; }
+.cap-ph-weeklabel { flex: 1 1 auto; text-align: center; font-size: 13.5px; }
+.cap-ph-weeklabel small { color: var(--muted); margin-left: 4px; }
+.cap-ph-hostbar .cap-row-menu { margin-left: 0; width: 40px; height: 40px; opacity: 1; }
+.cap-ph-days { display: flex; flex-direction: column; }
+.cap-ph-day { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--bg-soft); }
+.cap-ph-when { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.cap-ph-when small { font-size: 11.5px; color: var(--muted); }
+.cap-ph-day .cap-gapchip { height: 26px; min-width: 0; font-size: 13px; }
+.cap-ph-val { min-width: 40px; text-align: center; font-size: 16px; }
+.cap-stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; background: var(--panel); }
+.cap-stepper button { width: 40px; min-height: 40px; border: 0; background: var(--bg-soft); color: var(--text); font: inherit; font-size: 19px; cursor: pointer; }
+.cap-stepper button:disabled { color: var(--muted); opacity: .5; cursor: default; }
+.cap-stepper input { width: 44px; border: 0; border-inline: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-size: 16px; font-weight: 700; text-align: center; -moz-appearance: textfield; }
+.cap-stepper input:focus { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+.cap-ph-next { margin: 10px 12px 0; width: calc(100% - 24px); justify-content: center; min-height: 42px; }
+.cap-ph-add { padding: 12px; }
+.cap-ph-add .cap-add input, .cap-ph-add .cap-add select, .cap-ph-add .cap-add .btn { height: 40px; font-size: 14px; }
+#capacity-panel > .cap-note { padding: 0 4px; }
+@media (max-width: 640px) {
+  /* the two actions move into ⋯ so the toolbar stays one row */
+  #btn-cap-seed, #btn-cap-copy-week { display: none; }
+  .cap-board-btn { padding: 0 10px; }
+  /* the summary wraps here, so the separating dots would start lines */
+  .cap-summary > span + span::before { display: none; }
+  .cap-summary { gap: 4px 10px; }
+}
 
 /* Ctrl+P on a forecast or the Capacity grid: a notice, not the tentative plan */
 @media print {

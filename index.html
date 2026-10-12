@@ -44,7 +44,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-12j">
+<link rel="stylesheet" href="styles.css?v=2026-10-12k">
 </head>
 <body>
 
@@ -64,7 +64,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-12j"></script>
+<script src="version.js?v=2026-10-12k"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -440,11 +440,13 @@
       <span class="toggle-track"><span class="toggle-thumb"></span></span>
       <span class="toggle-text">Holiday</span>
     </label>
-    <!-- Capacity tab: the board it shows (one at a time), how far ahead, and
-         the week copy — a display:contents group like #emplist-toolbar. -->
+    <!-- Capacity tab: the board it shows (one at a time, each with its count of
+         short days), how far ahead, the main action, the week copy, and a ⋯
+         menu that keeps Reset to 0 out of the everyday row (on a phone it also
+         holds the two actions) — a display:contents group like #emplist-toolbar. -->
     <div id="capacity-toolbar" class="hidden">
       <div id="cap-board-switch" role="group" aria-label="Board"></div>
-      <label class="cap-tool-label" for="cap-range">Range</label>
+      <label class="cap-field" for="cap-range"><span class="cap-tool-label">Range</span>
       <select id="cap-range" title="How far ahead">
         <option value="1">Next 1 week</option>
         <option value="2">Next 2 weeks</option>
@@ -454,10 +456,10 @@
         <option value="6">Next 6 weeks</option>
         <option value="7">Next 7 weeks</option>
         <option value="8">Next 8 weeks</option>
-      </select>
-      <button type="button" id="btn-cap-seed" class="btn" title="Fill empty cells with the latest confirmed day's deployment — people per host and shift">Start from confirmed plan</button>
+      </select></label>
+      <button type="button" id="btn-cap-seed" class="btn btn-primary" title="Fill empty cells with the latest confirmed day's deployment — people per host and shift">Start from confirmed plan</button>
       <button type="button" id="btn-cap-copy-week" class="btn" title="Copy this board's demand for the current week onto next week">Copy this week → next week</button>
-      <button type="button" id="btn-cap-reset" class="btn" title="Set every number on this board to 0 from today on — the host rows stay">Reset to 0</button>
+      <button type="button" id="btn-cap-more" class="btn" title="More Capacity actions" aria-haspopup="menu" aria-label="More Capacity actions"><svg class="ic" aria-hidden="true"><use href="#i-more"></use></svg></button>
     </div>
     <button id="btn-toolbar-more" class="btn toolbar-more-toggle" type="button" title="More actions" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"></use></svg> More</button>
     <!-- Below ~640px this collapses into a dropdown behind "⋯ More" (see #toolbar-more
@@ -1248,12 +1250,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-12j"></script>
-<script src="employee-id.js?v=2026-10-12j"></script>
-<script src="cloud.js?v=2026-10-12j"></script>
-<script src="charts.js?v=2026-10-12j"></script>
-<script src="xlsx-export.js?v=2026-10-12j"></script>
-<script src="bulk-edit.js?v=2026-10-12j"></script>
-<script src="app.js?v=2026-10-12j"></script>
+<script src="planning.js?v=2026-10-12k"></script>
+<script src="employee-id.js?v=2026-10-12k"></script>
+<script src="cloud.js?v=2026-10-12k"></script>
+<script src="charts.js?v=2026-10-12k"></script>
+<script src="xlsx-export.js?v=2026-10-12k"></script>
+<script src="bulk-edit.js?v=2026-10-12k"></script>
+<script src="app.js?v=2026-10-12k"></script>
 </body>
 </html>
