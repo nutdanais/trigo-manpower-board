@@ -1190,7 +1190,10 @@ body.touch-mode .m-empty-hide { height: 36px; }
 .mission-card.night .m-empty-hint b { color: #f3c98a; }
 .mission-card.night .m-empty-hide { background: transparent; color: #e8ebed; border-color: #4a5566; }
 .mission-card.night .m-empty-hide:hover { background: rgba(255,255,255,.08); }
+/* never in a JPG / PDF / print: the export also drops cards with no crew
+   (hideEmptyMissionsForExport), this covers the row on its own */
 body.exporting .m-empty { display: none; }
+@media print { .m-empty { display: none !important; } }
 .m-remark {
   margin-top: auto;
   padding-top: 6px;

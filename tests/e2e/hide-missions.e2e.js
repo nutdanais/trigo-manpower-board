@@ -75,6 +75,52 @@ async function step(name, fn) {
       assert.equal(await badge.innerText(), "1");
     });
 
+    await step("the No crew row and its Hide never reach an export (JPG, PDF, plain print)", async () => {
+      const shown = (el) => getComputedStyle(el).display !== "none";
+      // JPG: look at exactly what html2canvas is handed, at the moment it is handed it
+      const shots = await p.evaluate(async () => {
+        const real = window.html2canvas, out = [];
+        window.html2canvas = (el, opts) => {
+          const rows = [...el.querySelectorAll(".m-empty")];
+          out.push({
+            rows: rows.length,
+            rowDisplay: rows.map((r) => getComputedStyle(r).display),
+            visible: rows.filter((r) => r.getClientRects().length > 0).length,
+          });
+          return real(el, opts);
+        };
+        try { await exportBoard(); } finally { window.html2canvas = real; }
+        return out;
+      });
+      assert.ok(shots.length >= 1, "the JPG export ran");
+      for (const s of shots) {
+        assert.ok(s.rows >= 1, "the row is in the captured DOM, so the check means something");
+        assert.equal(s.visible, 0, "nothing of it is drawn");
+        assert.deepEqual([...new Set(s.rowDisplay)], ["none"], "hidden by its own rule, not only with its card");
+      }
+      assert.equal(await card("104").locator(".m-empty").isVisible(), true, "back on the board after the JPG");
+
+      // PDF button and Ctrl+P both run prepareForPrint on beforeprint
+      const pdf = await p.evaluate(() => {
+        prepareForPrint();
+        const rows = [...document.querySelectorAll("#missions-grid .m-empty")];
+        const r = { rows: rows.length, visible: rows.filter((x) => x.getClientRects().length > 0).length,
+          rowDisplay: rows.map((x) => getComputedStyle(x).display) };
+        restoreAfterPrint();
+        return r;
+      });
+      assert.ok(pdf.rows >= 1);
+      assert.equal(pdf.visible, 0);
+      assert.deepEqual([...new Set(pdf.rowDisplay)], ["none"]);
+      assert.equal(await card("104").locator(".m-empty").isVisible(), true, "back on the board after the PDF");
+
+      // a print that skips prepareForPrint still drops it (print stylesheet)
+      await p.emulateMedia({ media: "print" });
+      assert.equal(await card("104").locator(".m-empty").evaluate(shown), false);
+      await p.emulateMedia({ media: "screen" });
+      assert.equal(await card("104").locator(".m-empty").evaluate(shown), true);
+    });
+
     await step("the dialog suggests the mission with no crew first, then the board, then hidden", async () => {
       await p.click("#btn-hide-missions");
       await dlg.waitFor({ state: "visible" });
