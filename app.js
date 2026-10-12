@@ -7339,8 +7339,10 @@ function hideRowHtml(m, crew) {
   const willHide = m.hidden !== hideUi.pending.has(m.id);
   return `<label class="hm-row${hideUi.pending.has(m.id) ? " pend" : ""}${m.hidden ? " is-hidden" : ""}" data-id="${escapeHtml(m.id)}">
     <input type="checkbox" value="${escapeHtml(m.id)}" ${willHide ? "checked" : ""} aria-label="Hide ${escapeHtml(m.number)}">
-    <span class="hm-no">${escapeHtml(m.number)}</span>
-    <span class="hm-route"><b>${escapeHtml(m.host)}</b> ${icon("arrow-right")} ${escapeHtml(m.customer)}</span>
+    <span class="hm-mission">
+      <span class="hm-no" title="${escapeHtml(m.number)}">${escapeHtml(m.number)}</span>
+      <span class="hm-route" title="${escapeHtml(m.host)} → ${escapeHtml(m.customer)}">${escapeHtml(m.host)} ${icon("arrow-right")} ${escapeHtml(m.customer)}</span>
+    </span>
     <span class="hm-when"><span class="hm-shift${night ? " night" : ""}">${night ? icon("moon") + "NIGHT" : "DAY"}</span>${escapeHtml(m.startTime)}-${escapeHtml(m.endTime)}</span>
     <span class="hm-eng">${eng ? `<i style="background:${escapeHtml(eng.color)}"></i>${escapeHtml(eng.name)}` : ""}</span>
     <span class="hm-crew${crew ? "" : " zero"}" title="${crew} assigned from this board">${icon("users")}${crew}</span>
