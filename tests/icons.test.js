@@ -32,7 +32,7 @@ test("every icon index.html links exists, at the size it claims", () => {
 test("the manifest is linked and each of its icons exists at its stated size", () => {
   assert.match(html, /<link rel="manifest" href="manifest\.webmanifest/);
   const man = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.webmanifest"), "utf8"));
-  assert.equal(man.background_color, "#004983");
+  assert.equal(man.background_color, "#003a66");
   assert.ok(man.icons.some((i) => i.sizes === "192x192") && man.icons.some((i) => i.sizes === "512x512"));
   assert.ok(man.icons.some((i) => i.purpose === "maskable"), "an Android adaptive icon");
   assert.equal(man.name, "Manpower Board", "the name a phone or desktop install shows");

@@ -54,11 +54,16 @@ async function step(name, fn) {
     const tab = async (t) => { await p.click(`#settings-tabs [data-tab=${t}]`); await p.waitForFunction((x) => state.settingsTab === x, t); };
     const closeDialog = async () => { await p.keyboard.press("Escape"); await p.waitForSelector("#modal-backdrop", { state: "hidden" }); };
 
-    await step("the top bar and the export header use the deeper navy", async () => {
-      const bg = await p.evaluate(() => [getComputedStyle(document.querySelector("#topbar")).backgroundColor, getComputedStyle(document.querySelector("#capture-header")).backgroundColor]);
-      assert.deepEqual(bg, ["rgb(6, 42, 68)", "rgb(6, 42, 68)"]);
-      // --primary is untouched: buttons and selected states stay the lighter blue
-      assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()), "#004983");
+    await step("one navy: the top bar, the export header, the sidebar selection and the main buttons share it", async () => {
+      const navy = await p.evaluate(() => {
+        const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundColor;
+        return { top: bg("#topbar"), capture: bg("#capture-header"), button: bg("#btn-new-mission"), token: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() };
+      });
+      assert.equal(navy.token, "#003a66");
+      assert.deepEqual([navy.top, navy.capture, navy.button], ["rgb(0, 58, 102)", "rgb(0, 58, 102)", "rgb(0, 58, 102)"]);
+      await openSettings();
+      assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector("#settings-tabs .settings-tab.active")).backgroundColor), "rgb(0, 58, 102)");
+      await p.click("#btn-settings-back");
     });
 
     await step("Settings opens as a page over the app and Back to board hands the board back untouched", async () => {

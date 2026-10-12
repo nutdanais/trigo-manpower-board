@@ -6,9 +6,9 @@
   --border: #d8dde4;
   --text: #1f2937;
   --muted: #6b7280;
-  --primary: #004983;        /* TRIGO navy, PMS 295C — kept as-is across themes: always used as a solid fill behind white text/borders */
-  --primary-dark: #00335c;
-  --primary-text: #004983;   /* navy used AS TEXT/BORDER on a page surface — this one lightens in dark mode for contrast */
+  --primary: #003a66;        /* TRIGO navy — the ONE navy: top bar, Settings sidebar selection, main buttons, selected states. Kept as-is across themes: always used as a solid fill behind white text/borders */
+  --primary-dark: #002a4a;   /* hover / pressed */
+  --primary-text: #003a66;   /* navy used AS TEXT/BORDER on a page surface — this one lightens in dark mode for contrast */
   --brand-green: #a8c855;    /* TRIGO green, PMS 367C */
   --danger: #dc2626;
   --danger-line: #e6c2be;    /* outlined destructive edge — the fill was too loud for the action */
@@ -125,13 +125,12 @@
   --on-navy-line-strong: rgba(255, 255, 255, .62);
   --on-navy-fill: rgba(255, 255, 255, .14);
 
-  /* #topbar is a solid, deep navy (the CI guide's header navy, #062A44) — darker
-     than --primary, which stays the lighter PMS 295C blue for buttons, links and
-     selected states. It is chrome with its own fixed identity, so it does not
-     follow the light/dark toggle — same reasoning as --card-ink. The exported
-     board header mirrors it (see #capture-header). */
-  --topbar-bg: #062a44;
-  --topbar-line: #041c2e;
+  /* #topbar uses the same navy as every main button and selected state
+     (--primary), so the whole app reads as one blue. It is chrome with its own
+     fixed identity, so it does not follow the light/dark toggle — same reasoning
+     as --card-ink. The exported board header mirrors it (see #capture-header). */
+  --topbar-bg: var(--primary);
+  --topbar-line: var(--primary-dark);
 }
 
 :root[data-theme="dark"] {
@@ -4414,7 +4413,7 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 :root {
   --cap-left: 250px;
   --cap-avail: #d6e0eb;
-  --cap-dem: #004983;
+  --cap-dem: #003a66;
   --cap-over: #d0342c;
   --cap-stripe: rgba(0, 73, 131, .05);
   --cap-sel: rgba(0, 73, 131, .12);
@@ -4699,22 +4698,22 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   width: max-content; padding: 24px; background: #ffffff; color: #13222f;
   font-family: var(--font-ui); font-size: 12px;
 }
-#cap-export-sheet .ce-top { display: flex; align-items: baseline; gap: 16px; background: #004983; color: #ffffff; padding: 12px 16px; border-bottom: 3px solid #a8c855; }
+#cap-export-sheet .ce-top { display: flex; align-items: baseline; gap: 16px; background: #003a66; color: #ffffff; padding: 12px 16px; border-bottom: 3px solid #a8c855; }
 #cap-export-sheet .ce-brand { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
 #cap-export-sheet .ce-sub { color: #b8ccdd; font-size: 12px; }
 #cap-export-sheet .ce-board { margin-top: 18px; }
-#cap-export-sheet .ce-board h2 { margin: 0 0 6px; font-size: 15px; color: #004983; }
+#cap-export-sheet .ce-board h2 { margin: 0 0 6px; font-size: 15px; color: #003a66; }
 #cap-export-sheet table { border-collapse: collapse; }
 #cap-export-sheet th, #cap-export-sheet td { border-bottom: 1px solid #d8e0e7; padding: 4px 8px; white-space: nowrap; text-align: center; min-width: 44px; }
 #cap-export-sheet .ce-l { text-align: left; }
 #cap-export-sheet .ce-wrap { white-space: normal; min-width: 140px; max-width: 260px; }
-#cap-export-sheet thead th { background: #004983; color: #ffffff; font-weight: 700; }
+#cap-export-sheet thead th { background: #003a66; color: #ffffff; font-weight: 700; }
 #cap-export-sheet thead .ce-mode th { font-size: 9px; color: #b8ccdd; border-bottom: 2px solid #a8c855; }
 #cap-export-sheet thead .ce-mode th.fc { color: #a8c855; }
 #cap-export-sheet th .ce-dow { display: block; font-size: 10px; font-weight: 400; color: #b8ccdd; }
 #cap-export-sheet .ce-fc { background: #f6f8fb; }
 #cap-export-sheet .ce-sum td { background: #eaf1f7; font-weight: 700; }
-#cap-export-sheet .ce-sum td.ce-l { color: #004983; }
+#cap-export-sheet .ce-sum td.ce-l { color: #003a66; }
 #cap-export-sheet .ce-short { background: #fbe4e4 !important; color: #b42318; }
 #cap-export-sheet .ce-tight { background: #fff3cc !important; color: #7a5b00; }
 #cap-export-sheet .ce-ok { background: #eaf4d5 !important; color: #40610a; }
