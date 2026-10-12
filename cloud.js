@@ -1504,8 +1504,9 @@ const cloud = {
     const out = {};
     for (const host of hosts) {
       const ids = setsByHost[host];
-      if (!ids) { out[host] = { count: 0, names: [] }; continue; }
-      out[host] = { count: ids.size, names: [...ids].map((id) => nameOf.get(id)).filter(Boolean).slice(0, 2) };
+      if (!ids) { out[host] = { count: 0, names: [], ids: [] }; continue; }
+      // ids: everyone, so the Overview can say where each of them is today
+      out[host] = { count: ids.size, names: [...ids].map((id) => nameOf.get(id)).filter(Boolean).slice(0, 2), ids: [...ids] };
     }
     return out;
   },
