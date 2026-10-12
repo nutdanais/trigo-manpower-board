@@ -44,7 +44,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-12g">
+<link rel="stylesheet" href="styles.css?v=2026-10-12h">
 </head>
 <body>
 
@@ -64,7 +64,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-12g"></script>
+<script src="version.js?v=2026-10-12h"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -515,7 +515,8 @@
         </div>
         <!-- Narrows the board like a filter does, so it sits with them: reads
              "Hide/Unhide" until something is hidden, then "Hidden n" in the
-             active-filter tint (see updateHideMissionsButton). -->
+             active-filter tint, plus an amber count of missions with no crew
+             (see updateHideMissionsButton). -->
         <button id="btn-hide-missions" class="btn btn-hidden-chip" title="Choose which missions are hidden from this board"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"></use></svg> Hide/Unhide</button>
         <select id="sort-by" title="Sort missions">
           <option value="number">Sort: Mission No.</option>
@@ -1034,11 +1035,18 @@
     </div>
   </div>
 
-  <div class="modal hidden" id="modal-hide-missions">
-    <h3>Hide/Unhide Missions<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <p class="import-note">Ticked missions are hidden from this board and date — their definition (and carried-forward days) is kept, just off the board. Anyone assigned to a mission you hide returns to Standby.</p>
+  <!-- Wide on a desktop, full-screen on a phone (styles.css). Missions with no
+       crew are grouped first as the suggestion; groups follow the SAVED state so
+       a row never jumps while it is being ticked (see renderHideMissions). -->
+  <div class="modal hidden" id="modal-hide-missions" role="dialog" aria-labelledby="hide-missions-title">
+    <h3><span id="hide-missions-title">Hide/Unhide missions</span><small id="hide-missions-sub"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div id="hide-missions-tools">
+      <label class="hm-search"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="hide-missions-q" placeholder="Search mission, host, customer or engineer" aria-label="Search missions" autocomplete="off"></label>
+      <div class="hm-filters" id="hide-missions-filters" role="group" aria-label="Show"></div>
+    </div>
     <div id="hide-missions-list"></div>
     <div class="modal-actions">
+      <span id="hide-missions-summary" aria-live="polite"></span>
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-hide-missions-save">Save</button>
     </div>
@@ -1240,12 +1248,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-12g"></script>
-<script src="employee-id.js?v=2026-10-12g"></script>
-<script src="cloud.js?v=2026-10-12g"></script>
-<script src="charts.js?v=2026-10-12g"></script>
-<script src="xlsx-export.js?v=2026-10-12g"></script>
-<script src="bulk-edit.js?v=2026-10-12g"></script>
-<script src="app.js?v=2026-10-12g"></script>
+<script src="planning.js?v=2026-10-12h"></script>
+<script src="employee-id.js?v=2026-10-12h"></script>
+<script src="cloud.js?v=2026-10-12h"></script>
+<script src="charts.js?v=2026-10-12h"></script>
+<script src="xlsx-export.js?v=2026-10-12h"></script>
+<script src="bulk-edit.js?v=2026-10-12h"></script>
+<script src="app.js?v=2026-10-12h"></script>
 </body>
 </html>

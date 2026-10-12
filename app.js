@@ -291,6 +291,15 @@ function toast(message, type = "info", opts = {}) {
   msg.className = "toast-msg";
   msg.textContent = message;
   el.appendChild(msg);
+  // opts.action = { label, run }: one follow-up the toast offers, e.g. Undo
+  if (opts.action) {
+    const act = document.createElement("button");
+    act.className = "toast-action";
+    act.type = "button";
+    act.textContent = opts.action.label;
+    act.onclick = () => { remove(); opts.action.run(); };
+    el.appendChild(act);
+  }
   const close = document.createElement("button");
   close.className = "toast-close";
   close.type = "button";
@@ -1520,11 +1529,27 @@ function orgWirePan() {
 function updateHideMissionsButton() {
   const btn = $("#btn-hide-missions");
   if (!btn) return;
-  const n = getPlan().missions.filter(m => m.hidden).length;
+  const missions = getPlan().missions;
+  const n = missions.filter(m => m.hidden).length;
   // "Hidden 7" is a filter in effect (tinted, like an active filter); with nothing
   // hidden it is just the way in to the dialog
   setIconLabel(btn, "eye-off", n ? `Hidden ${n}` : "Hide/Unhide");
   btn.classList.toggle("is-on", n > 0);
+  // amber count of missions with no crew: the ones the dialog suggests hiding
+  const empty = missions.filter(missionHasNoCrew).length;
+  if (empty) {
+    const badge = document.createElement("span");
+    badge.className = "hide-empty-badge";
+    badge.textContent = empty;
+    btn.appendChild(badge);
+    const sr = document.createElement("span");
+    sr.className = "sr-only";
+    sr.textContent = ` ${empty === 1 ? "mission" : "missions"} with no crew`;
+    btn.appendChild(sr);
+  }
+  btn.title = empty
+    ? `${empty} ${empty === 1 ? "mission has" : "missions have"} no crew. Choose which missions are hidden from this board`
+    : "Choose which missions are hidden from this board";
 }
 
 /* A plan is "empty" when it has no missions and nobody in any leave zone —
@@ -2261,6 +2286,7 @@ function renderMissions() {
   grid.innerHTML = "";
   let missions = plan.missions.filter(m => !m.hidden);
   const fcView = isForecastView();
+  const cardHide = !fcView && can("board", "edit") && !isReadOnly();
   if (state.sort) {
     missions.sort((a, b) =>
       missionSortValue(a).localeCompare(missionSortValue(b)) || a.number.localeCompare(b.number));
@@ -2282,9 +2308,7 @@ function renderMissions() {
     // block from across the room, and the header text can follow the theme
     // like every other label again.
     card.style.borderTopColor = engColor;
-    const memberEmps = m.members
-      .map(empId => D().employees.find(e => e.id === empId))
-      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
+    const memberEmps = missionCrew(m);
     const header = document.createElement("div");
     header.className = "mission-header";
     header.style.background = tintOf(engColor, MISSION_TINT);
@@ -2344,6 +2368,24 @@ function renderMissions() {
     empRow.className = "mission-emps";
     for (const emp of sortEmployeesDisplay(memberEmps)) empRow.appendChild(empCard(emp));
     body.appendChild(empRow);
+    // No crew: say so where the people would be, and offer to take the mission
+    // off the board. Only for someone who could hide it right now (no prompt),
+    // and never in an export (body.exporting hides it).
+    if (!memberEmps.length && cardHide) {
+      const empty = document.createElement("div");
+      empty.className = "m-empty";
+      empty.innerHTML = `<span class="m-empty-hint"><b>No crew yet</b> · drag people here</span>`;
+      const hideBtn = document.createElement("button");
+      hideBtn.type = "button";
+      hideBtn.className = "m-empty-hide";
+      hideBtn.title = "Take this mission off the board without deleting it";
+      hideBtn.setAttribute("aria-label", `Hide mission ${m.number} (no crew)`);
+      hideBtn.innerHTML = `${icon("eye-off")}<span>Hide</span>`;
+      // stop here: the body is a drop zone whose click assigns a selection
+      hideBtn.onclick = (ev) => { ev.stopPropagation(); hideMissionFromCard(m); };
+      empty.appendChild(hideBtn);
+      body.appendChild(empty);
+    }
     if (m.remark) {
       const remark = document.createElement("div");
       remark.className = "m-remark";
@@ -7255,33 +7297,185 @@ function confirmImport() {
 }
 
 /* ---------- Hide/Unhide missions (declutter the board without deleting) ---------- */
+/* The dialog keeps what has been ticked as `pending`: the ids whose hidden state
+   Save will flip. A tick is "hidden after Save", exactly as before, so the rows
+   can be re-drawn (search, filter, "Select all") without losing a tick. */
+let hideUi = { pending: new Set(), q: "", f: "all" };
+const HIDE_FILTERS = [["all", "All"], ["empty", "No crew"], ["hidden", "Hidden"], ["day", "Day"], ["night", "Night"]];
+
+/* this board's people on a mission — what the card's headcount chip shows */
+function missionCrew(m) {
+  return m.members
+    .map(empId => D().employees.find(e => e.id === empId))
+    .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
+}
+/* on the board with nobody from this board on it: the missions worth hiding */
+function missionHasNoCrew(m) { return !m.hidden && missionCrew(m).length === 0; }
+
 function openHideMissionsModal() {
   if (isForecastView()) return;
   guardEdit(() => {
-    const missions = [...getPlan().missions].sort((a, b) => a.number.localeCompare(b.number));
-    const list = $("#hide-missions-list");
-    list.innerHTML = "";
-    if (!missions.length) {
-      list.innerHTML = '<p class="import-note">No missions on this date yet.</p>';
-    }
-    for (const m of missions) {
-      const eng = D().engineers.find(e => e.id === m.engineerId);
-      const row = document.createElement("label");
-      row.className = "import-row";
-      row.innerHTML = `<input type="checkbox" value="${m.id}" ${m.hidden ? "checked" : ""}>
-        <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
-        <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""} • ${m.members.length} assigned</small></span>`;
-      list.appendChild(row);
-    }
+    hideUi = { pending: new Set(), q: "", f: "all" };
+    $("#hide-missions-q").value = "";
+    const board = D().boards.find(b => b.id === D().activeBoardId);
+    $("#hide-missions-sub").textContent = `${board ? board.name + " · " : ""}${fmtDow(state.date)} ${fmtDate(state.date)}`;
+    renderHideMissions();
     openModal("#modal-hide-missions");
+    $("#hide-missions-list").scrollTop = 0;
   });
+}
+
+function hideStateTag(m, crew) {
+  if (hideUi.pending.has(m.id)) {
+    if (m.hidden) return '<span class="hm-tag will-unhide">Will unhide</span>';
+    return `<span class="hm-tag will-hide">Will hide${crew ? ` · ${crew} → Standby` : ""}</span>`;
+  }
+  return m.hidden ? '<span class="hm-tag">Hidden</span>' : "";
+}
+
+function hideRowHtml(m, crew) {
+  const eng = D().engineers.find(e => e.id === m.engineerId);
+  const night = m.shift === "night";
+  const willHide = m.hidden !== hideUi.pending.has(m.id);
+  return `<label class="hm-row${hideUi.pending.has(m.id) ? " pend" : ""}${m.hidden ? " is-hidden" : ""}" data-id="${escapeHtml(m.id)}">
+    <input type="checkbox" value="${escapeHtml(m.id)}" ${willHide ? "checked" : ""} aria-label="Hide ${escapeHtml(m.number)}">
+    <span class="hm-no">${escapeHtml(m.number)}</span>
+    <span class="hm-route"><b>${escapeHtml(m.host)}</b> ${icon("arrow-right")} ${escapeHtml(m.customer)}</span>
+    <span class="hm-when"><span class="hm-shift${night ? " night" : ""}">${night ? icon("moon") + "NIGHT" : "DAY"}</span>${escapeHtml(m.startTime)}-${escapeHtml(m.endTime)}</span>
+    <span class="hm-eng">${eng ? `<i style="background:${escapeHtml(eng.color)}"></i>${escapeHtml(eng.name)}` : ""}</span>
+    <span class="hm-crew${crew ? "" : " zero"}" title="${crew} assigned from this board">${icon("users")}${crew}</span>
+    <span class="hm-state">${hideStateTag(m, crew)}</span>
+  </label>`;
+}
+
+function renderHideMissions() {
+  const list = $("#hide-missions-list");
+  const missions = [...getPlan().missions].sort((a, b) => a.number.localeCompare(b.number));
+  const crew = new Map(missions.map(m => [m.id, missionCrew(m).length]));
+  const noCrew = (m) => !m.hidden && !crew.get(m.id);
+  const counts = {
+    all: missions.length,
+    empty: missions.filter(noCrew).length,
+    hidden: missions.filter(m => m.hidden).length,
+    day: missions.filter(m => m.shift !== "night").length,
+    night: missions.filter(m => m.shift === "night").length,
+  };
+  $("#hide-missions-filters").innerHTML = HIDE_FILTERS.map(([k, label]) =>
+    `<button type="button" class="hm-filter${hideUi.f === k ? " on" : ""}${k === "empty" && counts.empty ? " warn" : ""}" data-f="${k}" aria-pressed="${hideUi.f === k}">${label} <span class="n">${counts[k]}</span></button>`).join("");
+
+  const q = hideUi.q.trim().toLowerCase();
+  const engName = (m) => (D().engineers.find(e => e.id === m.engineerId) || {}).name || "";
+  const shown = missions.filter(m => {
+    if (q && !`${m.number} ${m.host} ${m.customer} ${engName(m)}`.toLowerCase().includes(q)) return false;
+    if (hideUi.f === "empty") return noCrew(m);
+    if (hideUi.f === "hidden") return m.hidden;
+    if (hideUi.f === "day") return m.shift !== "night";
+    if (hideUi.f === "night") return m.shift === "night";
+    return true;
+  });
+  // grouped by the SAVED state, so ticking a row tags it in place instead of moving it
+  const groups = [
+    { rows: shown.filter(noCrew), suggest: true, title: "Suggested · no crew",
+      note: "Nobody from this board is on these missions on this date. Hide them to tidy the board; you can unhide them any time." },
+    { rows: shown.filter(m => !m.hidden && crew.get(m.id)), title: "On the board",
+      note: "Anyone on a mission you hide returns to Standby." },
+    { rows: shown.filter(m => m.hidden), title: "Hidden",
+      note: "Untick to put a mission back on the board. Its setup was kept." },
+  ];
+  const allEmpty = missions.filter(noCrew);
+  const allPicked = allEmpty.length && allEmpty.every(m => hideUi.pending.has(m.id));
+  let html = "";
+  for (const g of groups) {
+    if (!g.rows.length) continue;
+    const act = g.suggest
+      ? `<button type="button" class="btn btn-small hm-select" data-hm-act="${allPicked ? "clear-empty" : "select-empty"}">${allPicked ? "Clear selection" : `Select all ${allEmpty.length}`}</button>` : "";
+    html += `<div class="hm-group${g.suggest ? " is-suggest" : ""}">
+      <div class="hm-group-head">${g.suggest ? icon("alert") : ""}<span class="hm-group-title">${g.title} (${g.rows.length})<small>${g.note}</small></span>${act}</div>
+      ${g.rows.map(m => hideRowHtml(m, crew.get(m.id))).join("")}</div>`;
+  }
+  if (!missions.length) html = '<p class="hm-empty">No missions on this date yet.</p>';
+  else if (!html) html = `<p class="hm-empty">No missions match${q ? ` “${escapeHtml(hideUi.q.trim())}”` : " this filter"}.</p>`;
+  const top = list.scrollTop;
+  list.innerHTML = html;
+  list.scrollTop = top;
+  updateHideSummary();
+}
+
+/* what Save will do, in words, next to the Save button */
+function updateHideSummary() {
+  const changed = getPlan().missions.filter(m => hideUi.pending.has(m.id));
+  const hide = changed.filter(m => !m.hidden), unhide = changed.filter(m => m.hidden);
+  const people = hide.reduce((n, m) => n + m.members.length, 0);
+  const el = $("#hide-missions-summary");
+  $("#btn-hide-missions-save").disabled = !changed.length;
+  if (!changed.length) { el.textContent = "No changes yet."; return; }
+  const parts = [];
+  if (hide.length) parts.push(`<b>Hide ${hide.length}</b>`);
+  if (unhide.length) parts.push(`<b>Unhide ${unhide.length}</b>`);
+  el.innerHTML = parts.join(" · ") + (people
+    ? ` · <span class="hm-warn">${people} ${people === 1 ? "person returns" : "people return"} to Standby</span>`
+    : " · nobody returns to Standby");
+}
+
+function bindHideMissionsModal() {
+  $("#hide-missions-q").oninput = (e) => { hideUi.q = e.target.value; renderHideMissions(); };
+  $("#hide-missions-filters").onclick = (e) => {
+    const b = e.target.closest("[data-f]");
+    if (!b) return;
+    hideUi.f = b.dataset.f;
+    renderHideMissions();
+  };
+  const list = $("#hide-missions-list");
+  list.onchange = (e) => {
+    const c = e.target;
+    if (c.type !== "checkbox") return;
+    const m = getPlan().missions.find(x => x.id === c.value);
+    if (!m) return;
+    if (c.checked !== m.hidden) hideUi.pending.add(m.id); else hideUi.pending.delete(m.id);
+    // update the one row in place: keeps focus and scroll for keyboard users
+    const row = c.closest(".hm-row");
+    row.classList.toggle("pend", hideUi.pending.has(m.id));
+    row.querySelector(".hm-state").innerHTML = hideStateTag(m, missionCrew(m).length);
+    const sel = list.querySelector(".hm-select");
+    const allEmpty = getPlan().missions.filter(missionHasNoCrew);
+    if (sel) {
+      const allPicked = allEmpty.every(x => hideUi.pending.has(x.id));
+      sel.dataset.hmAct = allPicked ? "clear-empty" : "select-empty";
+      sel.textContent = allPicked ? "Clear selection" : `Select all ${allEmpty.length}`;
+    }
+    updateHideSummary();
+  };
+  list.onclick = (e) => {
+    const b = e.target.closest("[data-hm-act]");
+    if (!b) return;
+    const empties = getPlan().missions.filter(missionHasNoCrew);
+    for (const m of empties) {
+      if (b.dataset.hmAct === "select-empty") hideUi.pending.add(m.id); else hideUi.pending.delete(m.id);
+    }
+    renderHideMissions();
+  };
+}
+
+/* the card's own Hide (missions with no crew): nobody returns to Standby, so it
+   hides at once and the toast carries the Undo instead of a confirm */
+function hideMissionFromCard(m) {
+  guardEdit(() => safely(async () => {
+    await cloud.setMissionsHidden([m.id], true);
+    await refreshAndRender();
+    toast(`${m.number} hidden. It is in Hide/Unhide if you need it back.`, "info", {
+      duration: 6000,
+      action: { label: "Undo", run: () => safely(async () => {
+        await cloud.setMissionsHidden([m.id], false);
+        await refreshAndRender();
+      }) },
+    });
+  }));
 }
 
 function saveHideMissions() {
   const missions = getPlan().missions;
-  const checked = new Set(Array.from($$("#hide-missions-list input[type=checkbox]:checked")).map(c => c.value));
-  const toHide = missions.filter(m => checked.has(m.id) && !m.hidden).map(m => m.id);
-  const toUnhide = missions.filter(m => !checked.has(m.id) && m.hidden).map(m => m.id);
+  const toHide = missions.filter(m => hideUi.pending.has(m.id) && !m.hidden).map(m => m.id);
+  const toUnhide = missions.filter(m => hideUi.pending.has(m.id) && m.hidden).map(m => m.id);
   if (!toHide.length && !toUnhide.length) { closeModal(); return; }
   safely(async () => {
     if (toHide.length) await cloud.setMissionsHidden(toHide, true);
@@ -10357,6 +10551,7 @@ function wireApp() {
   $("#btn-hide-mission").onclick = hideMission;
   $("#btn-hide-missions").onclick = openHideMissionsModal;
   $("#btn-hide-missions-save").onclick = saveHideMissions;
+  bindHideMissionsModal();
   $("#btn-deactivate-employee").onclick = deactivateEmployee;
 
   $("#btn-settings").onclick = () => openSettingsView();
