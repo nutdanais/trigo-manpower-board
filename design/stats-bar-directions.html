@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stats Bar Redesign Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral — not loaded by the app. Page tokens mirror styles.css; the
+   mockups reuse the app's own control sizes (32px controls, 13.5px labels, 11px/13px
+   stat chips) so "Current" is a faithful replica, not a sketch. Every number in every
+   mockup comes from one scenario object, so the directions are always compared on
+   identical data. */
+:root {
+  --page: #eef1f4;  --surface: #ffffff;  --line: #d8dde4;  --ink: #1f2937;
+  --mut: #5f6773;   /* page copy, nudged darker than the app's muted for 4.5:1 on --page */
+  --amut: #6b7280;  /* the app's --muted: used INSIDE mockups so they match the real UI */
+  --navy: #004983;  --navy-text: #004983;  --navy-tint: rgba(0,73,131,.08);  --navy-tint-line: rgba(0,73,131,.35);
+  --green: #a8c855; --soft: #e6eaef;
+  --warn-text: #8a4f10; --warn-surface: #fdf8ef; --warn-line: #e0c9a4; --warn: #f59e0b;
+  --ok-text: #4d6810;   --ok-surface: #f7faef;   --ok-line: #cfdcae;
+  --bad-text: #a3271f;  --bad-surface: #fef2f2;  --bad-line: #e6c2be;
+  /* bar segments: each is >= 3:1 against the panel it sits on, and none is colour-only
+     (every segment has a text label with its number next to it) */
+  --seg-asg: #2a78d6; --seg-leave: #b87800; --seg-standby: #cf3a39; --seg-free: #78808a; --seg-hol: #7c6fd0;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", "Noto Sans", sans-serif;
+  --f-body: "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --page: #14171a; --surface: #1c2024; --line: #2c3236; --ink: #e8ebed; --mut: #a3aab1; --amut: #9aa1a8;
+  --navy-text: #6fb1e0; --navy-tint: rgba(111,177,224,.12); --navy-tint-line: rgba(111,177,224,.4); --soft: #232a33;
+  --warn-text: #e0b070; --warn-surface: #2a2313; --warn-line: #6a5426;
+  --ok-text: #a8c855; --ok-surface: #1b2416; --ok-line: #46592a;
+  --bad-text: #fca5a5; --bad-surface: rgba(185,28,28,.16); --bad-line: #7f2222;
+  --seg-asg: #3987e5; --seg-leave: #c98500; --seg-standby: #d0334f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: 76px; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1640px; margin: 0 auto; padding: 28px 20px 72px; display: flex; flex-direction: column; gap: 44px; }
+h1, h2, h3, h4 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: .1px; }
+h1 { font-size: 40px; line-height: 1.05; font-weight: 700; }
+h2 { font-size: 27px; line-height: 1.15; font-weight: 700; }
+h3 { font-size: 19px; line-height: 1.2; font-weight: 700; }
+p { margin: 0; max-width: 72ch; }
+a { color: var(--navy-text); }
+:focus-visible { outline: 2px solid var(--navy-text); outline-offset: 2px; }
+section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase; color: var(--navy-text); display: flex; align-items: center; gap: 8px; }
+.eyebrow::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--green); }
+.lede { color: var(--mut); font-size: 16px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--mut); }
+.meta b { color: var(--ink); font-weight: 600; }
+.ic { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -.2em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- preview controls (sticky) ---------- */
+.ctrl { position: sticky; top: 0; z-index: 30; background: var(--surface); border-bottom: 1px solid var(--line); }
+.ctrl-in { max-width: 1640px; margin: 0 auto; padding: 8px 20px; display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
+.ctrl-g { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctrl-l { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--mut); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: 600 13px/1 var(--f-body); padding: 8px 12px; min-height: 34px; border: 0; border-left: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.seg button:first-child { border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: #2b5f8a; }
+.seg button:hover:not([aria-pressed="true"]) { background: var(--soft); }
+.ctrl-note { font-size: 12.5px; color: var(--mut); }
+
+/* ---------- tags, cards ---------- */
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.tag.ok { color: var(--ok-text); background: var(--ok-surface); border-color: var(--ok-line); }
+.tag.hi { color: var(--bad-text); background: var(--bad-surface); border-color: var(--bad-line); }
+.tag.md { color: var(--warn-text); background: var(--warn-surface); border-color: var(--warn-line); }
+.tag.lo { color: var(--mut); background: var(--soft); border-color: var(--line); }
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; }
+.finding { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.finding-top { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.finding-top span:first-child { font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 12px; color: var(--mut); }
+.finding h3 { font-size: 16.5px; }
+.finding p { font-size: 14px; color: var(--mut); }
+.finding .where { font-size: 12.5px; color: var(--mut); }
+.finding .where code, .case code, .note code { font-size: 12px; background: var(--soft); border-radius: 4px; padding: 0 4px; }
+.keep { background: var(--ok-surface); border: 1px solid var(--ok-line); border-radius: 10px; padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; }
+.keep h3 { color: var(--ok-text); font-size: 17px; }
+.keep ul { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 3px; }
+
+/* anatomy: what the 14 numbers actually are */
+.anat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 16px; }
+.anat-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) auto; gap: 8px 18px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.anat-row:first-child { border-top: 0; }
+.anat-k { font-weight: 700; font-size: 14px; }
+.anat-k small { display: block; font-weight: 400; color: var(--mut); font-size: 12.5px; }
+.eq { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 13px; }
+.eq .ch { border: 1px solid var(--line); border-radius: 6px; padding: 2px 9px; background: var(--page); color: var(--mut); white-space: nowrap; font-weight: 600; }
+.eq .ch b { color: var(--ink); margin-left: 3px; font-variant-numeric: tabular-nums; }
+.eq .ch.tot { border-color: var(--navy-tint-line); background: var(--navy-tint); }
+.eq i { font-style: normal; color: var(--mut); font-weight: 700; }
+.verdict { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.verdict.good { color: var(--ok-text); }
+.verdict.bad { color: var(--bad-text); }
+@media (max-width: 900px) { .anat-row { grid-template-columns: 1fr; } }
+
+/* ---------- direction bands ---------- */
+.dir { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding-top: 26px; border-top: 1px solid var(--line); }
+.dir-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.dir-head p { color: var(--mut); flex-basis: 100%; }
+.letter { font-family: var(--f-display); font-size: 15px; font-weight: 700; color: #fff; background: var(--navy); border-radius: 6px; padding: 1px 10px; }
+:root[data-theme="dark"] .letter { background: #2b5f8a; }
+.case { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px 28px; }
+.case h4 { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--mut); }
+.case ul { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.case p { font-size: 14px; }
+.rec-band { border: 2px solid var(--green); border-radius: 12px; padding: 0 18px 18px; }
+.rec-band .dir-head { margin-top: -14px; }
+.rec-flag { background: var(--green); color: #1c2a06; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 3px 12px; border-radius: 999px; }
+
+/* ---------- mockup frame ---------- */
+.frame { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
+.frame-bar { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: var(--navy); color: #fff; font-size: 12px; font-weight: 600; }
+:root[data-theme="dark"] .frame-bar { background: #1d3a52; }
+.frame-bar .dots { display: flex; gap: 5px; }
+.frame-bar .dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.35); }
+.frame-bar .live { margin-left: auto; font-weight: 500; opacity: .85; font-variant-numeric: tabular-nums; }
+.frame-scroll { overflow-x: auto; background: var(--page); }
+.stage { width: 100%; }
+body[data-w="1440"] .stage { width: 1440px; }
+body[data-w="1280"] .stage { width: 1280px; }
+body[data-w="390"] .stage { width: 390px; }
+
+/* ---- mock: the toolbar block (#toolbar) ---- */
+.tb { position: relative; background: var(--surface); border-bottom: 1px solid var(--line); color: var(--ink); font-size: 13.5px; line-height: 1.2; }
+.tb-row { display: flex; align-items: center; gap: 8px; padding: 7px 14px; flex-wrap: wrap; }
+.tb-row.tier { padding-top: 0; padding-bottom: 9px; }
+.sp { flex: 1; }
+.vr { width: 1px; height: 20px; background: var(--line); margin: 0 4px; flex: none; }
+.b { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font: 500 13.5px/1 var(--f-body); color: var(--ink); white-space: nowrap; }
+.b.pri { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 600; }
+:root[data-theme="dark"] .b.pri { background: #2b5f8a; border-color: #2b5f8a; }
+.b.out { color: var(--navy-text); border-color: var(--navy-tint-line); font-weight: 600; }
+.b.quiet { border-color: transparent; background: transparent; color: var(--amut); }
+.b.dis { opacity: .45; }
+.fgrp { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.b.fl { padding: 0 11px; }
+.b.sel { padding: 0 8px 0 11px; justify-content: space-between; }
+.b.names { min-width: 176px; }
+.b.names.compact { min-width: 0; }  /* a native select sizes to its longest option, "Names: Thai + English" */
+.b em { font-style: normal; color: var(--amut); font-weight: 500; }
+.b.act { background: var(--navy-tint); border-color: var(--navy-tint-line); color: var(--navy-text); font-weight: 600; }
+.b.act em { color: inherit; font-weight: 700; }
+.more-btn { display: none; }
+.stage.phone .r1 .hide-phone { display: none; }
+.stage.phone .more-btn { display: inline-flex; }
+.ro { display: inline-flex; align-items: center; gap: 6px; background: var(--warn-surface); border: 1px solid var(--warn); color: var(--warn-text); padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 12px; white-space: nowrap; }
+.rt { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+/* current (replica of styles.css .stat-chip / #stats-bar / #area-bar) */
+.cur-stats { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; flex-shrink: 1; }
+.cur-areas { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; min-width: 0; flex-shrink: 1; }
+.sc { white-space: nowrap; display: inline-flex; align-items: baseline; gap: 5px; font-size: 11px; font-weight: 600; color: var(--amut); }
+.sc b { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.cur-stats .sc { padding: 2px 13px; position: relative; }
+.cur-stats .sc:not(:first-child)::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 1px; height: 14px; background: var(--line); }
+.sc.night::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #1c2430; align-self: center; flex: none; }
+:root[data-theme="dark"] .sc.night::after { background: var(--ink); }
+.cur-areas .sc { gap: 6px; }
+.stage.phone .cur-stats .sc { padding: 2px 8px; }
+
+/* A — grouped & hushed */
+.a-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+.a-g { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.a-i { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--amut); white-space: nowrap; }
+.a-i b { font-size: 14px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.a-i.lead b { font-size: 15px; }
+.a-i.zero b { color: var(--amut); font-weight: 600; }
+.a-i.sm { font-size: 11.5px; }
+.a-i.sm b { font-size: 12.5px; font-weight: 600; }
+.a-div { width: 1px; height: 18px; background: var(--line); }
+.stage.phone .a-div { display: none; }
+.a-cap { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--amut); }
+.a-alert { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 6px; background: var(--bad-surface); border: 1px solid var(--bad-line); color: var(--bad-text); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.a-alert b { color: inherit; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* B — headline + composition bar */
+.b-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; min-width: 0; }
+.b-head { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--amut); font-weight: 500; white-space: nowrap; }
+.b-head b { font-size: 22px; line-height: 1; color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; align-self: center; }
+.sw.asg, .seg-s.asg { background: var(--seg-asg); }
+.sw.leave, .seg-s.leave { background: var(--seg-leave); }
+.sw.standby, .seg-s.standby { background: var(--seg-standby); }
+.sw.free, .seg-s.free { background: var(--seg-free); }
+.sw.hol, .seg-s.hol { background: repeating-linear-gradient(45deg, var(--seg-hol) 0 3px, transparent 3px 6px); box-shadow: inset 0 0 0 1px var(--seg-hol); }
+.b-meter { width: 260px; flex: 0 1 260px; min-width: 140px; }
+.b-track { display: flex; gap: 2px; height: 10px; border-radius: 5px; overflow: hidden; background: var(--soft); }
+.seg-s { display: block; height: 100%; min-width: 3px; }
+.b-legend { display: flex; flex-wrap: nowrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; }
+.stage.phone .b-legend { flex-wrap: wrap; }
+.b-legend li { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: var(--amut); white-space: nowrap; }
+.b-legend b { font-size: 14px; color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.b-legend li.zero b { color: var(--amut); font-weight: 600; }
+.b-legend li.alert { color: var(--bad-text); font-weight: 600; }
+.b-legend li.alert b { color: var(--bad-text); }
+.tier-in { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; }
+
+/* C — KPI tiles */
+.c-bar { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; min-width: 0; }
+.c-lead { display: flex; flex-direction: column; justify-content: center; padding: 0 10px 0 2px; }
+.c-l { font-size: 11.5px; font-weight: 600; color: var(--amut); white-space: nowrap; }
+.c-lead b, .c-tl b { font-size: 22px; line-height: 1.1; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.c-t { display: flex; align-items: center; gap: 14px; padding: 6px 13px 6px 10px; border: 1px solid var(--line); border-left: 3px solid var(--tc, var(--line)); border-radius: 8px; background: var(--surface); min-width: 96px; }
+.c-tl { display: flex; flex-direction: column; }
+.c-t.asg { --tc: var(--seg-asg); } .c-t.leave { --tc: var(--seg-leave); } .c-t.standby { --tc: var(--seg-standby); } .c-t.free { --tc: var(--seg-free); } .c-t.hol { --tc: var(--seg-hol); }
+.c-t.zero .c-tl b { color: var(--amut); font-weight: 600; }
+.c-t.alert { background: var(--bad-surface); border-color: var(--bad-line); border-left-color: var(--seg-standby); }
+.c-t.alert .c-tl b, .c-t.alert .c-l { color: var(--bad-text); }
+.c-t .ic.al { color: var(--bad-text); }
+.c-sh { display: flex; flex-direction: column; gap: 2px; border-left: 1px solid var(--line); padding-left: 12px; }
+.c-sh span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--amut); font-weight: 500; white-space: nowrap; }
+.c-sh b { color: var(--ink); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* D — one-line summary + details popover */
+.d-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; font-size: 13px; color: var(--amut); }
+.d-bar b { color: var(--ink); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.d-sep { color: var(--amut); opacity: .55; }
+.d-st.alert { display: inline-flex; align-items: center; gap: 5px; color: var(--bad-text); background: var(--bad-surface); border: 1px solid var(--bad-line); border-radius: 6px; padding: 1px 9px; font-weight: 600; }
+.d-st.alert b { color: inherit; }
+.d-wrap { position: relative; }
+.d-btn { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: 600 12.5px/1 var(--f-body); cursor: pointer; }
+.d-btn:hover { background: var(--soft); }
+.d-btn .ic { transition: transform .15s; }
+.d-btn[aria-expanded="true"] .ic { transform: rotate(180deg); }
+.d-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 6; width: 680px; max-width: calc(100vw - 48px); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 12px 14px; display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 10px 28px; font-size: 13px; color: var(--amut); }
+.d-pop[hidden] { display: none; }
+.d-pop h5 { margin: 0 0 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--amut); }
+.d-pop .row { display: flex; flex-direction: column; gap: 3px; }
+.d-pop .row span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.d-pop .row b { color: var(--ink); font-size: 14px; }
+.d-pop .areas { display: flex; flex-wrap: wrap; gap: 3px 14px; }
+.d-pop .areas span { display: inline-flex; gap: 4px; align-items: baseline; font-size: 12px; white-space: nowrap; }
+.d-pop .areas b { font-size: 13px; font-weight: 600; }
+.tb { z-index: 1; }
+.stage.phone .d-wrap { position: static; }
+.stage.phone .d-pop { left: 8px; right: 8px; width: auto; max-width: none; top: auto; margin-top: 6px; grid-template-columns: 1fr 1fr; }
+.stage.phone .d-pop .areas-wrap { grid-column: 1 / -1; }
+
+/* board skeleton under the toolbar, for context (and room for the popover) */
+.board-skel { display: flex; gap: 10px; padding: 12px 14px; height: 190px; overflow: hidden; background: var(--page); }
+.sk { flex: 0 0 230px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 7px; height: 150px; }
+.sk i { display: block; height: 9px; border-radius: 3px; background: var(--soft); }
+.sk i:first-child { width: 60%; height: 11px; background: var(--line); }
+.sk i:nth-child(3) { width: 80%; } .sk i:nth-child(4) { width: 45%; }
+
+/* ---------- row-1 tidy list ---------- */
+.wins { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 10px; counter-reset: w; }
+.wins li { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px 12px 46px; position: relative; font-size: 14px; counter-increment: w; }
+.wins li::before { content: counter(w); position: absolute; left: 14px; top: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--navy-text); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+.wins b { display: block; font-size: 14.5px; }
+.wins span { color: var(--mut); }
+
+/* ---------- comparison table ---------- */
+.cmp-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.cmp { width: 100%; min-width: 880px; border-collapse: collapse; font-size: 14px; }
+.cmp th, .cmp td { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.cmp thead th { font-family: var(--f-display); font-size: 16px; white-space: nowrap; }
+.cmp tbody th { font-weight: 600; width: 20%; }
+.cmp tr:last-child th, .cmp tr:last-child td { border-bottom: 0; }
+.cmp .best { background: var(--ok-surface); }
+.cmp td small { display: block; color: var(--mut); font-size: 12.5px; }
+
+.decide { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px 28px; }
+.decide h3 { font-size: 16px; margin-bottom: 4px; }
+.decide p, .decide li { font-size: 14px; color: var(--mut); }
+.decide ol, .decide ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; }
+.note { font-size: 13px; color: var(--mut); }
+
+@media (prefers-reduced-motion: reduce) { .d-btn .ic { transition: none; } }
+@media (max-width: 600px) { h1 { font-size: 32px; } .wrap { padding-inline: 16px; } .ctrl-in { padding-inline: 16px; } }
+</style>
+</head>
+<body data-w="fit">
+
+<!-- icon sprite: one monochrome stroke set, same idea as the app's own sprite -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+</svg>
+
+<div class="ctrl" role="region" aria-label="Preview controls">
+  <div class="ctrl-in">
+    <div class="ctrl-g" role="group" aria-label="Sample day">
+      <span class="ctrl-l">Day</span>
+      <div class="seg" data-ctl="scen">
+        <button type="button" data-v="normal" aria-pressed="true">Normal (your screenshot)</button>
+        <button type="button" data-v="short" aria-pressed="false">Short-staffed</button>
+        <button type="button" data-v="holiday" aria-pressed="false">Holiday</button>
+      </div>
+    </div>
+    <div class="ctrl-g" role="group" aria-label="Toolbar width">
+      <span class="ctrl-l">Width</span>
+      <div class="seg" data-ctl="width">
+        <button type="button" data-v="fit" aria-pressed="true">Fit window</button>
+        <button type="button" data-v="1440" aria-pressed="false">1440</button>
+        <button type="button" data-v="1280" aria-pressed="false">1280 (≈ your screenshot)</button>
+        <button type="button" data-v="390" aria-pressed="false">Phone</button>
+      </div>
+    </div>
+    <div class="ctrl-g" role="group" aria-label="Row 1 treatment">
+      <span class="ctrl-l">Row 1</span>
+      <div class="seg" data-ctl="row1">
+        <button type="button" data-v="today" aria-pressed="true">As today</button>
+        <button type="button" data-v="tidy" aria-pressed="false">Tidied</button>
+      </div>
+    </div>
+    <div class="ctrl-g" role="group" aria-label="Theme">
+      <span class="ctrl-l">Theme</span>
+      <div class="seg" data-ctl="theme">
+        <button type="button" data-v="light" aria-pressed="true">Light</button>
+        <button type="button" data-v="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+
+<header class="head" style="display:flex;flex-direction:column;gap:12px">
+  <div class="eyebrow">Design review · Board tab toolbar</div>
+  <h1>Stats bar: calmer, with a clear first read</h1>
+  <p class="lede">Your instinct is right: the bar is busy. It shows 14 numbers at one visual weight, and they are three different breakdowns of the same people. Below: what is going on, four directions on identical data, and a recommendation. Everything is live: switch the day, the width, row 1 and the theme in the bar above and every mockup follows.</p>
+  <div class="meta">
+    <span><b>Reviewed</b> 12 Oct 2026</span>
+    <span><b>Scope</b> toolbar block above a board (row 1 actions + row 2 stats); stats bar is the focus</span>
+    <span><b>Status</b> design collateral only: the app is untouched</span>
+  </div>
+</header>
+
+<!-- ============================ TODAY ============================ -->
+<section id="today" aria-labelledby="h-today">
+  <div class="eyebrow">1 · Where it stands</div>
+  <h2 id="h-today">Today, as shipped</h2>
+  <p>A live replica built from the app's own CSS (<code>styles.css</code> stat chips, 32px controls). Your screenshot looks like a 125% display scale (its buttons are about 40px tall; the app's are 32px), which is roughly 1250px of layout width. Pick <b>1280</b> in Width to reproduce it: the stats fill their line and Names / Read-only / Export drop to a third line at the left.</p>
+
+  <div class="frame">
+    <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span> Current · as shipped <span class="live">toolbar height <span data-h="cur">–</span></span></div>
+    <div class="frame-scroll"><div class="mock" data-mock="cur"></div></div>
+  </div>
+
+  <h3 style="margin-top:8px">What the 14 numbers actually are</h3>
+  <p>They are not one list. They are three different cuts of the same people, and only the first two add up. (Figures are from your screenshot.)</p>
+  <div class="anat" role="table" aria-label="How the stats relate">
+    <div class="anat-row" role="row">
+      <div class="anat-k" role="cell">Status<small>splits the whole board</small></div>
+      <div class="eq" role="cell"><span class="ch">Assigned <b>83</b></span><i>+</i><span class="ch">Leave <b>12</b></span><i>+</i><span class="ch">Standby <b>0</b></span><i>+</i><span class="ch">On-call free <b>11</b></span><i>=</i><span class="ch tot">Total <b>106</b></span></div>
+      <div class="verdict good" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>adds up</div>
+    </div>
+    <div class="anat-row" role="row">
+      <div class="anat-k" role="cell">Shift<small>splits only the Assigned people</small></div>
+      <div class="eq" role="cell"><span class="ch">Day <b>76</b></span><i>+</i><span class="ch">Night <b>7</b></span><i>=</i><span class="ch tot">Assigned <b>83</b></span></div>
+      <div class="verdict good" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>adds up</div>
+    </div>
+    <div class="anat-row" role="row">
+      <div class="anat-k" role="cell">Service area<small>a different cut: 7 more numbers</small></div>
+      <div class="eq" role="cell"><span class="ch">AMATA <b>33</b></span><i>+</i><span class="ch">AYT <b>15</b></span><i>+</i><span class="ch">BENZ <b>5</b></span><i>+</i><span class="ch">LCB <b>59</b></span><i>+</i><span class="ch">NPT <b>16</b></span><i>+</i><span class="ch">RAYONG <b>9</b></span><i>+</i><span class="ch">Wellgrow <b>7</b></span><i>=</i><span class="ch"><b>144</b></span><i>vs</i><span class="ch tot">Total <b>106</b></span></div>
+      <div class="verdict bad" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>does not add up (S3)</div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:8px">Findings</h3>
+  <div class="findings">
+    <article class="finding"><div class="finding-top"><span>S1</span><span class="tag hi">High</span></div>
+      <h3>Fourteen numbers, one visual weight</h3>
+      <p>Every chip is 11px label + 13px value in the same grey and ink. Nothing leads, so the eye has no first stop and reads the strip left to right like a sentence.</p>
+      <div class="where"><b>Where</b> <code>styles.css:569–570</code>, <code>app.js:2474–2488</code></div></article>
+    <article class="finding"><div class="finding-top"><span>S2</span><span class="tag hi">High</span></div>
+      <h3>Three breakdowns share one flat run</h3>
+      <p>Status, shift and area sit in one line. Only the first seven chips get hairline separators; the area chips have none (just a 16px gap), so "Wellgrow" runs straight on from "Night". Nothing signals where one cut ends and another begins.</p>
+      <div class="where"><b>Where</b> <code>styles.css:546–547, 573–577</code></div></article>
+    <article class="finding"><div class="finding-top"><span>S3</span><span class="tag hi">Verify</span></div>
+      <h3>Area chips total 144; Total says 106</h3>
+      <p>By my reading of the code this cannot happen on one board: Total counts <code>rosterEmployees</code>, the area chips count the same people filtered by area (one area each), so the areas should sum to at most Total. Either that screenshot comes from a different state or build, or area counting differs from what I read. Worth checking before anything implies "areas add up to Total". The mockups below deliberately never draw areas as part of a whole.</p>
+      <div class="where"><b>Where</b> <code>app.js:2352, 591</code> (Total) vs <code>app.js:2486</code> (areas)</div></article>
+    <article class="finding"><div class="finding-top"><span>S4</span><span class="tag hi">High</span></div>
+      <h3>Row 2 wraps to a third line; Export lands bottom-left</h3>
+      <p>The code comment says Export is "always at the right edge", but its pushing spacer only works on the same line as the stats. At your screenshot width the stats fill the line, so Names / Read-only / Export wrap to a new line and sit at the left. The toolbar is three lines tall (about 120px at 1280) before the board starts.</p>
+      <div class="where"><b>Where</b> <code>index.html:340–359</code>, <code>styles.css:610–616</code></div></article>
+    <article class="finding"><div class="finding-top"><span>S5</span><span class="tag md">Medium</span></div>
+      <h3>Exceptions don't stand out; zeros weigh the same</h3>
+      <p>"Standby 0" is the good state and reads exactly like "Standby 9" would. The one count a planner acts on (people with no job) gets no emphasis when it is non-zero. Only Night has a special mark, and that is a decorative dot after the number that reads like a notification badge.</p>
+      <div class="where"><b>Where</b> <code>app.js:2480–2483</code>, <code>styles.css:578–591</code></div></article>
+    <article class="finding"><div class="finding-top"><span>S6</span><span class="tag md">Medium</span></div>
+      <h3>Two filled primaries</h3>
+      <p>New Mission and New Employee are both solid navy. The app's own button rule says a view has one filled action and the TRIGO design system says "one primary per view". Two equal fills split the first read of row 1.</p>
+      <div class="where"><b>Where</b> <code>index.html:245–246</code> vs <code>styles.css:378–381</code></div></article>
+    <article class="finding"><div class="finding-top"><span>S7</span><span class="tag md">Medium</span></div>
+      <h3>Row 1 mixes make, narrow and fix</h3>
+      <p>Create buttons, Hide/Unhide (a filter in effect: it hides 7 missions), four filters, Sort, then Reset Board (destructive) and Undo, all at similar weight in one run. Reset Board sits mid-row between Sort and Undo, and moves as optional buttons appear.</p>
+      <div class="where"><b>Where</b> <code>index.html:243–339</code></div></article>
+    <article class="finding"><div class="finding-top"><span>S8</span><span class="tag md">Medium</span></div>
+      <h3>A display preference crowds the stats row</h3>
+      <p>"Names: Thai" changes how cards look; it is not a stat and not an export option. A native select sizes to its longest option ("Names: Thai + English"), so it takes about 176px of row 2 and is the item that tips the line into wrapping. In the screenshot it lands under Hide/Unhide, implying a relationship that isn't there.</p>
+      <div class="where"><b>Where</b> <code>index.html:349–353</code></div></article>
+    <article class="finding"><div class="finding-top"><span>S9</span><span class="tag lo">Low</span></div>
+      <h3>Small type and a read-only state that is easy to miss</h3>
+      <p>Stat labels are 11px (AA contrast passes at 4.83:1, but only just, and below the 12px floor). The Read-only badge is a small pill at the end of the row; in the screenshot New Mission and Reset Board still look fully active on a past date. Worth confirming they are guarded and, if so, dimming them.</p>
+      <div class="where"><b>Where</b> <code>styles.css:569</code>, <code>styles.css:735–743</code></div></article>
+  </div>
+
+  <div class="keep">
+    <h3>Keep: what already works</h3>
+    <ul>
+      <li>Labels are spelled out, never abbreviated or icon-only. Keep that.</li>
+      <li>Tabular numerals on every figure, so columns of counts don't jitter between days.</li>
+      <li>One control height (32px) and one radius across row 1: the rhythm is good.</li>
+      <li>Read-only is amber with a lock icon and words, so it never relies on colour alone.</li>
+      <li>"Total = Assigned + Leave + Standby + On-call free" and "Day + Night = Assigned" are real invariants (verified above); the directions below use them.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================ DIRECTIONS ============================ -->
+<section id="directions" aria-labelledby="h-dir">
+  <div class="eyebrow">2 · Four directions</div>
+  <h2 id="h-dir">Same data, four ways to read it</h2>
+  <p>Each direction changes only the stats cluster (and, where noted, where the area counts live). Numbers, labels and the sample day are identical in all four, and Row 1 follows the control above. Try <b>Short-staffed</b> to see how each one flags the count that matters, and <b>Holiday</b> for the extra chip the app adds on non-working days.</p>
+
+  <!-- A -->
+  <article class="dir" aria-labelledby="h-a">
+    <div class="dir-head"><span class="letter">A</span><h3 id="h-a">Grouped &amp; hushed</h3><span class="tag ok">Smallest change</span>
+      <p>Same single line, same 14 numbers, but with a hierarchy: number first, three labelled groups, and zeros that fade.</p></div>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span> Direction A <span class="live">toolbar height <span data-h="A">–</span></span></div>
+      <div class="frame-scroll"><div class="mock" data-mock="A"></div></div>
+    </div>
+    <div class="case">
+      <div><h4>What changes</h4><ul>
+        <li>Number first, label second, no colons: planners scan for the figure.</li>
+        <li>Three groups (People · Shift · By area), one divider each, instead of seven hairlines and an unmarked run.</li>
+        <li>Zero fades to muted. A non-zero Standby becomes a tinted tag with an alert icon.</li>
+        <li>Night dot becomes Day / Night icons (shape plus text).</li>
+        <li>Labels go from 11px to 12px; area counts get a small "By area" caption.</li></ul></div>
+      <div><h4>Gains</h4><ul>
+        <li>Lowest risk: same information, same position, same line count.</li>
+        <li>Every number stays glanceable.</li>
+        <li>The exception (Standby &gt; 0) finally stands out.</li></ul></div>
+      <div><h4>Costs</h4><ul>
+        <li>Still 14 numbers: calmer, not fewer.</li>
+        <li>The "parts of Total" relationship stays implicit.</li>
+        <li>Below ~1300px the area group wraps to a second line.</li></ul>
+        <h4 style="margin-top:10px">Effort</h4><p><b>Small.</b> <code>renderStats</code> markup plus about 40 lines of CSS. E2E tests read chip text as <code>"Label: n"</code> (<code>added-on.e2e.js:25</code>), so they need a one-line update.</p></div>
+    </div>
+  </article>
+
+  <!-- B -->
+  <article class="dir rec-band" aria-labelledby="h-b">
+    <div class="dir-head"><span class="letter">B</span><h3 id="h-b">Headline + composition bar</h3><span class="rec-flag">Recommended</span>
+      <p>One headline ("83 of 106 assigned") and a single bar that shows how the 106 split. The sum-to-Total relationship becomes visible instead of something to work out.</p></div>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span> Direction B <span class="live">toolbar height <span data-h="B">–</span></span></div>
+      <div class="frame-scroll"><div class="mock" data-mock="B"></div></div>
+    </div>
+    <div class="case">
+      <div><h4>What changes</h4><ul>
+        <li>"<b>83</b> of 106 assigned" leads. It is the first read the board owes you.</li>
+        <li>A stacked 100% bar for Assigned / Leave / Standby / On-call free (plus Holiday on non-working days). Each segment is labelled with its number in the legend; colour never carries the meaning alone.</li>
+        <li>Status is the headline line. Day / Night and By area become one quiet second line, because they are secondary cuts of the same people.</li>
+        <li>Areas are <i>not</i> drawn as a bar, because they don't reconcile with Total (S3).</li>
+        <li>Standby &gt; 0 makes its segment appear and its legend item turn red with an alert icon.</li></ul></div>
+      <div><h4>Gains</h4><ul>
+        <li>Clearest hierarchy of the four without hiding any number.</li>
+        <li>You see "nobody is idle" or "9 people have no job" before reading a digit.</li>
+        <li>Frees row 2's right side: Export / Read-only stay on the same line as the stats.</li>
+        <li>The second line can later become filter chips for shift and area (see the note at the end).</li></ul></div>
+      <div><h4>Costs</h4><ul>
+        <li>One new component (the bar) and an accessible name for it.</li>
+        <li>Day / Night and areas sit on a second, thinner line, so they are a glance lower than the headline.</li>
+        <li>Not shorter than today: about the same height at 1280 (live height above). It spends the space on hierarchy, not on saving it.</li>
+        <li>Zero-width segments are omitted, so the bar alone can't say "Standby 0"; the legend does.</li></ul>
+        <h4 style="margin-top:10px">Effort</h4><p><b>Medium.</b> <code>renderStats</code> + a small bar helper + CSS. The bar is a flex row, so no charting library is needed. Same e2e text-match update as A.</p></div>
+    </div>
+  </article>
+
+  <!-- C -->
+  <article class="dir" aria-labelledby="h-c">
+    <div class="dir-head"><span class="letter">C</span><h3 id="h-c">KPI tiles</h3><span class="tag lo">Bold</span>
+      <p>The four counts a planner works from become tiles with large numerals; Day / Night live inside the Assigned tile.</p></div>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span> Direction C <span class="live">toolbar height <span data-h="C">–</span></span></div>
+      <div class="frame-scroll"><div class="mock" data-mock="C"></div></div>
+    </div>
+    <div class="case">
+      <div><h4>What changes</h4><ul>
+        <li>Total as a lead figure, then four tiles: Assigned (with Day / Night), Leave, Standby, On-call free. A Holiday tile joins on non-working days.</li>
+        <li>22px numerals with a colour edge, plus the label, so state is never colour alone.</li>
+        <li>Standby tile turns red with an alert icon when non-zero; zero is muted.</li>
+        <li>Areas drop to the same quiet second tier as B.</li></ul></div>
+      <div><h4>Gains</h4><ul>
+        <li>Strongest hierarchy; readable across a room (design principle 4, shop-floor displays).</li>
+        <li>Each tile is a natural click target if you later want "click to filter".</li></ul></div>
+      <div><h4>Costs</h4><ul>
+        <li>The tallest option (about 15px more than today at 1280; live height above): the tiles are about 46px high where a chip line is about 26px. That runs against the "density is a feature" principle.</li>
+        <li>Four tiles read like a dashboard: heavy for a toolbar that sits above the board.</li>
+        <li>On a phone the tiles wrap to two rows.</li></ul>
+        <h4 style="margin-top:10px">Effort</h4><p><b>Medium.</b> New tile markup and CSS, same e2e update.</p></div>
+    </div>
+  </article>
+
+  <!-- D -->
+  <article class="dir" aria-labelledby="h-d">
+    <div class="dir-head"><span class="letter">D</span><h3 id="h-d">Summary line + details popover</h3><span class="tag lo">Calmest</span>
+      <p>One sentence in the bar; everything else one click away. The popover is open here: click <b>Details</b> to close it.</p></div>
+    <div class="frame">
+      <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span> Direction D <span class="live">toolbar height <span data-h="D">–</span></span></div>
+      <div class="frame-scroll"><div class="mock" data-mock="D"></div></div>
+    </div>
+    <div class="case">
+      <div><h4>What changes</h4><ul>
+        <li>The bar keeps three facts: assigned of total, leave, standby (plus holiday when it applies). Standby is flagged in red when non-zero.</li>
+        <li>A <b>Details</b> button opens a popover with On-call free, Day / Night and By area.</li>
+        <li>Toolbar is two lines at any normal width.</li></ul></div>
+      <div><h4>Gains</h4><ul>
+        <li>Quietest and shortest: two lines at every desktop width, so the board starts about 30–40px higher than today (live height above).</li>
+        <li>Best phone story: a short line plus a sheet.</li>
+        <li>The app already has a popover pattern (<code>.ms-pop</code>) to reuse.</li></ul></div>
+      <div><h4>Costs</h4><ul>
+        <li>Day, Night, On-call free and areas are no longer glanceable: a click away. If planners check Day / Night all day, this will annoy them.</li>
+        <li>Popover needs focus handling, Esc and outside-click.</li>
+        <li>The old code comment explicitly rejected hiding counters; here it is an explicit control rather than a silent scroll, but it is still hiding.</li></ul>
+        <h4 style="margin-top:10px">Effort</h4><p><b>Medium to large.</b> New popover content, keyboard handling, phone sheet, e2e rewrite for the hidden counts.</p></div>
+    </div>
+  </article>
+</section>
+
+<!-- ============================ ROW 1 ============================ -->
+<section id="row1" aria-labelledby="h-r1">
+  <div class="eyebrow">3 · The rest of the toolbar</div>
+  <h2 id="h-r1">Row 1 and the right-hand cluster (works with any direction)</h2>
+  <p>Not part of the stats bar, but it is what makes the block feel busy overall. The "Tidied" setting in the bar above applies this to every mockup; here are the two row-1 treatments side by side.</p>
+  <div class="frame">
+    <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span> Row 1 · as today</div>
+    <div class="frame-scroll"><div class="mock" data-mock="row1-today"></div></div>
+  </div>
+  <div class="frame">
+    <div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span> Row 1 · tidied</div>
+    <div class="frame-scroll"><div class="mock" data-mock="row1-tidy"></div></div>
+  </div>
+  <ol class="wins">
+    <li><b>One filled primary</b><span>New Mission stays solid navy; New Employee becomes outlined. If both are used equally often, keep both solid: it is a judgement call (S6).</span></li>
+    <li><b>Three zones: make · narrow · fix</b><span>Create on the left; filters and sort in the middle; Undo and Reset Board pinned right, quiet, away from the filters (S7).</span></li>
+    <li><b>Hide/Unhide becomes a filter-state chip</b><span>"Hidden 7" sits with the filters and is tinted because a filter is in effect. Clicking it opens the same Hide/Unhide dialog.</span></li>
+    <li><b>Filters go quiet when unfiltered</b><span>"Engineer: <i>All</i>" shows the value in muted text; an active filter would use the same tinted style as "Hidden 7". Optional: this is new behaviour.</span></li>
+    <li><b>Right-hand cluster pinned, Names sized to its value</b><span>Read-only, Names and Export sit in one cluster that stays at the right edge even when it wraps (S4). The Names select shrinks from about 176px (sized to "Thai + English") to its current value, about 120px (S8).</span></li>
+    <li><b>Read-only dims what it forbids</b><span>Keep the amber badge next to Export; also dim New Mission / Reset Board on past dates if they are guarded (S9).</span></li>
+  </ol>
+  <p class="note">Phone preview note: below about 640px the app folds the filters, Reset and Undo behind "⋯ More" (<code>index.html:274–278</code>). The Phone preview mimics that, simplified; it does not reproduce the dropdown itself.</p>
+</section>
+
+<!-- ============================ COMPARE ============================ -->
+<section id="compare" aria-labelledby="h-cmp">
+  <div class="eyebrow">4 · Compare and decide</div>
+  <h2 id="h-cmp">Side by side</h2>
+  <div class="cmp-wrap">
+    <table class="cmp">
+      <thead><tr><th scope="col"></th><th scope="col">Current</th><th scope="col">A · Grouped &amp; hushed</th><th scope="col" class="best">B · Bar</th><th scope="col">C · Tiles</th><th scope="col">D · Popover</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Toolbar height<small style="display:block;font-weight:400;color:var(--mut)">live, at your current width and settings</small></th>
+          <td><b data-h="cur">–</b></td><td><b data-h="A">–</b> <small data-d="A"></small></td><td class="best"><b data-h="B">–</b> <small data-d="B"></small></td><td><b data-h="C">–</b> <small data-d="C"></small></td><td><b data-h="D">–</b> <small data-d="D"></small></td></tr>
+        <tr><th scope="row">What the eye lands on first</th><td>Nothing in particular (14 equal items)</td><td>Bold numerals; Total</td><td class="best">"83 of 106 assigned" and the bar</td><td>Four large tiles</td><td>One summary sentence</td></tr>
+        <tr><th scope="row">Shows how numbers relate</th><td>No</td><td>Partly (groups)</td><td class="best">Yes: bar is the parts of Total</td><td>Partly (Day / Night inside Assigned)</td><td>No (hidden)</td></tr>
+        <tr><th scope="row">Flags Standby &gt; 0</th><td>No</td><td>Red tag with icon</td><td class="best">Segment appears + red legend item</td><td>Red tile with icon</td><td>Red tag in summary</td></tr>
+        <tr><th scope="row">Every number glanceable</th><td>Yes</td><td>Yes</td><td class="best">Yes</td><td>Yes</td><td>No: Day, Night, On-call free and areas are behind Details</td></tr>
+        <tr><th scope="row">Phone behaviour</th><td>Chips wrap</td><td>Groups wrap</td><td class="best">Headline, bar and legend wrap in order</td><td>Tiles wrap two by two</td><td>Best: short line plus a sheet</td></tr>
+        <tr><th scope="row">Fit with design principles</th><td>Dense, but no hierarchy</td><td>Dense and quieter</td><td class="best">Dense, with a hierarchy; state is colour + shape + text</td><td>Least dense; strongest across a room</td><td>Densest, but hides state</td></tr>
+        <tr><th scope="row">Build effort</th><td>–</td><td>Small</td><td class="best">Medium</td><td>Medium</td><td>Medium to large</td></tr>
+        <tr><th scope="row">Risk</th><td>–</td><td>Very low</td><td class="best">Low (new bar helper)</td><td>Low</td><td>Medium: focus handling, hidden info</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="decide">
+    <div>
+      <h3>Recommendation</h3>
+      <p><b>Direction B, plus the row-1 tidy.</b> It is the only option that makes the stats <i>less busy and more informative</i> at once, because it shows how the numbers relate instead of just restyling them, and it keeps every number visible. It also lets the toolbar settle back to a predictable shape, with Export at the right edge.</p>
+      <p style="margin-top:8px">If you want the smallest possible step, ship <b>A</b> first: B reuses A's zero-fading, icons and area tier, so A is the first half of B, not a detour.</p>
+    </div>
+    <div>
+      <h3>Decisions I need from you</h3>
+      <ol>
+        <li>Which direction (A, B, C or D), or a mix?</li>
+        <li>Apply the row-1 tidy too (section 3), or leave row 1 alone for now?</li>
+        <li>Areas: keep as a quiet second tier (B, C), fold into a popover (D), or later make them filter chips?</li>
+        <li>S3: can you confirm whether area counts are expected to add up to Total? I would settle that before building anything.</li>
+      </ol>
+    </div>
+    <div>
+      <h3>When we implement</h3>
+      <ul>
+        <li>Touch points: <code>renderStats</code> and <code>statChip</code> (<code>app.js:2404–2489</code>), the stat-chip CSS block (<code>styles.css:539–596</code>) and the phone overrides (<code>styles.css:1468–1473</code>).</li>
+        <li><code>.stat-chip</code> is also used by the Manpower, Host, Capacity and Org Chart tabs, and by the bulk-edit preview, so keep those on the old chips or migrate them together.</li>
+        <li>E2E tests read <code>"Label: n"</code> from <code>#stats-bar .stat-chip</code> (<code>added-on</code>, <code>forward-planning</code>); update them in the same change.</li>
+        <li>Holiday adds a chip; forecast days use the same stats; Overview shows no stats on purpose. All three are handled in the mockups' scenarios or unchanged.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">Beyond this review, not mocked: clicking a stat or area to filter the board. It would be a natural next step for B or C, but it is new behaviour and needs a product decision.</p>
+</section>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  /* One scenario object per sample day: every mockup reads from it. Each scenario is
+     checked below against the two invariants the app guarantees. */
+  var SCEN = {
+    normal:  { total: 106, assigned: 83, leave: 12, standby: 0, oncall: 11, holiday: 0,  isHoliday: false, day: 76, night: 7, readOnly: true  },
+    short:   { total: 106, assigned: 71, leave: 14, standby: 9, oncall: 12, holiday: 0,  isHoliday: false, day: 63, night: 8, readOnly: false },
+    holiday: { total: 106, assigned: 18, leave: 6,  standby: 0, oncall: 11, holiday: 71, isHoliday: true,  day: 14, night: 4, readOnly: false }
+  };
+  var AREAS = [["AMATA", 33], ["AYT", 15], ["BENZ", 5], ["LCB", 59], ["NPT", 16], ["RAYONG", 9], ["Wellgrow", 7]];
+  Object.keys(SCEN).forEach(function (k) {
+    var s = SCEN[k];
+    if (s.assigned + s.leave + s.standby + s.holiday + s.oncall !== s.total) console.warn("scenario " + k + ": status parts do not sum to Total");
+    if (s.day + s.night !== s.assigned) console.warn("scenario " + k + ": Day + Night does not equal Assigned");
+  });
+
+  var state = { scen: "normal", width: "fit", row1: "today", theme: null, dOpen: true };
+
+  var I = function (n, cls) { return '<svg class="ic' + (cls ? " " + cls : "") + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; };
+  var zc = function (n) { return n === 0 ? " zero" : ""; };
+
+  /* ---------- row 1 ---------- */
+  function row1(mode) {
+    var filt = function (cls) { return ["Engineer", "Host", "Customer", "Shift"].map(function (l) { return '<span class="b fl">' + l + ': ' + (cls ? '<em>All</em>' : 'All') + '</span>'; }).join(""); };
+    if (mode === "tidy") {
+      return '<div class="tb-row r1">' +
+        '<span class="b pri">' + I("plus") + ' New Mission</span>' +
+        '<span class="b out">' + I("plus") + ' New Employee</span>' +
+        '<span class="b more-btn">' + I("more") + ' More</span>' +
+        '<span class="vr hide-phone"></span>' +
+        '<span class="fgrp hide-phone">' + filt(true) + '<span class="b act">' + I("eye-off") + ' Hidden <em>7</em></span><span class="b sel">Sort: Mission No. ' + I("chev") + '</span></span>' +
+        '<span class="sp hide-phone"></span>' +
+        '<span class="b quiet dis hide-phone">' + I("undo") + ' Undo</span>' +
+        '<span class="b quiet hide-phone">' + I("reset") + ' Reset Board</span>' +
+        '</div>';
+    }
+    return '<div class="tb-row r1">' +
+      '<span class="b pri">' + I("plus") + ' New Mission</span>' +
+      '<span class="b pri">' + I("plus") + ' New Employee</span>' +
+      '<span class="b more-btn">' + I("more") + ' More</span>' +
+      '<span class="b quiet hide-phone">' + I("eye-off") + ' Hide/Unhide (7)</span>' +
+      '<span class="fgrp hide-phone">' + filt(false) + '<span class="b sel">Sort: Mission No. ' + I("chev") + '</span></span>' +
+      '<span class="b quiet hide-phone">' + I("reset") + ' Reset Board</span>' +
+      '<span class="b quiet dis hide-phone">' + I("undo") + ' Undo</span>' +
+      '</div>';
+  }
+
+  /* ---------- the four stat directions (+ current) ---------- */
+  function areaChips(cls) { return AREAS.map(function (a) { return '<span class="a-i sm"><b>' + a[1] + '</b> ' + a[0] + '</span>'; }).join(""); }
+  function tierRow() { return '<div class="tb-row tier"><div class="tier-in"><span class="a-cap">By area</span>' + areaChips() + '</div></div>'; }
+
+  var DIRS = {
+    cur: function (s) {
+      var chips = [["Total", s.total], ["Assigned", s.assigned], ["Leave", s.leave], ["Standby", s.standby]];
+      if (s.isHoliday) chips.push(["Holiday", s.holiday]);
+      chips.push(["On-call free", s.oncall], ["Day", s.day]);
+      var html = '<div class="cur-stats">' + chips.map(function (c) { return '<span class="sc">' + c[0] + ': <b>' + c[1] + '</b></span>'; }).join("") +
+        '<span class="sc night">Night: <b>' + s.night + '</b></span></div>' +
+        '<div class="cur-areas">' + AREAS.map(function (a) { return '<span class="sc">' + a[0] + ': <b>' + a[1] + '</b></span>'; }).join("") + '</div>';
+      return { main: html, tier: "" };
+    },
+    A: function (s) {
+      var sb = s.standby > 0
+        ? '<span class="a-alert">' + I("alert") + '<b>' + s.standby + '</b> Standby</span>'
+        : '<span class="a-i zero"><b>0</b> Standby</span>';
+      var hol = s.isHoliday ? '<span class="a-i"><b>' + s.holiday + '</b> Holiday</span>' : "";
+      var html = '<div class="a-bar">' +
+        '<div class="a-g"><span class="a-i lead"><b>' + s.total + '</b> Total</span><span class="a-i"><b>' + s.assigned + '</b> Assigned</span>' +
+        '<span class="a-i' + zc(s.leave) + '"><b>' + s.leave + '</b> Leave</span>' + sb + hol +
+        '<span class="a-i' + zc(s.oncall) + '"><b>' + s.oncall + '</b> On-call free</span></div>' +
+        '<span class="a-div"></span>' +
+        '<div class="a-g"><span class="a-i">' + I("sun") + '<b>' + s.day + '</b> Day</span><span class="a-i">' + I("moon") + '<b>' + s.night + '</b> Night</span></div>' +
+        '<span class="a-div"></span>' +
+        '<div class="a-g"><span class="a-cap">By area</span>' + areaChips() + '</div></div>';
+      return { main: html, tier: "" };
+    },
+    B: function (s) {
+      var parts = [["Leave", s.leave, "leave"], ["Standby", s.standby, "standby"]];
+      if (s.isHoliday) parts.push(["Holiday", s.holiday, "hol"]);
+      parts.push(["On-call free", s.oncall, "free"]);
+      var all = [["Assigned", s.assigned, "asg"]].concat(parts);
+      var aria = s.assigned + " of " + s.total + " assigned. " + parts.map(function (p) { return p[1] + " " + p[0].toLowerCase(); }).join(", ") + ".";
+      var bar = all.filter(function (p) { return p[1] > 0; }).map(function (p) { return '<span class="seg-s ' + p[2] + '" style="flex:' + p[1] + '"></span>'; }).join("");
+      var legend = parts.map(function (p) {
+        var alert = p[2] === "standby" && p[1] > 0;
+        return '<li class="' + (p[1] === 0 ? "zero" : "") + (alert ? " alert" : "") + '"><i class="sw ' + p[2] + '"></i>' + (alert ? I("alert") : "") + '<b>' + p[1] + '</b> ' + p[0] + '</li>';
+      }).join("");
+      var html = '<div class="b-main">' +
+        '<div class="b-head"><i class="sw asg"></i><b>' + s.assigned + '</b> of ' + s.total + ' assigned</div>' +
+        '<div class="b-meter"><div class="b-track" role="img" aria-label="' + aria + '">' + bar + '</div></div>' +
+        '<ul class="b-legend">' + legend + '</ul></div>';
+      var tier = '<div class="tb-row tier"><div class="tier-in"><span class="a-cap">Shift</span>' +
+        '<span class="a-i">' + I("sun") + '<b>' + s.day + '</b> Day</span><span class="a-i">' + I("moon") + '<b>' + s.night + '</b> Night</span>' +
+        '<span class="a-div"></span><span class="a-cap">By area</span>' + areaChips() + '</div></div>';
+      return { main: html, tier: tier };
+    },
+    C: function (s) {
+      var sh = '<div class="c-sh"><span>' + I("sun") + '<b>' + s.day + '</b> Day</span><span>' + I("moon") + '<b>' + s.night + '</b> Night</span></div>';
+      function tile(label, n, kind, extra, alert) {
+        return '<div class="c-t ' + kind + (n === 0 && !alert ? " zero" : "") + (alert ? " alert" : "") + '"><div class="c-tl"><span class="c-l">' + label + '</span><b>' + n + '</b></div>' + (extra || "") + '</div>';
+      }
+      var al = s.standby > 0;
+      var html = '<div class="c-bar">' +
+        '<div class="c-lead"><span class="c-l">Total</span><b>' + s.total + '</b></div>' +
+        tile("Assigned", s.assigned, "asg", sh) +
+        tile("Leave", s.leave, "leave") +
+        tile("Standby", s.standby, "standby", al ? I("alert", "al") : "", al) +
+        (s.isHoliday ? tile("Holiday", s.holiday, "hol") : "") +
+        tile("On-call free", s.oncall, "free") + '</div>';
+      return { main: html, tier: tierRow() };
+    },
+    D: function (s) {
+      var open = state.dOpen;
+      var sb = s.standby > 0
+        ? '<span class="d-st alert">' + I("alert") + '<b>' + s.standby + '</b> standby</span>'
+        : '<span><b>0</b> standby</span>';
+      var html = '<div class="d-bar">' +
+        '<span><b>' + s.assigned + '</b> of <b>' + s.total + '</b> assigned</span><span class="d-sep">·</span>' +
+        '<span><b>' + s.leave + '</b> leave</span><span class="d-sep">·</span>' +
+        (s.isHoliday ? '<span><b>' + s.holiday + '</b> holiday</span><span class="d-sep">·</span>' : "") + sb +
+        '<span class="d-wrap"><button type="button" class="d-btn" data-d-toggle aria-expanded="' + open + '" aria-controls="d-pop">Details ' + I("chev") + '</button>' +
+        '<div class="d-pop" id="d-pop" role="group" aria-label="More counts"' + (open ? "" : " hidden") + '>' +
+        '<div><h5>Availability</h5><div class="row"><span><b>' + s.oncall + '</b> On-call free</span></div></div>' +
+        '<div><h5>Shift</h5><div class="row"><span>' + I("sun") + '<b>' + s.day + '</b> Day</span><span>' + I("moon") + '<b>' + s.night + '</b> Night</span></div></div>' +
+        '<div class="areas-wrap"><h5>By area</h5><div class="areas">' + AREAS.map(function (a) { return '<span><b>' + a[1] + '</b> ' + a[0] + '</span>'; }).join("") + '</div></div>' +
+        '</div></span></div>';
+      return { main: html, tier: "" };
+    }
+  };
+
+  function skeleton() {
+    return '<div class="board-skel" aria-hidden="true">' + [0, 1, 2, 3, 4, 5].map(function () { return '<div class="sk"><i></i><i></i><i></i><i></i></div>'; }).join("") + '</div>';
+  }
+
+  function mock(k) {
+    var phone = state.width === "390" ? " phone" : "";
+    if (k === "row1-today" || k === "row1-tidy") {
+      return '<div class="stage' + phone + '"><div class="tb">' + row1(k === "row1-tidy" ? "tidy" : "today") + '</div></div>';
+    }
+    var s = SCEN[state.scen], d = DIRS[k](s), mode = state.row1;
+    var ro = s.readOnly ? '<span class="ro">' + I("lock") + '<span>Read-only (past date)</span></span>' : "";
+    var exp = '<span class="b">' + I("download") + ' Export</span>';
+    var names = '<span class="b sel names' + (mode === "tidy" ? " compact" : "") + '">Names: Thai ' + I("chev") + '</span>';
+    var r2;
+    if (k === "cur") {
+      /* replica: spacer + loose children, exactly like #toolbar-row2 */
+      r2 = '<div class="tb-row r2">' + d.main + '<span class="sp"></span>' + names + ro + exp + '</div>';
+    } else {
+      r2 = '<div class="tb-row r2">' + d.main + '<div class="rt">' + names + ro + exp + '</div></div>';
+    }
+    return '<div class="stage' + phone + '"><div class="tb">' + row1(mode) + r2 + d.tier + '</div>' + skeleton() + '</div>';
+  }
+
+  /* ---------- render + measure ---------- */
+  function measure() {
+    var base = null, h = {};
+    ["cur", "A", "B", "C", "D"].forEach(function (k) {
+      var el = $('[data-mock="' + k + '"] .tb');
+      if (!el) return;
+      h[k] = Math.round(el.getBoundingClientRect().height);
+    });
+    base = h.cur;
+    $$("[data-h]").forEach(function (n) { var k = n.getAttribute("data-h"); if (h[k] != null) n.textContent = h[k] + "px"; });
+    $$("[data-d]").forEach(function (n) {
+      var k = n.getAttribute("data-d"); if (h[k] == null || base == null) return;
+      var d = h[k] - base;
+      n.textContent = d === 0 ? "same as today" : (d < 0 ? "−" : "+") + Math.abs(d) + "px vs today";
+    });
+  }
+  function render() {
+    $$("[data-mock]").forEach(function (el) { el.innerHTML = mock(el.getAttribute("data-mock")); });
+    measure();
+  }
+
+  /* ---------- controls ---------- */
+  function setPressed(ctl, v) { $$("button", $('[data-ctl="' + ctl + '"]')).forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-v") === v)); }); }
+  function applyTheme(t) {
+    if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    else document.documentElement.removeAttribute("data-theme");
+    setPressed("theme", t);
+  }
+  $$(".seg").forEach(function (seg) {
+    seg.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      var ctl = seg.getAttribute("data-ctl"), v = b.getAttribute("data-v");
+      if (ctl === "theme") { state.theme = v; applyTheme(v); return; }
+      state[ctl] = v; setPressed(ctl, v);
+      if (ctl === "width") document.body.setAttribute("data-w", v);
+      render();
+    });
+  });
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-d-toggle]");
+    if (t) { state.dOpen = !state.dOpen; render(); var again = $("[data-d-toggle]"); if (again) again.focus(); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && state.dOpen && $("#d-pop")) { state.dOpen = false; render(); var again = $("[data-d-toggle]"); if (again) again.focus(); }
+  });
+  window.addEventListener("resize", measure);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(dark ? "dark" : "light");
+  render();
+})();
+</script>
+</body>
+</html>
