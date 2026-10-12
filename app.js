@@ -375,8 +375,14 @@ const state = {
   empSearch: "",              // name filter for the floating available panel
   poolAreas: new Set(),       // service-area filter for the floating panel; empty = all
   undoStack: [],              // [{date, entries:[{empId, prior}]}] — inverse of recent assignment changes
-  settingsTab: "engineers",   // Settings modal: which sub-menu is showing. applySettingsTab falls
-                              // back to the first pane this role may open (My account, at worst)
+  settingsOpen: false,        // the Settings page (#settings-view) is up over the app
+  settingsTab: "account",     // which section is showing. applySettingsTab falls back to My account
+                              // when this role may not open it
+  settingsReturn: null,       // {scrollY} of the page underneath, put back on "Back to board"
+  settingsStale: false,       // a live update arrived while a field had focus: redraw once it leaves
+  settingsSave: { phase: "clean" },   // clean | dirty | saving | saved | error, per the open section
+  settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, roles: {} },   // staged edits, by section
+  rolesColumn: null,          // Roles & permissions: the one role shown below 960px
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
@@ -839,6 +845,7 @@ async function refreshPlanSignals(boardId, date) {
 async function refreshAndRender() {
   await refreshData();
   render();
+  settingsLiveRefresh();   // an open Settings page redraws around its drafts
 }
 
 /* ---------- read-only guard ---------- */
@@ -4862,17 +4869,61 @@ function bindDropzones() {
 }
 
 /* ---------- modals ---------- */
+let _modalReturnFocus = null;   // where focus goes back to when a dialog over Settings closes
 function openModal(id) {
-  $("#modal-backdrop").classList.remove("hidden");
+  const backdrop = $("#modal-backdrop");
+  // Settings is a page, so the dialogs it opens (review, password, add…) are the
+  // only modal-over-content case that needs a focus story: name the dialog,
+  // move focus in, keep Tab inside, and hand focus back on close.
+  if (state.settingsOpen && backdrop.classList.contains("hidden")) _modalReturnFocus = document.activeElement;
+  backdrop.classList.remove("hidden");
   for (const m of $$(".modal")) m.classList.add("hidden");
   $(id).classList.remove("hidden");
+  if (state.settingsOpen) focusModal($(id));
 }
 let _confirmCancel = null;   // fired if a confirm is dismissed any way other than "Yes"
 
 function closeModal() {
-  $("#modal-backdrop").classList.add("hidden");
+  const backdrop = $("#modal-backdrop");
+  backdrop.classList.add("hidden");
   for (const m of $$(".modal")) m.classList.add("hidden");
+  // a password typed into the Change password dialog does not outlive it
+  const pw = $("#form-account-password");
+  if (pw) pw.reset();
   if (_confirmCancel) { const c = _confirmCancel; _confirmCancel = null; c(); }
+  if (_modalReturnFocus && backdrop.classList.contains("hidden")) {
+    const back = _modalReturnFocus;
+    _modalReturnFocus = null;
+    if (back.isConnected && typeof back.focus === "function") back.focus({ preventScroll: true });
+  }
+}
+
+function modalFocusables(m) {
+  return Array.from(m.querySelectorAll('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+    .filter(el => !el.disabled && el.type !== "hidden" && el.getClientRects().length > 0);
+}
+function focusModal(m) {
+  m.setAttribute("role", "dialog");
+  m.setAttribute("aria-modal", "true");
+  if (!m.getAttribute("aria-labelledby")) {
+    const h = m.querySelector("h3 [id]") || m.querySelector("h3");
+    if (h) { if (!h.id) h.id = m.id + "-title"; m.setAttribute("aria-labelledby", h.id); }
+  }
+  const all = modalFocusables(m);
+  const first = all.find(el => !el.classList.contains("modal-close")) || all[0];
+  if (first) first.focus({ preventScroll: true });
+  else { m.tabIndex = -1; m.focus({ preventScroll: true }); }
+}
+/* keep Tab / Shift+Tab inside the open dialog */
+function trapModalTab(ev) {
+  const m = $$(".modal").find(x => !x.classList.contains("hidden"));
+  if (!m) return;
+  const all = modalFocusables(m);
+  if (!all.length) { ev.preventDefault(); return; }
+  const firstEl = all[0], lastEl = all[all.length - 1];
+  const inside = m.contains(document.activeElement);
+  if (ev.shiftKey && (!inside || document.activeElement === firstEl)) { ev.preventDefault(); lastEl.focus(); }
+  else if (!ev.shiftKey && (!inside || document.activeElement === lastEl)) { ev.preventDefault(); firstEl.focus(); }
 }
 
 function showConfirm(title, message, onYes, onCancel, yesLabel) {
@@ -5345,9 +5396,38 @@ function saveEmployeeNote(ev) {
   });
 }
 
-/* settings modal — My account / Engineer / Service Area / Board / Users / Roles */
+/* ---------- Settings: a full page below the top bar ----------
+   Settings used to be a dialog. It is a page now (#settings-view): a grouped
+   rail on the left (a section picker on a phone), a fixed heading, ONE scroll
+   region and an action bar. It sits on top of the app rather than replacing a
+   view, so opening it changes nothing — the tab, board and date underneath are
+   exactly as they were, and "Back to board" is only this page hiding again.
+
+   Editing is by DRAFT. A field you touch is staged in state.settingsDraft and
+   written only by Save changes; Discard puts the saved values back. The
+   renderers read their field values through sdVal(), so a live update from
+   another user redraws the page around what you are typing instead of over it.
+   Each entry keeps a base() — a function that reads the saved value NOW — so a
+   draft that ends up equal to what is saved (or whose target was deleted
+   elsewhere) drops out by itself (sdPrune). Roles & permissions is staged the
+   same way but goes through a before/after review before anything is written.
+
+   The existing cloud calls are per-field, not one transaction, so a save is a
+   sequence: whatever succeeds is cleared from the draft, whatever fails is
+   kept and named, and the page never claims a rollback it cannot do. */
+const SETTINGS_SECTIONS = {
+  account:   { label: "My account",          group: "Personal",       hint: "Your profile and sign-in details." },
+  engineers: { label: "Engineers",           group: "Board setup",    hint: "Who can run a mission, and the colour of their mission cards." },
+  areas:     { label: "Service areas",       group: "Board setup",    hint: "Labels used across people, missions and hosts." },
+  boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and non-working days." },
+  users:     { label: "Users",               group: "Administration", hint: "Accounts, access requests and status." },
+  roles:     { label: "Roles & permissions", group: "Administration", hint: "Review what each role can see and change." },
+};
+const SETTINGS_GROUPS = { account: "Personal", board: "Board setup", admin: "Administration" };
+const SETTINGS_TAB_KEY = "mpm-settings-section";
+
 /* Each button declares the permission area it needs (data-area in index.html).
-   "account" is everybody's, so the modal always has at least one pane and the
+   "account" is everybody's, so the page always has at least one section and the
    Settings button is never a dead end. */
 function settingsTabAllowed(btn) {
   const area = btn.dataset.area;
@@ -5356,43 +5436,476 @@ function settingsTabAllowed(btn) {
   return can(area, "edit") || (area === "users" && can("users"));
 }
 
+function settingsEq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+/* ----- drafts ----- */
+function sdMap(section) { return state.settingsDraft[section] || (state.settingsDraft[section] = {}); }
+function sdCount(section) { return Object.keys(sdMap(section || state.settingsTab)).length; }
+function sdDirty(section) { return sdCount(section) > 0; }
+function anySettingsDirty() { return Object.keys(state.settingsDraft).some(sdDirty); }
+/* the value a field should show: what the user has typed, else what is saved */
+function sdVal(section, key, saved) {
+  const e = sdMap(section)[key];
+  return e ? e.after : saved;
+}
+/* Stage `after` for a field. `base` reads the saved value right now; staging
+   the saved value again is how a field is put back, and unstages it. */
+function sdSet(section, key, after, label, base, meta) {
+  const d = sdMap(section);
+  if (settingsEq(base(), after)) delete d[key];
+  else {
+    const prev = d[key];
+    // `before` is the value the user saw when they started editing this field —
+    // the review compares it with what is saved by the time they confirm
+    d[key] = Object.assign({ after, label, base, before: prev ? prev.before : base() }, meta || {});
+  }
+  if (state.settingsSave.phase !== "saving") state.settingsSave = { phase: "clean" };
+  renderSettingsFooter();
+}
+function sdDiscard(section) { state.settingsDraft[section] = {}; }
+function sdPrune() {
+  for (const section of Object.keys(state.settingsDraft)) {
+    const d = state.settingsDraft[section];
+    for (const k of Object.keys(d)) {
+      let cur;
+      try { cur = d[k].base(); } catch (e) { cur = undefined; }
+      if (cur === undefined || settingsEq(cur, d[k].after)) delete d[k];
+    }
+  }
+}
+/* a row whose fields carry a pending edit gets an accent, so it is visible
+   which lines of a long list are unsaved */
+function sdRowDirty(section, rowKey) {
+  return Object.keys(sdMap(section)).some(k => k.split("|")[1] === rowKey);
+}
+function sdMarkRow(row, section, rowKey) {
+  row.classList.toggle("st-dirty", sdRowDirty(section, rowKey));
+}
+
+/* ----- footer: the action bar ----- */
+function settingsIdleText() {
+  const tab = state.settingsTab;
+  if (tab === "roles") return "Permission changes apply only after you review them.";
+  if (tab === "users") {
+    return can("users", "edit")
+      ? "Account changes are saved from each person's own dialog."
+      : "View only — you can see accounts but not change them.";
+  }
+  return "Changes apply when you save.";
+}
+
+function renderSettingsFooter() {
+  if (!state.settingsOpen) return;
+  const tab = state.settingsTab;
+  const sv = state.settingsSave;
+  const n = sdCount(tab);
+  const dirty = n > 0;
+  const status = $("#sv-status");
+  const save = $("#btn-sv-save");
+  const discard = $("#btn-sv-discard");
+  let text, cls = "";
+  if (sv.phase === "saving") { text = "Saving…"; cls = "saving"; }
+  else if (sv.phase === "error") { text = sv.message; cls = "error"; }
+  else if (dirty) {
+    text = tab === "roles"
+      ? `● ${n} permission ${n === 1 ? "change" : "changes"} ready to review`
+      : `● Unsaved changes (${n})`;
+    cls = "dirty";
+  }
+  else if (sv.phase === "saved") { text = "✓ " + sv.message; cls = "saved"; }
+  else text = settingsIdleText();
+  status.textContent = text;
+  status.className = cls;
+  const saving = sv.phase === "saving";
+  save.classList.toggle("hidden", !dirty);
+  discard.classList.toggle("hidden", !dirty);
+  save.disabled = saving;
+  discard.disabled = saving;
+  save.textContent = tab === "roles" ? "Review changes" : sv.phase === "error" ? "Retry" : "Save changes";
+}
+
+function renderSettingsHead() {
+  const tab = state.settingsTab;
+  const meta = SETTINGS_SECTIONS[tab];
+  $("#sv-crumb").textContent = meta.group;
+  $("#sv-title").textContent = meta.label;
+  $("#sv-hint").textContent = meta.hint;
+  $("#btn-add-engineer").classList.toggle("hidden", !(tab === "engineers" && can("settings", "edit")));
+  $("#btn-add-area").classList.toggle("hidden", !(tab === "areas" && can("settings", "edit")));
+  $("#btn-add-user").classList.toggle("hidden", !(tab === "users" && can("users", "edit")));
+}
+
 function applySettingsTab() {
   const buttons = $$("#settings-tabs .settings-tab");
-  let firstAllowed = null;
+  const allowed = [];
   for (const btn of buttons) {
     const ok = settingsTabAllowed(btn);
     btn.classList.toggle("hidden", !ok);
-    if (ok && !firstAllowed) firstAllowed = btn.dataset.tab;
+    if (ok) allowed.push(btn.dataset.tab);
   }
-  // A role that has just lost a pane (or a Viewer opening Settings for the
-  // first time) would otherwise land on a hidden one and see nothing.
-  const current = buttons.find(b => b.dataset.tab === state.settingsTab);
-  if (!current || !settingsTabAllowed(current)) state.settingsTab = firstAllowed;
+  // Access can change under an open page (an admin edits the role, or a
+  // Realtime update arrives). Whatever is no longer permitted loses its draft —
+  // no write for it can go out — and the page falls back to My account.
+  const lost = Object.keys(state.settingsDraft).filter(s => !allowed.includes(s) && sdDirty(s));
+  for (const s of Object.keys(state.settingsDraft)) if (!allowed.includes(s)) sdDiscard(s);
+  if (!allowed.includes(state.settingsTab)) state.settingsTab = "account";
+  if (lost.length) {
+    state.settingsSave = { phase: "clean" };
+    toast(`Your access to ${SETTINGS_SECTIONS[lost[0]].label} changed, so the unsaved changes there were dropped.`, "warn");
+  }
   for (const btn of buttons) {
-    btn.classList.toggle("active", btn.dataset.tab === state.settingsTab);
+    const on = btn.dataset.tab === state.settingsTab;
+    btn.classList.toggle("active", on);
+    if (on) btn.setAttribute("aria-current", "page"); else btn.removeAttribute("aria-current");
   }
   // The dividers between rail groups are .settings-group elements, so one goes
   // when everything under it does — otherwise a Viewer (My account only) would
-  // be left looking at rules with nothing between them.
+  // be left looking at a heading with nothing under it.
   for (const g of $$("#settings-tabs .settings-group")) {
     const anyVisible = buttons.some(b => b.dataset.group === g.dataset.group && !b.classList.contains("hidden"));
     g.classList.toggle("hidden", !anyVisible);
   }
-  for (const pane of $$(".settings-pane")) {
+  for (const pane of $$("#settings-view .settings-pane")) {
     pane.classList.toggle("hidden", pane.dataset.pane !== state.settingsTab);
   }
+  // the phone's stand-in for the rail
+  const sel = $("#sv-select");
+  let html = "", group = null;
+  for (const btn of buttons) {
+    if (btn.classList.contains("hidden")) continue;
+    if (btn.dataset.group !== group) {
+      if (group !== null) html += "</optgroup>";
+      group = btn.dataset.group;
+      html += `<optgroup label="${escapeHtml(SETTINGS_GROUPS[group] || group)}">`;
+    }
+    html += `<option value="${escapeHtml(btn.dataset.tab)}">${escapeHtml(SETTINGS_SECTIONS[btn.dataset.tab].label)}</option>`;
+  }
+  sel.innerHTML = html + (group !== null ? "</optgroup>" : "");
+  sel.value = state.settingsTab;
+
+  renderSettingsHead();
   if (state.settingsTab === "account") renderAccountPane();
   if (state.settingsTab === "users") renderUsersPane();
   if (state.settingsTab === "roles") renderRolesMatrix();
+  renderSettingsFooter();
 }
 
-/* ---------- Settings -> Engineer ---------- */
+/* Everything on the page, drawn from the data plus the drafts. */
+function renderSettings() {
+  if (!state.settingsOpen) return;
+  state.settingsStale = false;
+  applySettingsTab();
+  renderEngineerRows();
+  renderAreaRows();
+  renderBoardRows();
+  // the counts under each table — cheap orientation, and they make an empty
+  // list say so rather than showing a bare frame
+  const n = (one, many, count) => `${count} ${count === 1 ? one : many}`;
+  $("#engineers-count").textContent = n("engineer", "engineers", engineerPaneRows().length);
+  $("#areas-count").textContent = n("service area", "service areas", D().areas.length);
+  $("#boards-count").textContent = n("board", "boards", D().boards.length);
+}
+
+/* After a data refresh (Realtime, a role change, coming back to the tab). The
+   page is redrawn from the new data around the drafts — but not while a control
+   in it has focus: swapping the DOM under a caret or an open colour picker is
+   how a half-typed name gets lost. That redraw waits for focus to leave. */
+function settingsLiveRefresh() {
+  if (!state.settingsOpen) return;
+  sdPrune();
+  const ae = document.activeElement;
+  if (ae && $("#sv-scroll").contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) {
+    state.settingsStale = true;
+    renderSettingsFooter();
+    return;
+  }
+  renderSettings();
+}
+
+/* ----- opening, leaving, section changes ----- */
+function openSettingsView(tab) {
+  if (state.settingsOpen) { if (tab) goSettingsTab(tab); return; }
+  closeModal();
+  hideContextMenu();
+  hideDatePicker();
+  closeFilterPops();
+  hideToolbarMore();
+  state.settingsReturn = { scrollY: window.scrollY };
+  state.settingsOpen = true;
+  state.settingsSave = { phase: "clean" };
+  let remembered = null;
+  try { remembered = localStorage.getItem(SETTINGS_TAB_KEY); } catch (e) { /* private mode */ }
+  state.settingsTab = tab || (SETTINGS_SECTIONS[remembered] ? remembered : "account");
+  document.body.classList.add("settings-open");
+  $("#settings-view").classList.remove("hidden");
+  renderSettings();
+  window.scrollTo(0, 0);
+  $("#sv-scroll").scrollTop = 0;
+  $("#sv-title").focus({ preventScroll: true });
+}
+
+/* Back to the board. The page only hid it, so the view, board and date are
+   still what they were; the board is redrawn because it was display:none (and
+   so unmeasured) while Settings was up, and the scroll position comes back. */
+function closeSettingsView() {
+  if (!state.settingsOpen) return;
+  settingsGuard(() => {
+    state.settingsOpen = false;
+    for (const s of Object.keys(state.settingsDraft)) sdDiscard(s);
+    state.settingsSave = { phase: "clean" };
+    state.settingsStale = false;
+    closeModal();
+    document.body.classList.remove("settings-open");
+    $("#settings-view").classList.add("hidden");
+    render();
+    const y = state.settingsReturn ? state.settingsReturn.scrollY : 0;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+    $("#btn-settings").focus({ preventScroll: true });
+  });
+}
+
+function goSettingsTab(tab, onCancel) {
+  if (tab === state.settingsTab) return;
+  settingsGuard(() => {
+    state.settingsTab = tab;
+    state.settingsSave = { phase: "clean" };
+    try { localStorage.setItem(SETTINGS_TAB_KEY, tab); } catch (e) { /* private mode */ }
+    renderSettings();
+    $("#sv-scroll").scrollTop = 0;
+    $("#sv-title").focus({ preventScroll: true });
+  }, onCancel);
+}
+
+/* Leaving with edits pending — another section, the board, signing out — asks
+   first: keep editing, throw them away, or save and carry on. For permissions
+   "save" is the review step, never a silent write. */
+function settingsGuard(proceed, onCancel) {
+  if (!state.settingsOpen || !sdDirty()) { proceed(); return; }
+  const roles = state.settingsTab === "roles";
+  const label = SETTINGS_SECTIONS[state.settingsTab].label;
+  $("#unsaved-text").textContent = roles
+    ? `You have staged permission changes in ${label}. They only take effect after you review and apply them.`
+    : `You have unsaved changes in ${label}.`;
+  $("#btn-unsaved-save").textContent = roles ? "Review changes" : "Save & continue";
+  $("#btn-unsaved-keep").onclick = () => { _confirmCancel = null; closeModal(); if (onCancel) onCancel(); };
+  $("#btn-unsaved-discard").onclick = () => {
+    _confirmCancel = null;
+    closeModal();
+    sdDiscard(state.settingsTab);
+    state.settingsSave = { phase: "clean" };
+    renderSettings();
+    proceed();
+  };
+  $("#btn-unsaved-save").onclick = () => { _confirmCancel = null; closeModal(); saveSettingsSection(proceed); };
+  openModal("#modal-unsaved");
+  // Esc or a click on the backdrop closes the dialog without choosing: that is
+  // "keep editing", and the section picker must snap back to where it was
+  _confirmCancel = onCancel || null;
+}
+
+function discardSettingsDraft() {
+  if (state.settingsSave.phase === "saving") return;
+  sdDiscard(state.settingsTab);
+  state.settingsSave = { phase: "clean" };
+  renderSettings();
+  toast("Changes discarded.", "info");
+}
+
+/* ----- saving ----- */
+/* Turn the draft into writes. Validation happens first and stops everything: a
+   bad name should not leave half the page saved. */
+function settingsSaveOps(section) {
+  const d = sdMap(section);
+  const ops = [], errors = [];
+
+  if (section === "account") {
+    const me = D().me || {};
+    ops.push({
+      keys: Object.keys(d), label: "Profile",
+      // The full name is an admin's record of who somebody is (Users), not
+      // something to edit here, so it goes back unchanged — update_my_profile
+      // writes the whole row and would otherwise blank it. A blank display name
+      // IS meaningful: the database fills it back in from the email address.
+      run: () => cloud.updateMyProfile(me.fullName,
+        "displayName" in d ? d.displayName.after : (me.displayName || ""),
+        "phone" in d ? d.phone.after : (me.phone || "")),
+    });
+  }
+
+  if (section === "engineers") {
+    const rowKeys = [...new Set(Object.keys(d).map(k => k.split("|")[1]))];
+    for (const rowKey of rowKeys) {
+      const row = engineerPaneRows().find(r => r.key === rowKey);
+      if (!row) continue;
+      const who = row.name;
+      const resolveId = async () => row.engineer ? row.engineer.id : cloud.ensureEngineerForProfile(row.profile.id);
+      if (d["name|" + rowKey]) {
+        const name = d["name|" + rowKey].after.trim();
+        if (!name) errors.push(`The name of an engineer record can't be empty (${who}).`);
+        else ops.push({ keys: ["name|" + rowKey], label: `${who}: name`, run: async () => cloud.saveEngineerField(await resolveId(), "name", name) });
+      }
+      if (d["link|" + rowKey]) {
+        const link = d["link|" + rowKey].after || null;
+        ops.push({ keys: ["link|" + rowKey], label: `${who}: account`, run: async () => cloud.saveEngineerField(await resolveId(), "profile_id", link) });
+      }
+      if (d["color|" + rowKey]) {
+        const color = d["color|" + rowKey].after;
+        // an engineer listed by role alone has no record yet — picking a colour
+        // is what creates it
+        ops.push({ keys: ["color|" + rowKey], label: `${who}: colour`, run: async () => cloud.saveEngineerField(await resolveId(), "color", color) });
+      }
+    }
+  }
+
+  if (section === "areas") {
+    const effective = (a) => String(sdVal("areas", "name|" + a.id, a.name)).trim().toLowerCase();
+    for (const a of D().areas) {
+      if (d["name|" + a.id]) {
+        const name = d["name|" + a.id].after.trim();
+        if (!name) errors.push(`A service area needs a name (${a.name}).`);
+        else if (D().areas.some(x => x.id !== a.id && effective(x) === name.toLowerCase())) errors.push(`There is already a service area called ${name}.`);
+        else ops.push({ keys: ["name|" + a.id], label: `${a.name}: name`, run: () => cloud.saveAreaField(a.id, "name", name) });
+      }
+      if (d["color|" + a.id]) {
+        const color = d["color|" + a.id].after;
+        ops.push({ keys: ["color|" + a.id], label: `${a.name}: colour`, run: () => cloud.saveAreaField(a.id, "color", color) });
+      }
+    }
+  }
+
+  if (section === "boards") {
+    const effective = (b) => String(sdVal("boards", "name|" + b.id, b.name)).trim().toLowerCase();
+    for (const b of D().boards) {
+      if (d["name|" + b.id]) {
+        const name = d["name|" + b.id].after.trim();
+        if (!can("boarddelete", "edit")) errors.push("Your role may not rename boards.");
+        else if (!name) errors.push(`A board needs a name (${b.name}).`);
+        else if (D().boards.some(x => x.id !== b.id && effective(x) === name.toLowerCase())) errors.push(`There is already a board called ${name}.`);
+        else ops.push({ keys: ["name|" + b.id], label: `${b.name}: name`, run: () => cloud.renameBoard(b.id, name) });
+      }
+      if (d["weekend|" + b.id]) {
+        const days = d["weekend|" + b.id].after.slice();
+        ops.push({ keys: ["weekend|" + b.id], label: `${b.name}: non-working days`, run: () => cloud.saveBoardWeekendDays(b.id, days) });
+      }
+    }
+  }
+  return { ops, errors };
+}
+
+/* Run the section's writes one after another. What succeeds leaves the draft;
+   what fails stays in it, named, so Retry sends only that. `then` (a guarded
+   navigation waiting on this save) runs only if nothing failed. */
+async function saveSettingsSection(then) {
+  const section = state.settingsTab;
+  if (state.settingsSave.phase === "saving" || !sdDirty(section)) return;
+  if (section === "roles") { openPermReview(then); return; }
+
+  const { ops, errors } = settingsSaveOps(section);
+  if (errors.length) {
+    state.settingsSave = { phase: "error", message: errors.join(" ") };
+    renderSettingsFooter();
+    return;
+  }
+  state.settingsSave = { phase: "saving" };
+  renderSettingsFooter();
+  const failed = [];
+  let done = 0;
+  for (const op of ops) {
+    try {
+      await op.run();
+      for (const k of op.keys) delete sdMap(section)[k];
+      done++;
+    } catch (e) {
+      failed.push({ label: op.label, message: (e && e.message) || String(e) });
+    }
+  }
+  settingsSaveOutcome(section, ops.length, done, failed, then);
+}
+
+function settingsSaveOutcome(section, total, done, failed, then) {
+  if (failed.length) {
+    state.settingsSave = {
+      phase: "error",
+      message: (done ? `${done} of ${total} changes saved. ` : "Nothing was saved. ") +
+        `Could not save ${failed.map(f => f.label).join("; ")} — ${failed[0].message}. ` +
+        `Your edits are kept; use Retry. Saved changes are not rolled back.`,
+    };
+    toast("Some changes could not be saved.", "error");
+  } else {
+    state.settingsSave = { phase: "saved", message: "All changes saved." };
+    toast("Saved.", "info");
+  }
+  renderSettings();
+  if (!failed.length && then) then();
+}
+
+/* ----- Roles & permissions: review, then apply ----- */
+function openPermReview(then) {
+  const entries = Object.entries(sdMap("roles"));
+  if (!entries.length) return;
+  const label = { none: "—", view: "View", edit: "Edit" };
+  const lv = (e, v) => (e.allowOnly && v === "edit") ? "Allowed" : label[v] || v;
+  const body = $("#perm-review-body");
+  body.innerHTML = "";
+  let stale = 0;
+  for (const [, e] of entries) {
+    let cur;
+    try { cur = e.base(); } catch (x) { cur = e.before; }
+    const changedUnderneath = cur !== e.before;
+    if (changedUnderneath) stale++;
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td>${escapeHtml(e.roleLabel)}</td>` +
+      `<td>${escapeHtml(e.areaLabel)}</td>` +
+      `<td>${escapeHtml(lv(e, cur))}${changedUnderneath ? ` <span class="rm-stale">(was ${escapeHtml(lv(e, e.before))} when you started)</span>` : ""}</td>` +
+      `<td><b>${escapeHtml(lv(e, e.after))}</b></td>`;
+    body.appendChild(tr);
+  }
+  const roles = [...new Set(entries.map(([, e]) => e.roleLabel))];
+  $("#perm-review-intro").textContent =
+    `${entries.length} ${entries.length === 1 ? "change" : "changes"} to ${roles.join(", ")}. ` +
+    `They apply to everyone with ${roles.length === 1 ? "that role" : "those roles"} straight away, including anyone with the app open now.`;
+  const warn = $("#perm-review-warn");
+  warn.classList.toggle("hidden", !stale);
+  warn.textContent = stale
+    ? `${stale === 1 ? "One value was" : stale + " values were"} changed by someone else while you were editing. "Before" shows what is saved now; applying replaces it.`
+    : "";
+  $("#btn-perm-cancel").onclick = () => { closeModal(); };
+  $("#btn-perm-apply").onclick = () => applyPermChanges(then);
+  openModal("#modal-perm-review");
+}
+
+async function applyPermChanges(then) {
+  if (state.settingsSave.phase === "saving") return;
+  const entries = Object.entries(sdMap("roles"));
+  closeModal();
+  state.settingsSave = { phase: "saving" };
+  renderSettingsFooter();
+  const failed = [];
+  let done = 0;
+  for (const [key, e] of entries) {
+    try {
+      await cloud.setRolePermission(e.roleKey, e.areaKey, e.after);
+      delete sdMap("roles")[key];
+      done++;
+    } catch (x) {
+      failed.push({ label: `${e.roleLabel}: ${e.areaLabel}`, message: (x && x.message) || String(x) });
+    }
+  }
+  // the change may have been to our own role — re-read access and redraw the
+  // whole app (this also redraws Settings around whatever is left in the draft)
+  try { await refreshAndRender(); } catch (x) { /* the outcome below still stands */ }
+  settingsSaveOutcome("roles", entries.length, done, failed, then);
+}
+
+/* ---------- Settings -> Engineers ---------- */
 /* The pane is a view of the people who may run a mission, not a list of loose
    records: everyone with the Engineer role is here because of their role, a
-   manager or admin appears once they have been added with "+ Add engineer",
-   and an engineer record with no account behind it stays until somebody links
-   it. Only the colour is edited here — the name and the phone number belong to
-   the account, and each person keeps their own number in My account. */
+   manager or admin appears once they have been added with "Add engineer", and
+   an engineer record with no account behind it stays until somebody links it.
+   The colour is edited here for everyone; the name is edited only on a record
+   with no account — otherwise name and phone belong to the account, and each
+   person keeps their own number in My account. */
 const DEFAULT_ENGINEER_COLOR = "#9ca3af";
 
 function engineerPaneRows() {
@@ -5403,6 +5916,7 @@ function engineerPaneRows() {
     const rec = d.engineerId ? D().engineers.find(e => e.id === d.engineerId) : null;
     rows.push({
       kind: "account", profile: d, engineer: rec,
+      key: rec ? "e:" + rec.id : "p:" + d.id,
       name: d.displayName || d.fullName || "?", phone: d.phone || "",
       color: rec ? rec.color : DEFAULT_ENGINEER_COLOR,
     });
@@ -5414,6 +5928,7 @@ function engineerPaneRows() {
       // "stranded": the account it points at is no longer an active engineer
       // (demoted, or disabled), so the person is not in the directory to show
       kind: e.profileId ? "stranded" : "record",
+      key: "e:" + e.id,
       profile: null, engineer: e, name: e.name, phone: e.phone || "", color: e.color,
     });
   }
@@ -5431,6 +5946,7 @@ function renderEngineerRows() {
   // accounts that could be linked to a record that has none: everyone in the
   // directory who isn't already an engineer in their own right
   const linkable = D().directory.filter(d => !d.engineerId);
+  const baseOf = (key, prop) => () => { const r = engineerPaneRows().find(x => x.key === key); return r ? r[prop] : undefined; };
 
   for (const r of rows) {
     const rec = r.engineer;
@@ -5439,6 +5955,7 @@ function renderEngineerRows() {
 
     const swatch = document.createElement("td");
     swatch.className = "st-swatch";
+    swatch.dataset.label = "Colour";
     // The swatch IS the control. A bare <input type="color"> is drawn by the
     // browser as a colour chip inside its OWN bordered box, using a fixed grey
     // that ignores the theme — a box, inside a box, inside a table cell. The
@@ -5448,45 +5965,46 @@ function renderEngineerRows() {
     pick.className = "sw-pick";
     const color = document.createElement("input");
     color.type = "color";
-    color.value = r.color;
+    color.value = sdVal("engineers", "color|" + r.key, r.color);
     color.title = "Mission card colour";
     color.setAttribute("aria-label", `Colour for ${r.name}`);
     const hex = document.createElement("b");
     hex.textContent = swHex(color.value);
-    color.oninput = () => { hex.textContent = swHex(color.value); };
-    color.onchange = () => safely(async () => {
-      // an engineer listed by role alone has no record yet — picking a colour
-      // is what creates it
-      const id = rec ? rec.id : await cloud.ensureEngineerForProfile(r.profile.id);
-      await cloud.saveEngineerField(id, "color", color.value);
-      renderSettings(); render();
-    });
+    color.oninput = () => {
+      hex.textContent = swHex(color.value);
+      sdSet("engineers", "color|" + r.key, color.value, `${r.name} colour`, baseOf(r.key, "color"));
+      sdMarkRow(row, "engineers", r.key);
+    };
     pick.appendChild(color);
     pick.appendChild(hex);
     swatch.appendChild(pick);
 
     const nameCell = document.createElement("td");
+    nameCell.className = "st-primary";
+    nameCell.dataset.label = "Name";
     if (r.kind === "record") {
       // no account behind it: the record's own name is still the only name
       // there is, so it stays editable until somebody links it
       const name = document.createElement("input");
       name.type = "text";
-      name.value = r.name;
+      name.value = sdVal("engineers", "name|" + r.key, r.name);
       name.placeholder = "Name";
+      name.maxLength = 80;
       name.setAttribute("aria-label", "Engineer name");
-      name.onchange = () => safely(async () => {
-        await cloud.saveEngineerField(rec.id, "name", name.value.trim() || r.name);
-        renderSettings(); render();
-      });
+      name.oninput = () => {
+        sdSet("engineers", "name|" + r.key, name.value, `${r.name} name`, baseOf(r.key, "name"));
+        sdMarkRow(row, "engineers", r.key);
+      };
       nameCell.appendChild(name);
     } else {
-      nameCell.className = "st-name";
+      nameCell.classList.add("st-name");
       nameCell.textContent = r.name;
       if (r.profile && r.profile.fullName) nameCell.title = r.profile.fullName;
     }
 
     const phoneCell = document.createElement("td");
     phoneCell.className = "st-phone";
+    phoneCell.dataset.label = "Phone";
     phoneCell.textContent = r.phone || "—";
     phoneCell.title = r.kind === "account"
       ? "Set by this person under Settings → My account."
@@ -5494,8 +6012,15 @@ function renderEngineerRows() {
 
     const acctCell = document.createElement("td");
     acctCell.className = "st-account";
+    acctCell.dataset.label = "Account";
     if (r.kind === "account") {
       acctCell.innerHTML = `<span class="role-pill role-${escapeHtml(r.profile.roleKey || "none")}">${escapeHtml(roleLabel(r.profile.roleKey))}</span>`;
+      // two kinds of mission owner, kept apart in words as well as by whether
+      // they can be removed: on the list because of their role, or added by hand
+      const via = document.createElement("span");
+      via.className = "st-hint";
+      via.textContent = r.profile.roleKey === "engineer" ? " from role" : " added manually";
+      acctCell.appendChild(via);
       if (!rec) {
         const hint = document.createElement("span");
         hint.className = "st-hint";
@@ -5514,7 +6039,7 @@ function renderEngineerRows() {
       unlink.title = "Keep the engineer record and its colour, but stop reading the name and phone from that account.";
       unlink.onclick = () => safely(async () => {
         await cloud.saveEngineerField(rec.id, "profile_id", null);
-        renderSettings(); render();
+        renderSettings();
       });
       acctCell.appendChild(unlink);
     } else {
@@ -5522,11 +6047,15 @@ function renderEngineerRows() {
       link.setAttribute("aria-label", `Account for ${r.name}`);
       link.innerHTML = `<option value="">— no account —</option>` +
         linkable.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.displayName || d.fullName || "?")}</option>`).join("");
+      link.value = sdVal("engineers", "link|" + r.key, "");
       link.title = "Link this record to the person's account — their name and phone number then come from it.";
-      link.onchange = () => safely(async () => {
-        await cloud.saveEngineerField(rec.id, "profile_id", link.value || null);
-        renderSettings(); render();
-      });
+      link.onchange = () => {
+        sdSet("engineers", "link|" + r.key, link.value, `${r.name} account`, () => {
+          const x = engineerPaneRows().find(q => q.key === r.key);
+          return x === undefined ? undefined : "";
+        });
+        sdMarkRow(row, "engineers", r.key);
+      };
       acctCell.appendChild(link);
     }
 
@@ -5548,17 +6077,19 @@ function renderEngineerRows() {
         `Missions that already name them keep their record of who ran them, but lose the engineer on the card.`,
         () => safely(async () => {
           await cloud.deleteEngineer(rec.id);
-          renderSettings(); render(); openModal("#modal-settings");
+          for (const k of Object.keys(sdMap("engineers"))) if (k.split("|")[1] === r.key) delete sdMap("engineers")[k];
+          renderSettings();
         }));
       actCell.appendChild(del);
     }
 
     row.append(swatch, nameCell, phoneCell, acctCell, actCell);
+    sdMarkRow(row, "engineers", r.key);
     engBox.appendChild(row);
   }
 }
 
-/* "+ Add engineer": for the manager or admin who runs missions themselves.
+/* "Add engineer": for the manager or admin who runs missions themselves.
    Everyone with the Engineer role is on the list already, so the picker only
    offers accounts that are not there yet. */
 function openAddEngineerModal() {
@@ -5590,62 +6121,119 @@ function addEngineerFromModal(ev) {
   });
 }
 
-function renderSettings() {
-  applySettingsTab();
-  renderEngineerRows();
+/* ---------- Settings -> Service areas ---------- */
+function renderAreaRows() {
   const areaBox = $("#settings-areas");
   areaBox.innerHTML = "";
+  if (!D().areas.length) {
+    areaBox.innerHTML = `<tr><td colspan="3" class="import-note">No service areas yet. Use <b>Add area</b> to create the first one.</td></tr>`;
+    return;
+  }
+  const baseOf = (id, prop) => () => { const a = D().areas.find(x => x.id === id); return a ? a[prop] : undefined; };
   for (const a of D().areas) {
     const row = document.createElement("tr");
     row.className = "st-row";
     row.innerHTML = `
-      <td class="st-swatch"><label class="sw-pick"><input type="color" value="${a.color}" title="Area colour" aria-label="Area colour"><b>${swHex(a.color)}</b></label></td>
-      <td><input type="text" value="${escapeHtml(a.name)}" placeholder="Area name" aria-label="Area name"></td>
+      <td class="st-swatch" data-label="Colour"><label class="sw-pick"><input type="color" title="Area colour" aria-label="Colour for ${escapeHtml(a.name)}"><b></b></label></td>
+      <td class="st-primary" data-label="Name"><input type="text" maxlength="60" placeholder="Area name" aria-label="Area name"></td>
       <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(a.name)}" aria-label="Delete ${escapeHtml(a.name)}">${icon("close")}</button></td>`;
-    const [color, name, del] = [...row.querySelectorAll("input, button")];
-    color.oninput = () => { const b = color.parentElement.querySelector("b"); if (b) b.textContent = swHex(color.value); };
-    color.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "color", color.value); render(); });
-    name.onchange = () => safely(async () => { await cloud.saveAreaField(a.id, "name", name.value.trim() || a.name); render(); });
-    del.onclick = () => {
-      const used = D().employees.some(e => e.areaId === a.id);
-      if (used) { showConfirm("Cannot delete", `${a.name} still has employees. Reassign them first.`, () => {}); return; }
-      safely(async () => { await cloud.deleteArea(a.id); renderSettings(); render(); openModal("#modal-settings"); });
+    const color = row.querySelector('input[type="color"]');
+    const hex = row.querySelector("b");
+    const name = row.querySelector('input[type="text"]');
+    const del = row.querySelector(".st-del");
+    color.value = sdVal("areas", "color|" + a.id, a.color);
+    hex.textContent = swHex(color.value);
+    name.value = sdVal("areas", "name|" + a.id, a.name);
+    color.oninput = () => {
+      hex.textContent = swHex(color.value);
+      sdSet("areas", "color|" + a.id, color.value, `${a.name} colour`, baseOf(a.id, "color"));
+      sdMarkRow(row, "areas", a.id);
     };
+    name.oninput = () => {
+      sdSet("areas", "name|" + a.id, name.value, `${a.name} name`, baseOf(a.id, "name"));
+      sdMarkRow(row, "areas", a.id);
+    };
+    del.onclick = () => {
+      const people = D().employees.filter(e => e.areaId === a.id).length;
+      if (people) {
+        showConfirm("Cannot delete", `${a.name} still has ${people} employee${people === 1 ? "" : "s"}. Reassign them first.`, () => {});
+        return;
+      }
+      const hosts = (D().hosts || []).filter(h => h.areaId === a.id).length;
+      showConfirm(`Delete ${a.name}?`,
+        `This removes the service area.` + (hosts ? ` ${hosts} host${hosts === 1 ? "" : "s"} using it will have no area set.` : "") +
+        ` It has no employees, so nobody loses their area. This cannot be undone.`,
+        () => safely(async () => {
+          await cloud.deleteArea(a.id);
+          for (const k of Object.keys(sdMap("areas"))) if (k.split("|")[1] === a.id) delete sdMap("areas")[k];
+          renderSettings();
+        }));
+    };
+    sdMarkRow(row, "areas", a.id);
     areaBox.appendChild(row);
   }
+}
 
-  // Weekly weekend days per board — set once at board creation and, until
-  // now, never editable afterward. Checking/unchecking saves immediately
-  // (same instant-save pattern as the engineer/area fields above), and
-  // affects every date-based calculation for that board going forward:
-  // the holiday toggle, the "Add Mission" weekend-import flow, the
-  // date-picker's weekend highlighting, and the Overview trend charts.
+function openAddAreaModal() {
+  const form = $("#form-add-area");
+  form.reset();
+  form.areaColor.value = "#9ca3af";
+  form.areaColor.parentElement.querySelector("b").textContent = swHex(form.areaColor.value);
+  $("#add-area-error").classList.add("hidden");
+  openModal("#modal-add-area");
+  form.areaName.focus();
+}
+
+function addAreaFromModal(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const name = form.areaName.value.trim();
+  const err = $("#add-area-error");
+  const problem = !name ? "Give the area a name."
+    : D().areas.some(a => a.name.trim().toLowerCase() === name.toLowerCase()) ? `There is already a service area called ${name}.`
+    : "";
+  err.textContent = problem;
+  err.classList.toggle("hidden", !problem);
+  if (problem) { form.areaName.focus(); return; }
+  safely(async () => {
+    await cloud.addArea(name, form.areaColor.value);
+    closeModal();
+    renderSettings();
+    toast(`${name} added.`, "info");
+  });
+}
+
+/* ---------- Settings -> Boards ---------- */
+/* Weekly weekend days per board — set once at board creation and editable here
+   afterwards. A board's name and ticked days are staged like every other field
+   and saved together; the days drive the holiday toggle, the "Add Mission"
+   weekend import, the date-picker's weekend highlighting and the Overview trend
+   charts for that board. */
+function renderBoardRows() {
   const boardsBox = $("#settings-boards");
   boardsBox.innerHTML = "";
+  const boardOf = (id) => D().boards.find(x => x.id === id);
   for (const b of D().boards) {
     const row = document.createElement("tr");
     row.className = "st-row";
     const nameCell = document.createElement("td");
-    nameCell.className = "st-board";
+    nameCell.className = "st-board st-primary";
+    nameCell.dataset.label = "Board";
     // Renaming shares the "Rename & delete boards" permission (Admin only by
-    // default; a trigger enforces it). An empty or unchanged name is put back.
+    // default; a trigger enforces it). A blank or duplicate name is refused when
+    // you save, and says so, rather than being put back silently.
     let nameEl;
     if (can("boarddelete", "edit")) {
       nameEl = document.createElement("input");
       nameEl.type = "text";
       nameEl.className = "settings-board-name";
-      nameEl.value = b.name;
+      nameEl.value = sdVal("boards", "name|" + b.id, b.name);
       nameEl.placeholder = "Board name";
+      nameEl.maxLength = 60;
       nameEl.setAttribute("aria-label", "Board name");
-      nameEl.onchange = () => {
-        const name = nameEl.value.trim();
-        if (!name || name === b.name) { nameEl.value = b.name; return; }
-        if (D().boards.some(x => x.id !== b.id && x.name.toLowerCase() === name.toLowerCase())) {
-          nameEl.value = b.name;
-          showConfirm("Cannot rename", `There is already a board called ${name}.`, () => openModal("#modal-settings"), () => openModal("#modal-settings"));
-          return;
-        }
-        safely(async () => { await cloud.renameBoard(b.id, name); renderSettings(); render(); });
+      nameEl.oninput = () => {
+        sdSet("boards", "name|" + b.id, nameEl.value, `${b.name} name`, () => { const x = boardOf(b.id); return x ? x.name : undefined; });
+        sdMarkRow(row, "boards", b.id);
       };
     } else {
       nameEl = document.createElement("div");
@@ -5653,25 +6241,28 @@ function renderSettings() {
       nameEl.textContent = b.name;
     }
     const daysCell = document.createElement("td");
+    daysCell.className = "st-days";
+    daysCell.dataset.label = "Non-working days";
     const picker = document.createElement("div");
     picker.className = "weekday-picker settings-board-days";
+    picker.setAttribute("role", "group");
+    picker.setAttribute("aria-label", `Non-working days for ${b.name}`);
+    const shown = sdVal("boards", "weekend|" + b.id, b.weekendDays.slice().sort((x, y) => x - y));
     for (let i = 0; i < DOW_LABELS.length; i++) {
       const lab = document.createElement("label");
       lab.className = "weekday-chip";
-      lab.innerHTML = `<input type="checkbox" value="${i}" ${b.weekendDays.includes(i) ? "checked" : ""}> ${DOW_LABELS[i]}`;
+      lab.innerHTML = `<input type="checkbox" value="${i}" ${shown.includes(i) ? "checked" : ""}> ${DOW_LABELS[i]}`;
       // The checkbox stays in the DOM for keyboard and screen readers; the cell
       // it sits in is what you actually see (see .weekday-picker in styles.css).
       // The .on class rather than :has(:checked) so the selected day still reads
       // correctly on the older browsers some of the factory PCs run.
-      lab.classList.toggle("on", b.weekendDays.includes(i));
+      lab.classList.toggle("on", shown.includes(i));
       lab.querySelector("input").onchange = (ev) => {
         lab.classList.toggle("on", ev.target.checked);
-        const weekendDays = Array.from(picker.querySelectorAll("input:checked")).map(c => Number(c.value));
-        safely(async () => {
-          await cloud.saveBoardWeekendDays(b.id, weekendDays);
-          renderSettings();
-          render();
-        });
+        const days = Array.from(picker.querySelectorAll("input:checked")).map(c => Number(c.value)).sort((x, y) => x - y);
+        sdSet("boards", "weekend|" + b.id, days, `${b.name} non-working days`,
+          () => { const x = boardOf(b.id); return x ? x.weekendDays.slice().sort((p, q) => p - q) : undefined; });
+        sdMarkRow(row, "boards", b.id);
       };
       picker.appendChild(lab);
     }
@@ -5694,24 +6285,16 @@ function renderSettings() {
       actCell.appendChild(del);
     }
     row.appendChild(actCell);
+    sdMarkRow(row, "boards", b.id);
     boardsBox.appendChild(row);
   }
-
-  // the counts under each table — cheap orientation, and they make an empty
-  // list say so rather than showing a bare frame
-  const n = (one, many, count) => `${count} ${count === 1 ? one : many}`;
-  $("#engineers-count").textContent = n("engineer", "engineers", engineerPaneRows().length);
-  $("#areas-count").textContent = n("service area", "service areas", D().areas.length);
-  $("#boards-count").textContent = n("board", "boards", D().boards.length);
-
-  applySettingsTab();
 }
 
 /* Deleting a board cascades to its missions, plans, overrides and forecasts in
    the database — and to its employees, which is why a board that still has
    people on it is refused rather than confirmed: move them first. */
 function confirmDeleteBoard(b) {
-  const back = () => openModal("#modal-settings");
+  const back = () => {};
   if (D().boards.length <= 1) {
     showConfirm("Cannot delete", `${b.name} is the only board. Create another board before deleting this one.`, back, back);
     return;
@@ -5728,7 +6311,8 @@ function confirmDeleteBoard(b) {
     () => safely(async () => {
       await cloud.deleteBoard(b.id);
       if (D().activeBoardId === b.id) D().activeBoardId = firstAllowedView();
-      renderSettings(); render(); openModal("#modal-settings");
+      for (const k of Object.keys(sdMap("boards"))) if (k.split("|")[1] === b.id) delete sdMap("boards")[k];
+      renderSettings();
     }),
     back);
 }
@@ -9018,8 +9602,11 @@ function renderAccountPane() {
         `</div>` +
         `<p class="import-note">Your role decides which tabs you see and what you can change. Only an admin can alter it.</p>`);
   const form = $("#form-account-name");
-  form.displayName.value = me.displayName || "";
-  form.phone.value = me.phone || "";
+  // what the user has typed wins over what is saved, so a refresh from another
+  // tab or device cannot overwrite a half-finished edit
+  const shown = { displayName: sdVal("account", "displayName", me.displayName || ""), phone: sdVal("account", "phone", me.phone || "") };
+  if (form.displayName.value !== shown.displayName) form.displayName.value = shown.displayName;
+  if (form.phone.value !== shown.phone) form.phone.value = shown.phone;
   // what the box would fill in by itself if it were left empty
   form.displayName.placeholder = autoDisplayName(me.fullName, me.email) || "e.g. Somchai.P";
 }
@@ -9045,33 +9632,42 @@ function autoDisplayName(fullName, email) {
 }
 
 function wireAccountPane() {
-  $("#form-account-name").onsubmit = (ev) => {
-    ev.preventDefault();
-    const form = ev.target;
-    safely(async () => {
-      // The full name is an admin's record of who somebody is (Settings →
-      // Users), not something to edit here, so it goes back unchanged —
-      // update_my_profile writes the whole row and would otherwise blank it.
-      // A blank display name IS meaningful: the database fills it back in from
-      // the email address, which is how somebody resets to the automatic one.
-      await cloud.updateMyProfile((D().me || {}).fullName, form.displayName.value, form.phone.value);
-      toast("Saved.", "info");
-      renderAccountPane();
-      renderSettings();
-      render();
-      if (D().users) renderUserRows();
-    });
-  };
+  const form = $("#form-account-name");
+  // Profile fields are drafts: Save changes (the action bar) writes them. Enter
+  // in a field is the same as that button.
+  form.displayName.oninput = () => sdSet("account", "displayName", form.displayName.value, "Display name",
+    () => (D().me || {}).displayName || "");
+  form.phone.oninput = () => sdSet("account", "phone", form.phone.value, "Mobile number",
+    () => (D().me || {}).phone || "");
+  form.onsubmit = (ev) => { ev.preventDefault(); saveSettingsSection(); };
+
+  // The password is its own form in its own dialog and never part of the
+  // draft: nothing about it is staged, stored or kept once the dialog closes.
+  $("#btn-change-password").onclick = openPasswordModal;
   $("#form-account-password").onsubmit = (ev) => {
     ev.preventDefault();
-    const form = ev.target;
-    if (form.password.value !== form.confirm.value) { toast("The two passwords don't match.", "error"); return; }
+    const f = ev.target;
+    const err = $("#password-error");
+    const problem = f.password.value.length < 8 ? "Use at least 8 characters."
+      : f.password.value !== f.confirm.value ? "The two passwords don't match."
+      : "";
+    err.textContent = problem;
+    err.classList.toggle("hidden", !problem);
+    if (problem) { (f.password.value.length < 8 ? f.password : f.confirm).focus(); return; }
     safely(async () => {
-      await cloud.updatePassword(form.password.value);
-      form.reset();
+      await cloud.updatePassword(f.password.value);
+      closeModal();
       toast("Password changed.", "info");
     });
   };
+}
+
+function openPasswordModal() {
+  const f = $("#form-account-password");
+  f.reset();
+  $("#password-error").classList.add("hidden");
+  openModal("#modal-password");
+  f.password.focus();
 }
 
 /* ---------- Users ---------- */
@@ -9179,7 +9775,6 @@ function renderUserRows() {
   $("#users-count").textContent = rows.length === all.length
     ? `${all.length} ${all.length === 1 ? "person" : "people"}`
     : `${rows.length} of ${all.length}`;
-  $("#btn-add-user").classList.toggle("hidden", !mayEdit);
 
   for (const th of $$("#users-table th[data-sort]")) {
     th.classList.toggle("sorted", th.dataset.sort === state.users.sortKey);
@@ -9297,7 +9892,6 @@ function openUserModal(id) {
 function reopenSettings() {
   closeModal();
   renderSettings();
-  openModal("#modal-settings");
 }
 
 function saveUserModal(ev) {
@@ -9417,17 +10011,31 @@ async function exportUsersXlsx() {
 /* The matrix, drawn as one table: rows are areas grouped into "Tabs & menus"
    and "Overview sections", columns are the roles. Admin's column is disabled
    here and guarded by a trigger in the database, so this screen can never be
-   used to lock everyone out of this screen. */
+   used to lock everyone out of this screen.
+
+   Nothing is written on change. A change is staged (it is highlighted, and the
+   action bar counts it) and Review changes opens a before/after list; Apply
+   changes in that dialog is what writes. Under 960px one role is shown at a time
+   (the picker above the table), because four columns do not fit a phone. */
+function permShown(roleKey, item, viewOnly) {
+  const cur = (D().perms[roleKey] || {})[item.key] || "none";
+  const levels = item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
+  return levels.includes(cur) ? cur : (item.allowOnly ? "none" : "view");
+}
+
 function renderRolesMatrix() {
   const body = $("#roles-matrix-body");
   if (!body || !can("users", "edit")) return;
   const roles = D().roles;
   body.innerHTML = "";
+  if (!roles.some(r => r.key === state.rolesColumn)) {
+    state.rolesColumn = (roles.find(r => !r.protected) || roles[0] || {}).key || null;
+  }
 
   const head = document.createElement("tr");
   head.className = "rm-head";
   head.innerHTML = "<th>Area</th>" + roles.map(r =>
-    `<th>${escapeHtml(r.label)}${r.protected ? '<br><small>always full access</small>' : ""}</th>`).join("");
+    `<th data-role="${escapeHtml(r.key)}">${escapeHtml(r.label)}${r.protected ? '<br><small>always full access</small>' : ""}</th>`).join("");
   body.appendChild(head);
 
   for (const group of PERM_AREAS) {
@@ -9443,32 +10051,45 @@ function renderRolesMatrix() {
       tr.innerHTML = `<td class="rm-area">${escapeHtml(item.label)}${hint}</td>`;
       for (const role of roles) {
         const td = document.createElement("td");
-        const cur = (D().perms[role.key] || {})[item.key] || "none";
+        td.dataset.role = role.key;
+        td.dataset.label = role.label;
+        const key = role.key + "|" + item.key;
         const sel = document.createElement("select");
         sel.className = "rm-level";
+        sel.setAttribute("aria-label", `${item.label} for ${role.label}`);
         // A section that nothing can "edit" only offers off/on — a third state
         // that means nothing would just be a way to get it wrong.
         // A one-off action (deleting a board) is simply allowed or not.
         const levels = item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
         sel.innerHTML = levels.map(l =>
           `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : item.allowOnly ? "Allowed" : "Edit"}</option>`).join("");
-        sel.value = levels.includes(cur) ? cur : (item.allowOnly ? "none" : "view");
+        const saved = permShown(role.key, item, viewOnly);
+        sel.value = sdVal("roles", key, saved);
         sel.disabled = !!role.protected;
         if (role.protected) sel.title = "Admin always keeps full access.";
+        td.classList.toggle("rm-changed", !!sdMap("roles")[key]);
         sel.onchange = () => {
-          const level = sel.value;
-          safely(async () => {
-            await cloud.setRolePermission(role.key, item.key, level);
-            renderRolesMatrix();
-            // the change may have been to our own role — redraw the whole app
-            await refreshAndRender();
-          });
+          sdSet("roles", key, sel.value, `${role.label}: ${item.label}`, () => permShown(role.key, item, viewOnly),
+            { roleKey: role.key, areaKey: item.key, roleLabel: role.label, areaLabel: item.label, allowOnly: !!item.allowOnly });
+          td.classList.toggle("rm-changed", !!sdMap("roles")[key]);
         };
         td.appendChild(sel);
         tr.appendChild(td);
       }
       body.appendChild(tr);
     }
+  }
+
+  const pick = $("#rm-role-select");
+  pick.innerHTML = roles.map(r => `<option value="${escapeHtml(r.key)}">${escapeHtml(r.label)}${r.protected ? " (always full access)" : ""}</option>`).join("");
+  pick.value = state.rolesColumn || "";
+  showRolesColumn();
+}
+
+/* the one-role-at-a-time view: CSS only shows the marked column below 960px */
+function showRolesColumn() {
+  for (const el of $$("#roles-matrix [data-role]")) {
+    el.toggleAttribute("data-visible", el.dataset.role === state.rolesColumn);
   }
 }
 
@@ -9738,10 +10359,31 @@ function wireApp() {
   $("#btn-hide-missions-save").onclick = saveHideMissions;
   $("#btn-deactivate-employee").onclick = deactivateEmployee;
 
-  $("#btn-settings").onclick = () => { renderSettings(); openModal("#modal-settings"); };
+  $("#btn-settings").onclick = () => openSettingsView();
   for (const btn of $$("#settings-tabs .settings-tab")) {
-    btn.onclick = () => { state.settingsTab = btn.dataset.tab; applySettingsTab(); };
+    btn.onclick = () => goSettingsTab(btn.dataset.tab);
   }
+  // the phone's section picker snaps back if the unsaved-changes guard is declined
+  $("#sv-select").onchange = (ev) => goSettingsTab(ev.target.value, () => { ev.target.value = state.settingsTab; });
+  $("#btn-settings-back").onclick = closeSettingsView;
+  $("#btn-settings-back-icon").onclick = closeSettingsView;
+  $("#btn-sv-save").onclick = () => saveSettingsSection();
+  $("#btn-sv-discard").onclick = discardSettingsDraft;
+  $("#rm-role-select").onchange = (ev) => { state.rolesColumn = ev.target.value; showRolesColumn(); };
+  // a live update that arrived while a field had focus is drawn once focus has
+  // left (after a beat, so a click on a button in the page is not swallowed by
+  // the page being redrawn between its press and its release)
+  $("#sv-scroll").addEventListener("focusout", () => {
+    if (!state.settingsStale) return;
+    setTimeout(() => {
+      const ae = document.activeElement;
+      const typing = ae && $("#sv-scroll").contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName);
+      if (state.settingsOpen && state.settingsStale && !typing) renderSettings();
+    }, 300);
+  });
+  window.addEventListener("beforeunload", (ev) => {
+    if (state.settingsOpen && anySettingsDirty()) { ev.preventDefault(); ev.returnValue = ""; }
+  });
   for (const btn of $$("#employee-tabs .settings-tab")) {
     btn.onclick = () => { state.employeeTab = btn.dataset.tab; applyEmployeeTab(); };
   }
@@ -9751,7 +10393,9 @@ function wireApp() {
   // back to Settings rather than closing everything: the pane it was opened
   // from is what the person was in the middle of
   $("#btn-add-engineer-cancel").onclick = reopenSettings;
-  $("#btn-add-area").onclick = () => safely(async () => { await cloud.addArea(); renderSettings(); });
+  $("#btn-add-area").onclick = openAddAreaModal;
+  $("#form-add-area").onsubmit = addAreaFromModal;
+  $("#form-add-area").areaColor.oninput = (ev) => { ev.target.parentElement.querySelector("b").textContent = swHex(ev.target.value); };
 
   initTheme();
   $("#btn-theme").onclick = () => {
@@ -9774,7 +10418,7 @@ function wireApp() {
   };
   $("#form-board").onsubmit = saveBoard;
 
-  $("#btn-signout").onclick = () => safely(() => cloud.signOut());
+  $("#btn-signout").onclick = () => settingsGuard(() => safely(() => cloud.signOut()));
 
   // date picker (custom calendar with weekend highlight)
   $("#btn-date").onclick = (ev) => { ev.stopPropagation(); toggleDatePicker(); };
@@ -10005,8 +10649,10 @@ function wireApp() {
   document.addEventListener("paste", capOnPaste);
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Escape") { hideContextMenu(); hideDatePicker(); closeFilterPops(); hideToolbarMore(); clearSelection(); closeModal(); }
-    // Ctrl/Cmd+Z = undo last assignment change (ignore while typing in a field)
-    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) {
+    if (ev.key === "Tab" && state.settingsOpen && !$("#modal-backdrop").classList.contains("hidden")) trapModalTab(ev);
+    // Ctrl/Cmd+Z = undo last assignment change (ignore while typing in a field,
+    // and while Settings covers the board — the board is not what you are looking at)
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !state.settingsOpen && !/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) {
       ev.preventDefault();
       undoLast();
     }
@@ -10173,9 +10819,8 @@ async function boot() {
       const board = D().boards.find(b => b.id === payload.boardId);
       toast(`${board ? board.name : "This board"} was just updated by ${payload.updatedBy}.`, "info");
     }
-    // render() never touches the Settings modal, so an approval or a role change
-    // arriving over Realtime would otherwise sit stale on an open Users pane.
-    if (!$("#modal-settings").classList.contains("hidden")) applySettingsTab();
+    // an approval or a role change arriving over Realtime reaches an open
+    // Settings page through refreshAndRender (settingsLiveRefresh)
     refreshAndRender();
   });
   await refreshAndRender();

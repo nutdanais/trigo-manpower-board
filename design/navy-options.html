@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One navy for the top bar, sidebar and main buttons — options</title>
+<style>
+  :root { --bg:#eef1f4; --panel:#fff; --border:#d8dde4; --text:#1f2937; --muted:#6b7280; --green:#a8c855; --font:"Noto Sans","Noto Sans Thai",Arial,sans-serif; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); }
+  header.page { padding: 22px 28px 6px; }
+  header.page h1 { margin: 0 0 4px; font-size: 20px; }
+  header.page p { margin: 0; color: var(--muted); max-width: 820px; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 20px; padding: 18px 28px 32px; }
+  .opt { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .opt-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .chip { width: 36px; height: 36px; border-radius: 8px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+  .opt-head b { font-size: 15px; display: block; }
+  .opt-head small { color: var(--muted); font-size: 12px; }
+  .opt-head .meta { margin-left: auto; text-align: right; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .opt-head .meta code { font: 600 13px ui-monospace, Consolas, monospace; color: var(--text); }
+  .badge { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; background: #fdf8ef; color: #8a4f10; border: 1px solid #e0c9a4; margin-left: 6px; vertical-align: 2px; }
+  .badge.rec { background: #f7faef; color: #4d6810; border-color: #cfdcae; }
+
+  /* a miniature of the real app, painted with this option's one navy */
+  .mini { --navy: #004983; --navy-hover: #00335c; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 9px 16px; background: var(--bar, var(--navy)); border-bottom: 3px solid var(--green); }
+  .bar img { height: 26px; }
+  .bar .t { color: #fff; font-weight: 700; font-size: 14px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,.28); line-height: 1.15; }
+  .bar .t small { display: block; font-weight: 400; font-size: 10px; color: rgba(255,255,255,.6); letter-spacing: .5px; }
+  .bar .sp { margin-left: auto; display: flex; gap: 6px; }
+  .bar .tb { color: #fff; border: 1px solid rgba(255,255,255,.42); border-radius: 7px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
+  .body { display: grid; grid-template-columns: 170px 1fr; min-height: 200px; background: var(--bg); }
+  .rail { background: var(--panel); border-right: 1px solid var(--border); padding: 12px 0; }
+  .rail .lbl { font-size: 9.5px; letter-spacing: 1.2px; text-transform: uppercase; font-weight: 700; color: var(--muted); margin: 8px 14px 4px; }
+  .rail .it { margin: 1px 8px; padding: 7px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .rail .it.on { background: var(--bar-on, var(--navy)); color: #fff; }
+  .main { padding: 14px 16px; }
+  .tabs { display: flex; gap: 16px; font-size: 12.5px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); margin: -14px -16px 12px; padding: 10px 16px 0; background: var(--panel); }
+  .tabs span { padding-bottom: 8px; }
+  .tabs .on { color: var(--navy); border-bottom: 2.5px solid var(--navy); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .btn { font: 600 12.5px var(--font); border-radius: 7px; padding: 7px 13px; border: 1px solid var(--border); background: #fff; color: var(--text); }
+  .btn.p { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .btn.p.h { background: var(--navy-hover); border-color: var(--navy-hover); }
+  .btn.o { color: var(--navy); border-color: color-mix(in srgb, var(--navy) 40%, transparent); }
+  .cap { font-size: 11px; color: var(--muted); margin: 0 0 4px; }
+  .foot { padding: 10px 16px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); }
+  .foot b { color: var(--text); }
+  .note { margin: 4px 28px 28px; padding: 12px 16px; border: 1px solid #e0c9a4; background: #fdf8ef; color: #8a4f10; border-radius: 8px; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>One navy for the top bar, the sidebar and the main buttons</h1>
+  <p>Today the top bar is <b>#062A44</b> but the sidebar's selected item and buttons such as <b>+ New Employee</b> and <b>+ New Mission</b> are <b>#004983</b>, so the app shows two navies. Each card below paints the top bar, sidebar selection, selected tab and buttons with <i>one</i> colour (the button hover is that colour about 25% darker). The green rule is unchanged. Contrast figures are against white text.</p>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<div class="note">Nothing in the app has been changed for these options — this is a preview only. Tell me which letter you prefer (or a tweak, such as "B but a little lighter") and I will apply it as the single navy token.</div>
+
+<script>
+const OPTIONS = [
+  { id: "Now", name: "Today (two navies)", hex: "#004983", bar: "#062a44", hover: "#00335c", tag: "current", why: "Top bar #062A44, everything else #004983 — the mismatch you noticed.", contrast: "14.8 / 9.2" },
+  { id: "A", name: "Deep navy", hex: "#062a44", hover: "#041d30", why: "The design-system header navy. Strongest, most formal; buttons turn nearly black-blue.", contrast: "14.8" },
+  { id: "B", name: "Midnight navy", hex: "#0a3357", hover: "#072743", tag: "suggested", why: "A touch lighter than A, still clearly darker than today's button blue. Keeps the brand hue; best balance for large buttons and a big sidebar highlight.", contrast: "12.9" },
+  { id: "C", name: "TRIGO navy, deepened", hex: "#003a66", hover: "#002a4a", why: "Today's brand blue (#004983) made ~20% darker: same hue, the least change from what people know.", contrast: "11.7" },
+  { id: "D", name: "Ink navy", hex: "#0e2f5a", hover: "#0a2342", why: "Slightly more violet (hue 213 vs 205). Reads cooler and more 'corporate'; the green rule pops a little more.", contrast: "13.4" },
+];
+const grid = document.getElementById("grid");
+for (const o of OPTIONS) {
+  const bar = o.bar || o.hex;
+  const el = document.createElement("section");
+  el.className = "opt";
+  el.innerHTML = `
+    <div class="opt-head">
+      <span class="chip" style="background:${o.hex}"></span>
+      <div><b>${o.id === "Now" ? "" : "Option " + o.id + " — "}${o.name}${o.tag === "suggested" ? '<span class="badge rec">my pick</span>' : ""}${o.tag === "current" ? '<span class="badge">current</span>' : ""}</b>
+        <small>${o.why}</small></div>
+      <div class="meta"><code>${o.id === "Now" ? "#062A44 + #004983" : o.hex.toUpperCase()}</code><br>white contrast ${o.contrast}</div>
+    </div>
+    <div class="mini" style="--navy:${o.hex};--navy-hover:${o.hover};--bar:${bar};--bar-on:${o.hex}">
+      <div class="bar">
+        <img src="../logo-on-navy.png" alt="TRIGO">
+        <div class="t">Manpower Board<small>Operations Planning</small></div>
+        <div class="sp"><span class="tb">Settings</span><span class="tb">Sign out</span></div>
+      </div>
+      <div class="body">
+        <div class="rail">
+          <div class="lbl">Personal</div><div class="it on">My account</div>
+          <div class="lbl">Board setup</div><div class="it">Engineers</div><div class="it">Service areas</div>
+          <div class="lbl">Administration</div><div class="it">Users</div>
+        </div>
+        <div class="main">
+          <div class="tabs"><span>Overview</span><span class="on">Manpower</span><span>Host</span></div>
+          <p class="cap">Main buttons</p>
+          <div class="row"><span class="btn p">+ New Employee</span><span class="btn p">+ New Mission</span><span class="btn p h">Hover</span><span class="btn o">Outline</span><span class="btn">Plain</span></div>
+        </div>
+      </div>
+    </div>`;
+  grid.appendChild(el);
+}
+</script>
+</body>
+</html>
