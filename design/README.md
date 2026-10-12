@@ -20,6 +20,14 @@ All figures in the artboards are realistic **placeholders** (128 staff, 21 missi
 mockups match the real app: `--panel` `#ffffff`, `--border` `#d8dde4`,
 `--primary` `#004983`, the 8-hue categorical chart set, Noto Sans.
 
+## Overview directions (2026-10-12)
+
+`overview-directions.html` is a standalone page (open it in any browser): a
+review of the Overview tab with findings F1–F11, then four directions — A
+Refined dashboard, B Board cards, C Action inbox, D Today | Trends — each with
+a live-HTML mockup on the same sample day, a comparison table and a
+recommendation. Like the rest of this folder it is not loaded by the app.
+
 ## Re-seeding the canvas
 
 The published canvas (`overview-tab-review.html`, gitignored — 2.5 MB of editor

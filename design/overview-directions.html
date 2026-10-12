@@ -1,0 +1,450 @@
+<title>Overview Redesign Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Mono:wght@500&display=swap">
+<style>
+/* Layout: a single reading column (review → directions → compare → decide); each
+   direction is a full-width band with a live-HTML mockup of the Overview on the
+   left and its case on the right. Mockups use the app's own tokens (styles.css)
+   so they read as the real tab, not a sketch. */
+:root {
+  --page: #eef1f4;          /* app --bg */
+  --surface: #ffffff;       /* app --panel */
+  --line: #d8dde4;          /* app --border */
+  --ink: #1f2937;           /* app --text */
+  --mut: #5f6773;           /* app --muted, nudged darker for 4.5:1 on --page */
+  --navy: #004983;          /* TRIGO navy, always a fill */
+  --navy-text: #004983;     /* navy as text; lightens in dark */
+  --green: #a8c855;         /* TRIGO green */
+  --soft: #e6eaef;
+  --warn: #f59e0b; --warn-text: #8a4f10; --warn-surface: #fdf8ef; --warn-line: #e0c9a4;
+  --ok-text: #4d6810; --ok-surface: #f7faef; --ok-line: #cfdcae;
+  --bad: #e34948; --bad-text: #a3271f; --bad-surface: #fef2f2; --bad-line: #e6c2be;
+  --c-dep: #2a78d6; --c-leave: #eda100; --c-idle: #e34948; --c-oc: #eb6834; --c-free: #9aa3ad; --c-night: #1c2430;
+  --c-b1: #2a78d6; --c-b2: #eb6834;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", "Noto Sans", sans-serif;
+  --f-body: "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "Noto Sans Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #14171a; --surface: #1c2024; --line: #2c3236; --ink: #e8ebed; --mut: #a3aab1;
+    --navy-text: #6fb1e0; --soft: #232a33;
+    --warn-text: #e0b070; --warn-surface: #2a2313; --warn-line: #6a5426;
+    --ok-text: #a8c855; --ok-surface: #1b2416; --ok-line: #46592a;
+    --bad: #e66767; --bad-text: #fca5a5; --bad-surface: rgba(185,28,28,.16); --bad-line: #7f2222;
+    --c-dep: #3987e5; --c-leave: #c98500; --c-idle: #d0334f; --c-oc: #d95926; --c-free: #6b737c; --c-night: #0c1015;
+    --c-b1: #3987e5; --c-b2: #d95926;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #14171a; --surface: #1c2024; --line: #2c3236; --ink: #e8ebed; --mut: #a3aab1;
+  --navy-text: #6fb1e0; --soft: #232a33;
+  --warn-text: #e0b070; --warn-surface: #2a2313; --warn-line: #6a5426;
+  --ok-text: #a8c855; --ok-surface: #1b2416; --ok-line: #46592a;
+  --bad: #e66767; --bad-text: #fca5a5; --bad-surface: rgba(185,28,28,.16); --bad-line: #7f2222;
+  --c-dep: #3987e5; --c-leave: #c98500; --c-idle: #d0334f; --c-oc: #d95926; --c-free: #6b737c; --c-night: #0c1015;
+  --c-b1: #3987e5; --c-b2: #d95926;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: flex; flex-direction: column; gap: 40px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: .1px; }
+h1 { font-size: 40px; line-height: 1.05; font-weight: 700; }
+h2 { font-size: 27px; line-height: 1.15; font-weight: 700; }
+h3 { font-size: 19px; line-height: 1.2; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase; color: var(--navy-text); display: flex; align-items: center; gap: 8px; }
+.eyebrow::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--green); }
+.lede { color: var(--mut); font-size: 16px; }
+section { display: flex; flex-direction: column; gap: 16px; }
+a { color: var(--navy-text); }
+:focus-visible { outline: 2px solid var(--navy-text); outline-offset: 2px; }
+
+/* ---------- header ---------- */
+.head { display: flex; flex-direction: column; gap: 12px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--mut); }
+.meta b { color: var(--ink); font-weight: 600; }
+
+/* ---------- shipped box ---------- */
+.shipped { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px 28px; }
+.shipped h3 { font-size: 16px; margin-bottom: 4px; }
+.shipped p { font-size: 14px; color: var(--mut); }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.tag.ok { color: var(--ok-text); background: var(--ok-surface); border-color: var(--ok-line); }
+.tag.hi { color: var(--bad-text); background: var(--bad-surface); border-color: var(--bad-line); }
+.tag.md { color: var(--warn-text); background: var(--warn-surface); border-color: var(--warn-line); }
+.tag.lo { color: var(--mut); background: var(--soft); border-color: var(--line); }
+
+/* ---------- findings ---------- */
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; }
+.finding { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.finding-top { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.finding-top span:first-child { font-family: var(--f-data); font-size: 12px; color: var(--mut); }
+.finding h3 { font-size: 16.5px; }
+.finding p { font-size: 14px; color: var(--mut); }
+.finding .where { font-size: 12.5px; color: var(--mut); }
+.finding .where b { color: var(--ink); font-weight: 600; }
+
+/* ---------- direction bands ---------- */
+.dir { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; align-items: start; padding-top: 24px; border-top: 1px solid var(--line); }
+.dir-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; grid-column: 1 / -1; }
+.letter { font-family: var(--f-display); font-size: 15px; font-weight: 700; color: #fff; background: var(--navy); border-radius: 6px; padding: 1px 10px; }
+.dir-head p { color: var(--mut); flex-basis: 100%; }
+.case { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.case h4 { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--mut); }
+.case ul { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.rec { border: 2px solid var(--green); }
+@media (max-width: 900px) { .dir { grid-template-columns: 1fr; } }
+
+/* ---------- mockup frame (a diagram: scrolls sideways on its own on a phone) ---------- */
+.frame { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
+.frame-bar { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: var(--navy); color: #fff; font-size: 12px; font-weight: 600; }
+.frame-bar .dots { display: flex; gap: 5px; }
+.frame-bar .dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.35); }
+.frame-scroll { overflow-x: auto; }
+.mk { min-width: 660px; background: var(--page); padding: 12px; display: flex; flex-direction: column; gap: 9px; font-size: 11px; line-height: 1.35; }
+.mk .card { background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 9px 11px; min-width: 0; }
+.mk .t { font-weight: 700; font-size: 11.5px; }
+.mk .s { color: var(--mut); font-size: 10px; }
+.mk .num { font-size: 19px; font-weight: 700; color: var(--navy-text); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.mk .num small { font-size: 11px; color: var(--mut); font-weight: 600; }
+.mk .row { display: flex; gap: 9px; align-items: stretch; }
+.mk .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.mk .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.mk .pills { display: flex; gap: 5px; align-items: center; }
+.mk .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 10.5px; white-space: nowrap; }
+.mk .pill.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.mk .pill em { font-style: normal; font-size: 9.5px; padding: 0 5px; border-radius: 999px; background: var(--soft); color: var(--mut); }
+.mk .pill.on em { background: rgba(255,255,255,.2); color: #fff; }
+.mk .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+.mk .bar { display: flex; height: 7px; border-radius: 999px; overflow: hidden; background: var(--soft); }
+.mk .bar.tall { height: 12px; border-radius: 3px; }
+.mk .bar span { display: block; height: 100%; }
+.mk .legend { display: flex; flex-wrap: wrap; gap: 3px 9px; font-size: 9.5px; color: var(--mut); margin-top: 4px; }
+.mk .legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; margin-right: 3px; vertical-align: -0.5px; }
+.mk .chip { display: inline-block; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); background: var(--soft); font-size: 9.5px; font-weight: 600; margin: 0 3px 3px 0; white-space: nowrap; }
+.mk .attn { background: var(--warn-surface); border: 1px solid var(--warn-line); border-left: 4px solid var(--warn); border-radius: 7px; padding: 9px 11px; }
+.mk .attn .t { color: var(--warn-text); }
+.mk .okbox { background: var(--ok-surface); border: 1px solid var(--ok-line); border-radius: 6px; padding: 6px 9px; color: var(--ok-text); font-weight: 600; font-size: 10px; }
+.mk .grouph { font-size: 9.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--navy-text); padding: 2px 2px 0; }
+.mk table { width: 100%; border-collapse: collapse; font-size: 10px; font-variant-numeric: tabular-nums; }
+.mk th { text-align: left; font-size: 8.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--mut); font-weight: 700; padding: 2px 4px 4px; border-bottom: 1px solid var(--line); }
+.mk td { padding: 4px; border-bottom: 1px solid var(--line); }
+.mk tr:last-child td { border-bottom: 0; }
+.mk td.r, .mk th.r { text-align: right; }
+.mk .idle { color: var(--warn-text); font-weight: 700; }
+.mk .btn { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--navy); color: #fff; font-weight: 600; font-size: 9.5px; white-space: nowrap; }
+.mk .btn.ghost { background: transparent; color: var(--navy-text); border: 1px solid var(--line); }
+.mk .tabs { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; width: max-content; background: var(--surface); }
+.mk .tabs span { padding: 4px 14px; font-weight: 700; font-size: 10.5px; }
+.mk .tabs span.on { background: var(--navy); color: #fff; }
+.mk .item { display: grid; grid-template-columns: 4px 1fr auto; gap: 9px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px 7px 0; overflow: hidden; }
+.mk .item .rail { align-self: stretch; margin: -7px 0; }
+.mk .ring { --p: 40; width: 46px; height: 46px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: conic-gradient(var(--c-dep) calc(var(--p) * 1%), var(--soft) 0); }
+.mk .ring b { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; font-size: 10.5px; }
+.mk .kv { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; font-size: 10px; font-variant-numeric: tabular-nums; }
+.mk .kv span:nth-child(odd) { color: var(--mut); }
+.mk .kv span:nth-child(even) { font-weight: 700; text-align: right; }
+.mk svg { display: block; }
+.mk .spark path.l { fill: none; stroke: var(--c-dep); stroke-width: 1.6; }
+.mk .spark path.a { fill: var(--c-dep); opacity: .14; }
+.mk .spark circle { fill: var(--c-dep); }
+.mk .spark line { stroke: var(--line); stroke-width: 1; }
+.mk .note { font-size: 9px; color: var(--mut); font-style: italic; }
+.mk .phone { width: 210px; flex: none; background: var(--page); border: 1px solid var(--line); border-radius: 14px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+/* ---------- comparison table ---------- */
+.cmp-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.cmp { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 14px; }
+.cmp th, .cmp td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.cmp thead th { font-family: var(--f-display); font-size: 16px; }
+.cmp tbody th { font-weight: 600; width: 26%; }
+.cmp tr:last-child th, .cmp tr:last-child td { border-bottom: 0; }
+.score { display: flex; align-items: center; gap: 8px; }
+.score i { font-style: normal; letter-spacing: 2px; color: var(--navy-text); font-size: 13px; }
+.score span { color: var(--mut); font-size: 13px; }
+.cmp .best { background: var(--ok-surface); }
+
+/* ---------- quick wins ---------- */
+.wins { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; counter-reset: w; }
+.wins li { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px 12px 46px; position: relative; font-size: 14px; counter-increment: w; }
+.wins li::before { content: counter(w); position: absolute; left: 14px; top: 12px; font-family: var(--f-data); font-size: 12px; color: var(--navy-text); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+.wins b { display: block; font-size: 14.5px; }
+.wins span { color: var(--mut); }
+
+.decide { background: var(--navy); color: #fff; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+.decide h2 { color: #fff; }
+.decide p { color: rgba(255,255,255,.86); }
+.decide b { color: #fff; }
+.mono { font-family: var(--f-data); font-size: .92em; }
+@media (max-width: 560px) { h1 { font-size: 32px; } h2 { font-size: 23px; } .wrap { padding-inline: 16px; } }
+</style>
+
+<main class="wrap">
+  <header class="head">
+    <div class="eyebrow">Manpower Board · Overview tab review</div>
+    <h1>Overview: four ways forward</h1>
+    <p class="lede">A review of the Overview dashboard as it stands on the branch <span class="mono">claude/amazing-ritchie-ukwily</span>, then four design directions to choose from. Every mockup uses the same sample day so you can compare like with like: <b>40 staff on 2 boards, 9 deployed, 2 on leave, 20 permanent idle, 9 on-call free, 4 missions</b>.</p>
+    <div class="meta"><span>Sample day <b>Mon 12-Oct-2026</b></span><span>Boards <b>Board One (28) · Board Two (12)</b></span><span>Mockups are live HTML in the app's colours, not screenshots</span></div>
+  </header>
+
+  <section aria-labelledby="shipped-h">
+    <div class="eyebrow">Already done on this branch</div>
+    <h2 id="shipped-h">What changed in the code</h2>
+    <div class="shipped">
+      <div><span class="tag ok">Shipped</span><h3>Board selector</h3><p>First row of the tab, above "Needs attention today": <b>All boards</b> plus one pill per board with its headcount. It scopes every section, History included, and the device remembers it.</p></div>
+      <div><span class="tag ok">Shipped</span><h3>Summary → detail → history</h3><p>History and Engineer workload moved from the middle of the page to the end, under an <b>Over time</b> heading. The day's cards sit under <b>In detail</b>: Day/night next to By engineer, Leave next to Host coverage, then By service area.</p></div>
+      <div><span class="tag ok">Shipped</span><h3>Past days stay put</h3><p>Adding an employee was already handled for headcount. Three gaps are now closed: <b>Host coverage risk</b> counts only deployments up to that date, <b>By engineer</b> uses the same roster rule, and someone <b>deactivated today</b> stays in every earlier day's History.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="find-h">
+    <div class="eyebrow">Review</div>
+    <h2 id="find-h">What still gets in the way</h2>
+    <p class="lede">Found by walking the tab at desktop (1400px) and phone (390px) widths. Severity means how often it costs a user time, not how hard it is to fix.</p>
+    <div class="findings">
+      <article class="finding"><div class="finding-top"><span>F1 · status bar + Action queue</span><span class="tag hi">High</span></div>
+        <h3>The same alert is said twice</h3>
+        <p>"20 permanent staff idle" heads the status bar, and "20 permanent staff not assigned yet" heads the Action queue right below it. The reader parses two boxes to learn one fact.</p></article>
+      <article class="finding"><div class="finding-top"><span>F2 · status bar, KPI, Day/night</span><span class="tag hi">High</span></div>
+        <h3>"Day 3" and "Day 8" on one page</h3>
+        <p>The status bar's Day / Night chips count <b>missions</b> (3 / 1). The Day/night card counts <b>crew</b> (8 / 1). Both are labelled just "Day", so the page appears to contradict itself.</p></article>
+      <article class="finding"><div class="finding-top"><span>F3 · KPI "Deployed on a mission"</span><span class="tag md">Medium</span></div>
+        <h3>A five-colour bar with no legend</h3>
+        <p>Deployed, leave, idle, holiday and on-call free share one 8px bar, and the colours are only named in hover tooltips. On a phone nobody hovers.</p></article>
+      <article class="finding"><div class="finding-top"><span>F4 · KPI "Overall utilization"</span><span class="tag md">Medium</span></div>
+        <h3>The trend caption mixes two windows</h3>
+        <p>"▲ 7 pts vs the previous 5 days · 14-day trend": two numbers of days in one line, and neither says "last week", which is what people actually compare against.</p></article>
+      <article class="finding"><div class="finding-top"><span>F5 · History + Engineer workload</span><span class="tag md">Medium</span></div>
+        <h3>Two large charts for a glance at the month</h3>
+        <p>Together they take about 40% of the page height. Most days the lines are flat, and the engineer chart repeats what its own table shows. This is lighter now that they sit at the end, but they are still long.</p></article>
+      <article class="finding"><div class="finding-top"><span>F6 · phone toolbar</span><span class="tag md">Medium</span></div>
+        <h3>Four rows of chrome before any number</h3>
+        <p>On a phone, Overview shows a "Board…" select and a "More" button that do nothing here, the chip strip, then Export. On a 390px phone, the status bar starts about 310px down the screen.</p></article>
+      <article class="finding"><div class="finding-top"><span>F7 · By board on a phone</span><span class="tag md">Medium</span></div>
+        <h3>Half the table is off-screen</h3>
+        <p>At 390px only Board, Utilized and Missions are visible. Headcount, Assigned, Idle and Contract mix need a sideways scroll that nothing hints at.</p></article>
+      <article class="finding"><div class="finding-top"><span>F8 · toolbar chip strip</span><span class="tag lo">Low</span></div>
+        <h3>Headcounts now appear twice</h3>
+        <p>"All employees 40 · Board One 28 · Board Two 12" in the toolbar shows the same numbers the new board pills carry.</p></article>
+      <article class="finding"><div class="finding-top"><span>F9 · Leave today</span><span class="tag lo">Low</span></div>
+        <h3>Five rows to say "2 people"</h3>
+        <p>Every leave type gets a row, even at 0. On a normal day, three empty tracks push Host coverage and By service area further down.</p></article>
+      <article class="finding"><div class="finding-top"><span>F10 · Action queue chips</span><span class="tag lo">Low</span></div>
+        <h3>The area tag repeats on every name</h3>
+        <p>"Worker 15 · AREA1" ×20. When one area covers everyone, the suffix is noise. Grouping chips under their board would also answer "where" without reading the right-hand caption.</p></article>
+      <article class="finding"><div class="finding-top"><span>F11 · section subtitles</span><span class="tag lo">Low</span></div>
+        <h3>The utilization formula is printed in full, twice</h3>
+        <p>"assigned ÷ (headcount − leave − holiday − free on-call)" sits under By board and in the KPI tile's fallback. It belongs in an ⓘ tooltip, read once.</p></article>
+    </div>
+  </section>
+
+  <section aria-labelledby="dirs-h">
+    <div class="eyebrow">Directions</div>
+    <h2 id="dirs-h">Four directions, same data</h2>
+    <p class="lede">A builds on what shipped today. B and C rethink what the page is for. D is a structural change that combines with A, B or C.</p>
+
+    <!-- ===================== A ===================== -->
+    <article class="dir" aria-labelledby="a-h">
+      <div class="dir-head"><span class="letter">A</span><h3 id="a-h">Refined dashboard</h3><p>Keep today's layout and fix what reads wrong: one attention card, labelled KPIs, consistent day/night units, and History shrunk to a strip of sparklines that opens into the full chart.</p></div>
+      <div class="frame"><div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span>Overview · direction A</div><div class="frame-scroll">
+        <div class="mk" role="img" aria-label="Mockup of direction A">
+          <div class="pills"><span class="s" style="font-weight:700;letter-spacing:.5px">BOARD</span><span class="pill on">All boards <em>40</em></span><span class="pill"><i class="dot" style="background:var(--c-b1)"></i>Board One <em>28</em></span><span class="pill"><i class="dot" style="background:var(--c-b2)"></i>Board Two <em>12</em></span></div>
+          <div class="attn">
+            <div class="row" style="justify-content:space-between;align-items:center"><span class="t">⚠ 20 permanent staff have no mission · Mon 12-Oct</span><span class="s">Click a name to open its board</span></div>
+            <div style="margin-top:6px"><span class="s"><b>Board One · 12</b></span><br><span class="chip">Person F</span><span class="chip">Worker 19</span><span class="chip">Worker 22</span><span class="chip">Worker 23</span><span class="chip">Worker 25</span><span class="chip">+7 more</span></div>
+            <div><span class="s"><b>Board Two · 8</b></span><br><span class="chip">Person J</span><span class="chip">Worker 15</span><span class="chip">Worker 18</span><span class="chip">+5 more</span></div>
+            <div class="s" style="margin-top:3px">9 on-call free · surge capacity, no action needed</div>
+          </div>
+          <div class="grid4">
+            <div class="card"><div class="row" style="justify-content:space-between"><div><div class="num">31%</div><div class="s">Utilization</div></div>
+              <svg class="spark" width="64" height="26" viewBox="0 0 64 26" aria-hidden="true"><line x1="0" y1="25" x2="64" y2="25"/><path class="a" d="M2 20 L14 19 L26 20 L38 18 L50 19 L60 6 L60 25 L2 25 Z"/><path class="l" d="M2 20 L14 19 L26 20 L38 18 L50 19 L60 6"/><circle cx="60" cy="6" r="2.4"/></svg></div>
+              <div class="s" style="margin-top:4px"><b style="color:var(--ok-text)">▲ 7 pts</b> vs last week</div></div>
+            <div class="card"><div class="num">9<small> / 40</small></div><div class="s">Deployed</div><div class="bar" style="margin-top:5px"><span style="width:22.5%;background:var(--c-dep)"></span><span style="width:5%;background:var(--c-leave)"></span><span style="width:50%;background:var(--c-idle)"></span><span style="width:22.5%;background:var(--c-free)"></span></div>
+              <div class="legend"><span><i style="background:var(--c-dep)"></i>9 on mission</span><span><i style="background:var(--c-leave)"></i>2 leave</span><span><i style="background:var(--c-idle)"></i>20 idle</span><span><i style="background:var(--c-free)"></i>9 on-call free</span></div></div>
+            <div class="card"><div class="num">4</div><div class="s">Missions</div><div class="s" style="margin-top:4px">3 day · 1 night<br>crew 8 day · 1 night</div></div>
+            <div class="card"><div class="num">9<small> of 10</small></div><div class="s">On-call free</div><div class="s" style="margin-top:4px">1 called in today</div></div>
+          </div>
+          <div class="card"><table><thead><tr><th>Board</th><th class="r">Utilized</th><th class="r">Missions</th><th class="r">Headcount</th><th class="r">Deployed</th><th class="r">Idle</th></tr></thead>
+            <tbody><tr><td><i class="dot" style="background:var(--c-b1)"></i> Board One</td><td class="r">40%</td><td class="r">3</td><td class="r">28</td><td class="r">8</td><td class="r idle">12</td></tr>
+            <tr><td><i class="dot" style="background:var(--c-b2)"></i> Board Two</td><td class="r">11%</td><td class="r">1</td><td class="r">12</td><td class="r">1</td><td class="r idle">8</td></tr></tbody></table></div>
+          <div class="grouph">In detail</div>
+          <div class="grid2">
+            <div class="card"><span class="t">Shifts · crew</span><div class="bar tall" style="margin-top:6px"><span style="width:89%;background:var(--c-dep)"></span><span style="width:11%;background:var(--c-night)"></span></div><div class="legend"><span><i style="background:var(--c-dep)"></i>Day 8 crew · 3 missions</span><span><i style="background:var(--c-night)"></i>Night 1 crew · 1 mission</span></div></div>
+            <div class="card"><span class="t">Leave · 2 people</span><div class="s" style="margin-top:5px">Annual 1 · Sick 1</div><div class="s">Business, Unpaid, Exchange: none</div></div>
+          </div>
+          <div class="grouph">Over time · This month</div>
+          <div class="card"><div class="grid4">
+            <div><div class="s">Utilization</div><svg class="spark" width="120" height="24" viewBox="0 0 120 24" aria-hidden="true"><path class="l" d="M2 18 L20 17 L38 18 L56 16 L74 17 L92 16 L112 6"/><circle cx="112" cy="6" r="2.2"/></svg></div>
+            <div><div class="s">Deployed / day</div><svg class="spark" width="120" height="24" viewBox="0 0 120 24" aria-hidden="true"><path class="l" d="M2 20 L20 20 L38 19 L56 20 L74 20 L92 19 L112 8"/><circle cx="112" cy="8" r="2.2"/></svg></div>
+            <div><div class="s">Idle / day</div><svg class="spark" width="120" height="24" viewBox="0 0 120 24" aria-hidden="true"><path class="l" d="M2 5 L20 5 L38 5 L56 5 L74 5 L92 5 L112 12"/><circle cx="112" cy="12" r="2.2"/></svg></div>
+            <div style="align-self:center;text-align:right"><span class="btn ghost">Open full history →</span></div>
+          </div></div>
+        </div></div></div>
+      <div class="case">
+        <div class="facts"><span class="tag ok">Recommended</span><span class="tag lo">Effort: small–medium</span><span class="tag lo">Fixes F1–F5, F9–F11</span></div>
+        <div><h4>What changes</h4><ul>
+          <li>Status bar and Action queue merge into one attention card, with names grouped by board and the first five shown.</li>
+          <li>Every KPI says its unit, and Deployed gets a visible legend.</li>
+          <li>Day/night always reads "crew · missions".</li>
+          <li>History becomes three sparklines. The full chart opens on demand.</li>
+          <li>Leave lists only the types in use.</li></ul></div>
+        <div><h4>Good for</h4><p>People who already know the tab. Nothing moves far, so nobody has to learn the page again.</p></div>
+        <div><h4>Trade-off</h4><p>It stays a dashboard you read top to bottom. It doesn't tell you what to do next beyond the idle list.</p></div>
+      </div>
+    </article>
+
+    <!-- ===================== B ===================== -->
+    <article class="dir" aria-labelledby="b-h">
+      <div class="dir-head"><span class="letter">B</span><h3 id="b-h">Board cards</h3><p>Board-first. One card per board replaces the By board table, the KPI strip shrinks to a one-line all-boards summary, and clicking a card scopes the details below it.</p></div>
+      <div class="frame"><div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span>Overview · direction B</div><div class="frame-scroll">
+        <div class="mk" role="img" aria-label="Mockup of direction B">
+          <div class="card row" style="justify-content:space-between;align-items:center;flex-wrap:wrap">
+            <span class="t">All boards · Mon 12-Oct</span>
+            <span class="s"><b style="color:var(--ink)">40</b> staff · <b style="color:var(--ink)">9</b> deployed · <b class="idle">20</b> idle · <b style="color:var(--ink)">2</b> leave · <b style="color:var(--ink)">4</b> missions · <b style="color:var(--ink)">31%</b> utilized</span>
+          </div>
+          <div class="grid2">
+            <div class="card" style="border-top:3px solid var(--c-b1)">
+              <div class="row" style="justify-content:space-between"><div><div class="t">Board One</div><div class="s">28 staff · 21 permanent / 7 on-call</div></div><div class="ring" style="--p:40"><b>40%</b></div></div>
+              <div class="kv" style="margin-top:6px"><span>Missions</span><span>3 · 2 day, 1 night</span><span>Deployed</span><span>8</span><span>Leave</span><span>2</span><span>On-call free</span><span>6</span><span>Idle permanent</span><span class="idle">12</span></div>
+              <div style="margin-top:6px"><span class="chip">Person F</span><span class="chip">Worker 19</span><span class="chip">Worker 22</span><span class="chip">+9</span></div>
+              <div class="row" style="justify-content:flex-end;margin-top:4px"><span class="btn ghost">Show details</span><span class="btn">Open board →</span></div>
+            </div>
+            <div class="card" style="border-top:3px solid var(--c-b2)">
+              <div class="row" style="justify-content:space-between"><div><div class="t">Board Two</div><div class="s">12 staff · 9 permanent / 3 on-call</div></div><div class="ring" style="--p:11"><b>11%</b></div></div>
+              <div class="kv" style="margin-top:6px"><span>Missions</span><span>1 · 1 day</span><span>Deployed</span><span>1</span><span>Leave</span><span>0</span><span>On-call free</span><span>3</span><span>Idle permanent</span><span class="idle">8</span></div>
+              <div style="margin-top:6px"><span class="chip">Person J</span><span class="chip">Worker 15</span><span class="chip">Worker 18</span><span class="chip">+5</span></div>
+              <div class="row" style="justify-content:flex-end;margin-top:4px"><span class="btn ghost">Show details</span><span class="btn">Open board →</span></div>
+            </div>
+          </div>
+          <div class="grouph">In detail · all boards</div>
+          <div class="grid2">
+            <div class="card"><span class="t">By engineer</span><table style="margin-top:4px"><tbody><tr><td><i class="dot" style="background:#a8d98a"></i> Eng One</td><td class="r">2 missions</td><td class="r">5 crew</td></tr><tr><td><i class="dot" style="background:#f6a06b"></i> Eng Two</td><td class="r">2 missions</td><td class="r">4 crew</td></tr></tbody></table></div>
+            <div class="card"><span class="t">Host coverage</span><div class="okbox" style="margin-top:5px">Every host today has 3+ trained people.</div></div>
+          </div>
+          <div class="note">With 6+ boards the cards wrap 3 across. A sort control (idle ↓, utilization ↑) keeps the board that needs help first.</div>
+        </div></div></div>
+      <div class="case">
+        <div class="facts"><span class="tag lo">Effort: medium</span><span class="tag lo">Fixes F1, F7, F8</span></div>
+        <div><h4>What changes</h4><ul>
+          <li>Board cards become the centre of the page, each with the numbers a board lead checks every morning.</li>
+          <li>Each card links to its board, and the idle names sit on the card itself.</li>
+          <li>On a phone the cards stack one under another, so nothing scrolls sideways (F7).</li></ul></div>
+        <div><h4>Good for</h4><p>Managers who look after several sites and want to compare boards at a glance, especially as boards grow past two or three.</p></div>
+        <div><h4>Trade-off</h4><p>The all-boards picture gets thinner, and the per-card numbers repeat the board's own stats bar. With a single board it looks like an oversized card.</p></div>
+      </div>
+    </article>
+
+    <!-- ===================== C ===================== -->
+    <article class="dir" aria-labelledby="c-h">
+      <div class="dir-head"><span class="letter">C</span><h3 id="c-h">Action inbox</h3><p>Exception-first. A ranked to-do list takes the wide column, and the numbers move to a narrow side rail. When nothing needs doing, the list shrinks to one green line and the page goes quiet.</p></div>
+      <div class="frame"><div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span>Overview · direction C</div><div class="frame-scroll">
+        <div class="mk" role="img" aria-label="Mockup of direction C">
+          <div class="pills"><span class="pill on">All boards <em>40</em></span><span class="pill"><i class="dot" style="background:var(--c-b1)"></i>Board One <em>28</em></span><span class="pill"><i class="dot" style="background:var(--c-b2)"></i>Board Two <em>12</em></span><span class="s" style="margin-left:auto">Mon 12-Oct · 4 things to do</span></div>
+          <div class="row">
+            <div style="flex:1.7;display:flex;flex-direction:column;gap:6px;min-width:0">
+              <div class="item"><span class="rail" style="background:var(--bad)"></span><div><div class="t">12 permanent staff idle on Board One</div><div class="s">Person F, Worker 19, Worker 22 +9</div></div><span class="btn">Assign →</span></div>
+              <div class="item"><span class="rail" style="background:var(--bad)"></span><div><div class="t">8 permanent staff idle on Board Two</div><div class="s">Person J, Worker 15, Worker 18 +5</div></div><span class="btn">Assign →</span></div>
+              <div class="item"><span class="rail" style="background:var(--warn)"></span><div><div class="t">Tue 13-Oct not planned yet on Board Two</div><div class="s">Next working day · no carry-over made</div></div><span class="btn ghost">Carry over</span></div>
+              <div class="item"><span class="rail" style="background:var(--warn)"></span><div><div class="t">2 forecast holds taken from Eng One</div><div class="s">Mission 103 · not acknowledged</div></div><span class="btn ghost">Review</span></div>
+              <div class="item"><span class="rail" style="background:var(--c-free)"></span><div><div class="t">9 on-call staff free</div><div class="s">Surge capacity · no action needed</div></div><span class="btn ghost">Show</span></div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
+              <div class="card"><div class="num">31%</div><div class="s">Utilization · <b style="color:var(--ok-text)">▲ 7 pts</b> vs last week</div></div>
+              <div class="card"><div class="num">9<small> / 40</small></div><div class="s">Deployed</div><div class="bar" style="margin-top:4px"><span style="width:22.5%;background:var(--c-dep)"></span><span style="width:5%;background:var(--c-leave)"></span><span style="width:50%;background:var(--c-idle)"></span><span style="width:22.5%;background:var(--c-free)"></span></div></div>
+              <div class="card"><div class="t">4 missions</div><div class="s">Day 3 (8 crew) · Night 1 (1 crew)</div></div>
+              <div class="card"><div class="t">2 on leave</div><div class="s">Annual 1 · Sick 1</div></div>
+            </div>
+          </div>
+          <div class="note">The "not planned yet" and "holds taken" items reuse signals the board already computes (carry-over state, forecast hold alerts); they are new to the Overview.</div>
+        </div></div></div>
+      <div class="case">
+        <div class="facts"><span class="tag lo">Effort: medium–large</span><span class="tag lo">Fixes F1, F2, F5</span></div>
+        <div><h4>What changes</h4><ul>
+          <li>The page opens with what to do, ranked by urgency: red means act now, amber means act today, grey means no action needed.</li>
+          <li>Each item has the one button that resolves it.</li>
+          <li>Tomorrow's planning gaps and forecast holds move up from the board onto the Overview.</li></ul></div>
+        <div><h4>Good for</h4><p>Planners who open the Overview first thing to find out what to fix, rather than to report.</p></div>
+        <div><h4>Trade-off</h4><p>It is the biggest change for current users and makes a weaker JPG for LINE, since a to-do list is not a status report. It needs new queries for the planning-gap and holds items.</p></div>
+      </div>
+    </article>
+
+    <!-- ===================== D ===================== -->
+    <article class="dir" aria-labelledby="d-h">
+      <div class="dir-head"><span class="letter">D</span><h3 id="d-h">Today | Trends</h3><p>Split the tab in two. <b>Today</b> fits one desktop screen with no scrolling. <b>Trends</b> gives History and Engineer workload the full width, with their range control at the top. This combines with A, B or C.</p></div>
+      <div class="frame"><div class="frame-bar"><span class="dots"><i></i><i></i><i></i></span>Overview · direction D, desktop and phone</div><div class="frame-scroll">
+        <div class="mk" role="img" aria-label="Mockup of direction D">
+          <div class="row">
+            <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+              <div class="row" style="align-items:center;justify-content:space-between"><div class="tabs"><span class="on">Today</span><span>Trends</span></div><div class="pills"><span class="pill on">All boards <em>40</em></span><span class="pill">Board One <em>28</em></span><span class="pill">Board Two <em>12</em></span></div></div>
+              <div class="attn"><span class="t">⚠ 20 permanent staff have no mission</span> <span class="s">Board One 12 · Board Two 8</span></div>
+              <div class="grid4"><div class="card"><div class="num">31%</div><div class="s">Utilization</div></div><div class="card"><div class="num">9<small>/40</small></div><div class="s">Deployed</div></div><div class="card"><div class="num">4</div><div class="s">Missions</div></div><div class="card"><div class="num">9</div><div class="s">On-call free</div></div></div>
+              <div class="grid2"><div class="card"><span class="t">By board</span><div class="s">Board One 40% · Board Two 11%</div></div><div class="card"><span class="t">Shifts · crew</span><div class="s">Day 8 · Night 1</div></div></div>
+              <div class="grid2"><div class="card"><span class="t">By engineer</span><div class="s">Eng One 2 · Eng Two 2</div></div><div class="card"><span class="t">Leave · Host coverage</span><div class="s">2 on leave · no thin hosts</div></div></div>
+              <div class="s" style="text-align:center">Ends here: the whole day fits one desktop screen</div>
+            </div>
+            <div class="phone" aria-hidden="true">
+              <div class="tabs" style="width:100%"><span class="on" style="flex:1;text-align:center">Today</span><span style="flex:1;text-align:center">Trends</span></div>
+              <div class="pills" style="overflow:hidden"><span class="pill on">All <em>40</em></span><span class="pill">Board One <em>28</em></span></div>
+              <div class="attn" style="padding:6px 8px"><span class="t">⚠ 20 idle</span><div class="s">Board One 12 · Board Two 8</div></div>
+              <div class="grid2" style="gap:5px"><div class="card" style="padding:6px"><div class="num" style="font-size:15px">31%</div><div class="s">Util.</div></div><div class="card" style="padding:6px"><div class="num" style="font-size:15px">9<small>/40</small></div><div class="s">Deployed</div></div></div>
+              <div class="card" style="padding:6px"><div class="t">Board One</div><div class="s">40% · 3 missions · 12 idle</div></div>
+              <div class="card" style="padding:6px"><div class="t">Board Two</div><div class="s">11% · 1 mission · 8 idle</div></div>
+            </div>
+          </div>
+        </div></div></div>
+      <div class="case">
+        <div class="facts"><span class="tag lo">Effort: small</span><span class="tag lo">Fixes F5, F6, F7</span></div>
+        <div><h4>What changes</h4><ul>
+          <li>A Today / Trends switch sits next to the board selector.</li>
+          <li>Trends loads its range query only when it is opened, so Today gets faster.</li>
+          <li>On a phone, By board becomes one card per board (F7) and the board-only toolbar controls are hidden on Overview (F6).</li></ul></div>
+        <div><h4>Good for</h4><p>Everyone on a phone, and anyone who exports Today as a JPG for LINE, because the image becomes one tidy screen.</p></div>
+        <div><h4>Trade-off</h4><p>History is one click further away, and a manager who wants the day and the month side by side has to switch views.</p></div>
+      </div>
+    </article>
+  </section>
+
+  <section aria-labelledby="cmp-h">
+    <div class="eyebrow">Side by side</div>
+    <h2 id="cmp-h">How they compare</h2>
+    <div class="cmp-wrap"><table class="cmp">
+      <thead><tr><th scope="col">Criterion</th><th scope="col">A · Refined</th><th scope="col">B · Board cards</th><th scope="col">C · Action inbox</th><th scope="col">D · Today | Trends</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Know what needs doing within 5 seconds</th><td><div class="score"><i>●●●○</i><span>one attention card</span></div></td><td><div class="score"><i>●●○○</i><span>split across cards</span></div></td><td class="best"><div class="score"><i>●●●●</i><span>the page is the list</span></div></td><td><div class="score"><i>●●●○</i><span>same as base</span></div></td></tr>
+        <tr><th scope="row">Compare boards</th><td><div class="score"><i>●●●○</i><span>table</span></div></td><td class="best"><div class="score"><i>●●●●</i><span>cards side by side</span></div></td><td><div class="score"><i>●●○○</i><span>by item</span></div></td><td><div class="score"><i>●●●○</i><span>same as base</span></div></td></tr>
+        <tr><th scope="row">Works on a phone</th><td><div class="score"><i>●●○○</i><span>still long</span></div></td><td><div class="score"><i>●●●○</i><span>cards stack</span></div></td><td><div class="score"><i>●●●○</i><span>list stacks</span></div></td><td class="best"><div class="score"><i>●●●●</i><span>short Today view</span></div></td></tr>
+        <tr><th scope="row">JPG / PDF for LINE</th><td><div class="score"><i>●●●○</i><span>shorter than now</span></div></td><td><div class="score"><i>●●●○</i><span>reads well</span></div></td><td><div class="score"><i>●●○○</i><span>a to-do list</span></div></td><td class="best"><div class="score"><i>●●●●</i><span>one screen</span></div></td></tr>
+        <tr><th scope="row">Change for current users</th><td class="best"><div class="score"><i>●●●●</i><span>barely any</span></div></td><td><div class="score"><i>●●○○</i><span>new layout</span></div></td><td><div class="score"><i>●○○○</i><span>new mental model</span></div></td><td><div class="score"><i>●●●○</i><span>one new switch</span></div></td></tr>
+        <tr><th scope="row">Build effort</th><td><div class="score"><i>●●●○</i><span>small–medium</span></div></td><td><div class="score"><i>●●○○</i><span>medium</span></div></td><td><div class="score"><i>●○○○</i><span>medium–large, new queries</span></div></td><td class="best"><div class="score"><i>●●●●</i><span>small</span></div></td></tr>
+      </tbody></table></div>
+    <p class="lede">More dots is better on every row. For effort, more dots means less work.</p>
+  </section>
+
+  <section aria-labelledby="wins-h">
+    <div class="eyebrow">Whichever direction you pick</div>
+    <h2 id="wins-h">Quick wins worth doing anyway</h2>
+    <ol class="wins">
+      <li><b>One unit for day/night</b><span>Status bar and Day/night card both say "8 crew · 3 missions" (F2).</span></li>
+      <li><b>Legend under the Deployed bar</b><span>Name the colours on the tile, not only in the tooltip (F3).</span></li>
+      <li><b>"vs last week"</b><span>One window in the utilization caption (F4).</span></li>
+      <li><b>Drop the Overview chip strip</b><span>The board pills already carry each headcount (F8).</span></li>
+      <li><b>Hide board-only controls on Overview</b><span>The phone toolbar's "Board…" select and "More" (F6).</span></li>
+      <li><b>Leave: only the types in use</b><span>"Annual 1 · Sick 1", with zeros folded away (F9).</span></li>
+      <li><b>Group idle names by board</b><span>And drop the area suffix when one area covers everyone (F10).</span></li>
+      <li><b>Formula in an ⓘ tooltip</b><span>Read once, not printed twice (F11).</span></li>
+    </ol>
+  </section>
+
+  <section class="decide" aria-labelledby="dec-h">
+    <h2 id="dec-h">Recommendation</h2>
+    <p><b>A, with D's Today | Trends split.</b> A fixes the parts that read wrong without moving anything far, and D makes the phone view and the LINE export one screen long at little cost. B is the right next step once there are more than three boards. C is the most useful for planners, but it is a different product. It's worth trying as an extra "My day" view before it replaces anything.</p>
+    <p>Reply with a letter, or a mix such as "A + D, without the sparkline strip", and I'll build it on this branch.</p>
+  </section>
+</main>
