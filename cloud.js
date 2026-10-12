@@ -482,6 +482,10 @@ const cloud = {
     if (!boardId) return { missions: [], zones: emptyZones(), updatedAt: null };
     if (!this.data.plans[boardId]) this.data.plans[boardId] = {};
     if (this.data.plans[boardId][date] && !force) return this.data.plans[boardId][date];
+    // a write that lands while this load is reading clears the cache
+    // (_invalidatePlans); the rows read here may predate it, so they are then
+    // returned but not cached, and the next load reads the written state
+    const bucket = this.data.plans[boardId];
 
     const { data: missionRows, error } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", date);
     if (error) throw error;
@@ -513,7 +517,7 @@ const cloud = {
     for (const m of missionRows || []) if (!latest || m.updated_at > latest) latest = m.updated_at;
     plan.updatedAt = latest;
 
-    this.data.plans[boardId][date] = plan;
+    if (this.data.plans[boardId] === bucket) bucket[date] = plan;
     return plan;
   },
 

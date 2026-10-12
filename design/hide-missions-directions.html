@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hide/Unhide Missions Redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not loaded by the app. Tokens mirror styles.css (navy #003a66,
+   panel, border, warn/ok/danger tints), so the mockups look like the real board.
+   Layout: one reading column of sections; each direction shows a desktop frame and a
+   phone frame side by side, both driven by the same sample day and the same state. */
+:root {
+  --page: #eef1f4; --surface: #ffffff; --line: #d8dde4; --ink: #1f2937;
+  --mut: #5f6773;  --amut: #6b7280;
+  --navy: #003a66; --navy-d: #002a4a; --navy-text: #003a66;
+  --navy-tint: rgba(0,58,102,.07); --navy-line: rgba(0,58,102,.28);
+  --green: #a8c855; --soft: #eef1f5; --hover: #eef3fb;
+  --warn: #f59e0b; --warn-text: #8a4f10; --warn-surface: #fdf8ef; --warn-line: #e0c9a4;
+  --ok-text: #4d6810; --ok-surface: #f7faef; --ok-line: #cfdcae;
+  --bad-text: #a3271f; --bad-surface: #fef2f2; --bad-line: #e6c2be;
+  --night: #1c2430; --night-ink: #e8ebed; --night-mut: #b8bfc8;
+  --emp-bg: #e6e9ec; --emp-line: #b4bcc4; --emp-ink: #1a1a1a;
+  --scrim: rgba(15,23,42,.5); --bezel: #111418; --chip-white: rgba(255,255,255,.72);
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", "Noto Sans", sans-serif;
+  --f-body: "Noto Sans", "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #14171a; --surface: #1c2024; --line: #2c3236; --ink: #e8ebed; --mut: #a3aab1; --amut: #9aa1a8;
+  --navy-text: #6fb1e0; --navy-tint: rgba(111,177,224,.10); --navy-line: rgba(111,177,224,.38);
+  --soft: #232a33; --hover: #232c38;
+  --warn-text: #e0b070; --warn-surface: #2a2313; --warn-line: #6a5426;
+  --ok-text: #a8c855; --ok-surface: #1b2416; --ok-line: #46592a;
+  --bad-text: #fca5a5; --bad-surface: rgba(185,28,28,.16); --bad-line: #7f2222;
+  --emp-bg: #4a535d; --emp-line: #5d6772; --emp-ink: #f1f3f5;
+  --scrim: rgba(0,0,0,.6); --bezel: #000000; --chip-white: rgba(255,255,255,.14);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --page: #14171a; --surface: #1c2024; --line: #2c3236; --ink: #e8ebed; --mut: #a3aab1; --amut: #9aa1a8;
+  --navy-text: #6fb1e0; --navy-tint: rgba(111,177,224,.10); --navy-line: rgba(111,177,224,.38);
+  --soft: #232a33; --hover: #232c38;
+  --warn-text: #e0b070; --warn-surface: #2a2313; --warn-line: #6a5426;
+  --ok-text: #a8c855; --ok-surface: #1b2416; --ok-line: #46592a;
+  --bad-text: #fca5a5; --bad-surface: rgba(185,28,28,.16); --bad-line: #7f2222;
+  --emp-bg: #4a535d; --emp-line: #5d6772; --emp-ink: #f1f3f5;
+  --scrim: rgba(0,0,0,.6); --bezel: #000000; --chip-white: rgba(255,255,255,.14);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1440px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 80px; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: .1px; }
+h1 { font-size: 40px; line-height: 1.05; }
+h2 { font-size: 28px; line-height: 1.15; }
+h3 { font-size: 21px; line-height: 1.2; }
+p { margin: 0; }
+.lede { max-width: 72ch; color: var(--mut); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--navy-text); display: flex; align-items: center; gap: 8px; }
+.eyebrow::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--green); }
+section { display: flex; flex-direction: column; gap: 18px; }
+.ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+:focus-visible { outline: 2px solid var(--navy-text); outline-offset: 2px; }
+
+/* header */
+.hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.hero-l { display: flex; flex-direction: column; gap: 14px; }
+.asks { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.asks h3 { font-size: 16px; font-family: var(--f-body); font-weight: 700; }
+.asks ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.asks a { color: var(--navy-text); font-weight: 600; }
+.scenario { font-size: 13px; color: var(--mut); border-top: 1px dashed var(--line); padding-top: 10px; }
+@media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
+
+/* findings */
+.findings { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 900px) { .findings { grid-template-columns: 1fr; } }
+.flist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.flist li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; font-size: 14px; }
+.flist .fid { font-family: var(--f-display); font-weight: 700; color: var(--bad-text); font-size: 15px; }
+.flist b { display: block; }
+.flist span { color: var(--mut); }
+
+/* old modal replica */
+.old { background: var(--surface); border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,.18); border: 1px solid var(--line); width: 100%; max-width: 440px; font-size: 13px; }
+.old h4 { margin: 0; padding: 15px 20px 13px; border-bottom: 1px solid var(--line); font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; }
+.old-b { padding: 14px 20px; max-height: 330px; overflow-y: auto; }
+.old-note { font-size: 12px; color: var(--amut); margin-bottom: 10px; }
+.old-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--soft); }
+.old-row small { display: block; color: var(--amut); font-size: 11.5px; }
+.old-f { border-top: 1px solid var(--line); padding: 12px 20px; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* direction block */
+.dir { border-top: 1px solid var(--line); padding-top: 28px; display: flex; flex-direction: column; gap: 16px; }
+.dir-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; }
+.tag-rec { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); border-radius: 999px; padding: 2px 10px; }
+.dir-head .letter { font-family: var(--f-display); font-size: 44px; line-height: .9; color: var(--navy-text); }
+.stage { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+.frame-label { font-size: 12px; font-weight: 600; color: var(--mut); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+.frame-label kbd { font-family: inherit; font-size: 11px; background: var(--soft); border-radius: 4px; padding: 0 6px; }
+.desk-scroll { flex: 1 1 760px; min-width: 0; overflow-x: auto; padding-bottom: 6px; }
+.desk { width: 1000px; height: 640px; border-radius: 10px; border: 1px solid var(--line); background: var(--page); position: relative; overflow: hidden; }
+.phone-col { flex: none; }
+.phone { width: 375px; height: 740px; border: 9px solid var(--bezel); border-radius: 38px; position: relative; overflow: hidden; background: var(--page); max-width: 100%; }
+.notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; font-size: 14px; }
+@media (max-width: 900px) { .notes { grid-template-columns: 1fr; } }
+.notes h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+.notes ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.notes .pro h4 { color: var(--ok-text); }
+.notes .con h4 { color: var(--bad-text); }
+.notes .spec h4 { color: var(--navy-text); }
+
+/* fake board behind the dialog */
+.fake-top { height: 44px; background: var(--navy); display: flex; align-items: center; gap: 10px; padding: 0 14px; }
+.fake-top i { display: block; height: 10px; border-radius: 3px; background: rgba(255,255,255,.25); }
+.fake-grid { padding: 14px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.phone .fake-grid { grid-template-columns: 1fr; }
+.fake-card { height: 120px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); border-top: 5px solid var(--c, #999); }
+.scrim { position: absolute; inset: 0; background: var(--scrim); display: flex; align-items: center; justify-content: center; }
+.phone .scrim { align-items: stretch; }
+
+/* ===== shared dialog anatomy (the proposed #modal-hide-missions) ===== */
+.dlg { container-type: inline-size; background: var(--surface); color: var(--ink); border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,.3);
+  width: min(920px, 94%); height: 86%; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; line-height: 1.4; position: relative; }
+.phone .dlg { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+.dlg-h { flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 14px 12px 12px 20px; border-bottom: 1px solid var(--line); }
+.dlg-h .t { flex: 1; min-width: 0; }
+.dlg-h h4 { margin: 0; font-size: 16px; font-weight: 600; }
+.dlg-h .sub { font-size: 12px; color: var(--amut); }
+.xbtn { width: 32px; height: 32px; border: 0; background: none; border-radius: 6px; color: var(--amut); display: grid; place-items: center; cursor: pointer; }
+.xbtn:hover { background: var(--soft); color: var(--ink); }
+.dlg-tools { flex: none; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.search { flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 6px; height: 32px; border: 1px solid var(--line); border-radius: 7px; padding: 0 9px; color: var(--amut); background: var(--surface); }
+.search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; }
+.search:focus-within { border-color: var(--navy-text); }
+.fchips { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.fchip { flex: none; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.fchip .n { font-variant-numeric: tabular-nums; color: var(--amut); font-weight: 600; }
+.fchip.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.fchip.on .n { color: rgba(255,255,255,.75); }
+.fchip.warnish:not(.on) { border-color: var(--warn-line); background: var(--warn-surface); color: var(--warn-text); }
+.dlg-b { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 14px; }
+.dlg-f { flex: none; display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--surface); }
+.dlg-f .sum { flex: 1; min-width: 0; font-size: 12.5px; color: var(--amut); }
+.dlg-f .sum b { color: var(--ink); }
+.dlg-f .sum .w { color: var(--warn-text); font-weight: 600; }
+.btn { height: 32px; padding: 0 14px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn:hover { background: var(--hover); }
+.btn-p { background: var(--navy); border-color: var(--navy); color: #fff; min-width: 90px; justify-content: center; }
+.btn-p:hover { background: var(--navy-d); }
+.btn-p[disabled] { opacity: .45; cursor: default; }
+.btn-s { height: 26px; padding: 0 10px; font-size: 12px; }
+.btn-warn { border-color: var(--warn-line); background: var(--warn-surface); color: var(--warn-text); }
+.btn-warn:hover { background: var(--warn-surface); filter: brightness(.97); }
+.toast { position: absolute; left: 50%; bottom: 70px; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 9px 14px; border-radius: 8px; font-size: 12.5px; display: flex; gap: 12px; align-items: center; box-shadow: 0 6px 18px rgba(0,0,0,.25); z-index: 5; white-space: nowrap; }
+.toast button { background: none; border: 0; color: var(--green); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
+.dlg-b > *, .pane > * { flex: none; }
+.empty-msg { padding: 24px; text-align: center; color: var(--amut); }
+
+/* bits used in rows */
+.mno { font-family: var(--f-display); font-weight: 700; font-size: 14.5px; letter-spacing: .2px; }
+.shift { font-size: 9.5px; font-weight: 700; letter-spacing: .3px; padding: 0 5px; line-height: 1.7; border-radius: 3px; border: 1px solid var(--navy-line); color: var(--navy-text); display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.shift.night { background: var(--night); color: #fff; border-color: var(--night); }
+.shift .ic { width: 9px; height: 9px; }
+.eng { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.eng i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.crew { font-variant-numeric: tabular-nums; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+.crew .ic { width: 13px; height: 13px; color: var(--amut); }
+.crew.zero { color: var(--warn-text); }
+.crew.zero .ic { color: var(--warn-text); }
+.state { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.state.hid { background: var(--soft); color: var(--amut); }
+.state.will-h { background: var(--warn-surface); color: var(--warn-text); border: 1px solid var(--warn-line); }
+.state.will-u { background: var(--ok-surface); color: var(--ok-text); border: 1px solid var(--ok-line); }
+.route { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.route .ic { width: 12px; height: 12px; vertical-align: -.15em; color: var(--amut); }
+.cbx { width: 18px; height: 18px; accent-color: var(--navy); cursor: pointer; margin: 0; flex: none; }
+
+/* ===== A: grouped list ===== */
+.grp { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.grp-h { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--soft); font-size: 12px; font-weight: 700; flex-wrap: wrap; }
+.grp-h .gt { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; }
+.grp-h .gt small { font-weight: 400; color: var(--amut); font-size: 12px; }
+.grp.sugg { border-color: var(--warn-line); }
+.grp.sugg .grp-h { background: var(--warn-surface); color: var(--warn-text); }
+.grp.sugg .grp-h .ic { color: var(--warn-text); }
+.grp.sugg .grp-h small { color: var(--warn-text); opacity: .85; }
+.rowA { display: grid; grid-template-columns: 26px 92px minmax(0, 1fr) 150px 120px 44px 140px; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); cursor: pointer; }
+.grp-h + .rowA { border-top: 0; }
+.rowA:hover { background: var(--hover); }
+.rowA.pend { background: var(--navy-tint); }
+.rowA.is-hidden .mno, .rowA.is-hidden .route { color: var(--amut); }
+.rowA .time { color: var(--amut); font-variant-numeric: tabular-nums; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.rowA .st { justify-self: end; }
+.rowA .l2 { display: none; }
+@container (max-width: 560px) {
+  .dlg-h { padding: 12px 8px 10px 16px; }
+  .dlg-tools { padding: 10px 16px; }
+  .search { flex-basis: 100%; height: 40px; }
+  .fchip { height: 32px; }
+  .dlg-b { padding: 12px 12px 16px; }
+  .dlg-f { padding: 10px 16px 14px; flex-wrap: wrap; }
+  .dlg-f .sum { flex-basis: 100%; }
+  .dlg-f .btn { flex: 1; height: 40px; justify-content: center; }
+  .rowA { grid-template-columns: minmax(0, 1fr) 30px; grid-template-areas: "main cb"; padding: 10px 12px; min-height: 56px; }
+  .rowA > :not(.cbx):not(.l2) { display: none; }
+  .rowA .l2 { display: flex; flex-direction: column; gap: 2px; grid-area: main; min-width: 0; }
+  .rowA .cbx { grid-area: cb; width: 22px; height: 22px; justify-self: end; }
+  .rowA .l2 .a { display: flex; gap: 8px; align-items: center; }
+  .rowA .l2 .a .crew { margin-left: auto; }
+  .rowA .l2 .b { color: var(--amut); font-size: 12px; display: flex; gap: 6px; min-width: 0; }
+  .rowA .l2 .b .eng { overflow: hidden; }
+}
+
+/* ===== B: two panes ===== */
+.panes { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.pane { min-height: 0; overflow-y: auto; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.pane + .pane { border-left: 1px solid var(--line); background: var(--soft); }
+.pane-h { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; }
+.pane-h .n { font-variant-numeric: tabular-nums; color: var(--amut); }
+.sub-h { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--amut); margin-top: 6px; }
+.sub-h.w { color: var(--warn-text); }
+.sub-h .btn { margin-left: auto; text-transform: none; letter-spacing: 0; }
+.rowB { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 6px; background: var(--surface); }
+.rowB.zero { border-style: dashed; border-left-style: solid; }
+.rowB.pend { outline: 2px solid var(--navy-line); outline-offset: -1px; }
+.rowB .a { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.rowB .b { display: flex; gap: 6px; color: var(--amut); font-size: 12px; min-width: 0; margin-top: 2px; }
+.rowB .a .crew { margin-left: auto; }
+.seg { display: none; }
+@container (max-width: 560px) {
+  .seg { display: flex; margin: 0 16px 0; padding: 3px; background: var(--soft); border-radius: 8px; gap: 3px; flex: none; }
+  .seg button { flex: 1; height: 34px; border: 0; border-radius: 6px; background: none; color: var(--amut); font: inherit; font-weight: 600; cursor: pointer; }
+  .seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  .panes { grid-template-columns: 1fr; }
+  .pane + .pane { border-left: 0; }
+  .panes[data-tab="board"] .pane.hidp, .panes[data-tab="hidden"] .pane.boardp { display: none; }
+  .rowB .btn { height: 34px; }
+}
+
+/* ===== C: mini-card grid ===== */
+.banner { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--warn-line); background: var(--warn-surface); color: var(--warn-text); border-radius: 8px; flex-wrap: wrap; }
+.banner .bt { flex: 1 1 220px; min-width: 0; }
+.banner small { display: block; opacity: .85; }
+.gridC { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.mini { position: relative; border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 7px; background: var(--surface); overflow: hidden; cursor: pointer; text-align: left; padding: 0; font: inherit; color: inherit; display: flex; flex-direction: column; }
+.mini:hover { box-shadow: 0 0 0 2px var(--navy-line); }
+.mini .mh { padding: 6px 8px; background: var(--tint); display: flex; flex-direction: column; gap: 2px; }
+.mini .mh .a { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.mini .mh .a .route { font-weight: 700; }
+.mini .mh .b { display: flex; gap: 6px; font-size: 11px; color: var(--amut); align-items: center; }
+.mini .mh .b .crew { margin-left: auto; }
+.mini .mb { padding: 7px 8px; display: flex; gap: 4px; flex-wrap: wrap; min-height: 34px; align-items: center; }
+.mini.night .mb { background: var(--night); }
+.mini .mb i { width: 22px; height: 16px; border-radius: 3px; background: var(--emp-bg); border: 1px solid var(--emp-line); }
+.mini .mb .nocrew { font-size: 11px; font-weight: 600; color: var(--warn-text); border: 1px dashed var(--warn-line); border-radius: 4px; padding: 1px 6px; }
+.mini.night .mb .nocrew { color: #f3c98a; border-color: #8a6a32; }
+.mini.zero { border-color: var(--warn-line); border-style: dashed; border-top-style: solid; }
+.mini.is-hid { opacity: .5; filter: grayscale(.8); }
+.mini .ov { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+.mini.is-hid .ov { display: flex; }
+.mini .ov span { background: var(--ink); color: var(--surface); padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; display: inline-flex; gap: 5px; align-items: center; }
+.mini .pmark { position: absolute; top: 4px; right: 4px; font-size: 10px; font-weight: 700; background: var(--navy); color: #fff; padding: 0 6px; border-radius: 999px; line-height: 1.7; }
+@container (max-width: 560px) { .gridC { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .mini .mh .b .t { display: none; } }
+
+/* ===== Part 3: card chips ===== */
+.chip-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 1100px) { .chip-opts { grid-template-columns: 1fr; } }
+.copt { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.copt.rec { border-color: var(--ok-line); box-shadow: 0 0 0 1px var(--ok-line); }
+.copt h3 { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.copt h3 .k { color: var(--navy-text); }
+.copt p, .copt li { font-size: 13.5px; }
+.copt ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.copt .board { background: var(--page); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+/* faithful replica of .mission-card */
+.mc { border: 1px solid var(--line); border-top: 5px solid var(--c); border-radius: 8px; background: var(--surface); overflow: hidden; font-size: 11.5px; position: relative; }
+.mc-h { padding: 7px 9px; background: var(--tint); border-bottom: 1px solid var(--line); cursor: pointer; position: relative; }
+.mc-l1 { display: flex; align-items: baseline; gap: 7px; }
+.mc-l1 .host { font-weight: 700; font-size: 15px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.mc-l1 .num { font-family: var(--f-display); font-weight: 700; font-size: 15px; flex: none; }
+.mc-l1 .pills { margin-left: auto; display: flex; gap: 4px; flex: none; }
+.mc .sh { font-weight: 700; font-size: 9px; line-height: 1.7; letter-spacing: .3px; padding: 0 4px; border-radius: 3px; background: var(--chip-white); color: var(--navy-text); border: 1px solid var(--navy-line); display: inline-flex; align-items: center; gap: 3px; }
+.mc .sh.night { background: var(--night); color: #fff; border-color: var(--night); }
+.mc .sh .ic { width: 9px; height: 9px; }
+.mc-l2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--amut); }
+.mc-l2 .e { font-weight: 600; color: var(--ink); }
+.mc-l2 .sep { opacity: .45; }
+.mc-l2 .cnt { margin-left: auto; font-weight: 700; font-size: 9px; line-height: 1.7; background: var(--chip-white); border-radius: 999px; padding: 0 6px; color: var(--ink); }
+.mc-b { padding: 8px; min-height: 52px; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.mc.night .mc-b { background: var(--night); }
+.emp { width: 116px; height: 70px; border-radius: 6px; padding: 5px 6px 6px; background: var(--emp-bg); border: 1px solid var(--emp-line); color: var(--emp-ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+.emp small { display: block; font-size: 11px; font-weight: 500; opacity: .75; }
+
+/* H1: empty-state row in the body */
+.h1-empty { flex: 1; display: flex; align-items: center; gap: 10px; min-height: 36px; border: 1px dashed var(--line); border-radius: 6px; padding: 4px 4px 4px 10px; }
+.h1-empty .hint { flex: 1; min-width: 0; color: var(--amut); font-size: 12px; }
+.h1-empty .hint b { color: var(--warn-text); font-weight: 700; }
+.mc.night .h1-empty { border-color: #3b4656; }
+.mc.night .h1-empty .hint { color: var(--night-mut); }
+.mc.night .h1-empty .hint b { color: #f3c98a; }
+.hide-btn { height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; flex: none; }
+.hide-btn .ic { width: 14px; height: 14px; }
+.hide-btn:hover { background: var(--hover); }
+.mc.night .hide-btn { background: transparent; color: var(--night-ink); border-color: #4a5566; }
+.mc.night .hide-btn:hover { background: rgba(255,255,255,.08); }
+/* H2: count chip becomes the action */
+.h2-chip { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px 0 7px; border-radius: 999px; border: 1px solid var(--warn-line); background: var(--warn-surface); color: var(--warn-text); font: inherit; font-size: 10.5px; font-weight: 700; cursor: pointer; }
+.h2-chip .ic { width: 12px; height: 12px; }
+.h2-chip .d { opacity: .5; }
+/* H3: corner icon */
+.h3-btn { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .12s; z-index: 2; }
+.h3-btn .ic { width: 14px; height: 14px; }
+.mc:hover .h3-btn, .h3-btn:focus-visible, .touch .h3-btn { opacity: 1; }
+.mc.h3 .pills { margin-right: 30px; transition: margin .12s; }
+.mc-gone { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px; color: var(--amut); font-size: 12.5px; display: flex; gap: 10px; align-items: center; }
+.mc-gone button { background: none; border: 0; color: var(--navy-text); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
+.verdict { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--soft); }
+.toggle-touch { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--mut); }
+
+.rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 28px; font-size: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.rules > div { min-width: 0; }
+.rules b { display: block; }
+.rules span { color: var(--mut); }
+@media (max-width: 760px) { .rules { grid-template-columns: 1fr; } }
+
+/* entry point mini mock */
+.entry { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; font-size: 13px; }
+.entry .tb { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 7px; color: var(--amut); font-weight: 600; border: 1px solid transparent; }
+.entry .tb.new .dot { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--warn-surface); border: 1px solid var(--warn-line); color: var(--warn-text); font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+.entry .cap { font-size: 12px; color: var(--mut); }
+
+/* compare table */
+.tbl-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--mut); background: var(--soft); }
+tr:last-child td { border-bottom: 0; }
+td.y { color: var(--ok-text); font-weight: 600; }
+td.m { color: var(--warn-text); font-weight: 600; }
+td.n { color: var(--bad-text); font-weight: 600; }
+
+/* decision */
+.decide { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 760px) { .decide { grid-template-columns: 1fr; } }
+.decide fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.decide legend { font-weight: 700; margin-bottom: 6px; }
+.decide label.opt { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+.decide label.opt:has(input:checked) { border-color: var(--navy-text); background: var(--navy-tint); }
+.decide label.opt input { margin-top: 4px; accent-color: var(--navy); }
+.decide .full { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; }
+.decide textarea { width: 100%; min-height: 70px; border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; font: inherit; font-size: 14px; background: var(--surface); color: var(--ink); resize: vertical; }
+.decide pre { margin: 0; white-space: pre-wrap; background: var(--soft); border-radius: 7px; padding: 10px 12px; font-size: 12.5px; }
+.decide .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.copied { font-size: 13px; color: var(--ok-text); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z"/></symbol>
+</svg>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="hero-l">
+    <div class="eyebrow">Design review · Board toolbar → Hide/Unhide</div>
+    <h1>Hide/Unhide missions, redesigned</h1>
+    <p class="lede">The current dialog is a 440px list of checkboxes. On a busy board, the missions you most want to hide, the ones with nobody assigned, look the same as every other row. This page proposes three dialog layouts that put those missions first, plus three ways to hide an empty mission straight from its card. Every mockup is live: tick, search, filter and save. The desktop and phone frames in each direction share one state.</p>
+  </div>
+  <aside class="asks">
+    <h3>What you asked for, and where it is</h3>
+    <ol>
+      <li><a href="#dialog">Wider dialog on desktop, full-screen on phone</a> (directions A, B, C)</li>
+      <li><a href="#dialog">Suggest missions with 0 assigned</a> when the dialog opens (in every direction)</li>
+      <li><a href="#chip">Where a "Hide" chip goes on an empty card, and how it looks</a> (H1, H2, H3)</li>
+      <li><a href="#decide">Pick your directions</a> and copy the decision back to me</li>
+    </ol>
+    <p class="scenario">Sample day used everywhere: <b>Rayong board, Mon 12 Oct 2026</b>. 14 missions: 12 on the board (4 of them with no crew) and 2 already hidden. Names and numbers are placeholders.</p>
+  </aside>
+</header>
+
+<section id="today">
+  <div class="eyebrow">Today</div>
+  <h2>What the dialog does now</h2>
+  <div class="findings">
+    <div class="old" aria-label="Replica of the current dialog">
+      <h4>Hide/Unhide Missions <span style="color:var(--amut)">&times;</span></h4>
+      <div class="old-b" id="old-list"></div>
+      <div class="old-f"><span class="btn">Cancel</span><span class="btn btn-p">Save</span></div>
+    </div>
+    <ol class="flist">
+      <li><span class="fid">F1</span><div><b>Fixed at 440px wide on every screen</b><span>Each row wraps to three lines, so 14 missions take two screens of scrolling. On a phone it is a floating box at 94% width with the board still showing around it.</span></div></li>
+      <li><span class="fid">F2</span><div><b>Empty missions are hidden in small print</b><span>"0 assigned" sits at the end of the grey second line. You have to read every row to find the four candidates.</span></div></li>
+      <li><span class="fid">F3</span><div><b>Sorted only by mission number</b><span>Hidden and visible missions are mixed together. Nothing groups by state or crew.</span></div></li>
+      <li><span class="fid">F4</span><div><b>No search and no filters</b><span>A board with 30+ missions turns into a long checklist.</span></div></li>
+      <li><span class="fid">F5</span><div><b>No preview of what Save will do</b><span>Hiding a mission sends its crew back to Standby. The only warning is a paragraph at the top of the dialog, not next to the rows it affects.</span></div></li>
+      <li><span class="fid">F6</span><div><b>The way in gives no hint</b><span>The toolbar button says "Hide/Unhide" whether there are 0 or 10 empty missions on the board.</span></div></li>
+    </ol>
+  </div>
+</section>
+
+<section id="dialog">
+  <div class="eyebrow">Asks 1 and 2</div>
+  <h2>Three dialog directions</h2>
+  <p class="lede">All three share the same frame: <b>min(920px, 94vw) wide and 86vh tall on desktop</b>, with a fixed header and footer and only the list scrolling. <b>At 640px and below the dialog goes full-screen</b> (100vw × 100dvh, no rounded corners) with 40px tap targets and a footer padded for the phone's home bar. In every direction, missions with no crew are suggested first and can be selected in one tap. The footer always says what Save will do, including how many people go back to Standby.</p>
+
+  <div class="entry">
+    <div><div class="cap">Toolbar today</div><span class="tb"><svg class="ic"><use href="#i-eye-off"/></svg>Hide/Unhide</span></div>
+    <svg class="ic" style="color:var(--amut)"><use href="#i-arrow"/></svg>
+    <div><div class="cap">Proposed for all directions: count of empty missions on the button</div><span class="tb new"><svg class="ic"><use href="#i-eye-off"/></svg>Hide/Unhide <span class="dot">4</span></span></div>
+    <p class="cap" style="flex:1 1 260px">The amber badge appears only when this board has missions with no crew, and only for people who can edit the board. It keeps today's "Hidden n" label once something is hidden, for example "Hidden 2 · 4".</p>
+  </div>
+
+  <div class="dir" id="dir-a">
+    <div class="dir-head"><span class="letter">A</span><h3>Grouped list</h3><span class="tag-rec">Recommended</span></div>
+    <p class="lede">One table split into three groups: <b>Suggested · no crew</b> at the top (amber), then <b>On the board</b>, then <b>Hidden</b>. Groups follow the saved state, so a row stays where it is when you tick it and shows "Will hide" in place. On a phone each row becomes a two-line item with a large checkbox on the right.</p>
+    <div class="stage">
+      <div class="desk-scroll"><div class="frame-label">Desktop <kbd>1000 × 640</kbd></div><div class="desk" data-mount="A" data-mode="desk"></div></div>
+      <div class="phone-col"><div class="frame-label">Phone <kbd>375 × 740, full-screen</kbd></div><div class="phone" data-mount="A" data-mode="phone"></div></div>
+    </div>
+    <div class="notes">
+      <div class="pro"><h4>Why it works</h4><ul><li>Closest to today. Same tick-to-hide model, so nobody needs retraining.</li><li>"Select all 4" clears the whole suggestion in one tap.</li><li>Rows never move while you tick, so you keep your place.</li></ul></div>
+      <div class="con"><h4>Watch-outs</h4><ul><li>The densest of the three. It needs the column layout to stay readable on desktop.</li><li>The checkbox meaning (ticked = hidden) still has to be learned. The tags help.</li></ul></div>
+      <div class="spec"><h4>Build notes</h4><ul><li>Reuses <code>openHideMissionsModal()</code>. The groups are three filters over <code>getPlan().missions</code>.</li><li>Crew count uses this board's roster, like <code>boardStats().unstaffed</code>.</li><li>One container query switches desktop rows to phone rows.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="dir" id="dir-b">
+    <div class="dir-head"><span class="letter">B</span><h3>On the board | Hidden</h3></div>
+    <p class="lede">Two panes. The left pane shows what is on the board, with the no-crew missions grouped first and a "Hide all 4" button. The right pane shows what is hidden. Each row has one verb, <b>Hide</b> or <b>Unhide</b>, and moves to the other pane right away (outlined until you save). On a phone the panes become two tabs.</p>
+    <div class="stage">
+      <div class="desk-scroll"><div class="frame-label">Desktop <kbd>1000 × 640</kbd></div><div class="desk" data-mount="B" data-mode="desk"></div></div>
+      <div class="phone-col"><div class="frame-label">Phone <kbd>375 × 740, full-screen</kbd></div><div class="phone" data-mount="B" data-mode="phone"></div></div>
+    </div>
+    <div class="notes">
+      <div class="pro"><h4>Why it works</h4><ul><li>No checkbox to decode. The button says what happens.</li><li>You see the resulting board and the hidden list side by side.</li><li>Unhiding is easy to find because hidden missions have their own pane.</li></ul></div>
+      <div class="con"><h4>Watch-outs</h4><ul><li>Rows jump between panes, which can be disorienting in a long list.</li><li>On a phone the hidden tab is one tap away, so unhiding is less visible.</li></ul></div>
+      <div class="spec"><h4>Build notes</h4><ul><li>Same save path (<code>setMissionsHidden</code> twice). Only the markup changes.</li><li>Phone tabs: one <code>data-tab</code> attribute, CSS only.</li></ul></div>
+    </div>
+  </div>
+
+  <div class="dir" id="dir-c">
+    <div class="dir-head"><span class="letter">C</span><h3>Mini board</h3></div>
+    <p class="lede">The dialog mirrors the board itself: small mission cards with the engineer's colour edge, in board order. Empty cards have an amber dashed outline and a "No crew" label in their body. Tap a card to hide it (it greys out). A banner offers "Select 4 with no crew". On a phone the grid is two columns.</p>
+    <div class="stage">
+      <div class="desk-scroll"><div class="frame-label">Desktop <kbd>1000 × 640</kbd></div><div class="desk" data-mount="C" data-mode="desk"></div></div>
+      <div class="phone-col"><div class="frame-label">Phone <kbd>375 × 740, full-screen</kbd></div><div class="phone" data-mount="C" data-mode="phone"></div></div>
+    </div>
+    <div class="notes">
+      <div class="pro"><h4>Why it works</h4><ul><li>Matches the board people already know (the "magnet board" principle).</li><li>An empty card looks empty, so the suggestion explains itself.</li></ul></div>
+      <div class="con"><h4>Watch-outs</h4><ul><li>Fits the fewest missions per screen. Slow on boards with 30+ missions.</li><li>Tap-to-toggle on a whole card is easy to trigger by accident.</li><li>Shows the least detail (no PPE or engineer phone).</li></ul></div>
+      <div class="spec"><h4>Build notes</h4><ul><li>New mini-card renderer, styled from <code>.mission-card</code> tokens.</li><li>Needs its own keyboard handling (cards are buttons with <code>aria-pressed</code>).</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section id="chip">
+  <div class="eyebrow">Ask 3</div>
+  <h2>A "Hide" action on a mission card with no crew</h2>
+  <p class="lede">These are replicas of the real mission card, a day and a night card for each option, both with nobody assigned. Click <b>Hide</b> to see what happens: the card leaves the board right away, with an Undo. No confirmation is needed because nobody goes back to Standby, which matches how <code>hideMission()</code> already behaves for empty missions.</p>
+  <label class="toggle-touch"><input type="checkbox" id="touch-sim"> Show as on a touch screen (no hover)</label>
+  <div class="chip-opts" id="chip-opts"></div>
+
+  <h3>Rules for any option</h3>
+  <div class="rules">
+    <div><b>When it shows</b><span>The mission has 0 crew from this board, and the viewer can edit this board on this date. Never on a forecast, a read-only past date, or a locked day.</span></div>
+    <div><b>What it does</b><span>Hides the mission at once and shows a toast: "M-2410-035 hidden · Undo". The toolbar label updates to "Hidden 3" and the badge count goes down.</span></div>
+    <div><b>Drag and drop still works</b><span>The card body stays a drop zone. Dropping someone on the card gives it crew, and the Hide action disappears.</span></div>
+    <div><b>Kept out of exports</b><span>Marked <code>data-html2canvas-ignore</code> and hidden in print, so the JPG and PDF of the board never show it.</span></div>
+    <div><b>Does not open the editor</b><span>The header opens the mission editor, so the action stops the click from reaching it. H1 avoids the problem because it sits in the body.</span></div>
+    <div><b>Accessible name</b><span>"Hide mission M-2410-035 (no crew)". At least 28px tall with the mouse and 36px in touch mode.</span></div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="eyebrow">Side by side</div>
+  <h2>Compare and recommend</h2>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Direction</th><th>Find empty missions</th><th>Missions per screen</th><th>Phone</th><th>Learning curve</th><th>Build effort</th></tr></thead>
+    <tbody>
+      <tr><td><b>A · Grouped list</b></td><td class="y">Top group + Select all</td><td class="y">~12</td><td class="y">Two-line rows, big ticks</td><td class="y">Same as today</td><td class="y">Small</td></tr>
+      <tr><td><b>B · Two panes</b></td><td class="y">Top group + Hide all</td><td class="m">~8 + hidden pane</td><td class="m">Tabs split the view</td><td class="y">Buttons say what they do</td><td class="m">Medium</td></tr>
+      <tr><td><b>C · Mini board</b></td><td class="y">Dashed outline + banner</td><td class="n">~8</td><td class="m">2-column cards</td><td class="y">Looks like the board</td><td class="n">Largest</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Card action</th><th>Discoverable</th><th>Adds card height</th><th>Risk of a mis-tap</th><th>Night card</th></tr></thead>
+    <tbody>
+      <tr><td><b>H1 · Empty-state row</b></td><td class="y">Always visible, where the crew would be</td><td class="y">No (the body is empty anyway)</td><td class="y">Low: away from the header</td><td class="y">Works on the dark body</td></tr>
+      <tr><td><b>H2 · Count chip</b></td><td class="m">Visible but small</td><td class="y">None</td><td class="m">Sits inside the clickable header</td><td class="y">Header is unaffected</td></tr>
+      <tr><td><b>H3 · Corner icon</b></td><td class="n">Hover only on desktop</td><td class="y">None</td><td class="m">Next to the shift pills</td><td class="y">Header is unaffected</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lede"><b>My recommendation: A + H1.</b> A fixes all six findings with the smallest change to how people already work. H1 puts the action where the missing crew would be, so the empty card explains itself ("No crew yet") and offers the obvious next step. It takes no extra height and stays clear of the header, which opens the editor.</p>
+</section>
+
+<section id="decide">
+  <div class="eyebrow">Ask 4</div>
+  <h2>Your decision</h2>
+  <form class="decide" id="decide-form">
+    <fieldset>
+      <legend>Hide/Unhide dialog</legend>
+      <label class="opt"><input type="radio" name="dlg" id="dlg-a" value="A · Grouped list" checked> A · Grouped list (recommended)</label>
+      <label class="opt"><input type="radio" name="dlg" id="dlg-b" value="B · On the board | Hidden"> B · On the board | Hidden</label>
+      <label class="opt"><input type="radio" name="dlg" id="dlg-c" value="C · Mini board"> C · Mini board</label>
+    </fieldset>
+    <fieldset>
+      <legend>Hide action on empty cards</legend>
+      <label class="opt"><input type="radio" name="chip" id="chip-h1" value="H1 · Empty-state row in the body" checked> H1 · Empty-state row in the body (recommended)</label>
+      <label class="opt"><input type="radio" name="chip" id="chip-h2" value="H2 · Crew-count chip becomes Hide"> H2 · Crew-count chip becomes Hide</label>
+      <label class="opt"><input type="radio" name="chip" id="chip-h3" value="H3 · Corner eye icon"> H3 · Corner eye icon</label>
+      <label class="opt"><input type="radio" name="chip" id="chip-none" value="None, the dialog suggestion is enough"> None, the dialog suggestion is enough</label>
+    </fieldset>
+    <div class="full">
+      <label class="opt" style="align-items:center"><input type="checkbox" id="opt-badge" checked style="margin-top:0"> Also add the amber "no crew" count to the toolbar button</label>
+      <label for="notes" style="font-weight:700">Changes or notes</label>
+      <textarea id="notes" placeholder="For example: use A, but rename the group to 'Unstaffed'"></textarea>
+      <pre id="decision-out"></pre>
+      <div class="row"><button type="submit" class="btn btn-p">Copy decision</button><span class="copied" id="copied" hidden>Copied. Paste it into the chat.</span></div>
+    </div>
+  </form>
+</section>
+
+</div>
+
+<script>
+(() => {
+const ENG = {
+  S: { name: "Somchai K.", color: "#2a78d6" },
+  N: { name: "Nattaya P.", color: "#1baf7a" },
+  K: { name: "Krit W.", color: "#eb6834" },
+  P: { name: "Pimchanok S.", color: "#7c6fd0" },
+};
+const DATA = [
+  ["M-2410-025", "Hitachi Astemo", "Honda", "day", "08:00-17:00", "N", 0, true],
+  ["M-2410-028", "Valeo Siam", "Nissan", "day", "08:00-17:00", "K", 0, true],
+  ["M-2410-031", "AAT Rayong", "Mazda", "day", "08:00-17:00", "S", 6, false],
+  ["M-2410-032", "Denso Wellgrow", "Toyota", "day", "08:00-17:00", "N", 4, false],
+  ["M-2410-035", "Thai Summit Laem Chabang", "Ford", "day", "08:00-17:00", "K", 0, false],
+  ["M-2410-036", "Yazaki EDS", "Isuzu", "night", "20:00-05:00", "P", 3, false],
+  ["M-2410-038", "Aisin Takaoka Asia", "Toyota", "day", "07:30-16:30", "S", 0, false],
+  ["M-2410-040", "Siam Toyota Mfg", "Toyota", "night", "20:00-05:00", "N", 5, false],
+  ["M-2410-041", "Bosch Hemaraj", "BMW", "day", "08:00-17:00", "K", 2, false],
+  ["M-2410-043", "Mitsubishi Laem Chabang", "Mitsubishi", "day", "08:00-17:00", "P", 8, false],
+  ["M-2410-044", "Continental Rayong", "Mercedes-Benz", "night", "20:00-05:00", "S", 0, false],
+  ["M-2410-046", "Summit Auto Seats", "Nissan", "day", "08:00-17:00", "N", 3, false],
+  ["M-2410-047", "TRW Chonburi", "Ford", "day", "08:00-17:00", "K", 1, false],
+  ["M-2410-049", "NHK Spring", "Honda", "night", "20:00-05:00", "P", 0, false],
+].map(([number, host, customer, shift, time, eng, crew, hidden]) => ({ id: number, number, host, customer, shift, time, eng: ENG[eng], crew, hidden }));
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ic = n => `<svg class="ic" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const shiftPill = m => `<span class="shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? ic("moon") + "NIGHT" : "DAY"}</span>`;
+const engHtml = m => `<span class="eng" style="--c:${m.eng.color}"><i></i>${esc(m.eng.name)}</span>`;
+const crewHtml = m => `<span class="crew${m.crew ? "" : " zero"}" title="${pl(m.crew, "person", "people")} assigned">${ic("users")}${m.crew}</span>`;
+const route = m => `<span class="route"><b>${esc(m.host)}</b> ${ic("arrow")} ${esc(m.customer)}</span>`;
+
+/* ---- today's dialog replica ---- */
+document.getElementById("old-list").innerHTML =
+  `<p class="old-note">Ticked missions are hidden from this board and date. Their definition (and carried-forward days) is kept, just off the board. Anyone assigned to a mission you hide returns to Standby.</p>` +
+  DATA.map(m => `<label class="old-row"><input type="checkbox" ${m.hidden ? "checked" : ""}><span><b>${m.number}</b> — ${esc(m.host)} → ${esc(m.customer)}<small>${m.shift === "night" ? "Night" : "Day"} ${m.time} • ${esc(m.eng.name)} • ${m.crew} assigned</small></span></label>`).join("");
+
+/* ---- shared state per direction ---- */
+function makeState() {
+  return { missions: DATA.map(m => ({ ...m })), pending: new Set(), q: "", f: "all", tab: "board", toast: null, undo: null };
+}
+const isHid = (st, m) => m.hidden !== st.pending.has(m.id);
+function matches(st, m) {
+  const q = st.q.trim().toLowerCase();
+  if (q && !`${m.number} ${m.host} ${m.customer} ${m.eng.name}`.toLowerCase().includes(q)) return false;
+  if (st.f === "empty") return m.crew === 0 && !m.hidden;
+  if (st.f === "hidden") return m.hidden;
+  if (st.f === "day" || st.f === "night") return m.shift === st.f;
+  return true;
+}
+function summary(st) {
+  const ch = st.missions.filter(m => st.pending.has(m.id));
+  const h = ch.filter(m => !m.hidden), u = ch.filter(m => m.hidden);
+  const people = h.reduce((s, m) => s + m.crew, 0);
+  if (!ch.length) return { html: "No changes yet.", n: 0 };
+  const parts = [];
+  if (h.length) parts.push(`<b>Hide ${h.length}</b>`);
+  if (u.length) parts.push(`<b>Unhide ${u.length}</b>`);
+  let html = parts.join(" · ");
+  html += people ? ` · <span class="w">${pl(people, "person returns", "people return")} to Standby</span>` : " · nobody returns to Standby";
+  return { html, n: ch.length, h: h.length, u: u.length };
+}
+function filterChips(st) {
+  const vis = st.missions.filter(m => !m.hidden);
+  const c = { all: st.missions.length, empty: vis.filter(m => !m.crew).length, hidden: st.missions.filter(m => m.hidden).length,
+    day: st.missions.filter(m => m.shift === "day").length, night: st.missions.filter(m => m.shift === "night").length };
+  const lab = { all: "All", empty: "No crew", hidden: "Hidden", day: "Day", night: "Night" };
+  return `<div class="fchips" role="group" aria-label="Filter">${Object.keys(lab).map(k =>
+    `<button type="button" class="fchip${st.f === k ? " on" : ""}${k === "empty" && c.empty ? " warnish" : ""}" data-act="f" data-v="${k}" aria-pressed="${st.f === k}">${lab[k]} <span class="n">${c[k]}</span></button>`).join("")}</div>`;
+}
+function head(sub) {
+  return `<div class="dlg-h"><div class="t"><h4>Hide/Unhide missions</h4><div class="sub">${sub}</div></div><button type="button" class="xbtn" aria-label="Close" data-act="cancel">${ic("x")}</button></div>`;
+}
+function tools(st, key) {
+  return `<div class="dlg-tools"><label class="search">${ic("search")}<input type="search" data-fk="${key}" data-act="q" value="${esc(st.q)}" placeholder="Search mission, host, customer or engineer" aria-label="Search missions"></label>${filterChips(st)}</div>`;
+}
+function foot(st) {
+  const s = summary(st);
+  return `<div class="dlg-f"><div class="sum" aria-live="polite">${s.html}</div><button type="button" class="btn" data-act="cancel">Cancel</button><button type="button" class="btn btn-p" data-act="save" ${s.n ? "" : "disabled"}>Save</button></div>`;
+}
+function emptyCandidates(st) { return st.missions.filter(m => !m.hidden && !m.crew); }
+function stateTag(st, m) {
+  if (st.pending.has(m.id)) {
+    if (m.hidden) return `<span class="state will-u">Will unhide</span>`;
+    return `<span class="state will-h">Will hide${m.crew ? ` · ${m.crew} → Standby` : ""}</span>`;
+  }
+  return m.hidden ? `<span class="state hid">Hidden</span>` : "";
+}
+
+/* ---- A ---- */
+function rowA(st, m) {
+  const h = isHid(st, m);
+  return `<label class="rowA${st.pending.has(m.id) ? " pend" : ""}${m.hidden ? " is-hidden" : ""}">
+    <input type="checkbox" class="cbx" data-act="tog" data-id="${m.id}" ${h ? "checked" : ""} aria-label="Hide ${m.number}">
+    <span class="mno">${m.number}</span>${route(m)}
+    <span class="time">${shiftPill(m)}${m.time}</span>${engHtml(m)}${crewHtml(m)}<span class="st">${stateTag(st, m)}</span>
+    <span class="l2"><span class="a"><span class="mno">${m.number}</span>${shiftPill(m)}${stateTag(st, m)}${crewHtml(m)}</span>
+      <span class="b">${route(m)}</span><span class="b">${m.time} · ${engHtml(m)}</span></span>
+  </label>`;
+}
+function renderA(st, key) {
+  const list = st.missions.filter(m => matches(st, m));
+  const g1 = list.filter(m => !m.hidden && !m.crew), g2 = list.filter(m => !m.hidden && m.crew), g3 = list.filter(m => m.hidden);
+  const allEmpty = emptyCandidates(st);
+  const allSel = allEmpty.length && allEmpty.every(m => st.pending.has(m.id));
+  let body = "";
+  if (g1.length) body += `<div class="grp sugg"><div class="grp-h">${ic("bulb")}<span class="gt">Suggested · no crew (${g1.length})<small>Nobody is assigned on this date. Hiding them tidies the board, and you can unhide them any time.</small></span>
+      <button type="button" class="btn btn-s btn-warn" data-act="${allSel ? "clrEmpty" : "selEmpty"}">${allSel ? "Clear selection" : `Select all ${allEmpty.length}`}</button></div>${g1.map(m => rowA(st, m)).join("")}</div>`;
+  if (g2.length) body += `<div class="grp"><div class="grp-h"><span class="gt">On the board (${g2.length})</span></div>${g2.map(m => rowA(st, m)).join("")}</div>`;
+  if (g3.length) body += `<div class="grp"><div class="grp-h"><span class="gt">Hidden (${g3.length})<small>Untick to put back on the board.</small></span></div>${g3.map(m => rowA(st, m)).join("")}</div>`;
+  if (!body) body = `<p class="empty-msg">No missions match “${esc(st.q)}”.</p>`;
+  return `<div class="dlg" role="dialog" aria-label="Hide/Unhide missions">${head("Rayong · Mon 12 Oct 2026 · tick a mission to hide it")}${tools(st, key)}<div class="dlg-b">${body}</div>${foot(st)}${toastHtml(st)}</div>`;
+}
+
+/* ---- B ---- */
+function rowB(st, m, verb) {
+  return `<div class="rowB${m.crew ? "" : " zero"}${st.pending.has(m.id) ? " pend" : ""}" style="--c:${m.eng.color}">
+    <div style="min-width:0"><div class="a"><span class="mno">${m.number}</span>${shiftPill(m)}${st.pending.has(m.id) ? `<span class="state ${verb === "Hide" ? "will-u" : "will-h"}">${verb === "Hide" ? "Will unhide" : "Will hide"}</span>` : ""}${crewHtml(m)}</div>
+    <div class="b">${route(m)}</div><div class="b">${m.time} · ${engHtml(m)}</div></div>
+    <button type="button" class="btn btn-s" data-act="tog" data-id="${m.id}">${ic(verb === "Hide" ? "eye-off" : "eye")}${verb}</button></div>`;
+}
+function renderB(st, key) {
+  const list = st.missions.filter(m => matches(st, m));
+  const on = list.filter(m => !isHid(st, m)), off = list.filter(m => isHid(st, m));
+  const onEmpty = on.filter(m => !m.crew), onCrew = on.filter(m => m.crew);
+  const nOn = st.missions.filter(m => !isHid(st, m)).length, nOff = st.missions.length - nOn;
+  const boardPane = `<div class="pane boardp"><div class="pane-h">On the board <span class="n">${nOn}</span></div>
+    ${onEmpty.length ? `<div class="sub-h w">${ic("bulb")}No crew · suggested <button type="button" class="btn btn-s btn-warn" data-act="hideEmptyB">Hide all ${onEmpty.length}</button></div>${onEmpty.map(m => rowB(st, m, "Hide")).join("")}` : ""}
+    ${onCrew.length ? `<div class="sub-h">With crew</div>${onCrew.map(m => rowB(st, m, "Hide")).join("")}` : ""}
+    ${on.length ? "" : `<p class="empty-msg">Nothing here.</p>`}</div>`;
+  const hidPane = `<div class="pane hidp"><div class="pane-h">${ic("eye-off")}Hidden <span class="n">${nOff}</span></div>
+    ${off.length ? off.map(m => rowB(st, m, "Unhide")).join("") : `<p class="empty-msg">No hidden missions.</p>`}</div>`;
+  return `<div class="dlg" role="dialog" aria-label="Hide/Unhide missions">${head("Rayong · Mon 12 Oct 2026")}
+    <div class="dlg-tools"><label class="search">${ic("search")}<input type="search" data-fk="${key}" data-act="q" value="${esc(st.q)}" placeholder="Search mission, host, customer or engineer" aria-label="Search missions"></label></div>
+    <div class="seg" role="tablist"><button type="button" role="tab" class="${st.tab === "board" ? "on" : ""}" data-act="tab" data-v="board" aria-selected="${st.tab === "board"}">On the board ${nOn}</button><button type="button" role="tab" class="${st.tab === "hidden" ? "on" : ""}" data-act="tab" data-v="hidden" aria-selected="${st.tab === "hidden"}">Hidden ${nOff}</button></div>
+    <div class="panes" data-tab="${st.tab}">${boardPane}${hidPane}</div>${foot(st)}${toastHtml(st)}</div>`;
+}
+
+/* ---- C ---- */
+function renderC(st, key) {
+  const list = st.missions.filter(m => matches(st, m)).sort((a, b) => (a.hidden - b.hidden) || a.number.localeCompare(b.number));
+  const allEmpty = emptyCandidates(st);
+  const allSel = allEmpty.length && allEmpty.every(m => st.pending.has(m.id));
+  const cards = list.map(m => {
+    const h = isHid(st, m);
+    const body = m.crew ? Array.from({ length: Math.min(m.crew, 8) }, () => "<i></i>").join("") : `<span class="nocrew">No crew</span>`;
+    return `<button type="button" class="mini${m.shift === "night" ? " night" : ""}${m.crew ? "" : " zero"}${h ? " is-hid" : ""}" style="--c:${m.eng.color};--tint:${tint(m.eng.color, .15)}" data-act="tog" data-id="${m.id}" aria-pressed="${h}" aria-label="${m.number}, ${pl(m.crew, "person", "people")}, ${h ? "hidden" : "on the board"}">
+      <span class="mh"><span class="a"><span class="mno">${m.number.slice(-3)}</span><span class="route">${esc(m.host)}</span></span>
+      <span class="b">${shiftPill(m)}<span class="t">${m.time}</span>${crewHtml(m)}</span></span>
+      <span class="mb">${body}</span>
+      <span class="ov"><span>${ic("eye-off")}Hidden</span></span>
+      ${st.pending.has(m.id) ? `<span class="pmark">${m.hidden ? "unhide" : "hide"}</span>` : ""}</button>`;
+  }).join("");
+  const banner = allEmpty.length ? `<div class="banner">${ic("bulb")}<div class="bt"><b>${allEmpty.length} missions have no crew</b><small>They have a dashed amber outline. Tap any card to hide or unhide it.</small></div><button type="button" class="btn btn-s btn-warn" data-act="${allSel ? "clrEmpty" : "selEmpty"}">${allSel ? "Clear selection" : `Select ${allEmpty.length} with no crew`}</button></div>` : "";
+  return `<div class="dlg" role="dialog" aria-label="Hide/Unhide missions">${head("Rayong · Mon 12 Oct 2026 · tap a card to hide it")}${tools(st, key)}
+    <div class="dlg-b">${banner}${list.length ? `<div class="gridC">${cards}</div>` : `<p class="empty-msg">No missions match.</p>`}</div>${foot(st)}${toastHtml(st)}</div>`;
+}
+
+function toastHtml(st) { return st.toast ? `<div class="toast" role="status">${st.toast}${st.undo ? ` <button type="button" data-act="undo">Undo</button>` : ""}</div>` : ""; }
+
+/* ---- mount ---- */
+const RENDER = { A: renderA, B: renderB, C: renderC };
+const STATES = { A: makeState(), B: makeState(), C: makeState() };
+const COLORS = DATA.slice(2, 10).map(m => m.eng.color);
+function bg(mode) {
+  const n = mode === "phone" ? 3 : 8;
+  return `<div class="fake-top"><i style="width:70px"></i><i style="width:120px"></i></div><div class="fake-grid">${COLORS.slice(0, n).map(c => `<div class="fake-card" style="--c:${c}"></div>`).join("")}</div>`;
+}
+const mounts = [...document.querySelectorAll("[data-mount]")];
+function draw(dir) {
+  const st = STATES[dir];
+  for (const el of mounts.filter(e => e.dataset.mount === dir)) {
+    const key = dir + "-" + el.dataset.mode;
+    const scroll = el.querySelector(".dlg-b, .pane.boardp");
+    const keep = scroll ? scroll.scrollTop : 0;
+    el.innerHTML = bg(el.dataset.mode) + `<div class="scrim">${RENDER[dir](st, key)}</div>`;
+    const ns = el.querySelector(".dlg-b, .pane.boardp");
+    if (ns) ns.scrollTop = keep;
+    if (st.focus === key) {
+      const inp = el.querySelector(`[data-fk="${key}"]`);
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    }
+  }
+}
+function act(dir, a, v, id, fk) {
+  const st = STATES[dir];
+  st.focus = null;
+  if (a === "tog") { st.pending.has(id) ? st.pending.delete(id) : st.pending.add(id); }
+  else if (a === "selEmpty" || a === "hideEmptyB") emptyCandidates(st).forEach(m => st.pending.add(m.id));
+  else if (a === "clrEmpty") emptyCandidates(st).forEach(m => st.pending.delete(m.id));
+  else if (a === "f") st.f = v;
+  else if (a === "tab") st.tab = v;
+  else if (a === "q") { st.q = v; st.focus = fk; }
+  else if (a === "cancel") { st.pending.clear(); st.q = ""; st.f = "all"; }
+  else if (a === "save") {
+    const s = summary(st);
+    if (!s.n) return;
+    const snap = st.missions.map(m => ({ id: m.id, hidden: m.hidden }));
+    st.missions.forEach(m => { if (st.pending.has(m.id)) m.hidden = !m.hidden; });
+    st.pending.clear();
+    st.toast = [s.h && `Hidden ${pl(s.h, "mission", "missions")}`, s.u && `put ${s.u} back on the board`].filter(Boolean).join(", ") + ".";
+    st.undo = snap;
+    clearTimeout(st.timer);
+    st.timer = setTimeout(() => { st.toast = null; st.undo = null; draw(dir); }, 5000);
+  }
+  else if (a === "undo" && st.undo) {
+    st.undo.forEach(s => { st.missions.find(m => m.id === s.id).hidden = s.hidden; });
+    st.toast = "Undone."; st.undo = null;
+    clearTimeout(st.timer);
+    st.timer = setTimeout(() => { st.toast = null; draw(dir); }, 2000);
+  }
+  draw(dir);
+}
+for (const el of mounts) {
+  const dir = el.dataset.mount;
+  el.addEventListener("click", e => {
+    const t = e.target.closest("[data-act]");
+    if (!t || t.dataset.act === "q") return;
+    if (t.tagName === "INPUT" && t.type === "checkbox") return; // handled on change
+    e.preventDefault();
+    act(dir, t.dataset.act, t.dataset.v, t.dataset.id);
+  });
+  el.addEventListener("change", e => {
+    const t = e.target;
+    if (t.dataset.act === "tog") act(dir, "tog", null, t.dataset.id);
+  });
+  el.addEventListener("input", e => {
+    const t = e.target;
+    if (t.dataset.act === "q") act(dir, "q", t.value, null, t.dataset.fk);
+  });
+}
+Object.keys(STATES).forEach(draw);
+
+/* ---- Part 3: card options ---- */
+const CHIP_OPTS = [
+  { k: "H1", name: "Empty-state row in the body", rec: true,
+    what: "Where the employee tiles would be, an empty card shows a dashed row: \"No crew yet · drag people here\" on the left and a quiet Hide button on the right.",
+    pros: ["Always visible, no hover needed", "Away from the header, which opens the editor", "Uses space that is empty anyway"],
+    cons: ["Adds one more control to every empty card"] },
+  { k: "H2", name: "Crew-count chip becomes Hide", rec: false,
+    what: "The small \"0\" headcount chip at the end of line 2 turns into an amber \"0 · Hide\" pill. The count and the action sit together.",
+    pros: ["Adds no height", "Amber 0 also flags the empty card from across the room"],
+    cons: ["Sits inside the header, which opens the editor, so a near-miss opens the wrong thing", "Hard to tap on a phone unless the header grows"] },
+  { k: "H3", name: "Corner eye icon", rec: false,
+    what: "An eye-off icon button in the card's top-right corner. It appears on hover with a mouse and is always visible on touch screens.",
+    pros: ["Cleanest card at rest", "Familiar pattern from other apps"],
+    cons: ["Hard to discover on desktop", "Crowds the area and shift pills", "Icon only, so it needs a tooltip to explain"] },
+];
+const SAMPLES = [DATA[4], DATA[13]];   // M-2410-035 day, M-2410-049 night, both with 0 crew
+const NEIGHBOUR = DATA[12];            // TRW, 1 person
+const gone = {};
+function cardHtml(opt, m) {
+  const key = opt.k + m.id;
+  if (gone[key]) return `<div class="mc-gone">${ic("eye-off")}<span><b>${m.number}</b> hidden · it now appears in Hide/Unhide.</span><button type="button" data-undo="${key}">Undo</button></div>`;
+  const label = `Hide mission ${m.number} (no crew)`;
+  const empty = !m.crew;
+  const cnt = opt.k === "H2" && empty
+    ? `<button type="button" class="h2-chip" data-hide="${key}" aria-label="${label}">0 <span class="d">·</span>${ic("eye-off")}Hide</button>`
+    : `<span class="cnt">${m.crew}</span>`;
+  let body;
+  if (!empty) body = `<div class="emp">ประเสริฐ<small>Prasert S.</small></div>`;
+  else if (opt.k === "H1") body = `<div class="h1-empty"><span class="hint"><b>No crew yet</b> · drag people here</span><button type="button" class="hide-btn" data-hide="${key}" aria-label="${label}">${ic("eye-off")}Hide</button></div>`;
+  else body = "";
+  const corner = opt.k === "H3" && empty ? `<button type="button" class="h3-btn" data-hide="${key}" aria-label="${label}" title="Hide (no crew)">${ic("eye-off")}</button>` : "";
+  return `<div class="mc${m.shift === "night" ? " night" : ""}${opt.k === "H3" && empty ? " h3" : ""}" style="--c:${m.eng.color};--tint:${tint(m.eng.color, .15)}">
+    <div class="mc-h">${corner}<div class="mc-l1"><span class="num">${m.number}</span><span class="sep" style="opacity:.45">|</span><span class="host">${esc(m.host)}</span><span class="pills"><span class="sh${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? ic("moon") + "NIGHT" : "DAY"}</span></span></div>
+    <div class="mc-l2"><span>${esc(m.customer)}</span><span class="sep">|</span><span>${m.time}</span><span class="sep">|</span><span class="e">${esc(m.eng.name)}</span>${cnt}</div></div>
+    <div class="mc-b">${body}</div></div>`;
+}
+function drawChips() {
+  document.getElementById("chip-opts").innerHTML = CHIP_OPTS.map(o => `
+    <article class="copt${o.rec ? " rec" : ""}">
+      <h3><span class="k">${o.k}</span>${o.name}${o.rec ? ' <span class="tag-rec">Recommended</span>' : ""}</h3>
+      <p>${o.what}</p>
+      <div class="board">${SAMPLES.map(m => cardHtml(o, m)).join("")}${cardHtml(o, NEIGHBOUR)}</div>
+      <div><b style="font-size:13px;color:var(--ok-text)">Good</b><ul>${o.pros.map(p => `<li>${p}</li>`).join("")}</ul></div>
+      <div><b style="font-size:13px;color:var(--bad-text)">Watch out</b><ul>${o.cons.map(p => `<li>${p}</li>`).join("")}</ul></div>
+    </article>`).join("");
+}
+document.getElementById("chip-opts").addEventListener("click", e => {
+  const h = e.target.closest("[data-hide]"), u = e.target.closest("[data-undo]");
+  if (h) { e.stopPropagation(); gone[h.dataset.hide] = true; drawChips(); }
+  if (u) { delete gone[u.dataset.undo]; drawChips(); }
+});
+document.getElementById("touch-sim").addEventListener("change", e => {
+  document.getElementById("chip-opts").classList.toggle("touch", e.target.checked);
+});
+drawChips();
+
+/* ---- decision ---- */
+const form = document.getElementById("decide-form");
+function decisionText() {
+  const f = new FormData(form);
+  const notes = document.getElementById("notes").value.trim();
+  return `Hide/Unhide redesign decision\n- Dialog: ${f.get("dlg")}\n- Card action: ${f.get("chip")}\n- Toolbar "no crew" badge: ${document.getElementById("opt-badge").checked ? "yes" : "no"}` + (notes ? `\n- Notes: ${notes}` : "");
+}
+function drawDecision() { document.getElementById("decision-out").textContent = decisionText(); document.getElementById("copied").hidden = true; }
+form.addEventListener("input", drawDecision);
+form.addEventListener("change", drawDecision);
+form.addEventListener("submit", e => {
+  e.preventDefault();
+  const txt = decisionText(), ok = document.getElementById("copied");
+  const fallback = () => { const r = document.createRange(); r.selectNodeContents(document.getElementById("decision-out")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); ok.textContent = "Selected. Press Ctrl+C to copy."; ok.hidden = false; };
+  try {
+    navigator.clipboard.writeText(txt).then(() => { ok.textContent = "Copied. Paste it into the chat."; ok.hidden = false; }, fallback);
+  } catch (_) { fallback(); }
+});
+drawDecision();
+})();
+</script>
+</body>
+</html>

@@ -62,3 +62,14 @@ live mockups driven by one scenario object (normal / short-staffed / holiday day
 widths, row-1 as-is or tidied, light/dark), a comparison table with live toolbar heights,
 and a recommendation (B plus the row-1 tidy). Like the rest of this folder it is not loaded
 by the app.
+
+## Hide/Unhide missions directions (2026-10-12)
+
+`hide-missions-directions.html` is a standalone, interactive review page for the
+board toolbar's Hide/Unhide dialog: findings F1–F6 on today's dialog, three
+dialog directions (A Grouped list, B On the board | Hidden, C Mini board), each
+shown in a live desktop frame (min(920px, 94vw) wide) and a full-screen phone
+frame, all suggesting the missions with no crew first. It also proposes three
+places for a "Hide" action on an empty mission card (H1 empty-state row, H2
+count chip, H3 corner icon), with a comparison and a decision picker. Not
+loaded by the app.
