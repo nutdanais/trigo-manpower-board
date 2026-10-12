@@ -426,7 +426,8 @@ const state = {
     historyPreset: "thisMonth",   // thisMonth | lastMonth | last30 | last90 | ytd | custom
     historyFrom: null,            // resolved by resolveHistoryRange() on first render
     historyTo: null,
-    historyBoardId: "",           // "" = all boards summed; otherwise one board id
+    boardId: ovBoardSaved(),      // the board selector at the top: "" = all boards; otherwise one
+                                  // board id. Scopes EVERY section, History included (ovScopeBoards)
     historyHidden: new Set(HISTORY_DEFAULT_HIDDEN),   // measure keys toggled off via the History legend
     engMetric: "missions",        // "missions" | "crew" — Engineer workload chart
     engHidden: new Set(),         // engineer ids toggled off via that chart's legend
@@ -771,7 +772,9 @@ async function ensureHostCoverageLoaded() {
   const cacheKey = state.date + "|" + hosts.slice().sort().join(",");
   if (state.overview.hostCoverageCacheKey === cacheKey) return;
   const seq = ++hostCoverageFetchSeq;
-  const result = hosts.length ? await cloud.getHostCoverageForHosts(hosts) : {};
+  // only deployments up to the date on screen: a past day's risk list must not
+  // change because someone added later has since worked one of its hosts
+  const result = hosts.length ? await cloud.getHostCoverageForHosts(hosts, state.date) : {};
   if (seq !== hostCoverageFetchSeq) return;   // a newer request has since superseded this one
   state.overview.hostCoverage = result;
   state.overview.hostCoverageCacheKey = cacheKey;
@@ -2533,6 +2536,16 @@ function ovSection(title, subtitle) {
   return sec;
 }
 
+/* A plain heading between Overview's groups of cards ("In detail", "Over
+   time"): tells the reader the time frame changes, without another box. */
+function ovGroupHead(title, subtitle) {
+  const head = document.createElement("div");
+  head.className = "ov-group-head";
+  head.appendChild(Object.assign(document.createElement("h2"), { textContent: title }));
+  if (subtitle) head.appendChild(Object.assign(document.createElement("span"), { className: "ov-group-sub", textContent: subtitle }));
+  return head;
+}
+
 /* Comparison table with an inline bar in every numeric cell — the Overview's
    answer to "this has to stay readable at 6+ boards". A per-board line of text
    ("Non-Rayong 103 · Rayong 2") stops working past two or three; rows grow
@@ -2764,14 +2777,55 @@ function trendWindowDelta(series) {
 }
 
 
-/* "" = every board summed. A board id that no longer exists (deleted in
-   another tab mid-session) falls back to all boards rather than an empty
-   chart. */
-function historyBoardsInScope(boards) {
-  const pick = state.overview.historyBoardId;
+/* ---------- Overview board scope (the selector at the top of the tab) ----------
+   "" = every board summed. A board id that no longer exists (deleted in
+   another tab mid-session, or remembered from an older session) falls back
+   to all boards rather than an empty dashboard. Remembered per device. */
+function ovBoardSaved() {   // also called while `state` is built, so the key is spelled out here
+  try { return localStorage.getItem("manpower.ovBoard") || ""; } catch (e) { return ""; }
+}
+function setOvBoard(id) {
+  state.overview.boardId = id;
+  try { localStorage.setItem("manpower.ovBoard", id); } catch (e) { /* storage unavailable — just don't remember it */ }
+  render();
+}
+function ovScopeBoards() {
+  const boards = D().boards;
+  const pick = state.overview.boardId;
   if (!pick) return boards;
   const one = boards.filter(b => b.id === pick);
   return one.length ? one : boards;
+}
+const ovScopeName = (boards) => boards.length === 1 && D().boards.length > 1 ? boards[0].name : "all boards";
+
+/* The selector itself: one pill per board plus "All boards", each with its
+   roster count for the date on screen. Pills rather than a <select> — with a
+   handful of boards every choice is visible and one tap away; past that the
+   row scrolls sideways on its own (styles.css) instead of wrapping into a wall. */
+function ovScopeBar(scope) {
+  const bar = document.createElement("div");
+  bar.className = "ov-scope-bar";
+  bar.setAttribute("role", "group");
+  bar.setAttribute("aria-label", "Board shown on the dashboard");
+  bar.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-label", textContent: "Board" }));
+  const pills = document.createElement("div");
+  pills.className = "ov-scope-pills";
+  const current = scope.length === 1 ? scope[0].id : "";
+  const pill = (id, label, count, color) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ov-scope-pill" + (id === current ? " active" : "");
+    btn.setAttribute("aria-pressed", id === current ? "true" : "false");
+    if (color) btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-table-dot" })).style.background = color;
+    btn.appendChild(document.createTextNode(label));   // board names are user data — never innerHTML
+    btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-count", textContent: String(count) }));
+    btn.onclick = () => { if (id !== current) setOvBoard(id); };
+    pills.appendChild(btn);
+  };
+  pill("", "All boards", D().employees.filter(onRoster).length);
+  D().boards.forEach((b, i) => pill(b.id, b.name, rosterEmployees(b.id).length, Charts.catColor(i)));
+  bar.appendChild(pills);
+  return bar;
 }
 /* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
    works carries no information, so it's dropped from the axis entirely
@@ -2882,23 +2936,10 @@ function historyControls() {
   dates.appendChild(mkDate("to", ov.historyTo));
   wrap.appendChild(dates);
 
-  const sel = document.createElement("select");
-  sel.className = "ov-history-board";
-  sel.setAttribute("aria-label", "History board scope");
-  const all = document.createElement("option");
-  all.value = ""; all.textContent = "All boards";
-  sel.appendChild(all);
-  for (const b of D().boards) {
-    const opt = document.createElement("option");
-    opt.value = b.id;
-    opt.textContent = b.name;      // board names are user data — textContent, never innerHTML
-    sel.appendChild(opt);
-  }
-  sel.value = ov.historyBoardId;
-  // no cache reset: ensureHistoryLoaded always fetches every board for the
-  // range, so narrowing the scope is a redraw, not a round trip
-  sel.onchange = () => { ov.historyBoardId = sel.value; render(); };
-  wrap.appendChild(sel);
+  // No board <select> here any more: the board selector at the top of the tab
+  // scopes History too, so the page can't show one board above and another
+  // here. ensureHistoryLoaded still fetches every board for the range, so
+  // switching boards up there is a redraw, not a round trip.
 
   // Utilization is a % (0-100), not a headcount — it can't share an axis with
   // the other six measures without either one becoming unreadable, so it's a
@@ -2918,10 +2959,7 @@ function historyControls() {
 function historyRangeCaption(dates) {
   const ov = state.overview;
   const span = `${fmtDate(ov.historyFrom)} → ${fmtDate(ov.historyTo)}`;
-  const scope = ov.historyBoardId
-    ? (D().boards.find(b => b.id === ov.historyBoardId) || {}).name || "one board"
-    : "all boards";
-  return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${scope}`;
+  return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${ovScopeName(ovScopeBoards())}`;
 }
 
 /* ---------- History chart (measures + colours: HISTORY_MEASURES, top of file) ---------- */
@@ -3174,13 +3212,20 @@ function engineerHistorySection(dates, recs, pendingCharts) {
 function renderOverview() {
   const panel = $("#overview-panel");
   panel.innerHTML = "";
-  const boards = D().boards;
-  if (!boards.length) {
+  const allBoards = D().boards;
+  if (!allBoards.length) {
     panel.innerHTML = '<p class="import-note">Create a board (+ Board, top left) to see the Overview dashboard.</p>';
     return;
   }
+  // The board selector at the top scopes the WHOLE page: every section below
+  // reads `boards`, never D().boards, so picking one board can't leave a
+  // stray all-boards number somewhere further down.
+  const boards = ovScopeBoards();
+  const scoped = boards.length !== allBoards.length;
+  const scopeName = ovScopeName(boards);
   const stats = Object.fromEntries(boards.map(b => [b.id, boardStats(b.id)]));
-  const boardColor = (i) => Charts.catColor(i);
+  // a board keeps its colour whichever board is picked (index in the full list)
+  const boardColor = (b) => Charts.catColor(allBoards.indexOf(b));
   // charts that need their container's real width are drawn after the whole
   // panel is in the document (see fillLineChart)
   const pendingCharts = [];
@@ -3199,7 +3244,7 @@ function renderOverview() {
   // these global totals have to use the same set or the KPI strip, the By board
   // table and every utilization denominator disagree by however many people are
   // currently deactivated. (Past dates keep everyone; see onRoster().)
-  const rosterAll = D().employees.filter(onRoster);
+  const rosterAll = scoped ? boards.flatMap(b => rosterEmployees(b.id)) : D().employees.filter(onRoster);
   const totalEmp = rosterAll.length;
   const totalAssigned = boards.reduce((s, b) => s + stats[b.id].assigned, 0);
   const totalLeave = boards.reduce((s, b) => s + stats[b.id].leave, 0);
@@ -3257,7 +3302,7 @@ function renderOverview() {
   const statusHeading = document.createElement("div");
   statusHeading.className = "ov-status-heading";
   statusHeading.innerHTML = `<span class="ov-status-title">${totalStandby ? "Needs attention today" : "All permanent staff assigned"}</span>` +
-    `<span class="ov-status-date">${fmtDow(state.date)} ${fmtDate(state.date)} · ${boards.length} board${boards.length === 1 ? "" : "s"}</span>`;
+    `<span class="ov-status-date">${fmtDow(state.date)} ${fmtDate(state.date)} · ${scoped ? escapeHtml(scopeName) : `${boards.length} board${boards.length === 1 ? "" : "s"}`}</span>`;
   statusMain.appendChild(statusHeading);
   const statusLine = document.createElement("div");
   statusLine.className = "ov-status-line";
@@ -3410,10 +3455,10 @@ function renderOverview() {
      Leave/On-call-free, since those two now live in the KPI strip's bar and
      "idle" is the one board-level number that can actually need attention. ---------- */
   const boardSec = ovSection("By board", `${fmtDow(state.date)} ${fmtDate(state.date)} — click a board name to open it. Utilized = assigned ÷ (headcount − leave − holiday − free on-call).`);
-  const boardRows = boards.map((b, i) => {
+  const boardRows = boards.map((b) => {
     const s = stats[b.id];
     return {
-      key: b.id, label: b.name, color: boardColor(i),
+      key: b.id, label: b.name, color: boardColor(b),
       sub: s.isHoliday ? "holiday" : null,
       onClick: () => { D().activeBoardId = b.id; refreshAndRender(); },
       mixPerm: s.permanent, mixOncall: s.oncall,
@@ -3423,7 +3468,8 @@ function renderOverview() {
       },
     };
   });
-  boardRows.push({
+  // one board picked: its row IS the total, a second identical row adds nothing
+  if (boards.length > 1) boardRows.push({
     key: "__total__", label: "All boards", isTotal: true,
     sub: `${boards.length} board${boards.length === 1 ? "" : "s"}`,
     mixPerm: totalPerm, mixOncall: totalOncall,
@@ -3466,12 +3512,12 @@ function renderOverview() {
       <div class="ov-daynight-rows"></div>
       <div class="ov-daynight-legend"></div>`;
     const rowsWrap = daynightSec.querySelector(".ov-daynight-rows");
-    boards.forEach((b, i) => {
+    boards.forEach((b) => {
       const s = stats[b.id];
       const row = document.createElement("div");
       row.className = "ov-daynight-row";
       row.innerHTML = `
-        <span class="ov-daynight-row-label"><span class="ov-table-dot" style="background:${boardColor(i)}"></span>${escapeHtml(b.name)}</span>
+        <span class="ov-daynight-row-label"><span class="ov-table-dot" style="background:${boardColor(b)}"></span>${escapeHtml(b.name)}</span>
         <div class="ov-daynight-row-bar"></div>
         <span class="ov-daynight-row-total">${s.dayMissions} / ${s.nightMissions}</span>`;
       row.querySelector(".ov-daynight-row-bar").innerHTML = Charts.stackedBarH({
@@ -3536,37 +3582,38 @@ function renderOverview() {
   // daynightSec and hostRiskSec are appended further down — see the bottom
   // of this function.
 
-  /* ---------- 5. History + Engineer workload ----------
+  /* ---------- History + Engineer workload (appended last, under "Over
+     time" — see the bottom of this function) ----------
      Both read one fetch (state.overview.history) over one user-chosen range,
      computed here once and handed to both so the day records aren't summed
      twice. Wrapped in one .ov-history-group with no gap between them (see
      styles.css) so the two read as a single connected block — they already
-     share this one range/board control, rendered once in History's header. */
+     share this one range control, rendered once in History's header, and
+     the board selector at the top of the tab. */
   // Built only when it is going to be shown: refreshData skips the range fetch
   // for a role without ov.history, so state.overview.history would be stale or
   // empty here anyway.
+  let historyGroup = null;
   if (can("ov.history")) {
     resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
-    const histBoards = historyBoardsInScope(boards);
-    const histDates = historyDates(histBoards);
-    const histRecs = histDates.map(d => historyDayRec(d, histBoards, state.overview.history || {}));
-    const historyGroup = document.createElement("div");
+    const histDates = historyDates(boards);
+    const histRecs = histDates.map(d => historyDayRec(d, boards, state.overview.history || {}));
+    historyGroup = document.createElement("div");
     historyGroup.className = "ov-history-group";
     historyGroup.appendChild(historySection(histDates, histRecs, pendingCharts));
     historyGroup.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
-    panel.appendChild(historyGroup);
   }
 
-  /* ---------- 6. by engineer (first of six cards masonry-packed further
+  /* ---------- by engineer (first of the cards masonry-packed further
      down — see layoutOverviewMasonry) ----------
-     By engineer: workload per responsible engineer, across all boards.
+     By engineer: workload per responsible engineer, across the boards in scope.
      Missions carry an engineerId, so this is the one view that answers "who is
      carrying how much today" — the board sections all slice by board instead.
-     Crew counts only members who still belong to the board the mission is on,
-     the same rule boardStats/renderMissions use, so a stale membership never
-     inflates the number. */
+     Crew counts only members who are on the roster of the board the mission is
+     on for this date — the same rule boardStats uses, so a stale membership or
+     someone added to the app after this date never inflates the number. */
   const engSec = ovSection("By engineer",
-    `Missions each engineer is responsible for on ${fmtDow(state.date)} ${fmtDate(state.date)}, and how many people are deployed under them — across all boards`);
+    `Missions each engineer is responsible for on ${fmtDow(state.date)} ${fmtDate(state.date)}, and how many people are deployed under them — ${scoped ? "on " + scopeName : "across all boards"}`);
   const engLoad = new Map();   // engineerId (or "" = unassigned) -> {missions, crew, permCrew, oncallCrew, boards:Set}
   const bump = (id, crewEmps, boardName) => {
     const rec = engLoad.get(id) || { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0, boards: new Set() };
@@ -3577,7 +3624,7 @@ function renderOverview() {
     engLoad.set(id, rec);
   };
   for (const b of boards) {
-    const empById = new Map(boardEmployees(b.id).map(e => [e.id, e]));
+    const empById = new Map(rosterEmployees(b.id).map(e => [e.id, e]));
     for (const m of peekPlan(b.id).missions) {
       if (m.hidden) continue;
       bump(m.engineerId || "", m.members.map(id => empById.get(id)).filter(Boolean), b.name);
@@ -3710,7 +3757,7 @@ function renderOverview() {
   const leaveTotals = LEAVE_ZONES.map(z => boards.reduce((sum, b) => sum + stats[b.id].zones[z], 0));
   const leaveMax = Math.max(1, ...leaveTotals);
   LEAVE_ZONES.forEach((z, zi) => {
-    const segs = boards.map((b, i) => ({ key: b.id, label: b.name, value: stats[b.id].zones[z], color: boardColor(i) }));
+    const segs = boards.map((b) => ({ key: b.id, label: b.name, value: stats[b.id].zones[z], color: boardColor(b) }));
     const row = document.createElement("div");
     row.className = "ov-leave-row";
     row.innerHTML = `<span class="ov-leave-row-label">${ZONE_LABELS[z]}<small>${ZONE_LABELS_TH[z]}</small></span>
@@ -3719,31 +3766,59 @@ function renderOverview() {
     leaveRows.appendChild(row);
   });
   leaveSec.appendChild(leaveRows);
-  if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b, i) => ({ key: b.id, label: b.name, color: boardColor(i) }))));
+  if (boards.length > 1) leaveSec.appendChild(Charts.legendEl(boards.map((b) => ({ key: b.id, label: b.name, color: boardColor(b) }))));
 
-  // These five cards are still meant to read as pairs — By engineer + By
-  // service area, Host coverage risk + Day/night split, then Leave today —
-  // but a FIXED 50/50 row forces each pair's row to
-  // the height of its taller card, leaving the shorter card sitting in a
-  // block of dead space before the next row can start (e.g. a short By
-  // service area under a long By engineer). A 2-column masonry keeps the
-  // same left-to-right reading order (so the first pair still lands side by
-  // side exactly as before) but lets every card after that rise into
-  // whichever column is currently shortest, closing that gap instead of
-  // reserving it.
+  /* The page reads top to bottom as summary -> detail -> history:
+       1. board selector + status bar + KPI strip   (the verdict and four numbers)
+       2. Action queue + By board                   (what to do, and where)
+       3. "In detail" — the day's cards             (shift, engineers, leave, coverage, areas)
+       4. "Over time" — History + Engineer workload (a chosen date range)
+     History used to sit between 2 and 3, splitting the day's own numbers in
+     two around a year-long chart; it now closes the page, under a heading
+     that says it is a different time frame.
+
+     The day's cards read as pairs — Day/night split + By engineer (who is
+     out on which shift, and under whom), Leave today + Host coverage risk
+     (who is away, and which sites that leaves thin), then By service area —
+     but a FIXED 50/50 row forces each pair's row to the height of its taller
+     card, leaving the shorter card sitting in a block of dead space before
+     the next row can start. A 2-column masonry keeps the same left-to-right
+     reading order (so the first pair still lands side by side) but lets
+     every card after that rise into whichever column is currently shortest,
+     closing that gap instead of reserving it. */
   const masonry = document.createElement("div");
   masonry.id = "overview-masonry";
   const masonryCards = [
-    ["ov.byEngineer", engSec], ["ov.byArea", areaSec], ["ov.hostRisk", hostRiskSec],
-    ["ov.dayNight", daynightSec], ["ov.leave", leaveSec],
+    ["ov.dayNight", daynightSec], ["ov.byEngineer", engSec],
+    ["ov.leave", leaveSec], ["ov.hostRisk", hostRiskSec], ["ov.byArea", areaSec],
   ].filter(([area]) => can(area)).map(([, sec]) => sec);
   for (const sec of masonryCards) masonry.appendChild(sec);
-  if (masonryCards.length) panel.appendChild(masonry);
+  if (masonryCards.length) {
+    panel.appendChild(ovGroupHead("In detail", `${fmtDow(state.date)} ${fmtDate(state.date)} · ${scopeName}`));
+    panel.appendChild(masonry);
+  }
+  if (historyGroup) {
+    panel.appendChild(ovGroupHead("Over time", `A date range you choose · ${scopeName}`));
+    panel.appendChild(historyGroup);
+  }
   // A role with every section switched off would otherwise get a blank tab with
   // no explanation.
   if (!panel.children.length) {
     panel.innerHTML = '<p class="import-note">Your role doesn\'t have access to any of the Overview sections. Ask an admin if you think that\'s wrong.</p>';
     return;
+  }
+  // Board selector first, above "Needs attention today". Added last so the
+  // empty-page check above still sees only real sections; pointless with a
+  // single board, where "All boards" and that board are the same thing.
+  if (allBoards.length > 1) {
+    panel.prepend(ovScopeBar(boards));
+    // on a phone the pill row scrolls sideways: keep the picked board in view
+    // (set on the row itself, not scrollIntoView, which could move the page)
+    const pills = panel.querySelector(".ov-scope-pills");
+    const act = pills.querySelector(".ov-scope-pill.active");
+    if (act && pills.scrollWidth > pills.clientWidth) {
+      pills.scrollLeft = Math.max(0, act.offsetLeft + act.offsetWidth - pills.clientWidth + 8);
+    }
   }
 
   // every section is in the document now, so containers have a real width

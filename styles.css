@@ -2361,6 +2361,48 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-status-line { font-size: 13px; }
 .ov-status-shifts { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
+/* ===== board selector: the first row of the tab. Pills, one per board plus
+   "All boards", each with that board's roster count; the picked one is a
+   solid navy fill. Past a handful of boards the row scrolls sideways on its
+   own (like the phone tab strip) rather than wrapping into a wall. ===== */
+.ov-scope-bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ov-scope-label { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; flex: none; }
+.ov-scope-pills {
+  display: flex; gap: 6px; min-width: 0;
+  overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; padding: 2px;   /* room for the focus ring */
+  position: relative;                    /* offsetParent for keeping the picked pill in view (app.js) */
+}
+.ov-scope-pills::-webkit-scrollbar { display: none; }
+.ov-scope-pill {
+  flex: none; display: inline-flex; align-items: center; gap: 7px;
+  min-height: 36px; padding: 0 14px;
+  font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
+  color: var(--text); background: var(--panel);
+  border: 1px solid var(--border); border-radius: 999px;
+  cursor: pointer; transition: background-color .15s, border-color .15s, color .15s;
+}
+.ov-scope-pill:hover { background: var(--hover-tint); }
+.ov-scope-pill:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-scope-pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.ov-scope-pill .ov-table-dot { margin: 0; }
+.ov-scope-pill.active .ov-table-dot { box-shadow: 0 0 0 2px #fff; }
+.ov-scope-count {
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 1px 7px; border-radius: 999px;
+  background: var(--bg); color: var(--muted);
+}
+.ov-scope-pill.active .ov-scope-count { background: rgba(255, 255, 255, .2); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .ov-scope-pill { transition: none; } }
+@media (max-width: 640px) { .ov-scope-label { display: none; } }
+
+/* ===== group headings between the Overview's blocks ("In detail", "Over
+   time"): plain text on the page ground, no box — they mark a change of time
+   frame, they are not another card to read. ===== */
+.ov-group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 8px 2px -6px; }
+.ov-group-head h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--primary-text); }
+.ov-group-sub { font-size: 12px; color: var(--muted); }
+
 /* ===== Overview dashboard: KPI strip + chart sections ===== */
 .ov-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .ov-kpi-tile {
@@ -2582,7 +2624,7 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 /* ===== Overview History + Engineer workload =====
    The range control reuses .ov-trend-btns for its preset row so the two
    header control strips read as the same kind of thing, and adds a native
-   date pair and a board <select> beside it. Wraps onto its own line on a
+   date pair (the board comes from the selector at the top of the tab). Wraps onto its own line on a
    narrow panel rather than squeezing the heading — it's five presets plus
    two date fields, not the two small groups the Trend header carries. */
 .ov-history-controls { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
@@ -2595,7 +2637,7 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 /* matched to .btn-small so the whole strip sits on one baseline; the native
    picker indicator is left alone (it is the affordance) but recoloured for
    dark mode, where the default black glyph disappears into the field */
-.ov-history-date, .ov-history-board {
+.ov-history-date {
   font: inherit;
   font-size: 12px;
   padding: 2px 8px;
@@ -2605,8 +2647,7 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   border-radius: 6px;
   min-height: 26px;
 }
-.ov-history-board { max-width: 180px; }
-.ov-history-date:focus-visible, .ov-history-board:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-history-date:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 [data-theme="dark"] .ov-history-date::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.7); }
 /* the range averages, under the legend: one chip per VISIBLE measure, so the
    chip row and the chart always describe the same set of lines */
@@ -2616,8 +2657,10 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
    and #board-capture takes the whole panel with it. A native date input and a
    <select> are the two controls html2canvas reproduces least predictably, and
    they carry nothing the export needs: the section subtitle already prints the
-   resolved range, working-day count and board scope as plain text. */
-body.exporting .ov-history-controls { display: none; }
+   resolved range, working-day count and board scope as plain text — as do the
+   status bar and the group headings for the board selector. */
+body.exporting .ov-history-controls,
+body.exporting .ov-scope-bar { display: none; }
 /* Engineer workload is the first section to put a chart legend directly above
    a table; without this the legend row collides with the table's column heads. */
 .ov-section .chart-legend + .ov-table-wrap { margin-top: 14px; }

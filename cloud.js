@@ -1289,17 +1289,14 @@ const cloud = {
       if (m.hidden) missionHidden.add(m.id);
     }
     // A deactivated employee drops out of "today"'s figures everywhere else
-    // on the board (onRoster() in app.js: showsDeactivated() || active !==
-    // false — a PAST date is a record of who was actually there, so it keeps
-    // showing them). This trend is one static current-roster snapshot for
-    // the whole window (already true of board membership below), so it can
-    // only approximate that per-date rule with one flag keyed on `toDate`,
-    // the window's end — but leaving inactive employees in unconditionally
-    // inflated the headcount denominator for every "today" trend point
-    // relative to the KPI/By-board figures for that same date.
-    const includeInactive = toDate < todayStrISO();
-    const activeEmpIds = includeInactive ? null : new Set(this.data.employees.filter((e) => e.active !== false).map((e) => e.id));
-    const isActiveEmp = (id) => includeInactive || activeEmpIds.has(id);
+    // on the board, but a PAST date is a record of who was actually there, so
+    // it keeps showing them (onRoster() in app.js: showsDeactivated() ||
+    // active !== false). Applied per DATE, exactly like onRoster: keying it
+    // once on the window's end made deactivating someone today shrink the
+    // headcount of every earlier day in the History / sparkline window.
+    const today = todayStrISO();
+    const activeEmpIds = new Set(this.data.employees.filter((e) => e.active !== false).map((e) => e.id));
+    const isActiveEmp = (id, date) => date < today || activeEmpIds.has(id);
     const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
     const empContract = new Map(this.data.employees.map((e) => [e.id, e.contract]));
     // An employee only counts from the day they were added to the app
@@ -1307,10 +1304,10 @@ const cloud = {
     // don't inflate headcount — and therefore Standby — for earlier days.
     // Same per-day rule as onRoster() in app.js.
     const empAddedOn = new Map(this.data.employees.filter((e) => e.addedOn).map((e) => [e.id, e.addedOn]));
-    const isCounted = (id, date) => isActiveEmp(id) && !(empAddedOn.has(id) && empAddedOn.get(id) > date);
+    const isCounted = (id, date) => isActiveEmp(id, date) && !(empAddedOn.has(id) && empAddedOn.get(id) > date);
     const rosterByBoard = {};
-    for (const id of boardIds) rosterByBoard[id] = this.data.employees.filter((e) => e.boardId === id && isActiveEmp(e.id));
-    const headcountOn = (boardId, date) => rosterByBoard[boardId].filter((e) => !e.addedOn || e.addedOn <= date);
+    for (const id of boardIds) rosterByBoard[id] = this.data.employees.filter((e) => e.boardId === id);
+    const headcountOn = (boardId, date) => rosterByBoard[boardId].filter((e) => isCounted(e.id, date));
 
     // seed every calendar date for every requested board so each chart has a
     // full axis to work from, even on dates with zero assignments
@@ -1484,13 +1481,17 @@ const cloud = {
      same deployment_history rows, grouped by host instead of by employee.
      Degrades to an empty coverage map (not an error) pre-migration, same as
      getEmployeeHostHistory. */
-  async getHostCoverageForHosts(hosts) {
+  /* `upTo` (optional, an ISO date) counts only deployments on or before that
+     day, so a past date's Overview reads the coverage it really had then —
+     people added (and sent to a host) afterwards must not thin out its risk list. */
+  async getHostCoverageForHosts(hosts, upTo) {
     if (!hosts || !hosts.length) return {};
     let data;
     try {
-      data = await fetchAllPages(() => sb.from("deployment_history")
-        .select("host, employee_id")
-        .in("host", hosts));
+      data = await fetchAllPages(() => {
+        const q = sb.from("deployment_history").select("host, employee_id").in("host", hosts);
+        return upTo ? q.lte("plan_date", upTo) : q;
+      });
     } catch (error) {
       if (this._tableMissing(error)) return {};
       throw error;
