@@ -520,7 +520,7 @@
     return { cols: HOST_COLUMNS, rows };
   }
   
-  const NAVY = "FF004983", GREEN = "FFA8C855", GREY = "FFE6EAEE", GREY_TXT = "FF7A8794", INK = "FF13222F";
+  const NAVY = "FF003A66", GREEN = "FFA8C855", GREY = "FFE6EAEE", GREY_TXT = "FF7A8794", INK = "FF13222F";
   const EXTRA_ROWS = 300;   // validated, formatted blank rows under the data, for people who add new rows
 
   /* kind: "employees" | "hosts". The workbook has the data sheet, a Lists sheet

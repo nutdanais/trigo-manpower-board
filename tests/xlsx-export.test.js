@@ -326,7 +326,7 @@ test("Manpower List sheet: plain table from row 1 — no banner, no logo — in 
   assert.deepEqual(rowOf(ws, 1), ["Thai Name", "English Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Current Board", "30D Utilization", "Status"]);
   assert.equal(ws.getImages().length, 0, "no logo");
   assert.equal(Object.keys(ws._merges).length, 1, "only the total row label is merged");
-  assert.equal(ws.getCell(1, 1).fill.fgColor.argb, "FF004983", "TRIGO navy header");
+  assert.equal(ws.getCell(1, 1).fill.fgColor.argb, "FF003A66", "TRIGO navy header");
   assert.equal(ws.getCell(1, 1).border.bottom.color.argb, "FFA8C855", "TRIGO green rule");
   assert.equal(ws.getCell(1, 1).font.color.argb, "FFFFFFFF");
   assert.equal(ws.views[0].ySplit, 1, "header frozen");
@@ -387,7 +387,7 @@ test("table sheet: header on row 1 in the list design, values as text (never for
   assert.equal(summary.total, 2);
   assert.equal(ws.name, "Host List");
   assert.deepEqual([1, 2, 3].map((c) => ws.getCell(1, c).value), ["Host name", "Missions", "Note"]);
-  assert.equal(ws.getCell(1, 1).fill.fgColor.argb, "FF004983");
+  assert.equal(ws.getCell(1, 1).fill.fgColor.argb, "FF003A66");
   assert.equal(ws.views[0].ySplit, 1);
   assert.equal(ws.getCell(2, 2).value, 12, "numbers stay numbers");
   assert.equal(ws.getCell(2, 3).value, '=HYPERLINK("x")', "text starting with = is kept as plain text");

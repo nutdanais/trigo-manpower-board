@@ -44,7 +44,7 @@
   /* TRIGO palette, ARGB. Same navy/green as the app's top bar (styles.css
      --primary / --brand-green) and the shift tints from the design system. */
   const C = {
-    navy: "FF004983", green: "FFA8C855", ink: "FF13222F", mut: "FF5C707F", line: "FFD8E0E7",
+    navy: "FF003A66", green: "FFA8C855", ink: "FF13222F", mut: "FF5C707F", line: "FFD8E0E7",
     paper: "FFF2F5F8", pale: "FFEAF1F7", onNavy: "FFB8CCDD", divider: "FF6F93B2",
     dayBg: "FFFFF3CC", dayFg: "FF7A5B00", nightBg: "FFE4E5F7", nightFg: "FF31357D", oncall: "FFB45309",
     okBg: "FFEAF4D5", okFg: "FF40610A",
@@ -777,7 +777,7 @@
         categories: { ref: `${q}${abs(c0, 3)}:${abs(c1, 3)}`, values: b.dates.map((d) => d.label) },
         series: [
           { name: "Available", ref: `${q}${abs(c0, R_AV)}:${abs(c1, R_AV)}`, values: b.summary.available, color: "C3CCD6", type: "bar" },
-          { name: "Demand", ref: `${q}${abs(c0, R_DEM)}:${abs(c1, R_DEM)}`, values: b.dates.map((d, i) => demandOf(i)), color: "004983", type: "bar" },
+          { name: "Demand", ref: `${q}${abs(c0, R_DEM)}:${abs(c1, R_DEM)}`, values: b.dates.map((d, i) => demandOf(i)), color: "003A66", type: "bar" },
           { name: "Gap", ref: `${q}${abs(c0, R_GAP)}:${abs(c1, R_GAP)}`, values: gapVals, color: "E0701F", type: "line" },
         ],
         anchor: { fromCol: 0, fromRow: r - 1, toCol: Math.max(last, fixed + 12), toRow: r - 1 + 20 },
@@ -817,7 +817,7 @@
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
       `<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
       `<c:roundedCorners val="0"/><c:chart>` +
-      `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200" b="1"/></a:pPr><a:r><a:rPr lang="en-US" sz="1200" b="1"><a:solidFill><a:srgbClr val="004983"/></a:solidFill></a:rPr><a:t>${xmlEsc(ch.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` +
+      `<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200" b="1"/></a:pPr><a:r><a:rPr lang="en-US" sz="1200" b="1"><a:solidFill><a:srgbClr val="003A66"/></a:solidFill></a:rPr><a:t>${xmlEsc(ch.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` +
       `<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>` +
       (bars.length ? `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>` +
         bars.map(([s, i]) => ser(s, i)).join("") + `<c:gapWidth val="60"/><c:overlap val="-10"/>${AX}</c:barChart>` : "") +
