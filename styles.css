@@ -125,9 +125,13 @@
   --on-navy-line-strong: rgba(255, 255, 255, .62);
   --on-navy-fill: rgba(255, 255, 255, .14);
 
-  /* #topbar keeps a solid brand navy per the CI guide (PMS 295C, --primary).
-     It is chrome with its own fixed identity, so it does not follow the
-     light/dark toggle — same reasoning as --card-ink. */
+  /* #topbar is a solid, deep navy (the CI guide's header navy, #062A44) — darker
+     than --primary, which stays the lighter PMS 295C blue for buttons, links and
+     selected states. It is chrome with its own fixed identity, so it does not
+     follow the light/dark toggle — same reasoning as --card-ink. The exported
+     board header mirrors it (see #capture-header). */
+  --topbar-bg: #062a44;
+  --topbar-line: #041c2e;
 }
 
 :root[data-theme="dark"] {
@@ -289,8 +293,8 @@ button, input, select, textarea, optgroup {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 14px;
-  background: var(--primary);
-  border-bottom: 1px solid var(--primary-dark);
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-line);
   flex-wrap: wrap;
 }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -820,7 +824,7 @@ body.board-view #toolbar-row2 #area-bar { order: 5; flex: 0 0 100%; gap: 3px 14p
   font-weight: 700;
   padding: 14px 16px;
   margin: -14px -14px 14px;
-  background: var(--primary);
+  background: var(--topbar-bg);
   border-bottom: 3px solid var(--brand-green);   /* mirrors #green-rule, which lives outside #board-capture and is never exported */
 }
 .capture-left { display: flex; align-items: center; gap: 14px; }
@@ -2197,8 +2201,9 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 /* .modal label is display:block (it wraps the form fields), which would break
    these cells out of their row — they are labels too, but they are cells first.
    The same applies to .sw-pick in the Settings tables: as a block it stretched
-   and dropped its hex onto a second line under the swatch. Both live inside
-   #modal-settings, so both need this. */
+   and dropped its hex onto a second line under the swatch. The weekday chips
+   and the colour swatch in the Add area dialog sit in a .modal, so both need
+   this. */
 .modal .weekday-chip,
 .modal .sw-pick { display: inline-flex; margin-bottom: 0; }
 .weekday-chip:hover { background: var(--hover-tint); color: var(--text); }
@@ -3239,199 +3244,27 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   .toast, .toast-out { animation: none; }
 }
 
-/* ===== Users, roles & permissions (Settings modal) =====
-   User management lives in Settings rather than as a tab of its own — every
-   role has something to do here (My account), only an admin has the rest. The
-   Users and Roles panes hold real tables, so the modal widens for those two
-   and stays its normal 440px everywhere else. */
-/* This modal is the only one holding real tables — a row per account on Users,
-   a 16 x 4 grid on Roles — so it is built as a two-column dialog rather than as
-   the short form the shared .modal rules assume: a nav rail on the left, one
-   pane at a time on the right, and only that pane scrolling. Six sections is
-   past what a horizontal tab strip carries, which is why the strip needed a
-   scroller in the first place; a rail never needs one. */
-/* One box, whatever you click. The panes used to size themselves — 820x315 for
-   Engineer against 1320x828 for Roles — so the frame, the footer and the rail
-   items all jumped on every click down the rail. Content varies inside; the
-   dialog does not.
-
-   1120 is measured, not guessed: below 1080 the Users table can no longer lay
-   out its seven columns without a horizontal scroll (it needs 793px against 758
-   available at a 1000px modal), and 1120 leaves ~80px of slack for addresses
-   longer than today's. A real `height` rather than a max-height is what makes
-   the short panes stop shrink-wrapping. */
-#modal-settings {
-  /* 1180, not less: at 1120 the Users table stops overflowing by WRAPPING every
-     name and email onto a second line (45px rows against 35px), which a
-     "does it overflow horizontally" check happily passes. Row height is the
-     honest test, and 1180 is where it goes back to one line.
-     600: the tallest form pane (My account) needs 489, so this clears every form
-     without scrolling while cutting the empty space the uniform height cost. */
-  width: min(1180px, 94vw);
-  height: min(600px, 84vh);
-  display: flex;
-  flex-direction: row;
-  padding: 0;                /* the rail and the body carry their own */
-  overflow: hidden;          /* the pane scrolls, not the card */
-  position: relative;        /* anchors .modal-close to this box, not the viewport */
-}
-/* Sits above both the rail and every pane, same corner on every tab since it
-   is a child of the dialog itself rather than of #settings-body. */
-#modal-settings .modal-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 5;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  border-radius: 6px;
-  font-size: 22px;
-  line-height: 1;
-  color: var(--muted);
-  cursor: pointer;
-}
-#modal-settings .modal-close:hover { color: var(--text); background: var(--bg-soft); }
-
-#settings-rail {
-  flex: 0 0 200px;
-  display: flex;
-  flex-direction: column;
-  /* a fraction of --bg-soft mixed back toward the panel: a whisper of grey in
-     light mode, and it still darkens correctly in dark. A hex here would only
-     have been right in one of the two. */
-  background: color-mix(in srgb, var(--bg-soft) 45%, var(--panel));
-  border-right: 1px solid var(--border);
-  padding: 18px 0;
-  /* overflow-x is pinned on purpose: `overflow-x: auto` alone makes the OTHER
-     axis compute to auto too, and the old tab strip's 1px of overflow was
-     enough for the browser to offer a vertical scrollbar for it. */
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-#settings-rail > h3 { margin: 0 0 14px 18px; flex: 0 0 auto; }
-
-#settings-tabs {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin: 0;
-  border-bottom: none;
-  overflow: visible;
-}
-/* Drawn as a divider rule rather than a label. Keeping it an element (instead of
-   a border on the first button of each group) is what lets applySettingsTab drop
-   the divider together with the items under it — a Viewer with only My account
-   gets a clean single entry, not an orphan rule. Restoring the text labels is a
-   matter of undoing this one block. */
-.settings-group {
-  margin: 8px 18px;
-  border-top: 1px solid var(--border);
-  height: 0;
-  font-size: 0;
-  line-height: 0;
-  overflow: hidden;
-}
-.settings-group:first-child { display: none; }   /* nothing to divide above the first */
-
-#settings-tabs .settings-tab {
-  display: block;
-  width: 100%;
-  text-align: left;
-  margin: 0;
-  padding: 10px 18px;
-  padding-left: 15px;
-  border: none;
-  /* the accent bar's width is always reserved, so selecting an item doesn't
-     nudge every label sideways */
-  border-left: 3px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-}
-#settings-tabs .settings-tab:hover { background: rgba(0,0,0,.035); }
-/* the selected row is the panel colour and runs flush to the rail's right edge,
-   so it reads as continuous with the content beside it */
-#settings-tabs .settings-tab.active {
-  background: var(--panel);
-  border-left-color: var(--primary-text);
-  color: var(--primary-text);
-  font-weight: 700;
-}
-
-#settings-body {
-  flex: 1 1 auto;
-  /* without min-width:0 a wide table refuses to shrink and shoves the rail off */
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  /* Settings has no shared header band the way every other modal's <h3> gives
-     it, so nothing here yet keeps the pane's own top-right content (an "+ Add
-     …" button, or the pane's own scrollbar once it overflows) out from under
-     #modal-settings' close button. This top padding is that reserved band,
-     applied once so every pane clears it the same way. */
-  padding: 48px 20px 18px;
-}
-/* The scroll region. min-height:0 is what actually lets a flex child scroll
-   instead of growing to fit and pushing the footer off-screen. Height stays a
-   max, not a fixed value, so My account is still a compact dialog and only the
-   tall panes reach the cap. */
-#modal-settings .settings-pane {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 2px;        /* room for the scrollbar beside the last column */
-}
-/* The tables want the whole body; the forms do not — an unconstrained name
-   field would stretch the full ~880px. Capped near the width these forms
-   already laid out at, so they keep their proportions inside the wider frame. */
-/* Only My account is a form, and a form wants a readable measure rather than the
-   full 940px. The list panes are tables now and use the whole width. */
-#modal-settings .settings-pane[data-pane="account"] .settings-section { max-width: 640px; }
-
-/* ----- the three list panes: Engineer, Service Area, Board -----
-   Same table language as the Users and Roles panes one click away. The section
-   is a flex column filling the pane, so the heading, its Add button, the hint
-   and the count all stay put and ONLY the rows scroll — a growing engineer list
-   lengthens the scroll box, never the dialog. */
-#modal-settings .settings-pane[data-pane="engineers"],
-#modal-settings .settings-pane[data-pane="areas"],
-#modal-settings .settings-pane[data-pane="boards"] {
-  overflow: hidden;          /* the list inside does the scrolling */
-  display: flex;
-}
-#modal-settings .settings-pane[data-pane="engineers"] .settings-section,
-#modal-settings .settings-pane[data-pane="areas"] .settings-section,
-#modal-settings .settings-pane[data-pane="boards"] .settings-section {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 0;
-}
+/* ===== Users, roles & permissions (Settings page) =====
+   The layout of the Settings page itself (rail, heading, scroll region, action
+   bar) is further down, under "Settings page". What follows is the content
+   shared by its panes: hint, list and count, then the Users and Roles tables. */
 .settings-hint {
-  flex: 0 0 auto;
   color: var(--muted);
   font-size: 12.5px;
-  margin: -2px 0 10px;
+  margin: 0 0 12px;
+  max-width: 760px;
 }
 .settings-list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-box);
+  background: var(--panel);
+  /* `clip`, not `hidden`: it rounds the corners without becoming a scroll
+     container, so the sticky header keeps sticking to the page's scroll region.
+     Where `clip` is unknown the corners are simply square. */
+  overflow: visible;
+  overflow: clip;
 }
 .settings-count {
-  flex: 0 0 auto;
   color: var(--muted);
   font-size: 12px;
   margin: 8px 2px 0;
@@ -3446,7 +3279,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .settings-table th {
   position: sticky;
   top: 0;
-  z-index: 2;   /* same as the Users and Roles headers in this modal */
+  z-index: 2;   /* same as the Users and Roles headers on this page */
   background: var(--bg-soft);
   text-align: left;
   font-size: 11px;
@@ -3550,14 +3383,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 /* the weekday chips sit on one line beside the board name */
 .settings-table .settings-board-days { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 0; }
 .settings-table .settings-board-name { margin: 0; font-size: 13px; }
-#modal-settings .modal-actions {
-  flex: 0 0 auto;
-  margin-top: 0;   /* the pane above already fills the dialog */
-}
-/* Inside the modal the PANE is the scroll container, so the table must not open
-   a second one — a nested scroller is what stops a sticky header from ever
-   leaving the top of its own table. */
-#modal-settings .table-wrap { overflow: visible; border: none; }
 
 /* Column headers stay put while the rows move under them, the same treatment
    #emplist-table th and #hostlist-table th already get on the two list tabs. */
@@ -3781,32 +3606,249 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 /* a control that is present so its state can be read, but not operated */
 .btn-inert { opacity: .55; cursor: default; }
 
+
+/* ===== Settings page =====
+   A full page under the top bar (#settings-view), not a dialog. While it is up
+   the board is display:none — the app underneath keeps its view, board, date
+   and scroll position, and "Back to board" only hides this again. The page is
+   a fixed-height flex column from the top bar down, so exactly one region (the
+   pane, #sv-scroll) scrolls between a fixed heading and a fixed action bar. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+body.settings-open { overflow: hidden; }
+body.settings-open #app-root {
+  margin-right: 0 !important;   /* the floating panel's gutter is for the board */
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+body.settings-open #sticky-header { position: static; flex: 0 0 auto; }
+/* what belongs to the board stays out of the way (and out of the tab order) */
+body.settings-open #board-bar,
+body.settings-open #toolbar,
+body.settings-open #plan-banners,
+body.settings-open #board-capture,
+body.settings-open #float-pool,
+body.settings-open #fp-resizer,
+body.settings-open #touch-actions,
+body.settings-open #app-footer,
+body.settings-open #topbar .date-nav,
+body.settings-open #btn-lock { display: none !important; }
+body.settings-open #btn-settings { background: var(--on-navy-fill); border-color: var(--on-navy-line-strong); }
+
+#settings-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  background: var(--bg);
+  color: var(--text);
+}
+
+#settings-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 14px 0 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.sv-back { align-self: flex-start; margin: 0 8px 10px; color: var(--primary-text); font-weight: 600; }
+.sv-rail-title { margin: 0 16px 6px; font-size: 20px; line-height: 1.3; letter-spacing: -.2px; }
+#settings-tabs { display: flex; flex-direction: column; gap: 0; margin: 0; border-bottom: none; }
+/* group labels are real labels again (they were a bare divider rule in the
+   dialog); applySettingsTab hides one when nothing under it is permitted */
+#settings-tabs .settings-group {
+  margin: 16px 16px 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--muted);
+}
+#settings-tabs .settings-group:first-of-type { margin-top: 10px; }
+#settings-tabs .settings-tab {
+  display: flex; align-items: center; gap: 10px;
+  width: calc(100% - 16px);
+  min-height: 40px;
+  margin: 1px 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px; font-weight: 600; text-align: left;
+  cursor: pointer;
+}
+#settings-tabs .settings-tab .ic { width: 16px; height: 16px; flex: none; }
+#settings-tabs .settings-tab:hover { background: var(--hover-tint); color: var(--text); }
+#settings-tabs .settings-tab:focus-visible { outline: 2.5px solid var(--primary-text); outline-offset: 2px; }
+/* selected = the app's main-action navy with white text, in both themes */
+#settings-tabs .settings-tab.active { background: var(--primary); color: #fff; }
+/* the version, pinned to the bottom of the rail */
+#settings-version { margin: auto 0 0; padding: 14px 16px 0; }
+
+#sv-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+#sv-head {
+  flex: 0 0 auto;
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 20px 28px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.sv-heading { flex: 1; min-width: 0; }
+.sv-crumb { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+#sv-title { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 700; letter-spacing: -.3px; overflow-wrap: anywhere; }
+#sv-title:focus { outline: none; }
+#sv-hint { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); max-width: 650px; }
+#sv-head-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.sv-back-icon { display: none; flex: none; }
+#sv-mobile-nav { display: none; padding: 12px 16px 0; }
+#sv-mobile-nav select { width: 100%; }
+
+#sv-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 28px;
+}
+#sv-foot {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 28px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+#sv-status { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+#sv-status.dirty { color: var(--warn-text); font-weight: 600; }
+#sv-status.saving { color: var(--text); }
+#sv-status.saved { color: var(--ok-text); font-weight: 600; }
+#sv-status.error { color: var(--danger-text); font-weight: 600; }
+
+/* ----- My account ----- */
+.sv-cards { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; max-width: 980px; align-items: start; }
+.sv-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-box); padding: 18px; }
+.sv-card h2 { margin: 0 0 12px; font-size: 16px; line-height: 1.3; }
+.sv-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.sv-card-head h2 { margin: 0; flex: 1; }
+.sv-card .account-form { margin-bottom: 0; }
+.sv-details { font-size: 12.5px; }
+.sv-details summary { cursor: pointer; font-weight: 600; color: var(--primary-text); }
+.sv-details p { margin-top: 8px; }
+
+/* ----- notices ----- */
+.sv-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-bottom: 12px; padding: 11px 13px;
+  border: 1px solid var(--border); border-radius: var(--r-box);
+  background: var(--bg-soft); color: var(--muted); font-size: 12.5px;
+}
+.sv-banner .ic { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.sv-banner b { color: var(--text); }
+.sv-banner-warn { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
+.sv-banner-warn b { color: inherit; }
+.settings-error { color: var(--danger-text); font-weight: 600; }
+
+/* ----- tables on the page ----- */
+#settings-view .table-wrap { background: var(--panel); overflow: visible; overflow: clip; }
+#users-table td { overflow-wrap: anywhere; }
+.settings-table tr.st-dirty td:first-child { box-shadow: inset 3px 0 0 var(--warn-text); }
+#roles-matrix td.rm-changed { background: var(--warn-surface); box-shadow: inset 0 0 0 1px var(--warn-line); }
+#roles-matrix td.rm-changed .rm-level { font-weight: 700; }
+.rm-role-pick { display: none; margin-bottom: 12px; }
+.rm-role-pick label { display: block; margin-bottom: 4px; font-size: 12.5px; font-weight: 600; }
+.rm-role-pick select { width: 100%; }
+.rm-stale { color: var(--warn-text); font-size: 11.5px; }
+#perm-review-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#perm-review-table th, #perm-review-table td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--border); }
+#perm-review-table th { font-size: 12px; color: var(--muted); }
+#modal-perm-review { width: min(640px, 94vw); }
+
+/* ----- form controls on the page (they used to inherit these from .modal) ----- */
+#settings-view .account-form label { display: block; margin-bottom: 4px; }
+#settings-view .settings-table td input[type="text"],
+#settings-view .settings-table td select,
+#settings-view #users-search,
+#settings-view .rm-role-pick select,
+#sv-mobile-nav select {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+#settings-view .settings-table td select { width: 100%; }
+#settings-view :is(input, select, button, summary):focus-visible { outline: 2.5px solid var(--primary-text); outline-offset: 2px; }
+
+/* ----- narrower than 960px: lists become labelled cards, one role at a time ----- */
+@media (max-width: 960px) {
+  #settings-view { grid-template-columns: 180px minmax(0, 1fr); }
+  .sv-cards { grid-template-columns: minmax(0, 1fr); }
+
+  .sv-responsive, .sv-responsive tbody, .sv-responsive tr, .sv-responsive td { display: block; width: auto !important; }
+  .sv-responsive thead { display: none; }
+  .sv-responsive tr { display: flex; flex-direction: column; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .sv-responsive tr:last-child { border-bottom: 0; }
+  .sv-responsive td, .settings-table.sv-responsive td { padding: 3px 0; border: 0; text-align: left; }
+  .sv-responsive td[data-label]:not([data-label=""]) {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px;
+  }
+  .sv-responsive td[data-label]:not([data-label=""])::before {
+    content: attr(data-label); flex: 0 0 96px; font-size: 11.5px; font-weight: 600; color: var(--muted);
+  }
+  /* the identifying cell leads the card and carries no label */
+  .settings-table.sv-responsive td.st-primary { order: -1; display: block; margin: 0 0 4px; font-size: 14px; }
+  .settings-table.sv-responsive td.st-primary::before { content: none; }
+  .settings-table.sv-responsive td.st-primary input { width: 100%; }
+  .settings-table.sv-responsive td.st-days { display: block; }
+  .settings-table.sv-responsive td.st-days::before { display: block; margin-bottom: 6px; }
+  .settings-table.sv-responsive td.st-act { display: flex; justify-content: flex-end; margin-top: 6px; }
+  .settings-table.sv-responsive td.st-account { white-space: normal; flex-wrap: wrap; }
+  .settings-table.sv-responsive td.st-account select { width: auto; max-width: 220px; }
+  .settings-table tr.st-dirty td:first-child { box-shadow: none; }
+  .settings-table tr.st-dirty { box-shadow: inset 3px 0 0 var(--warn-text); }
+  #users-table.sv-responsive td:first-child { order: -1; display: block; margin-bottom: 4px; font-size: 14px; font-weight: 600; }
+  #users-table.sv-responsive td:first-child::before { content: none; }
+  #users-table.sv-responsive td.user-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  #users-table.sv-responsive td.user-actions .btn { margin-left: 0; }
+
+  /* Roles & permissions: pick one role; the others are hidden */
+  .rm-role-pick { display: block; }
+  #roles-matrix [data-role]:not([data-visible]) { display: none; }
+  #roles-matrix th, #roles-matrix td { padding: 9px 10px; }
+  #roles-matrix .rm-area { width: 62%; }
+  #roles-matrix .rm-level { min-width: 0; width: 100%; }
+}
+
+/* ----- phone ----- */
 @media (max-width: 720px) {
-  /* on a phone these two panes want the whole screen */
-  #modal-settings { width: 96vw; height: min(600px, 90vh); }
-  /* the rail becomes a strip above the body — a 200px column would leave the
-     tables nothing on a phone */
-  #modal-settings { flex-direction: column; }
-  #settings-rail {
-    flex: 0 0 auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding: 12px 0 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-  #settings-rail > h3 { margin-bottom: 8px; }
-  #settings-version { display: none; }
-  #settings-tabs { flex-direction: row; }
-  #settings-tabs .settings-tab {
-    width: auto;
-    white-space: nowrap;
-    border-left: none;
-    border-bottom: 3px solid transparent;
-    padding: 8px 14px;
-  }
-  #settings-tabs .settings-tab.active { border-bottom-color: var(--primary-text); }
-  .settings-group { display: none; }
+  #settings-view { grid-template-columns: minmax(0, 1fr); }
+  #settings-rail { display: none; }
+  #sv-mobile-nav { display: block; background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 16px; }
+  #sv-head { padding: 16px 16px 12px; gap: 8px; }
+  #sv-title { font-size: 21px; }
+  .sv-back-icon { display: inline-flex; order: -1; }
+  #sv-head-actions .btn { font-size: 12px; }
+  #sv-scroll { padding: 14px 16px; }
+  #sv-foot { padding: 10px 16px; flex-wrap: wrap; }
+  #sv-status { flex: 1 1 100%; }
+  #sv-foot .btn { flex: 1; }
+  .sv-card { padding: 16px; }
+  /* 44px touch targets */
+  #settings-view .btn, #settings-view input:not([type="checkbox"]):not([type="color"]), #settings-view select,
+  #sv-mobile-nav select { min-height: 44px; }
+  #settings-view .btn-small { min-height: 44px; padding: 0 14px; }
+  #settings-view .st-del { min-width: 44px; min-height: 44px; }
+  #settings-view .weekday-chip { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  #settings-view .sw-pick { min-height: 44px; }
+  #settings-view .sw-pick input[type="color"] { width: 28px; height: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #settings-view * { scroll-behavior: auto !important; transition: none !important; }
 }
 
 /* ===== PRINT / PDF =================================================

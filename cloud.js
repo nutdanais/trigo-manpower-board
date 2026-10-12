@@ -1232,8 +1232,12 @@ const cloud = {
     if (error) throw error;
     await this._loadAreas();
   },
-  async addArea() {
-    const { error } = await sb.from("service_areas").insert({ name: "New Area", color: "#9ca3af" });
+  /* Settings → Service areas asks for the name and colour first, so the row is
+     born with them rather than as a "New Area" placeholder that gets renamed in
+     a second write (which could fail and leave the placeholder behind). With no
+     arguments it still adds the old placeholder. */
+  async addArea(name, color) {
+    const { error } = await sb.from("service_areas").insert({ name: (name || "").trim() || "New Area", color: color || "#9ca3af" });
     if (error) throw error;
     await this._loadAreas();
   },

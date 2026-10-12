@@ -21,7 +21,7 @@
 <link rel="manifest" href="manifest.webmanifest?v=3">
 <meta name="apple-mobile-web-app-title" content="Manpower Board">
 <meta name="application-name" content="Manpower Board">
-<meta name="theme-color" content="#004983">
+<meta name="theme-color" content="#062a44">
 <script>
   // applied before first paint so the page never flashes the wrong theme
   (function () {
@@ -44,7 +44,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-12d">
+<link rel="stylesheet" href="styles.css?v=2026-10-12e">
 </head>
 <body>
 
@@ -64,7 +64,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-12d"></script>
+<script src="version.js?v=2026-10-12e"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -114,6 +114,11 @@
 <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
 <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
 <symbol id="i-return" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10L4 15l5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3"/></symbol>
+<symbol id="i-hardhat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15h16M6 15v-3a6 6 0 0 1 12 0v3M12 4v4M7 15v3h10v-3"/></symbol>
+<symbol id="i-area" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6zM9 4v14M15 6v14"/></symbol>
+<symbol id="i-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3.5V12c0 4.5-3.4 7.6-8 9-4.6-1.4-8-4.5-8-9V6.5L12 3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
 </defs></svg>
 
 <div id="login-screen" class="hidden">
@@ -230,6 +235,191 @@
   <button id="btn-add-board" class="btn btn-quiet" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Board</button>
 </div>
 </div>
+
+<!-- ===== Settings: a full page below the top bar =====
+     Was a dialog (#modal-settings). Opening it hides the board, never changes
+     it — the view, board and date are untouched, so "Back to board" is just
+     this section hiding again (see openSettingsView in app.js). The ids and
+     classes inside are the ones app.js reads (#settings-tabs, .settings-tab,
+     data-tab, data-area, data-pane). One scroll region (#sv-scroll) sits
+     between a fixed heading and a fixed action bar. -->
+<section id="settings-view" class="hidden" aria-labelledby="sv-title">
+  <aside id="settings-rail">
+    <button type="button" class="btn btn-small btn-quiet sv-back" id="btn-settings-back">
+      <svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg> Back to board
+    </button>
+    <h2 class="sv-rail-title">Settings</h2>
+    <nav id="settings-tabs" class="settings-tabs" aria-label="Settings sections">
+      <div class="settings-group" data-group="account">Personal</div>
+      <button type="button" class="settings-tab" data-tab="account" data-area="account" data-group="account"><svg class="ic" aria-hidden="true"><use href="#i-person"></use></svg><span>My account</span></button>
+      <div class="settings-group" data-group="board">Board setup</div>
+      <button type="button" class="settings-tab" data-tab="engineers" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"></use></svg><span>Engineers</span></button>
+      <button type="button" class="settings-tab" data-tab="areas" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-area"></use></svg><span>Service areas</span></button>
+      <button type="button" class="settings-tab" data-tab="boards" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-board"></use></svg><span>Boards</span></button>
+      <div class="settings-group" data-group="admin">Administration</div>
+      <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg><span>Users</span></button>
+      <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg><span>Roles &amp; permissions</span></button>
+    </nav>
+    <!-- Where a bug report quotes the version from. Pinned to the bottom of
+         the rail (a phone has no rail — the footer carries it there). -->
+    <p class="app-version" id="settings-version">Version <span data-app-version></span></p>
+  </aside>
+
+  <div id="sv-main">
+    <header id="sv-head">
+      <div class="sv-heading">
+        <div class="sv-crumb" id="sv-crumb"></div>
+        <h1 id="sv-title" tabindex="-1">My account</h1>
+        <p id="sv-hint"></p>
+      </div>
+      <div id="sv-head-actions">
+        <button class="btn btn-small btn-primary hidden" id="btn-add-engineer" type="button"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add engineer</button>
+        <button class="btn btn-small btn-primary hidden" id="btn-add-area" type="button"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add area</button>
+        <button class="btn btn-small btn-primary hidden" id="btn-add-user" type="button" title="Create an account and get a temporary password to hand over"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add user</button>
+      </div>
+      <button type="button" class="btn btn-icon sv-back-icon" id="btn-settings-back-icon" aria-label="Back to board" title="Back to board"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
+    </header>
+
+    <!-- Phone only: the rail is gone at 720px, this takes its place -->
+    <div id="sv-mobile-nav">
+      <label for="sv-select" class="sr-only">Settings section</label>
+      <select id="sv-select"></select>
+    </div>
+
+    <div id="sv-scroll">
+      <!-- My account: the one pane every role can open, which is why user
+           management lives in Settings rather than as a tab of its own. -->
+      <div class="settings-pane" data-pane="account">
+        <div class="sv-cards">
+          <section class="sv-card">
+            <h2>Profile</h2>
+            <div id="account-identity" class="account-identity"></div>
+            <form id="form-account-name" class="account-form" autocomplete="off">
+              <label for="acct-display-name">Display name</label>
+              <input id="acct-display-name" name="displayName" type="text" maxlength="40" autocomplete="off">
+              <p class="import-note">The short name the board shows you by, taken from your email address — <b>first name . last initial</b>. Leave it empty to keep it that way, or type your own if it clashes with somebody.</p>
+              <label for="acct-phone">Mobile number</label>
+              <input id="acct-phone" name="phone" type="tel" maxlength="40" placeholder="e.g. 081-234-5678" autocomplete="tel">
+              <p class="import-note">Shown as a tap-to-call link on every mission card you are the engineer for, and on the printed board. Yours to keep up to date — nobody edits it for you in Settings.</p>
+              <button type="submit" class="sr-only" tabindex="-1">Save</button>
+            </form>
+          </section>
+          <section class="sv-card">
+            <div class="sv-card-head">
+              <h2>Password</h2>
+              <button type="button" class="btn btn-small" id="btn-change-password">Change password…</button>
+            </div>
+            <p class="import-note">Use at least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
+            <details class="sv-details">
+              <summary>Who can edit my account?</summary>
+              <p class="import-note">You own your display name and phone number. An administrator controls your role and account status.</p>
+            </details>
+          </section>
+        </div>
+      </div>
+
+      <!-- The list panes are tables rather than loose rows: the same language
+           the Users and Roles panes use, a heading for each field, and below
+           960px each row becomes a labelled card (data-label on every cell). -->
+      <div class="settings-pane" data-pane="engineers">
+        <p class="settings-hint">Everyone with the <b>Engineer</b> role is here automatically. Use <b>Add engineer</b> for a manager or admin who runs missions of their own. The colour marks every mission card that person is responsible for; the name and phone number come from their account, and each person keeps their own number up to date under <b>My account</b>.</p>
+        <div class="settings-list">
+          <table class="settings-table sv-responsive">
+            <thead><tr>
+              <th class="st-swatch">Colour</th><th>Name</th><th>Phone</th><th>Account</th><th class="st-act"><span class="sr-only">Actions</span></th>
+            </tr></thead>
+            <tbody id="settings-engineers"></tbody>
+          </table>
+        </div>
+        <p class="settings-count" id="engineers-count"></p>
+      </div>
+
+      <div class="settings-pane" data-pane="areas">
+        <p class="settings-hint">The colour is the pill shown on employee cards, mission cards and both lists. An area that still has employees cannot be deleted — move them first.</p>
+        <div class="settings-list">
+          <table class="settings-table sv-responsive">
+            <thead><tr>
+              <th class="st-swatch">Colour</th><th>Name</th><th class="st-act"><span class="sr-only">Actions</span></th>
+            </tr></thead>
+            <tbody id="settings-areas"></tbody>
+          </table>
+        </div>
+        <p class="settings-count" id="areas-count"></p>
+      </div>
+
+      <div class="settings-pane" data-pane="boards">
+        <p class="settings-hint">Ticked days are that board's non-working days (its weekend). This drives the holiday toggle, the weekend "Add Mission" import, the date picker's highlighting and both Overview trend charts.</p>
+        <div class="settings-list">
+          <table class="settings-table sv-responsive">
+            <thead><tr><th class="st-board">Board</th><th>Non-working days</th><th class="st-act"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody id="settings-boards"></tbody>
+          </table>
+        </div>
+        <p class="settings-count" id="boards-count"></p>
+      </div>
+
+      <!-- Users: the same table shape as the Host list, so it inherits that
+           tab's toolbar / filter / sort styling rather than inventing any. -->
+      <div class="settings-pane" data-pane="users">
+        <div id="users-pending" class="hidden">
+          <span class="dupbar-icon" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-alert"></use></svg></span>
+          <span id="users-pending-text"></span>
+          <button type="button" class="btn btn-small" id="btn-users-pending">Review requests</button>
+        </div>
+        <div id="users-toolbar">
+          <input id="users-search" type="search" placeholder="Search name or email…" aria-label="Search users" autocomplete="off">
+          <div id="users-filters">
+            <div class="ms" data-filter="roleKey"><button type="button" class="ms-btn">Role: All</button><div class="ms-pop hidden"></div></div>
+            <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <span id="users-count"></span>
+          <button type="button" class="btn btn-small" id="btn-users-xlsx" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
+        </div>
+        <div class="table-wrap">
+          <table id="users-table" class="sv-responsive">
+            <thead>
+              <tr>
+                <th data-sort="name">Name</th>
+                <th data-sort="email">Email</th>
+                <th data-sort="role" title="What this person may see and change. The rules behind each role are under Roles &amp; permissions.">Role</th>
+                <th data-sort="status" title="Pending = waiting for approval. Disabled keeps the record and all of their attribution, and only stops them signing in.">Status</th>
+                <th data-sort="lastSeen" title="When this person last opened the app.">Last seen</th>
+                <th data-sort="requested" title="When they asked for access, or were invited.">Requested</th>
+                <th><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Roles & permissions: the matrix itself. Admin's column is rendered
+           read-only, and database triggers back that up. Changes are staged
+           here and only written after the review dialog. -->
+      <div class="settings-pane" data-pane="roles">
+        <div class="sv-banner sv-banner-warn">
+          <svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg>
+          <div><b>Changes affect everyone with that role</b>, including anyone with the app open right now. You review them before they apply. Admin always keeps full access, so nobody can lock themselves out of this screen.</div>
+        </div>
+        <p class="import-note"><b>Edit</b> also grants view. <b>—</b> removes access. Hiding an Overview section keeps it off the page and skips its query; it is not a data barrier — those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
+        <div class="rm-role-pick">
+          <label for="rm-role-select">Role to review</label>
+          <select id="rm-role-select"></select>
+        </div>
+        <div class="table-wrap">
+          <table id="roles-matrix"><tbody id="roles-matrix-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <footer id="sv-foot">
+      <div id="sv-status" role="status" aria-live="polite"></div>
+      <button type="button" class="btn hidden" id="btn-sv-discard">Discard</button>
+      <button type="button" class="btn btn-primary hidden" id="btn-sv-save">Save changes</button>
+    </footer>
+  </div>
+</section>
 
 <!-- Two rows, shared by every app-wide tab (Overview, Manpower, Host) and every
      Board tab: whichever tab is active shows a strict subset of these children
@@ -675,167 +865,66 @@
     </div>
   </div>
 
-  <!-- Settings is a two-column dialog: a nav rail on the left, one pane at a
-       time on the right. Six sections is past what a horizontal tab strip
-       carries, and the panes here include two real tables. The ids and classes
-       are the ones app.js reads (#settings-tabs, .settings-tab, data-tab,
-       data-area) — only the box around them changed. -->
-  <div class="modal hidden" id="modal-settings">
-    <button type="button" class="modal-close" data-close aria-label="Close">&times;</button>
-    <aside id="settings-rail">
-      <h3>Settings</h3>
-      <nav id="settings-tabs" class="settings-tabs">
-        <!-- .settings-group is drawn as a divider rule, not a heading (see
-             styles.css). It stays an element rather than a border on the button
-             so applySettingsTab can drop the divider along with the last item
-             above it, and so the text labels are one CSS rule away. -->
-        <div class="settings-group" data-group="account">Account</div>
-        <button type="button" class="settings-tab" data-tab="account" data-area="account" data-group="account">My account</button>
-        <div class="settings-group" data-group="board">Board setup</div>
-        <button type="button" class="settings-tab" data-tab="engineers" data-area="settings" data-group="board">Engineer</button>
-        <button type="button" class="settings-tab" data-tab="areas" data-area="settings" data-group="board">Service Area</button>
-        <button type="button" class="settings-tab" data-tab="boards" data-area="settings" data-group="board">Board</button>
-        <div class="settings-group" data-group="admin">Administration</div>
-        <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin">Users</button>
-        <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit" data-group="admin">Roles</button>
-      </nav>
-      <!-- Where a bug report quotes the version from. Pinned to the bottom of
-           the rail (the strip on a phone drops it — the footer has it too). -->
-      <p class="app-version" id="settings-version">Version <span data-app-version></span></p>
-    </aside>
-    <div id="settings-body">
-      <!-- My account: the one pane every role can open, which is why user
-           management lives in Settings rather than as a tab of its own. -->
-      <div class="settings-pane" data-pane="account">
-        <div class="settings-section">
-          <h4>My account</h4>
-          <div id="account-identity" class="account-identity"></div>
-          <form id="form-account-name" class="account-form">
-            <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off"></label>
-            <p class="import-note">The short name the board shows you by, taken from your email address — <b>first name . last initial</b>. Leave it empty to keep it that way, or type your own if it clashes with somebody.</p>
-            <label>Mobile number <input name="phone" type="tel" maxlength="40" placeholder="e.g. 081-234-5678" autocomplete="tel"></label>
-            <p class="import-note">Shown as a tap-to-call link on every mission card you are the engineer for, and on the printed board. Yours to keep up to date — nobody edits it for you in Settings.</p>
-            <button type="submit" class="btn btn-small btn-primary">Save</button>
-          </form>
-          <h4>Change password</h4>
-          <form id="form-account-password" class="account-form">
-            <label>New password <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
-            <label>Repeat it <input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label>
-            <p class="import-note">At least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
-            <button type="submit" class="btn btn-small btn-primary">Change password</button>
-          </form>
-        </div>
-      </div>
-      <!-- The three list panes are tables rather than loose rows: it is the same
-           language the Users and Roles panes already use one click away, it gives
-           each field a column heading, and it fills the dialog's width instead of
-           leaving a third of it empty. The heading and its Add button sit outside
-           the scroll box, so a long list scrolls under a fixed header rather than
-           carrying the controls off the top. -->
-      <div class="settings-pane" data-pane="engineers">
-        <div class="settings-section">
-          <h4>Engineers
-            <button class="btn btn-small btn-primary" id="btn-add-engineer">+ Add engineer</button>
-          </h4>
-          <p class="settings-hint">Everyone with the <b>Engineer</b> role is here automatically. Use <b>+ Add engineer</b> for a manager or admin who runs missions of their own. The colour marks every mission card that person is responsible for; the name and phone number come from their account, and each person keeps their own number up to date under <b>My account</b>.</p>
-          <div class="settings-list">
-            <table class="settings-table">
-              <thead><tr>
-                <th class="st-swatch">Colour</th><th>Name</th><th>Phone</th><th>Account</th><th class="st-act"></th>
-              </tr></thead>
-              <tbody id="settings-engineers"></tbody>
-            </table>
-          </div>
-          <p class="settings-count" id="engineers-count"></p>
-        </div>
-      </div>
-      <div class="settings-pane" data-pane="areas">
-        <div class="settings-section">
-          <h4>Service areas
-            <button class="btn btn-small btn-primary" id="btn-add-area">+ Add area</button>
-          </h4>
-          <p class="settings-hint">The colour is the pill shown on employee cards, mission cards and both lists.</p>
-          <div class="settings-list">
-            <table class="settings-table">
-              <thead><tr>
-                <th class="st-swatch">Colour</th><th>Name</th><th class="st-act"></th>
-              </tr></thead>
-              <tbody id="settings-areas"></tbody>
-            </table>
-          </div>
-          <p class="settings-count" id="areas-count"></p>
-        </div>
-      </div>
-      <div class="settings-pane" data-pane="boards">
-        <div class="settings-section">
-          <h4>Boards</h4>
-          <p class="settings-hint">Ticked days are that board's weekend. This drives the holiday toggle, the weekend "Add Mission" import, the date picker's highlighting and both Overview trend charts.</p>
-          <div class="settings-list">
-            <table class="settings-table">
-              <thead><tr><th class="st-board">Board</th><th>Weekend days</th><th class="st-act"></th></tr></thead>
-              <tbody id="settings-boards"></tbody>
-            </table>
-          </div>
-          <p class="settings-count" id="boards-count"></p>
-        </div>
-      </div>
-
-      <!-- Users: the same table shape as the Host list, so it inherits that
-           tab's toolbar / filter / sort / CSV styling rather than inventing any. -->
-      <div class="settings-pane" data-pane="users">
-        <div class="settings-section">
-          <div id="users-pending" class="hidden">
-            <span class="dupbar-icon" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-alert"></use></svg></span>
-            <span id="users-pending-text"></span>
-            <button type="button" class="btn btn-small" id="btn-users-pending">Review requests</button>
-          </div>
-          <div id="users-toolbar">
-            <input id="users-search" type="search" placeholder="Search name or email…" autocomplete="off">
-            <div id="users-filters">
-              <div class="ms" data-filter="roleKey"><button type="button" class="ms-btn">Role: All</button><div class="ms-pop hidden"></div></div>
-              <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
-            </div>
-            <div class="toolbar-spacer"></div>
-            <span id="users-count"></span>
-            <button type="button" class="btn btn-small btn-primary" id="btn-add-user" title="Create an account and get a temporary password to hand over">+ Add user</button>
-            <button type="button" class="btn btn-small" id="btn-users-xlsx" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
-          </div>
-          <div class="table-wrap">
-            <table id="users-table">
-              <thead>
-                <tr>
-                  <th data-sort="name">Name</th>
-                  <th data-sort="email">Email</th>
-                  <th data-sort="role" title="What this person may see and change. The rules behind each role are on the Roles &amp; permissions tab.">Role</th>
-                  <th data-sort="status" title="Pending = waiting for approval. Disabled keeps the record and all of their attribution, and only stops them signing in.">Status</th>
-                  <th data-sort="lastSeen" title="When this person last opened the app.">Last seen</th>
-                  <th data-sort="requested" title="When they asked for access, or were invited.">Requested</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="users-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Roles & permissions: the matrix itself. Admin's column is rendered
-           read-only, and database triggers back that up. -->
-      <div class="settings-pane" data-pane="roles">
-        <div class="settings-section">
-          <h4>Roles &amp; permissions</h4>
-          <p class="import-note">What each role may see and change. <b>Edit</b> also grants view. Changes apply to everyone with that role straight away — including anyone with the app open right now. Admin always keeps full access, so nobody can lock themselves out of this screen.</p>
-          <div class="table-wrap">
-            <table id="roles-matrix"><tbody id="roles-matrix-body"></tbody></table>
-          </div>
-          <p class="import-note">Hiding an Overview section keeps it off the page and skips its query. It is not a data barrier: those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-primary" data-close>Done</button>
-      </div>
-  
+  <!-- Settings used to be a dialog here. It is now a full page (#settings-view,
+       below the top bar), so what stays in this stack is only what opens OVER
+       it: the unsaved-changes guard, the permission review, the password form
+       and the add-area form, next to the user / engineer / temp-password
+       dialogs that were always separate. -->
+  <div class="modal hidden" id="modal-unsaved" role="dialog" aria-modal="true" aria-labelledby="unsaved-title">
+    <h3 id="unsaved-title">Save your changes?</h3>
+    <p id="unsaved-text" class="import-note"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="btn-unsaved-keep">Keep editing</button>
+      <button type="button" class="btn btn-danger" id="btn-unsaved-discard">Discard</button>
+      <button type="button" class="btn btn-primary" id="btn-unsaved-save">Save &amp; continue</button>
     </div>
+  </div>
+
+  <!-- Roles &amp; permissions: nothing is written until this is confirmed. -->
+  <div class="modal hidden" id="modal-perm-review" role="dialog" aria-modal="true" aria-labelledby="perm-review-title">
+    <h3 id="perm-review-title">Review permission changes</h3>
+    <p id="perm-review-intro" class="import-note"></p>
+    <div class="table-wrap">
+      <table id="perm-review-table">
+        <thead><tr><th>Role</th><th>Area</th><th>Before</th><th>After</th></tr></thead>
+        <tbody id="perm-review-body"></tbody>
+      </table>
+    </div>
+    <p id="perm-review-warn" class="import-note hidden"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="btn-perm-cancel">Keep editing</button>
+      <button type="button" class="btn btn-primary" id="btn-perm-apply">Apply changes</button>
+    </div>
+  </div>
+
+  <!-- My account &rarr; Change password: its own form, never part of the page's
+       draft, and cleared as soon as it is closed or submitted. -->
+  <div class="modal hidden" id="modal-password" role="dialog" aria-modal="true" aria-labelledby="password-title">
+    <h3 id="password-title">Change password<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-account-password" autocomplete="off" novalidate>
+      <label>New password <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+      <label>Repeat it <input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label>
+      <p id="password-error" class="import-note settings-error hidden" role="alert"></p>
+      <p class="import-note">At least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Change password</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal hidden" id="modal-add-area" role="dialog" aria-modal="true" aria-labelledby="add-area-title">
+    <h3 id="add-area-title">Add a service area<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-add-area" autocomplete="off">
+      <label>Area name <input name="areaName" type="text" required maxlength="60" placeholder="e.g. Rayong"></label>
+      <label>Colour <span class="sw-pick"><input name="areaColor" type="color" value="#9ca3af" aria-label="Area colour"><b>9CA3AF</b></span></label>
+      <p id="add-area-error" class="import-note settings-error hidden" role="alert"></p>
+      <p class="import-note">The colour is the pill shown on employee cards, mission cards and both lists.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add area</button>
+      </div>
+    </form>
   </div>
 
   <div class="modal hidden" id="modal-user">
@@ -1151,12 +1240,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-12d"></script>
-<script src="employee-id.js?v=2026-10-12d"></script>
-<script src="cloud.js?v=2026-10-12d"></script>
-<script src="charts.js?v=2026-10-12d"></script>
-<script src="xlsx-export.js?v=2026-10-12d"></script>
-<script src="bulk-edit.js?v=2026-10-12d"></script>
-<script src="app.js?v=2026-10-12d"></script>
+<script src="planning.js?v=2026-10-12e"></script>
+<script src="employee-id.js?v=2026-10-12e"></script>
+<script src="cloud.js?v=2026-10-12e"></script>
+<script src="charts.js?v=2026-10-12e"></script>
+<script src="xlsx-export.js?v=2026-10-12e"></script>
+<script src="bulk-edit.js?v=2026-10-12e"></script>
+<script src="app.js?v=2026-10-12e"></script>
 </body>
 </html>
