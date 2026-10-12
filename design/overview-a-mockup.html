@@ -271,22 +271,11 @@ table.heat { border-collapse: separate; border-spacing: 3px; font-size: 12px; fo
 .heat-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
 .heat-legend i { width: 18px; height: 12px; border-radius: 3px; display: inline-block; }
 
-/* ---------- 10 workload options ---------- */
-.optbar { border: 1px dashed var(--primary-text); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; background: var(--hover); display: flex; flex-direction: column; gap: 6px; }
-.optlabel { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--primary-text); }
-.optbar .note { font-size: 12.5px; }
-.optbar .note b { color: var(--text); }
-.rk-bar { display: flex; align-items: center; gap: 8px; --rkmax: 180px; }
+/* ---------- 10 engineer workload: ranked bars + trend ---------- */
+.rk-bar { display: flex; align-items: center; gap: 8px; --rkmax: 150px; }
 .rk-bar .sbar { height: 12px; }
 .rk-split { display: block; font-size: 11.5px; color: var(--muted); }
-.mult { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
-.mcard { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.mcard .mh { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; }
-.mcard .ms { font-size: 11.5px; color: var(--muted); }
-.heat td.cell { position: relative; }
-.cellsplit { position: absolute; left: 4px; right: 4px; bottom: 3px; height: 4px; display: flex; gap: 1px; }
-.cellsplit i { display: block; height: 100%; border-radius: 1px; }
-.heat td.cell.crew { vertical-align: top; padding-top: 4px; }
+#ew-body .tbl td { vertical-align: top; }
 
 /* ---------- tooltip ---------- */
 #tip { position: fixed; z-index: 50; pointer-events: none; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.18); max-width: 260px; }
@@ -311,17 +300,8 @@ table.heat { border-collapse: separate; border-spacing: 3px; font-size: 12px; fo
   .arow { grid-template-columns: 74px 1fr 60px; }
   .a-brand small { display: none; }
   #ew-body .tbl .wide { display: none; }
-  .rk-bar { --rkmax: 96px; }
+  .rk-bar { --rkmax: 64px; }
 }
-
-/* ================= option comparison ================= */
-.cmp-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
-table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13.5px; }
-.cmpt th, .cmpt td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-.cmpt thead th { font-size: 11.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
-.cmpt tbody th { font-weight: 700; }
-.cmpt tr:last-child th, .cmpt tr:last-child td { border-bottom: 0; }
-.cmpt tr.best { background: var(--ok-surface); }
 
 /* ================= change list ================= */
 .changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px; }
@@ -345,7 +325,7 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
   <header class="sheet-head">
     <div class="eyebrow">Manpower Board · Overview · direction A</div>
     <h1>The full Overview, for approval</h1>
-    <p class="lede">This is the whole dashboard as it would ship in direction A, with every section reworked or confirmed. It is a working mockup: hover any bar, number or chart point for its tooltip, expand the name lists, switch the History measure, and try the board pills. The numbered markers match the change list below the dashboard. <b>Sample data, not your records:</b> Mon 12-Oct-2026, 40 people on 2 boards, 4 service areas, 3 engineers. <b>Round 2:</b> your changes are in. The new order is By board, By engineer, Shifts, Host coverage, By service area, History, Engineer workload. On leave is removed, By service area shows permanent / on-call, and Engineer workload has four designs to compare, each with the crew split.</p>
+    <p class="lede">This is the whole dashboard as it would ship in direction A, with every section reworked or confirmed. It is a working mockup: hover any bar, number or chart point for its tooltip, expand the name lists, switch the History measure, and try the board pills. The numbered markers match the change list below the dashboard. <b>Sample data, not your records:</b> Mon 12-Oct-2026, 40 people on 2 boards, 4 service areas, 3 engineers. <b>Round 3:</b> "In detail" now pairs By engineer with By service area, then Shifts with Host coverage. Engineer workload is Ranked bars + trend, with missions and crew in one table. (Round 2 removed On leave and set By service area to permanent / on-call.)</p>
     <div class="controls">
       <div class="seg" role="group" aria-label="Frame width">
         <button type="button" id="w-desk" aria-pressed="true">Desktop</button>
@@ -447,9 +427,15 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
           <div class="eng-free" id="eng-free"></div>
         </section>
 
-        <!-- 6 shifts -->
+        <!-- 6 by service area -->
+        <section class="card" aria-labelledby="sa-h">
+          <div class="card-h"><h3 id="sa-h">By service area</h3><a class="mk" href="#c6" title="Change 6">6</a><span class="sub">Headcount per area by contract type. Bar length is the area's headcount; biggest area first.</span></div>
+          <div class="arows" id="sa-rows"></div>
+          <div class="legend" id="sa-legend" style="margin-top:10px"></div>
+        </section>
+        <!-- 7 shifts -->
         <section class="card" aria-labelledby="sh-h">
-          <div class="card-h"><h3 id="sh-h">Shifts</h3><a class="mk" href="#c6" title="Change 6">6</a><span class="sub">People on missions by shift. Crew is the headline, missions the detail.</span></div>
+          <div class="card-h"><h3 id="sh-h">Shifts</h3><a class="mk" href="#c7" title="Change 7">7</a><span class="sub">People on missions by shift. Crew is the headline, missions the detail.</span></div>
           <div class="shift-tiles">
             <div class="stile"><div class="big"><span id="sh-day">8</span> <small>crew</small> <span class="shift day">DAY</span></div><p id="sh-day-s">on 3 missions · 89% of today's crew</p></div>
             <div class="stile"><div class="big"><span id="sh-night">1</span> <small>crew</small> <span class="shift night">NIGHT</span></div><p id="sh-night-s">on 1 mission · 11% of today's crew</p></div>
@@ -457,18 +443,12 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
           <div class="srows" id="sh-rows"></div>
         </section>
 
-        <!-- 7 host coverage -->
+        <!-- 8 host coverage -->
         <section class="card" aria-labelledby="hc-h">
-          <div class="card-h"><h3 id="hc-h">Host coverage</h3><a class="mk" href="#c7" title="Change 7">7</a><span class="sub">Today's hosts that only one or two people have ever worked, and where those people are today.</span></div>
+          <div class="card-h"><h3 id="hc-h">Host coverage</h3><a class="mk" href="#c8" title="Change 8">8</a><span class="sub">Today's hosts that only one or two people have ever worked, and where those people are today.</span></div>
           <div id="hc-list"></div>
         </section>
 
-        <!-- 8 by service area -->
-        <section class="card" aria-labelledby="sa-h">
-          <div class="card-h"><h3 id="sa-h">By service area</h3><a class="mk" href="#c8" title="Change 8">8</a><span class="sub">Headcount per area by contract type. Bar length is the area's headcount; biggest area first.</span></div>
-          <div class="arows" id="sa-rows"></div>
-          <div class="legend" id="sa-legend" style="margin-top:10px"></div>
-        </section>
       </div>
 
       <div class="group"><h2>Over time</h2><span id="ot-sub">This month · 8 working days · all boards</span></div>
@@ -488,15 +468,7 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
 
       <!-- 10 engineer workload -->
       <section class="card" aria-labelledby="ew-h">
-        <div class="optbar">
-          <span class="optlabel">Design option to compare · the app will show only the one you pick</span>
-          <div class="btns" role="group" aria-label="Engineer workload design option" id="ew-view">
-            <button type="button" aria-pressed="true" data-v="ranked">Ranked bars + trend</button><button type="button" aria-pressed="false" data-v="multiples">Small multiples</button><button type="button" aria-pressed="false" data-v="grid">Day grid</button><button type="button" aria-pressed="false" data-v="stacked">Stacked columns</button>
-          </div>
-          <p class="note" id="ew-view-note"></p>
-        </div>
         <div class="card-h"><h3 id="ew-h">Engineer workload</h3><a class="mk" href="#c10" title="Change 10">10</a>
-          <div class="btns right" role="group" aria-label="Workload measure" id="ew-metric"><button type="button" aria-pressed="false" data-m="missions">Missions</button><button type="button" aria-pressed="true" data-m="crew">Crew</button></div>
           <span class="sub" id="ew-sub"></span></div>
         <div id="ew-body" style="margin-top:10px"></div>
         <div class="legend" id="ew-legend" style="margin-top:10px"></div>
@@ -527,53 +499,38 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
         <p class="why">A table is for exact values, and one word per idea across the page.</p></article>
 
       <article class="chg" id="c5"><div class="chg-top"><span class="mk">5</span><h3>By engineer</h3><span class="tag warn">Improve</span></div>
-        <dl class="ba"><dt>Before</dt><dd>A coloured missions bar and a crew bar per engineer, a zero row for every free engineer, and rows that went nowhere.</dd><dt>After</dt><dd>Missions as a number with Day/Night tags, crew split into permanent and on-call with labels, free engineers on one line ("Free today: Eng Three"), and a row click opens the board filtered to that engineer. Now first in "In detail", next to Shifts.</dd></dl>
+        <dl class="ba"><dt>Before</dt><dd>A coloured missions bar and a crew bar per engineer, a zero row for every free engineer, and rows that went nowhere.</dd><dt>After</dt><dd>Missions as a number with Day/Night tags, crew split into permanent and on-call with labels, free engineers on one line ("Free today: Eng Three"), and a row click opens the board filtered to that engineer. First in "In detail", next to By service area.</dd></dl>
         <p class="why">With 8 engineers and 3 working, five zero rows hid the three that matter. When one board is picked, "free" means free on that board.</p></article>
 
-      <article class="chg" id="c6"><div class="chg-top"><span class="mk">6</span><h3>Shifts (was Day / night split)</h3><span class="tag warn">Improve</span></div>
+      <article class="chg" id="c6"><div class="chg-top"><span class="mk">6</span><h3>By service area</h3><span class="tag warn">Improve</span></div>
+        <dl class="ba"><dt>Before</dt><dd>Headcount per area split permanent / on-call, with each count only in a tooltip and a percentage line under the total.</dd><dt>After</dt><dd>The same permanent / on-call split, as you asked, with both counts on every row ("12 P · 4 OC"), the biggest area first, totals and percentages on the All areas row, and it follows the board selector.</dd></dl>
+        <p class="why">You can read how many people of each contract type each area has without hovering.</p></article>
+
+      <article class="chg" id="c7"><div class="chg-top"><span class="mk">7</span><h3>Shifts (was Day / night split)</h3><span class="tag warn">Improve</span></div>
         <dl class="ba"><dt>Before</dt><dd>"8 DAY" here, "Day: 3" in the status bar, and per-board rows reading "7 / 1".</dd><dt>After</dt><dd>Always "crew · missions", and each board row spelled out: "Day 7 · Night 1 crew".</dd></dl>
         <p class="why">The page stops appearing to contradict itself.</p></article>
 
-      <article class="chg" id="c7"><div class="chg-top"><span class="mk">7</span><h3>Host coverage (was Host coverage risk)</h3><span class="tag bad">Rework</span></div>
+      <article class="chg" id="c8"><div class="chg-top"><span class="mk">8</span><h3>Host coverage (was Host coverage risk)</h3><span class="tag bad">Rework</span></div>
         <dl class="ba"><dt>Before</dt><dd>A count of people who have ever worked each host, with no word on whether they are available, and a note naming a database table.</dd><dt>After</dt><dd>Each thin host shows its people and where they are today. Red means the only backup is unavailable today, amber means thin but covered.</dd></dl>
         <p class="why">A host is only at risk when the few people who know it are away. The data is already loaded: deployment history plus today's board.</p></article>
-
-      <article class="chg" id="c8"><div class="chg-top"><span class="mk">8</span><h3>By service area</h3><span class="tag warn">Improve</span></div>
-        <dl class="ba"><dt>Before</dt><dd>Headcount per area split permanent / on-call, with each count only in a tooltip and a percentage line under the total.</dd><dt>After</dt><dd>The same permanent / on-call split, as you asked, with both counts on every row ("12 P · 4 OC"), the biggest area first, totals and percentages on the All areas row, and it follows the board selector.</dd></dl>
-        <p class="why">You can read how many people of each contract type each area has without hovering.</p></article>
 
       <article class="chg" id="c9"><div class="chg-top"><span class="mk">9</span><h3>History</h3><span class="tag bad">Rework</span></div>
         <dl class="ba"><dt>Before</dt><dd>Six lines on one axis (Idle around 28 next to Missions around 0.5), two of them crossed out in the legend by default, and a separate "% Utilization" mode.</dd><dt>After</dt><dd>Four average tiles (Utilization, Deployed, Idle, Missions). Pick one to see it day by day on its own axis, with an average line and a hover readout.</dd></dl>
         <p class="why">One measure per chart, so no line is squashed flat by another's scale. The tiles answer most visits without a chart at all.</p></article>
 
       <article class="chg" id="c10"><div class="chg-top"><span class="mk">10</span><h3>Engineer workload</h3><span class="tag bad">Rework</span></div>
-        <dl class="ba"><dt>Before</dt><dd>One line per engineer, which tangles past four engineers, a separate five-column table, and crew shown as a single number.</dd><dt>After</dt><dd>One block, with <b>Crew</b> split into permanent and on-call for every engineer, so a manager can see each engineer's team mix. Four designs to compare are in the mockup; the table below compares them.</dd></dl>
-        <p class="why">The data is already there: the History query returns each engineer's permanent and on-call crew per day, so no extra loading is needed.</p></article>
+        <dl class="ba"><dt>Before</dt><dd>One line per engineer, which tangles past four engineers, a separate five-column table, a Missions / Crew switch, and crew as a single number.</dd><dt>After</dt><dd><b>Ranked bars + trend</b>, your pick, with missions and crew in one table: missions per day, crew per day split permanent / on-call, crew per mission, a crew trend line, active days and share of missions. Busiest engineer first, and no switch.</dd></dl>
+        <p class="why">A manager sees each engineer's load and team mix in one row. The data is already there: the History query returns each engineer's missions and permanent / on-call crew per day. On a phone, the table keeps Missions and Crew.</p></article>
 
       <article class="chg"><div class="chg-top"><span class="mk" style="background:var(--muted)">–</span><h3>On leave</h3><span class="tag mute">Removed</span></div>
         <dl class="ba"><dt>Before</dt><dd>Leave today: five leave types as bars.</dd><dt>After</dt><dd>Removed, as you asked. The number on leave stays in the Deployed tile's legend and in the By board table's Leave column.</dd></dl></article>
     </div>
   </section>
 
-  <section aria-labelledby="ew-cmp-h" style="display:flex;flex-direction:column;gap:12px">
-    <div class="eyebrow">Engineer workload · pick one</div>
-    <h2 id="ew-cmp-h">Four ways to show engineer workload</h2>
-    <p class="lede">All four use the same numbers and follow the board selector and History's range. Try each one in the mockup above with the "Design option" switch, in both Missions and Crew.</p>
-    <div class="cmp-wrap"><table class="cmpt">
-      <thead><tr><th scope="col">Design</th><th scope="col">Best for</th><th scope="col">Crew split per engineer</th><th scope="col">10+ engineers</th><th scope="col">90-day range</th><th scope="col">Phone</th></tr></thead>
-      <tbody>
-        <tr class="best"><th scope="row">Ranked bars + trend <span class="tag ok">Recommended</span></th><td>Comparing engineers: who carries the most, and with what mix of people</td><td>Clear: a split bar and the numbers on every row</td><td>Good: one row each</td><td>Good: the trend line compresses</td><td>Good</td></tr>
-        <tr><th scope="row">Small multiples</th><td>Each engineer's day-by-day pattern and mix together</td><td>Clear: split on every day's column</td><td>Weak: one card each, the page gets long</td><td>OK: columns get thin</td><td>OK</td></tr>
-        <tr><th scope="row">Day grid</th><td>Spotting gaps, streaks and busy days across a long range</td><td>Weak: a thin strip under each number</td><td>Good</td><td>Best: most compact</td><td>Weak: scrolls sideways</td></tr>
-        <tr><th scope="row">Stacked columns</th><td>The team's total per day and who carried it</td><td>Hidden: only in the tooltip</td><td>Weak: too many colours</td><td>OK</td><td>OK</td></tr>
-      </tbody></table></div>
-    <p class="lede"><b>My pick: Ranked bars + trend.</b> It answers your question directly (each engineer's crew and its permanent / on-call mix) in the least space, and it still scales to many engineers and a phone. If day-by-day gaps matter more to you, Small multiples is the runner-up.</p>
-  </section>
-
   <section class="approve" aria-labelledby="ap-h">
     <h2 id="ap-h">To approve</h2>
-    <p>Reply <b>"approved"</b> with the Engineer workload design you want (for example <b>"approved, ranked bars"</b>) and I'll build it in the app on the same branch and pull request, with tests. To change something first, name it by number.</p>
-    <p>One change needs a small amount of new logic: <b>7</b> (Host coverage) combines deployment history with today's board. Everything else re-uses numbers the Overview already loads, so the page won't get slower.</p>
+    <p>Reply <b>"approved"</b> and I'll build this in the app on the same branch and pull request, with tests. To change something first, name it by number.</p>
+    <p>One change needs a small amount of new logic: <b>8</b> (Host coverage) combines deployment history with today's board. Everything else re-uses numbers the Overview already loads, so the page won't get slower.</p>
   </section>
 </div>
 <div id="tip" hidden></div>
@@ -637,8 +594,6 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
   const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   let scope = "all";
   let histMeasure = "util";
-  let ewMetric = "crew";
-  let ewView = "ranked";
   const boardsIn = () => scope === "all" ? ["b1", "b2"] : [scope];
   const scopeName = () => scope === "all" ? "all boards" : BOARDS[scope].name;
   const sum = (key) => boardsIn().reduce((s, b) => s + BOARDS[b][key], 0);
@@ -673,7 +628,7 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
     `<span style="flex:${s.v} 1 0;background:${s.c}" tabindex="0" data-tip="<b>${s.v}</b> ${esc(s.l)} · ${Math.round(s.v / total * 100)}%"></span>`).join("");
 
   /* ---------- sparkline / line chart (one series, one axis) ---------- */
-  function line(svg, vals, labels, { w, h, pad = [6, 6, 6, 6], yMax, suffix = "", axis = false, avg = null }) {
+  function line(svg, vals, labels, { w, h, pad = [6, 6, 6, 6], yMax, suffix = "", axis = false, avg = null, tips = null }) {
     const [pt, pr, pb, pl_] = pad;
     const max = yMax ?? niceMax(vals);
     const x = (i) => pl_ + (vals.length === 1 ? 0 : i * (w - pl_ - pr) / (vals.length - 1));
@@ -695,7 +650,7 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
     out += `<circle cx="${x(vals.length - 1)}" cy="${y(vals[vals.length - 1])}" r="${axis ? 4.5 : 3.5}" fill="var(--c-dep)" stroke="var(--panel)" stroke-width="2"/>`;
     // hit targets wider than the marks
     const step = vals.length > 1 ? (w - pl_ - pr) / (vals.length - 1) : w;
-    vals.forEach((v, i) => { out += `<rect x="${x(i) - step / 2}" y="0" width="${step}" height="${h}" fill="transparent" data-tip="${labels[i]}: <b>${v}${suffix}</b>"/>`; });
+    vals.forEach((v, i) => { out += `<rect x="${x(i) - step / 2}" y="0" width="${step}" height="${h}" fill="transparent" data-tip="${tips ? tips[i] : `${labels[i]}: <b>${v}${suffix}</b>`}"/>`; });
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     svg.innerHTML = out;
   }
@@ -869,14 +824,7 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
     line(box.querySelector("svg"), vals, DAYS.map(fmtDay), { w, h: 220, pad: [14, 12, 24, 40], yMax, suffix: m.suffix, axis: true, avg: mean(vals) });
   }
 
-  /* ---------- 10 engineer workload: four candidate views ---------- */
-  const EW_NOTES = {
-    ranked: "<b>Ranked bars + trend.</b> One row per engineer, busiest first: the daily average as a bar split permanent / on-call, a small trend line, active days and share. Best for comparing engineers and reading each one's crew mix at a glance.",
-    multiples: "<b>Small multiples.</b> One mini chart per engineer on the same scale, one column per day, split permanent / on-call. Best for seeing each engineer's day-by-day pattern and crew mix together. Takes the most room; past about 9 engineers it scrolls.",
-    grid: "<b>Day grid.</b> Engineers × days, darker for more; in Crew mode a thin strip under each number shows the split. The most compact for long ranges, but the split is small, so it is the weakest of the four for contract mix.",
-    stacked: "<b>Stacked columns.</b> One column per day, stacked by engineer. Best for the team total and who carried each day. The contract split is only in the tooltip, and past about 6 engineers the colours get hard to tell apart.",
-  };
-  const DOW = ["Thu","Fri","Mon","Tue","Wed","Thu","Fri","Mon"];
+  /* ---------- 10 engineer workload: ranked bars + trend, missions and crew together ---------- */
   const s1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
   function ewRows() {
     const m = workIn("missions"), c = workIn("crew"), o = workIn("oc");
@@ -888,129 +836,40 @@ table.cmpt { width: 100%; min-width: 760px; border-collapse: collapse; font-size
         totM: tot(m[e]), totC: tot(c[e]), totP: tot(perm), totO: tot(o[e]), active: m[e].filter(x => x > 0).length };
     });
   }
-  const crew = () => ewMetric === "crew";
-  const vals = (r) => crew() ? r.c : r.m;
-  const avg = (r) => crew() ? r.avgC : r.avgM;
-  const unitOf = (x) => crew() ? "crew" : (x === 1 ? "mission" : "missions");
-  const splitTip = (r, i) => crew() ? ` (${r.perm[i]} permanent · ${r.oc[i]} on-call)` : "";
-  const nameCell = (r) => `<span class="name"><span class="dot" style="background:${r.color}"></span>${r.name}</span>`;
-
-  function viewRanked(rows) {
-    rows = rows.slice().sort((a, b) => avg(b) - avg(a));
-    const max = Math.max(0.1, ...rows.map(avg));
-    // shares by largest remainder, so the column always adds up to 100%
-    const raw = rows.map(r => (crew() ? r.totC : r.totM));
-    const grand = raw.reduce((a, b) => a + b, 0) || 1;
-    const exact = raw.map(v => v / grand * 100), share = exact.map(Math.floor);
-    exact.map((v, i) => [v - share[i], i]).sort((a, b) => b[0] - a[0]).slice(0, 100 - share.reduce((a, b) => a + b, 0)).forEach(([, i]) => share[i]++);
-    const html = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Engineer</th><th>Average per day</th><th class="wide">Trend</th><th class="r wide">Active days</th><th class="r">Share</th></tr></thead><tbody>`
-      + rows.map(r => {
-        const bar = crew()
-          ? sbar([{ l: "permanent / day", v: +s1(r.avgP), c: "var(--c-perm)" }, { l: "on-call / day", v: +s1(r.avgO), c: "var(--c-oc)" }], r.avgC || 1)
-          : `<span style="flex:1;background:var(--c-dep)" data-tip="<b>${s1(r.avgM)}</b> missions / day"></span>`;
-        return `<tr><td>${nameCell(r)}</td>
-          <td><span class="rk-bar"><span style="width:max(4px, calc(var(--rkmax) * ${(avg(r) / max).toFixed(3)}))"><span class="sbar">${bar}</span></span><b>${s1(avg(r))}</b></span>
-            ${crew() ? `<span class="rk-split">${s1(r.avgP)} permanent · ${s1(r.avgO)} on-call</span>` : `<span class="rk-split">${r.totM} missions in the range</span>`}</td>
-          <td class="wide"><svg class="spark" data-spark="${r.e}" width="120" height="28" role="img" aria-label="${r.name} per day"></svg></td>
-          <td class="r wide">${r.active} <span class="note">of ${DAYS.length}</span></td>
-          <td class="r">${share[rows.indexOf(r)]}%</td></tr>`;
-      }).join("")
-      + (() => { const t = rows.reduce((a, r) => ({ c: a.c + r.avgC, p: a.p + r.avgP, o: a.o + r.avgO, m: a.m + r.avgM }), { c: 0, p: 0, o: 0, m: 0 });
-          return `<tr class="total"><td>All engineers</td><td>${crew() ? `${s1(t.c)} <span class="note">· ${s1(t.p)} permanent · ${s1(t.o)} on-call</span>` : s1(t.m)}</td><td class="wide"></td><td class="wide"></td><td class="r">100%</td></tr>`; })()
-      + `</tbody></table></div>`;
-    $("#ew-body").innerHTML = html;
-    for (const r of rows) line($(`svg[data-spark="${r.e}"]`), vals(r), DAYS.map(fmtDay), { w: 120, h: 28, pad: [4, 4, 4, 4], yMax: Math.max(1, ...rows.flatMap(vals)), suffix: crew() ? " crew" : "" });
+  // shares by largest remainder, so the column always adds up to 100%
+  function shares(raw) {
+    const grand = raw.reduce((a, b) => a + b, 0);
+    if (!grand) return raw.map(() => 0);
+    const exact = raw.map(v => v / grand * 100), out = exact.map(Math.floor);
+    exact.map((v, i) => [v - out[i], i]).sort((a, b) => b[0] - a[0]).slice(0, 100 - out.reduce((a, b) => a + b, 0)).forEach(([, i]) => out[i]++);
+    return out;
   }
-
-  // one mini column chart; every engineer shares yMax so the cards compare
-  function colsSvg(r, yMax, w, h) {
-    const pad = 4, base = h - 16, n = DAYS.length, gap = 4;
-    const bw = (w - pad * 2 - gap * (n - 1)) / n;
-    const y = (v) => (base - 4) * v / yMax;
-    let out = `<line x1="${pad}" x2="${w - pad}" y1="${base}" y2="${base}" stroke="var(--border)"/>`;
-    vals(r).forEach((v, i) => {
-      const x = pad + i * (bw + gap);
-      if (crew()) {
-        const hp = y(r.perm[i]), ho = y(r.oc[i]);
-        if (hp) out += `<rect x="${x}" y="${base - hp}" width="${bw}" height="${hp}" rx="2" fill="var(--c-perm)"/>`;
-        if (ho) out += `<rect x="${x}" y="${base - hp - ho - (hp ? 2 : 0)}" width="${bw}" height="${ho}" rx="2" fill="var(--c-oc)"/>`;
-      } else if (v) out += `<rect x="${x}" y="${base - y(v)}" width="${bw}" height="${y(v)}" rx="2" fill="var(--c-dep)"/>`;
-      if (i === n - 1) out += `<text x="${x + bw / 2}" y="${h - 3}" text-anchor="middle" font-size="9.5" fill="var(--muted)">today</text>`;
-      out += `<rect x="${x - gap / 2}" y="0" width="${bw + gap}" height="${base}" fill="transparent" data-tip="${r.name} · ${fmtDay(DAYS[i])}: <b>${v}</b> ${unitOf(v)}${splitTip(r, i)}"/>`;
-    });
-    return `<svg width="100%" viewBox="0 0 ${w} ${h}" role="img" aria-label="${r.name} per day">${out}</svg>`;
-  }
-  function viewMultiples(rows) {
-    const yMax = Math.max(1, ...rows.flatMap(vals));
-    $("#ew-body").innerHTML = `<div class="mult">${rows.slice().sort((a, b) => avg(b) - avg(a)).map(r => `<div class="mcard">
-      <span class="mh"><span class="dot" style="background:${r.color}"></span>${r.name}<span class="note" style="margin-left:auto;font-weight:600">${s1(avg(r))} / day</span></span>
-      <span class="ms">${crew() ? `${s1(r.avgP)} permanent · ${s1(r.avgO)} on-call · ` : ""}active ${r.active} of ${DAYS.length} days</span>
-      ${colsSvg(r, yMax, 230, 86)}</div>`).join("")}</div>`;
-  }
-
-  function viewGrid(rows) {
-    const all = rows.flatMap(vals);
-    const max = Math.max(1, ...all);
-    const t1 = max <= 3 ? 1 : Math.ceil(max / 3), t2 = max <= 3 ? 2 : Math.ceil(max * 2 / 3);
-    const step = (v) => v === 0 ? 0 : v <= t1 ? 1 : v <= t2 ? 2 : 3;
-    let html = `<div class="heat-wrap"><table class="heat"><thead><tr><th class="left">Engineer</th>${DAYS.map((d, i) => `<th>${DOW[i]}<br>${d.slice(8)}</th>`).join("")}<th class="stat">Avg / day</th><th class="stat">Active days</th></tr></thead><tbody>`;
-    for (const r of rows) {
-      html += `<tr><td class="left">${nameCell(r)}</td>` + vals(r).map((x, i) => {
-        const strip = crew() && x ? `<span class="cellsplit">${r.perm[i] ? `<i style="flex:${r.perm[i]};background:var(--c-perm)"></i>` : ""}${r.oc[i] ? `<i style="flex:${r.oc[i]};background:var(--c-oc)"></i>` : ""}</span>` : "";
-        return `<td class="cell h${step(x)}${crew() ? " crew" : ""}${i === DAYS.length - 1 ? " today" : ""}" tabindex="0" data-tip="${r.name} · ${fmtDay(DAYS[i])}: <b>${x}</b> ${unitOf(x)}${splitTip(r, i)}">${x}${strip}</td>`;
-      }).join("") + `<td class="stat"><b>${s1(avg(r))}</b>${crew() ? `<br><small>${s1(r.avgP)} P · ${s1(r.avgO)} OC</small>` : ""}</td><td class="stat">${r.active} <small>of ${DAYS.length}</small></td></tr>`;
-    }
-    $("#ew-body").innerHTML = html + "</tbody></table></div>";
-    const rng = (a, b) => a >= b ? `${b}` : `${a}–${b}`;
-    const buckets = [["0", 0], [rng(1, t1), 1]];
-    if (max > t1) buckets.push([rng(t1 + 1, Math.min(t2, max)), 2]);
-    if (max > t2) buckets.push([rng(t2 + 1, max), 3]);
-    return `<span class="heat-legend" style="margin:0">${crew() ? "crew" : "missions"} per day: ${buckets.map(([l, k]) => `<i style="background:var(--heat-${k})"></i>${l}`).join(" ")}</span>`;
-  }
-
-  function viewStacked(rows) {
-    const box = $("#ew-body");
-    const w = Math.max(320, Math.min(1180, box.clientWidth || 900)), h = 230;
-    const pl_ = 34, pr = 8, pt = 16, pb = 26, n = DAYS.length, gap = Math.max(6, (w - pl_ - pr) / n * .3);
-    const bw = (w - pl_ - pr - gap * (n - 1)) / n;
-    const totals = DAYS.map((_, i) => rows.reduce((s, r) => s + vals(r)[i], 0));
-    const yMax = niceMax(totals);
-    const y = (v) => (h - pt - pb) * v / yMax;
-    let out = "";
-    for (const t of [0, Math.round(yMax / 2), yMax]) out += `<g class="axis"><line x1="${pl_}" x2="${w - pr}" y1="${h - pb - y(t)}" y2="${h - pb - y(t)}"/><text x="${pl_ - 6}" y="${h - pb - y(t) + 4}" text-anchor="end">${t}</text></g>`;
-    DAYS.forEach((d, i) => {
-      const x = pl_ + i * (bw + gap);
-      let top = h - pb;
-      for (const r of rows) {
-        const v = vals(r)[i];
-        if (!v) continue;
-        const hh = y(v);
-        out += `<rect x="${x}" y="${top - hh}" width="${bw}" height="${Math.max(1, hh - 2)}" rx="2" fill="${r.color}" data-tip="${r.name} · ${fmtDay(d)}: <b>${v}</b> ${unitOf(v)}${splitTip(r, i)}"/>`;
-        top -= hh;
-      }
-      out += `<text x="${x + bw / 2}" y="${top - 4}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text)">${totals[i]}</text>`;
-      out += `<g class="axis"><text x="${x + bw / 2}" y="${h - 8}" text-anchor="middle">${i === n - 1 ? "today" : fmtDay(d)}</text></g>`;
-    });
-    box.innerHTML = `<svg width="100%" viewBox="0 0 ${w} ${h}" role="img" aria-label="Team ${crew() ? "crew" : "missions"} per day, stacked by engineer">${out}</svg>`;
-    return rows.map(r => `<span><i style="background:${r.color}"></i>${r.name} <b>${s1(avg(r))}</b>/day</span>`).join("");
-  }
-
   function renderWorkload() {
-    const rows = ewRows();
-    document.querySelectorAll("#ew-view button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === ewView)));
-    document.querySelectorAll("#ew-metric button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === ewMetric)));
-    $("#ew-view-note").innerHTML = EW_NOTES[ewView];
-    $("#ew-sub").textContent = `${crew() ? (ewView === "stacked" ? "People each engineer had out per working day (hover a block for its permanent / on-call split)" : "People each engineer had out per working day, split by contract type") : "Missions each engineer ran per working day"}. Same range and board as History: ${scopeName()}.`;
-    const split = `<span><i style="background:var(--c-perm)"></i>Permanent</span><span><i style="background:var(--c-oc)"></i>On-call</span>`;
-    let legend = "";
-    if (ewView === "ranked") { viewRanked(rows); legend = crew() ? split : ""; }
-    else if (ewView === "multiples") { viewMultiples(rows); legend = crew() ? split : ""; }
-    else if (ewView === "grid") { legend = viewGrid(rows) + (crew() ? split : ""); }
-    else legend = viewStacked(rows);
-    $("#ew-legend").innerHTML = legend;
+    const rows = ewRows().sort((a, b) => b.avgM - a.avgM || b.avgC - a.avgC || a.name.localeCompare(b.name));
+    const maxM = Math.max(0.1, ...rows.map(r => r.avgM)), maxC = Math.max(0.1, ...rows.map(r => r.avgC));
+    const share = shares(rows.map(r => r.totM));
+    const yMax = Math.max(1, ...rows.flatMap(r => r.c));
+    const T = rows.reduce((a, r) => ({ m: a.m + r.avgM, c: a.c + r.avgC, p: a.p + r.avgP, o: a.o + r.avgO, tm: a.tm + r.totM, tc: a.tc + r.totC }), { m: 0, c: 0, p: 0, o: 0, tm: 0, tc: 0 });
+    const w = (frac) => `width:max(4px, calc(var(--rkmax) * ${frac.toFixed(3)}))`;
+    $("#ew-sub").textContent = `Missions each engineer ran and the people they had out, per working day, busiest first. Same range and board as History: ${scopeName()}.`;
+    $("#ew-body").innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr>
+        <th>Engineer</th><th>Missions / day</th><th>Crew / day</th><th class="r wide">Crew per mission</th><th class="wide">Trend · crew per day</th><th class="r wide">Active days</th><th class="r wide">Share of missions</th></tr></thead><tbody>`
+      + rows.map((r, i) => `<tr><td><span class="name"><span class="dot" style="background:${r.color}"></span>${r.name}</span></td>
+          <td><span class="rk-bar"><span style="${w(r.avgM / maxM)}"><span class="sbar"><span style="flex:1;background:var(--c-free)" data-tip="${r.name}: <b>${s1(r.avgM)}</b> missions / day"></span></span></span><b>${s1(r.avgM)}</b></span>
+            <span class="rk-split">${pl(r.totM, "mission", "missions")} in the range</span></td>
+          <td><span class="rk-bar"><span style="${w(r.avgC / maxC)}"><span class="sbar">${sbar([{ l: "permanent / day", v: +s1(r.avgP), c: "var(--c-perm)" }, { l: "on-call / day", v: +s1(r.avgO), c: "var(--c-oc)" }], r.avgC || 1)}</span></span><b>${s1(r.avgC)}</b></span>
+            <span class="rk-split">${s1(r.avgP)} permanent · ${s1(r.avgO)} on-call</span></td>
+          <td class="r wide">${r.totM ? s1(r.totC / r.totM) : "—"}</td>
+          <td class="wide"><svg class="spark" data-spark="${r.e}" width="120" height="28" role="img" aria-label="${r.name}: crew per day"></svg></td>
+          <td class="r wide">${r.active} <span class="note">of ${DAYS.length}</span></td>
+          <td class="r wide">${share[i]}%</td></tr>`).join("")
+      + `<tr class="total"><td>All engineers</td><td>${s1(T.m)}</td><td>${s1(T.c)} <span class="note">· ${s1(T.p)} permanent · ${s1(T.o)} on-call</span></td>
+          <td class="r wide">${T.tm ? s1(T.tc / T.tm) : "—"}</td><td class="wide"></td><td class="wide"></td><td class="r wide">100%</td></tr>`
+      + `</tbody></table></div>`;
+    for (const r of rows) line($(`svg[data-spark="${r.e}"]`), r.c, DAYS.map(fmtDay), { w: 120, h: 28, pad: [4, 4, 4, 4], yMax,
+      tips: DAYS.map((d, i) => `${r.name} · ${fmtDay(d)}: <b>${r.m[i]}</b> ${r.m[i] === 1 ? "mission" : "missions"} · <b>${r.c[i]}</b> crew (${r.perm[i]} permanent · ${r.oc[i]} on-call)`) });
+    $("#ew-legend").innerHTML = `<span><i style="background:var(--c-free)"></i>Missions</span><span><i style="background:var(--c-perm)"></i>Permanent crew</span><span><i style="background:var(--c-oc)"></i>On-call crew</span><span><i style="background:var(--c-dep);height:2px;border-radius:0"></i>Crew per day (trend)</span>`;
   }
-  document.querySelectorAll("#ew-metric button").forEach(b => b.onclick = () => { ewMetric = b.dataset.m; renderWorkload(); });
-  document.querySelectorAll("#ew-view button").forEach(b => b.onclick = () => { ewView = b.dataset.v; renderWorkload(); });
 
   /* ---------- controls ---------- */
   document.querySelectorAll("#pills .pill").forEach(p => p.onclick = () => { scope = p.dataset.scope; renderScope(); });
