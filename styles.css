@@ -5252,7 +5252,7 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 }
 .tb-item:hover, .tb-item:focus-visible { background: var(--hover-tint); color: var(--primary-text); outline: none; }
 #board-menu .board-tab.tab-board { height: auto; border: 0; margin: 0; color: var(--text); font-weight: 550; }
-#board-menu .board-tab.tab-board.active { color: var(--primary-text); font-weight: 700; background: var(--hover-tint); box-shadow: inset 3px 0 0 var(--brand-green); }
+#board-menu .board-tab.tab-board.active { color: var(--primary-text); font-weight: 700; background: var(--hover-tint); }
 .tb-item-add { color: var(--muted); border-top: 1px solid var(--border); border-radius: 0 0 var(--r) var(--r); margin-top: 4px; padding-top: 11px; }
 .tb-who { padding: 8px 11px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .tb-who b { display: block; font-size: 13.5px; font-weight: 650; }
