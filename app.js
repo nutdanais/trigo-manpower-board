@@ -1001,6 +1001,7 @@ function render() {
   const planEmpty = board && planIsEmpty(getPlan());
   $("#btn-reset-board").classList.toggle("hidden", fc ? !(planEdit && planEmpty) : !boardEdit);
   $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
+  placeBoardRow1Tools(board);
   renderStats();
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
   $("#float-pool").classList.toggle("hidden", !board);
@@ -6932,6 +6933,25 @@ function setXlsxTicks(on) {
   for (const b of $$("#xlsx-cols input[type=checkbox]")) b.checked = on;
   updateXlsxCount();
 }
+
+/* On a board (computer widths), the Names switch and Export join toolbar row 1:
+   Names → Undo → Reset → Export, Export at the right edge. Every other tab, and
+   phones (where row 1 folds into the More dropdown), keep them in #toolbar-right. */
+const ROW1_TOOLS_MQ = window.matchMedia("(min-width: 641px)");
+function placeBoardRow1Tools(board) {
+  const end = $("#row1-end"), right = $("#toolbar-right");
+  const names = $("#card-names"), seg = names._seg, exp = $("#btn-export");
+  if (board && ROW1_TOOLS_MQ.matches) {
+    if (names.parentNode !== end) { end.prepend(names); if (seg) names.after(seg); }
+    if (exp.parentNode !== end || end.lastElementChild !== exp) end.append(exp);
+  } else if (names.parentNode !== right) {
+    const badge = $("#readonly-badge");
+    right.insertBefore(names, badge);
+    if (seg) names.after(seg);
+    right.append(exp);
+  }
+}
+ROW1_TOOLS_MQ.addEventListener("change", () => placeBoardRow1Tools(document.body.classList.contains("board-view")));
 
 /* ---------- the one Export button ----------
    Every tab has the same Export button at the right edge of the toolbar. It

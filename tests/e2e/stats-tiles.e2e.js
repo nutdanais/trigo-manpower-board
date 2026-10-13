@@ -119,12 +119,15 @@ async function step(name, fn) {
       await p.evaluate(() => { state.filters.engineer = []; renderFilterOptions(); });
     });
 
-    await step("Undo and Reset Board are pinned to the right edge of row 1", async () => {
+    await step("row 1 ends Names → Undo → Reset Board → Export, Export at the right edge", async () => {
       const row = await p.locator("#toolbar-row1").boundingBox();
-      const reset = await p.locator("#btn-reset-board").boundingBox();
+      const names = await p.locator("#card-names + .seg-pick").boundingBox();
       const undo = await p.locator("#btn-undo").boundingBox();
-      assert.ok(row.x + row.width - (reset.x + reset.width) <= 24, "Reset Board at the right edge");
-      assert.ok(undo.x < reset.x, "Undo then Reset Board");
+      const reset = await p.locator("#btn-reset-board").boundingBox();
+      const exp = await p.locator("#btn-export").boundingBox();
+      assert.ok(row.x + row.width - (exp.x + exp.width) <= 24, "Export at the right edge");
+      assert.ok(names.x < undo.x && undo.x < reset.x && reset.x < exp.x, "Names, Undo, Reset Board, Export");
+      for (const b of [names, undo, reset, exp]) assert.ok(Math.abs((b.y + b.height / 2) - (undo.y + undo.height / 2)) <= 4, "all on one line");
     });
 
     await step("row 1 stays on ONE line at laptop width on an editable future day (Holiday toggle showing)", async () => {
