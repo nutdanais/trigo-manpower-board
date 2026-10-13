@@ -104,7 +104,7 @@ async function step(name, fn) {
       assert.equal(await p.evaluate(() => document.getElementById("board-dd").closest("#toolbar-row1") !== null), true, "the board picker is in the toolbar");
       assert.equal((await p.textContent("#board-dd-label")).trim(), "Board One");
       await p.click("#btn-board-dd");
-      assert.deepEqual(await p.$$eval("#board-menu .tab-board", (e) => e.map((x) => x.textContent.trim())), ["Board One", "Board Two"]);
+      assert.deepEqual(await p.$$eval("#board-menu .tab-board", (e) => e.map((x) => [x.querySelector(".ovb-name").textContent, /^\d+$/.test(x.querySelector(".ovb-count").textContent)])), [["Board One", true], ["Board Two", true]], "each board shows its name and headcount");
       assert.equal(await p.isVisible("#btn-add-board"), true);
       await p.keyboard.press("Escape");
       assert.equal(await p.isVisible("#board-menu"), false);

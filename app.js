@@ -1035,9 +1035,9 @@ function render() {
   }
   renderBoardEmptyState();
   renderPlanBanners();
-  const lock = board ? lockInfo(D().activeBoardId, state.date) : null;
-  $("#readonly-badge").classList.toggle("hidden", !board || !isReadOnly());
-  setIconLabel($("#readonly-badge"), "lock", lock ? `Locked by ${lock.lockedBy}` : "Read-only (past date)");
+  // read-only / locked is part of the date pill beside the date picker now (renderModePill)
+  $("#readonly-badge").classList.add("hidden");
+  renderModePill();
   updateSelectionUI();
   updateUndoButton();
   applySearchHighlight();
@@ -1707,7 +1707,9 @@ function renderTabs() {
     // these and shows #board-select instead, but keeps Overview / Manpower List
     t.className = "board-tab tab-board tb-item" + (b.id === D().activeBoardId ? " active" : "");
     t.setAttribute("role", "menuitem");
-    t.textContent = b.name;
+    // name + headcount, the same rows as Overview's board menu (no colour key here)
+    t.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: b.name }));
+    t.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(rosterEmployees(b.id).length) }));
     t.title = can("settings", "edit") ? "Click to switch. Double-click to rename." : "Click to switch.";
     t.onclick = () => { closeTopbarMenus(); clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
     t.ondblclick = () => {
@@ -1742,7 +1744,6 @@ function renderBoardPill() {
   try { localStorage.setItem("manpower.lastBoard", cur.id); } catch (e) { /* remembering is a courtesy */ }
   $("#board-dd-label").textContent = cur.name;   // textContent: board names are user data
   $("#board-dd-count").textContent = rosterEmployees(cur.id).length;
-  $("#board-dd-dot").style.background = Charts.catColor(D().boards.indexOf(cur));
 }
 
 /* Initials + role in the account menu (Sign out lives there). */
@@ -7892,16 +7893,30 @@ function nextWorkingDates(boardId, after, n) {
 }
 
 /* ---------- mode pill ---------- */
+/* One pill beside the date picker says what the date on screen is:
+   Confirmed, Confirmed · Read-only (today or a past date), Confirmed · Locked, or Forecast.
+   Without forward planning there is no confirmed / forecast split, so the pill
+   only appears for a read-only or locked day. */
 function renderModePill() {
   const pill = $("#mode-pill");
-  const show = !isNonBoardView() && !!D().activeBoardId && !!feat().forecast && can("board");
-  if (!show) { pill.className = "mode-pill hidden"; return; }
-  const fc = isForecastView();
-  const end = horizonEndFor(D().activeBoardId);
-  pill.className = "mode-pill " + (fc ? "mode-forecast" : "mode-confirmed");
-  pill.textContent = fc ? "FORECAST" : "CONFIRMED";
-  pill.title = (fc ? "Tentative plan — never exported, never in the Host Record. " : "The operational plan. ") +
-    `Confirmed plans run up to ${fmtShort(end)} (the next working day); every later date opens as a forecast.`;
+  const onBoard = !isNonBoardView() && !!D().activeBoardId && can("board");
+  if (!onBoard) { pill.className = "mode-pill hidden"; return; }
+  const planning = !!feat().forecast;
+  const fc = planning && isForecastView();
+  const lock = lockInfo(D().activeBoardId, state.date);
+  const ro = !fc && isReadOnly();
+  if (!planning && !ro) { pill.className = "mode-pill hidden"; return; }
+  const state2 = fc ? "forecast" : ro ? (lock ? "locked" : "readonly") : "confirmed";
+  pill.className = "mode-pill mode-" + (fc ? "forecast" : "confirmed") + (ro ? " mode-ro" : "");
+  pill.dataset.state = state2;
+  const main = planning ? (fc ? "Forecast" : "Confirmed") : "";
+  const extra = state2 === "locked" ? "Locked" : state2 === "readonly" ? "Read-only" : "";
+  pill.innerHTML = (ro ? icon("lock") : "") + escapeHtml([main, extra].filter(Boolean).join(" · "));
+  const end = planning ? horizonEndFor(D().activeBoardId) : null;
+  pill.title = (fc ? "Tentative plan — never exported, never in the Host Record. " : planning ? "The operational plan. " : "") +
+    (state2 === "locked" ? `Locked by ${lock.lockedBy}: view-only for everyone until someone unlocks it. ` : "") +
+    (state2 === "readonly" ? "Today or a past date: view-only (editing asks first). " : "") +
+    (planning ? `Confirmed plans run up to ${fmtShort(end)} (the next working day); every later date opens as a forecast.` : "");
 }
 
 /* ---------- lost holds (D3) ---------- */

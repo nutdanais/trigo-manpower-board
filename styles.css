@@ -5571,3 +5571,17 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
   #board-dd, #ov-board-dd { flex: 1 1 100%; }
   #btn-board-dd, #btn-ov-board { width: 100%; justify-content: flex-start; }
 }
+
+/* the date pill beside the date picker, on the navy banner */
+.topbar-right #mode-pill { margin: 0 2px 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.topbar-right #mode-pill.hidden { display: none; }
+#mode-pill .ic { width: 13px; height: 13px; }
+#mode-pill.mode-ro { color: #8a4f10; border-color: #ebd3a9; background: #fdf7ec; }
+#board-menu .board-tab.tab-board { display: flex; align-items: center; gap: 9px; }
+#board-menu .board-tab.tab-board .ovb-name { flex: 1; }
+.topbar-right #mode-pill { height: 26px; padding: 0 10px; border-radius: 13px; letter-spacing: .2px; font-size: 11.5px; }
+/* room for the date pill: the module tabs scroll rather than run under it, and Lock
+   shows as an icon (its tooltip says what it does) on screens under 1600px */
+#board-tabs { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+#board-tabs::-webkit-scrollbar { display: none; }
+@media (max-width: 1600px) and (min-width: 641px) { #btn-lock .btn-label { display: none; } #btn-lock { padding: 0 10px; } }
