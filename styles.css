@@ -5472,3 +5472,12 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 @keyframes flash-outline { 0%, 60% { box-shadow: 0 0 0 3px var(--warn); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); } }
 body.exporting .st-status { display: none; }
+
+/* Layout A, row 2 on the other tabs: status chips first, then the numbers. */
+.st-status-lead { margin-right: 8px; padding-right: 14px; border-right: 1px solid var(--border); }
+.status-chip.sc-static { cursor: default; }
+.status-chip.sc-static:hover { box-shadow: none; }
+.status-chip.sc-static:active { transform: none; }
+.status-chip.sc-red { background: var(--danger-tint); border-color: var(--danger-line); color: var(--danger-text); }
+.status-chip.sc-red::before { background: var(--danger); }
+.status-chip.sc-on { box-shadow: inset 0 0 0 1.5px currentColor; }

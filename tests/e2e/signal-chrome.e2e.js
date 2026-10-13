@@ -238,6 +238,24 @@ async function step(name, fn) {
       await p.click("#modal-xlsx [data-close]");
     });
 
+    await step("layout A on the other tabs: Export in row 1 on Overview, status chips lead row 2, a Manpower chip narrows the list", async () => {
+      const tab = (t) => p.evaluate((t) => { [...document.querySelectorAll("#board-tabs .board-tab")].find((x) => x.textContent.includes(t)).click(); }, t);
+      await tab("Overview"); await p.waitForTimeout(400);
+      assert.equal(await p.evaluate(() => document.querySelector("#btn-export").parentNode.id), "row1-end");
+      assert.match(await p.textContent("#stats-bar"), /Utilization/);
+      await tab("Manpower"); await p.waitForTimeout(400);
+      assert.equal(await p.evaluate(() => document.querySelector("#btn-export").parentNode.id), "toolbar-right", "the lists keep Export beside their count");
+      await p.evaluate(() => { D().employees[0].trigoId = "T1"; renderStats(); renderEmployeeRows(); });
+      const all = await p.locator("#emplist-table tbody tr").count();
+      const chip = p.locator("#stats-bar .st-status .status-chip", { hasText: "missing TRIGO ID" });
+      assert.equal(await chip.count(), 1);
+      await chip.click();
+      assert.equal(await p.locator("#emplist-table tbody tr").count(), all - 1, "the chip shows only the people it counts");
+      await p.locator("#stats-bar .st-status .status-chip", { hasText: "missing TRIGO ID" }).click();
+      assert.equal(await p.locator("#emplist-table tbody tr").count(), all, "a second click shows everyone again");
+      await p.evaluate(() => { D().employees[0].trigoId = null; });
+    });
+
     await step("no page errors", async () => { assert.deepEqual(a.errors, []); });
     console.log("all signal-chrome checks passed");
   } finally {

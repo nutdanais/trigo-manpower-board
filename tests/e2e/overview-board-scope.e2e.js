@@ -55,7 +55,7 @@ async function step(name, fn) {
       assert.equal(first, "ov-scope-bar");
       const second = await p.evaluate(() => document.querySelector("#overview-panel").children[1].className);
       assert.match(second, /^ov-attn/);
-      assert.equal(await p.evaluate(() => document.querySelector("#stats-bar").children.length), 0, "no chip strip on Overview: the pills carry the counts");
+      assert.equal(await p.locator("#stats-bar .stat-tile").count(), 0, "Overview row 2 is a plain summary line, not the board tiles");
       const pills = await p.$$eval(".ov-scope-pill", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-pressed")]));
       assert.deepEqual(pills, [["All boards10", "true"], ["Board One8", "false"], ["Board Two2", "false"]]);
     });

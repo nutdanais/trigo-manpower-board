@@ -171,9 +171,10 @@ async function step(name, fn) {
       assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
     });
 
-    await step("Overview still shows no stats", async () => {
+    await step("Overview shows the day across every board in row 2 (layout A), no board tiles or areas", async () => {
       await p.click(".tab-overview");
-      assert.equal(await p.evaluate(() => document.querySelector("#stats-bar").children.length), 0);
+      assert.match(await p.textContent("#stats-bar"), /Boards: \d+.*Utilization: \d+%.*Assigned: \d+.*Standby: \d+/s);
+      assert.equal(await p.locator("#stats-bar .stat-tile").count(), 0);
       assert.equal(await p.evaluate(() => document.querySelector("#area-bar").children.length), 0);
     });
 

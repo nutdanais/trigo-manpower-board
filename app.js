@@ -399,6 +399,7 @@ const state = {
     filters: { contract: [], position: [], service: [], areaId: [], boardId: [], status: [] },
     sortKey: "name",
     sortDir: 1,
+    issue: null,         // a status chip's narrowing: "trigo" | "area" | "en" (active people missing it), or null
     nameView: "th",      // which name the list shows: "th" | "en" | "both" (remembered per device)
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
@@ -2549,6 +2550,26 @@ function statChip(label, n, color, extraClass) {
   return c;
 }
 
+/* A status chip (layout A, row 2): grey = for information, amber = check it,
+   red = fix it. With onClick it is a button that narrows the page to what it counts. */
+function statusChip(tone, n, label, onClick, title = "") {
+  const c = document.createElement(onClick ? "button" : "span");
+  if (onClick) { c.type = "button"; c.onclick = onClick; }
+  c.className = "status-chip" + (tone ? " sc-" + tone : "") + (onClick ? "" : " sc-static");
+  if (title) c.title = title;
+  c.innerHTML = (n == null ? "" : `<b>${n}</b> `) + escapeHtml(label);
+  return c;
+}
+function statusGroup(bar, chips) {
+  const list = chips.filter(Boolean);
+  if (!list.length) return;
+  const g = document.createElement("div");
+  g.className = "st-status st-status-lead";
+  for (const c of list) g.appendChild(c);
+  bar.prepend(g);
+}
+const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+
 function renderStats() {
   const bar = $("#stats-bar");
   const areaBar = $("#area-bar");
@@ -2556,10 +2577,26 @@ function renderStats() {
   bar.classList.remove("stats-tiles");
   $("#board-status").classList.add("hidden");   // the board path below fills and shows it
   areaBar.innerHTML = "";
-  // Overview: no chips — its board selector already carries every headcount
-  if (isOverview()) return;
+  // Overview: the day across every board — same rule as the board tiles
+  if (isOverview()) {
+    let assigned = 0, total = 0, leave = 0, hol = 0, free = 0, standby = 0, unstaffed = 0, standbyBoards = 0;
+    for (const b of D().boards) {
+      let st; try { st = boardStats(b.id); } catch (e) { continue; }
+      assigned += st.assigned; total += st.total; leave += st.leave; hol += st.onHoliday; free += st.oncallAvailable;
+      standby += st.standby; unstaffed += st.unstaffed; if (st.standby) standbyBoards++;
+    }
+    bar.appendChild(statChip("Boards", D().boards.length));
+    bar.appendChild(statChip("Utilization", utilizationPct(assigned, total, leave, hol, free) + "%"));
+    bar.appendChild(statChip("Assigned", assigned));
+    bar.appendChild(statChip("Standby", standby));
+    statusGroup(bar, [
+      standbyBoards ? statusChip("red", null, plural(standbyBoards, "board", "boards") + " with Standby", null, "Boards with permanent people on no mission and no leave") : null,
+      unstaffed ? statusChip("amber", null, plural(unstaffed, "mission", "missions") + " with no crew") : null,
+    ]);
+    return;
+  }
   if (isOrgChart()) {
-    let missions = 0, crew = 0; const engs = new Set();
+    let missions = 0, crew = 0, emptyMissions = 0; const engs = new Set();
     for (const b of D().boards) {
       const plan = (D().plans[b.id] || {})[state.date];
       if (!plan) continue;
@@ -2568,12 +2605,14 @@ function renderStats() {
         missions++;
         if (m.engineerId) engs.add(m.engineerId);
         crew += m.members.length;
+        if (!m.members.length) emptyMissions++;
       }
     }
     bar.appendChild(statChip("Boards", D().boards.length));
     bar.appendChild(statChip("Engineers", engs.size));
     bar.appendChild(statChip("Missions", missions));
     bar.appendChild(statChip("Crew deployed", crew));
+    statusGroup(bar, [emptyMissions ? statusChip("amber", null, plural(emptyMissions, "mission", "missions") + " with no crew") : null]);
     return;
   }
   if (isEmployeeList()) {
@@ -2589,6 +2628,18 @@ function renderStats() {
       const n = D().employees.filter(e => e.areaId === a.id).length;
       if (n) emplistAreaBar.appendChild(statChip(a.name, n));
     }
+    const knownAreas = new Set(D().areas.map(a => a.id));
+    const act = D().employees.filter(e => e.active !== false);
+    const issueChip = (key, tone, n, label) => n ? statusChip(tone, n, label, () => {
+      state.emplist.issue = state.emplist.issue === key ? null : key;
+      renderEmployeeRows(); renderStats();
+    }, state.emplist.issue === key ? "Click again to show everyone" : "Show only these people") : null;
+    statusGroup(bar, [
+      issueChip("trigo", "amber", act.filter(e => !e.trigoId).length, "missing TRIGO ID"),
+      issueChip("area", "amber", act.filter(e => !knownAreas.has(e.areaId)).length, "no service area"),
+      issueChip("en", "", act.filter(e => !(e.nameEn || "").trim()).length, "no English name"),
+    ]);
+    for (const c of bar.querySelectorAll(".st-status .status-chip")) c.classList.toggle("sc-on", c.title.startsWith("Click again"));
     return;
   }
   if (isCapacity()) {
@@ -2608,6 +2659,13 @@ function renderStats() {
     bar.appendChild(statChip("With location", withLoc));
     bar.appendChild(statChip("No location", rows.length - withLoc));
     bar.appendChild(statChip("Ever staffed", staffed));
+    const noLoc = rows.filter(r => !r.archived && !(r.location || r.mapUrl)).length;
+    const on = state.hostlist.filters.location.length === 1 && state.hostlist.filters.location[0] === "missing";
+    statusGroup(bar, [noLoc ? statusChip("amber", noLoc, "without a location", () => {
+      state.hostlist.filters.location = on ? [] : ["missing"];
+      renderHostlistFilterOptions(); renderHostRows(); renderStats();
+    }, on ? "Click again to show every host" : "Show only active hosts with no location or Maps link") : null]);
+    if (on) bar.querySelector(".st-status .status-chip").classList.add("sc-on");
     return;
   }
   const s = boardStats(D().activeBoardId);
@@ -3742,6 +3800,8 @@ function emplistFilteredSorted() {
     if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
     if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
+    const issue = state.emplist.issue;   // a status chip narrowing the list to active people missing one thing
+    if (issue && (e.active === false || (issue === "trigo" ? e.trigoId : issue === "en" ? (e.nameEn || "").trim() : D().areas.some(a => a.id === e.areaId)))) return false;
     if (q && !e.name.toLowerCase().includes(q) && !(e.nameEn || "").toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q) && !(e.trigoId || "").toLowerCase().includes(q)) return false;
     return true;
   });
@@ -6934,24 +6994,31 @@ function setXlsxTicks(on) {
   updateXlsxCount();
 }
 
-/* On a board (computer widths), the Names switch and Export join toolbar row 1:
-   Names → Undo → Reset → Export, Export at the right edge. Every other tab, and
-   phones (where row 1 folds into the More dropdown), keep them in #toolbar-right. */
+/* Layout A (computer widths): row 1 ends with the tab's tools and Export at the
+   right edge. On a board that is Names → Undo → Reset → Export. The Manpower and
+   Host lists keep Bulk edit and Export at the end of row 2 (row 1 is full). Phones (where row 1 folds into the More dropdown) keep
+   them in #toolbar-right. */
 const ROW1_TOOLS_MQ = window.matchMedia("(min-width: 641px)");
 function placeBoardRow1Tools(board) {
   const end = $("#row1-end"), right = $("#toolbar-right");
   const names = $("#card-names"), seg = names._seg, exp = $("#btn-export");
-  if (board && ROW1_TOOLS_MQ.matches) {
+  const bulk = [$("#btn-emplist-bulk"), $("#btn-hostlist-bulk")];
+  const wide = ROW1_TOOLS_MQ.matches;
+  // layout A: row 1 ends with the tab's tools and Export, on every tab
+  if (board && wide) {
     if (names.parentNode !== end) { end.prepend(names); if (seg) names.after(seg); }
-    if (exp.parentNode !== end || end.lastElementChild !== exp) end.append(exp);
   } else if (names.parentNode !== right) {
-    const badge = $("#readonly-badge");
-    right.insertBefore(names, badge);
+    right.insertBefore(names, $("#readonly-badge"));
     if (seg) names.after(seg);
-    right.append(exp);
   }
+  // the two lists keep Bulk edit and Export in row 2, beside their "N of M" count:
+  // their row 1 (search + six filters) already fills a laptop's width
+  const list = isEmployeeList() || isHostList();
+  const home = wide && !list ? end : right;
+  for (const b of bulk) if (b.parentNode !== right) right.append(b);
+  if (home.lastElementChild !== exp) home.append(exp);
 }
-ROW1_TOOLS_MQ.addEventListener("change", () => placeBoardRow1Tools(document.body.classList.contains("board-view")));
+ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.body.classList.contains("board-view")); });
 
 /* ---------- the one Export button ----------
    Every tab has the same Export button at the right edge of the toolbar. It
