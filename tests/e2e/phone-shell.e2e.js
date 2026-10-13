@@ -57,6 +57,31 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.ok(await p.$eval("#board-dd-label", (e) => e.scrollWidth <= e.clientWidth), "the name fits whole");
     });
 
+    await step("line 1 never wraps: a long name shortens with …, the date stays beside it (360pt, with HOLIDAY too)", async () => {
+      await p.setViewportSize({ width: 360, height: 800 });
+      const board = await p.evaluate(() => D().boards.find((b) => b.id === D().activeBoardId).name);
+      const line = () => p.evaluate(() => {
+        const mid = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return Math.round((r.top + r.bottom) / 2); };
+        const l = document.querySelector("#board-dd-label");
+        return { same: Math.abs(mid("#btn-board-dd") - mid("#btn-date")) < 6, cut: l.scrollWidth > l.clientWidth };
+      });
+      const setup = (name, hol) => p.evaluate(([n, hol]) => {
+        D().boards.find((b) => b.id === D().activeBoardId).name = n;
+        renderBoardPill();
+        document.querySelector("#m-hol-pill").classList.toggle("hidden", !hol);
+      }, [name, hol]);
+      for (const hol of [false, true]) {
+        await setup("Non-Rayong", hol);
+        assert.deepEqual(await line(), { same: true, cut: false }, "Non-Rayong fits whole, holiday=" + hol);
+        await setup("Eastern Seaboard North", hol);
+        assert.deepEqual(await line(), { same: true, cut: true }, "a long name shortens, holiday=" + hol);
+      }
+      assert.equal(await visible(p, "#mode-pill"), false, "HOLIDAY stands in for CONFIRMED on a phone");
+      await setup(board, false);
+      await p.evaluate(() => renderModePill());
+      await p.setViewportSize({ width: 390, height: 844 });
+    });
+
     await step("line 2: the summary card, Filter and ⋯; the old toolbar and stats are gone from the board", async () => {
       assert.equal(await visible(p, "#toolbar"), false);
       for (const sel of ["#m-summary", "#m-filter", "#m-more"]) assert.equal(await visible(p, sel), true, sel);

@@ -5475,7 +5475,10 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #btn-board-dd #board-dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   #btn-board-dd .ic:last-child { width: 15px; height: 15px; opacity: .6; }
   body:not(.board-view) #board-dd { display: none; }
-  #mode-pill, #m-hol-pill { order: 2; flex: none; margin-left: 0; font-size: 10px; padding: 1px 7px; }
+  #mode-pill, #m-hol-pill { order: 2; flex: none; margin-left: 0; font-size: 9.5px; letter-spacing: .2px; padding: 1px 6px; }
+  /* one pill only: on a holiday, HOLIDAY stands in for CONFIRMED / FORECAST, or the
+     name would be left with almost no room */
+  #topbar:has(#m-hol-pill:not(.hidden)) #mode-pill { display: none; }
   #m-hol-pill { display: inline-flex; color: #5b4bb8; background: #f1effc; border: 1px solid #cfc8f2; }
   #m-hol-pill.hidden { display: none; }
   #btn-hold-alerts { order: 4; }
@@ -5486,7 +5489,7 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #topbar .date-nav { border: 0; border-radius: 10px; background: var(--bg-soft); flex: none; height: 38px; }
   #topbar .date-nav .btn-top { border-left: 1px solid var(--border); background: transparent; min-height: 38px; height: 38px; }
   #topbar .date-nav .btn-top:first-child { border-left: 0; }
-  #topbar .date-nav .btn-top.btn-icon { width: 30px; }
+  #topbar .date-nav .btn-top.btn-icon { width: 28px; }
   #topbar .btn-date { flex: none; padding: 0 7px; font-weight: 650; font-size: 12.5px; }
   #topbar .btn-date .d-txt { display: flex; flex-direction: column; align-items: center; line-height: 1.08; }
   #topbar .btn-date .d-dow { font-size: 9.5px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase; color: var(--muted); }
@@ -5589,6 +5592,33 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   body.board-view.hdr-compact #m-count b { color: var(--stat-asg); }
   body.board-view.hdr-compact #m-filter { order: 5; height: 36px; width: 40px; }
   body.board-view.hdr-compact #m-more { order: 6; height: 36px; width: 40px; }
+
+  /* Line 1 must never wrap. In a wrapping flex row the date drops to a line of its
+     own before the name gives up any width (it did on a phone with a larger text
+     setting), so the header is a grid instead: the name's column is the only one
+     that shrinks, down to "…", while the pills and the date keep their full size.
+     Every item has an explicit column, so a hidden pill leaves its column empty
+     instead of shifting the rest. */
+  #topbar {
+    display: grid; align-items: center; column-gap: 5px; row-gap: 8px;
+    grid-template-columns: minmax(0, max-content) max-content max-content minmax(0, 1fr) max-content;
+  }
+  #board-dd { grid-area: 1 / 1; min-width: 0; }
+  #btn-board-dd { width: 100%; }
+  #mode-pill { grid-area: 1 / 2; }
+  #m-hol-pill { grid-area: 1 / 3; }
+  #topbar .topbar-right { grid-area: 1 / 5; justify-self: end; }
+  body:not(.board-view) #topbar .topbar-right { grid-column: 1 / -1; justify-self: start; }
+  #btn-hold-alerts { grid-area: 4 / 1 / 5 / -1; justify-self: start; }
+  body.board-view #m-row2 { grid-area: 2 / 1 / 3 / -1; }
+  body.board-view #m-details:not(.hidden) { grid-area: 3 / 1 / 4 / -1; }
+  body.board-view.hdr-compact #topbar {
+    grid-template-columns: minmax(0, max-content) max-content minmax(0, 1fr) max-content max-content max-content;
+  }
+  body.board-view.hdr-compact #topbar .topbar-right { grid-area: 1 / 2; justify-self: start; }
+  body.board-view.hdr-compact #m-count { grid-area: 1 / 4; margin-left: 0; }
+  body.board-view.hdr-compact #m-filter { grid-area: 1 / 5; }
+  body.board-view.hdr-compact #m-more { grid-area: 1 / 6; }
 
   /* leave: one swipeable row of short names, types with people first */
   body.board-view:not(.exporting) #leave-tabs {
