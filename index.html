@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-13l">
+<link rel="stylesheet" href="styles.css?v=2026-10-13m">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-13l"></script>
+<script src="version.js?v=2026-10-13m"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -431,7 +431,10 @@
   <div id="toolbar-row1">
     <!-- Overview: which board the dashboard shows. In the toolbar (not the page) so it
          stays in view while the dashboard scrolls; filled by renderOverview. -->
-    <select id="ov-board-select" class="hidden" aria-label="Board shown on the dashboard" title="Board shown on the dashboard"></select>
+    <div id="ov-board-dd" class="tb-dd hidden">
+      <button type="button" id="btn-ov-board" class="btn" aria-haspopup="menu" aria-expanded="false" title="Board shown on the dashboard"><span class="ovb-dot"></span><span class="ovb-cap">Board</span><span class="ovb-label">All boards</span><span class="ovb-count"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+      <div id="ov-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the dashboard"></div>
+    </div>
     <button id="btn-import-mission" class="btn btn-danger hidden"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add Mission</button>
     <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
     <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
@@ -1299,12 +1302,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-13l"></script>
-<script src="employee-id.js?v=2026-10-13l"></script>
-<script src="cloud.js?v=2026-10-13l"></script>
-<script src="charts.js?v=2026-10-13l"></script>
-<script src="xlsx-export.js?v=2026-10-13l"></script>
-<script src="bulk-edit.js?v=2026-10-13l"></script>
-<script src="app.js?v=2026-10-13l"></script>
+<script src="planning.js?v=2026-10-13m"></script>
+<script src="employee-id.js?v=2026-10-13m"></script>
+<script src="cloud.js?v=2026-10-13m"></script>
+<script src="charts.js?v=2026-10-13m"></script>
+<script src="xlsx-export.js?v=2026-10-13m"></script>
+<script src="bulk-edit.js?v=2026-10-13m"></script>
+<script src="app.js?v=2026-10-13m"></script>
 </body>
 </html>

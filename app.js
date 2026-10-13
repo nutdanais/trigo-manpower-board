@@ -263,10 +263,14 @@ const POSITIONS = {
 /* Overview History: four measures, ONE charted at a time — each on its own
    axis, so Missions (~4) is never squashed flat under Idle (~28). */
 const OV_HISTORY_MEASURES = [
-  { key: "util",     label: "Utilization",    suffix: "%", value: (r) => trendMetricValue("util", r) },
-  { key: "deployed", label: "Deployed / day", suffix: "",  value: (r) => r.assigned },
-  { key: "idle",     label: "Idle / day",     suffix: "",  value: (r) => trendMetricValue("idle", r) },
-  { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions },
+  { key: "util",     label: "Utilization",    suffix: "%", value: (r) => trendMetricValue("util", r),
+    help: "Assigned ÷ (Assigned + Standby), averaged over the working days. People on leave (exchange working day included), on a holiday or on-call and not called in are left out, so a day with no one on Standby reads 100%." },
+  { key: "deployed", label: "Deployed / day", suffix: "",  value: (r) => r.assigned,
+    help: "People on a mission each working day (permanent and on-call), averaged over the range." },
+  { key: "idle",     label: "Idle / day",     suffix: "",  value: (r) => trendMetricValue("idle", r),
+    help: "Permanent people on no mission and no leave each working day, the board's Standby, averaged over the range. It is the share Utilization misses. On-call people who were not called in are not idle." },
+  { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions,
+    help: "Missions with at least one person on them each working day, averaged over the range." },
 ];
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
 /* the utilization formula, said once behind an ⓘ (hover / focus) instead of
@@ -1002,7 +1006,7 @@ function render() {
   const planEmpty = board && planIsEmpty(getPlan());
   $("#btn-reset-board").classList.toggle("hidden", fc ? !(planEdit && planEmpty) : !boardEdit);
   $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
-  $("#ov-board-select").classList.toggle("hidden", !ov || D().boards.length < 2);
+  $("#ov-board-dd").classList.toggle("hidden", !ov || D().boards.length < 2);
   document.body.classList.toggle("ov-view", ov);
   placeBoardRow1Tools(board);
   renderStats();
@@ -1734,7 +1738,7 @@ function renderUserMenu() {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2898,14 +2902,30 @@ const ovScopeName = (boards) => boards.length === 1 && D().boards.length > 1 ? b
    roster count for the date on screen. It lives in toolbar row 1, which stays in
    view while the dashboard scrolls, so the board being shown is always visible. */
 function fillOvBoardSelect(scope) {
-  const sel = $("#ov-board-select");
+  // the same button + menu as the banner's Boards picker and the Filters popover
   const current = scope.length === 1 && D().boards.length > 1 ? scope[0].id : "";
-  sel.innerHTML = "";
-  const opt = (id, label, count) => sel.appendChild(Object.assign(document.createElement("option"), { value: id, textContent: `${label} (${count})` }));
-  opt("", "All boards", D().employees.filter(onRoster).length);
-  for (const b of D().boards) opt(b.id, b.name, rosterEmployees(b.id).length);   // textContent: board names are user data
-  sel.value = current;
-  sel.onchange = () => setOvBoard(sel.value);
+  const btn = $("#btn-ov-board"), menu = $("#ov-board-menu");
+  const all = D().employees.filter(onRoster).length;
+  const pickedBoard = D().boards.find(b => b.id === current);
+  const label = btn.querySelector(".ovb-label");
+  label.textContent = pickedBoard ? pickedBoard.name : "All boards";   // textContent: board names are user data
+  btn.querySelector(".ovb-count").textContent = pickedBoard ? rosterEmployees(pickedBoard.id).length : all;
+  btn.querySelector(".ovb-dot").style.background = pickedBoard ? Charts.catColor(D().boards.indexOf(pickedBoard)) : "transparent";
+  menu.innerHTML = "";
+  const item = (id, name, count, color) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tb-item" + (id === current ? " is-current" : "");
+    b.setAttribute("aria-current", id === current ? "true" : "false");
+    const dot = b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-dot" }));
+    dot.style.background = color || "transparent";
+    b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: name }));
+    b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(count) }));
+    b.onclick = () => { closeTopbarMenus(); if (id !== current) setOvBoard(id); };
+    menu.appendChild(b);
+  };
+  item("", "All boards", all);
+  D().boards.forEach((b, i) => item(b.id, b.name, rosterEmployees(b.id).length, Charts.catColor(i)));
 }
 /* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
    works carries no information, so it's dropped from the axis entirely
@@ -3062,10 +3082,14 @@ function historySection(dates, recs, pendingCharts) {
     btn.innerHTML = `<span class="ov-htile-label">${m.label}</span>
       <span class="ov-htile-value">${mean == null ? "—" : mean + m.suffix}<small> avg</small></span>
       <span class="ov-htile-sub">${latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}`}</span>`;
+    btn.title = m.help;
     btn.onclick = () => { if (ov.historyMeasure !== m.key) { ov.historyMeasure = m.key; render(); } };
     tiles.appendChild(btn);
   }
   sec.appendChild(tiles);
+  // what the tile being charted means, in plain words, right under the tiles
+  const picked = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
+  sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help", textContent: `${picked.label}: ${picked.help}` }));
 
   const m = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
   const values = recs.map(r => (r ? m.value(r) : null));

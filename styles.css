@@ -5514,12 +5514,33 @@ body.toolbar-one-row #toolbar-row1 { order: 1; flex: 0 0 auto; }
 /* Overview: the board dropdown leads the one toolbar row, and the toolbar stays
    under the banner while the dashboard scrolls, so the board shown is always in view */
 body.toolbar-one-row #toolbar-row1 { display: contents; }
-body.toolbar-one-row #ov-board-select { order: -1; margin-left: 20px; }
+body.toolbar-one-row #ov-board-dd { order: -1; margin-left: 20px; }
 body.toolbar-one-row #row1-end { order: 2; padding: 7px 20px 7px 0; }
-#ov-board-select { height: 34px; min-width: 200px; padding: 0 30px 0 11px; border: 1px solid var(--border); border-radius: var(--r); background-color: var(--panel); font: inherit; font-size: 13.5px; font-weight: 600; color: var(--text); }
-#ov-board-select.hidden { display: none; }
+/* the board picker: an outline button like every toolbar control, opening the app's menu */
+#ov-board-dd.hidden { display: none; }
+#btn-ov-board { gap: 8px; min-width: 210px; }
+#btn-ov-board .ovb-cap { color: var(--muted); font-weight: 550; }
+#btn-ov-board .ovb-label { font-weight: 650; }
+#btn-ov-board .ic { margin-left: auto; width: 14px; height: 14px; opacity: .7; }
+.ovb-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+#btn-ov-board .ovb-dot[style*="transparent"] { display: none; }
+.ovb-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: 11.5px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+#ov-board-menu { min-width: 240px; }
+#ov-board-menu .tb-item .ovb-name { flex: 1; }
+#ov-board-menu .tb-item.is-current { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; }
+#ov-board-menu .tb-item .ovb-dot[style*="transparent"] { box-shadow: inset 0 0 0 1.5px var(--border); }
 body.ov-view #toolbar { position: sticky; top: var(--bar-h, 56px); z-index: 30; }
 
 /* Host stats: "No location" in the warning key colour, the By area line on its own row */
 .st-noloc { --tc: var(--stat-leave); }
 body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 100%; gap: 6px 8px; }
+
+/* History: the charted measure explained in plain words */
+.ov-htile-help { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; text-wrap: pretty; }
+
+/* Overview "In detail": two independent columns so a short card never leaves a hole
+   beside a tall one (the grid made every row as tall as its tallest card) */
+@media (min-width: 901px) {
+  .ov-detail-grid { display: block; columns: 2; column-gap: 18px; }
+  .ov-detail-grid > * { break-inside: avoid; margin: 0 0 18px; display: block; width: 100%; }
+}

@@ -53,11 +53,13 @@ async function step(name, fn) {
       await go(SRC);
       const first = await p.evaluate(() => document.querySelector("#overview-panel").firstElementChild.className);
       assert.match(first, /^ov-attn/, "the dashboard starts with the attention card");
-      assert.equal(await p.isVisible("#ov-board-select"), true);
+      assert.equal(await p.isVisible("#btn-ov-board"), true);
       assert.equal(await p.evaluate(() => getComputedStyle(document.getElementById("toolbar")).position), "sticky");
       assert.equal(await p.locator("#stats-bar .stat-tile").count(), 0, "Overview row 2 is a plain summary line, not the board tiles");
-      const opts = await p.$$eval("#ov-board-select option", (els) => els.map((e) => [e.textContent.trim(), e.selected]));
-      assert.deepEqual(opts, [["All boards (10)", true], ["Board One (8)", false], ["Board Two (2)", false]]);
+      await p.click("#btn-ov-board");
+      const opts = await p.$$eval("#ov-board-menu .tb-item", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-current")]));
+      assert.deepEqual(opts, [["All boards10", "true"], ["Board One8", "false"], ["Board Two2", "false"]]);
+      await p.click("#btn-ov-board");
     });
 
     await step("the page reads summary, then In detail, then Over time", async () => {
@@ -93,8 +95,9 @@ async function step(name, fn) {
     });
 
     await step("picking a board scopes every section, and is remembered", async () => {
-      await p.selectOption("#ov-board-select", "b2");
-      await p.waitForFunction(() => document.querySelector("#ov-board-select").value === "b2" && /Board Two/.test(document.querySelector(".ov-attn-sub").textContent));
+      await p.click("#btn-ov-board");
+      await p.click("#ov-board-menu .tb-item:has-text('Board Two')");
+      await p.waitForFunction(() => /Board Two/.test(document.querySelector("#btn-ov-board").textContent) && /Board Two/.test(document.querySelector(".ov-attn-sub").textContent));
       const view = await p.evaluate(() => ({
         title: document.querySelector(".ov-attn-title").textContent.trim(),
         sub: document.querySelector(".ov-attn-sub").textContent,
@@ -113,8 +116,9 @@ async function step(name, fn) {
       assert.match(view.overTime, /Board Two/);
       assert.equal(view.historySelect, 0, "History has no board select of its own any more");
       assert.equal(view.saved, "b2");
-      await p.selectOption("#ov-board-select", "");
-      await p.waitForFunction(() => document.querySelector("#ov-board-select").value === "");
+      await p.click("#btn-ov-board");
+      await p.click("#ov-board-menu .tb-item:has-text('All boards')");
+      await p.waitForFunction(() => /All boards/.test(document.querySelector("#btn-ov-board").textContent));
       assert.equal(await p.evaluate(() => localStorage.getItem("manpower.ovBoard")), "");
     });
 
