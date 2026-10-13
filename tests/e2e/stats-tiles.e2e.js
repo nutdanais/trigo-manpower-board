@@ -174,6 +174,17 @@ async function step(name, fn) {
       assert.equal(await p.evaluate(() => document.querySelector("#area-bar").children.length), 0);
     });
 
+    await step("Assigned shows utilization as Assigned ÷ (Assigned + Standby), status chips leave Standby out", async () => {
+      await p.evaluate((id) => { D().activeBoardId = id; return refreshAndRender(); }, await p.evaluate(() => D().boards[0].id));
+      const r = await p.evaluate(() => {
+        const s = boardStats(D().activeBoardId);
+        return { s, pct: document.querySelector("#stats-bar .st-pct").textContent, chips: document.querySelector("#board-status").textContent };
+      });
+      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 100) : 0;
+      assert.equal(r.pct, want + "% utilized");
+      assert.ok(!/standby/i.test(r.chips), "no Standby status chip: " + r.chips);
+    });
+
     assert.deepEqual(a.errors, [], "no page errors");
     console.log("all stats-tiles checks passed");
   } catch (e) {

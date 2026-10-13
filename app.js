@@ -271,7 +271,7 @@ const OV_HISTORY_MEASURES = [
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
 /* the utilization formula, said once behind an ⓘ (hover / focus) instead of
    printed under two sections */
-const OV_UTIL_INFO = '<span class="ov-info chart-mark" tabindex="0" data-tip-value="Utilization" data-tip-label="deployed ÷ (headcount − leave − holiday − free on-call). Free on-call staff are surge capacity, so they are left out.">i</span>';
+const OV_UTIL_INFO = '<span class="ov-info chart-mark" tabindex="0" data-tip-value="Utilization" data-tip-label="Assigned ÷ (Assigned + Standby): how much of the people really available that day is deployed. People on leave (exchange working day included), on a holiday or on-call and not called in are left out, so 0 Standby reads 100%.">i</span>';
 const HISTORY_SUM_KEYS = ["assigned", "headcount", "leave", "oncallAssigned", "oncallHeadcount", "oncallLeave", "staffedMissions"];
 async function safely(fn) {
   try { await fn(); } catch (e) { toast("Something went wrong: " + (e.message || e), "error"); }
@@ -2377,6 +2377,7 @@ function renderMissions() {
     // block from across the room, and the header text can follow the theme
     // like every other label again.
     card.style.borderTopColor = engColor;
+    card.dataset.missionId = m.id;   // the "mission with no crew" status chip scrolls to it
     const memberEmps = missionCrew(m);
     const header = document.createElement("div");
     header.className = "mission-header";
@@ -2538,6 +2539,7 @@ function renderStats() {
   const areaBar = $("#area-bar");
   bar.innerHTML = "";
   bar.classList.remove("stats-tiles");
+  $("#board-status").classList.add("hidden");   // the board path below fills and shows it
   areaBar.innerHTML = "";
   // Overview: no chips — its board selector already carries every headcount
   if (isOverview()) return;
@@ -2604,9 +2606,20 @@ function renderStats() {
     `<div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div>${extra}</div>`;
   const shift = `<div class="st-shift"><span data-stat="Day">${icon("sun")}<b>${s.dayMissions}</b> Day</span>` +
     `<span data-stat="Night">${icon("moon")}<b>${s.nightMissions}</b> Night</span></div>`;
+  // Utilization = Assigned ÷ (Assigned + Standby): people on leave (exchange
+  // working day included), on a holiday or on-call and not called in are left out,
+  // so the missing share is exactly Standby and 0 Standby reads 100%.
+  const util = utilizationPct(s.assigned, s.total, s.leave, s.onHoliday, s.oncallAvailable);
+  const utilLine = `<span class="st-pct" data-stat="Utilized" title="Assigned ÷ (Assigned + Standby). People on leave, on a holiday or on-call and not called in are left out.">${util}% utilized</span>`;
+  // Status chips: what needs a look, beside the numbers. Standby has no chip — its tile already flags it.
+  const plan = peekPlan(D().activeBoardId);
+  const hiddenN = plan.missions.filter(m => m.hidden).length;
+  const statusChips =
+    (s.unstaffed ? `<button type="button" class="status-chip sc-amber" data-status="unstaffed" title="Show the first mission with nobody on it"><b>${s.unstaffed}</b> ${s.unstaffed === 1 ? "mission" : "missions"} with no crew</button>` : "") +
+    (hiddenN ? `<button type="button" class="status-chip" data-status="hidden" title="Open Hide/Unhide"><b>${hiddenN}</b> ${hiddenN === 1 ? "mission" : "missions"} hidden</button>` : "");
   bar.classList.add("stats-tiles");
   bar.innerHTML = lead +
-    tile("Assigned", s.assigned, "asg", shift) +
+    tile("Assigned", s.assigned, "asg", shift).replace(/<b>(\d+)<\/b><\/div>/, (m0, n) => `<span class="st-num"><b>${n}</b>${utilLine}</span></div>`) +
     tile("Leave", s.leave, "leave") +
     tile("Standby", s.standby, "standby", s.standby > 0 ? `<span class="st-ico">${icon("alert")}</span>` : "", s.standby > 0,
       "Permanent staff on no mission and no leave") +
@@ -2615,6 +2628,19 @@ function renderStats() {
     // how the day splits, in the tile colours: a quick read of the proportions, never the only carrier of a number
     `<div class="st-split" aria-hidden="true">${[["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]]
       .filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
+  const statusBox = $("#board-status");
+  statusBox.innerHTML = statusChips;
+  statusBox.classList.toggle("hidden", !statusChips);
+  const firstEmpty = statusBox.querySelector('[data-status="unstaffed"]');
+  if (firstEmpty) firstEmpty.onclick = () => {
+    const m = plan.missions.find(x => !x.hidden && !x.members.length);
+    const card = m && document.querySelector(`.mission-card[data-mission-id="${CSS.escape(String(m.id))}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("flash-outline"); void card.offsetWidth; card.classList.add("flash-outline");
+  };
+  const hiddenBtn = statusBox.querySelector('[data-status="hidden"]');
+  if (hiddenBtn) hiddenBtn.onclick = () => $("#btn-hide-missions").click();
   // Service area is a different cut of the SAME people as Total (the board's roster),
   // so the chips must add up to it: anyone without a known area is counted as
   // "No area" instead of silently dropping out of the sum.
