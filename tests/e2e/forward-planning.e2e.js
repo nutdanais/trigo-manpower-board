@@ -825,4 +825,4 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
   }
   console.log(failures ? `\n${failures} FAILED` : "\nALL END-TO-END CHECKS PASSED");
   process.exit(failures ? 1 : 0);
-})().catch((e) => { console.error(e && e.message ? "" : e); process.exit(1); });
+})().catch((e) => { console.error(e); process.exit(1); });

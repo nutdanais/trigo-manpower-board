@@ -5208,3 +5208,118 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   .modal.modal-side { animation: none; }
 }
+
+/* ===== Control deck (2026-10-13c) =====
+   The top of the app as one navy deck. Row 1 (#topbar): logo, the app-wide tabs,
+   the board pill, then date, Lock, Settings and the account avatar (Sign out lives
+   in its menu). On a board, row 2 is the toolbar in a slightly deeper navy; the
+   stats strip below it is white. The people panel starts under row 1. Nothing here
+   touches the board itself (mission / employee / leave cards). */
+#topbar { flex-wrap: nowrap; justify-content: flex-start; gap: 6px; min-height: 54px; padding: 0 20px; }
+#topbar .topbar-left { flex: none; margin-right: 10px; }
+#app-logo { height: 26px; }
+#app-title { display: none; }
+#topbar .topbar-right { margin-left: auto; flex-wrap: nowrap; flex: none; }
+#green-rule { height: 2px; }
+
+/* app-wide tabs, on navy */
+#board-tabs { flex-wrap: nowrap; align-items: center; gap: 2px; }
+#board-tabs .board-tab {
+  height: 34px; padding: 0 13px; margin: 0; border: 0; border-radius: var(--r);
+  color: rgba(255, 255, 255, .78); font-size: 13.5px; font-weight: 550; position: relative; white-space: nowrap;
+}
+#board-tabs .board-tab:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+#board-tabs .board-tab.active { color: #fff; font-weight: 600; background: transparent; }
+#board-tabs .board-tab.active::after {
+  content: ""; position: absolute; left: 13px; right: 13px; bottom: -10px; height: 2px; border-radius: 2px; background: var(--brand-green);
+}
+#board-tabs .board-tab .ic { margin-right: 6px; opacity: .85; }
+
+/* banner menus (board pill, account) */
+.tb-dd { position: relative; flex: none; }
+#btn-board-dd { gap: 7px; }
+#btn-board-dd.is-current { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .4); }
+#btn-board-dd .ic:last-child { width: 14px; height: 14px; opacity: .8; }
+.tb-pop {
+  position: absolute; top: calc(100% + 8px); left: 0; min-width: 220px; padding: 6px; z-index: 80;
+  background: var(--panel); color: var(--text); border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(0, 38, 70, .10), 0 14px 34px -8px rgba(0, 38, 70, .35);
+}
+.tb-pop-right { left: auto; right: 0; min-width: 240px; }
+.tb-item {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 11px; border: 0; border-radius: var(--r);
+  background: none; color: var(--text); font: inherit; font-size: 13.5px; font-weight: 550; text-align: left; cursor: pointer;
+}
+.tb-item:hover, .tb-item:focus-visible { background: var(--hover-tint); color: var(--primary-text); outline: none; }
+#board-menu .board-tab.tab-board { height: auto; border: 0; margin: 0; color: var(--text); font-weight: 550; }
+#board-menu .board-tab.tab-board.active { color: var(--primary-text); font-weight: 700; background: var(--hover-tint); box-shadow: inset 3px 0 0 var(--brand-green); }
+.tb-item-add { color: var(--muted); border-top: 1px solid var(--border); border-radius: 0 0 var(--r) var(--r); margin-top: 4px; padding-top: 11px; }
+.tb-who { padding: 8px 11px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.tb-who b { display: block; font-size: 13.5px; font-weight: 650; }
+.tb-who small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.avatar-btn {
+  width: 32px; height: 32px; margin-left: 4px; border: 0; border-radius: 9px; padding: 0; cursor: pointer;
+  background: var(--brand-green); color: #1d2c05; font: 700 12px var(--font-ui); display: grid; place-items: center;
+}
+.avatar-btn:hover, .avatar-btn[aria-expanded="true"] { box-shadow: 0 0 0 3px rgba(168, 200, 85, .35); }
+.avatar-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+#mode-pill { margin-left: 4px; }
+
+/* the people panel starts under row 1 and the banner spans the full width */
+@media (min-width: 901px) {
+  body.board-view #sticky-header #topbar,
+  body.board-view #sticky-header #green-rule,
+  body.board-view #sticky-header #update-banner { margin-right: calc(-1 * var(--fp-w, 264px)); }
+  #float-pool { top: var(--bar-h, 56px); }
+  #fp-resizer { top: var(--bar-h, 56px); }
+}
+body.settings-open #board-tabs, body.settings-open #board-dd { display: none !important; }
+
+/* Row 2: the toolbar on a board, in the deeper navy */
+@media (min-width: 641px) {
+  body.board-view #toolbar-row1 { background: #00325a; padding: 7px 20px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  body.board-view #toolbar-row1 .btn { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff; }
+  body.board-view #toolbar-row1 .btn:hover { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .4); }
+  body.board-view #toolbar-row1 .btn-primary { background: #fff; border-color: #fff; color: var(--primary); }
+  body.board-view #toolbar-row1 .btn-primary:hover { background: #e6eef6; border-color: #e6eef6; }
+  body.board-view #toolbar-row1 .btn-quiet,
+  body.board-view #toolbar-row1 .btn-reset,
+  body.board-view #toolbar-row1 .btn-hidden-chip { background: transparent; border-color: transparent; color: rgba(255, 255, 255, .85); }
+  body.board-view #toolbar-row1 .btn-quiet:hover,
+  body.board-view #toolbar-row1 .btn-reset:hover,
+  body.board-view #toolbar-row1 .btn-hidden-chip:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+  body.board-view #toolbar-row1 .btn:disabled { opacity: .45; }
+  body.board-view #toolbar-row1 .ms-btn { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff; }
+  body.board-view #toolbar-row1 .ms-btn:hover { background: rgba(255, 255, 255, .16); }
+  body.board-view #toolbar-row1 .ms-btn .ms-val { color: rgba(255, 255, 255, .7); }
+  body.board-view #toolbar-row1 .ms-btn.ms-active,
+  body.board-view #toolbar-row1 .btn-hidden-chip.is-on { background: #fff; border-color: #fff; color: var(--primary); }
+  body.board-view #toolbar-row1 .ms-btn.ms-active .ms-val { color: var(--primary); }
+  body.board-view #toolbar-row1 #filters select {
+    background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff;
+  }
+  body.board-view #toolbar-row1 #filters select option { color: var(--text); background: var(--panel); }
+  body.board-view #toolbar-row1 .toggle-text { color: rgba(255, 255, 255, .88); }
+  body.board-view #toolbar-row2 { border-bottom: 1px solid var(--border); }
+}
+
+/* Thai | English toggle (a select[data-seg] drawn as two buttons) */
+#card-names + .seg-pick, #emplist-name-view + .seg-pick { margin: 0; align-self: center; }
+select.hidden + .seg-pick { display: none; }
+#card-names + .seg-pick button, #emplist-name-view + .seg-pick button { flex: none; height: 28px; padding: 0 12px; font-size: 12.5px; }
+#sticky-header { z-index: 60; }   /* above the people panel, so the banner menus open over it */
+
+/* phone: the banner wraps into the brand + board pill, the scrolling module tabs, then the date row */
+@media (max-width: 640px) {
+  #topbar { flex-wrap: wrap; min-height: 0; padding: 5px 8px 6px; gap: 4px 8px; }
+  #topbar .topbar-left { margin-right: 0; }
+  #board-dd { flex: 1 1 0; min-width: 0; }
+  #btn-board-dd { width: 100%; justify-content: space-between; min-height: 34px; }
+  #board-tabs { order: 5; flex: 1 1 100%; min-width: 0; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  #board-tabs::-webkit-scrollbar { display: none; }
+  #board-tabs .board-tab { flex: none; padding: 0 11px; }
+  #board-tabs .board-tab.active::after { bottom: 0; left: 11px; right: 11px; }
+  #topbar .topbar-right { order: 6; margin-left: 0; }
+  .avatar-btn { width: 34px; height: 34px; margin-left: 0; }
+  .tb-pop { min-width: min(260px, calc(100vw - 16px)); }
+}

@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-13b">
+<link rel="stylesheet" href="styles.css?v=2026-10-13c">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-13b"></script>
+<script src="version.js?v=2026-10-13c"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -195,6 +195,23 @@
     <img id="app-logo" src="logo-on-navy.png" alt="TRIGO" onerror="this.onerror=null;this.src='logo.svg'">
     <div id="app-title">Manpower Board<small>Operations Planning</small></div>
   </div>
+  <!-- The app-wide views (Overview, Org Chart, Manpower, Host, Capacity). The
+       per-board tabs live in the board menu next to it (#board-dd), so adding a
+       board no longer widens this strip. -->
+  <nav id="board-tabs" aria-label="Modules"></nav>
+  <!-- Which board is on screen, as one pill. The boards themselves are the
+       .board-tab.tab-board items of #board-menu (see renderTabs in app.js). -->
+  <div id="board-dd" class="tb-dd">
+    <button type="button" id="btn-board-dd" class="btn btn-top" aria-haspopup="menu" aria-expanded="false" title="Switch board"><span id="board-dd-label">Board</span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+    <div id="board-menu" class="tb-pop hidden" role="menu" aria-label="Boards">
+      <div id="board-menu-list"></div>
+      <button id="btn-add-board" class="tb-item tb-item-add" type="button" role="menuitem" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New board</button>
+    </div>
+  </div>
+  <!-- CONFIRMED / FORECAST for the board and date on screen, and the
+       "holds taken from you" counter (forward planning; see app.js) -->
+  <span id="mode-pill" class="mode-pill hidden"></span>
+  <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
   <div class="topbar-right">
     <span id="save-status" class="hidden"></span>
     <div class="date-nav">
@@ -204,25 +221,16 @@
     </div>
     <button id="btn-lock" class="btn btn-top hidden" title="Lock this board so it's view-only for everyone"><svg class="ic" aria-hidden="true"><use href="#i-unlock"></use></svg><span class="btn-label">Lock</span></button>
     <button id="btn-settings" class="btn btn-top" title="Settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg><span class="btn-label">Settings</span></button>
-    <button id="btn-signout" class="btn btn-top" title="Sign out"><svg class="ic" aria-hidden="true"><use href="#i-sign-out"></use></svg><span class="btn-label">Sign out</span></button>
+    <div id="user-dd" class="tb-dd">
+      <button type="button" id="btn-avatar" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account" aria-label="Account menu"><span id="avatar-initials">?</span></button>
+      <div id="user-menu" class="tb-pop tb-pop-right hidden" role="menu" aria-label="Account">
+        <div class="tb-who"><b id="user-menu-name"></b><small id="user-menu-role"></small></div>
+        <button id="btn-signout" class="tb-item" type="button" role="menuitem" title="Sign out"><svg class="ic" aria-hidden="true"><use href="#i-sign-out"></use></svg> Sign out</button>
+      </div>
+    </div>
   </div>
 </header>
 <div id="green-rule"></div>
-
-<div id="board-bar">
-  <div id="board-tabs"></div>
-  <!-- CONFIRMED / FORECAST for the board and date on screen, and the
-       "holds taken from you" counter (forward planning; see app.js) -->
-  <span id="mode-pill" class="mode-pill hidden"></span>
-  <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
-  <!-- Phone-only stand-in for the per-board tabs and "+ Board" (see #board-select
-       in styles.css). A native <select> is deliberate: it gets the platform's own
-       picker, which is a far better target than a row of tabs, and it collapses
-       any number of boards into one control so the whole bar stays on one line.
-       Above ~640px it is display:none and the tabs are the real thing. -->
-  <select id="board-select" aria-label="Board"></select>
-  <button id="btn-add-board" class="btn btn-quiet" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Board</button>
-</div>
 </div>
 
 <!-- ===== Settings: a full page below the top bar =====
@@ -462,10 +470,9 @@
            this row; render() shows/hides the whole group with one class. -->
       <div id="emplist-toolbar">
         <input id="emplist-search" type="search" placeholder="Search name (Thai or English), TRIGO ID or mobile…" autocomplete="off">
-        <select id="emplist-name-view" aria-label="Names shown" title="Which name the list shows. The app shows the Thai name by default.">
-          <option value="th">Names: Thai</option>
-          <option value="en">Names: English</option>
-          <option value="both">Names: Thai + English</option>
+        <select id="emplist-name-view" data-seg aria-label="Names shown" title="Which name the list shows. The app shows the Thai name by default.">
+          <option value="th">Thai</option>
+          <option value="en">English</option>
         </select>
         <div id="emplist-filters">
           <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
@@ -539,10 +546,9 @@
       <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
       <span id="hostlist-count" class="hidden"></span>
       <button type="button" class="btn hidden" id="btn-hostlist-bulk" title="Edit many hosts in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
-      <select id="card-names" class="hidden" aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
-        <option value="th">Names: Thai</option>
-        <option value="en">Names: English</option>
-        <option value="both">Names: Thai + English</option>
+      <select id="card-names" class="hidden" data-seg aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
+        <option value="th">Thai</option>
+        <option value="en">English</option>
       </select>
       <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
       <!-- One Export button for every tab, always at the right edge. It opens that
@@ -1253,12 +1259,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-13b"></script>
-<script src="employee-id.js?v=2026-10-13b"></script>
-<script src="cloud.js?v=2026-10-13b"></script>
-<script src="charts.js?v=2026-10-13b"></script>
-<script src="xlsx-export.js?v=2026-10-13b"></script>
-<script src="bulk-edit.js?v=2026-10-13b"></script>
-<script src="app.js?v=2026-10-13b"></script>
+<script src="planning.js?v=2026-10-13c"></script>
+<script src="employee-id.js?v=2026-10-13c"></script>
+<script src="cloud.js?v=2026-10-13c"></script>
+<script src="charts.js?v=2026-10-13c"></script>
+<script src="xlsx-export.js?v=2026-10-13c"></script>
+<script src="bulk-edit.js?v=2026-10-13c"></script>
+<script src="app.js?v=2026-10-13c"></script>
 </body>
 </html>

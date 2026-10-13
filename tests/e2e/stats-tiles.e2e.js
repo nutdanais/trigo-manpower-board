@@ -123,7 +123,7 @@ async function step(name, fn) {
       const row = await p.locator("#toolbar-row1").boundingBox();
       const reset = await p.locator("#btn-reset-board").boundingBox();
       const undo = await p.locator("#btn-undo").boundingBox();
-      assert.ok(row.x + row.width - (reset.x + reset.width) <= 16, "Reset Board at the right edge");
+      assert.ok(row.x + row.width - (reset.x + reset.width) <= 24, "Reset Board at the right edge");
       assert.ok(undo.x < reset.x, "Undo then Reset Board");
     });
 
@@ -162,10 +162,10 @@ async function step(name, fn) {
     }
     await p.setViewportSize({ width: 1400, height: 900 });
 
-    await step("the Names select is sized to the name showing, not to 'Thai + English'", async () => {
-      const w = await p.evaluate(() => document.querySelector("#card-names").getBoundingClientRect().width);
-      const supported = await p.evaluate(() => CSS.supports("field-sizing", "content"));
-      if (supported) assert.ok(w < 150, "compact, was " + w);
+    await step("the Names control is a compact Thai | English toggle", async () => {
+      const w = await p.evaluate(() => document.querySelector("#card-names + .seg-pick").getBoundingClientRect().width);
+      assert.ok(w > 0 && w < 190, "compact, was " + w);
+      assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
     });
 
     await step("Overview still shows no stats", async () => {

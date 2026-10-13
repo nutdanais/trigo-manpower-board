@@ -122,4 +122,4 @@ async function step(name, fn) {
   } finally {
     await env.close();
   }
-})().catch(() => { process.exitCode = 1; });
+})().catch((e) => { console.error(e); process.exitCode = 1; });

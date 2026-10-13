@@ -57,7 +57,9 @@ async function step(name, fn) {
     await step("one navy: the top bar, the export header, the sidebar selection and the main buttons share it", async () => {
       const navy = await p.evaluate(() => {
         const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundColor;
-        return { top: bg("#topbar"), capture: bg("#capture-header"), button: bg("#btn-new-mission"), token: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() };
+        const probe = document.createElement("button"); probe.className = "btn btn-primary"; document.body.appendChild(probe);
+        const button = getComputedStyle(probe).backgroundColor; probe.remove();   // a main button; New Mission is white-on-navy inside the deck
+        return { top: bg("#topbar"), capture: bg("#capture-header"), button, token: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() };
       });
       assert.equal(navy.token, "#003a66");
       assert.deepEqual([navy.top, navy.capture, navy.button], ["rgb(0, 58, 102)", "rgb(0, 58, 102)", "rgb(0, 58, 102)"]);
@@ -155,6 +157,7 @@ async function step(name, fn) {
     await step("a dirty page also guards signing out", async () => {
       await tab("account");
       await p.fill("#acct-phone", "091-111-1111");
+      await p.click("#btn-avatar");
       await p.click("#btn-signout");
       await p.waitForSelector("#modal-unsaved:not(.hidden)");
       await p.click("#btn-unsaved-keep");

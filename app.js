@@ -1672,27 +1672,25 @@ function renderTabs() {
   };
   el.appendChild(cp);
   }
-  // visual break: the three above are app-wide views; the rest are per-board.
-  // Only worth drawing when there is something on both sides of it.
-  if (D().boards.length && can("board") && el.children.length) {
-    const sep = document.createElement("div");
-    sep.className = "board-tab-sep";
-    el.appendChild(sep);
-  }
+  // The per-board tabs live in the board menu (#board-menu-list) behind one pill,
+  // so a new board never widens the strip above.
+  const list = $("#board-menu-list");
+  list.innerHTML = "";
   for (const b of (can("board") ? D().boards : [])) {
     const t = document.createElement("div");
     // tab-board marks the per-board tabs specifically: the phone layout hides
     // these and shows #board-select instead, but keeps Overview / Manpower List
-    t.className = "board-tab tab-board" + (b.id === D().activeBoardId ? " active" : "");
+    t.className = "board-tab tab-board tb-item" + (b.id === D().activeBoardId ? " active" : "");
+    t.setAttribute("role", "menuitem");
     t.textContent = b.name;
     t.title = can("settings", "edit") ? "Click to switch. Double-click to rename." : "Click to switch.";
-    t.onclick = () => { clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
+    t.onclick = () => { closeTopbarMenus(); clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
     t.ondblclick = () => {
       if (!can("settings", "edit")) return;
       const name = prompt("Rename board:", b.name);
       if (name && name.trim()) safely(async () => { await cloud.renameBoard(b.id, name.trim()); render(); });
     };
-    el.appendChild(t);
+    list.appendChild(t);
   }
   el.scrollLeft = keepScroll;
   const act = el.querySelector(".board-tab.active");
@@ -1701,43 +1699,61 @@ function renderTabs() {
     if (a.left < e.left) el.scrollLeft += a.left - e.left - 8;
     else if (a.right > e.right) el.scrollLeft += a.right - e.right + 8;
   }
-  renderBoardSelect();
+  renderBoardPill();
+  renderUserMenu();
 }
 
-/* Phone stand-in for the per-board tabs (CSS decides which of the two is
-   visible; both are always populated, so a rotate or a resize needs no
-   re-render). "+ New board…" rides along as the last option, which is what
-   lets the "+ Board" button be hidden on a phone. */
-const NEW_BOARD_OPT = "__new_board__";
-
-function renderBoardSelect() {
-  const sel = $("#board-select");
+/* The pill that stands for the per-board tabs: shows the board on screen, or just
+   "Boards" while an app-wide view (Overview, Manpower, Host…) is showing. Hidden for
+   a role that cannot see boards at all. */
+function renderBoardPill() {
+  const wrap = $("#board-dd");
+  const boards = can("board") ? D().boards : [];
+  wrap.classList.toggle("hidden", !boards.length && !can("settings", "edit"));
   const onBoard = !isNonBoardView();
-  sel.innerHTML = "";
-  // Overview / Manpower List / Host List are not boards, so no option matches then — a
-  // <select> with no match silently displays its first option, which would read
-  // as "you are on this board" while looking at something else. A disabled
-  // placeholder is what it shows instead.
-  if (!onBoard) {
-    const ph = document.createElement("option");
-    ph.value = "";
-    ph.textContent = "Board…";
-    ph.disabled = true;
-    sel.appendChild(ph);
+  const cur = boards.find(b => b.id === D().activeBoardId);
+  $("#board-dd-label").textContent = onBoard && cur ? cur.name : "Boards";
+  $("#btn-board-dd").classList.toggle("is-current", !!(onBoard && cur));
+}
+
+/* Initials + role in the account menu (Sign out lives there). */
+function renderUserMenu() {
+  const me = D().me || {};
+  const name = me.displayName || me.fullName || me.email || "";
+  const parts = String(me.displayName || me.fullName || me.email || "?").replace(/@.*$/, "").split(/[\s._-]+/).filter(Boolean);
+  const initials = ((parts[0] || "?")[0] + (parts.length > 1 ? parts[1][0] : "")).toUpperCase();
+  $("#avatar-initials").textContent = initials;
+  $("#user-menu-name").textContent = name;
+  $("#user-menu-role").textContent = me.legacy ? (me.email || "") : [roleLabel(me.roleKey), me.email].filter(Boolean).join(" · ");
+}
+
+/* The two menus in the banner (boards, account): one open at a time, closed by a
+   click anywhere else, Esc, or choosing something. */
+function closeTopbarMenus() {
+  for (const [btn, pop] of [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"]]) {
+    $(pop).classList.add("hidden");
+    $(btn).setAttribute("aria-expanded", "false");
   }
-  for (const b of (can("board") ? D().boards : [])) {
-    const o = document.createElement("option");
-    o.value = b.id;
-    o.textContent = b.name;
-    sel.appendChild(o);
+}
+function wireTopbarMenus() {
+  for (const [btn, pop] of [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"]]) {
+    $(btn).addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const open = $(pop).classList.contains("hidden");
+      closeTopbarMenus();
+      $(pop).classList.toggle("hidden", !open);
+      $(btn).setAttribute("aria-expanded", String(open));
+    });
   }
-  if (can("settings", "edit")) {
-    const add = document.createElement("option");
-    add.value = NEW_BOARD_OPT;
-    add.textContent = "+ New board…";
-    sel.appendChild(add);
-  }
-  sel.value = onBoard ? D().activeBoardId : "";
+  document.addEventListener("click", (ev) => { if (!ev.target.closest(".tb-dd")) closeTopbarMenus(); });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeTopbarMenus(); });
+  $("#board-menu").addEventListener("click", (ev) => { if (ev.target.closest("#btn-add-board")) closeTopbarMenus(); });
+  $("#user-menu").addEventListener("click", closeTopbarMenus);
+  // the people panel starts under the banner, wherever the banner ends
+  const head = $("#sticky-header");
+  const setBar = () => document.documentElement.style.setProperty("--bar-h", head.offsetHeight + "px");
+  setBar();
+  if (window.ResizeObserver) new ResizeObserver(setBar).observe(head);
 }
 
 /* Built from spans rather than one string so the phone header can drop the
@@ -1797,7 +1813,7 @@ function splitFullName(name) {
 /* Which name the board's employee cards show: the Thai name (the app's default), the English name
    (the Thai one where there is none) or both, the English on a third small line. Remembered per device. */
 function cardNamesSaved() {   // also called while `state` is built, so the key is spelled out here
-  try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" || v === "both" ? v : "th"; } catch (e) { return "th"; }
+  try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 
 function empCard(emp) {
@@ -3602,7 +3618,7 @@ function renderEmplistFilterOptions() {
    An empty English name falls back to the Thai one, so a row is never blank. */
 const EMPLIST_NAME_VIEW_KEY = "manpower.emplistNameView";
 function emplistNameViewSaved() {
-  try { const v = localStorage.getItem(EMPLIST_NAME_VIEW_KEY); return v === "en" || v === "both" ? v : "th"; } catch (e) { return "th"; }
+  try { const v = localStorage.getItem(EMPLIST_NAME_VIEW_KEY); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 function emplistShownName(e) { return state.emplist.nameView === "en" ? (e.nameEn || e.name) : e.name; }
 function emplistNameHtml(e) {
@@ -4046,6 +4062,7 @@ function renderEmployeeList() {
   $("#emplist-search").value = state.emplist.search;
   state.emplist.nameView = emplistNameViewSaved();
   $("#emplist-name-view").value = state.emplist.nameView;
+  syncSegmented();
   renderEmplistFilterOptions();
   renderEmployeeRows();
 }
@@ -10925,19 +10942,8 @@ function wireApp() {
 
   $("#btn-add-board").onclick = openBoardModal;
   $("#btn-add-board-settings").onclick = openBoardModal;
-  $("#board-select").onchange = (ev) => {
-    const val = ev.target.value;
-    if (val === NEW_BOARD_OPT) {
-      renderBoardSelect();   // put the picker back on the current board first —
-      openBoardModal();      // cancelling the modal must not leave "+ New board…" showing
-      return;
-    }
-    clearSelection();
-    D().activeBoardId = val;
-    refreshAndRender();
-  };
+  wireTopbarMenus();
   $("#form-board").onsubmit = saveBoard;
-
   $("#btn-signout").onclick = () => settingsGuard(() => safely(() => cloud.signOut()));
 
   // date picker (custom calendar with weekend highlight)
@@ -10985,6 +10991,8 @@ function wireApp() {
 
   $("#btn-export").onclick = openExportModal;
   $("#card-names").value = state.cardNames;
+  initSegmented();   // draws the Thai | English toggles (the selects stay the source of truth)
+  syncSegmented();
   $("#card-names").addEventListener("change", (e) => {
     state.cardNames = e.target.value;
     try { localStorage.setItem("manpower.cardNames", state.cardNames); } catch (err) { /* remembering is a courtesy */ }
