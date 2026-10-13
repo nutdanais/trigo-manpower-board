@@ -57,7 +57,9 @@ async function step(name, fn) {
     await step("one navy: the top bar, the export header, the sidebar selection and the main buttons share it", async () => {
       const navy = await p.evaluate(() => {
         const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundColor;
-        return { top: bg("#topbar"), capture: bg("#capture-header"), button: bg("#btn-new-mission"), token: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() };
+        const probe = document.createElement("button"); probe.className = "btn btn-primary"; document.body.appendChild(probe);
+        const button = getComputedStyle(probe).backgroundColor; probe.remove();   // a main button; New Mission is white-on-navy inside the deck
+        return { top: bg("#topbar"), capture: bg("#capture-header"), button, token: getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() };
       });
       assert.equal(navy.token, "#003a66");
       assert.deepEqual([navy.top, navy.capture, navy.button], ["rgb(0, 58, 102)", "rgb(0, 58, 102)", "rgb(0, 58, 102)"]);
@@ -155,6 +157,7 @@ async function step(name, fn) {
     await step("a dirty page also guards signing out", async () => {
       await tab("account");
       await p.fill("#acct-phone", "091-111-1111");
+      await p.click("#btn-avatar");
       await p.click("#btn-signout");
       await p.waitForSelector("#modal-unsaved:not(.hidden)");
       await p.click("#btn-unsaved-keep");
@@ -265,6 +268,22 @@ async function step(name, fn) {
       await p.locator("#settings-boards tr").nth(0).locator(".st-del").click();
       assert.match(await p.locator("#confirm-message").innerText(), /still has \d+ employee/);
       await closeDialog();
+    });
+
+    await step("Boards: \"+ Board\" in the page header creates a board and the table shows it", async () => {
+      await tab("boards");
+      assert.equal(await p.locator("#btn-add-board-settings").isVisible(), true, "button is on the Boards section");
+      await tab("areas");
+      assert.equal(await p.locator("#btn-add-board-settings").isVisible(), false, "and only there");
+      await tab("boards");
+      const before = await p.locator("#settings-boards tr").count();
+      await p.click("#btn-add-board-settings");
+      await p.waitForSelector("#modal-board:not(.hidden)");
+      await p.fill("#form-board [name=name]", "Board Three");
+      await p.click("#form-board button[type=submit]");
+      await p.waitForFunction((n) => document.querySelectorAll("#settings-boards tr").length === n + 1, before);
+      assert.equal(db.t("boards").some((b) => b.name === "Board Three"), true, "saved");
+      assert.equal(await p.locator("#settings-view").isVisible(), true, "still on the Settings page");
     });
 
     await step("Engineers: a colour is staged and saved from the page", async () => {

@@ -937,6 +937,7 @@ function render() {
   const planEdit = board && (fc ? can("forecast", "edit") : can("board", "edit"));
   document.body.classList.toggle("forecast-mode", fc);
   $("#status-zones").classList.toggle("hidden", !board);
+  $("#leave-tabs").classList.toggle("hidden", !board);
   $("#missions-grid").classList.toggle("hidden", !board);
   $("#overview-panel").classList.toggle("hidden", !ov);
   $("#orgchart-panel").classList.toggle("hidden", !org);
@@ -1672,27 +1673,25 @@ function renderTabs() {
   };
   el.appendChild(cp);
   }
-  // visual break: the three above are app-wide views; the rest are per-board.
-  // Only worth drawing when there is something on both sides of it.
-  if (D().boards.length && can("board") && el.children.length) {
-    const sep = document.createElement("div");
-    sep.className = "board-tab-sep";
-    el.appendChild(sep);
-  }
+  // The per-board tabs live in the board menu (#board-menu-list) behind one pill,
+  // so a new board never widens the strip above.
+  const list = $("#board-menu-list");
+  list.innerHTML = "";
   for (const b of (can("board") ? D().boards : [])) {
     const t = document.createElement("div");
     // tab-board marks the per-board tabs specifically: the phone layout hides
     // these and shows #board-select instead, but keeps Overview / Manpower List
-    t.className = "board-tab tab-board" + (b.id === D().activeBoardId ? " active" : "");
+    t.className = "board-tab tab-board tb-item" + (b.id === D().activeBoardId ? " active" : "");
+    t.setAttribute("role", "menuitem");
     t.textContent = b.name;
     t.title = can("settings", "edit") ? "Click to switch. Double-click to rename." : "Click to switch.";
-    t.onclick = () => { clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
+    t.onclick = () => { closeTopbarMenus(); clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
     t.ondblclick = () => {
       if (!can("settings", "edit")) return;
       const name = prompt("Rename board:", b.name);
       if (name && name.trim()) safely(async () => { await cloud.renameBoard(b.id, name.trim()); render(); });
     };
-    el.appendChild(t);
+    list.appendChild(t);
   }
   el.scrollLeft = keepScroll;
   const act = el.querySelector(".board-tab.active");
@@ -1701,43 +1700,62 @@ function renderTabs() {
     if (a.left < e.left) el.scrollLeft += a.left - e.left - 8;
     else if (a.right > e.right) el.scrollLeft += a.right - e.right + 8;
   }
-  renderBoardSelect();
+  renderBoardPill();
+  renderUserMenu();
 }
 
-/* Phone stand-in for the per-board tabs (CSS decides which of the two is
-   visible; both are always populated, so a rotate or a resize needs no
-   re-render). "+ New board…" rides along as the last option, which is what
-   lets the "+ Board" button be hidden on a phone. */
-const NEW_BOARD_OPT = "__new_board__";
-
-function renderBoardSelect() {
-  const sel = $("#board-select");
+/* The pill that stands for the per-board tabs: shows the board on screen, or just
+   "Boards" while an app-wide view (Overview, Manpower, Host…) is showing. Hidden for
+   a role that cannot see boards at all. */
+function renderBoardPill() {
+  const wrap = $("#board-dd");
+  const boards = can("board") ? D().boards : [];
+  wrap.classList.toggle("hidden", !boards.length && !can("settings", "edit"));
   const onBoard = !isNonBoardView();
-  sel.innerHTML = "";
-  // Overview / Manpower List / Host List are not boards, so no option matches then — a
-  // <select> with no match silently displays its first option, which would read
-  // as "you are on this board" while looking at something else. A disabled
-  // placeholder is what it shows instead.
-  if (!onBoard) {
-    const ph = document.createElement("option");
-    ph.value = "";
-    ph.textContent = "Board…";
-    ph.disabled = true;
-    sel.appendChild(ph);
+  const cur = boards.find(b => b.id === D().activeBoardId);
+  $("#board-dd-label").textContent = onBoard && cur ? cur.name : "Boards";
+  $("#btn-board-dd").classList.toggle("is-current", !!(onBoard && cur));
+}
+
+/* Initials + role in the account menu (Sign out lives there). */
+function renderUserMenu() {
+  const me = D().me || {};
+  const name = me.displayName || me.fullName || me.email || "";
+  const parts = String(me.displayName || me.fullName || me.email || "?").replace(/@.*$/, "").split(/[\s._-]+/).filter(Boolean);
+  const initials = ((parts[0] || "?")[0] + (parts.length > 1 ? parts[1][0] : "")).toUpperCase();
+  $("#avatar-initials").textContent = initials;
+  $("#user-menu-name").textContent = name;
+  $("#user-menu-role").textContent = me.legacy ? (me.email || "") : [roleLabel(me.roleKey), me.email].filter(Boolean).join(" · ");
+}
+
+/* The two menus in the banner (boards, account): one open at a time, closed by a
+   click anywhere else, Esc, or choosing something. */
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"]];
+function closeTopbarMenus() {
+  for (const [btn, pop] of TOPBAR_MENUS) {
+    $(pop).classList.add("hidden");
+    $(btn).setAttribute("aria-expanded", "false");
   }
-  for (const b of (can("board") ? D().boards : [])) {
-    const o = document.createElement("option");
-    o.value = b.id;
-    o.textContent = b.name;
-    sel.appendChild(o);
+}
+function wireTopbarMenus() {
+  for (const [btn, pop] of TOPBAR_MENUS) {
+    $(btn).addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const open = $(pop).classList.contains("hidden");
+      closeTopbarMenus();
+      $(pop).classList.toggle("hidden", !open);
+      $(btn).setAttribute("aria-expanded", String(open));
+    });
   }
-  if (can("settings", "edit")) {
-    const add = document.createElement("option");
-    add.value = NEW_BOARD_OPT;
-    add.textContent = "+ New board…";
-    sel.appendChild(add);
-  }
-  sel.value = onBoard ? D().activeBoardId : "";
+  document.addEventListener("click", (ev) => { if (!ev.target.closest(".tb-dd")) closeTopbarMenus(); });
+  document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeTopbarMenus(); });
+  $("#board-menu").addEventListener("click", (ev) => { if (ev.target.closest("#btn-add-board")) closeTopbarMenus(); });
+  $("#user-menu").addEventListener("click", closeTopbarMenus);
+  // the people panel starts under the banner, wherever the banner ends
+  const head = $("#sticky-header");
+  const setBar = () => document.documentElement.style.setProperty("--bar-h", head.offsetHeight + "px");
+  setBar();
+  if (window.ResizeObserver) new ResizeObserver(setBar).observe(head);
 }
 
 /* Built from spans rather than one string so the phone header can drop the
@@ -1797,7 +1815,7 @@ function splitFullName(name) {
 /* Which name the board's employee cards show: the Thai name (the app's default), the English name
    (the Thai one where there is none) or both, the English on a third small line. Remembered per device. */
 function cardNamesSaved() {   // also called while `state` is built, so the key is spelled out here
-  try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" || v === "both" ? v : "th"; } catch (e) { return "th"; }
+  try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 
 function empCard(emp) {
@@ -2112,7 +2130,7 @@ function renderCtxMenu(view) {
 function renderZones() {
   const plan = getPlan();
   for (const z of ZONES) {
-    const body = $(`[data-drop="zone:${z}"]`);
+    const body = $(`#status-zones [data-drop="zone:${z}"]`);
     body.innerHTML = "";
     const emps = plan.zones[z]
       .map(empId => D().employees.find(e => e.id === empId))
@@ -2135,7 +2153,56 @@ function renderZones() {
       body.appendChild(hint);
     }
   }
+  renderLeaveTabs();
   renderFloatPool();
+}
+
+/* ---------- Leave tabs ----------
+   The leave band shows one type at a time; the tab strip carries every count. It opens
+   on the busiest type for the board and day on screen and stays where the user puts it
+   (a click, a drop on a tab, or hovering a tab mid-drag). The tabs are drop targets
+   themselves (class dropzone, data-drop="zone:…"), so bindDropzones handles them. */
+function setLeaveTab(z) {
+  state.leaveTab = z;
+  for (const zone of $$("#status-zones .zone-leave")) zone.classList.toggle("lz-on", zone.dataset.zone === z);
+  for (const t of $$("#leave-tabs .lv-tab")) {
+    const on = t.dataset.lv === z;
+    t.classList.toggle("on", on);
+    t.setAttribute("aria-selected", String(on));
+  }
+}
+function renderLeaveTabs() {
+  const counts = {};
+  for (const t of $$("#leave-tabs .lv-tab")) {
+    const body = $(`#status-zones [data-drop="zone:${t.dataset.lv}"]`);
+    const n = body ? body.querySelectorAll(".emp-card").length : 0;
+    counts[t.dataset.lv] = n;
+    t.querySelector("b").textContent = n;
+    t.classList.toggle("has", n > 0);
+  }
+  const key = D().activeBoardId + "|" + state.date;
+  if (state.leaveTabKey !== key || !state.leaveTab) {
+    state.leaveTabKey = key;
+    state.leaveTab = null;
+    let best = "annual";
+    for (const z of Object.keys(counts)) if (counts[z] > counts[best]) best = z;
+    state.leaveTab = best;
+  }
+  setLeaveTab(state.leaveTab);
+}
+function wireLeaveTabs() {
+  const strip = $("#leave-tabs");
+  let hoverTimer = null;
+  const stop = () => { clearTimeout(hoverTimer); hoverTimer = null; };
+  strip.addEventListener("click", (ev) => { const t = ev.target.closest(".lv-tab"); if (t) setLeaveTab(t.dataset.lv); });
+  // dragging a person over a tab opens it after a beat, so they can be dropped into the lane itself
+  strip.addEventListener("dragover", (ev) => {
+    const t = ev.target.closest(".lv-tab");
+    if (!t || t.classList.contains("on") || hoverTimer) return;
+    hoverTimer = setTimeout(() => { hoverTimer = null; setLeaveTab(t.dataset.lv); }, 450);
+  });
+  strip.addEventListener("dragleave", stop);
+  strip.addEventListener("drop", (ev) => { stop(); const t = ev.target.closest(".lv-tab"); if (t) setLeaveTab(t.dataset.lv); });
 }
 
 /* which employees on the active board are unassigned right now (Map for reuse) */
@@ -2544,20 +2611,23 @@ function renderStats() {
     tile("Standby", s.standby, "standby", s.standby > 0 ? `<span class="st-ico">${icon("alert")}</span>` : "", s.standby > 0,
       "Permanent staff on no mission and no leave") +
     (s.isHoliday ? tile("Holiday", s.onHoliday, "hol") : "") +
-    tile("On-call free", s.oncallAvailable, "free");
+    tile("On-call free", s.oncallAvailable, "free") +
+    // how the day splits, in the tile colours: a quick read of the proportions, never the only carrier of a number
+    `<div class="st-split" aria-hidden="true">${[["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]]
+      .filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
   // Service area is a different cut of the SAME people as Total (the board's roster),
   // so the chips must add up to it: anyone without a known area is counted as
   // "No area" instead of silently dropping out of the sum.
   const roster = rosterEmployees(D().activeBoardId);
   const known = new Set(D().areas.map(a => a.id));
-  const areaChip = (name, n) => `<span class="area-chip" data-area="${escapeHtml(name)}"><b>${n}</b> ${escapeHtml(name)}</span>`;
+  const areaChip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
   let areaHtml = "";
   for (const a of D().areas) {
     const n = roster.filter(e => e.areaId === a.id).length;
-    if (n) areaHtml += areaChip(a.name, n);
+    if (n) areaHtml += areaChip(a.name, n, a.color);
   }
   const noArea = roster.filter(e => !known.has(e.areaId)).length;
-  if (noArea) areaHtml += areaChip("No area", noArea);
+  if (noArea) areaHtml += areaChip("No area", noArea, "");
   areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
 }
 
@@ -3519,12 +3589,23 @@ function renderFilterOptions() {
         e.target.checked ? set.add(o.value) : set.delete(o.value);
         state.filters[key] = [...set];
         setMsLabel(ms.querySelector(".ms-btn"), key);   // keep dropdown open
+        updateFilterBadge();
         renderMissions();
       };
       pop.appendChild(row);
     }
   }
   $("#sort-by").value = state.sort;
+  updateFilterBadge();
+}
+
+/* how many of the four filters are on, shown on the "Filter & sort" button */
+function updateFilterBadge() {
+  const n = Object.values(state.filters).reduce((a, v) => a + (v && v.length ? 1 : 0), 0);
+  const b = $("#filter-count");
+  b.textContent = n;
+  b.classList.toggle("hidden", !n);
+  $("#btn-filter-pop").classList.toggle("ms-active", n > 0);
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
@@ -3599,7 +3680,7 @@ function renderEmplistFilterOptions() {
    An empty English name falls back to the Thai one, so a row is never blank. */
 const EMPLIST_NAME_VIEW_KEY = "manpower.emplistNameView";
 function emplistNameViewSaved() {
-  try { const v = localStorage.getItem(EMPLIST_NAME_VIEW_KEY); return v === "en" || v === "both" ? v : "th"; } catch (e) { return "th"; }
+  try { const v = localStorage.getItem(EMPLIST_NAME_VIEW_KEY); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 function emplistShownName(e) { return state.emplist.nameView === "en" ? (e.nameEn || e.name) : e.name; }
 function emplistNameHtml(e) {
@@ -4036,6 +4117,39 @@ function renderEmployeeRows() {
     th.classList.toggle("sorted-asc", th.dataset.sort === state.emplist.sortKey && state.emplist.sortDir === 1);
     th.classList.toggle("sorted-desc", th.dataset.sort === state.emplist.sortKey && state.emplist.sortDir === -1);
   }
+  quietTable("#emplist-table");
+}
+
+/* The Manpower and Host tables read quietly: a column in which every row is empty (or "—")
+   is left out, and a lone "—" is drawn blank, so what is on screen is only what carries
+   information. Each table's service-area pill also hands its colour to CSS as --ac, which
+   draws it as a small colour key beside plain text. Re-run after every row render; the
+   header cells are static, so their marks are reset first. */
+/* empty for this purpose: nothing but the hover-only "add note" invitation or an "none" marker */
+function quietCellEmpty(td) {
+  let t = td.textContent.replace("\u2014", "");
+  for (const x of td.querySelectorAll(".hl-add-note, .hl-empty")) t = t.replace(x.textContent, "");
+  return t.trim() === "";
+}
+function quietTable(sel) {
+  const table = $(sel);
+  const ths = [...table.querySelectorAll("thead th")];
+  const rows = [...table.querySelectorAll("tbody tr")].filter(r => r.children.length === ths.length);
+  ths.forEach(th => th.classList.remove("col-off"));
+  for (const r of rows) {
+    for (const td of r.children) {
+      td.classList.remove("col-off");
+      td.classList.toggle("q-dash", !td.children.length && td.textContent.trim() === "\u2014");   // drawn blank, still there for tools and tests
+    }
+    for (const pill of r.querySelectorAll(".area-pill")) pill.style.setProperty("--ac", pill.style.backgroundColor || "#999");
+  }
+  if (!rows.length) return;
+  ths.forEach((th, i) => {
+    if (th.classList.contains("el-check")) return;
+    if (!rows.every(r => quietCellEmpty(r.children[i]))) return;
+    th.classList.add("col-off");
+    for (const r of rows) r.children[i].classList.add("col-off");
+  });
 }
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
@@ -4043,6 +4157,7 @@ function renderEmployeeList() {
   $("#emplist-search").value = state.emplist.search;
   state.emplist.nameView = emplistNameViewSaved();
   $("#emplist-name-view").value = state.emplist.nameView;
+  syncSegmented();
   renderEmplistFilterOptions();
   renderEmployeeRows();
 }
@@ -4540,6 +4655,7 @@ function renderHostRows() {
     th.classList.toggle("sorted-asc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === 1);
     th.classList.toggle("sorted-desc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === -1);
   }
+  quietTable("#hostlist-table");
 }
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
@@ -4919,7 +5035,48 @@ function openModal(id) {
   backdrop.classList.remove("hidden");
   for (const m of $$(".modal")) m.classList.add("hidden");
   $(id).classList.remove("hidden");
+  syncSegmented($(id));
   if (state.settingsOpen) focusModal($(id));
+}
+
+/* ---------- segmented controls ----------
+   A <select data-seg> (Shift, Contract type) is drawn as a row of buttons. The select
+   stays the source of truth, so the form code reads and writes it exactly as before and
+   the buttons just follow it; it is hidden from sight and from assistive technology. */
+function syncSegmented(root = document) {
+  for (const sel of root.querySelectorAll("select[data-seg]")) {
+    if (!sel._seg) continue;
+    for (const btn of sel._seg.children) btn.setAttribute("aria-pressed", String(btn.dataset.v === sel.value));
+  }
+}
+function initSegmented() {
+  for (const sel of $$("select[data-seg]")) {
+    if (sel._seg) continue;
+    const row = document.createElement("div");
+    row.className = "seg-pick";
+    row.setAttribute("role", "group");
+    const lab = sel.closest("label");
+    row.setAttribute("aria-label", ((lab && lab.childNodes[0] && lab.childNodes[0].textContent) || sel.name || "").trim());
+    for (const o of sel.options) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.v = o.value;
+      btn.textContent = o.textContent;
+      btn.onclick = (ev) => {
+        ev.preventDefault();
+        sel.value = o.value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        syncSegmented(sel.closest(".modal") || document);
+      };
+      row.appendChild(btn);
+    }
+    sel.classList.add("seg-source");
+    sel.tabIndex = -1;
+    sel.setAttribute("aria-hidden", "true");
+    sel.after(row);
+    sel._seg = row;
+    if (sel.form) sel.form.addEventListener("reset", () => setTimeout(() => syncSegmented(sel.form), 0));
+  }
 }
 let _confirmCancel = null;   // fired if a confirm is dismissed any way other than "Yes"
 
@@ -5572,6 +5729,7 @@ function renderSettingsHead() {
   $("#sv-hint").textContent = meta.hint;
   $("#btn-add-engineer").classList.toggle("hidden", !(tab === "engineers" && can("settings", "edit")));
   $("#btn-add-area").classList.toggle("hidden", !(tab === "areas" && can("settings", "edit")));
+  $("#btn-add-board-settings").classList.toggle("hidden", !(tab === "boards" && can("settings", "edit")));
   $("#btn-add-user").classList.toggle("hidden", !(tab === "users" && can("users", "edit")));
 }
 
@@ -10027,14 +10185,12 @@ function saveBoard(ev) {
 /* the <head> has a tiny inline script that already applies the saved theme
    before first paint (avoids a flash of the wrong theme); this just keeps
    the toggle button's icon in sync and handles the click. */
-function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-  const btn = $("#btn-theme");
-  if (btn) btn.innerHTML = icon(theme === "dark" ? "sun" : "moon");
+function applyTheme() {
+  // Dark mode is gone: the app is light only. A theme saved by an older version is cleared.
+  document.documentElement.removeAttribute("data-theme");
+  try { localStorage.removeItem("mpm-theme"); } catch (e) { /* storage blocked: nothing to clear */ }
 }
-function initTheme() {
-  applyTheme(localStorage.getItem("mpm-theme") || "light");
-}
+function initTheme() { applyTheme(); }
 
 /* ================= Settings > My account / Users / Roles =================
    User management lives in the Settings modal rather than as a tab of its own:
@@ -10830,6 +10986,7 @@ function wireApp() {
   $("#btn-new-mission").onclick = () => guardEdit(() => openMissionModal(null));
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
+  initSegmented();
   $("#form-employee").onsubmit = saveEmployee;
   $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = deleteMission;
@@ -10878,26 +11035,12 @@ function wireApp() {
   $("#form-add-area").areaColor.oninput = (ev) => { ev.target.parentElement.querySelector("b").textContent = swHex(ev.target.value); };
 
   initTheme();
-  $("#btn-theme").onclick = () => {
-    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    localStorage.setItem("mpm-theme", next);
-    applyTheme(next);
-  };
 
   $("#btn-add-board").onclick = openBoardModal;
-  $("#board-select").onchange = (ev) => {
-    const val = ev.target.value;
-    if (val === NEW_BOARD_OPT) {
-      renderBoardSelect();   // put the picker back on the current board first —
-      openBoardModal();      // cancelling the modal must not leave "+ New board…" showing
-      return;
-    }
-    clearSelection();
-    D().activeBoardId = val;
-    refreshAndRender();
-  };
+  $("#btn-add-board-settings").onclick = openBoardModal;
+  wireTopbarMenus();
+  wireLeaveTabs();
   $("#form-board").onsubmit = saveBoard;
-
   $("#btn-signout").onclick = () => settingsGuard(() => safely(() => cloud.signOut()));
 
   // date picker (custom calendar with weekend highlight)
@@ -10945,6 +11088,8 @@ function wireApp() {
 
   $("#btn-export").onclick = openExportModal;
   $("#card-names").value = state.cardNames;
+  initSegmented();   // draws the Thai | English toggles (the selects stay the source of truth)
+  syncSegmented();
   $("#card-names").addEventListener("change", (e) => {
     state.cardNames = e.target.value;
     try { localStorage.setItem("manpower.cardNames", state.cardNames); } catch (err) { /* remembering is a courtesy */ }

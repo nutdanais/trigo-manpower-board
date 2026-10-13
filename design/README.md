@@ -86,3 +86,41 @@ D Guided planner. Each has a desktop frame and a phone frame, and editing a numb
 one mockup updates every gap on the page. A comparison table follows, then a
 recommendation (A now, B's day panel next, C later) and a decision picker. Not
 loaded by the app.
+
+## Modal directions (2026-10-13)
+
+`modal-directions.html` is a standalone page: an audit of all 26 dialogs (17 on the
+default 440 px card), then four directions — A Size tiers, B Side sheet, C Sectioned
+workspace, D Adaptive hybrid (recommended) — each mocked on Edit Employee, Review &
+merge forecast and a phone view, with a comparison table. Not loaded by the app.
+
+## Signal redesign proposal (2026-10-13)
+
+`signal-proposal.html` is an independent whole-app proposal (not based on the Settings
+page): audit of the real board and dialogs, the "Signal" direction (calmer canvas, Geist
+type, one navy accent, dark mode), an interactive board mock with a side inspector, command
+palette and a queue-style Review & merge workbench, the 26-dialog map, tokens and a five-phase
+rollout. `modal-directions.html` (the Settings-shell proposal) is kept unchanged as the baseline.
+
+## Signal samples (2026-10-13)
+
+`signal-samples.html` applies the feedback on the Signal proposal: light theme only, and the
+board (mission cards, employee cards, leave cards) left exactly as it is. The board inside the
+mock is the app's own markup rendered with the app's own `styles.css`, so it is not a redrawn copy.
+It adds three alternative leave layouts (A columns, B strip, C side panel) with measured heights,
+and mission and employee inspectors that open from the real cards. `signal-proposal.html` and
+`modal-directions.html` are unchanged.
+
+## Signal samples, round two (2026-10-13)
+
+`signal-samples-2.html` answers four notes on the first build: a tidier leave area (Rows,
+A lanes, B tabs, C two tiers), three options for the top section (banner tabs, navy control
+deck, compact) with the people panel tucked under the banner and a two-way Thai | English
+toggle, and three table options (quiet, directory, grouped) for Manpower and Host. The
+boards and tables in it are the app's own markup and `styles.css`, loaded with data that
+matches the production screenshots (106 people, 19 on exchange days). Not loaded by the app.
+
+Chosen from round two and built in the app: leave as tabs (B), the navy control deck with the
+board picker as a pill in the banner, the quiet table (A), Sign out in the avatar menu, Holiday
+and Reset board kept on the toolbar. Not built from it: one "New" menu (New mission and New
+employee stay as two buttons) and the Ctrl+K palette.

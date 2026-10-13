@@ -22,19 +22,9 @@
 <meta name="apple-mobile-web-app-title" content="Manpower Board">
 <meta name="application-name" content="Manpower Board">
 <meta name="theme-color" content="#003a66">
-<script>
-  // applied before first paint so the page never flashes the wrong theme
-  (function () {
-    try {
-      if (localStorage.getItem("mpm-theme") === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark");
-      }
-    } catch (e) {}
-  })();
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- ?v= on every local script and stylesheet is the release version from
      version.js. Netlify already sends "must-revalidate", so a stale ?v= degrades
      to the browser revalidating and getting the new file — but a caching proxy
@@ -44,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-12k">
+<link rel="stylesheet" href="styles.css?v=2026-10-13d">
 </head>
 <body>
 
@@ -64,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-12k"></script>
+<script src="version.js?v=2026-10-13d"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -205,6 +195,23 @@
     <img id="app-logo" src="logo-on-navy.png" alt="TRIGO" onerror="this.onerror=null;this.src='logo.svg'">
     <div id="app-title">Manpower Board<small>Operations Planning</small></div>
   </div>
+  <!-- The app-wide views (Overview, Org Chart, Manpower, Host, Capacity). The
+       per-board tabs live in the board menu next to it (#board-dd), so adding a
+       board no longer widens this strip. -->
+  <nav id="board-tabs" aria-label="Modules"></nav>
+  <!-- Which board is on screen, as one pill. The boards themselves are the
+       .board-tab.tab-board items of #board-menu (see renderTabs in app.js). -->
+  <div id="board-dd" class="tb-dd">
+    <button type="button" id="btn-board-dd" class="btn btn-top" aria-haspopup="menu" aria-expanded="false" title="Switch board"><span id="board-dd-label">Board</span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+    <div id="board-menu" class="tb-pop hidden" role="menu" aria-label="Boards">
+      <div id="board-menu-list"></div>
+      <button id="btn-add-board" class="tb-item tb-item-add" type="button" role="menuitem" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New board</button>
+    </div>
+  </div>
+  <!-- CONFIRMED / FORECAST for the board and date on screen, and the
+       "holds taken from you" counter (forward planning; see app.js) -->
+  <span id="mode-pill" class="mode-pill hidden"></span>
+  <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
   <div class="topbar-right">
     <span id="save-status" class="hidden"></span>
     <div class="date-nav">
@@ -213,27 +220,17 @@
       <button id="btn-date-next" class="btn btn-top btn-icon" title="Next day" aria-label="Next day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
     </div>
     <button id="btn-lock" class="btn btn-top hidden" title="Lock this board so it's view-only for everyone"><svg class="ic" aria-hidden="true"><use href="#i-unlock"></use></svg><span class="btn-label">Lock</span></button>
-    <button id="btn-theme" class="btn btn-top btn-icon" title="Toggle dark mode" aria-label="Toggle dark mode"><svg class="ic" aria-hidden="true"><use href="#i-moon"></use></svg></button>
     <button id="btn-settings" class="btn btn-top" title="Settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg><span class="btn-label">Settings</span></button>
-    <button id="btn-signout" class="btn btn-top" title="Sign out"><svg class="ic" aria-hidden="true"><use href="#i-sign-out"></use></svg><span class="btn-label">Sign out</span></button>
+    <div id="user-dd" class="tb-dd">
+      <button type="button" id="btn-avatar" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account" aria-label="Account menu"><span id="avatar-initials">?</span></button>
+      <div id="user-menu" class="tb-pop tb-pop-right hidden" role="menu" aria-label="Account">
+        <div class="tb-who"><b id="user-menu-name"></b><small id="user-menu-role"></small></div>
+        <button id="btn-signout" class="tb-item" type="button" role="menuitem" title="Sign out"><svg class="ic" aria-hidden="true"><use href="#i-sign-out"></use></svg> Sign out</button>
+      </div>
+    </div>
   </div>
 </header>
 <div id="green-rule"></div>
-
-<div id="board-bar">
-  <div id="board-tabs"></div>
-  <!-- CONFIRMED / FORECAST for the board and date on screen, and the
-       "holds taken from you" counter (forward planning; see app.js) -->
-  <span id="mode-pill" class="mode-pill hidden"></span>
-  <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
-  <!-- Phone-only stand-in for the per-board tabs and "+ Board" (see #board-select
-       in styles.css). A native <select> is deliberate: it gets the platform's own
-       picker, which is a far better target than a row of tabs, and it collapses
-       any number of boards into one control so the whole bar stays on one line.
-       Above ~640px it is display:none and the tabs are the real thing. -->
-  <select id="board-select" aria-label="Board"></select>
-  <button id="btn-add-board" class="btn btn-quiet" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Board</button>
-</div>
 </div>
 
 <!-- ===== Settings: a full page below the top bar =====
@@ -275,6 +272,7 @@
       <div id="sv-head-actions">
         <button class="btn btn-small btn-primary hidden" id="btn-add-engineer" type="button"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add engineer</button>
         <button class="btn btn-small btn-primary hidden" id="btn-add-area" type="button"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add area</button>
+        <button class="btn btn-small btn-primary hidden" id="btn-add-board-settings" type="button" title="Create a new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Board</button>
         <button class="btn btn-small btn-primary hidden" id="btn-add-user" type="button" title="Create an account and get a temporary password to hand over"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add user</button>
       </div>
       <button type="button" class="btn btn-icon sv-back-icon" id="btn-settings-back-icon" aria-label="Back to board" title="Back to board"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
@@ -472,10 +470,9 @@
            this row; render() shows/hides the whole group with one class. -->
       <div id="emplist-toolbar">
         <input id="emplist-search" type="search" placeholder="Search name (Thai or English), TRIGO ID or mobile…" autocomplete="off">
-        <select id="emplist-name-view" aria-label="Names shown" title="Which name the list shows. The app shows the Thai name by default.">
-          <option value="th">Names: Thai</option>
-          <option value="en">Names: English</option>
-          <option value="both">Names: Thai + English</option>
+        <select id="emplist-name-view" data-seg aria-label="Names shown" title="Which name the list shows. The app shows the Thai name by default.">
+          <option value="th">Thai</option>
+          <option value="en">English</option>
         </select>
         <div id="emplist-filters">
           <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
@@ -499,34 +496,44 @@
         </div>
       </div>
       <div id="filters">
-        <div class="ms" data-filter="engineer">
-          <button type="button" class="ms-btn">Engineer: All</button>
-          <div class="ms-pop hidden"></div>
-        </div>
-        <div class="ms" data-filter="host">
-          <button type="button" class="ms-btn">Host: All</button>
-          <div class="ms-pop hidden"></div>
-        </div>
-        <div class="ms" data-filter="customer">
-          <button type="button" class="ms-btn">Customer: All</button>
-          <div class="ms-pop hidden"></div>
-        </div>
-        <div class="ms" data-filter="shift">
-          <button type="button" class="ms-btn">Shift: All</button>
-          <div class="ms-pop hidden"></div>
+        <!-- Engineer / Host / Customer / Shift and the sort order live in one popover, so the
+             toolbar shows one "Filter & sort" button (with how many filters are on) instead of
+             five controls. On a phone the popover is simply open inside the More dropdown. -->
+        <div id="filter-dd" class="tb-dd">
+          <button type="button" id="btn-filter-pop" class="btn" aria-haspopup="true" aria-expanded="false" title="Filter and sort the missions"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg> Filter &amp; sort<span id="filter-count" class="fcount hidden"></span></button>
+          <div id="filter-pop" class="tb-pop hidden" aria-label="Filter and sort">
+            <div class="ms" data-filter="engineer">
+              <button type="button" class="ms-btn">Engineer: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <div class="ms" data-filter="host">
+              <button type="button" class="ms-btn">Host: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <div class="ms" data-filter="customer">
+              <button type="button" class="ms-btn">Customer: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <div class="ms" data-filter="shift">
+              <button type="button" class="ms-btn">Shift: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <label class="filter-sort"><span>Sort by</span>
+            <select id="sort-by" title="Sort missions">
+              <option value="number">Mission No.</option>
+              <option value="engineer">Engineer</option>
+              <option value="host">Host</option>
+              <option value="customer">Customer</option>
+              <option value="shift">Shift</option>
+            </select>
+            </label>
+          </div>
         </div>
         <!-- Narrows the board like a filter does, so it sits with them: reads
              "Hide/Unhide" until something is hidden, then "Hidden n" in the
              active-filter tint, plus an amber count of missions with no crew
              (see updateHideMissionsButton). -->
         <button id="btn-hide-missions" class="btn btn-hidden-chip" title="Choose which missions are hidden from this board"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"></use></svg> Hide/Unhide</button>
-        <select id="sort-by" title="Sort missions">
-          <option value="number">Sort: Mission No.</option>
-          <option value="engineer">Sort: Engineer</option>
-          <option value="host">Sort: Host</option>
-          <option value="customer">Sort: Customer</option>
-          <option value="shift">Sort: Shift</option>
-        </select>
       </div>
       <!-- the "fix" zone: pinned to the right edge, away from the filters (a
            display:contents group on a phone, where it sits inside the dropdown) -->
@@ -549,10 +556,9 @@
       <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
       <span id="hostlist-count" class="hidden"></span>
       <button type="button" class="btn hidden" id="btn-hostlist-bulk" title="Edit many hosts in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
-      <select id="card-names" class="hidden" aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
-        <option value="th">Names: Thai</option>
-        <option value="en">Names: English</option>
-        <option value="both">Names: Thai + English</option>
+      <select id="card-names" class="hidden" data-seg aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
+        <option value="th">Thai</option>
+        <option value="en">English</option>
       </select>
       <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
       <!-- One Export button for every tab, always at the right edge. It opens that
@@ -574,6 +580,16 @@
       <span id="capture-title"></span>
     </div>
     <span id="capture-date"></span>
+  </div>
+  <!-- Leave, one type at a time. The tabs are part of the screen only (hidden while
+       exporting, when every non-empty type is drawn); each one is also a drop target,
+       so a person can be dropped straight onto "Sick leave" without opening it. -->
+  <div id="leave-tabs" role="tablist" aria-label="Leave">
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="annual" data-drop="zone:annual"><span>Annual leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="sick" data-drop="zone:sick"><span>Sick leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="business" data-drop="zone:business"><span>Business leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="unpaid" data-drop="zone:unpaid"><span>Unpaid leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="exchange" data-drop="zone:exchange"><span>Exchange working day</span><b>0</b></button>
   </div>
   <section id="status-zones">
     <div class="zone zone-leave" data-zone="annual">
@@ -723,9 +739,10 @@
 <!-- ===== Modals ===== -->
 <div id="modal-backdrop" class="hidden">
 
-  <div class="modal hidden" id="modal-mission">
+  <div class="modal modal-side hidden" id="modal-mission">
     <h3><span id="mission-modal-title">New Mission</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-mission">
+      <div class="form-group">Where</div>
       <label>Mission number <input name="number" required placeholder="e.g. BANGN.26.0007"></label>
       <!-- Host is a search over the Host list: the datalist is filled by
            renderMissionHostOptions() so the browser's own type-ahead filters
@@ -736,14 +753,15 @@
       <datalist id="host-options"></datalist>
       <p id="mission-host-note" class="import-note hidden"></p>
       <label>Customer (company) <input name="customer" required placeholder="e.g. Hayashi"></label>
-      <label>PPE (required equipment) <input name="ppe" placeholder="e.g. Safety shoes, helmet, glasses"></label>
+      <div class="form-group">When</div>
       <div class="form-row">
         <label>Shift
-          <select name="shift"><option value="day">Day</option><option value="night">Night</option></select>
+          <select name="shift" data-seg><option value="day">Day</option><option value="night">Night</option></select>
         </label>
         <label>Start <input name="startTime" type="time" value="08:00"></label>
         <label>End <input name="endTime" type="time" value="17:00"></label>
       </div>
+      <div class="form-group">Who</div>
       <!-- Engineer is a search over the people who may run a mission: everyone
            from Engineer upwards, by the display name on their account. Same
            shape as the Host box above — the datalist gives the browser's own
@@ -752,6 +770,8 @@
       <label>Engineer <input name="engineer" required list="engineer-options" autocomplete="off" placeholder="Search by name…"></label>
       <datalist id="engineer-options"></datalist>
       <p id="mission-engineer-note" class="import-note hidden"></p>
+      <div class="form-group">Notes</div>
+      <label>PPE (required equipment) <input name="ppe" placeholder="e.g. Safety shoes, helmet, glasses"></label>
       <label>Remark <textarea name="remark" rows="2" placeholder="Optional notes"></textarea></label>
       <div class="modal-actions">
         <button type="button" class="btn btn-danger hidden" id="btn-delete-mission">Delete</button>
@@ -763,7 +783,7 @@
     </form>
   </div>
 
-  <div class="modal hidden" id="modal-employee">
+  <div class="modal modal-side hidden" id="modal-employee">
     <h3><span id="employee-modal-title">New Employee</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <div id="employee-tabs" class="settings-tabs hidden">
       <button type="button" class="settings-tab" data-tab="hosts">Host Record</button>
@@ -795,13 +815,17 @@
       </div>
       <div class="settings-pane" data-pane="edit">
         <form id="form-employee">
+          <div class="form-group">Identity</div>
           <label>Thai name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
           <p class="field-hint" id="hint-name-th">Required. This is the name shown in the app by default.</p>
           <label>English name (optional) <input name="nameEn" maxlength="200" autocomplete="off" placeholder="e.g. Somchai Jaidee" title="Used when you export to Excel in English. If it is empty, the Thai name is used."></label>
           <p class="field-hint" id="hint-name-en">Used when you export to Excel in English. If it is empty, the Thai name is used.</p>
           <label>TRIGO ID (optional) <input name="trigoId" placeholder="e.g. T329" maxlength="8" autocomplete="off" title="The letter T and digits, like T329. Must be unique; two people may share a name only when both have a TRIGO ID."></label>
+          <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+          <div class="form-group">Contract</div>
+          <div class="form-row">
           <label>Contract type
-            <select name="contract">
+            <select name="contract" data-seg>
               <option value="permanent">Permanent</option>
               <option value="oncall">On-call</option>
             </select>
@@ -816,11 +840,16 @@
               <option value="assistant_site_engineer">Assistant Site Engineer</option>
             </select>
           </label>
-          <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+          </div>
+          <div class="form-row">
           <label>Start date (optional) <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
           <label>On the board from (optional) <input name="addedOn" type="date" min="2000-01-01" max="2099-12-31" title="The day this person was added to the app. Dashboard headcount and Standby count them only from this date. Blank on a new employee = today; clear it on an existing one = counted on every date."></label>
+          </div>
+          <div class="form-group">Placement</div>
+          <div class="form-row">
           <label>Service area <select name="areaId" required></select></label>
           <label>Board <select name="boardId" required></select></label>
+          </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee"><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg> Deactivate</button>
             <span class="toolbar-spacer"></span>
@@ -832,7 +861,7 @@
     </div>
   </div>
 
-  <div class="modal hidden" id="modal-host">
+  <div class="modal modal-side hidden" id="modal-host">
     <h3><span id="host-modal-title">Host</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-host">
       <label>Host name <input name="name" required placeholder="e.g. Fortune"></label>
@@ -916,7 +945,7 @@
     </form>
   </div>
 
-  <div class="modal hidden" id="modal-add-area" role="dialog" aria-modal="true" aria-labelledby="add-area-title">
+  <div class="modal modal-side hidden" id="modal-add-area" role="dialog" aria-modal="true" aria-labelledby="add-area-title">
     <h3 id="add-area-title">Add a service area<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-add-area" autocomplete="off">
       <label>Area name <input name="areaName" type="text" required maxlength="60" placeholder="e.g. Rayong"></label>
@@ -930,7 +959,7 @@
     </form>
   </div>
 
-  <div class="modal hidden" id="modal-user">
+  <div class="modal modal-side hidden" id="modal-user">
     <h3><span id="user-modal-title">User</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-user">
       <p id="user-modal-email" class="import-note"></p>
@@ -962,7 +991,7 @@
 
   <!-- No invitation email is possible here, so the account is made outright and
        the admin carries the password over by hand. -->
-  <div class="modal hidden" id="modal-add-user">
+  <div class="modal modal-side hidden" id="modal-add-user">
     <h3>Add someone<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-add-user">
       <label>Their name <input name="fullName" type="text" maxlength="80" autocomplete="off"></label>
@@ -980,7 +1009,7 @@
   <!-- Adding an engineer is naming an account: everyone with the Engineer role
        is already on the list, so this is for the manager or admin who also runs
        missions themselves. -->
-  <div class="modal hidden" id="modal-add-engineer">
+  <div class="modal modal-side hidden" id="modal-add-engineer">
     <h3>Add an engineer<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-add-engineer">
       <label>Person <select name="profileId" required></select></label>
@@ -1011,7 +1040,7 @@
     </div>
   </div>
 
-  <div class="modal hidden" id="modal-board">
+  <div class="modal modal-side hidden" id="modal-board">
     <h3>New Board<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-board">
       <label>Board name <input name="name" required placeholder="e.g. Rayong"></label>
@@ -1250,12 +1279,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-12k"></script>
-<script src="employee-id.js?v=2026-10-12k"></script>
-<script src="cloud.js?v=2026-10-12k"></script>
-<script src="charts.js?v=2026-10-12k"></script>
-<script src="xlsx-export.js?v=2026-10-12k"></script>
-<script src="bulk-edit.js?v=2026-10-12k"></script>
-<script src="app.js?v=2026-10-12k"></script>
+<script src="planning.js?v=2026-10-13d"></script>
+<script src="employee-id.js?v=2026-10-13d"></script>
+<script src="cloud.js?v=2026-10-13d"></script>
+<script src="charts.js?v=2026-10-13d"></script>
+<script src="xlsx-export.js?v=2026-10-13d"></script>
+<script src="bulk-edit.js?v=2026-10-13d"></script>
+<script src="app.js?v=2026-10-13d"></script>
 </body>
 </html>

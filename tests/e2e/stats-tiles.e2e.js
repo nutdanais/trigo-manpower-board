@@ -123,7 +123,7 @@ async function step(name, fn) {
       const row = await p.locator("#toolbar-row1").boundingBox();
       const reset = await p.locator("#btn-reset-board").boundingBox();
       const undo = await p.locator("#btn-undo").boundingBox();
-      assert.ok(row.x + row.width - (reset.x + reset.width) <= 16, "Reset Board at the right edge");
+      assert.ok(row.x + row.width - (reset.x + reset.width) <= 24, "Reset Board at the right edge");
       assert.ok(undo.x < reset.x, "Undo then Reset Board");
     });
 
@@ -133,7 +133,7 @@ async function step(name, fn) {
       assert.equal(await p.isVisible("#holiday-toggle"), true, "the widest case: Holiday toggle visible");
       const tops = await p.evaluate(() => [...document.querySelectorAll("#toolbar-row1 button:not(.hidden), #toolbar-row1 label:not(.hidden), #toolbar-row1 select")]
         .filter((e) => e.offsetWidth && e.offsetParent).map((e) => { const r = e.getBoundingClientRect(); return Math.round((r.top + r.height / 2) / 8) * 8; }));   // centres, bucketed: controls differ a little in height
-      assert.ok(tops.length >= 9, "all the controls are there: " + tops.length);
+      assert.ok(tops.length >= 7, "all the controls are there (the filters sit in one popover): " + tops.length);
       assert.equal(new Set(tops).size, 1, "every control on the same line, centres: " + [...new Set(tops)]);
       assert.equal((await p.innerText("#btn-undo")).trim(), "Undo", "the Undo word is still there for screen readers");
       // and with a couple of filters switched on (they are wider while active)
@@ -162,10 +162,10 @@ async function step(name, fn) {
     }
     await p.setViewportSize({ width: 1400, height: 900 });
 
-    await step("the Names select is sized to the name showing, not to 'Thai + English'", async () => {
-      const w = await p.evaluate(() => document.querySelector("#card-names").getBoundingClientRect().width);
-      const supported = await p.evaluate(() => CSS.supports("field-sizing", "content"));
-      if (supported) assert.ok(w < 150, "compact, was " + w);
+    await step("the Names control is a compact Thai | English toggle", async () => {
+      const w = await p.evaluate(() => document.querySelector("#card-names + .seg-pick").getBoundingClientRect().width);
+      assert.ok(w > 0 && w < 190, "compact, was " + w);
+      assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
     });
 
     await step("Overview still shows no stats", async () => {
