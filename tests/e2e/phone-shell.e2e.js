@@ -201,6 +201,33 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.equal(await visible(p, "#missions-grid"), true);
     });
 
+    await step("Overview, Manpower and Host share the board's header: title, date, summary card, ⋯", async () => {
+      for (const [label, title] of [["Overview", "Overview"], ["Manpower", "Manpower"], ["Host", "Host"]]) {
+        await tapNav(p, label);
+        await p.waitForTimeout(300);
+        assert.equal((await p.textContent("#m-title")).trim(), title, "title on " + label);
+        assert.equal(await visible(p, "#m-title"), true, "title shown on " + label);
+        assert.equal(await visible(p, "#m-summary"), true, "summary card on " + label);
+        assert.equal(await visible(p, "#toolbar-row2"), false, "row 2 folded into the card on " + label);
+        assert.equal(await visible(p, "#m-filter"), label !== "Overview", "Filter only on the lists");
+        const d = await rect(p, "#btn-date"), t = await rect(p, "#m-title");
+        assert.ok(Math.abs(d.top - t.top) < 20, "date on the title's line on " + label);
+        await p.click("#m-more");
+        const items = await menuItems(p, "#m-more-menu");
+        assert.ok(items.some((x) => /Export/.test(x)), "Export in ⋯ on " + label + ": " + items);
+        if (label !== "Overview") assert.ok(items.some((x) => /Bulk edit/.test(x)), "Bulk edit in ⋯ on " + label);
+        await p.click("#m-more");
+        await shot(p, "5-" + label.toLowerCase());
+      }
+      // record cards fold their rarer fields behind More details
+      await tapNav(p, "Manpower");
+      const tid = "#emplist-body tr:first-child td.el-tid";
+      assert.equal(await visible(p, tid), false, "TRIGO ID folded");
+      await p.click("#emplist-body tr:first-child .m-fold");
+      assert.equal(await visible(p, tid), true, "TRIGO ID shown after More details");
+      await tapNav(p, "Board");
+    });
+
     await step("Me holds the account, Org Chart, Lock, Settings and Sign out; Settings hides the bar", async () => {
       await tapNav(p, "Me");
       assert.equal(await visible(p, "#more-menu"), true);

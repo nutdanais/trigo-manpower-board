@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-13u">
+<link rel="stylesheet" href="styles.css?v=2026-10-13v">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-13u"></script>
+<script src="version.js?v=2026-10-13v"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -229,6 +229,7 @@
        Filter and the ⋯ menu that holds the toolbar's actions. Scrolled down, the
        header folds into one line and #m-count stands in for the card. -->
   <span id="m-count"></span>
+  <span id="m-title"></span>
   <div id="m-row2">
     <button type="button" id="m-summary" aria-expanded="false" aria-controls="m-details" title="Show the full numbers"></button>
     <button type="button" id="m-filter" class="m-sq" aria-label="Filter and sort" aria-expanded="false" title="Filter and sort"><svg class="ic" aria-hidden="true"><use href="#i-filter"></use></svg></button>
@@ -1334,12 +1335,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-13u"></script>
-<script src="employee-id.js?v=2026-10-13u"></script>
-<script src="cloud.js?v=2026-10-13u"></script>
-<script src="charts.js?v=2026-10-13u"></script>
-<script src="xlsx-export.js?v=2026-10-13u"></script>
-<script src="bulk-edit.js?v=2026-10-13u"></script>
-<script src="app.js?v=2026-10-13u"></script>
+<script src="planning.js?v=2026-10-13v"></script>
+<script src="employee-id.js?v=2026-10-13v"></script>
+<script src="cloud.js?v=2026-10-13v"></script>
+<script src="charts.js?v=2026-10-13v"></script>
+<script src="xlsx-export.js?v=2026-10-13v"></script>
+<script src="bulk-edit.js?v=2026-10-13v"></script>
+<script src="app.js?v=2026-10-13v"></script>
 </body>
 </html>

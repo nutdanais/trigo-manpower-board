@@ -5908,3 +5908,85 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); }
 }
 @media (max-width: 640px) { #mode-pill .mp-extra { display: none; } #mode-pill .ic { width: 10px; height: 10px; } }
+
+/* ===== Phone parity: Overview, Manpower, Host (2026-10-13, design/mobile-parity.html) =====
+   The board's phone header on every tab: the tab's name and the date on line 1, the
+   summary card, Filter (lists) and ⋯ on line 2. Row 2 of the toolbar (tiles, chips,
+   Bulk edit, Export) folds into that card and that menu; row 1 keeps the tab's one
+   filled button. Record cards get the desktop tables' quiet labels and fold their
+   rarer fields behind "More details". */
+#m-title { display: none; }
+.m-fold { display: none; }
+@media (max-width: 640px) {
+  body:not(.board-view):not(.settings-open) #m-title:not(:empty) {
+    display: block; grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 18px; font-weight: 700; letter-spacing: -.3px; color: var(--text); line-height: 40px; padding: 0 2px;
+  }
+  body:not(.board-view) #topbar .topbar-right { grid-area: 1 / 5; justify-self: end; }
+
+  /* line 2: summary card, Filter (lists only), ⋯ */
+  body:is(.ov-view, .el-view, .hl-view) #m-row2 { grid-area: 2 / 1 / 3 / -1; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+  body.ov-view #m-filter { display: none; }
+  body:is(.ov-view, .el-view, .hl-view) #m-details:not(.hidden) {
+    grid-area: 3 / 1 / 4 / -1; display: flex; flex-direction: column; gap: 8px;
+    padding: 8px 10px 9px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
+  }
+  /* dots and bar segments take their tile colour, so every tab's kinds work */
+  .ms-k i { background: var(--tc, var(--muted)); }
+  .ms-bar i { background: var(--tc, var(--muted)); }
+  .ms-k.st-noloc.ms-alert { color: var(--stat-leave); }
+  .md-chips .status-chip.sc-red { background: var(--danger-tint); border-color: var(--danger-line); color: var(--danger-text); }
+  .md-chips .status-chip.sc-red::before { background: var(--danger); }
+  .md-chips .status-chip.sc-on { box-shadow: inset 0 0 0 1px currentColor; }
+  /* four tiles with long names (Host): the label may take two lines rather than "…" */
+  body:is(.el-view, .hl-view) .md-l { white-space: normal; align-items: flex-start; line-height: 1.2; }
+  body:is(.el-view, .hl-view) .md-l i { margin-top: 3px; }
+  body:is(.el-view, .hl-view) .md-t { justify-content: space-between; }
+
+  /* row 2 lives in the card and the ⋯ menu now */
+  body:is(.ov-view, .el-view, .hl-view) #toolbar-row2 { display: none; }
+  body:is(.el-view, .hl-view) #btn-toolbar-more,
+  body:is(.el-view, .hl-view) #toolbar-more { display: none; }
+  body.ov-view #toolbar-row1 > :not(#ov-board-dd) { display: none !important; }
+  body.ov-view #toolbar-row1:not(:has(#ov-board-dd:not(.hidden))) { display: none; }
+  body.ov-view #ov-board-dd { flex: 1 1 auto; }
+  body.ov-view #btn-ov-board { width: 100%; justify-content: space-between; }
+
+  /* Filter on a list: search and filters as a sheet under the header, like a board's */
+  body:is(.el-view, .hl-view).m-filter-open #toolbar {
+    display: block; position: fixed; left: 0; right: 0; top: var(--bar-h, 110px); z-index: 80;
+    max-height: calc(100dvh - var(--bar-h, 110px) - var(--bnav-h)); overflow-y: auto;
+    background: var(--panel); border-bottom: 1px solid var(--border); box-shadow: 0 14px 30px -8px rgba(0, 38, 70, .35);
+  }
+  body:is(.el-view, .hl-view).m-filter-open #toolbar-row1 { display: block; padding: 12px; background: var(--panel); }
+  body:is(.el-view, .hl-view).m-filter-open #toolbar-row1 > :not(#toolbar-more) { display: none !important; }
+  body:is(.el-view, .hl-view).m-filter-open #toolbar-more {
+    display: flex; position: static; margin: 0; padding: 0; border: 0; box-shadow: none; background: none;
+  }
+  body.el-view.m-filter-open #emplist-name-view + .seg-pick { display: none; }
+
+  /* --- record cards: one card level, quiet sentence-case labels, rarer fields folded --- */
+  #emplist-panel, #hostlist-panel, #emplist-panel .table-wrap, #hostlist-panel .table-wrap {
+    background: transparent; border: 0; box-shadow: none; padding-left: 0; padding-right: 0;
+  }
+  :is(#emplist-table, #hostlist-table) td[data-label]::before {
+    text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 500;
+  }
+  #emplist-table thead th.el-check { background: none; text-transform: none; letter-spacing: 0; }
+  #emplist-table thead th.el-check::after { text-transform: none; }
+  :is(#emplist-table, #hostlist-table) tr:not(.m-open) td.m-x { display: none; }
+  #hostlist-table td { width: auto !important; align-self: stretch; }
+  /* the card's footer: More details on the left, the Active switch on the right */
+  :is(#emplist-table, #hostlist-table) td:is(.el-status, .hl-status) {
+    flex-direction: row; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  :is(#emplist-table, #hostlist-table) td:is(.el-status, .hl-status)::before { content: none; }
+  .m-fold {
+    display: inline-flex; align-items: center; min-height: 36px; padding: 0; border: 0; background: none;
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--primary-text); cursor: pointer;
+  }
+  .m-fold::after { content: ""; width: 6px; height: 6px; margin-left: 7px; border: solid currentColor; border-width: 0 1.6px 1.6px 0; transform: translateY(-2px) rotate(45deg); transition: transform .2s; }
+  tr.m-open .m-fold::after { transform: translateY(1px) rotate(-135deg); }
+  .m-fold:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 4px; }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) { .m-fold::after { transition: none; } }

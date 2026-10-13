@@ -1010,6 +1010,10 @@ function render() {
   $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
   $("#ov-board-dd").classList.toggle("hidden", !ov || D().boards.length < 2);
   document.body.classList.toggle("ov-view", ov);
+  document.body.classList.toggle("el-view", eml);
+  document.body.classList.toggle("hl-view", hl);
+  // phone header line 1 off a board: the tab's name where a board shows its own
+  $("#m-title").textContent = ov ? "Overview" : org ? "Org Chart" : eml ? "Manpower" : hl ? "Host" : cap ? "Capacity" : "";
   placeBoardRow1Tools(board);
   renderStats();
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
@@ -2716,11 +2720,12 @@ function renderStats() {
   areaBar.innerHTML = "";
   // Overview: the day across every board — same rule as the board tiles
   if (isOverview()) {
-    let assigned = 0, total = 0, leave = 0, hol = 0, free = 0, standby = 0, unstaffed = 0, standbyBoards = 0;
+    let assigned = 0, total = 0, leave = 0, hol = 0, free = 0, standby = 0, unstaffed = 0, standbyBoards = 0, day = 0, night = 0;
     for (const b of ovScopeBoards()) {   // the boards the toolbar's dropdown picked
       let st; try { st = boardStats(b.id); } catch (e) { continue; }
       assigned += st.assigned; total += st.total; leave += st.leave; hol += st.onHoliday; free += st.oncallAvailable;
       standby += st.standby; unstaffed += st.unstaffed; if (st.standby) standbyBoards++;
+      day += st.dayMissions; night += st.nightMissions;
     }
     if (ovScopeBoards().length > 1) bar.appendChild(statChip("Boards", ovScopeBoards().length));
     bar.appendChild(statChip("Utilization", utilizationPct2(assigned, standby) + "%"));
@@ -2730,6 +2735,17 @@ function renderStats() {
       standbyBoards ? statusChip("red", null, plural(standbyBoards, "board", "boards") + " with Standby", null, "Boards with permanent people on no mission and no leave") : null,
       unstaffed ? statusChip("amber", null, plural(unstaffed, "mission", "missions") + " with no crew") : null,
     ]);
+    const util = utilizationPct2(assigned, standby);
+    renderPhoneViewCard({
+      head: `<b>${assigned}</b> <span class="ms-u">(${util}%)</span><span class="ms-w"> assigned</span>`,
+      label: `${assigned} assigned, ${util}% utilized, ${leave} on leave, ${standby} standby, ${free} on-call free`,
+      keys: [["leave", leave, "Leave"], ["standby", standby, "Standby", standby > 0], ["free", free, "On-call free"]],
+      bar: [["asg", assigned], ["leave", leave], ["standby", standby], ["hol", hol], ["free", free]],
+      tiles: [["asg", assigned, "Assigned"], ["leave", leave, "Leave"], ["standby", standby, "Standby", standby > 0]]
+        .concat(hol ? [["hol", hol, "Holiday"]] : [], [["free", free, "On-call"]]),
+      line: `<span>Total <b>${total}</b></span><span>${icon("sun")}<b>${day}</b> day</span><span>${icon("moon")}<b>${night}</b> night</span>` +
+        `<span class="md-util"><b>${util}%</b> utilized</span>`,
+    });
     return;
   }
   if (isOrgChart()) {
@@ -2786,6 +2802,16 @@ function renderStats() {
       issueChip("en", "", act.filter(e => !(e.nameEn || "").trim()).length, "no English name"),
     ]);
     for (const c of $$("#board-status .status-chip")) c.classList.toggle("sc-on", c.title.startsWith("Click again"));
+    const onN = emps.length - permN;
+    renderPhoneViewCard({
+      head: `<b>${emps.length}</b><span class="ms-w"> people</span>`,
+      label: `${emps.length} people: ${permN} permanent, ${onN} on-call, ${inactiveN} inactive`,
+      keys: [["perm", permN, "Permanent"], ["oncall", onN, "On-call"], ["inactive", inactiveN, "Inactive"]],
+      bar: [["perm", permN], ["oncall", onN]],
+      tiles: [["perm", permN, "Permanent"], ["oncall", onN, "On-call"], ["inactive", inactiveN, "Inactive"]],
+      areaHtml: html,
+      filterCount: Object.values(state.emplist.filters).filter(v => v && v.length).length + (state.emplist.search ? 1 : 0),
+    });
     return;
   }
   if (isCapacity()) {
@@ -2827,6 +2853,15 @@ function renderStats() {
       renderHostlistFilterOptions(); renderHostRows(); renderStats();
     }, on ? "Click again to show every host" : "Show only active hosts with no location or Maps link") : null]);
     if (on) $("#board-status .status-chip").classList.add("sc-on");
+    renderPhoneViewCard({
+      head: `<b>${rows.length}</b><span class="ms-w"> hosts</span>`,
+      label: `${rows.length} hosts: ${withLoc} with a location, ${rows.length - withLoc} without, ${archived} archived`,
+      keys: [["perm", withLoc, "With location"], ["noloc", rows.length - withLoc, "No location", rows.length - withLoc > 0], ["inactive", archived, "Archived"]],
+      bar: [["perm", withLoc], ["noloc", rows.length - withLoc]],
+      tiles: [["perm", withLoc, "With location"], ["noloc", rows.length - withLoc, "No location"], ["oncall", staffed, "Ever staffed"], ["inactive", archived, "Archived"]],
+      areaHtml,
+      filterCount: Object.values(state.hostlist.filters).filter(v => v && v.length).length + (state.hostlist.search ? 1 : 0),
+    });
     return;
   }
   const s = boardStats(D().activeBoardId);
@@ -2942,6 +2977,38 @@ function renderPhoneSummary(s, areaHtml) {
   try { open = localStorage.getItem("mpm-m-details") === "1"; } catch (e) { /* private mode */ }
   setPhoneDetails(open);
 }
+/* Phone header on Overview, Manpower and Host: the same summary card as a board
+   (a headline count, coloured dots, the proportion bar; tapped open, the tiles and
+   chips), built from that tab's own numbers. The chips in the details are stand-ins
+   for the tab's status chips (#board-status), which a phone hides with the rest of
+   row 2. */
+function renderPhoneViewCard(o) {
+  const card = $("#m-summary");
+  if (!card) return;
+  const k = ([kind, n, label, alert]) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}</span>`;
+  card.innerHTML = `<span class="ms-row"><span class="ms-t">${o.head}</span>${o.keys.map(k).join("")}` +
+    `<span class="ms-chev">${icon("chevron-down")}</span></span>` +
+    `<span class="ms-bar" aria-hidden="true">${o.bar.filter(([, n]) => n > 0).map(([kind, n]) => `<i class="st-${kind}" style="flex:${n}"></i>`).join("")}</span>`;
+  card.setAttribute("aria-label", o.label + ". Show details");
+  const details = $("#m-details");
+  details.innerHTML = `<div class="md-grid" style="--n:${o.tiles.length}">` + o.tiles.map(([kind, n, label, alert]) =>
+    `<div class="md-t st-${kind}${alert ? " md-alert" : ""}${n === 0 ? " md-zero" : ""}" data-stat="${label}"><span class="md-l"><i></i>${label}</span><b>${n}</b></div>`).join("") + `</div>` +
+    (o.line ? `<div class="md-line">${o.line}</div>` : "");
+  const chips = document.createElement("div");
+  chips.className = "md-chips";
+  for (const c of $$("#board-status .status-chip")) {
+    const x = c.cloneNode(true);
+    if (c.onclick) x.onclick = () => c.onclick();
+    chips.appendChild(x);
+  }
+  if (o.areaHtml) chips.insertAdjacentHTML("beforeend", o.areaHtml);
+  if (chips.children.length) details.appendChild(chips);
+  const mf = $("#m-filter");
+  if (mf && o.filterCount != null) { mf.dataset.count = o.filterCount ? String(o.filterCount) : ""; mf.classList.toggle("on", o.filterCount > 0); }
+  let open = false;
+  try { open = localStorage.getItem("mpm-m-details") === "1"; } catch (e) { /* private mode */ }
+  setPhoneDetails(open);
+}
 function setPhoneDetails(open) {
   $("#m-details").classList.toggle("hidden", !open);
   $("#m-summary").setAttribute("aria-expanded", String(open));
@@ -2968,6 +3035,37 @@ function buildPhoneMoreMenu() {
   };
   const sep = () => { if (menu.lastChild && menu.lastChild.tagName !== "HR") menu.appendChild(document.createElement("hr")); };
   const click = (sel) => () => $(sel).click();
+  // Overview, Manpower and Host: their own row-2 actions (the create button stays in view)
+  if (isOverview() || isEmployeeList() || isHostList()) {
+    const nv = $("#emplist-name-view");
+    if (isEmployeeList() && nv) {
+      const row = document.createElement("div");
+      row.className = "tb-item tb-item-static";
+      row.innerHTML = icon("users") + `<span class="tb-grow">Names</span>`;
+      const seg = document.createElement("span");
+      seg.className = "tb-seg";
+      for (const o of nv.options) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = o.value === "th" ? "ไทย" : o.value === "en" ? "EN" : o.textContent;
+        b.setAttribute("aria-pressed", String(nv.value === o.value));
+        b.onclick = (ev) => {
+          ev.stopPropagation();
+          nv.value = o.value;
+          nv.dispatchEvent(new Event("change", { bubbles: true }));
+          for (const x of seg.children) x.setAttribute("aria-pressed", String(x === b));
+        };
+        seg.appendChild(b);
+      }
+      row.appendChild(seg);
+      menu.appendChild(row);
+    }
+    if (shown("#btn-emplist-bulk") && isEmployeeList()) item("Bulk edit", "edit", click("#btn-emplist-bulk"));
+    if (shown("#btn-hostlist-bulk") && isHostList()) item("Bulk edit", "edit", click("#btn-hostlist-bulk"));
+    if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+    if (!menu.children.length) menu.innerHTML = `<div class="tb-item tb-item-static">Nothing to do here</div>`;
+    return;
+  }
   if (shown("#btn-new-mission")) item("New mission", "plus", click("#btn-new-mission"), "tb-item-pri");
   if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Add mission", "plus", click("#btn-import-mission"), "tb-item-pri");
   if (shown("#btn-new-employee")) item("New employee", "plus", click("#btn-new-employee"), "tb-item-pri");
@@ -4483,16 +4581,17 @@ function renderEmployeeRows() {
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
       <td data-label="Name" class="el-name">${emplistNameHtml(e)}</td>
-      <td data-label="TRIGO ID" class="el-tid">${e.trigoId ? escapeHtml(e.trigoId) : "—"}</td>
+      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : "—"}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td data-label="Position">${pos ? pos.label : "—"}</td>
+      <td data-label="Position" class="m-x">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
-      <td data-label="Start date">${e.startDate ? fmtDate(e.startDate) : "—"}</td>
-      <td data-label="Years of service">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
+      <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : "—"}</td>
+      <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
+        <button type="button" class="m-fold" aria-expanded="false">More details</button>
         <label class="toggle toggle-active">
           <input type="checkbox" ${isActive ? "checked" : ""} ${can("emplist", "edit") ? "" : "disabled"}>
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -4998,10 +5097,11 @@ function renderHostRows() {
       <td data-label="Service area" class="hl-area-cell">${r.area
         ? areaPillHtml(r.area, "area-pill")
         : `<button type="button" class="hl-add-loc hl-add-area">+ Set area</button>`}</td>
-      <td data-label="Note" class="hl-note-cell">${hostNoteCell(r)}</td>
+      <td data-label="Note" class="hl-note-cell m-x">${hostNoteCell(r)}</td>
       <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
-      <td data-label="Appear on board" class="hl-board-cell">${hostBoardCell(r)}</td>
+      <td data-label="Appear on board" class="hl-board-cell m-x">${hostBoardCell(r)}</td>
       <td data-label="Status" class="hl-status">
+        <button type="button" class="m-fold" aria-expanded="false">More details</button>
         <label class="toggle toggle-active">
           <input type="checkbox" ${r.archived ? "" : "checked"} ${can("hostlist", "edit") ? "" : "disabled"}>
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -11630,6 +11730,16 @@ function wireApp() {
     try { localStorage.setItem("mpm-m-details", open ? "1" : "0"); } catch (e) { /* private mode */ }
   };
   $("#m-more").onclick = togglePhoneMoreMenu;
+  // phone record cards (Manpower, Host): "More details" shows the folded fields
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest(".m-fold");
+    if (!b) return;
+    const tr = b.closest("tr");
+    const open = !tr.classList.contains("m-open");
+    tr.classList.toggle("m-open", open);
+    b.setAttribute("aria-expanded", String(open));
+    b.textContent = open ? "Fewer details" : "More details";
+  });
   $("#m-filter").onclick = togglePhoneFilter;
   document.addEventListener("click", (ev) => {
     if (!ev.target.closest("#m-more-menu, #m-more")) { $("#m-more-menu").classList.add("hidden"); $("#m-more").setAttribute("aria-expanded", "false"); }
