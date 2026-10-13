@@ -5559,17 +5559,21 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
    the same control as Overview's (button + menu), followed by CONFIRMED / FORECAST */
 #board-dd.hidden { display: none; }
 #board-dd { flex: none; }
+@media (min-width: 641px) {
 #btn-board-dd { gap: 8px; min-width: 210px; background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: none; font-weight: 550; }
 #btn-board-dd:hover { background: var(--hover-tint); }
 #btn-board-dd .ovb-cap { color: var(--muted); font-weight: 550; }
 #btn-board-dd .ovb-label { font-weight: 650; }
 #btn-board-dd > .ic:last-child { margin-left: auto; width: 14px; height: 14px; opacity: .7; color: inherit; }
+}
+/* phone: the header keeps the board name alone, as the phone layout designed it */
+@media (max-width: 640px) { #btn-board-dd .ovb-cap, #btn-board-dd .ovb-count { display: none; } }
 #board-menu { min-width: 240px; }
 #board-menu .board-tab.tab-board.active { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; box-shadow: none; }
 #toolbar-row1 #mode-pill { margin-left: 0; }
 @media (max-width: 640px) {
-  #board-dd, #ov-board-dd { flex: 1 1 100%; }
-  #btn-board-dd, #btn-ov-board { width: 100%; justify-content: flex-start; }
+  #ov-board-dd { flex: 1 1 100%; }
+  #btn-ov-board { width: 100%; justify-content: flex-start; }
 }
 
 /* the date pill beside the date picker, on the navy banner */
@@ -5606,3 +5610,301 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 .ov-group-head h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: .2px; text-transform: none; color: #fff; }
 .ov-group-head .ov-group-sub { color: rgba(255, 255, 255, .78); font-size: 12.5px; }
 .ov-group-head::before { content: ""; width: 4px; align-self: stretch; border-radius: 2px; background: var(--brand-green); margin-right: 2px; }
+/* ===== Phone shell (2026-10-13, mobile direction C + pool drawer) =====
+   See design/mobile-directions.html. Below 640px only; desktop is untouched.
+   - Top bar: a light surface with the date and the avatar on one line, then the
+     board name as a large title. The module tabs, Lock and Settings leave the
+     header: the tabs become the navy bottom bar, the rest goes under More.
+   - Bottom bar (#bottom-nav, built by renderBottomNav in app.js).
+   - New Mission becomes a floating button above the bar.
+   - The available-people panel is a drawer that peeks above the bar.
+   - Record dialogs (.modal-side) open full screen with Save pinned. */
+#bottom-nav, #fp-drawer-handle, #m-count, #m-row2, #m-details, #m-hol-pill, #m-more-menu { display: none; }
+#more-menu.hidden { display: none; }
+
+@media (max-width: 640px) {
+  :root { --bnav-h: calc(58px + env(safe-area-inset-bottom, 0px)); --peek-h: 52px; }
+
+  /* --- top bar (approved in design/mobile-header-final.html) ---
+     Line 1: board name, status pill, date. Line 2 (on a board): the summary card,
+     Filter and ⋯. The avatar and save status move to the bottom bar's Me tab;
+     the module tabs, Lock and Settings to Me's menu. Scrolled down
+     (body.hdr-compact) both lines fold into one. */
+  #topbar {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 6px 12px 8px; gap: 8px 6px; flex-wrap: wrap; align-items: center;
+  }
+  #green-rule { display: none; }
+  #topbar .topbar-left, #board-tabs, #btn-settings, #btn-lock, #user-dd, #save-status { display: none !important; }
+  #topbar .btn-top { color: var(--text); border-color: transparent; background: var(--bg-soft); }
+  #topbar .btn-top:hover { background: var(--hover-tint); }
+
+  #board-dd { order: 1; flex: 0 1 auto; min-width: 0; }
+  #btn-board-dd {
+    width: auto; max-width: 100%; height: 40px; min-height: 40px; padding: 0 2px; gap: 3px;
+    background: transparent !important; border: 0 !important; color: var(--text);
+    font-size: 18px; font-weight: 700; letter-spacing: -.3px; justify-content: flex-start;
+  }
+  #btn-board-dd #board-dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  #btn-board-dd .ic:last-child { width: 15px; height: 15px; opacity: .6; }
+  body:not(.board-view) #board-dd { display: none; }
+  #mode-pill, #m-hol-pill { order: 2; flex: none; margin-left: 0; font-size: 9.5px; letter-spacing: .2px; padding: 1px 6px; }
+  /* one pill only: on a holiday, HOLIDAY stands in for CONFIRMED / FORECAST, or the
+     name would be left with almost no room */
+  #topbar:has(#m-hol-pill:not(.hidden)) #mode-pill { display: none; }
+  #m-hol-pill { display: inline-flex; color: #5b4bb8; background: #f1effc; border: 1px solid #cfc8f2; }
+  #m-hol-pill.hidden { display: none; }
+  #btn-hold-alerts { order: 4; }
+  #topbar .topbar-right { order: 3; flex: 0 0 auto; margin-left: auto; gap: 0; }
+  body:not(.board-view) #topbar .topbar-right { margin-left: 0; }
+
+  /* the date: weekday stacked small above "14-Oct", so it fits beside the name */
+  #topbar .date-nav { border: 0; border-radius: 10px; background: var(--bg-soft); flex: none; height: 38px; }
+  #topbar .date-nav .btn-top { border-left: 1px solid var(--border); background: transparent; min-height: 38px; height: 38px; }
+  #topbar .date-nav .btn-top:first-child { border-left: 0; }
+  #topbar .date-nav .btn-top.btn-icon { width: 28px; }
+  #topbar .btn-date { flex: none; padding: 0 7px; font-weight: 650; font-size: 12.5px; }
+  #topbar .btn-date .d-txt { display: flex; flex-direction: column; align-items: center; line-height: 1.08; }
+  #topbar .btn-date .d-dow { font-size: 9.5px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase; color: var(--muted); }
+
+  /* line 2: summary card, Filter, ⋯ */
+  body.board-view #m-row2 { order: 10; flex: 1 0 100%; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+  #m-summary {
+    flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px;
+    min-height: 44px; padding: 6px 10px 7px; border: 0; border-radius: 11px; background: var(--bg-soft);
+    font: inherit; color: var(--muted); text-align: left; cursor: pointer;
+  }
+  #m-summary:focus-visible, .m-sq:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+  .ms-row { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 12px; font-weight: 600; min-width: 0; }
+  .ms-t b { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
+  .ms-k { display: inline-flex; align-items: center; gap: 3px; color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ms-k i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .ms-k.st-leave i { background: var(--stat-leave); } .ms-k.st-standby i { background: var(--stat-standby); } .ms-k.st-free i { background: var(--stat-free); }
+  .ms-k.ms-alert { color: var(--stat-standby); }
+  .ms-chev { margin-left: auto; display: inline-grid; place-items: center; width: 16px; height: 16px; color: var(--muted); transition: transform .2s; }
+  .ms-chev .ic { width: 14px; height: 14px; }
+  #m-summary.open .ms-chev { transform: rotate(180deg); }
+  .ms-bar { display: flex; gap: 2px; height: 4px; border-radius: 2px; overflow: hidden; }
+  .ms-bar i { display: block; }
+  .ms-bar .st-asg { background: var(--stat-asg); } .ms-bar .st-leave { background: var(--stat-leave); }
+  .ms-bar .st-standby { background: var(--stat-standby); } .ms-bar .st-hol { background: var(--stat-hol); } .ms-bar .st-free { background: var(--stat-free); }
+  .m-sq {
+    flex: none; width: 44px; border-radius: 11px; border: 1px solid var(--border); background: var(--panel);
+    color: var(--text); display: grid; place-items: center; position: relative; cursor: pointer; padding: 0;
+  }
+  .m-sq[aria-expanded="true"], #m-filter.on { border-color: var(--primary-text); background: var(--hover-tint); color: var(--primary-text); }
+  #m-filter[data-count]:not([data-count=""])::after {
+    content: attr(data-count); position: absolute; top: -5px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px;
+    border-radius: 6px; background: var(--primary); color: #fff; font-size: 10px; font-weight: 700; line-height: 17px; text-align: center;
+  }
+  body.board-view #m-details:not(.hidden) {
+    order: 11; flex: 1 0 100%; display: flex; flex-direction: column; gap: 8px;
+    padding: 8px 10px 9px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
+  }
+  /* opened: one row of status counts, one line of Total / Day / Night / utilization,
+     then status and area chips in one run */
+  .md-grid { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); }
+  .md-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 0 8px; border-left: 1px solid var(--border); }
+  .md-t:first-child { border-left: 0; padding-left: 2px; }
+  .md-l { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .md-l i { width: 8px; height: 8px; border-radius: 3px; flex: none; background: var(--tc, var(--border)); }
+  .md-t b { font-size: 20px; line-height: 1.1; font-weight: 700; letter-spacing: -.3px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .md-t.md-zero b { color: var(--muted); font-weight: 600; }
+  .md-t.md-alert .md-l, .md-t.md-alert b { color: var(--warn-text); }
+  .md-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 7px 2px 0; border-top: 1px solid var(--border); font-size: 12px; font-weight: 550; color: var(--muted); }
+  .md-line span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .md-line b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .md-line .ic { width: 13px; height: 13px; }
+  .md-line .md-util { margin-left: auto; }
+  .md-line .md-util b { color: var(--stat-asg); }
+  .md-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .md-chips .area-chip { background: var(--panel); height: 26px; }
+  .ms-u { color: var(--stat-asg); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .ms-k { gap: 2px; }
+  .md-chips .status-chip {
+    display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px 0 8px;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--text);
+    font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  }
+  .md-chips .status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--muted); }
+  .md-chips .status-chip b { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .md-chips .status-chip:active { transform: translateY(1px); }
+  .md-chips .status-chip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+  .md-chips .status-chip.sc-amber { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
+  .md-chips .status-chip.sc-amber::before { background: var(--warn); }
+  .mission-card.flash-outline { animation: m-flash-outline 1.6s ease-out; }
+
+  /* ⋯ menu */
+  #board-menu .tb-item, #more-menu .tb-item, #m-more-menu .tb-item { min-height: 44px; font-size: 14.5px; }
+  #board-menu { min-width: min(300px, calc(100vw - 24px)); }
+  #m-more-menu:not(.hidden) {
+    display: block; position: fixed; top: calc(var(--bar-h, 110px) + 4px); right: 8px; left: auto;
+    width: min(270px, calc(100vw - 16px)); max-height: calc(100dvh - var(--bar-h, 110px) - var(--bnav-h) - 16px); overflow-y: auto; z-index: 85;
+  }
+  #m-more-menu hr, #more-menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 2px; }
+  .tb-grow { flex: 1; min-width: 0; }
+  .tb-item-pri { color: var(--primary-text); font-weight: 650; }
+  .tb-item-pri .ic { background: var(--primary); color: #fff; border-radius: 7px; padding: 3px; width: 22px; height: 22px; }
+  .tb-item:disabled { color: var(--muted); opacity: .6; cursor: default; }
+  .tb-item-static { cursor: default; }
+  .tb-item-static:hover { background: none; color: var(--text); }
+  .tb-switch { width: 36px; height: 21px; border-radius: 11px; background: var(--track-off); position: relative; flex: none; transition: background-color .2s; }
+  .tb-switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .tb-switch.on { background: var(--primary); }
+  .tb-switch.on::after { transform: translateX(15px); }
+  .tb-seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--bg-soft); }
+  .tb-seg button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 4px 10px; border-radius: 6px; cursor: pointer; min-height: 30px; }
+  .tb-seg button[aria-pressed="true"] { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+
+  /* the board's toolbar is replaced by the header above; Filter opens its filter list as a sheet */
+  body.board-view #toolbar { display: none; }
+  body.board-view.m-filter-open #toolbar {
+    display: block; position: fixed; left: 0; right: 0; top: var(--bar-h, 110px); z-index: 80;
+    max-height: calc(100dvh - var(--bar-h, 110px) - var(--bnav-h)); overflow-y: auto;
+    background: var(--panel); border-bottom: 1px solid var(--border); box-shadow: 0 14px 30px -8px rgba(0, 38, 70, .35);
+  }
+  body.board-view.m-filter-open #toolbar-row2,
+  body.board-view.m-filter-open #toolbar-row1 > :not(#toolbar-more),
+  body.board-view.m-filter-open #toolbar-more > :not(#filters),
+  body.board-view.m-filter-open #filters > :not(#filter-dd) { display: none !important; }
+  body.board-view.m-filter-open #toolbar-row1 { display: block; padding: 12px; background: var(--panel); }
+  body.board-view.m-filter-open #toolbar-more { display: flex; position: static; margin: 0; padding: 0; border: 0; box-shadow: none; background: none; }
+
+  /* scrolled down: one line — name, date, the count, Filter, ⋯ */
+  body.board-view.hdr-compact #topbar { padding-top: 4px; padding-bottom: 4px; }
+  body.board-view.hdr-compact #mode-pill,
+  body.board-view.hdr-compact #m-hol-pill,
+  body.board-view.hdr-compact #btn-date-prev,
+  body.board-view.hdr-compact #btn-date-next,
+  body.board-view.hdr-compact #m-summary,
+  body.board-view.hdr-compact #m-details { display: none !important; }
+  body.board-view.hdr-compact #btn-board-dd { font-size: 15px; height: 36px; min-height: 36px; }
+  body.board-view.hdr-compact #m-row2 { display: contents; }
+  body.board-view.hdr-compact #topbar .topbar-right { order: 3; margin-left: 0; }
+  body.board-view.hdr-compact #topbar .date-nav { background: none; height: 36px; }
+  body.board-view.hdr-compact #m-count { display: inline; order: 4; margin-left: auto; font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  body.board-view.hdr-compact #m-count b { color: var(--stat-asg); }
+  body.board-view.hdr-compact #m-filter { order: 5; height: 36px; width: 40px; }
+  body.board-view.hdr-compact #m-more { order: 6; height: 36px; width: 40px; }
+
+  /* Line 1 must never wrap. In a wrapping flex row the date drops to a line of its
+     own before the name gives up any width (it did on a phone with a larger text
+     setting), so the header is a grid instead: the name's column is the only one
+     that shrinks, down to "…", while the pills and the date keep their full size.
+     Every item has an explicit column, so a hidden pill leaves its column empty
+     instead of shifting the rest. */
+  #topbar {
+    display: grid; align-items: center; column-gap: 5px; row-gap: 8px;
+    grid-template-columns: minmax(0, max-content) max-content max-content minmax(0, 1fr) max-content;
+  }
+  #board-dd { grid-area: 1 / 1; min-width: 0; }
+  #btn-board-dd { width: 100%; }
+  #mode-pill { grid-area: 1 / 2; }
+  #m-hol-pill { grid-area: 1 / 3; }
+  #topbar .topbar-right { grid-area: 1 / 5; justify-self: end; }
+  body:not(.board-view) #topbar .topbar-right { grid-column: 1 / -1; justify-self: start; }
+  #btn-hold-alerts { grid-area: 4 / 1 / 5 / -1; justify-self: start; }
+  body.board-view #m-row2 { grid-area: 2 / 1 / 3 / -1; }
+  body.board-view #m-details:not(.hidden) { grid-area: 3 / 1 / 4 / -1; }
+  body.board-view.hdr-compact #topbar {
+    grid-template-columns: minmax(0, max-content) max-content minmax(0, 1fr) max-content max-content max-content;
+  }
+  body.board-view.hdr-compact #topbar .topbar-right { grid-area: 1 / 2; justify-self: start; }
+  body.board-view.hdr-compact #m-count { grid-area: 1 / 4; margin-left: 0; }
+  body.board-view.hdr-compact #m-filter { grid-area: 1 / 5; }
+  body.board-view.hdr-compact #m-more { grid-area: 1 / 6; }
+
+  /* leave: one swipeable row of short names, types with people first */
+  body.board-view:not(.exporting) #leave-tabs {
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; margin-bottom: 8px;
+  }
+  body.board-view:not(.exporting) #leave-tabs::-webkit-scrollbar { display: none; }
+  .lv-tab { flex: none; height: 34px; }
+  .lv-tab.has { order: -1; }
+  .lv-long { display: none; }
+
+  /* --- bottom bar --- */
+  #bottom-nav {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    padding: 6px 4px env(safe-area-inset-bottom, 0px); height: var(--bnav-h);
+    background: var(--primary); box-shadow: 0 -6px 18px rgba(0, 30, 56, .16);
+  }
+  body.settings-open #bottom-nav, body.settings-open #more-menu { display: none; }
+  .bn-item {
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    border: 0; background: none; padding: 0; cursor: pointer; font: inherit;
+    font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, .68);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bn-pill { width: 52px; height: 28px; border-radius: 14px; display: grid; place-items: center; transition: background-color .2s; }
+  .bn-pill .ic { width: 20px; height: 20px; }
+  .bn-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bn-item.active { color: #fff; }
+  .bn-item.active .bn-pill { background: rgba(168, 200, 85, .3); }
+  .bn-me {
+    width: 26px; height: 26px; border-radius: 8px; background: var(--brand-green); color: #1d2c05;
+    font-size: 11px; font-weight: 700; display: grid; place-items: center; position: relative;
+  }
+  .bn-me::after {
+    content: ""; position: absolute; right: -4px; bottom: -4px; width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid var(--primary); background: transparent; display: none;
+  }
+  body[data-save="saved"] .bn-me::after { display: block; background: #4caf50; }
+  body[data-save="saving"] .bn-me::after { display: block; background: #f5b335; }
+  body[data-save="error"] .bn-me::after { display: block; background: var(--danger); }
+  #more-menu .tb-who { min-width: 0; }
+  .bn-item:active .bn-pill { transform: scale(.94); }
+  .bn-item:focus-visible { outline: none; }
+  .bn-item:focus-visible .bn-pill { box-shadow: 0 0 0 2px #fff; }
+  #more-menu {
+    position: fixed; right: 8px; left: auto; top: auto; bottom: calc(var(--bnav-h) + 8px);
+    min-width: 230px; z-index: 75;
+  }
+  #more-menu .tb-item.active { color: var(--primary-text); font-weight: 700; background: var(--hover-tint); }
+  .tb-item-danger { color: var(--danger-text); }
+
+  /* room under every view for the bar (and, on a board, the drawer's peek) */
+  #app-root { padding-bottom: calc(var(--bnav-h) + 16px); }
+  body.board-view #app-root { padding-bottom: calc(var(--bnav-h) + var(--peek-h) + 24px); }
+
+  /* --- available-people drawer --- */
+  #float-pool {
+    position: fixed; left: 0; right: 0; top: auto; bottom: var(--bnav-h); width: auto;
+    height: var(--peek-h); overflow: hidden; z-index: 65;
+    border: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -6px 20px rgba(0, 42, 74, .16);
+    transition: height .28s cubic-bezier(.2, .8, .2, 1);
+  }
+  #float-pool.hidden { display: none; }
+  #float-pool.fp-open { height: min(72dvh, calc(100dvh - var(--bnav-h) - 56px)); overflow-y: auto; overscroll-behavior: contain; }
+  #float-pool.fp-collapsed { width: auto; }
+  #fp-drawer-handle {
+    display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 2; flex: none;
+    width: 100%; min-height: var(--peek-h); padding: 14px 16px 8px; border: 0; background: var(--panel);
+    font: inherit; font-size: 14px; font-weight: 700; color: var(--text); cursor: pointer; text-align: left;
+  }
+  .fp-grab { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--border); }
+  #fp-drawer-sum { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fp-drawer-cue { flex: none; font-size: 13px; font-weight: 650; color: var(--primary-text); }
+  #fp-drawer-handle:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+  #float-pool:not(.fp-open) > :not(#fp-drawer-handle) { visibility: hidden; }
+  #float-pool .fp-hint { display: none; }
+  body.fp-drawer-open #touch-actions.on { bottom: calc(var(--bnav-h) + 8px); }
+  body.touch-mode #touch-actions.on { bottom: calc(var(--bnav-h) + var(--peek-h) + 8px); z-index: 68; }
+  body.touch-mode.fp-drawer-open #touch-actions.on { bottom: calc(var(--bnav-h) + 8px); }
+  body.fp-drawer-open.has-selection #float-pool.fp-open { padding-bottom: 64px; }
+
+  /* --- record dialogs full screen, Save pinned --- */
+  #modal-backdrop { z-index: 100; }
+  .modal.modal-side { height: 100dvh; max-height: none; border-radius: 0; }
+  .modal-side h3 { padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+  .modal-side .modal-actions .btn { min-height: 44px; }
+  .modal-side .modal-actions .btn-primary { flex: 1 1 auto; }
+}
+/* a narrow phone keeps the number and the % but drops the word "assigned" */
+@media (max-width: 369px) { .ms-w { display: none; } }
+@keyframes m-flash-outline { 0%, 60% { box-shadow: 0 0 0 3px var(--warn); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  #float-pool { transition: none; }
+  .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); }
+}
+@media (max-width: 640px) { #mode-pill .mp-extra { display: none; } #mode-pill .ic { width: 10px; height: 10px; } }

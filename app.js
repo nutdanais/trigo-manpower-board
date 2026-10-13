@@ -331,6 +331,7 @@ function setSaveStatus(kind) {
   const el = $("#save-status");
   if (!el) return;
   el.classList.remove("hidden", "save-saving", "save-saved", "save-error");
+  document.body.dataset.save = kind;   // the phone's Me tab shows this as a dot
   if (kind === "saving") {
     el.classList.add("save-saving");
     el.textContent = "Saving…";
@@ -927,6 +928,7 @@ function render() {
   renderTabs();
   renderDateButton();
   renderLockButton();
+  renderBottomNav();   // again: More offers Lock, whose state renderLockButton just set
   const ov = isOverview();
   const org = isOrgChart();
   const eml = isEmployeeList();
@@ -1728,6 +1730,107 @@ function renderTabs() {
   }
   renderBoardPill();
   renderUserMenu();
+  renderBottomNav();
+}
+
+/* Phone bottom bar (shown only <=640px, see "Phone shell" in styles.css). It
+   reuses the header tabs' own click handlers, so switching views goes through
+   exactly the same path as on desktop. Board / Overview / Manpower / Host sit in
+   the bar; Org Chart, Capacity, Lock, Settings and Sign out go under More. */
+function renderBottomNav() {
+  const nav = $("#bottom-nav");
+  if (!nav) return;
+  const tabs = $("#board-tabs");
+  const boards = can("board") ? D().boards : [];
+  if (!isNonBoardView()) state.lastBoardId = D().activeBoardId;
+  const lastBoard = boards.find(b => b.id === state.lastBoardId) || boards[0];
+  const go = (cls) => () => { closeMoreMenu(); const t = tabs.querySelector("." + cls); if (t) t.onclick(); };
+  const items = [];
+  if (lastBoard) items.push({ label: "Board", ic: "board", on: !isNonBoardView(), run: () => {
+    closeMoreMenu(); clearSelection(); D().activeBoardId = lastBoard.id; refreshAndRender();
+  } });
+  for (const [cls, label, ic] of [["tab-overview", "Overview", "chart"], ["tab-emplist", "Manpower", "users"], ["tab-hostlist", "Host", "site"]]) {
+    const t = tabs.querySelector("." + cls);
+    if (t) items.push({ label, ic, on: t.classList.contains("active"), run: go(cls) });
+  }
+  const more = [];
+  for (const [cls, label, ic] of [["tab-orgchart", "Org Chart", "orgchart"], ["tab-capacity", "Capacity", "list"]]) {
+    const t = tabs.querySelector("." + cls);
+    if (t) more.push({ label, ic, on: t.classList.contains("active"), run: go(cls) });
+  }
+  const lockBtn = $("#btn-lock");
+  if (lockBtn && !lockBtn.classList.contains("hidden") && !lockBtn.disabled) {
+    const locked = lockBtn.classList.contains("locked");
+    more.push({ label: locked ? "Unlock this board" : "Lock this board", ic: locked ? "lock" : "unlock", run: () => { closeMoreMenu(); lockBtn.click(); } });
+  }
+  more.push({ label: "Settings", ic: "settings", run: () => { closeMoreMenu(); $("#btn-settings").click(); } });
+  more.push({ label: "Sign out", ic: "sign-out", danger: true, run: () => { closeMoreMenu(); $("#btn-signout").click(); } });
+  const moreOn = more.some(m => m.on);
+  nav.innerHTML = "";
+  const add = (it, extra) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bn-item" + (it.on ? " active" : "");
+    if (it.on) b.setAttribute("aria-current", "page");
+    b.innerHTML = `<span class="bn-pill">${icon(it.ic)}</span><span class="bn-label">${escapeHtml(it.label)}</span>`;
+    b.onclick = it.run;
+    if (extra) extra(b);
+    nav.appendChild(b);
+  };
+  for (const it of items) add(it);
+  // "Me": the account avatar lives here on a phone (styles.css hides the header's),
+  // with the save state as a dot on it and the rarer views in its menu
+  add({ label: "Me", ic: "more", on: moreOn, run: toggleMoreMenu }, (b) => {
+    b.id = "btn-bn-more";
+    b.setAttribute("aria-haspopup", "menu");
+    b.setAttribute("aria-expanded", "false");
+    b.setAttribute("aria-label", "Me: account, settings and more views");
+    b.querySelector(".bn-pill").innerHTML = `<span class="bn-me">${escapeHtml($("#avatar-initials").textContent || "?")}</span>`;
+  });
+  const menu = $("#more-menu");
+  menu.innerHTML = "";
+  const who = document.createElement("div");
+  who.className = "tb-who";
+  who.innerHTML = `<b>${escapeHtml($("#user-menu-name").textContent)}</b><small>${escapeHtml($("#user-menu-role").textContent)}</small>`;
+  menu.appendChild(who);
+  for (const m of more) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tb-item" + (m.on ? " active" : "") + (m.danger ? " tb-item-danger" : "");
+    b.setAttribute("role", "menuitem");
+    b.innerHTML = icon(m.ic) + escapeHtml(m.label);
+    b.onclick = (ev) => { ev.stopPropagation(); m.run(); };
+    menu.appendChild(b);
+  }
+}
+function toggleMoreMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = $("#more-menu");
+  const open = menu.classList.contains("hidden");
+  closeTopbarMenus();
+  closePhoneMenus();
+  menu.classList.toggle("hidden", !open);
+  const btn = $("#btn-bn-more");
+  if (btn) btn.setAttribute("aria-expanded", String(open));
+}
+function closeMoreMenu() {
+  const menu = $("#more-menu");
+  if (menu) menu.classList.add("hidden");
+  const btn = $("#btn-bn-more");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+/* Phone drawer for the available-people panel (see "Phone shell" in styles.css).
+   Closed, it peeks above the bottom bar with the two counts; open, it covers most
+   of the board so people can be picked, and closing it shows the missions again
+   to tap one and place them. */
+function setPoolDrawer(open) {
+  const fp = $("#float-pool");
+  fp.classList.toggle("fp-open", open);
+  document.body.classList.toggle("fp-drawer-open", open);
+  const h = $("#fp-drawer-handle");
+  h.setAttribute("aria-expanded", String(open));
+  h.querySelector(".fp-drawer-cue").textContent = open ? (state.selectedEmps.size ? "Place" : "Hide") : "Show";
 }
 
 /* The pill that stands for the per-board tabs: shows the board on screen, or just
@@ -1739,8 +1842,10 @@ function renderBoardPill() {
   const boards = can("board") ? D().boards : [];
   const onBoard = !isNonBoardView();
   const cur = boards.find(b => b.id === D().activeBoardId);
-  wrap.classList.toggle("hidden", !onBoard || !cur);
-  if (!cur) return;
+  // computer: only on the Board tab (Overview has its own); phone: always, as the header's board name
+  const phone = !ROW1_TOOLS_MQ.matches;
+  wrap.classList.toggle("hidden", phone ? (!boards.length && !can("settings", "edit")) : (!onBoard || !cur));
+  if (!(onBoard && cur)) { $("#board-dd-label").textContent = "Boards"; $("#board-dd-count").textContent = ""; return; }
   try { localStorage.setItem("manpower.lastBoard", cur.id); } catch (e) { /* remembering is a courtesy */ }
   $("#board-dd-label").textContent = cur.name;   // textContent: board names are user data
   $("#board-dd-count").textContent = rosterEmployees(cur.id).length;
@@ -1812,7 +1917,7 @@ function renderDateButton() {
   const full = fmtDate(state.date);
   const [d, mon, yr] = full.split("-");
   const btn = $("#btn-date");
-  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt">${dow} ${d}-${mon}<span class="d-yr">-${yr}</span></span>`;
+  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt"><span class="d-dow">${dow}</span> <span class="d-dm">${d}-${mon}</span><span class="d-yr">-${yr}</span></span>`;
   btn.title = `${dow} ${full} — click to pick a date`;
 }
 
@@ -1934,6 +2039,10 @@ function updateSelectionUI() {
     $("#selection-count").textContent = label;
   }
   // floating touch action bar (CSS only shows it on touch devices)
+  // the drawer's handle says "Place" once someone is picked: closing it is how
+  // the missions come back into view to tap one
+  const fp = $("#float-pool");
+  if (fp && fp.classList.contains("fp-open")) $("#fp-drawer-handle .fp-drawer-cue").textContent = n ? "Place" : "Hide";
   const tbar = $("#touch-actions");
   if (tbar) {
     tbar.classList.toggle("on", n > 0);
@@ -2313,6 +2422,7 @@ function renderFloatPool() {
   }
   $("#standby-count").textContent = standbyN;
   $("#oncall-count").textContent = oncallN;
+  $("#fp-drawer-sum").textContent = `${$("#standby-label").textContent} ${standbyN} · On-call ${oncallN}`;
   if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : (holiday ? "No one on holiday" : "Everyone permanent is assigned")}</span>`;
   if (!oncallBody.children.length) oncallBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "No on-call free"}</span>`;
   markSelectedCards();
@@ -2779,6 +2889,153 @@ function renderStats() {
   const noArea = roster.filter(e => !known.has(e.areaId)).length;
   if (noArea) areaHtml += areaChip("No area", noArea, "");
   areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+  renderPhoneSummary(s, areaHtml);
+}
+
+/* Phone header (styles.css, Phone header): the same numbers as the tiles above,
+   folded into one card. Closed it reads "89/106 assigned" plus the leave, standby
+   and on-call counts as coloured dots; opened (#m-details) it adds the tiles, the
+   Day / Night split and the area chips. Open or closed is remembered per device. */
+function renderPhoneSummary(s, areaHtml) {
+  const card = $("#m-summary");
+  if (!card) return;
+  const word = isForecastView() ? "planned" : "assigned";
+  const parts = [["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]];
+  const split = `<span class="ms-bar" aria-hidden="true">${parts.filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</span>`;
+  const k = (kind, n, label, alert) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}</span>`;
+  // Utilization = Assigned ÷ (Assigned + Standby), to two decimals: people on leave,
+  // on a holiday or on-call and not called in are left out, so 0 Standby reads 100%.
+  const util = utilizationPct2(s.assigned, s.standby);
+  card.innerHTML = `<span class="ms-row"><span class="ms-t"><b>${s.assigned}</b> <span class="ms-u">(${util}%)</span><span class="ms-w"> ${word}</span></span>` +
+    k("leave", s.leave, "Leave") + k("standby", s.standby, "Standby", s.standby > 0) + k("free", s.oncallAvailable, "On-call free") +
+    `<span class="ms-chev">${icon("chevron-down")}</span></span>` + split;
+  card.setAttribute("aria-label", `${s.assigned} ${word}, ${util}% utilized, ${s.leave} on leave, ${s.standby} standby, ${s.oncallAvailable} on-call free. Show details`);
+  // Opened: one row of the status counts (they add up to Total), one line with
+  // Total and the Day / Night split, then what needs a look and the areas as one
+  // run of chips. The proportion bar is already on the card above.
+  const details = $("#m-details");
+  const tiles = [["asg", s.assigned, "Assigned"], ["leave", s.leave, "Leave"], ["standby", s.standby, "Standby"]]
+    .concat(s.isHoliday ? [["hol", s.onHoliday, "Holiday"]] : [], [["free", s.oncallAvailable, "On-call"]]);
+  const tileHtml = tiles.map(([kind, n, label]) =>
+    `<div class="md-t st-${kind}${kind === "standby" && n > 0 ? " md-alert" : ""}${n === 0 ? " md-zero" : ""}" data-stat="${label}"><span class="md-l"><i></i>${label}</span><b>${n}</b></div>`).join("");
+  details.innerHTML = `<div class="md-grid" style="--n:${tiles.length}">${tileHtml}</div>` +
+    `<div class="md-line"><span>Total <b>${s.total}</b></span><span>${icon("sun")}<b>${s.dayMissions}</b> day</span>` +
+    `<span>${icon("moon")}<b>${s.nightMissions}</b> night</span><span class="md-util"><b>${util}%</b> utilized</span></div>`;
+  const plan = peekPlan(D().activeBoardId);
+  const hiddenN = plan.missions.filter(m => m.hidden).length;
+  const chips =
+    (s.unstaffed ? `<button type="button" class="status-chip sc-amber" data-status="unstaffed" title="Show the first mission with nobody on it"><b>${s.unstaffed}</b> ${s.unstaffed === 1 ? "mission" : "missions"} with no crew</button>` : "") +
+    (hiddenN ? `<button type="button" class="status-chip" data-status="hidden" title="Open Hide/Unhide"><b>${hiddenN}</b> ${hiddenN === 1 ? "mission" : "missions"} hidden</button>` : "");
+  if (chips || areaHtml) details.insertAdjacentHTML("beforeend", `<div class="md-chips">${chips}${areaHtml}</div>`);
+  const firstEmpty = details.querySelector('[data-status="unstaffed"]');
+  if (firstEmpty) firstEmpty.onclick = () => {
+    const m = plan.missions.find(x => !x.hidden && !x.members.length);
+    const card = m && document.querySelector(`.mission-card[data-mission-id="${CSS.escape(String(m.id))}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("flash-outline"); void card.offsetWidth; card.classList.add("flash-outline");
+  };
+  const hiddenBtn = details.querySelector('[data-status="hidden"]');
+  if (hiddenBtn) hiddenBtn.onclick = () => $("#btn-hide-missions").click();
+  $("#m-count").innerHTML = `<b>${s.assigned}</b>/${s.total}`;
+  let open = false;
+  try { open = localStorage.getItem("mpm-m-details") === "1"; } catch (e) { /* private mode */ }
+  setPhoneDetails(open);
+}
+function setPhoneDetails(open) {
+  $("#m-details").classList.toggle("hidden", !open);
+  $("#m-summary").setAttribute("aria-expanded", String(open));
+  $("#m-summary").classList.toggle("open", open);
+}
+
+/* Phone ⋯ menu: the board toolbar's actions, listed from the real (hidden on a
+   phone) toolbar buttons so permissions and state follow whatever render() set
+   on them. Built fresh on every open. */
+function buildPhoneMoreMenu() {
+  const menu = $("#m-more-menu");
+  menu.innerHTML = "";
+  const shown = (sel) => { const el = $(sel); return el && !el.classList.contains("hidden"); };
+  const item = (label, ic, run, cls = "", disabled = false) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tb-item" + (cls ? " " + cls : "");
+    b.setAttribute("role", "menuitem");
+    b.innerHTML = icon(ic) + `<span class="tb-grow">${escapeHtml(label)}</span>`;
+    b.disabled = disabled;
+    b.onclick = (ev) => { ev.stopPropagation(); closePhoneMenus(); run(); };
+    menu.appendChild(b);
+    return b;
+  };
+  const sep = () => { if (menu.lastChild && menu.lastChild.tagName !== "HR") menu.appendChild(document.createElement("hr")); };
+  const click = (sel) => () => $(sel).click();
+  if (shown("#btn-new-mission")) item("New mission", "plus", click("#btn-new-mission"), "tb-item-pri");
+  if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Add mission", "plus", click("#btn-import-mission"), "tb-item-pri");
+  if (shown("#btn-new-employee")) item("New employee", "plus", click("#btn-new-employee"), "tb-item-pri");
+  sep();
+  if (shown("#holiday-toggle")) {
+    const on = $("#holiday-check").checked;
+    const b = item("Holiday", "calendar", click("#holiday-check"));
+    b.setAttribute("role", "menuitemcheckbox");
+    b.setAttribute("aria-checked", String(on));
+    b.insertAdjacentHTML("beforeend", `<span class="tb-switch${on ? " on" : ""}" aria-hidden="true"></span>`);
+  }
+  const names = $("#card-names");
+  if (names && !names.classList.contains("hidden")) {
+    const row = document.createElement("div");
+    row.className = "tb-item tb-item-static";
+    row.innerHTML = icon("users") + `<span class="tb-grow">Names</span>`;
+    const seg = document.createElement("span");
+    seg.className = "tb-seg";
+    for (const o of names.options) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = o.value === "th" ? "ไทย" : o.value === "en" ? "EN" : o.textContent;
+      b.setAttribute("aria-pressed", String(names.value === o.value));
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        names.value = o.value;
+        names.dispatchEvent(new Event("change", { bubbles: true }));
+        for (const x of seg.children) x.setAttribute("aria-pressed", String(x === b));
+      };
+      seg.appendChild(b);
+    }
+    row.appendChild(seg);
+    menu.appendChild(row);
+  }
+  if (shown("#btn-hide-missions")) item("Hide / unhide missions", "eye-off", click("#btn-hide-missions"));
+  if (shown("#btn-forecast-copy")) item("Copy forecast forward", "arrow-right", click("#btn-forecast-copy"));
+  if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+  sep();
+  if (shown("#btn-undo")) item("Undo last change", "undo", click("#btn-undo"), "", $("#btn-undo").disabled);
+  if (shown("#btn-reset-board")) item($("#btn-reset-board").textContent.trim() || "Reset board", "reset", click("#btn-reset-board"), "tb-item-danger");
+  if (menu.lastChild && menu.lastChild.tagName === "HR") menu.lastChild.remove();
+}
+function togglePhoneMoreMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = $("#m-more-menu");
+  const open = menu.classList.contains("hidden");
+  closePhoneMenus();
+  if (!open) return;
+  buildPhoneMoreMenu();
+  menu.classList.remove("hidden");
+  $("#m-more").setAttribute("aria-expanded", "true");
+}
+function togglePhoneFilter(ev) {
+  if (ev) ev.stopPropagation();
+  const open = !document.body.classList.contains("m-filter-open");
+  closePhoneMenus();
+  document.body.classList.toggle("m-filter-open", open);
+  $("#m-filter").setAttribute("aria-expanded", String(open));
+}
+function closePhoneMenus() {
+  closeMoreMenu();
+  const menu = $("#m-more-menu");
+  if (menu) menu.classList.add("hidden");
+  const mm = $("#m-more");
+  if (mm) mm.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("m-filter-open");
+  const mf = $("#m-filter");
+  if (mf) mf.setAttribute("aria-expanded", "false");
 }
 
 /* ---------- overview tab ---------- */
@@ -3756,6 +4013,8 @@ function updateFilterBadge() {
   b.textContent = n;
   b.classList.toggle("hidden", !n);
   $("#btn-filter-pop").classList.toggle("ms-active", n > 0);
+  const mf = $("#m-filter");
+  if (mf) { mf.dataset.count = n ? String(n) : ""; mf.classList.toggle("on", n > 0); }
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
@@ -7056,6 +7315,7 @@ function setXlsxTicks(on) {
    them in #toolbar-right. */
 const ROW1_TOOLS_MQ = window.matchMedia("(min-width: 641px)");
 function placeBoardRow1Tools(board) {
+  placeBoardPicker();
   const end = $("#row1-end"), right = $("#toolbar-right");
   const names = $("#card-names"), seg = names._seg, exp = $("#btn-export");
   const bulk = [$("#btn-emplist-bulk"), $("#btn-hostlist-bulk")];
@@ -7072,6 +7332,22 @@ function placeBoardRow1Tools(board) {
   if (home.lastElementChild !== exp) home.append(exp);
   // Overview and Org Chart have no row-1 controls but Export: one row, numbers left, Export right
   document.body.classList.toggle("toolbar-one-row", wide && (isOverview() || isOrgChart()));
+}
+/* The board picker and the date pill: on a computer the picker leads toolbar row 1
+   (like Overview's) and the pill sits beside the date picker; on a phone both stay
+   on header line 1 next to the date, as the phone layout has them. */
+function placeBoardPicker() {
+  const dd = $("#board-dd"), pill = $("#mode-pill"), hol = $("#m-hol-pill");
+  if (ROW1_TOOLS_MQ.matches) {
+    const row1 = $("#toolbar-row1");
+    if (dd.parentNode !== row1) row1.prepend(dd);
+    const nav = document.querySelector("#topbar .date-nav");
+    if (pill.nextElementSibling !== hol || hol.nextElementSibling !== nav) { nav.before(pill); nav.before(hol); }
+  } else {
+    const right = document.querySelector("#topbar .topbar-right");
+    if (dd.parentNode !== right.parentNode) right.before(dd);
+    if (pill.previousElementSibling !== dd) { dd.after(pill); pill.after(hol); }
+  }
 }
 ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.body.classList.contains("board-view")); });
 
@@ -7896,6 +8172,8 @@ function nextWorkingDates(boardId, after, n) {
    Without forward planning there is no confirmed / forecast split, so the pill
    only appears for a read-only or locked day. */
 function renderModePill() {
+  const hol = $("#m-hol-pill");
+  if (hol) hol.classList.toggle("hidden", isNonBoardView() || !isNonWorkingDate(state.date));
   const pill = $("#mode-pill");
   const onBoard = !isNonBoardView() && !!D().activeBoardId && can("board");
   if (!onBoard) { pill.className = "mode-pill hidden"; return; }
@@ -7909,7 +8187,9 @@ function renderModePill() {
   pill.dataset.state = state2;
   const main = planning ? (fc ? "Forecast" : "Confirmed") : "";
   const extra = state2 === "locked" ? "Locked" : state2 === "readonly" ? "Read-only" : "";
-  pill.innerHTML = (ro ? icon("lock") : "") + escapeHtml([main, extra].filter(Boolean).join(" · "));
+  // the second part (· Read-only / · Locked) drops on a phone, where the lock icon carries it
+  pill.innerHTML = (ro ? icon("lock") : "") + (main ? `<span>${escapeHtml(main)}</span>` : "") +
+    (extra ? `<span class="mp-extra">${main ? "· " : ""}${escapeHtml(extra)}</span>` : "");
   const end = planning ? horizonEndFor(D().activeBoardId) : null;
   pill.title = (fc ? "Tentative plan — never exported, never in the Host Record. " : planning ? "The operational plan. " : "") +
     (state2 === "locked" ? `Locked by ${lock.lockedBy}: view-only for everyone until someone unlocks it. ` : "") +
@@ -11339,6 +11619,35 @@ function wireApp() {
     if (hint) hint.textContent = "Tap to select · tap again for more · tap a mission or leave area to place · long-press for actions";
   }
   $("#btn-touch-clear").onclick = clearSelection;
+  $("#fp-drawer-handle").onclick = () => setPoolDrawer(!$("#float-pool").classList.contains("fp-open"));
+  document.addEventListener("click", (ev) => { if (!ev.target.closest("#more-menu, #btn-bn-more")) closeMoreMenu(); });
+  // phone header: summary card, Filter sheet, ⋯ menu, and folding to one line on scroll
+  $("#m-summary").onclick = () => {
+    const open = $("#m-details").classList.contains("hidden");
+    setPhoneDetails(open);
+    try { localStorage.setItem("mpm-m-details", open ? "1" : "0"); } catch (e) { /* private mode */ }
+  };
+  $("#m-more").onclick = togglePhoneMoreMenu;
+  $("#m-filter").onclick = togglePhoneFilter;
+  document.addEventListener("click", (ev) => {
+    if (!ev.target.closest("#m-more-menu, #m-more")) { $("#m-more-menu").classList.add("hidden"); $("#m-more").setAttribute("aria-expanded", "false"); }
+    if (document.body.classList.contains("m-filter-open") && !ev.target.closest("#toolbar, #m-filter, .ms-pop")) {
+      document.body.classList.remove("m-filter-open");
+      $("#m-filter").setAttribute("aria-expanded", "false");
+    }
+  });
+  // two thresholds, so the header changing height as it folds can't flip it back
+  window.addEventListener("scroll", () => {
+    const y = window.scrollY, c = document.body.classList.contains("hdr-compact");
+    if (!c && y > 72) document.body.classList.add("hdr-compact");
+    else if (c && y < 8) document.body.classList.remove("hdr-compact");
+  }, { passive: true });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    closeMoreMenu();
+    closePhoneMenus();
+    if ($("#float-pool").classList.contains("fp-open")) setPoolDrawer(false);
+  });
   $("#btn-touch-actions").onclick = (ev) => {
     ev.stopPropagation();
     const firstId = state.selectedEmps.values().next().value;

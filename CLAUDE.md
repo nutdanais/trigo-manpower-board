@@ -1,4 +1,4 @@
 # Notes for Claude
 
 - **Share files as GitHub links.** When you hand the user a SQL script (or any other file from this repo), give a GitHub link to it on the working branch (`https://github.com/nutdanais/trigo-manpower-board/blob/<branch>/<path>`, plus the `raw.githubusercontent.com` link for copy and paste). Do not rely on links to files inside the session; they often do not open for the user.
-- **Show HTML designs as an Artifact.** When you render a design sample, mockup or options page in HTML, publish it with the Artifact tool so it opens here, in addition to committing it under `design/`. Make the page self-contained (inline CSS/JS) so it works as an Artifact.
+- **Share HTML pages as a viewable link, without being asked.** Whenever you make an HTML page for the user (design directions, mockups, reports), publish it as a claude.ai Artifact and give that link first, so it opens rendered in the browser. Also commit the source under `design/` and add the GitHub link. A GitHub `blob` or `raw` link alone only shows source code, so it is never enough for an HTML page.
