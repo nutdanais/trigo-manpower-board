@@ -1,0 +1,256 @@
+<title>Board Toolbar Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column of full-width app mockups (navy banner + direction A rows), one per option, with a short why/trade-off beside each. */
+:root {
+  --page: #eef1f4; --panel: #ffffff; --soft: #f6f8fa; --line: #e3e8ee; --border: #d3dae2;
+  --text: #1f2937; --muted: #667085; --navy: #003a66; --navy-ink: #003a66; --green: #a8c855; --hover: #eaf1f8;
+  --red: #a3271f; --red-bg: #fdf1f0; --red-line: #f0c7c2; --red-dot: #dc2626;
+  --amber: #8a4f10; --amber-bg: #fdf7ec; --amber-line: #ebd3a9; --amber-dot: #e8950c;
+  --grey: #4b5563; --grey-bg: #f2f4f7; --grey-line: #dde2e8; --grey-dot: #98a2b3;
+  --s-day: #2f6fb3; --s-night: #1c2f4a; --s-leave: #c08a1e; --s-standby: #d0342c; --s-hol: #7a6fb0; --s-oc: #8a94a3;
+  --shadow: 0 0 0 1px rgba(0,38,70,.08), 0 12px 30px -16px rgba(0,38,70,.4);
+  --font: "Geist", "Noto Sans Thai", "Segoe UI", Arial, sans-serif;
+  --r: 7px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #11161c; --panel: #1a2027; --soft: #161b21; --line: #29313a; --border: #333c46;
+  --text: #e6e9ed; --muted: #9aa3ad; --navy-ink: #8fb8e0; --hover: #222b35;
+  --red: #f3a39b; --red-bg: #2e1a19; --red-line: #5b2a26; --amber: #e7b66a; --amber-bg: #2b2215; --amber-line: #5a4321;
+  --grey: #c3c9d0; --grey-bg: #222932; --grey-line: #39424d; --s-night: #9fb6d6;
+  --shadow: 0 0 0 1px rgba(255,255,255,.06), 0 12px 30px -16px rgba(0,0,0,.7); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --page: #11161c; --panel: #1a2027; --soft: #161b21; --line: #29313a; --border: #333c46;
+  --text: #e6e9ed; --muted: #9aa3ad; --navy-ink: #8fb8e0; --hover: #222b35;
+  --red: #f3a39b; --red-bg: #2e1a19; --red-line: #5b2a26; --amber: #e7b66a; --amber-bg: #2b2215; --amber-line: #5a4321;
+  --grey: #c3c9d0; --grey-bg: #222932; --grey-line: #39424d; --s-night: #9fb6d6;
+  --shadow: 0 0 0 1px rgba(255,255,255,.06), 0 12px 30px -16px rgba(0,0,0,.7); color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font: 14px/1.45 var(--font); }
+.page { max-width: 1320px; margin: 0 auto; padding: 32px 16px 72px; }
+h1 { font-size: 26px; font-weight: 650; letter-spacing: -.4px; margin: 0 0 8px; text-wrap: balance; }
+h2 { font-size: 18px; font-weight: 650; letter-spacing: -.2px; margin: 0; }
+.lead { color: var(--muted); max-width: 72ch; margin: 0 0 14px; text-wrap: pretty; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 30px; font-size: 13px; color: var(--muted); }
+.facts b { color: var(--text); font-variant-numeric: tabular-nums; }
+.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 0; background: var(--page); margin-bottom: 8px; }
+.jump a { height: 34px; padding: 0 13px; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font-weight: 600; font-size: 13px; text-decoration: none; }
+.jump a:hover { background: var(--hover); }
+.jump a:focus-visible, .btn:focus-visible, .chip:focus-visible, .ach:focus-visible { outline: 2px solid var(--navy-ink); outline-offset: 2px; }
+section.opt { margin: 26px 0 40px; scroll-margin-top: 64px; }
+.ohead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.letter { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--navy); color: #fff; font-weight: 700; font-size: 14px; }
+.ohead p { margin: 0; color: var(--muted); font-size: 13px; flex: 1 1 320px; }
+.notes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.notes div { background: var(--panel); border-radius: 10px; padding: 12px 14px; box-shadow: 0 0 0 1px var(--line); font-size: 13px; color: var(--muted); min-width: 0; }
+.notes b { display: block; color: var(--text); margin-bottom: 4px; font-size: 13px; }
+.notes ul { margin: 0; padding-left: 18px; } .notes li { margin-bottom: 2px; }
+
+/* app frame */
+.frame { background: var(--panel); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.nav { display: flex; align-items: center; gap: 4px; height: 54px; padding: 0 18px; background: var(--navy); color: #fff; border-bottom: 2px solid var(--green); overflow-x: auto; scrollbar-width: none; }
+.logo { font-weight: 800; letter-spacing: 2px; margin-right: 14px; font-size: 17px; }
+.logo i { color: var(--green); font-style: normal; }
+.ntab { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; color: rgba(255,255,255,.78); font-weight: 550; font-size: 13.5px; white-space: nowrap; border-radius: var(--r); }
+.npill { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255,255,255,.42); border-radius: var(--r); background: rgba(255,255,255,.14); color: #fff; font-size: 13.5px; font-weight: 600; white-space: nowrap; margin-left: 6px; }
+.nb { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; background: #e5484d; color: #fff; }
+.nb.a { background: #f5b544; color: #3b2503; }
+.nright { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.npill.q { background: none; margin: 0; font-weight: 500; }
+.avatar { width: 32px; height: 32px; border-radius: 9px; background: var(--green); color: #1d2c05; display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; }
+.row { display: flex; align-items: center; gap: 8px; padding: 0 18px; overflow-x: auto; scrollbar-width: none; }
+.row::-webkit-scrollbar, .nav::-webkit-scrollbar { display: none; }
+.r1 { height: 56px; border-bottom: 1px solid var(--line); }
+.btn { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--text); font: 550 13px var(--font); white-space: nowrap; flex: none; }
+.btn.pri { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn.q { border-color: transparent; background: transparent; color: var(--muted); }
+.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r); background: var(--grey-bg); flex: none; }
+.seg span { height: 30px; padding: 0 11px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--muted); border-radius: 6px; }
+.seg span:first-child { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(8,28,56,.16); }
+.grow { flex: 1; }
+.board { height: 70px; background: repeating-linear-gradient(90deg, var(--soft) 0 300px, transparent 300px 312px); border-top: 1px solid var(--border); }
+
+/* shared bits */
+.chip { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 9px; border: 1px solid var(--grey-line); border-radius: 6px; background: var(--grey-bg); color: var(--grey); font: 600 12.5px var(--font); white-space: nowrap; flex: none; cursor: pointer; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--grey-dot); }
+.chip b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.chip.red { background: var(--red-bg); border-color: var(--red-line); color: var(--red); } .chip.red::before { background: var(--red-dot); }
+.chip.amber { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber); } .chip.amber::before { background: var(--amber-dot); }
+.ach { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 5px; background: var(--grey-bg); color: var(--text); font-size: 12px; font-weight: 600; white-space: nowrap; flex: none; cursor: pointer; border: 0; font-family: var(--font); }
+.ach i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.ach b { font-variant-numeric: tabular-nums; }
+.ach.none { background: transparent; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); }
+.lbl { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; flex: none; }
+.sep { width: 1px; height: 22px; background: var(--line); flex: none; }
+.num { font-variant-numeric: tabular-nums; }
+.bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; }
+.bar span { display: block; height: 100%; }
+
+/* Option A: tiles + bar (today's strip, refined) */
+.A .r2 { padding: 10px 18px 8px; align-items: flex-start; gap: 0; }
+.tiles { display: flex; gap: 0; flex: none; }
+.tile { padding: 0 18px; border-left: 1px solid var(--line); flex: none; }
+.tile:first-child { padding-left: 0; border-left: 0; }
+.tile small { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.tile small i { width: 7px; height: 7px; border-radius: 2px; }
+.tile strong { display: block; font-size: 22px; line-height: 1.15; font-weight: 650; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+.tile .split { display: inline-flex; gap: 8px; margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--muted); vertical-align: 3px; }
+.tile .split b { color: var(--text); font-weight: 650; }
+.tile.alert strong, .tile.alert small { color: var(--red); }
+.tile.zero { opacity: .55; }
+.A .barwrap { margin-top: 8px; }
+.A .side { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: 6px; padding-left: 20px; max-width: 420px; }
+.A .r3 { height: 38px; background: var(--soft); border-top: 1px solid var(--line); }
+
+/* Option B: one equation line */
+.B .r2 { min-height: 50px; gap: 10px; border-bottom: 1px solid var(--line); }
+.eq { display: flex; align-items: center; gap: 8px; flex: none; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.eq b { color: var(--text); font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.eq .op { color: var(--grey-dot); font-weight: 500; }
+.eq .k { display: inline-flex; align-items: center; gap: 5px; }
+.eq .k i { width: 7px; height: 7px; border-radius: 2px; }
+.eq .k.alert, .eq .k.alert b { color: var(--red); }
+.eq small { font-size: 11.5px; }
+.B .mini { width: 150px; flex: none; }
+.B .r3 { height: 40px; background: var(--soft); }
+
+/* Option C: the bar is the strip */
+.C .r2 { padding: 10px 18px 12px; display: block; overflow: visible; }
+.C .top { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; overflow-x: auto; scrollbar-width: none; }
+.C .total { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.C .total b { font-size: 20px; color: var(--text); font-weight: 650; margin-right: 4px; font-variant-numeric: tabular-nums; }
+.bigbar { display: flex; gap: 3px; height: 34px; }
+.bigbar > div { position: relative; border-radius: 6px; display: flex; align-items: center; padding: 0 9px; min-width: 0; color: #fff; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; }
+.bigbar > div b { font-size: 14px; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.bigbar .lt { color: var(--text); }
+.bigbar .tiny { padding: 0; justify-content: center; }
+.bigbar .tiny span { display: none; }
+.bigbar .tiny b { margin: 0; }
+.C .legend { display: flex; gap: 14px; margin-top: 7px; font-size: 12px; color: var(--muted); overflow-x: auto; scrollbar-width: none; }
+.C .legend span { white-space: nowrap; }
+.C .legend b { color: var(--text); font-variant-numeric: tabular-nums; }
+.C .r3 { height: 40px; background: var(--soft); border-top: 1px solid var(--line); }
+
+/* Option D: people left, areas right */
+.D .r2 { padding: 10px 18px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: stretch; overflow: visible; }
+.D .left, .D .right { min-width: 0; }
+.D .chips { display: flex; gap: 6px; margin-bottom: 9px; overflow-x: auto; scrollbar-width: none; }
+.D .cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.D .card { border-radius: 8px; padding: 7px 9px; background: var(--soft); box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
+.D .card small { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.D .card small i { width: 7px; height: 7px; border-radius: 2px; flex: none; }
+.D .card strong { display: block; font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.D .card em { font-style: normal; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.D .card.alert { background: var(--red-bg); box-shadow: inset 0 0 0 1px var(--red-line); }
+.D .card.alert strong, .D .card.alert small { color: var(--red); }
+.D .right { border-left: 1px solid var(--line); padding-left: 22px; }
+.D .ah { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.D .alist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 16px; }
+.D .arow { display: grid; grid-template-columns: 54px minmax(0, 1fr) 24px; align-items: center; gap: 7px; font-size: 12px; }
+.D .arow span:first-child { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.D .arow .t { height: 6px; border-radius: 3px; background: var(--grey-bg); overflow: hidden; }
+.D .arow .t i { display: block; height: 100%; border-radius: 3px; }
+.D .arow b { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 900px) {
+  .notes { grid-template-columns: 1fr; }
+  .D .r2 { grid-template-columns: 1fr; }
+  .D .right { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 10px; }
+  .D .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: no-preference) { .jump a, .chip, .ach { transition: background-color .16s, box-shadow .16s; } }
+</style>
+
+<div class="page">
+  <h1>Board toolbar: keep every number</h1>
+  <p class="lead">All four options use layout A: one row of buttons and filters, then the summary. Each keeps everything today's Board shows: Total, Assigned with Day and Night, Leave, Standby, Holiday, On-call free, the proportion bar and the By area chips, plus the new status chips. The navy banner is unchanged. Numbers are made up but add up the way the app's do:</p>
+  <div class="facts">
+    <span>Assigned <b>89</b> + Leave <b>9</b> + Standby <b>2</b> + On-call free <b>6</b> = Total <b>106</b></span>
+    <span>Day <b>72</b> + Night <b>17</b> = Assigned</span>
+    <span>By area adds up to Total, with <b>No area 9</b></span>
+  </div>
+  <nav class="jump" aria-label="Options">
+    <a href="#A">A · Tiles + bar</a><a href="#B">B · One equation line</a><a href="#C">C · The bar is the strip</a><a href="#D">D · People | Areas</a>
+  </nav>
+  <div id="opts"></div>
+</div>
+
+<script>
+const S = { total: 106, day: 72, night: 17, leave: 9, standby: 2, holiday: 0, oc: 6 };
+S.assigned = S.day + S.night;
+const AREAS = [["AMATA", 33, "#3b82c4"], ["FTM", 26, "#2f9e8f"], ["AYT", 15, "#c47a2c"], ["AAT", 7, "#8e6cc0"], ["ESIE1", 6, "#c0507a"], ["ESIE2", 5, "#6f8f2f"], ["BENZ", 5, "#5a6b80"]];
+const NOAREA = 9;
+const SEG = [["Day", S.day, "var(--s-day)"], ["Night", S.night, "var(--s-night)"], ["Leave", S.leave, "var(--s-leave)"], ["Standby", S.standby, "var(--s-standby)"], ["On-call free", S.oc, "var(--s-oc)"]];
+const STATUS = [["red", 2, "on Standby"], ["amber", 1, "mission with no crew"], ["amber", 1, "hold taken from you"], ["", 3, "missions hidden"]];
+
+const nav = `<div class="nav"><span class="logo">TRIGO<i>≡</i></span><span class="ntab">Overview <span class="nb">1</span></span><span class="ntab">Org Chart</span><span class="ntab">Manpower <span class="nb a">7</span></span><span class="ntab">Host <span class="nb a">22</span></span><span class="ntab">Capacity <span class="nb">1</span></span><span class="npill">LCB Port ▾ <span class="nb">2</span></span><span class="nright"><span class="npill q">‹ Wed 14-Oct-2026 ›</span><span class="npill q">Settings</span><span class="avatar">NS</span></span></div>`;
+const r1 = `<div class="row r1"><button class="btn pri" type="button">＋ New Mission</button><button class="btn" type="button">＋ New Employee</button><button class="btn" type="button">Filter &amp; sort</button><button class="btn q" type="button">Hide/Unhide</button><span class="grow"></span><button class="btn q" type="button">Undo</button><button class="btn q" type="button">Reset Board</button><span class="seg"><span>Thai</span><span>English</span></span><button class="btn" type="button">⤓ Export</button></div>`;
+const chips = (n = 4, from = 0) => STATUS.slice(from, n).map(([t, k, l]) => `<button type="button" class="chip ${t}"><b>${k}</b> ${l}</button>`).join("");
+const areas = () => AREAS.map(([n, k, c]) => `<button type="button" class="ach"><i style="background:${c}"></i>${n} <b>${k}</b></button>`).join("") + `<button type="button" class="ach none">No area <b>${NOAREA}</b></button>`;
+const bar = () => `<div class="bar">${SEG.map(([, k, c]) => `<span style="flex:${k};background:${c}"></span>`).join("")}</div>`;
+const pct = (k) => (k / S.total * 100).toFixed(1).replace(/\.0$/, "") + "%";
+
+const OPTS = [
+  { id: "A", name: "Tiles + bar", line: "Today's strip, tidied: the same tiles and bar, status chips on the right, areas on their own soft line.",
+    idea: ["Big numbers stay as tiles; the bar under them shows the split at a glance.", "Standby turns red only above 0; a 0 tile (Holiday) fades.", "Status chips sit top-right, away from the numbers.", "By area moves to a thin grey line, so it reads as detail."],
+    cost: "The tallest of the four (about 112px under the buttons), close to today's height.",
+    html: () => `<div class="row r2">
+        <div><div class="tiles">
+          <div class="tile"><small>Total</small><strong>${S.total}</strong></div>
+          <div class="tile"><small><i style="background:var(--s-day)"></i>Assigned</small><strong>${S.assigned}<span class="split">☀ <b>${S.day}</b> ☾ <b>${S.night}</b></span></strong></div>
+          <div class="tile"><small><i style="background:var(--s-leave)"></i>Leave</small><strong>${S.leave}</strong></div>
+          <div class="tile alert"><small><i style="background:var(--s-standby)"></i>Standby ⚠</small><strong>${S.standby}</strong></div>
+          <div class="tile zero"><small><i style="background:var(--s-hol)"></i>Holiday</small><strong>0</strong></div>
+          <div class="tile"><small><i style="background:var(--s-oc)"></i>On-call free</small><strong>${S.oc}</strong></div>
+        </div><div class="barwrap">${bar()}</div></div>
+        <div class="side">${chips(4)}</div>
+      </div>
+      <div class="row r3"><span class="lbl">By area</span>${areas()}</div>` },
+  { id: "B", name: "One equation line", line: "The numbers read as the sum they are, in one line, with a small bar at the end.",
+    idea: ["One line reads left to right: Total = Assigned + Leave + Standby + On-call free.", "Day and Night sit inside Assigned as small text.", "Red and amber chips come first; the rest fold into +2 more.", "Lowest height: two thin rows under the buttons (about 90px)."],
+    cost: "Numbers are smaller than today's tiles; less of a dashboard feel.",
+    html: () => `<div class="row r2">${chips(2)}<span class="sep"></span>
+        <div class="eq"><span class="k">Total <b>${S.total}</b></span><span class="op">=</span>
+          <span class="k"><i style="background:var(--s-day)"></i>Assigned <b>${S.assigned}</b> <small>☀ ${S.day} · ☾ ${S.night}</small></span><span class="op">+</span>
+          <span class="k"><i style="background:var(--s-leave)"></i>Leave <b>${S.leave}</b></span><span class="op">+</span>
+          <span class="k alert"><i style="background:var(--s-standby)"></i>Standby <b>${S.standby}</b></span><span class="op">+</span>
+          <span class="k"><i style="background:var(--s-oc)"></i>On-call free <b>${S.oc}</b></span></div>
+        <div class="mini">${bar()}</div><span class="grow"></span><button type="button" class="chip">+2 more</button></div>
+      <div class="row r3"><span class="lbl">By area</span>${areas()}</div>` },
+  { id: "C", name: "The bar is the strip", line: "A wide bar sized to scale carries the numbers inside it, so the split is the first thing seen.",
+    idea: ["Each part of the day is a block sized to its share, with its number inside.", "Small parts (Standby 2) keep their number; the legend under it gives the percentages.", "Status chips and Total sit on the line above the bar.", "Very visual for a meeting screen or a TV."],
+    cost: "Holiday has no block when it is 0; small parts get narrow on a laptop.",
+    html: () => `<div class="row r2"><div class="top"><span class="total"><b>${S.total}</b>people today</span><span class="sep"></span>${chips(4)}</div>
+        <div class="bigbar">
+          <div style="flex:${S.day};background:var(--s-day)"><span>☀ Day</span><b>${S.day}</b></div>
+          <div style="flex:${S.night};background:var(--s-night)"><span>☾ Night</span><b>${S.night}</b></div>
+          <div style="flex:${S.leave};background:var(--s-leave)"><span>Leave</span><b>${S.leave}</b></div>
+          <div class="tiny" style="flex:${S.standby};background:var(--s-standby);min-width:30px"><span>Standby</span><b>${S.standby}</b></div>
+          <div style="flex:${S.oc};background:var(--s-oc)"><span>On-call</span><b>${S.oc}</b></div>
+        </div>
+        <div class="legend"><span>Assigned <b>${S.assigned}</b> (${pct(S.assigned)})</span><span>Leave <b>${S.leave}</b></span><span style="color:var(--red)">Standby <b>${S.standby}</b> ⚠</span><span>Holiday <b>0</b></span><span>On-call free <b>${S.oc}</b></span></div></div>
+      <div class="row r3"><span class="lbl">By area</span>${areas()}</div>` },
+  { id: "D", name: "People | Areas", line: "Two halves under the buttons: who is doing what on the left, where they work on the right.",
+    idea: ["Left: the status chips, then five small cards with each number and its share.", "Right: By area as short bars, so the biggest area stands out.", "No third row; everything fits in one band (about 104px).", "Areas get room for the No area count without wrapping."],
+    cost: "Most different from today; the areas take half the width even on a small board.",
+    html: () => `<div class="row r2"><div class="left"><div class="chips">${chips(4)}</div>
+          <div class="cards">
+            <div class="card"><small>Total</small><strong>${S.total}</strong><em>Holiday 0</em></div>
+            <div class="card"><small><i style="background:var(--s-day)"></i>Assigned</small><strong>${S.assigned}</strong><em>☀ ${S.day} · ☾ ${S.night}</em></div>
+            <div class="card"><small><i style="background:var(--s-leave)"></i>Leave</small><strong>${S.leave}</strong><em>${pct(S.leave)}</em></div>
+            <div class="card alert"><small><i style="background:var(--s-standby)"></i>Standby ⚠</small><strong>${S.standby}</strong><em>${pct(S.standby)}</em></div>
+            <div class="card"><small><i style="background:var(--s-oc)"></i>On-call free</small><strong>${S.oc}</strong><em>${pct(S.oc)}</em></div>
+          </div></div>
+        <div class="right"><div class="ah"><span>By area</span><span>${S.total}</span></div><div class="alist">
+          ${AREAS.concat([["No area", NOAREA, "var(--grey-dot)"]]).map(([n, k, c]) => `<div class="arow"><span>${n}</span><span class="t"><i style="width:${k / 33 * 100}%;background:${c}"></i></span><b>${k}</b></div>`).join("")}
+        </div></div></div>` },
+];
+
+document.getElementById("opts").innerHTML = OPTS.map((o) => `
+  <section class="opt ${o.id}" id="${o.id}">
+    <div class="ohead"><span class="letter">${o.id}</span><h2>${o.name}</h2><p>${o.line}</p></div>
+    <div class="frame">${nav}${r1}${o.html()}<div class="board"></div></div>
+    <div class="notes"><div><b>How it works</b><ul>${o.idea.map((x) => `<li>${x}</li>`).join("")}</ul></div><div><b>Trade-off</b>${o.cost}</div></div>
+  </section>`).join("");
+</script>
