@@ -119,6 +119,8 @@ section.opt { margin: 26px 0 40px; scroll-margin-top: 64px; }
 .C .legend { display: flex; gap: 18px; margin-top: 2px; font-size: 13px; color: var(--muted); overflow-x: auto; scrollbar-width: none; }
 .C .legend span { white-space: nowrap; }
 .C .legend b { font-size: 16px; font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
+.C .legend .sub { font-size: 12px; margin: 0 2px; }
+.C .legend .sub b { font-size: 12.5px; font-weight: 600; }
 .C .r3 { height: 40px; background: var(--soft); border-top: 1px solid var(--line); }
 
 /* Option D: people left, areas right */
@@ -211,7 +213,7 @@ const OPTS = [
     idea: ["Total and the status chips sit on the first line.", "Every count sits on the line under it, with Day and Night; Assigned shows its share of the people not on leave.", "No bar: the numbers carry the split on their own.", "By area keeps its own soft line."],
     cost: "Without a bar, the split between the counts is not visible at a glance.",
     html: () => `<div class="row r2"><div class="top"><span class="total"><b>${S.total}</b>people today</span><span class="sep"></span>${chips(4)}</div>
-        <div class="legend"><span>Assigned <b>${S.assigned}</b> (${(S.assigned / (S.total - S.leave) * 100).toFixed(1)}% of ${S.total - S.leave} not on leave)</span><span>☀ Day <b>${S.day}</b></span><span>☾ Night <b>${S.night}</b></span><span>Leave <b>${S.leave}</b></span><span style="color:var(--red)">Standby <b>${S.standby}</b> ⚠</span><span>Holiday <b>0</b></span><span>On-call free <b>${S.oc}</b></span></div></div>
+        <div class="legend"><span>Assigned <b>${S.assigned}</b> <small class="sub">☀ <b>${S.day}</b> · ☾ <b>${S.night}</b></small> (${(S.assigned / (S.total - S.leave) * 100).toFixed(1)}% of ${S.total - S.leave} not on leave)</span><span>Leave <b>${S.leave}</b></span><span style="color:var(--red)">Standby <b>${S.standby}</b> ⚠</span><span>Holiday <b>0</b></span><span>On-call free <b>${S.oc}</b></span></div></div>
       <div class="row r3"><span class="lbl">By area</span>${areas()}</div>` },
   { id: "D", name: "People | Areas", line: "Two halves under the buttons: who is doing what on the left, where they work on the right.",
     idea: ["Left: the status chips, then five small cards with each number and its share.", "Right: By area as short bars, so the biggest area stands out.", "No third row; everything fits in one band (about 104px).", "Areas get room for the No area count without wrapping."],
