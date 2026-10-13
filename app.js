@@ -7443,8 +7443,10 @@ function placeBoardPicker() {
   if (ROW1_TOOLS_MQ.matches) {
     const row1 = $("#toolbar-row1");
     if (dd.parentNode !== row1) row1.prepend(dd);
-    const nav = document.querySelector("#topbar .date-nav");
-    if (pill.nextElementSibling !== hol || hol.nextElementSibling !== nav) { nav.before(pill); nav.before(hol); }
+    // pill, then Lock, then the date: anchored on Lock so the pill never lands
+    // between Lock and the date arrows
+    const lock = $("#btn-lock");
+    if (pill.nextElementSibling !== hol || hol.nextElementSibling !== lock) { lock.before(pill); lock.before(hol); }
   } else {
     const right = document.querySelector("#topbar .topbar-right");
     if (dd.parentNode !== right.parentNode) right.before(dd);
@@ -12070,6 +12072,20 @@ async function boot() {
   await refreshAndRender();
   // fonts can settle after the first paint and change card heights — re-pack once ready
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);
+  // The column count comes from the grid's width, and on start-up the first
+  // pack can run before the page has its final width (one narrow column that
+  // stayed until a refresh or a tab switch). Window "resize" doesn't fire for
+  // that, so re-pack whenever the grid itself changes width.
+  const grid = $("#missions-grid");
+  if (grid && window.ResizeObserver) {
+    let lastW = grid.clientWidth, raf = 0;
+    new ResizeObserver(() => {
+      const w = grid.clientWidth;
+      if (w === lastW) return;   // height changes come from the pack itself
+      lastW = w;
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; layoutMasonry(); });
+    }).observe(grid);
+  }
 }
 
 /* A recovery link arrives as #access_token=...&type=recovery. Supabase's client
