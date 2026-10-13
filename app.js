@@ -937,6 +937,7 @@ function render() {
   const planEdit = board && (fc ? can("forecast", "edit") : can("board", "edit"));
   document.body.classList.toggle("forecast-mode", fc);
   $("#status-zones").classList.toggle("hidden", !board);
+  $("#leave-tabs").classList.toggle("hidden", !board);
   $("#missions-grid").classList.toggle("hidden", !board);
   $("#overview-panel").classList.toggle("hidden", !ov);
   $("#orgchart-panel").classList.toggle("hidden", !org);
@@ -1729,14 +1730,15 @@ function renderUserMenu() {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"]];
 function closeTopbarMenus() {
-  for (const [btn, pop] of [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"]]) {
+  for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
     $(btn).setAttribute("aria-expanded", "false");
   }
 }
 function wireTopbarMenus() {
-  for (const [btn, pop] of [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"]]) {
+  for (const [btn, pop] of TOPBAR_MENUS) {
     $(btn).addEventListener("click", (ev) => {
       ev.stopPropagation();
       const open = $(pop).classList.contains("hidden");
@@ -2128,7 +2130,7 @@ function renderCtxMenu(view) {
 function renderZones() {
   const plan = getPlan();
   for (const z of ZONES) {
-    const body = $(`[data-drop="zone:${z}"]`);
+    const body = $(`#status-zones [data-drop="zone:${z}"]`);
     body.innerHTML = "";
     const emps = plan.zones[z]
       .map(empId => D().employees.find(e => e.id === empId))
@@ -2151,7 +2153,56 @@ function renderZones() {
       body.appendChild(hint);
     }
   }
+  renderLeaveTabs();
   renderFloatPool();
+}
+
+/* ---------- Leave tabs ----------
+   The leave band shows one type at a time; the tab strip carries every count. It opens
+   on the busiest type for the board and day on screen and stays where the user puts it
+   (a click, a drop on a tab, or hovering a tab mid-drag). The tabs are drop targets
+   themselves (class dropzone, data-drop="zone:…"), so bindDropzones handles them. */
+function setLeaveTab(z) {
+  state.leaveTab = z;
+  for (const zone of $$("#status-zones .zone-leave")) zone.classList.toggle("lz-on", zone.dataset.zone === z);
+  for (const t of $$("#leave-tabs .lv-tab")) {
+    const on = t.dataset.lv === z;
+    t.classList.toggle("on", on);
+    t.setAttribute("aria-selected", String(on));
+  }
+}
+function renderLeaveTabs() {
+  const counts = {};
+  for (const t of $$("#leave-tabs .lv-tab")) {
+    const body = $(`#status-zones [data-drop="zone:${t.dataset.lv}"]`);
+    const n = body ? body.querySelectorAll(".emp-card").length : 0;
+    counts[t.dataset.lv] = n;
+    t.querySelector("b").textContent = n;
+    t.classList.toggle("has", n > 0);
+  }
+  const key = D().activeBoardId + "|" + state.date;
+  if (state.leaveTabKey !== key || !state.leaveTab) {
+    state.leaveTabKey = key;
+    state.leaveTab = null;
+    let best = "annual";
+    for (const z of Object.keys(counts)) if (counts[z] > counts[best]) best = z;
+    state.leaveTab = best;
+  }
+  setLeaveTab(state.leaveTab);
+}
+function wireLeaveTabs() {
+  const strip = $("#leave-tabs");
+  let hoverTimer = null;
+  const stop = () => { clearTimeout(hoverTimer); hoverTimer = null; };
+  strip.addEventListener("click", (ev) => { const t = ev.target.closest(".lv-tab"); if (t) setLeaveTab(t.dataset.lv); });
+  // dragging a person over a tab opens it after a beat, so they can be dropped into the lane itself
+  strip.addEventListener("dragover", (ev) => {
+    const t = ev.target.closest(".lv-tab");
+    if (!t || t.classList.contains("on") || hoverTimer) return;
+    hoverTimer = setTimeout(() => { hoverTimer = null; setLeaveTab(t.dataset.lv); }, 450);
+  });
+  strip.addEventListener("dragleave", stop);
+  strip.addEventListener("drop", (ev) => { stop(); const t = ev.target.closest(".lv-tab"); if (t) setLeaveTab(t.dataset.lv); });
 }
 
 /* which employees on the active board are unassigned right now (Map for reuse) */
@@ -3538,12 +3589,23 @@ function renderFilterOptions() {
         e.target.checked ? set.add(o.value) : set.delete(o.value);
         state.filters[key] = [...set];
         setMsLabel(ms.querySelector(".ms-btn"), key);   // keep dropdown open
+        updateFilterBadge();
         renderMissions();
       };
       pop.appendChild(row);
     }
   }
   $("#sort-by").value = state.sort;
+  updateFilterBadge();
+}
+
+/* how many of the four filters are on, shown on the "Filter & sort" button */
+function updateFilterBadge() {
+  const n = Object.values(state.filters).reduce((a, v) => a + (v && v.length ? 1 : 0), 0);
+  const b = $("#filter-count");
+  b.textContent = n;
+  b.classList.toggle("hidden", !n);
+  $("#btn-filter-pop").classList.toggle("ms-active", n > 0);
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
@@ -4055,6 +4117,39 @@ function renderEmployeeRows() {
     th.classList.toggle("sorted-asc", th.dataset.sort === state.emplist.sortKey && state.emplist.sortDir === 1);
     th.classList.toggle("sorted-desc", th.dataset.sort === state.emplist.sortKey && state.emplist.sortDir === -1);
   }
+  quietTable("#emplist-table");
+}
+
+/* The Manpower and Host tables read quietly: a column in which every row is empty (or "—")
+   is left out, and a lone "—" is drawn blank, so what is on screen is only what carries
+   information. Each table's service-area pill also hands its colour to CSS as --ac, which
+   draws it as a small colour key beside plain text. Re-run after every row render; the
+   header cells are static, so their marks are reset first. */
+/* empty for this purpose: nothing but the hover-only "add note" invitation or an "none" marker */
+function quietCellEmpty(td) {
+  let t = td.textContent.replace("\u2014", "");
+  for (const x of td.querySelectorAll(".hl-add-note, .hl-empty")) t = t.replace(x.textContent, "");
+  return t.trim() === "";
+}
+function quietTable(sel) {
+  const table = $(sel);
+  const ths = [...table.querySelectorAll("thead th")];
+  const rows = [...table.querySelectorAll("tbody tr")].filter(r => r.children.length === ths.length);
+  ths.forEach(th => th.classList.remove("col-off"));
+  for (const r of rows) {
+    for (const td of r.children) {
+      td.classList.remove("col-off");
+      td.classList.toggle("q-dash", !td.children.length && td.textContent.trim() === "\u2014");   // drawn blank, still there for tools and tests
+    }
+    for (const pill of r.querySelectorAll(".area-pill")) pill.style.setProperty("--ac", pill.style.backgroundColor || "#999");
+  }
+  if (!rows.length) return;
+  ths.forEach((th, i) => {
+    if (th.classList.contains("el-check")) return;
+    if (!rows.every(r => quietCellEmpty(r.children[i]))) return;
+    th.classList.add("col-off");
+    for (const r of rows) r.children[i].classList.add("col-off");
+  });
 }
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
@@ -4560,6 +4655,7 @@ function renderHostRows() {
     th.classList.toggle("sorted-asc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === 1);
     th.classList.toggle("sorted-desc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === -1);
   }
+  quietTable("#hostlist-table");
 }
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
@@ -10943,6 +11039,7 @@ function wireApp() {
   $("#btn-add-board").onclick = openBoardModal;
   $("#btn-add-board-settings").onclick = openBoardModal;
   wireTopbarMenus();
+  wireLeaveTabs();
   $("#form-board").onsubmit = saveBoard;
   $("#btn-signout").onclick = () => settingsGuard(() => safely(() => cloud.signOut()));
 

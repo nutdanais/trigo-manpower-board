@@ -5323,3 +5323,116 @@ select.hidden + .seg-pick { display: none; }
   .avatar-btn { width: 34px; height: 34px; margin-left: 0; }
   .tb-pop { min-width: min(260px, calc(100vw - 16px)); }
 }
+
+/* ===== Leave as tabs (2026-10-13c) =====
+   On screen the leave band shows one type at a time under a strip of tabs that carries
+   every count. While exporting (body.exporting) none of this applies: the strip is
+   hidden and every non-empty type is drawn as the grouped band above. Plain rgba, no
+   color-mix() — #status-zones sits inside #board-capture, which html2canvas draws. */
+#leave-tabs { display: none; }
+body.board-view:not(.exporting) #leave-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+body.board-view:not(.exporting) #leave-tabs.hidden { display: none; }
+.lv-tab {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text);
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: background-color .16s, border-color .16s, color .16s;
+}
+.lv-tab b {
+  min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--bg-soft); color: var(--muted);
+  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.lv-tab:not(.has):not(.on) { color: var(--muted); font-weight: 550; border-style: dashed; }
+.lv-tab:hover { border-color: var(--primary-text); }
+.lv-tab.has b { background: var(--leave-tint); color: var(--text); }
+.lv-tab.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.lv-tab.on b { background: rgba(255, 255, 255, .22); color: #fff; }
+.lv-tab.drag-over { outline: 2px dashed var(--primary-text); outline-offset: 2px; }
+.lv-tab:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+body.board-view:not(.exporting) #status-zones {
+  display: block; padding: 0; margin-bottom: 14px; border: 0; background: none;
+}
+body.board-view:not(.exporting) #status-zones::before { display: none; }
+body.board-view:not(.exporting) #status-zones .zone-leave { display: none; }
+body.board-view:not(.exporting) #status-zones .zone-leave.lz-on {
+  display: flex; position: static; flex-direction: row; height: auto; padding: 0; overflow: visible;
+  border: 1px solid var(--border); border-radius: var(--r-box); background: var(--panel);
+}
+body.board-view:not(.exporting) #status-zones .zone-leave.lz-on ~ .zone-leave { border-left: 1px solid var(--border); padding-left: 0; }
+body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-label { display: none; }
+body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-body {
+  position: static; inset: auto; flex: 1; display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start;
+  gap: 6px; padding: 12px; min-height: 96px; border-radius: 0;
+}
+body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-body::after { display: none; }
+body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint {
+  display: inline; align-self: center; margin: 0 auto; font-size: 12.5px;
+}
+
+/* ===== Quiet tables: Manpower and Host (2026-10-13c) =====
+   No box, sentence-case headers that stay put while the page scrolls, row lines only,
+   a colour key beside the area name instead of a pill, a plain toggle for Status, and
+   columns that are empty on every row left out (see quietTable in app.js). Phones keep
+   the card layout of the phone block above. */
+@media (min-width: 641px) {
+  #emplist-panel .table-wrap, #hostlist-panel .table-wrap { border: 0; background: transparent; border-radius: 0; overflow: visible; }
+  :is(#emplist-table, #hostlist-table) { border-collapse: separate; border-spacing: 0; }
+  :is(#emplist-table, #hostlist-table) th {
+    position: sticky; top: var(--bar-h, 56px); z-index: 3; background: var(--panel);
+    text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; color: var(--muted);
+    padding: 12px; border-bottom: 1px solid var(--border);
+  }
+  :is(#emplist-table, #hostlist-table) td { padding: 0 12px; height: 46px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  :is(#emplist-table, #hostlist-table) tbody tr:hover { background: transparent; }
+  :is(#emplist-table, #hostlist-table) tbody tr:hover td { background: var(--hover-tint); }
+  :is(#emplist-table, #hostlist-table) .col-off { display: none; }
+  :is(#emplist-table, #hostlist-table) .el-tid { color: var(--muted); font-variant-numeric: tabular-nums; }
+  :is(#emplist-table, #hostlist-table) .area-pill {
+    background: transparent !important; color: var(--text) !important; padding: 0; font-weight: 550; letter-spacing: 0; font-size: 13.5px;
+    display: inline-flex; align-items: center; gap: 7px; box-shadow: none; border-radius: 0; border: 0;
+  }
+  :is(#emplist-table, #hostlist-table) .area-pill::before {
+    content: ""; width: 10px; height: 10px; border-radius: 4px; flex: none; display: inline-block;
+    background: var(--ac, #999); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14);
+  }
+  :is(#emplist-table, #hostlist-table) .toggle-track { width: 30px; height: 18px; border-radius: 9px; }
+  :is(#emplist-table, #hostlist-table) .toggle-thumb { width: 14px; height: 14px; top: 2px; left: 2px; }
+  :is(#emplist-table, #hostlist-table) .toggle input:checked + .toggle-track .toggle-thumb { left: 14px; }
+  :is(#emplist-table, #hostlist-table) .toggle-active input:checked + .toggle-track { background: var(--primary); }
+  :is(#emplist-table, #hostlist-table) .toggle-active input:checked ~ .toggle-text { display: none; }
+  :is(#emplist-table, #hostlist-table) .el-util-meter { height: 4px; border-radius: 2px; }
+  :is(#emplist-table, #hostlist-table) .el-util-val { font-weight: 600; color: var(--muted); }
+  #hostlist-table .hl-add-note { opacity: 0; transition: opacity .15s; }
+  #hostlist-table tr:hover .hl-add-note, #hostlist-table .hl-add-note:focus-visible { opacity: 1; }
+  #hostlist-table .hl-empty { display: none; }
+}
+@media (min-width: 641px) { #emplist-search { min-width: 330px; } }
+@media (min-width: 641px) { #hostlist-table td { vertical-align: middle; } }
+@media (min-width: 641px) { :is(#emplist-table, #hostlist-table) td.q-dash { color: transparent; user-select: none; } }
+
+/* ===== Filter & sort popover ===== */
+#btn-filter-pop .fcount {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px;
+  background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+}
+#filter-pop { width: 280px; padding: 12px; display: grid; gap: 8px; }
+#filter-pop .ms { display: block; }
+#filter-pop .ms-btn { width: 100%; justify-content: space-between; }
+#filter-pop .filter-sort { display: grid; gap: 4px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--muted); }
+#filter-pop .filter-sort select { width: 100%; }
+@media (min-width: 641px) {
+  /* white controls again inside the popover, whatever the deep-navy toolbar behind it does */
+  body.board-view #toolbar-row1 #filter-pop .ms-btn { background: var(--panel); border-color: var(--border); color: var(--text); }
+  body.board-view #toolbar-row1 #filter-pop .ms-btn:hover { background: var(--hover-tint); }
+  body.board-view #toolbar-row1 #filter-pop .ms-btn .ms-val { color: var(--muted); }
+  body.board-view #toolbar-row1 #filter-pop .ms-btn.ms-active { background: var(--hover-tint); border-color: var(--primary-text); color: var(--primary-text); }
+  body.board-view #toolbar-row1 #filter-pop select { background: var(--panel); border-color: var(--border); color: var(--text); }
+  body.board-view #toolbar-row1 #btn-filter-pop.ms-active { background: #fff; border-color: #fff; color: var(--primary); }
+}
+/* phone: the popover is just the open list inside the More dropdown */
+@media (max-width: 640px) {
+  #btn-filter-pop { display: none; }
+  #filter-dd { display: block; width: 100%; }
+  #filter-pop { position: static; display: grid; width: 100%; padding: 0; box-shadow: none; background: none; }
+  #filter-pop.hidden { display: grid !important; }
+}

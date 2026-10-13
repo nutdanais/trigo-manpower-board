@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-13c">
+<link rel="stylesheet" href="styles.css?v=2026-10-13d">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-13c"></script>
+<script src="version.js?v=2026-10-13d"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -496,34 +496,44 @@
         </div>
       </div>
       <div id="filters">
-        <div class="ms" data-filter="engineer">
-          <button type="button" class="ms-btn">Engineer: All</button>
-          <div class="ms-pop hidden"></div>
-        </div>
-        <div class="ms" data-filter="host">
-          <button type="button" class="ms-btn">Host: All</button>
-          <div class="ms-pop hidden"></div>
-        </div>
-        <div class="ms" data-filter="customer">
-          <button type="button" class="ms-btn">Customer: All</button>
-          <div class="ms-pop hidden"></div>
-        </div>
-        <div class="ms" data-filter="shift">
-          <button type="button" class="ms-btn">Shift: All</button>
-          <div class="ms-pop hidden"></div>
+        <!-- Engineer / Host / Customer / Shift and the sort order live in one popover, so the
+             toolbar shows one "Filter & sort" button (with how many filters are on) instead of
+             five controls. On a phone the popover is simply open inside the More dropdown. -->
+        <div id="filter-dd" class="tb-dd">
+          <button type="button" id="btn-filter-pop" class="btn" aria-haspopup="true" aria-expanded="false" title="Filter and sort the missions"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg> Filter &amp; sort<span id="filter-count" class="fcount hidden"></span></button>
+          <div id="filter-pop" class="tb-pop hidden" aria-label="Filter and sort">
+            <div class="ms" data-filter="engineer">
+              <button type="button" class="ms-btn">Engineer: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <div class="ms" data-filter="host">
+              <button type="button" class="ms-btn">Host: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <div class="ms" data-filter="customer">
+              <button type="button" class="ms-btn">Customer: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <div class="ms" data-filter="shift">
+              <button type="button" class="ms-btn">Shift: All</button>
+              <div class="ms-pop hidden"></div>
+            </div>
+            <label class="filter-sort"><span>Sort by</span>
+            <select id="sort-by" title="Sort missions">
+              <option value="number">Mission No.</option>
+              <option value="engineer">Engineer</option>
+              <option value="host">Host</option>
+              <option value="customer">Customer</option>
+              <option value="shift">Shift</option>
+            </select>
+            </label>
+          </div>
         </div>
         <!-- Narrows the board like a filter does, so it sits with them: reads
              "Hide/Unhide" until something is hidden, then "Hidden n" in the
              active-filter tint, plus an amber count of missions with no crew
              (see updateHideMissionsButton). -->
         <button id="btn-hide-missions" class="btn btn-hidden-chip" title="Choose which missions are hidden from this board"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"></use></svg> Hide/Unhide</button>
-        <select id="sort-by" title="Sort missions">
-          <option value="number">Sort: Mission No.</option>
-          <option value="engineer">Sort: Engineer</option>
-          <option value="host">Sort: Host</option>
-          <option value="customer">Sort: Customer</option>
-          <option value="shift">Sort: Shift</option>
-        </select>
       </div>
       <!-- the "fix" zone: pinned to the right edge, away from the filters (a
            display:contents group on a phone, where it sits inside the dropdown) -->
@@ -570,6 +580,16 @@
       <span id="capture-title"></span>
     </div>
     <span id="capture-date"></span>
+  </div>
+  <!-- Leave, one type at a time. The tabs are part of the screen only (hidden while
+       exporting, when every non-empty type is drawn); each one is also a drop target,
+       so a person can be dropped straight onto "Sick leave" without opening it. -->
+  <div id="leave-tabs" role="tablist" aria-label="Leave">
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="annual" data-drop="zone:annual"><span>Annual leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="sick" data-drop="zone:sick"><span>Sick leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="business" data-drop="zone:business"><span>Business leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="unpaid" data-drop="zone:unpaid"><span>Unpaid leave</span><b>0</b></button>
+    <button type="button" role="tab" class="lv-tab dropzone" data-lv="exchange" data-drop="zone:exchange"><span>Exchange working day</span><b>0</b></button>
   </div>
   <section id="status-zones">
     <div class="zone zone-leave" data-zone="annual">
@@ -1259,12 +1279,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-13c"></script>
-<script src="employee-id.js?v=2026-10-13c"></script>
-<script src="cloud.js?v=2026-10-13c"></script>
-<script src="charts.js?v=2026-10-13c"></script>
-<script src="xlsx-export.js?v=2026-10-13c"></script>
-<script src="bulk-edit.js?v=2026-10-13c"></script>
-<script src="app.js?v=2026-10-13c"></script>
+<script src="planning.js?v=2026-10-13d"></script>
+<script src="employee-id.js?v=2026-10-13d"></script>
+<script src="cloud.js?v=2026-10-13d"></script>
+<script src="charts.js?v=2026-10-13d"></script>
+<script src="xlsx-export.js?v=2026-10-13d"></script>
+<script src="bulk-edit.js?v=2026-10-13d"></script>
+<script src="app.js?v=2026-10-13d"></script>
 </body>
 </html>

@@ -119,3 +119,8 @@ deck, compact) with the people panel tucked under the banner and a two-way Thai 
 toggle, and three table options (quiet, directory, grouped) for Manpower and Host. The
 boards and tables in it are the app's own markup and `styles.css`, loaded with data that
 matches the production screenshots (106 people, 19 on exchange days). Not loaded by the app.
+
+Chosen from round two and built in the app: leave as tabs (B), the navy control deck with the
+board picker as a pill in the banner, the quiet table (A), Sign out in the avatar menu, Holiday
+and Reset board kept on the toolbar. Not built from it: one "New" menu (New mission and New
+employee stay as two buttons) and the Ctrl+K palette.

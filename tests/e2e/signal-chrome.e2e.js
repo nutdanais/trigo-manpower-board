@@ -51,18 +51,89 @@ async function step(name, fn) {
       assert.ok(chips.length >= 1 && chips.every((c) => c.dot && c.n > 0), JSON.stringify(chips));
     });
 
-    await step("leave: a band, and an empty type is a small dashed chip that is still a drop target", async () => {
+    await step("leave: tabs with counts, opening on the busiest type; each tab is a drop target", async () => {
       const r = await p.evaluate(() => {
-        const z = document.querySelector('#status-zones .zone-leave.zone-empty[data-zone="unpaid"]');
-        const body = z.querySelector(".zone-body");
-        const zr = z.getBoundingClientRect(), br = body.getBoundingClientRect();
-        return { chipH: Math.round(zr.height), coversChip: Math.abs(zr.width - br.width) <= 3 && Math.abs(zr.height - br.height) <= 3, drop: body.dataset.drop };
+        const tabs = [...document.querySelectorAll("#leave-tabs .lv-tab")];
+        const zoneN = (z) => document.querySelectorAll(`#status-zones [data-drop="zone:${z}"] .emp-card`).length;
+        return {
+          tabs: tabs.map((t) => ({ z: t.dataset.lv, n: Number(t.querySelector("b").textContent), real: zoneN(t.dataset.lv), on: t.classList.contains("on"), drop: t.dataset.drop, cls: t.classList.contains("dropzone") })),
+          shown: [...document.querySelectorAll("#status-zones .zone-leave")].filter((z) => getComputedStyle(z).display !== "none").map((z) => z.dataset.zone),
+          band: document.getElementById("status-zones").getBoundingClientRect().height + document.getElementById("leave-tabs").getBoundingClientRect().height,
+        };
       });
-      assert.ok(r.chipH <= 40, "chip height " + r.chipH);
-      assert.equal(r.coversChip, true, "the drop body fills the chip");
-      assert.equal(r.drop, "zone:unpaid");
-      const band = await p.evaluate(() => document.getElementById("status-zones").getBoundingClientRect().height);
-      assert.ok(band < 200, "the leave band is compact: " + band);
+      assert.equal(r.tabs.length, 5);
+      assert.ok(r.tabs.every((t) => t.n === t.real && t.cls && t.drop === "zone:" + t.z), JSON.stringify(r.tabs));
+      assert.deepEqual(r.tabs.filter((t) => t.on).map((t) => t.z), ["annual"], "opens on the busiest type");
+      assert.deepEqual(r.shown, ["annual"], "one lane at a time");
+      assert.ok(r.band < 220, "compact: " + r.band);
+      await p.click('#leave-tabs [data-lv="unpaid"]');
+      assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll("#status-zones .zone-leave")].filter((z) => getComputedStyle(z).display !== "none").map((z) => z.dataset.zone)), ["unpaid"]);
+      const body = await p.locator('#status-zones [data-drop="zone:unpaid"]').boundingBox();
+      assert.ok(body.height >= 80 && body.width > 300, "the open lane is a real drop area");
+      await p.click('#leave-tabs [data-lv="annual"]');
+    });
+
+    await step("leave: dropping a person on a tab files them under that type, even with the lane closed", async () => {
+      await p.evaluate(() => { guardEdit = (fn) => fn(); });   // the day is read-only; this checks the drop wiring, not the date rules
+      const id = await p.evaluate(() => document.querySelector("#missions-grid .emp-card").dataset.empId);
+      await p.evaluate((emp) => {
+        const tab = document.querySelector('#leave-tabs [data-lv="sick"]');
+        const dt = new DataTransfer(); dt.setData("text/plain", JSON.stringify([emp]));
+        tab.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt }));
+        tab.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+      }, id);
+      await p.waitForFunction((emp) => getPlan().zones.sick.includes(emp), id);
+      assert.equal(await p.evaluate(() => state.leaveTab), "sick", "the lane the person went to opens");
+      assert.equal(await p.locator('#leave-tabs [data-lv="sick"] b').textContent(), "1");
+    });
+
+    await step("leave: while exporting, the tabs go away and every lane with people is drawn", async () => {
+      await p.evaluate(() => document.body.classList.add("exporting"));
+      const r = await p.evaluate(() => ({
+        tabs: getComputedStyle(document.getElementById("leave-tabs")).display,
+        shown: [...document.querySelectorAll("#status-zones .zone-leave:not(.zone-empty)")].filter((z) => getComputedStyle(z).display !== "none").map((z) => z.dataset.zone),
+      }));
+      await p.evaluate(() => document.body.classList.remove("exporting"));
+      assert.equal(r.tabs, "none");
+      assert.deepEqual(r.shown.sort(), ["annual", "sick"]);
+    });
+
+    await step("the banner: module tabs, a board pill that opens the boards, and Sign out inside the avatar menu", async () => {
+      assert.equal(await p.isVisible("#btn-signout"), false, "Sign out is not in the banner itself");
+      assert.equal((await p.textContent("#btn-board-dd")).trim(), "Board One");
+      await p.click("#btn-board-dd");
+      assert.deepEqual(await p.$$eval("#board-menu .tab-board", (e) => e.map((x) => x.textContent.trim())), ["Board One", "Board Two"]);
+      assert.equal(await p.isVisible("#btn-add-board"), true);
+      await p.keyboard.press("Escape");
+      assert.equal(await p.isVisible("#board-menu"), false);
+      await p.click("#btn-avatar");
+      assert.equal(await p.isVisible("#btn-signout"), true);
+      assert.match(await p.textContent("#user-menu-name"), /Admin/);
+      await p.click("body", { position: { x: 600, y: 500 } });
+      assert.equal(await p.isVisible("#user-menu"), false);
+    });
+
+    await step("Filter & sort is one popover with a count of the filters that are on", async () => {
+      assert.equal(await p.isVisible("#filter-pop"), false);
+      assert.equal(await p.isVisible("#filter-count"), false);
+      await p.click("#btn-filter-pop");
+      assert.equal(await p.isVisible("#filter-pop"), true);
+      await p.click('#filter-pop .ms[data-filter="engineer"] .ms-btn');
+      await p.click('#filter-pop .ms[data-filter="engineer"] .ms-opt input >> nth=0');
+      assert.equal((await p.textContent("#filter-count")).trim(), "1");
+      assert.equal(await p.locator("#missions-grid .mission-card.dimmed").count(), 1, "the non-matching mission is dimmed");
+      await p.click("body", { position: { x: 700, y: 700 } });
+      assert.equal(await p.isVisible("#filter-pop"), false);
+      assert.equal((await p.textContent("#filter-count")).trim(), "1", "the count stays on the closed button");
+      await p.evaluate(() => { state.filters.engineer = []; renderFilterOptions(); renderMissions(); });
+      assert.equal(await p.isVisible("#filter-count"), false);
+    });
+
+    await step("the people panel starts under the banner, and the Names control is a Thai | English toggle", async () => {
+      const r = await p.evaluate(() => ({ pool: document.getElementById("float-pool").getBoundingClientRect().top, bar: document.getElementById("sticky-header").getBoundingClientRect().bottom, bannerRight: document.getElementById("topbar").getBoundingClientRect().right, vw: innerWidth }));
+      assert.ok(Math.abs(r.pool - r.bar) <= 1, JSON.stringify(r));
+      assert.ok(r.bannerRight >= r.vw - 1, "the banner spans the full width");
+      assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
     });
 
     await step("a record dialog is a side panel: right-aligned, full height, footer pinned", async () => {
@@ -120,6 +191,26 @@ async function step(name, fn) {
       assert.equal(r.w, r.vw);
       assert.ok(r.bottom >= r.vh - 1 && r.top > 0, "anchored to the bottom, with the board showing above");
       await p.keyboard.press("Escape");
+    });
+
+    await step("quiet tables: sentence-case headers, a colour key for the area, empty columns left out", async () => {
+      await p.setViewportSize({ width: 1400, height: 900 });
+      await p.evaluate((d) => { state.date = d; D().activeBoardId = EMPLIST_ID; return refreshAndRender(); }, SRC);
+      const emp = await p.evaluate(() => {
+        const th = document.querySelector("#emplist-table th[data-sort=name]");
+        const pill = document.querySelector("#emplist-table .area-pill");
+        return { tt: getComputedStyle(th).textTransform, top: getComputedStyle(th).position, key: getComputedStyle(pill, "::before").width, bg: getComputedStyle(pill).backgroundColor, ac: pill.style.getPropertyValue("--ac"), box: getComputedStyle(document.querySelector("#emplist-panel .table-wrap")).borderTopWidth };
+      });
+      assert.equal(emp.tt, "none");
+      assert.equal(emp.top, "sticky");
+      assert.equal(emp.key, "10px");
+      assert.equal(emp.bg, "rgba(0, 0, 0, 0)");
+      assert.ok(emp.ac, "the area colour is handed to CSS");
+      assert.equal(emp.box, "0px");
+      await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
+      const hidden = await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th.col-off")].map((t) => t.textContent.trim()));
+      assert.ok(hidden.includes("Note") && hidden.includes("Inspectors deployed"), "columns empty on every row are left out: " + hidden);
+      assert.ok(await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th:not(.col-off)")].some((t) => /Host name/.test(t.textContent))));
     });
 
     await step("no page errors", async () => { assert.deepEqual(a.errors, []); });
