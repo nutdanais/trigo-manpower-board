@@ -2931,22 +2931,20 @@ function fillOvBoardSelect(scope) {
   const label = btn.querySelector(".ovb-label");
   label.textContent = pickedBoard ? pickedBoard.name : "All boards";   // textContent: board names are user data
   btn.querySelector(".ovb-count").textContent = pickedBoard ? rosterEmployees(pickedBoard.id).length : all;
-  btn.querySelector(".ovb-dot").style.background = pickedBoard ? Charts.catColor(D().boards.indexOf(pickedBoard)) : "transparent";
   menu.innerHTML = "";
-  const item = (id, name, count, color) => {
+  // the same rows as the Board tab's picker: name and headcount, no colour key
+  const item = (id, name, count) => {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "tb-item" + (id === current ? " is-current" : "");
     b.setAttribute("aria-current", id === current ? "true" : "false");
-    const dot = b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-dot" }));
-    dot.style.background = color || "transparent";
     b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: name }));
     b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(count) }));
     b.onclick = () => { closeTopbarMenus(); if (id !== current) setOvBoard(id); };
     menu.appendChild(b);
   };
   item("", "All boards", all);
-  D().boards.forEach((b, i) => item(b.id, b.name, rosterEmployees(b.id).length, Charts.catColor(i)));
+  for (const b of D().boards) item(b.id, b.name, rosterEmployees(b.id).length);
 }
 /* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
    works carries no information, so it's dropped from the axis entirely
