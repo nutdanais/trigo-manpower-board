@@ -5572,6 +5572,7 @@ function renderSettingsHead() {
   $("#sv-hint").textContent = meta.hint;
   $("#btn-add-engineer").classList.toggle("hidden", !(tab === "engineers" && can("settings", "edit")));
   $("#btn-add-area").classList.toggle("hidden", !(tab === "areas" && can("settings", "edit")));
+  $("#btn-add-board-settings").classList.toggle("hidden", !(tab === "boards" && can("settings", "edit")));
   $("#btn-add-user").classList.toggle("hidden", !(tab === "users" && can("users", "edit")));
 }
 
@@ -10885,6 +10886,7 @@ function wireApp() {
   };
 
   $("#btn-add-board").onclick = openBoardModal;
+  $("#btn-add-board-settings").onclick = openBoardModal;
   $("#board-select").onchange = (ev) => {
     const val = ev.target.value;
     if (val === NEW_BOARD_OPT) {

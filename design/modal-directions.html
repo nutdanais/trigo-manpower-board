@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modal Redesign Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;600&display=swap">
+<style>
+/* Design collateral, not loaded by the app. Tokens mirror styles.css. */
+:root {
+  --page:#eef1f4; --surface:#fff; --line:#d8dde4; --ink:#1f2937; --mut:#5f6773;
+  --navy:#003a66; --navy-d:#002a4a; --navy-text:#003a66; --navy-tint:rgba(0,58,102,.07);
+  --green:#a8c855; --soft:#eef1f5; --hover:#eef3fb;
+  --warn-text:#8a4f10; --warn-surface:#fdf8ef; --warn-line:#e0c9a4;
+  --ok-text:#4d6810; --ok-surface:#f7faef; --ok-line:#cfdcae;
+  --bad-text:#a3271f; --bad-surface:#fef2f2; --bad-line:#e6c2be;
+  --scrim:rgba(15,23,42,.55); --shadow:0 18px 48px rgba(0,0,0,.28);
+}
+@media (prefers-color-scheme: dark){ :root{
+  --page:#14171a; --surface:#1c2024; --line:#2c3236; --ink:#e8ebed; --mut:#a3aab1;
+  --navy-text:#6fb1e0; --navy-tint:rgba(111,177,224,.12); --soft:#232a33; --hover:#232c38;
+  --warn-text:#e0b070; --warn-surface:#2a2313; --warn-line:#6a5426;
+  --ok-text:#a8c855; --ok-surface:#1b2416; --ok-line:#46592a;
+  --bad-text:#fca5a5; --bad-surface:rgba(185,28,28,.16); --bad-line:#7f2222;
+  --scrim:rgba(0,0,0,.62); color-scheme:dark; } }
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 "Noto Sans","Noto Sans Thai",system-ui,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:28px 16px 80px}
+h1{font-size:28px;margin:0 0 6px} h2{font-size:21px;margin:44px 0 6px;scroll-margin-top:12px}
+h3{font-size:15px;margin:0 0 4px} p{margin:0 0 10px;color:var(--mut)} p b,li b{color:var(--ink)}
+a{color:var(--navy-text)}
+.lede{font-size:15px;max-width:76ch}
+nav.top{position:sticky;top:0;z-index:50;background:var(--page);padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+nav.top a{padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);text-decoration:none;font-weight:600;font-size:13px;min-height:32px;display:inline-flex;align-items:center}
+nav.top a:hover{border-color:var(--navy-text)}
+table.cmp{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px}
+table.cmp th,table.cmp td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.cmp th{background:var(--soft);font-weight:600}
+.scroll-x{overflow-x:auto}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--soft);color:var(--mut);border:1px solid var(--line)}
+.tag.bad{background:var(--bad-surface);color:var(--bad-text);border-color:var(--bad-line)}
+.tag.ok{background:var(--ok-surface);color:var(--ok-text);border-color:var(--ok-line)}
+.tag.warn{background:var(--warn-surface);color:var(--warn-text);border-color:var(--warn-line)}
+.callout{background:var(--warn-surface);border:1px solid var(--warn-line);border-radius:8px;padding:10px 14px;color:var(--ink);margin:12px 0}
+.callout.ok{background:var(--ok-surface);border-color:var(--ok-line)}
+.dir{border-top:3px solid var(--navy-text);margin-top:46px;padding-top:6px}
+.dir .badge{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:7px;background:var(--navy);color:#fff;font-weight:700;margin-right:8px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:820px){.cols{grid-template-columns:1fr}}
+ul.pc{margin:6px 0 14px;padding-left:18px;color:var(--mut)} ul.pc li{margin:2px 0}
+
+/* ================== mock stages ================== */
+.frames{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin:12px 0}
+.frame{flex:1 1 640px;min-width:0}
+.frame.phone{flex:0 0 300px}
+.cap{font-size:12px;font-weight:600;color:var(--mut);margin:0 0 5px;text-transform:uppercase;letter-spacing:.04em}
+.stage{position:relative;height:560px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#eef1f4;color:#1f2937}
+.stage.ph{height:560px;border-radius:26px;border:6px solid #111418}
+.stage.tall{height:620px}
+.bar{height:34px;background:#003a66;display:flex;align-items:center;gap:10px;padding:0 12px;color:#fff;font-weight:600;font-size:12px}
+.bar i{width:20px;height:6px;border-radius:2px;background:#a8c855;display:block}
+.bar span{opacity:.75;font-weight:500}
+.bg{padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bg b{display:block;height:84px;border-radius:7px;background:#fff;border:1px solid #d8dde4}
+.bg b:nth-child(3n){height:56px}
+.scrim{position:absolute;inset:0;background:var(--scrim)}
+.scrim.light{background:rgba(15,23,42,.28)}
+
+/* shared dialog anatomy */
+.dlg{position:absolute;background:var(--surface);color:var(--ink);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;border-radius:10px}
+.dh{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);flex:none}
+.dh h4{margin:0;font-size:16px;font-weight:600;flex:1;min-width:0}
+.dh small{display:block;font-weight:400;color:var(--mut);font-size:12px}
+.x{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--mut);font-size:19px;line-height:1;flex:none}
+.db{padding:16px 18px;overflow:auto;flex:1;min-height:0}
+.df{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:11px 18px;border-top:1px solid var(--line);background:var(--soft);flex:none}
+.df .sp{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font:600 13px "Noto Sans",sans-serif;color:var(--ink)}
+.btn.p{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.d{color:var(--bad-text);border-color:var(--bad-line);background:var(--bad-surface)}
+.btn.s{height:26px;padding:0 9px;font-size:12px}
+.fld{display:block;font-size:12.5px;font-weight:600;margin-bottom:11px}
+.fld .in{margin-top:3px;height:32px;border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:0 9px;display:flex;align-items:center;font-weight:400;font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden}
+.fld .in.ph{color:var(--mut)} .fld .in.ta{height:60px;align-items:flex-start;padding-top:6px}
+.fld .hint{display:block;font-weight:400;color:var(--mut);font-size:11.5px;margin-top:2px;white-space:normal}
+.req{color:var(--bad-text)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px} .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
+.sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:4px 0 8px;display:flex;align-items:center;gap:8px}
+.sec::after{content:"";flex:1;height:1px;background:var(--line)}
+.tabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--line);flex:none}
+.tabs span{padding:9px 12px;font-weight:600;font-size:13px;color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs span.on{color:var(--navy-text);border-color:var(--navy-text)}
+.mini{width:100%;border-collapse:collapse;font-size:12.5px}
+.mini th{background:var(--soft);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0}
+.mini td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.mini tr.chg td{background:var(--warn-surface)} .mini tr.new td{background:var(--ok-surface)}
+.pill{display:inline-block;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600;border:1px solid var(--line);background:var(--soft)}
+.pill.ok{background:var(--ok-surface);color:var(--ok-text);border-color:var(--ok-line)}
+.pill.warn{background:var(--warn-surface);color:var(--warn-text);border-color:var(--warn-line)}
+.chip{display:inline-block;padding:2px 9px;border-radius:7px;border:1px solid var(--line);font-size:12px;font-weight:600;margin-right:4px}
+.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.kpis{display:flex;gap:8px;margin-bottom:10px}
+.kpis div{flex:1;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface)}
+.kpis b{display:block;font-size:18px;line-height:1.2} .kpis span{font-size:11.5px;color:var(--mut)}
+.note{font-size:12px;color:var(--mut);margin:0 0 8px}
+.anno{position:absolute;z-index:4;background:#111418;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px}
+</style>
+</head>
+<body>
+<main>
+<h1>Modal redesign directions</h1>
+<p class="lede">The app has <b>26 dialogs</b>. 17 of them inherit the default <b>440&nbsp;px</b> card, and the nine that do have a width run from 640 to 1080&nbsp;px. The narrow ones squeeze long forms into a scrolling column. The wide ones are fixed pixel widths that don't use a big screen and don't adapt on a phone. Below: what is wrong today, then four directions, each shown on the same two dialogs (Edit Employee, a long form, and Review &amp; merge forecast, a wide data review) plus a phone view. The sample data is made up.</p>
+
+<nav class="top" aria-label="Sections">
+  <a href="#audit">Audit</a><a href="#today">Today</a><a href="#a">A · Size tiers</a><a href="#b">B · Side sheet</a><a href="#c">C · Sectioned workspace</a><a href="#d">D · Adaptive hybrid</a><a href="#compare">Compare</a>
+</nav>
+
+<!-- ========================= AUDIT ========================= -->
+<h2 id="audit">1 · Audit of every modal</h2>
+<p>Grouped by what the person is doing. The "Today" column is the width set in <code>styles.css</code>.</p>
+<div class="scroll-x"><table class="cmp">
+<thead><tr><th>Group</th><th>Dialogs</th><th>Today</th><th>Problem</th></tr></thead>
+<tbody>
+<tr><td><b>Record forms</b><br><span class="tag">9</span></td><td>Mission · Employee (3 tabs) · Host · User · Add user · Add engineer · Add service area · New board · Change password</td><td>440 px, one column</td><td>Employee has 10 fields in a single column and scrolls. The 3 tabs share one dialog. Mission has 8 fields, with Shift, Start and End squeezed into 3 slivers of ~120 px. Hints and long labels wrap. The Thai name can be clipped.</td></tr>
+<tr><td><b>Review &amp; decide</b><br><span class="tag">6</span></td><td>Review changes (plandiff) · Review &amp; merge forecast · Merge decisions · Holds taken · Forecast view · Permission review</td><td>640–1080 px fixed</td><td>Tables sit in a fixed width. Below ~1100 px wide the merge dialog switches to a plain scrolling block. A 1080 px card on a 1920 px screen still leaves most of the screen empty. The phone view is a shrunken desktop table.</td></tr>
+<tr><td><b>Pick &amp; bulk</b><br><span class="tag">3</span></td><td>Hide/Unhide missions (920 × 86 vh) · Bulk edit (780) · Add Mission (import, 440)</td><td>mixed</td><td>Import is 440 px but holds a paste area and a checklist. Hide missions is the only dialog designed full-height.</td></tr>
+<tr><td><b>Export</b><br><span class="tag">4</span></td><td>Export board · Export capacity · Export host list · Export manpower list</td><td>440 px</td><td>Format, language, boards and column pickers are stacked into one column. There is no preview of what the file contains.</td></tr>
+<tr><td><b>Confirm / notice</b><br><span class="tag">4</span></td><td>Confirm · Unsaved changes · Temporary password · Copy forecast</td><td>440 px</td><td>These are fine at about 440 px. The one change: the temporary password needs a larger monospace display plus a copy button.</td></tr>
+</tbody></table></div>
+<div class="callout"><b>Shared root causes:</b> (1) one size for everything, so every dialog gets 440 px unless someone hand-writes a width; (2) forms are always one column; (3) there is no phone behaviour except Hide missions, so most dialogs just shrink; (4) the dialog title, form and footer are good, with a sticky header, hairlines and a tinted action bar. <b>That anatomy stays in every direction.</b> The redesign is about size, layout and phone behaviour, not about replacing the markup.</div>
+
+<!-- ========================= TODAY ========================= -->
+<h2 id="today">2 · Today (for reference)</h2>
+<div class="frames">
+ <div class="frame"><p class="cap">Edit Employee · 440 px</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:50%;top:14px;width:440px;margin-left:-220px;bottom:14px;border-radius:8px">
+    <div class="dh"><h4>Edit Employee</h4><span class="x">×</span></div>
+    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Edit Employee</span></div>
+    <div class="db">
+     <label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label>
+     <label class="fld">English name (optional)<span class="in">Somchai Jaidee</span></label>
+     <label class="fld">TRIGO ID (optional)<span class="in">T329</span></label>
+     <label class="fld">Contract type<span class="in">Permanent</span></label>
+     <label class="fld">Position<span class="in">Senior Inspector</span></label>
+     <label class="fld">Mobile number<span class="in">081-234-5678</span></label>
+     <label class="fld">Start date (optional)<span class="in">12 Mar 2023</span></label>
+    </div>
+    <div class="anno" style="right:14px;top:40%">scrolls ↓ 3 more fields</div>
+    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
+   </div></div></div>
+ <div class="frame"><p class="cap">Review &amp; merge forecast · 1080 px (fixed)</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:6px;right:6px;top:14px;bottom:14px;border-radius:8px">
+    <div class="dh"><h4>Review &amp; merge forecast</h4><span class="x">×</span></div>
+    <div class="db"><table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Crew</th><th>Current</th><th>Forecast</th><th>Keep</th></tr></thead><tbody>
+     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>14 Oct</td><td>4</td><td>Somchai, Anan…</td><td>Somchai, Malee…</td><td>Forecast</td></tr>
+     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>14 Oct</td><td>2</td><td>—</td><td>Prasit, Kanya</td><td>Forecast</td></tr>
+     <tr><td>BANGN.26.0003</td><td>Amata Plt 2</td><td>15 Oct</td><td>3</td><td>Wichai…</td><td>Wichai…</td><td>—</td></tr>
+    </tbody></table></div>
+    <div class="df"><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
+   </div></div></div>
+</div>
+<p class="note">Sample only. In the real dialog, a 1080 px card is centred and capped, so on wide monitors the table cannot use the room and long host / crew text truncates.</p>
+
+<!-- ========================= A ========================= -->
+<section class="dir" id="a">
+<h2 style="margin-top:6px"><span class="badge">A</span>Size tiers + two-column forms <span class="tag ok">Smallest change</span></h2>
+<p><b>Idea:</b> keep the centred dialog but stop treating every dialog the same. Four size tiers: <b>S 480</b> (confirm/notice), <b>M 720</b> (record forms, two columns), <b>L 1040</b> (review tables, export), <b>XL 94 vw × 90 vh</b> (merge, bulk, hide missions). The card grows with the viewport up to its tier. On a phone every tier becomes a full-screen page.</p>
+<div class="frames">
+ <div class="frame"><p class="cap">M · Edit Employee · 720 px, 2 columns</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:50%;top:22px;width:720px;margin-left:-360px;bottom:22px">
+    <div class="dh"><h4>Edit Employee<small>สมชาย ใจดี · T329</small></h4><span class="x">×</span></div>
+    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Edit Employee</span></div>
+    <div class="db">
+     <div class="g2">
+      <label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label>
+      <label class="fld">English name<span class="in">Somchai Jaidee</span></label>
+      <label class="fld">TRIGO ID<span class="in">T329</span></label>
+      <label class="fld">Mobile number<span class="in">081-234-5678</span></label>
+      <label class="fld">Contract type<span class="in">Permanent</span></label>
+      <label class="fld">Position<span class="in">Senior Inspector</span></label>
+      <label class="fld">Start date<span class="in">12 Mar 2023</span></label>
+      <label class="fld">On the board from<span class="in">1 Apr 2023</span></label>
+      <label class="fld">Service area<span class="in">Eastern</span></label>
+      <label class="fld">Board<span class="in">Board A</span></label>
+     </div></div>
+    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
+   </div></div></div>
+ <div class="frame"><p class="cap">XL · Review &amp; merge forecast · 94 vw × 90 vh</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:3%;right:3%;top:14px;bottom:14px">
+    <div class="dh"><h4>Review &amp; merge forecast<small>Forecast for 14–18 Oct · 12 changes, 3 conflicts</small></h4><span class="x">×</span></div>
+    <div class="db"><div class="kpis"><div><b>12</b><span>changes</span></div><div><b>3</b><span>conflicts</span></div><div><b>2</b><span>new missions</span></div><div><b>0</b><span>skipped</span></div></div>
+     <table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Current crew</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
+     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14 Oct</td><td>Somchai, Anan, Wichai, Kanya</td><td>Somchai, Malee, Wichai, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14 Oct</td><td>—</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+     <tr class="chg"><td>BANGN.26.0003</td><td>Amata City Plt 2</td><td>Wed 15 Oct</td><td>Wichai, Anan, Malee</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr>
+     <tr><td>BANGN.26.0015</td><td>Toyota Gateway</td><td>Thu 16 Oct</td><td>Prasit, Nok</td><td>Prasit, Nok</td><td>no change</td></tr>
+    </tbody></table></div>
+    <div class="df"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
+   </div></div></div>
+ <div class="frame phone"><p class="cap">Phone · full-screen page</p>
+  <div class="stage ph"><div class="dlg" style="inset:0;border-radius:0">
+    <div class="dh" style="padding:12px 12px"><span class="x">‹</span><h4 style="font-size:15px">Edit Employee</h4></div>
+    <div class="db" style="padding:12px">
+     <label class="fld">Thai name <span class="req">*</span><span class="in" style="height:40px">สมชาย ใจดี</span></label>
+     <label class="fld">English name<span class="in" style="height:40px">Somchai Jaidee</span></label>
+     <label class="fld">Contract type<span class="in" style="height:40px">Permanent</span></label>
+     <label class="fld">Position<span class="in" style="height:40px">Senior Inspector</span></label>
+    </div>
+    <div class="df" style="padding:10px 12px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Save</span></div>
+   </div></div></div>
+</div>
+<ul class="pc"><li><b>+</b> Almost pure CSS: add a <code>data-size</code> on each <code>.modal</code> and a 2-column grid on <code>.modal form</code>. No markup rewrite.</li>
+<li><b>+</b> Reviews finally use big screens; forms stay a familiar centred card.</li>
+<li><b>−</b> Still a card over the board, so you cannot see the board while editing. 10-field forms are shorter but not "sectioned".</li></ul>
+</section>
+
+<!-- ========================= B ========================= -->
+<section class="dir" id="b">
+<h2 style="margin-top:6px"><span class="badge">B</span>Right-hand side sheet <span class="tag warn">Keeps the board visible</span></h2>
+<p><b>Idea:</b> record forms slide in from the right as a full-height <b>sheet</b> (560–720 px) with a light scrim, so the board and the cards you are editing stay visible and you can see the effect of a change behind it. Review tables open a <b>wide sheet</b> (up to 90 vw). Confirm / notice stay small centred dialogs. On a phone the sheet is full-screen.</p>
+<div class="frames">
+ <div class="frame"><p class="cap">Edit Employee · 640 px sheet, sections</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim light"></div>
+   <div class="dlg" style="right:0;top:0;bottom:0;width:640px;border-radius:12px 0 0 12px">
+    <div class="dh"><span class="x" style="background:var(--soft)">←</span><h4>Edit Employee<small>สมชาย ใจดี · T329 · Board A</small></h4><span class="x">×</span></div>
+    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Details</span></div>
+    <div class="db">
+     <div class="sec">Identity</div>
+     <div class="g2"><label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label><label class="fld">English name<span class="in">Somchai Jaidee</span></label><label class="fld">TRIGO ID<span class="in">T329</span></label><label class="fld">Mobile<span class="in">081-234-5678</span></label></div>
+     <div class="sec">Contract</div>
+     <div class="g2"><label class="fld">Contract type<span class="in">Permanent</span></label><label class="fld">Position<span class="in">Senior Inspector</span></label><label class="fld">Start date<span class="in">12 Mar 2023</span></label><label class="fld">On the board from<span class="in">1 Apr 2023</span></label></div>
+     <div class="sec">Placement</div>
+     <div class="g2"><label class="fld">Service area<span class="in">Eastern</span></label><label class="fld">Board<span class="in">Board A</span></label></div>
+    </div>
+    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
+   </div></div></div>
+ <div class="frame"><p class="cap">Wide sheet · Review &amp; merge forecast · 90 vw</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim light"></div>
+   <div class="dlg" style="right:0;top:0;bottom:0;width:92%;border-radius:12px 0 0 12px">
+    <div class="dh"><span class="x" style="background:var(--soft)">←</span><h4>Review &amp; merge forecast<small>14–18 Oct · 12 changes, 3 conflicts</small></h4><span class="x">×</span></div>
+    <div class="db"><div class="kpis"><div><b>12</b><span>changes</span></div><div><b>3</b><span>conflicts</span></div><div><b>2</b><span>new missions</span></div></div>
+     <table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Current crew</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
+     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14 Oct</td><td>Somchai, Anan, Wichai…</td><td>Somchai, Malee, Wichai…</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14 Oct</td><td>—</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+     <tr class="chg"><td>BANGN.26.0003</td><td>Amata City Plt 2</td><td>Wed 15 Oct</td><td>Wichai, Anan, Malee</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr>
+    </tbody></table></div>
+    <div class="df"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
+   </div></div></div>
+ <div class="frame phone"><p class="cap">Phone · full-screen sheet</p>
+  <div class="stage ph"><div class="dlg" style="inset:0;border-radius:0">
+    <div class="dh" style="padding:12px"><span class="x">‹</span><h4 style="font-size:15px">Edit Employee</h4></div>
+    <div class="db" style="padding:12px"><div class="sec">Identity</div>
+     <label class="fld">Thai name <span class="req">*</span><span class="in" style="height:40px">สมชาย ใจดี</span></label>
+     <label class="fld">English name<span class="in" style="height:40px">Somchai Jaidee</span></label>
+     <div class="sec">Contract</div>
+     <label class="fld">Contract type<span class="in" style="height:40px">Permanent</span></label></div>
+    <div class="df" style="padding:10px 12px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Save</span></div>
+   </div></div></div>
+</div>
+<ul class="pc"><li><b>+</b> Best for edit-in-context work (change an employee while seeing the board). The sheet is full height, so long forms and the notes list have room.</li>
+<li><b>+</b> One pattern for every "record" dialog and phone behaviour that matches it.</li>
+<li><b>−</b> A different feel from today. The focus trap, Esc and the unsaved-changes guard all need rework for a slide-in. A sheet that hides the right-hand cards can hide exactly what you were editing.</li></ul>
+</section>
+
+<!-- ========================= C ========================= -->
+<section class="dir" id="c">
+<h2 style="margin-top:6px"><span class="badge">C</span>Sectioned workspace (large, with a side index) <span class="tag warn">Most structure</span></h2>
+<p><b>Idea:</b> big forms become a ~960 px <b>workspace</b>: a left index (Identity · Contract · Placement · Notes) jumps to each section, the form is one scrolling column to its right, and a <b>live summary card</b> shows what the record will look like on the board. Review dialogs use the same shell with filters in the index column. Phone: the index becomes a sticky section selector.</p>
+<div class="frames">
+ <div class="frame"><p class="cap">Edit Employee · 960 px workspace</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:50%;top:20px;bottom:20px;width:min(960px,98%);transform:translateX(-50%)">
+    <div class="dh"><h4>Edit Employee</h4><span class="x">×</span></div>
+    <div style="display:grid;grid-template-columns:170px 1fr 190px;flex:1;min-height:0">
+     <div style="border-right:1px solid var(--line);padding:12px 8px;background:var(--soft);font-size:13px;font-weight:600">
+      <div style="padding:7px 10px;border-radius:7px;background:var(--navy-tint);color:var(--navy-text)">Identity</div>
+      <div style="padding:7px 10px;color:var(--mut)">Contract</div><div style="padding:7px 10px;color:var(--mut)">Placement</div>
+      <div style="padding:7px 10px;color:var(--mut)">Host record</div><div style="padding:7px 10px;color:var(--mut)">Notes <span class="pill" style="margin-left:4px">2</span></div></div>
+     <div class="db"><div class="sec">Identity</div><div class="g2">
+      <label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label><label class="fld">English name<span class="in">Somchai Jaidee</span><span class="hint">Used for English Excel exports.</span></label>
+      <label class="fld">TRIGO ID<span class="in">T329</span></label><label class="fld">Mobile<span class="in">081-234-5678</span></label></div>
+      <div class="sec">Contract</div><div class="g2"><label class="fld">Contract type<span class="in">Permanent</span></label><label class="fld">Position<span class="in">Senior Inspector</span></label><label class="fld">Start date<span class="in">12 Mar 2023</span></label><label class="fld">On the board from<span class="in">1 Apr 2023</span></label></div>
+      <div class="sec">Placement</div></div>
+     <div style="border-left:1px solid var(--line);padding:14px;background:var(--surface)"><p class="cap">Preview on board</p>
+      <div style="border:1px solid #b4bcc4;border-radius:8px;background:#e6e9ec;color:#1a1a1a;padding:8px 10px;font-size:12.5px"><b>สมชาย ใจดี</b><br><span style="color:#545c66">Senior Inspector · Eastern</span></div>
+      <p class="note" style="margin-top:10px">Shown on Board A, permanent (solid border).</p></div>
+    </div>
+    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
+   </div></div></div>
+ <div class="frame"><p class="cap">Workspace · Review &amp; merge forecast · filters in the index</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:2%;right:2%;top:14px;bottom:14px">
+    <div class="dh"><h4>Review &amp; merge forecast</h4><span class="x">×</span></div>
+    <div style="display:grid;grid-template-columns:170px 1fr;flex:1;min-height:0">
+     <div style="border-right:1px solid var(--line);padding:12px;background:var(--soft);font-size:12.5px;font-weight:600">
+      <p class="cap">Show</p><div style="padding:5px 8px;border-radius:7px;background:var(--navy-tint);color:var(--navy-text)">All · 12</div><div style="padding:5px 8px;color:var(--mut)">Conflicts · 3</div><div style="padding:5px 8px;color:var(--mut)">New missions · 2</div><div style="padding:5px 8px;color:var(--mut)">Unchanged · 4</div>
+      <p class="cap" style="margin-top:12px">Day</p><div style="padding:5px 8px;color:var(--mut)">Tue 14</div><div style="padding:5px 8px;color:var(--mut)">Wed 15</div></div>
+     <div class="db"><table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
+      <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14</td><td>Somchai, Malee, Wichai…</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+      <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+      <tr class="chg"><td>BANGN.26.0003</td><td>Amata Plt 2</td><td>Wed 15</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr></tbody></table></div></div>
+    <div class="df"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
+   </div></div></div>
+ <div class="frame phone"><p class="cap">Phone · sticky section tabs</p>
+  <div class="stage ph"><div class="dlg" style="inset:0;border-radius:0">
+    <div class="dh" style="padding:12px"><span class="x">‹</span><h4 style="font-size:15px">Edit Employee</h4></div>
+    <div class="tabs" style="padding:0 8px;overflow:hidden"><span class="on">Identity</span><span>Contract</span><span>Placement</span></div>
+    <div class="db" style="padding:12px"><label class="fld">Thai name <span class="req">*</span><span class="in" style="height:40px">สมชาย ใจดี</span></label><label class="fld">English name<span class="in" style="height:40px">Somchai Jaidee</span></label><label class="fld">TRIGO ID<span class="in" style="height:40px">T329</span></label></div>
+    <div class="df" style="padding:10px 12px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Save</span></div>
+   </div></div></div>
+</div>
+<ul class="pc"><li><b>+</b> Best for the heaviest dialogs (employee, user, bulk, review). The live preview ties a form to what shows on the board.</li>
+<li><b>−</b> The most work: every form needs sections and a preview component. Overkill for 5-field forms (host, board, area), which would still use a smaller dialog, so you end up with two patterns.</li></ul>
+</section>
+
+<!-- ========================= D ========================= -->
+<section class="dir" id="d">
+<h2 style="margin-top:6px"><span class="badge">D</span>Adaptive hybrid: right size per job, bottom sheet on a phone <span class="tag ok">Recommended</span></h2>
+<p><b>Idea:</b> A's size tiers, plus two things A lacks: review/bulk dialogs get an <b>expand to full screen</b> button (and open full-screen by default under 1200 px), and on a phone every dialog becomes a <b>bottom sheet</b> (confirm and short forms, ~70% height) or a <b>full-screen page</b> (tall forms and tables), with a sticky action bar that respects the safe area. Long forms get light section headings (as in B), but no side index.</p>
+<div class="frames">
+ <div class="frame"><p class="cap">Edit Employee · M tier, 760 px, sectioned</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:50%;top:18px;bottom:18px;width:760px;margin-left:-380px">
+    <div class="dh"><h4>Edit Employee<small>สมชาย ใจดี · T329</small></h4><span class="x" title="Expand">⤢</span><span class="x">×</span></div>
+    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Edit Employee</span></div>
+    <div class="db">
+     <div class="sec">Who</div>
+     <div class="g3"><label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label><label class="fld">English name<span class="in">Somchai Jaidee</span></label><label class="fld">TRIGO ID<span class="in">T329</span></label></div>
+     <div class="sec">Contract</div>
+     <div class="g3"><label class="fld">Contract type<span class="in">Permanent</span></label><label class="fld">Position<span class="in">Senior Inspector</span></label><label class="fld">Mobile<span class="in">081-234-5678</span></label>
+      <label class="fld">Start date<span class="in">12 Mar 2023</span></label><label class="fld">On the board from<span class="in">1 Apr 2023</span></label></div>
+     <div class="sec">Where</div>
+     <div class="g3"><label class="fld">Service area<span class="in">Eastern</span></label><label class="fld">Board<span class="in">Board A</span></label></div>
+    </div>
+    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
+   </div></div></div>
+ <div class="frame"><p class="cap">XL tier · Review &amp; merge forecast · full-width with ⤢ toggle</p>
+  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+   <div class="dlg" style="left:2%;right:2%;top:14px;bottom:14px">
+    <div class="dh"><h4>Review &amp; merge forecast<small>14–18 Oct · 12 changes, 3 conflicts</small></h4><span class="x" title="Full screen">⤢</span><span class="x">×</span></div>
+    <div class="db"><div class="kpis"><div><b>12</b><span>changes</span></div><div><b>3</b><span>conflicts</span></div><div><b>2</b><span>new missions</span></div></div>
+     <table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Current crew</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
+     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14 Oct</td><td>Somchai, Anan, Wichai, Kanya</td><td>Somchai, Malee, Wichai, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14 Oct</td><td>—</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
+     <tr class="chg"><td>BANGN.26.0003</td><td>Amata City Plt 2</td><td>Wed 15 Oct</td><td>Wichai, Anan, Malee</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr></tbody></table></div>
+    <div class="df"><span class="note" style="margin:0">3 conflicts need a choice</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
+   </div></div></div>
+ <div class="frame phone"><p class="cap">Phone · bottom sheet (short form)</p>
+  <div class="stage ph" style="background:#eef1f4"><div class="bar"><i></i>TRIGO</div><div class="scrim"></div>
+   <div class="dlg" style="left:0;right:0;bottom:0;height:78%;border-radius:16px 16px 0 0">
+    <div style="width:38px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 0"></div>
+    <div class="dh" style="padding:8px 14px 10px"><h4 style="font-size:15px">New Board</h4><span class="x">×</span></div>
+    <div class="db" style="padding:12px 14px"><label class="fld">Board name <span class="req">*</span><span class="in" style="height:40px">Board B</span></label>
+     <p class="cap">Weekend days</p><div><span class="chip on">Sun</span><span class="chip">Mon</span><span class="chip">Tue</span><span class="chip">Wed</span><span class="chip">Thu</span><span class="chip">Fri</span><span class="chip on">Sat</span></div></div>
+    <div class="df" style="padding:10px 14px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Create board</span></div>
+   </div></div></div>
+</div>
+<ul class="pc"><li><b>+</b> Closest to what the code already is (<code>h3</code> header, <code>form</code> body, <code>.modal-actions</code> footer), so most of it lands as CSS plus one <code>data-size</code> attribute per dialog. It covers all 26 dialogs, including the small ones.</li>
+<li><b>+</b> Fixes the phone, which no other direction treats as first-class for every dialog.</li>
+<li><b>−</b> The sectioned form headings need small markup additions to the 4–5 long forms (employee, mission, user, bulk). No live preview (that is C's extra).</li></ul>
+</section>
+
+<!-- ========================= COMPARE ========================= -->
+<h2 id="compare">3 · Comparison</h2>
+<div class="scroll-x"><table class="cmp">
+<thead><tr><th></th><th>A · Size tiers</th><th>B · Side sheet</th><th>C · Workspace</th><th>D · Adaptive hybrid</th></tr></thead>
+<tbody>
+<tr><td><b>Fixes narrow forms</b></td><td>✔ 2 columns at 720</td><td>✔ 640 sheet, full height</td><td>✔✔ 960 + preview</td><td>✔ 3 columns at 760</td></tr>
+<tr><td><b>Fixes wide reviews</b></td><td>✔ XL tier</td><td>✔ 90 vw sheet</td><td>✔ filter index</td><td>✔ XL + full-screen toggle</td></tr>
+<tr><td><b>Phone behaviour</b></td><td>full-screen page</td><td>full-screen sheet</td><td>full-screen + tabs</td><td>bottom sheet or page by height</td></tr>
+<tr><td><b>Board stays visible</b></td><td>no</td><td>yes (right side)</td><td>no</td><td>no</td></tr>
+<tr><td><b>Changes the feel</b></td><td>little</td><td>a lot</td><td>a lot</td><td>moderate</td></tr>
+<tr><td><b>Effort</b></td><td><span class="tag ok">Low</span> CSS + attribute</td><td><span class="tag warn">Medium-high</span> motion, focus, guards</td><td><span class="tag bad">High</span> new components</td><td><span class="tag ok">Low-medium</span> CSS + headings in 4–5 forms</td></tr>
+<tr><td><b>Risk to existing tests</b></td><td>low (ids/selectors kept)</td><td>medium</td><td>high</td><td>low</td></tr>
+</tbody></table></div>
+<div class="callout ok"><b>My recommendation: D.</b> It keeps every id and class the app and the e2e tests already use, covers all 26 dialogs with one rule set, and treats the phone as a first-class case. If you also want to <i>see the board while editing</i>, take D for everything and use B's side sheet only for Employee and Mission. Pick one letter (or a mix) and I'll implement it in <code>styles.css</code>, bring the e2e tests along, and bump the version.</div>
+<p class="note">Not loaded by the app. Sample data only. Colours, type and radii come from <code>styles.css</code> / the TRIGO design system; dark mode follows the system setting.</p>
+</main>
+</body>
+</html>

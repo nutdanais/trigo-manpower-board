@@ -86,3 +86,10 @@ D Guided planner. Each has a desktop frame and a phone frame, and editing a numb
 one mockup updates every gap on the page. A comparison table follows, then a
 recommendation (A now, B's day panel next, C later) and a decision picker. Not
 loaded by the app.
+
+## Modal directions (2026-10-13)
+
+`modal-directions.html` is a standalone page: an audit of all 26 dialogs (17 on the
+default 440 px card), then four directions — A Size tiers, B Side sheet, C Sectioned
+workspace, D Adaptive hybrid (recommended) — each mocked on Edit Employee, Review &
+merge forecast and a phone view, with a comparison table. Not loaded by the app.

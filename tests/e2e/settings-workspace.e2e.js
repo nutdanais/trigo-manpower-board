@@ -267,6 +267,22 @@ async function step(name, fn) {
       await closeDialog();
     });
 
+    await step("Boards: \"+ Board\" in the page header creates a board and the table shows it", async () => {
+      await tab("boards");
+      assert.equal(await p.locator("#btn-add-board-settings").isVisible(), true, "button is on the Boards section");
+      await tab("areas");
+      assert.equal(await p.locator("#btn-add-board-settings").isVisible(), false, "and only there");
+      await tab("boards");
+      const before = await p.locator("#settings-boards tr").count();
+      await p.click("#btn-add-board-settings");
+      await p.waitForSelector("#modal-board:not(.hidden)");
+      await p.fill("#form-board [name=name]", "Board Three");
+      await p.click("#form-board button[type=submit]");
+      await p.waitForFunction((n) => document.querySelectorAll("#settings-boards tr").length === n + 1, before);
+      assert.equal(db.t("boards").some((b) => b.name === "Board Three"), true, "saved");
+      assert.equal(await p.locator("#settings-view").isVisible(), true, "still on the Settings page");
+    });
+
     await step("Engineers: a colour is staged and saved from the page", async () => {
       await tab("engineers");
       const row = p.locator("#settings-engineers tr").nth(0);
