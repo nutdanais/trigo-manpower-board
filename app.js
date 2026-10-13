@@ -2544,20 +2544,23 @@ function renderStats() {
     tile("Standby", s.standby, "standby", s.standby > 0 ? `<span class="st-ico">${icon("alert")}</span>` : "", s.standby > 0,
       "Permanent staff on no mission and no leave") +
     (s.isHoliday ? tile("Holiday", s.onHoliday, "hol") : "") +
-    tile("On-call free", s.oncallAvailable, "free");
+    tile("On-call free", s.oncallAvailable, "free") +
+    // how the day splits, in the tile colours: a quick read of the proportions, never the only carrier of a number
+    `<div class="st-split" aria-hidden="true">${[["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]]
+      .filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
   // Service area is a different cut of the SAME people as Total (the board's roster),
   // so the chips must add up to it: anyone without a known area is counted as
   // "No area" instead of silently dropping out of the sum.
   const roster = rosterEmployees(D().activeBoardId);
   const known = new Set(D().areas.map(a => a.id));
-  const areaChip = (name, n) => `<span class="area-chip" data-area="${escapeHtml(name)}"><b>${n}</b> ${escapeHtml(name)}</span>`;
+  const areaChip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
   let areaHtml = "";
   for (const a of D().areas) {
     const n = roster.filter(e => e.areaId === a.id).length;
-    if (n) areaHtml += areaChip(a.name, n);
+    if (n) areaHtml += areaChip(a.name, n, a.color);
   }
   const noArea = roster.filter(e => !known.has(e.areaId)).length;
-  if (noArea) areaHtml += areaChip("No area", noArea);
+  if (noArea) areaHtml += areaChip("No area", noArea, "");
   areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
 }
 
@@ -4919,7 +4922,48 @@ function openModal(id) {
   backdrop.classList.remove("hidden");
   for (const m of $$(".modal")) m.classList.add("hidden");
   $(id).classList.remove("hidden");
+  syncSegmented($(id));
   if (state.settingsOpen) focusModal($(id));
+}
+
+/* ---------- segmented controls ----------
+   A <select data-seg> (Shift, Contract type) is drawn as a row of buttons. The select
+   stays the source of truth, so the form code reads and writes it exactly as before and
+   the buttons just follow it; it is hidden from sight and from assistive technology. */
+function syncSegmented(root = document) {
+  for (const sel of root.querySelectorAll("select[data-seg]")) {
+    if (!sel._seg) continue;
+    for (const btn of sel._seg.children) btn.setAttribute("aria-pressed", String(btn.dataset.v === sel.value));
+  }
+}
+function initSegmented() {
+  for (const sel of $$("select[data-seg]")) {
+    if (sel._seg) continue;
+    const row = document.createElement("div");
+    row.className = "seg-pick";
+    row.setAttribute("role", "group");
+    const lab = sel.closest("label");
+    row.setAttribute("aria-label", ((lab && lab.childNodes[0] && lab.childNodes[0].textContent) || sel.name || "").trim());
+    for (const o of sel.options) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.v = o.value;
+      btn.textContent = o.textContent;
+      btn.onclick = (ev) => {
+        ev.preventDefault();
+        sel.value = o.value;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        syncSegmented(sel.closest(".modal") || document);
+      };
+      row.appendChild(btn);
+    }
+    sel.classList.add("seg-source");
+    sel.tabIndex = -1;
+    sel.setAttribute("aria-hidden", "true");
+    sel.after(row);
+    sel._seg = row;
+    if (sel.form) sel.form.addEventListener("reset", () => setTimeout(() => syncSegmented(sel.form), 0));
+  }
 }
 let _confirmCancel = null;   // fired if a confirm is dismissed any way other than "Yes"
 
@@ -10028,14 +10072,12 @@ function saveBoard(ev) {
 /* the <head> has a tiny inline script that already applies the saved theme
    before first paint (avoids a flash of the wrong theme); this just keeps
    the toggle button's icon in sync and handles the click. */
-function applyTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-  const btn = $("#btn-theme");
-  if (btn) btn.innerHTML = icon(theme === "dark" ? "sun" : "moon");
+function applyTheme() {
+  // Dark mode is gone: the app is light only. A theme saved by an older version is cleared.
+  document.documentElement.removeAttribute("data-theme");
+  try { localStorage.removeItem("mpm-theme"); } catch (e) { /* storage blocked: nothing to clear */ }
 }
-function initTheme() {
-  applyTheme(localStorage.getItem("mpm-theme") || "light");
-}
+function initTheme() { applyTheme(); }
 
 /* ================= Settings > My account / Users / Roles =================
    User management lives in the Settings modal rather than as a tab of its own:
@@ -10831,6 +10873,7 @@ function wireApp() {
   $("#btn-new-mission").onclick = () => guardEdit(() => openMissionModal(null));
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
+  initSegmented();
   $("#form-employee").onsubmit = saveEmployee;
   $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = deleteMission;
@@ -10879,11 +10922,6 @@ function wireApp() {
   $("#form-add-area").areaColor.oninput = (ev) => { ev.target.parentElement.querySelector("b").textContent = swHex(ev.target.value); };
 
   initTheme();
-  $("#btn-theme").onclick = () => {
-    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    localStorage.setItem("mpm-theme", next);
-    applyTheme(next);
-  };
 
   $("#btn-add-board").onclick = openBoardModal;
   $("#btn-add-board-settings").onclick = openBoardModal;
