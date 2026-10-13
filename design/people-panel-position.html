@@ -1,0 +1,96 @@
+<title>People Panel Position</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: three side-by-side app frames (stacked on phones), each starting the people panel at a different line. Light only, like the app. */
+:root {
+  color-scheme: light;
+  --page: #eef1f4; --panel: #ffffff; --soft: #f6f8fa; --line: #e3e8ee; --border: #d3dae2;
+  --text: #1f2937; --muted: #667085; --navy: #003a66; --green: #a8c855; --hover: #eaf1f8;
+  --warn: #8a4f10; --warn-bg: #fdf7ec; --warn-line: #ebd3a9; --red: #a3271f;
+  --s-asg: #2f6fb3; --s-leave: #c08a1e; --s-standby: #d0342c; --s-oc: #8a94a3;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --r: 6px;
+}
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font: 14px/1.45 var(--font); }
+.page { max-width: 1400px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; font-weight: 650; letter-spacing: -.4px; margin: 0 0 8px; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 72ch; margin: 0 0 26px; text-wrap: pretty; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.opt h2 { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+.letter { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--navy); color: #fff; font-size: 13px; font-weight: 700; }
+.opt p { margin: 0 0 10px; color: var(--muted); font-size: 13px; min-height: 3.6em; }
+.pc { margin: 10px 0 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--muted); display: grid; gap: 4px; }
+.pc li::before { content: "+ "; color: #4d6810; font-weight: 700; }
+.pc li.con::before { content: "− "; color: var(--red); }
+
+/* the mock app, scaled down */
+.app { position: relative; height: 470px; border-radius: 10px; overflow: hidden; background: var(--page); box-shadow: 0 0 0 1px rgba(0,38,70,.08), 0 12px 30px -16px rgba(0,38,70,.4); display: grid; grid-template-columns: minmax(0, 1fr) 150px; grid-template-rows: auto auto auto 1fr; font-size: 10px; }
+.ban { grid-column: 1 / -1; height: 34px; background: var(--navy); border-bottom: 2px solid var(--green); color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 10px; white-space: nowrap; overflow: hidden; }
+.ban b { letter-spacing: 1.5px; font-size: 11px; margin-right: 4px; }
+.ban span { opacity: .8; }
+.ban .pill { border: 1px solid rgba(255,255,255,.45); border-radius: 5px; padding: 2px 6px; opacity: 1; }
+.tb, .st { grid-column: 1; background: var(--panel); display: flex; align-items: center; gap: 5px; padding: 0 10px; white-space: nowrap; overflow: hidden; }
+.tb { height: 32px; border-bottom: 1px solid var(--line); }
+.btn { border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; font-weight: 600; }
+.btn.pri { background: var(--navy); border-color: var(--navy); color: #fff; }
+.st { height: 54px; flex-direction: column; align-items: stretch; justify-content: center; gap: 4px; border-bottom: 1px solid var(--border); }
+.st .nums { display: flex; gap: 12px; }
+.st .nums b { display: block; font-size: 13px; }
+.st .nums .alert { color: var(--red); }
+.bar { display: flex; gap: 1px; height: 4px; border-radius: 2px; overflow: hidden; width: 70%; }
+.bar i { display: block; }
+.board { grid-column: 1; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
+.card { height: 74px; background: var(--panel); border-radius: 6px; border-top: 3px solid var(--s-asg); box-shadow: 0 0 0 1px var(--line); }
+.card:nth-child(2) { border-top-color: #2f9e8f; } .card:nth-child(3) { border-top-color: #c47a2c; height: 96px; } .card:nth-child(4) { border-top-color: #8e6cc0; }
+/* the people panel: its grid row start is what each option changes */
+.pp { grid-column: 2; grid-row: var(--from) / -1; background: var(--panel); border-left: 1px solid var(--border); padding: 8px; display: flex; flex-direction: column; gap: 6px; position: relative; z-index: 1; }
+.pp .srch { border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px; color: var(--muted); }
+.pp h4 { margin: 4px 0 0; font-size: 10px; display: flex; justify-content: space-between; }
+.pp h4 span { background: var(--warn-bg); color: var(--warn); border-radius: 4px; padding: 0 4px; }
+.pp .p { border-radius: 5px; background: var(--soft); box-shadow: inset 0 0 0 1px var(--line); padding: 5px 6px; font-weight: 600; }
+.pp .p small { display: block; color: var(--muted); font-weight: 400; }
+.mark { position: absolute; right: 156px; z-index: 2; transform: translateY(-50%); background: var(--green); color: #1d2c05; font-weight: 700; font-size: 9.5px; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.mark::after { content: ""; position: absolute; right: -5px; top: 50%; transform: translateY(-50%); border: 5px solid transparent; border-right: 0; border-left-color: var(--green); }
+/* option A: the toolbar and stats stretch across, under the panel's top they stop */
+.A .tb, .A .st { grid-column: 1; }
+.B .tb { grid-column: 1 / -1; }
+.C .tb, .C .st { grid-column: 1 / -1; }
+.C .st .nums { gap: 18px; }
+@media (max-width: 980px) { .grid { grid-template-columns: 1fr; } .opt p { min-height: 0; } }
+</style>
+
+<div class="page">
+  <h1>Where the people panel starts</h1>
+  <p class="lead">The panel on the right lists who is free to place: search, area chips, Standby, then Available on-call. Today it starts right under the navy banner (A). B and C start it lower, so the toolbar, or the toolbar and stats, run the full width above it. The green tag marks where the panel begins.</p>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const OPTS = [
+  { id: "A", from: 2, title: "Under the banner (today)", mark: 34,
+    why: "The panel is as tall as it can be. Toolbar and stats stop at the panel's edge.",
+    pros: ["Most room for the Standby and on-call lists", "No change for users"],
+    cons: ["Toolbar and stats get ~264px narrower, so Export and the Names switch wrap on a laptop"] },
+  { id: "B", from: 3, title: "Under the toolbar", mark: 66,
+    why: "The buttons and filters run the full width; the stats and the board sit beside the panel.",
+    pros: ["Row 1 never wraps: New Mission to Export on one line", "The panel lines up with the stats, the numbers it is about"],
+    cons: ["The panel is 32px shorter"] },
+  { id: "C", from: 4, title: "Under the stats", mark: 120,
+    why: "The whole top area runs full width; the panel only sits beside the board.",
+    pros: ["The top area looks the same as on every other tab", "Stats get room for the tiles, the status chips and By area on two lines"],
+    cons: ["The panel loses ~86px of height", "Its search box sits lower, further from the toolbar's filters"] },
+];
+const ban = '<div class="ban"><b>TRIGO</b><span>Overview</span><span>Org Chart</span><span>Manpower</span><span>Host</span><span>Capacity</span><span class="pill">LCB Port ▾</span></div>';
+const tb = '<div class="tb"><span class="btn pri">+ New Mission</span><span class="btn">+ New Employee</span><span class="btn">Filter &amp; sort</span><span style="flex:1"></span><span class="btn">Export</span></div>';
+const st = '<div class="st"><div class="nums"><span>Total<b>106</b></span><span>Assigned<b>89</b></span><span>Leave<b>9</b></span><span class="alert">Standby<b>2</b></span><span>On-call free<b>6</b></span></div>' +
+  '<div class="bar"><i style="flex:89;background:var(--s-asg)"></i><i style="flex:9;background:var(--s-leave)"></i><i style="flex:2;background:var(--s-standby)"></i><i style="flex:6;background:var(--s-oc)"></i></div></div>';
+const board = '<div class="board"><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div></div>';
+const pp = '<div class="pp"><div class="srch">Search employee…</div><h4>Standby <span>2</span></h4><div class="p">Kanokwan S.<small>AMATA</small></div><div class="p">Thanawat P.<small>FTM</small></div><h4>On-call <span style="background:#f2f4f7;color:#4b5563">6</span></h4><div class="p">Siriporn K.<small>AYT</small></div><div class="p">Prasert W.<small>AMATA</small></div></div>';
+document.getElementById("grid").innerHTML = OPTS.map((o) => `
+  <section class="opt">
+    <h2><span class="letter">${o.id}</span>${o.title}</h2>
+    <p>${o.why}</p>
+    <div class="app ${o.id}" style="--from:${o.from}">${ban}${tb}${st}${board}${pp}<span class="mark" style="top:${o.mark}px">Panel starts here</span></div>
+    <ul class="pc">${o.pros.map((x) => `<li>${x}</li>`).join("")}${o.cons.map((x) => `<li class="con">${x}</li>`).join("")}</ul>
+  </section>`).join("");
+</script>

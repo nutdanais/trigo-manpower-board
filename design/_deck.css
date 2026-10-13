@@ -1,0 +1,63 @@
+/* Shared look for the toolbar mockups: the app's tokens, light only. */
+:root {
+  --bg: #eef1f4; --panel: #fff; --border: #d8dde4; --line: #e6eaef; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --brand-green: #a8c855; --bg-soft: #eef1f5; --hover: #eef4fa; --r: 7px;
+  --red: #a3271f; --red-bg: #fef2f2; --red-line: #f0c7c2; --red-dot: #dc2626;
+  --amber: #8a4f10; --amber-bg: #fdf8ef; --amber-line: #e9d3ad; --amber-dot: #f59e0b;
+  --green: #4d6810; --green-bg: #f7faef; --green-line: #cfdcae; --green-dot: #7fa32b;
+  --grey: #4b5563; --grey-bg: #f3f5f8; --grey-line: #dde2e8; --grey-dot: #9aa3ad;
+  --font: "Geist", "Noto Sans Thai", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--font); }
+.page { max-width: 1320px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; letter-spacing: -.4px; margin: 0 0 6px; font-weight: 650; }
+h2 { font-size: 18px; letter-spacing: -.2px; margin: 0 0 4px; font-weight: 650; }
+.lead { color: var(--muted); max-width: 70ch; margin: 0 0 24px; text-wrap: pretty; }
+.frame { background: var(--panel); border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,38,70,.08), 0 10px 28px -14px rgba(0,38,70,.35); }
+/* navy banner, as in the app */
+.nav { display: flex; align-items: center; gap: 4px; height: 54px; padding: 0 18px; background: var(--primary); color: #fff; border-bottom: 2px solid var(--brand-green); overflow-x: auto; }
+.logo { font-weight: 800; letter-spacing: 2px; margin-right: 14px; font-size: 17px; }
+.logo i { color: var(--brand-green); font-style: normal; }
+.ntab { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 0; border-radius: var(--r); background: none; color: rgba(255,255,255,.78); font: 550 13.5px var(--font); cursor: pointer; white-space: nowrap; }
+.ntab:hover { background: rgba(255,255,255,.1); color: #fff; }
+.ntab.on { color: #fff; font-weight: 650; }
+.ntab.on::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -10px; height: 2px; background: var(--brand-green); border-radius: 2px; }
+.nbadge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.nbadge.red { background: #e5484d; color: #fff; }
+.nbadge.amber { background: #f5b544; color: #3b2503; }
+.nright { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.npill { height: 34px; padding: 0 12px; border: 1px solid rgba(255,255,255,.42); border-radius: var(--r); display: inline-flex; align-items: center; font-size: 13.5px; white-space: nowrap; }
+.avatar { width: 32px; height: 32px; border-radius: 9px; background: var(--brand-green); color: #1d2c05; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+/* controls */
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--text); font: 550 13px var(--font); white-space: nowrap; cursor: pointer; transition: background-color .16s, border-color .16s, transform .1s; }
+.btn:hover { background: var(--hover); border-color: #b9c6d3; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, .chip:focus-visible, .ntab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.btn.pri { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.pri:hover { background: #00497f; }
+.btn.quiet { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.quiet:hover { background: var(--hover); color: var(--text); }
+.search { height: 34px; width: 260px; padding: 0 11px; border: 1px solid var(--border); border-radius: var(--r); color: var(--muted); display: inline-flex; align-items: center; font-size: 13px; white-space: nowrap; }
+.seg { display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--r); background: var(--bg-soft); }
+.seg span { height: 30px; padding: 0 11px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--muted); border-radius: 6px; }
+.seg span:first-child { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(8,28,56,.16); }
+/* status chips */
+.chip { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 9px; border: 1px solid var(--grey-line); border-radius: 6px; background: var(--grey-bg); color: var(--grey); font: 600 12.5px var(--font); white-space: nowrap; cursor: pointer; transition: background-color .16s, box-shadow .16s, transform .1s; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--grey-dot); }
+.chip b { font-variant-numeric: tabular-nums; font-weight: 700; }
+.chip:hover { box-shadow: 0 1px 3px rgba(8,28,56,.14); }
+.chip:active { transform: translateY(1px); }
+.chip.red { background: var(--red-bg); border-color: var(--red-line); color: var(--red); } .chip.red::before { background: var(--red-dot); }
+.chip.amber { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber); } .chip.amber::before { background: var(--amber-dot); }
+.chip.green { background: var(--green-bg); border-color: var(--green-line); color: var(--green); } .chip.green::before { background: var(--green-dot); }
+.chip.on { box-shadow: 0 0 0 2px currentColor inset; }
+.stat { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.stat b { color: var(--text); font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.sep { width: 1px; height: 18px; background: var(--line); flex: none; }
+.grow { flex: 1; }
+/* the board picker pill sits after the tabs, as in the app */
+.ntab.npick { order: 9; border: 1px solid rgba(255,255,255,.42); margin-left: 6px; }
+.ntab.npick.on { background: rgba(255,255,255,.16); }
+.ntab.npick.on::after { display: none; }
+.nright { order: 10; }

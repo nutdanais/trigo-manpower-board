@@ -263,15 +263,19 @@ const POSITIONS = {
 /* Overview History: four measures, ONE charted at a time — each on its own
    axis, so Missions (~4) is never squashed flat under Idle (~28). */
 const OV_HISTORY_MEASURES = [
-  { key: "util",     label: "Utilization",    suffix: "%", value: (r) => trendMetricValue("util", r) },
-  { key: "deployed", label: "Deployed / day", suffix: "",  value: (r) => r.assigned },
-  { key: "idle",     label: "Standby / day",     suffix: "",  value: (r) => trendMetricValue("idle", r) },
-  { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions },
+  { key: "util",     label: "Utilization",    suffix: "%", value: (r) => trendMetricValue("util", r),
+    help: "Assigned ÷ (Assigned + Standby), averaged over the working days. People on leave (exchange working day included), on a holiday or on-call and not called in are left out, so a day with no one on Standby reads 100%." },
+  { key: "deployed", label: "Deployed / day", suffix: "",  value: (r) => r.assigned,
+    help: "People on a mission each working day (permanent and on-call), averaged over the range." },
+  { key: "idle",     label: "Standby / day",  suffix: "",  value: (r) => trendMetricValue("idle", r),
+    help: "Permanent people on no mission, no leave and no holiday each working day, the board's Standby, averaged over the range. It is the share Utilization misses. On-call people who were not called in are not idle." },
+  { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions,
+    help: "Missions with at least one person on them each working day, averaged over the range." },
 ];
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
 /* the utilization formula, said once behind an ⓘ (hover / focus) instead of
    printed under two sections */
-const OV_UTIL_INFO = '<span class="ov-info chart-mark" tabindex="0" data-tip-value="Utilization" data-tip-label="deployed ÷ (headcount − leave − holiday − free on-call). Free on-call staff are surge capacity, so they are left out.">i</span>';
+const OV_UTIL_INFO = '<span class="ov-info chart-mark" tabindex="0" data-tip-value="Utilization" data-tip-label="Assigned ÷ (Assigned + Standby): how much of the people really available that day is deployed. People on leave (exchange working day included), on a holiday or on-call and not called in are left out, so 0 Standby reads 100%.">i</span>';
 const HISTORY_SUM_KEYS = ["assigned", "headcount", "leave", "oncallAssigned", "oncallHeadcount", "oncallLeave", "staffedMissions"];
 async function safely(fn) {
   try { await fn(); } catch (e) { toast("Something went wrong: " + (e.message || e), "error"); }
@@ -400,6 +404,7 @@ const state = {
     filters: { contract: [], position: [], service: [], areaId: [], boardId: [], status: [] },
     sortKey: "name",
     sortDir: 1,
+    issue: null,         // a status chip's narrowing: "trigo" | "area" | "en" (active people missing it), or null
     nameView: "th",      // which name the list shows: "th" | "en" | "both" (remembered per device)
     util: null,          // { [empId]: pct } once loaded; null = not fetched yet
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
@@ -1003,6 +1008,9 @@ function render() {
   const planEmpty = board && planIsEmpty(getPlan());
   $("#btn-reset-board").classList.toggle("hidden", fc ? !(planEdit && planEmpty) : !boardEdit);
   $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
+  $("#ov-board-dd").classList.toggle("hidden", !ov || D().boards.length < 2);
+  document.body.classList.toggle("ov-view", ov);
+  placeBoardRow1Tools(board);
   renderStats();
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
   $("#float-pool").classList.toggle("hidden", !board);
@@ -1029,9 +1037,9 @@ function render() {
   }
   renderBoardEmptyState();
   renderPlanBanners();
-  const lock = board ? lockInfo(D().activeBoardId, state.date) : null;
-  $("#readonly-badge").classList.toggle("hidden", !board || !isReadOnly());
-  setIconLabel($("#readonly-badge"), "lock", lock ? `Locked by ${lock.lockedBy}` : "Read-only (past date)");
+  // read-only / locked is part of the date pill beside the date picker now (renderModePill)
+  $("#readonly-badge").classList.add("hidden");
+  renderModePill();
   updateSelectionUI();
   updateUndoButton();
   applySearchHighlight();
@@ -1641,6 +1649,22 @@ function renderTabs() {
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
   }
+  // Board: an ordinary module tab. It opens the board last shown (the toolbar's
+  // board picker then switches between boards, like Overview's).
+  if (can("board") && D().boards.length) {
+  const bt = document.createElement("div");
+  bt.className = "board-tab tab-boardmod" + (!isNonBoardView() ? " active" : "");
+  setIconLabel(bt, "appmark", "Board");   // the app mark (favicon's four squares), outlined
+  bt.onclick = () => {
+    if (!isNonBoardView()) return;
+    clearSelection();
+    let last = null;
+    try { last = localStorage.getItem("manpower.lastBoard"); } catch (e) { /* not remembered */ }
+    D().activeBoardId = (D().boards.find(b => b.id === last) || D().boards[0]).id;
+    refreshAndRender();
+  };
+  el.prepend(bt);
+  }
   if (can("orgchart")) {
   const oc = document.createElement("div");
   oc.className = "board-tab tab-orgchart" + (isOrgChart() ? " active" : "");
@@ -1675,7 +1699,7 @@ function renderTabs() {
   };
   el.appendChild(cp);
   }
-  // The per-board tabs live in the board menu (#board-menu-list) behind one pill,
+  // The boards themselves are listed in the toolbar's board picker (#board-menu-list),
   // so a new board never widens the strip above.
   const list = $("#board-menu-list");
   list.innerHTML = "";
@@ -1685,7 +1709,9 @@ function renderTabs() {
     // these and shows #board-select instead, but keeps Overview / Manpower List
     t.className = "board-tab tab-board tb-item" + (b.id === D().activeBoardId ? " active" : "");
     t.setAttribute("role", "menuitem");
-    t.textContent = b.name;
+    // name + headcount, the same rows as Overview's board menu (no colour key here)
+    t.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: b.name }));
+    t.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(rosterEmployees(b.id).length) }));
     t.title = can("settings", "edit") ? "Click to switch. Double-click to rename." : "Click to switch.";
     t.onclick = () => { closeTopbarMenus(); clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
     t.ondblclick = () => {
@@ -1811,13 +1837,18 @@ function setPoolDrawer(open) {
    "Boards" while an app-wide view (Overview, Manpower, Host…) is showing. Hidden for
    a role that cannot see boards at all. */
 function renderBoardPill() {
+  // the toolbar's board picker: shown on the Board tab only, like Overview's
   const wrap = $("#board-dd");
   const boards = can("board") ? D().boards : [];
-  wrap.classList.toggle("hidden", !boards.length && !can("settings", "edit"));
   const onBoard = !isNonBoardView();
   const cur = boards.find(b => b.id === D().activeBoardId);
-  $("#board-dd-label").textContent = onBoard && cur ? cur.name : "Boards";
-  $("#btn-board-dd").classList.toggle("is-current", !!(onBoard && cur));
+  // computer: only on the Board tab (Overview has its own); phone: always, as the header's board name
+  const phone = !ROW1_TOOLS_MQ.matches;
+  wrap.classList.toggle("hidden", phone ? (!boards.length && !can("settings", "edit")) : (!onBoard || !cur));
+  if (!(onBoard && cur)) { $("#board-dd-label").textContent = "Boards"; $("#board-dd-count").textContent = ""; return; }
+  try { localStorage.setItem("manpower.lastBoard", cur.id); } catch (e) { /* remembering is a courtesy */ }
+  $("#board-dd-label").textContent = cur.name;   // textContent: board names are user data
+  $("#board-dd-count").textContent = rosterEmployees(cur.id).length;
 }
 
 /* Initials + role in the account menu (Sign out lives there). */
@@ -1833,7 +1864,7 @@ function renderUserMenu() {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -1859,6 +1890,20 @@ function wireTopbarMenus() {
   const setBar = () => document.documentElement.style.setProperty("--bar-h", head.offsetHeight + "px");
   setBar();
   if (window.ResizeObserver) new ResizeObserver(setBar).observe(head);
+  // On a board the people panel starts under toolbar row 1 (the buttons run the full
+  // width), and once that row has scrolled away it stops at the banner instead.
+  const row1 = $("#toolbar-row1");
+  let fpRaf = 0;
+  const setFpTop = () => {
+    fpRaf = 0;
+    const top = Math.max(head.offsetHeight, Math.round(row1.getBoundingClientRect().bottom));
+    document.documentElement.style.setProperty("--fp-top", top + "px");
+  };
+  const queueFpTop = () => { if (!fpRaf) fpRaf = requestAnimationFrame(setFpTop); };
+  window.addEventListener("scroll", queueFpTop, { passive: true });
+  window.addEventListener("resize", queueFpTop);
+  if (window.ResizeObserver) new ResizeObserver(queueFpTop).observe(row1);
+  setFpTop();
 }
 
 /* Built from spans rather than one string so the phone header can drop the
@@ -2642,16 +2687,53 @@ function statChip(label, n, color, extraClass) {
   return c;
 }
 
+/* A status chip (layout A, row 2): grey = for information, amber = check it,
+   red = fix it. With onClick it is a button that narrows the page to what it counts. */
+function statusChip(tone, n, label, onClick, title = "") {
+  const c = document.createElement(onClick ? "button" : "span");
+  if (onClick) { c.type = "button"; c.onclick = onClick; }
+  c.className = "status-chip" + (tone ? " sc-" + tone : "") + (onClick ? "" : " sc-static");
+  if (title) c.title = title;
+  c.innerHTML = (n == null ? "" : `<b>${n}</b> `) + escapeHtml(label);
+  return c;
+}
+function statusGroup(bar, chips) {
+  // every tab's chips sit in the same place as the board's: #board-status, before the count
+  const g = $("#board-status");
+  g.innerHTML = "";
+  const list = chips.filter(Boolean);
+  for (const c of list) g.appendChild(c);
+  g.classList.toggle("hidden", !list.length);
+}
+const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+
 function renderStats() {
   const bar = $("#stats-bar");
   const areaBar = $("#area-bar");
   bar.innerHTML = "";
   bar.classList.remove("stats-tiles");
+  $("#board-status").classList.add("hidden");   // the board path below fills and shows it
   areaBar.innerHTML = "";
-  // Overview: no chips — its board selector already carries every headcount
-  if (isOverview()) return;
+  // Overview: the day across every board — same rule as the board tiles
+  if (isOverview()) {
+    let assigned = 0, total = 0, leave = 0, hol = 0, free = 0, standby = 0, unstaffed = 0, standbyBoards = 0;
+    for (const b of ovScopeBoards()) {   // the boards the toolbar's dropdown picked
+      let st; try { st = boardStats(b.id); } catch (e) { continue; }
+      assigned += st.assigned; total += st.total; leave += st.leave; hol += st.onHoliday; free += st.oncallAvailable;
+      standby += st.standby; unstaffed += st.unstaffed; if (st.standby) standbyBoards++;
+    }
+    if (ovScopeBoards().length > 1) bar.appendChild(statChip("Boards", ovScopeBoards().length));
+    bar.appendChild(statChip("Utilization", utilizationPct2(assigned, standby) + "%"));
+    bar.appendChild(statChip("Assigned", assigned));
+    bar.appendChild(statChip("Standby", standby));
+    statusGroup(bar, [
+      standbyBoards ? statusChip("red", null, plural(standbyBoards, "board", "boards") + " with Standby", null, "Boards with permanent people on no mission and no leave") : null,
+      unstaffed ? statusChip("amber", null, plural(unstaffed, "mission", "missions") + " with no crew") : null,
+    ]);
+    return;
+  }
   if (isOrgChart()) {
-    let missions = 0, crew = 0; const engs = new Set();
+    let missions = 0, crew = 0, emptyMissions = 0; const engs = new Set();
     for (const b of D().boards) {
       const plan = (D().plans[b.id] || {})[state.date];
       if (!plan) continue;
@@ -2660,27 +2742,50 @@ function renderStats() {
         missions++;
         if (m.engineerId) engs.add(m.engineerId);
         crew += m.members.length;
+        if (!m.members.length) emptyMissions++;
       }
     }
     bar.appendChild(statChip("Boards", D().boards.length));
     bar.appendChild(statChip("Engineers", engs.size));
     bar.appendChild(statChip("Missions", missions));
     bar.appendChild(statChip("Crew deployed", crew));
+    statusGroup(bar, [emptyMissions ? statusChip("amber", null, plural(emptyMissions, "mission", "missions") + " with no crew") : null]);
     return;
   }
   if (isEmployeeList()) {
-    const permN = D().employees.filter(e => e.contract === "permanent").length;
-    bar.appendChild(statChip("Total employees", D().employees.length));
-    bar.appendChild(statChip("Permanent", permN));
-    bar.appendChild(statChip("On-call", D().employees.length - permN));
-    // per-service-area counts, same idea as a board's #area-bar — its own chip
-    // group right after the ones above, still inside the shared #toolbar row
+    // the board's stats design: a Total lead, tiles that split it, a proportion bar,
+    // and a "By area" line of area-coloured chips that also adds up to Total
+    const emps = D().employees;
+    const permN = emps.filter(e => e.contract === "permanent").length;
+    const inactiveN = emps.filter(e => e.active === false).length;
+    const tileHtml = (label, n, kind, title = "") =>
+      `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"${title ? ` title="${title}"` : ""}><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
+    bar.classList.add("stats-tiles");
+    bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${emps.length}</b></div>` +
+      tileHtml("Permanent", permN, "perm") + tileHtml("On-call", emps.length - permN, "oncall") +
+      tileHtml("Inactive", inactiveN, "inactive", "Counted in Total; not on any board today") +
+      `<div class="st-split" aria-hidden="true">${[["perm", permN], ["oncall", emps.length - permN]].filter(([, n]) => n > 0)
+        .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
     const emplistAreaBar = $("#emplist-area-bar");
-    emplistAreaBar.innerHTML = "";
-    for (const a of D().areas) {
-      const n = D().employees.filter(e => e.areaId === a.id).length;
-      if (n) emplistAreaBar.appendChild(statChip(a.name, n));
-    }
+    const known = new Set(D().areas.map(a => a.id));
+    const chip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    let html = "";
+    for (const a of D().areas) { const n = emps.filter(e => e.areaId === a.id).length; if (n) html += chip(a.name, n, a.color); }
+    const noArea = emps.filter(e => !known.has(e.areaId)).length;
+    if (noArea) html += chip("No area", noArea, "");
+    emplistAreaBar.innerHTML = html ? `<span class="ar-cap">By area</span>${html}` : "";
+    const knownAreas = new Set(D().areas.map(a => a.id));
+    const act = D().employees.filter(e => e.active !== false);
+    const issueChip = (key, tone, n, label) => n ? statusChip(tone, n, label, () => {
+      state.emplist.issue = state.emplist.issue === key ? null : key;
+      renderEmployeeRows(); renderStats();
+    }, state.emplist.issue === key ? "Click again to show everyone" : "Show only these people") : null;
+    statusGroup(bar, [
+      issueChip("trigo", "amber", act.filter(e => !e.trigoId).length, "missing TRIGO ID"),
+      issueChip("area", "amber", act.filter(e => !knownAreas.has(e.areaId)).length, "no service area"),
+      issueChip("en", "", act.filter(e => !(e.nameEn || "").trim()).length, "no English name"),
+    ]);
+    for (const c of $$("#board-status .status-chip")) c.classList.toggle("sc-on", c.title.startsWith("Click again"));
     return;
   }
   if (isCapacity()) {
@@ -2696,10 +2801,32 @@ function renderStats() {
     const rows = allHostRows();
     const withLoc = rows.filter(r => r.location || r.mapUrl).length;
     const staffed = rows.filter(r => r.inspectors.length).length;
-    bar.appendChild(statChip("Hosts", rows.length));
-    bar.appendChild(statChip("With location", withLoc));
-    bar.appendChild(statChip("No location", rows.length - withLoc));
-    bar.appendChild(statChip("Ever staffed", staffed));
+    // the board's stats design: a Total lead, tiles that split it, a proportion bar,
+    // and a "By area" line of area-coloured chips that adds up to Total
+    const archived = rows.filter(r => r.archived).length;
+    const hTile = (label, n, kind, title = "") =>
+      `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"${title ? ` title="${title}"` : ""}><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
+    bar.classList.add("stats-tiles");
+    bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${rows.length}</b></div>` +
+      hTile("With location", withLoc, "perm") + hTile("No location", rows.length - withLoc, "noloc") +
+      hTile("Ever staffed", staffed, "oncall", "Hosts at least one person has ever been deployed to") +
+      hTile("Archived", archived, "inactive", "Counted in Total; kept for history") +
+      `<div class="st-split" aria-hidden="true">${[["perm", withLoc], ["noloc", rows.length - withLoc]].filter(([, n]) => n > 0)
+        .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
+    const hostAreaBar = $("#area-bar");
+    const areaChip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    let areaHtml = "";
+    for (const a of D().areas) { const n = rows.filter(r => r.area && r.area.id === a.id).length; if (n) areaHtml += areaChip(a.name, n, a.color); }
+    const noArea = rows.filter(r => !r.area).length;
+    if (noArea) areaHtml += areaChip("No area", noArea, "");
+    hostAreaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+    const noLoc = rows.filter(r => !r.archived && !(r.location || r.mapUrl)).length;
+    const on = state.hostlist.filters.location.length === 1 && state.hostlist.filters.location[0] === "missing";
+    statusGroup(bar, [noLoc ? statusChip("amber", noLoc, "without a location", () => {
+      state.hostlist.filters.location = on ? [] : ["missing"];
+      renderHostlistFilterOptions(); renderHostRows(); renderStats();
+    }, on ? "Click again to show every host" : "Show only active hosts with no location or Maps link") : null]);
+    if (on) $("#board-status .status-chip").classList.add("sc-on");
     return;
   }
   const s = boardStats(D().activeBoardId);
@@ -2713,9 +2840,20 @@ function renderStats() {
     `<div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div>${extra}</div>`;
   const shift = `<div class="st-shift"><span data-stat="Day">${icon("sun")}<b>${s.dayMissions}</b> Day</span>` +
     `<span data-stat="Night">${icon("moon")}<b>${s.nightMissions}</b> Night</span></div>`;
+  // Utilization = Assigned ÷ (Assigned + Standby): people on leave (exchange
+  // working day included), on a holiday or on-call and not called in are left out,
+  // so the missing share is exactly Standby and 0 Standby reads 100%.
+  const util = utilizationPct2(s.assigned, s.standby);
+  const utilLine = `<span class="st-pct" data-stat="Utilized" title="Assigned ÷ (Assigned + Standby). People on leave, on a holiday or on-call and not called in are left out.">${util}% utilized</span>`;
+  // Status chips: what needs a look, beside the numbers. Standby has no chip — its tile already flags it.
+  const plan = peekPlan(D().activeBoardId);
+  const hiddenN = plan.missions.filter(m => m.hidden).length;
+  const statusChips =
+    (s.unstaffed ? `<button type="button" class="status-chip sc-amber" data-status="unstaffed" title="Show the first mission with nobody on it"><b>${s.unstaffed}</b> ${s.unstaffed === 1 ? "mission" : "missions"} with no crew</button>` : "") +
+    (hiddenN ? `<button type="button" class="status-chip" data-status="hidden" title="Open Hide/Unhide"><b>${hiddenN}</b> ${hiddenN === 1 ? "mission" : "missions"} hidden</button>` : "");
   bar.classList.add("stats-tiles");
   bar.innerHTML = lead +
-    tile("Assigned", s.assigned, "asg", shift) +
+    tile("Assigned", s.assigned, "asg", shift).replace(/<b>(\d+)<\/b><\/div>/, (m0, n) => `<span class="st-num"><b>${n}</b>${utilLine}</span></div>`) +
     tile("Leave", s.leave, "leave") +
     tile("Standby", s.standby, "standby", s.standby > 0 ? `<span class="st-ico">${icon("alert")}</span>` : "", s.standby > 0,
       "Permanent staff on no mission and no leave") +
@@ -2724,6 +2862,19 @@ function renderStats() {
     // how the day splits, in the tile colours: a quick read of the proportions, never the only carrier of a number
     `<div class="st-split" aria-hidden="true">${[["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]]
       .filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
+  const statusBox = $("#board-status");
+  statusBox.innerHTML = statusChips;
+  statusBox.classList.toggle("hidden", !statusChips);
+  const firstEmpty = statusBox.querySelector('[data-status="unstaffed"]');
+  if (firstEmpty) firstEmpty.onclick = () => {
+    const m = plan.missions.find(x => !x.hidden && !x.members.length);
+    const card = m && document.querySelector(`.mission-card[data-mission-id="${CSS.escape(String(m.id))}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("flash-outline"); void card.offsetWidth; card.classList.add("flash-outline");
+  };
+  const hiddenBtn = statusBox.querySelector('[data-status="hidden"]');
+  if (hiddenBtn) hiddenBtn.onclick = () => $("#btn-hide-missions").click();
   // Service area is a different cut of the SAME people as Total (the board's roster),
   // so the chips must add up to it: anyone without a known area is counted as
   // "No area" instead of silently dropping out of the sum.
@@ -3027,34 +3178,32 @@ function ovScopeBoards() {
 }
 const ovScopeName = (boards) => boards.length === 1 && D().boards.length > 1 ? boards[0].name : "all boards";
 
-/* The selector itself: one pill per board plus "All boards", each with its
-   roster count for the date on screen. Pills rather than a <select> — with a
-   handful of boards every choice is visible and one tap away; past that the
-   row scrolls sideways on its own (styles.css) instead of wrapping into a wall. */
-function ovScopeBar(scope) {
-  const bar = document.createElement("div");
-  bar.className = "ov-scope-bar";
-  bar.setAttribute("role", "group");
-  bar.setAttribute("aria-label", "Board shown on the dashboard");
-  bar.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-label", textContent: "Board" }));
-  const pills = document.createElement("div");
-  pills.className = "ov-scope-pills";
-  const current = scope.length === 1 ? scope[0].id : "";
-  const pill = (id, label, count, color) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "ov-scope-pill" + (id === current ? " active" : "");
-    btn.setAttribute("aria-pressed", id === current ? "true" : "false");
-    if (color) btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-table-dot" })).style.background = color;
-    btn.appendChild(document.createTextNode(label));   // board names are user data — never innerHTML
-    btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-count", textContent: String(count) }));
-    btn.onclick = () => { if (id !== current) setOvBoard(id); };
-    pills.appendChild(btn);
+/* The toolbar's board dropdown on Overview: "All boards" and each board, with its
+   roster count for the date on screen. It lives in toolbar row 1, which stays in
+   view while the dashboard scrolls, so the board being shown is always visible. */
+function fillOvBoardSelect(scope) {
+  // the same button + menu as the banner's Boards picker and the Filters popover
+  const current = scope.length === 1 && D().boards.length > 1 ? scope[0].id : "";
+  const btn = $("#btn-ov-board"), menu = $("#ov-board-menu");
+  const all = D().employees.filter(onRoster).length;
+  const pickedBoard = D().boards.find(b => b.id === current);
+  const label = btn.querySelector(".ovb-label");
+  label.textContent = pickedBoard ? pickedBoard.name : "All boards";   // textContent: board names are user data
+  btn.querySelector(".ovb-count").textContent = pickedBoard ? rosterEmployees(pickedBoard.id).length : all;
+  menu.innerHTML = "";
+  // the same rows as the Board tab's picker: name and headcount, no colour key
+  const item = (id, name, count) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tb-item" + (id === current ? " is-current" : "");
+    b.setAttribute("aria-current", id === current ? "true" : "false");
+    b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: name }));
+    b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(count) }));
+    b.onclick = () => { closeTopbarMenus(); if (id !== current) setOvBoard(id); };
+    menu.appendChild(b);
   };
-  pill("", "All boards", D().employees.filter(onRoster).length);
-  D().boards.forEach((b, i) => pill(b.id, b.name, rosterEmployees(b.id).length, Charts.catColor(i)));
-  bar.appendChild(pills);
-  return bar;
+  item("", "All boards", all);
+  for (const b of D().boards) item(b.id, b.name, rosterEmployees(b.id).length);
 }
 /* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
    works carries no information, so it's dropped from the axis entirely
@@ -3211,10 +3360,14 @@ function historySection(dates, recs, pendingCharts) {
     btn.innerHTML = `<span class="ov-htile-label">${m.label}</span>
       <span class="ov-htile-value">${mean == null ? "—" : mean + m.suffix}<small> avg</small></span>
       <span class="ov-htile-sub">${latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}`}</span>`;
+    btn.title = m.help;
     btn.onclick = () => { if (ov.historyMeasure !== m.key) { ov.historyMeasure = m.key; render(); } };
     tiles.appendChild(btn);
   }
   sec.appendChild(tiles);
+  // what the tile being charted means, in plain words, right under the tiles
+  const picked = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
+  sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help", textContent: `${picked.label}: ${picked.help}` }));
 
   const m = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
   const values = recs.map(r => (r ? m.value(r) : null));
@@ -3603,15 +3756,15 @@ function renderOverview() {
       const crewMax = Math.max(1, ...rows.map(x => x.crew));
       const wrap = document.createElement("div");
       wrap.className = "ov-table-wrap";
-      wrap.innerHTML = `<table class="ov-table"><thead><tr><th>Engineer</th><th class="r">Missions</th><th class="r">Crew</th></tr></thead><tbody>`
+      wrap.innerHTML = `<table class="ov-table"><thead><tr><th>Engineer</th><th class="ov-mcell"><span class="ov-mgrid"><span>Missions</span><span class="ov-mtags"></span></span></th><th class="r">Crew</th></tr></thead><tbody>`
         + rows.map((x, i) => `<tr class="${x.e ? "ov-row-click" : ""}" data-i="${i}" ${x.e ? 'tabindex="0"' : ""}>
           <td><span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${escapeHtml(x.e ? x.e.color : "var(--muted)")}"></span>
             <span class="ov-table-label">${escapeHtml(x.e ? x.e.name : (x.id ? "Removed engineer" : "— no engineer set —"))}<small>${escapeHtml([...x.r.boards.values()].join(" · "))}</small></span></span></td>
-          <td class="r"><b>${x.missions}</b> ${x.r.day ? `<span class="ov-shift-tag day">D ${x.r.day}</span>` : ""}${x.r.night ? `<span class="ov-shift-tag night">N ${x.r.night}</span>` : ""}</td>
+          <td class="ov-mcell"><span class="ov-mgrid"><b>${x.missions}</b><span class="ov-mtags">${x.r.day ? `<span class="ov-shift-tag day">D ${x.r.day}</span>` : ""}${x.r.night ? `<span class="ov-shift-tag night">N ${x.r.night}</span>` : ""}</span></span></td>
           <td class="r"><span class="ov-crewcell"><span class="ov-crewbar" style="width:${Math.max(12, (x.crew / crewMax) * 100)}px">${Charts.stackedBarH({ segments: [
               { label: "permanent", value: x.r.perm, color: "var(--chart-permanent)" }, { label: "on-call", value: x.r.oncall, color: "var(--chart-oncall)" }], height: 8 })}</span><b>${x.crew}</b></span>
             <span class="ov-rk-sub">${x.r.perm} permanent${x.r.oncall ? ` · ${x.r.oncall} on-call` : ""}</span></td></tr>`).join("")
-        + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td class="r"><b>${totalMissions}</b></td><td class="r"><b>${rows.reduce((s, x) => s + x.crew, 0)}</b></td></tr></tbody></table>`;
+        + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td class="ov-mcell"><span class="ov-mgrid"><b>${totalMissions}</b><span class="ov-mtags"></span></span></td><td class="r"><b>${rows.reduce((s, x) => s + x.crew, 0)}</b></td></tr></tbody></table>`;
       // open the first in-scope board this engineer has a mission on, with the
       // board's Engineer filter set to them
       wrap.querySelectorAll("tr.ov-row-click").forEach(tr => {
@@ -3673,7 +3826,7 @@ function renderOverview() {
     shiftSec.insertAdjacentHTML("beforeend", `<div class="ov-daynight-tiles">
       <div class="ov-daynight-tile"><div class="ov-daynight-num"><span class="num">${totalDayCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip day">DAY</span></div>
         <div class="ov-daynight-sub">on ${plural(todaysDayCount, "mission", "missions")} · ${Math.round((totalDayCrew / crewAll) * 100)}% of today's crew</div></div>
-      <div class="ov-daynight-tile"><div class="ov-daynight-num"><span class="num">${totalNightCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip night">NIGHT</span></div>
+      <div class="ov-daynight-tile ov-dn-night"><div class="ov-daynight-num"><span class="num">${totalNightCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip night">NIGHT</span></div>
         <div class="ov-daynight-sub">on ${plural(todaysNightCount, "mission", "missions")} · ${Math.round((totalNightCrew / crewAll) * 100)}% of today's crew</div></div></div>`);
     if (boards.length > 1) {
       const max = Math.max(1, ...boards.map(b => stats[b.id].dayMissions + stats[b.id].nightMissions));
@@ -3771,7 +3924,7 @@ function renderOverview() {
     resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
     const histDates = historyDates(boards);
     const histRecs = histDates.map(d => historyDayRec(d, boards, state.overview.history || {}));
-    panel.appendChild(ovGroupHead("Over time", `${historyRangeCaption(histDates)}`));
+    panel.appendChild(ovGroupHead("Period", `${historyRangeCaption(histDates)}`));
     panel.appendChild(historySection(histDates, histRecs, pendingCharts));
     panel.appendChild(engineerHistorySection(histDates, histRecs));
   }
@@ -3785,16 +3938,7 @@ function renderOverview() {
   // Board selector first, above the attention card. Added last so the
   // empty-page check above still sees only real sections; pointless with a
   // single board, where "All boards" and that board are the same thing.
-  if (allBoards.length > 1) {
-    panel.prepend(ovScopeBar(boards));
-    // on a phone the pill row scrolls sideways: keep the picked board in view
-    // (set on the row itself, not scrollIntoView, which could move the page)
-    const pills = panel.querySelector(".ov-scope-pills");
-    const act = pills.querySelector(".ov-scope-pill.active");
-    if (act && pills.scrollWidth > pills.clientWidth) {
-      pills.scrollLeft = Math.max(0, act.offsetLeft + act.offsetWidth - pills.clientWidth + 8);
-    }
-  }
+  if (allBoards.length > 1) fillOvBoardSelect(boards);
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
@@ -3941,6 +4085,11 @@ function renderEmplistFilterOptions() {
     D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
   $("#emplist-bulk-board").innerHTML = `<option value="">Move to board…</option>` +
     D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
+  // how many of the six filters are on, shown on the "Filters" button
+  const on = Object.values(state.emplist.filters).filter(v => v && v.length).length;
+  $("#emplist-filter-count").textContent = on;
+  $("#emplist-filter-count").classList.toggle("hidden", !on);
+  $("#btn-emplist-filter-pop").classList.toggle("ms-active", on > 0);
 }
 
 /* Manpower List name display: the Thai name (the app's default), the English name, or both.
@@ -3968,6 +4117,8 @@ function emplistFilteredSorted() {
     if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
     if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
+    const issue = state.emplist.issue;   // a status chip narrowing the list to active people missing one thing
+    if (issue && (e.active === false || (issue === "trigo" ? e.trigoId : issue === "en" ? (e.nameEn || "").trim() : D().areas.some(a => a.id === e.areaId)))) return false;
     if (q && !e.name.toLowerCase().includes(q) && !(e.nameEn || "").toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q) && !(e.trigoId || "").toLowerCase().includes(q)) return false;
     return true;
   });
@@ -7160,6 +7311,48 @@ function setXlsxTicks(on) {
   updateXlsxCount();
 }
 
+/* Layout A (computer widths): row 1 ends with the tab's tools and Export at the
+   right edge. On a board that is Names → Undo → Reset → Export; on the lists,
+   Bulk edit → Export. Phones (where row 1 folds into the More dropdown) keep
+   them in #toolbar-right. */
+const ROW1_TOOLS_MQ = window.matchMedia("(min-width: 641px)");
+function placeBoardRow1Tools(board) {
+  placeBoardPicker();
+  const end = $("#row1-end"), right = $("#toolbar-right");
+  const names = $("#card-names"), seg = names._seg, exp = $("#btn-export");
+  const bulk = [$("#btn-emplist-bulk"), $("#btn-hostlist-bulk")];
+  const wide = ROW1_TOOLS_MQ.matches;
+  // layout A: row 1 ends with the tab's tools and Export, on every tab
+  if (board && wide) {
+    if (names.parentNode !== end) { end.prepend(names); if (seg) names.after(seg); }
+  } else if (names.parentNode !== right) {
+    right.insertBefore(names, $("#readonly-badge"));
+    if (seg) names.after(seg);
+  }
+  const home = wide ? end : right;
+  for (const b of bulk) if (b.parentNode !== home) home.append(b);
+  if (home.lastElementChild !== exp) home.append(exp);
+  // Overview and Org Chart have no row-1 controls but Export: one row, numbers left, Export right
+  document.body.classList.toggle("toolbar-one-row", wide && (isOverview() || isOrgChart()));
+}
+/* The board picker and the date pill: on a computer the picker leads toolbar row 1
+   (like Overview's) and the pill sits beside the date picker; on a phone both stay
+   on header line 1 next to the date, as the phone layout has them. */
+function placeBoardPicker() {
+  const dd = $("#board-dd"), pill = $("#mode-pill"), hol = $("#m-hol-pill");
+  if (ROW1_TOOLS_MQ.matches) {
+    const row1 = $("#toolbar-row1");
+    if (dd.parentNode !== row1) row1.prepend(dd);
+    const nav = document.querySelector("#topbar .date-nav");
+    if (pill.nextElementSibling !== hol || hol.nextElementSibling !== nav) { nav.before(pill); nav.before(hol); }
+  } else {
+    const right = document.querySelector("#topbar .topbar-right");
+    if (dd.parentNode !== right.parentNode) right.before(dd);
+    if (pill.previousElementSibling !== dd) { dd.after(pill); pill.after(hol); }
+  }
+}
+ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.body.classList.contains("board-view")); });
+
 /* ---------- the one Export button ----------
    Every tab has the same Export button at the right edge of the toolbar. It
    opens that tab's export dialog, which starts with the file type: JPG, PDF
@@ -7976,18 +8169,34 @@ function nextWorkingDates(boardId, after, n) {
 }
 
 /* ---------- mode pill ---------- */
+/* One pill beside the date picker says what the date on screen is:
+   Confirmed, Confirmed · Read-only (today or a past date), Confirmed · Locked, or Forecast.
+   Without forward planning there is no confirmed / forecast split, so the pill
+   only appears for a read-only or locked day. */
 function renderModePill() {
   const hol = $("#m-hol-pill");
   if (hol) hol.classList.toggle("hidden", isNonBoardView() || !isNonWorkingDate(state.date));
   const pill = $("#mode-pill");
-  const show = !isNonBoardView() && !!D().activeBoardId && !!feat().forecast && can("board");
-  if (!show) { pill.className = "mode-pill hidden"; return; }
-  const fc = isForecastView();
-  const end = horizonEndFor(D().activeBoardId);
-  pill.className = "mode-pill " + (fc ? "mode-forecast" : "mode-confirmed");
-  pill.textContent = fc ? "FORECAST" : "CONFIRMED";
-  pill.title = (fc ? "Tentative plan — never exported, never in the Host Record. " : "The operational plan. ") +
-    `Confirmed plans run up to ${fmtShort(end)} (the next working day); every later date opens as a forecast.`;
+  const onBoard = !isNonBoardView() && !!D().activeBoardId && can("board");
+  if (!onBoard) { pill.className = "mode-pill hidden"; return; }
+  const planning = !!feat().forecast;
+  const fc = planning && isForecastView();
+  const lock = lockInfo(D().activeBoardId, state.date);
+  const ro = !fc && isReadOnly();
+  if (!planning && !ro) { pill.className = "mode-pill hidden"; return; }
+  const state2 = fc ? "forecast" : ro ? (lock ? "locked" : "readonly") : "confirmed";
+  pill.className = "mode-pill mode-" + (fc ? "forecast" : "confirmed") + (ro ? " mode-ro" : "");
+  pill.dataset.state = state2;
+  const main = planning ? (fc ? "Forecast" : "Confirmed") : "";
+  const extra = state2 === "locked" ? "Locked" : state2 === "readonly" ? "Read-only" : "";
+  // the second part (· Read-only / · Locked) drops on a phone, where the lock icon carries it
+  pill.innerHTML = (ro ? icon("lock") : "") + (main ? `<span>${escapeHtml(main)}</span>` : "") +
+    (extra ? `<span class="mp-extra">${main ? "· " : ""}${escapeHtml(extra)}</span>` : "");
+  const end = planning ? horizonEndFor(D().activeBoardId) : null;
+  pill.title = (fc ? "Tentative plan — never exported, never in the Host Record. " : planning ? "The operational plan. " : "") +
+    (state2 === "locked" ? `Locked by ${lock.lockedBy}: view-only for everyone until someone unlocks it. ` : "") +
+    (state2 === "readonly" ? "Today or a past date: view-only (editing asks first). " : "") +
+    (planning ? `Confirmed plans run up to ${fmtShort(end)} (the next working day); every later date opens as a forecast.` : "");
 }
 
 /* ---------- lost holds (D3) ---------- */

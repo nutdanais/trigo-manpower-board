@@ -4,7 +4,7 @@
        plus one pill per board, and picking a board scopes every section
        (attention card, KPIs, By board, the day's cards and History);
      - the page reads summary -> "In detail" (By engineer | By service area,
-       Shifts | Host coverage) -> "Over time" (History, Engineer workload);
+       Shifts | Host coverage) -> "Period" (History, Engineer workload);
      - the idle names follow the "Action queue" permission, and Engineer
        workload ranks engineers with missions and crew in one table;
      - a newcomer who later works a host leaves a past day's Host coverage risk
@@ -49,24 +49,26 @@ async function step(name, fn) {
     const OVERVIEW = await p.evaluate(() => OVERVIEW_ID);
     const go = (d) => p.evaluate(([x, ov]) => { state.date = x; D().activeBoardId = ov; return refreshAndRender(); }, [d, OVERVIEW]);
 
-    await step("the selector comes first, above the attention card, with All boards and every board", async () => {
+    await step("the board dropdown leads the toolbar (which stays in view), with All boards and every board", async () => {
       await go(SRC);
       const first = await p.evaluate(() => document.querySelector("#overview-panel").firstElementChild.className);
-      assert.equal(first, "ov-scope-bar");
-      const second = await p.evaluate(() => document.querySelector("#overview-panel").children[1].className);
-      assert.match(second, /^ov-attn/);
-      assert.equal(await p.evaluate(() => document.querySelector("#stats-bar").children.length), 0, "no chip strip on Overview: the pills carry the counts");
-      const pills = await p.$$eval(".ov-scope-pill", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-pressed")]));
-      assert.deepEqual(pills, [["All boards10", "true"], ["Board One8", "false"], ["Board Two2", "false"]]);
+      assert.match(first, /^ov-attn/, "the dashboard starts with the attention card");
+      assert.equal(await p.isVisible("#btn-ov-board"), true);
+      assert.equal(await p.evaluate(() => getComputedStyle(document.getElementById("toolbar")).position), "sticky");
+      assert.equal(await p.locator("#stats-bar .stat-tile").count(), 0, "Overview row 2 is a plain summary line, not the board tiles");
+      await p.click("#btn-ov-board");
+      const opts = await p.$$eval("#ov-board-menu .tb-item", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-current")]));
+      assert.deepEqual(opts, [["All boards10", "true"], ["Board One8", "false"], ["Board Two2", "false"]]);
+      await p.click("#btn-ov-board");
     });
 
-    await step("the page reads summary, then In detail, then Over time", async () => {
+    await step("the page reads summary, then In detail, then Period", async () => {
       const order = await p.evaluate(() => [...document.querySelector("#overview-panel").children].map((c) =>
         c.classList.contains("ov-group-head") ? "head:" + c.querySelector("h2").textContent
           : c.classList.contains("ov-detail-grid") ? "detail-cards"
           : c.querySelector("h3") ? c.querySelector("h3").firstChild.textContent.trim() : c.className.split(" ")[0]));
-      assert.deepEqual(order, ["ov-scope-bar", "ov-attn", "ov-kpi-row", "By board",
-        "head:In detail", "detail-cards", "head:Over time", "History", "Engineer workload"]);
+      assert.deepEqual(order, ["ov-attn", "ov-kpi-row", "By board",
+        "head:In detail", "detail-cards", "head:Period", "History", "Engineer workload"]);
       const cards = await p.$$eval(".ov-detail-grid > .ov-section > h3", (els) => els.map((e) => e.textContent));
       assert.deepEqual(cards, ["By engineer", "By service area", "Shifts", "Host coverage"]);
     });
@@ -93,8 +95,9 @@ async function step(name, fn) {
     });
 
     await step("picking a board scopes every section, and is remembered", async () => {
-      await p.click(".ov-scope-pill:has-text('Board Two')");
-      await p.waitForSelector(".ov-scope-pill.active:has-text('Board Two')");
+      await p.click("#btn-ov-board");
+      await p.click("#ov-board-menu .tb-item:has-text('Board Two')");
+      await p.waitForFunction(() => /Board Two/.test(document.querySelector("#btn-ov-board").textContent) && /Board Two/.test(document.querySelector(".ov-attn-sub").textContent));
       const view = await p.evaluate(() => ({
         title: document.querySelector(".ov-attn-title").textContent.trim(),
         sub: document.querySelector(".ov-attn-sub").textContent,
@@ -113,8 +116,9 @@ async function step(name, fn) {
       assert.match(view.overTime, /Board Two/);
       assert.equal(view.historySelect, 0, "History has no board select of its own any more");
       assert.equal(view.saved, "b2");
-      await p.click(".ov-scope-pill:has-text('All boards')");
-      await p.waitForSelector(".ov-scope-pill.active:has-text('All boards')");
+      await p.click("#btn-ov-board");
+      await p.click("#ov-board-menu .tb-item:has-text('All boards')");
+      await p.waitForFunction(() => /All boards/.test(document.querySelector("#btn-ov-board").textContent));
       assert.equal(await p.evaluate(() => localStorage.getItem("manpower.ovBoard")), "");
     });
 

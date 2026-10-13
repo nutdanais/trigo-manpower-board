@@ -134,7 +134,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       await gotoDate(pa, F);
 
       await step("C1: a date beyond the horizon opens in Forecast mode — no export, no PDF, no lock", async () => {
-        assert.equal((await pa.textContent("#mode-pill")).trim(), "FORECAST");
+        assert.equal((await pa.textContent("#mode-pill")).trim(), "Forecast");
         assert.ok(await pa.evaluate(() => document.body.classList.contains("forecast-mode")));
         for (const sel of ["#btn-export", "#btn-lock"]) assert.equal(await pa.isVisible(sel), false, sel + " hidden");
         assert.equal((await pa.textContent("#btn-reset-board")).trim(), "Start from confirmed");

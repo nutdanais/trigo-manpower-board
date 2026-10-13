@@ -75,13 +75,17 @@ const X = require("../../xlsx-export.js");
     assert.equal(await cell("Undated Person", "Years of service"), "—");
     console.log("ok - the Manpower List shows Years of service");
 
+    // the six filters live behind the toolbar's Filters button
+    const openFilters = async () => { if (!(await p.isVisible("#emplist-filter-pop"))) await p.click("#btn-emplist-filter-pop"); };
     const pick = async (key, labels) => {
+      await openFilters();
       await p.click(`#emplist-filters .ms[data-filter=${key}] .ms-btn`);
       for (const l of labels) await p.locator(`#emplist-filters .ms[data-filter=${key}] .ms-opt`, { hasText: l }).locator("input").check();
       await p.click("body", { position: { x: 5, y: 5 } });
     };
     await pick("service", ["Under 1 year"]);
     assert.deepEqual(await rowsText(), ["Person A"]);
+    await openFilters();
     await p.click("#emplist-filters .ms[data-filter=service] .ms-btn");
     await p.locator("#emplist-filters .ms[data-filter=service] .ms-opt", { hasText: "Under 1 year" }).locator("input").uncheck();
     await p.locator("#emplist-filters .ms[data-filter=service] .ms-opt", { hasText: "3 years or more" }).locator("input").check();

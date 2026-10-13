@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Module status chips</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_deck.css">
+<style>
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+  .bar .lbl { font-size: 12.5px; font-weight: 650; color: var(--muted); margin-right: 2px; }
+  .stage { padding: 18px; min-height: 140px; display: grid; gap: 10px; align-content: start; background: #fafbfc; }
+  .result { padding: 12px 14px; border-radius: 10px; background: var(--panel); border: 1px dashed var(--border); color: var(--muted); font-size: 13px; }
+  .result b { color: var(--text); }
+  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 28px 0; }
+  .legend > div { background: var(--panel); border-radius: 10px; padding: 14px 16px; box-shadow: 0 0 0 1px var(--line); }
+  .legend p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; background: #fafbfc; }
+  tr:last-child td { border-bottom: 0; }
+  td.m { font-weight: 650; white-space: nowrap; }
+  .rules { margin: 28px 0 0; padding-left: 18px; color: var(--muted); max-width: 80ch; }
+  .rules li { margin-bottom: 6px; } .rules b { color: var(--text); }
+  @media (max-width: 640px) { .tbl { overflow-x: auto; } table { min-width: 640px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Status chips, one tab at a time</h1>
+  <p class="lead">Click a tab in the navy bar to switch tabs. The badge on a tab is its worst chip, so a problem shows from any tab. Click a chip to see what it does: it narrows the page to the people, missions or days it counts. Click it again to clear. Numbers are made up.</p>
+
+  <div class="frame">
+    <div class="nav" id="nav"></div>
+    <div class="bar" id="bar"></div>
+    <div class="stage" id="stage"></div>
+  </div>
+
+  <div class="legend">
+    <div><span class="chip red"><b>2</b> on Standby</span><p><b>Red: fix it.</b> Something is wrong with today's plan or the next working days. It puts a red badge on the tab.</p></div>
+    <div><span class="chip amber"><b>7</b> missing TRIGO ID</span><p><b>Amber: check it.</b> Not wrong yet, but incomplete or tight. It puts an amber badge on the tab if there is no red.</p></div>
+    <div><span class="chip green">Plan complete</span><p><b>Green: all clear.</b> Shown only when there is no red or amber chip, so a quiet tab still confirms it was checked.</p></div>
+    <div><span class="chip"><b>3</b> missions hidden</span><p><b>Grey: for information.</b> Never a badge. Still clickable when it filters something.</p></div>
+  </div>
+
+  <h2>What each chip counts and does</h2>
+  <p class="lead">A chip with 0 is not shown. At most four chips per tab, worst first.</p>
+  <div class="tbl"><table id="tbl"><thead><tr><th>Tab</th><th>Chip</th><th>Counts</th><th>Click</th></tr></thead><tbody></tbody></table></div>
+
+  <ul class="rules">
+    <li><b>One place.</b> Chips sit at the start of the summary line under the toolbar, before the plain numbers.</li>
+    <li><b>Same shape everywhere.</b> 28px high, 6px square-ish corners, a small square colour key, then the number in bold. No pills.</li>
+    <li><b>Colour is never the only signal.</b> The words always say what is wrong ("on Standby", "short day").</li>
+    <li><b>Live.</b> Chips and badges update with Realtime, like the stats do now.</li>
+    <li><b>Not in exports.</b> Like the banners, chips are for the planner and are left out of JPG, PDF and Excel.</li>
+  </ul>
+</div>
+<script src="_modules-data.js"></script>
+<script>
+  let cur = "board", picked = null;
+  const worst = (m) => (m.chips.find((c) => c.tone === "red") || m.chips.find((c) => c.tone === "amber"));
+  function render() {
+    const m = MODS.find((x) => x.key === cur);
+    document.getElementById("nav").innerHTML = '<span class="logo">TRIGO<i>≡</i></span>' + MODS.map((x) => {
+      const w = worst(x);
+      return `<button class="ntab${x.key === cur ? " on" : ""}${x.key === "board" ? " npick" : ""}" data-k="${x.key}">${x.key === "board" ? "Boards ▾" : x.name}${w ? `<span class="nbadge ${w.tone}">${w.n ?? "!"}</span>` : ""}</button>`;
+    }).join("") + '<div class="nright"><span class="npill">‹ Wed 14-Oct-2026 ›</span><span class="avatar">NS</span></div>';
+    const chips = m.chips.map((c, i) => `<button class="chip ${c.tone}${picked === i ? " on" : ""}" data-i="${i}" title="${c.why}">${c.n != null ? `<b>${c.n}</b> ` : ""}${c.label}</button>`).join("");
+    document.getElementById("bar").innerHTML = `<span class="lbl">${m.name}</span>${chips}<span class="sep"></span>` +
+      m.stats.map(([k, v]) => `<span class="stat">${k} <b>${v}</b></span>`).join('<span class="sep"></span>');
+    const c = picked != null ? m.chips[picked] : null;
+    document.getElementById("stage").innerHTML = c
+      ? `<div class="result"><b>${c.n != null ? c.n + " " : ""}${c.label}</b> — ${c.why}<br>Click → ${c.filter}</div>`
+      : `<div class="result">Click a chip above to see what it does.</div>`;
+    for (const b of document.querySelectorAll(".ntab")) b.onclick = () => { cur = b.dataset.k; picked = null; render(); };
+    for (const b of document.querySelectorAll("#bar .chip")) b.onclick = () => { const i = +b.dataset.i; picked = picked === i ? null : i; render(); };
+  }
+  document.querySelector("#tbl tbody").innerHTML = MODS.map((m) => m.chips.map((c, i) =>
+    `<tr>${i === 0 ? `<td class="m" rowspan="${m.chips.length}">${m.name}</td>` : ""}<td><span class="chip ${c.tone}">${c.n != null ? `<b>${c.n}</b> ` : ""}${c.label}</span></td><td>${c.why}</td><td>${c.filter}</td></tr>`).join("")).join("");
+  render();
+</script>
+</body>
+</html>

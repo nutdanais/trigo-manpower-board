@@ -96,7 +96,8 @@ async function step(name, fn) {
       assert.doesNotMatch(cls, /btn-primary/);
       await p.click(".tab-emplist");
       assert.match(await p.getAttribute("#btn-new-employee", "class"), /\bbtn-primary\b/, "on Manpower it is the only create button, so it stays filled");
-      assert.equal(await p.locator("#stats-bar .stat-chip").first().innerText().then((t) => /Total employees/.test(t)), true, "other tabs keep their chips");
+      assert.match(await p.locator("#stats-bar .stat-lead").innerText(), /Total/, "Manpower uses the board's stats design: a Total lead");
+      assert.deepEqual(await p.$$eval("#stats-bar .stat-tile", (t) => t.map((x) => x.dataset.stat)), ["Permanent", "On-call", "Inactive"]);
       await p.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
     });
 
@@ -119,12 +120,15 @@ async function step(name, fn) {
       await p.evaluate(() => { state.filters.engineer = []; renderFilterOptions(); });
     });
 
-    await step("Undo and Reset Board are pinned to the right edge of row 1", async () => {
+    await step("row 1 ends Names → Undo → Reset Board → Export, Export at the right edge", async () => {
       const row = await p.locator("#toolbar-row1").boundingBox();
-      const reset = await p.locator("#btn-reset-board").boundingBox();
+      const names = await p.locator("#card-names + .seg-pick").boundingBox();
       const undo = await p.locator("#btn-undo").boundingBox();
-      assert.ok(row.x + row.width - (reset.x + reset.width) <= 24, "Reset Board at the right edge");
-      assert.ok(undo.x < reset.x, "Undo then Reset Board");
+      const reset = await p.locator("#btn-reset-board").boundingBox();
+      const exp = await p.locator("#btn-export").boundingBox();
+      assert.ok(row.x + row.width - (exp.x + exp.width) <= 24, "Export at the right edge");
+      assert.ok(names.x < undo.x && undo.x < reset.x && reset.x < exp.x, "Names, Undo, Reset Board, Export");
+      for (const b of [names, undo, reset, exp]) assert.ok(Math.abs((b.y + b.height / 2) - (undo.y + undo.height / 2)) <= 4, "all on one line");
     });
 
     await step("row 1 stays on ONE line at laptop width on an editable future day (Holiday toggle showing)", async () => {
@@ -168,10 +172,23 @@ async function step(name, fn) {
       assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
     });
 
-    await step("Overview still shows no stats", async () => {
+    await step("Overview shows the day across every board in row 2 (layout A), no board tiles or areas", async () => {
       await p.click(".tab-overview");
-      assert.equal(await p.evaluate(() => document.querySelector("#stats-bar").children.length), 0);
+      assert.match(await p.textContent("#stats-bar"), /Boards: \d+.*Utilization: \d+%.*Assigned: \d+.*Standby: \d+/s);
+      assert.equal(await p.locator("#stats-bar .stat-tile").count(), 0);
       assert.equal(await p.evaluate(() => document.querySelector("#area-bar").children.length), 0);
+    });
+
+    await step("Assigned shows utilization as Assigned ÷ (Assigned + Standby), status chips leave Standby out", async () => {
+      await p.evaluate((id) => { D().activeBoardId = id; return refreshAndRender(); }, await p.evaluate(() => D().boards[0].id));
+      const r = await p.evaluate(() => {
+        const s = boardStats(D().activeBoardId);
+        return { s, pct: document.querySelector("#stats-bar .st-pct").textContent, chips: document.querySelector("#board-status").textContent };
+      });
+      // two decimals, trailing zeros dropped (97.85, 98.5, 100)
+      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 10000) / 100 : 0;
+      assert.equal(r.pct, want + "% utilized");
+      assert.ok(!/standby/i.test(r.chips), "no Standby status chip: " + r.chips);
     });
 
     assert.deepEqual(a.errors, [], "no page errors");
