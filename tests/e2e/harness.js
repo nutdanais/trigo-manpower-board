@@ -114,7 +114,9 @@ async function launch() {
     }, user);
     const unsub = db.subscribe((evt) => { page.evaluate((e) => window.__fakeSupabaseEmit && window.__fakeSupabaseEmit(e), evt).catch(() => {}); });
     await page.goto(base);
-    await page.waitForSelector("#board-tabs .board-tab", { timeout: 15000 });
+    // attached, not visible: on a phone-sized viewport the header tabs are hidden
+    // in favour of the bottom bar (styles.css, Phone shell)
+    await page.waitForSelector("#board-tabs .board-tab", { state: "attached", timeout: 15000 });
     const entry = { page, ctx, errors, close: async () => { unsub(); await ctx.close(); } };
     pages.push(entry);
     return entry;

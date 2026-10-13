@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile Redesign Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;600&display=swap">
+<style>
+/* Design collateral, not loaded by the app. Tokens copied from styles.css so the
+   mocks match the real board. Light theme only, like the other design/ pages. */
+:root{
+  color-scheme:light;
+  --bg:#eef1f4; --panel:#fff; --border:#d8dde4; --text:#1f2937; --muted:#6b7280;
+  --primary:#003a66; --primary-dark:#002a4a; --primary-text:#003a66;
+  --green:#a8c855; --green-d:#6e9312; --bg-soft:#eef1f5; --hover-tint:#eef3fb;
+  --ok-surface:#f7faef; --ok-line:#cfdcae; --ok-text:#4d6810;
+  --warn-surface:#fdf8ef; --warn-line:#e0c9a4; --warn-text:#8a4f10;
+  --danger:#dc2626; --danger-surface:#fef2f2; --danger-line:#e6c2be; --danger-text:#a3271f;
+  --stat-asg:#2a78d6; --stat-leave:#b87800; --stat-standby:#cf3a39; --stat-free:#78808a;
+  --emp-bg:#e6e9ec; --emp-perm:#b4bcc4; --emp-oncall:#6b737c;
+  --font:"Noto Sans","Noto Sans Thai",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--font)}
+main{max-width:1280px;margin:0 auto;padding:28px 16px 100px}
+h1{font-size:28px;letter-spacing:-.4px;margin:0 0 6px}
+h2{font-size:21px;letter-spacing:-.2px;margin:52px 0 6px;scroll-margin-top:60px}
+h3{font-size:15px;margin:0 0 4px}
+p{margin:0 0 10px;color:var(--muted);max-width:80ch} p b,li b,td b{color:var(--text)}
+.lede{font-size:15px}
+ul{margin:0 0 10px;padding-left:20px;color:var(--muted)} li{margin:3px 0}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+nav.top{position:sticky;top:0;z-index:40;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+nav.top a{padding:5px 12px;border:1px solid var(--border);border-radius:7px;background:var(--panel);text-decoration:none;font-weight:600;font-size:13px;color:var(--text)}
+nav.top a:hover{border-color:var(--primary-text)}
+.spec{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:8px;font-size:13px;overflow:hidden}
+.spec th,.spec td{padding:8px 11px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.spec th{background:var(--bg-soft);font-weight:600;color:var(--muted);font-size:12px}
+.spec tr:last-child td{border-bottom:none}
+.sev{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11.5px;font-weight:700}
+.sev.h{background:var(--danger-surface);color:var(--danger-text)} .sev.m{background:var(--warn-surface);color:var(--warn-text)} .sev.l{background:var(--bg-soft);color:var(--muted)}
+.tablewrap{overflow-x:auto}
+
+/* ===== direction blocks ===== */
+.dir{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:18px}
+.dir-head{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.dir-tag{font-weight:700;font-size:12px;background:var(--primary);color:#fff;padding:2px 9px;border-radius:5px}
+.dir-head h3{font-size:18px;margin:0}
+.dir-fit{font-size:12.5px;color:var(--ok-text);background:var(--ok-surface);border:1px solid var(--ok-line);padding:1px 8px;border-radius:5px}
+.phones{display:flex;gap:22px;overflow-x:auto;padding:14px 2px 6px;scroll-snap-type:x mandatory}
+.cap{font-size:12px;color:var(--muted);text-align:center;margin-top:8px;max-width:300px}
+.pc{scroll-snap-align:start;flex:none}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:12px}
+.notes div{background:var(--bg-soft);border-radius:8px;padding:10px 12px}
+.notes h4{margin:0 0 4px;font-size:13px}
+.notes ul{margin:0;font-size:13px}
+
+/* ===== phone frame ===== */
+.phone{width:300px;height:620px;border-radius:34px;background:#0f1720;padding:9px;box-shadow:0 18px 40px rgba(0,42,74,.22)}
+.scr{position:relative;width:100%;height:100%;border-radius:26px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;font-size:12px}
+.sb{height:22px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:0 18px;font-size:10.5px;font-weight:700}
+.sb.dark{background:var(--primary);color:#fff}
+.body{flex:1;overflow:hidden;padding:8px 10px;display:flex;flex-direction:column;gap:7px}
+.home{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:92px;height:4px;border-radius:3px;background:#0f1720;opacity:.55}
+
+/* app bars */
+.ab{background:var(--primary);color:#fff;padding:6px 10px 8px;flex:none}
+.ab-row{display:flex;align-items:center;gap:8px}
+.ab .ttl{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:3px}
+.ab .sub{font-size:10.5px;opacity:.75}
+.ab .sp{flex:1}
+.ib{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:inherit;background:rgba(255,255,255,.1)}
+.ib.plain{background:none}
+.av{width:28px;height:28px;border-radius:9px;background:var(--green);color:var(--primary);font-weight:700;font-size:11px;display:grid;place-items:center}
+.datechip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border-radius:9px;padding:4px 6px;font-weight:600;font-size:11.5px}
+.mode{font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:4px;background:var(--green);color:var(--primary)}
+.mode.fc{background:#f4d58d;color:#5b3d00}
+.ab.light{background:var(--panel);color:var(--text);border-bottom:1px solid var(--border)}
+.ab.light .ib{background:var(--bg-soft)}
+
+/* week strip */
+.week{display:flex;gap:4px;margin-top:7px}
+.wd{flex:1;text-align:center;border-radius:9px;padding:3px 0;font-size:9.5px;opacity:.8}
+.wd b{display:block;font-size:13px}
+.wd.on{background:#fff;color:var(--primary);opacity:1}
+.wd.fc{position:relative}
+.wd.fc::after{content:"";position:absolute;bottom:2px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:#f4d58d}
+
+/* chips */
+.chips{display:flex;gap:5px;overflow:hidden;flex:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:4px 9px;font-weight:600;font-size:11px;color:var(--text)}
+.chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.chip.tint{background:var(--hover-tint);border-color:#bcd0e6;color:var(--primary-text)}
+.chip .n{font-variant-numeric:tabular-nums;opacity:.8}
+.chip.sq{border-radius:6px}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;flex:none}
+.st{background:var(--panel);border-radius:9px;padding:5px 6px;border:1px solid var(--border)}
+.st b{display:block;font-size:15px;font-variant-numeric:tabular-nums;line-height:1.1}
+.st span{font-size:9.5px;color:var(--muted)}
+.st.a b{color:var(--stat-asg)} .st.s b{color:var(--stat-standby)} .st.l b{color:var(--stat-leave)} .st.f b{color:var(--stat-free)}
+.statline{display:flex;gap:10px;font-size:11px;color:var(--muted);flex:none;padding:0 2px}
+.statline b{color:var(--text);font-variant-numeric:tabular-nums}
+.statline .short{color:var(--danger-text);font-weight:700}
+
+/* mission cards */
+.mc{background:var(--panel);border-radius:11px;border:1px solid var(--border);overflow:hidden;flex:none}
+.mc-h{display:flex;align-items:center;gap:6px;padding:6px 9px;background:rgba(42,120,214,.12);font-weight:700;font-size:11.5px}
+.mc-h.g{background:rgba(168,200,85,.22)} .mc-h.o{background:rgba(237,161,0,.16)}
+.mc-h .no{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:600}
+.mc-h .sp{flex:1}
+.mc-h .need{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--danger-surface);color:var(--danger-text)}
+.mc-h .ok{font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--ok-surface);color:var(--ok-text)}
+.mc-m{padding:3px 9px 0;font-size:10.5px;color:var(--muted);display:flex;gap:8px}
+.mc-b{display:flex;flex-wrap:wrap;gap:4px;padding:6px 9px 8px}
+.emp{display:inline-flex;align-items:center;gap:4px;background:var(--emp-bg);border:1px solid var(--emp-perm);border-radius:7px;padding:2px 6px 2px 3px;font-size:10.5px;font-weight:600}
+.emp i{width:16px;height:16px;border-radius:5px;background:#9fb3c6;display:inline-block}
+.emp.oc{border-style:dashed;border-color:var(--emp-oncall)}
+.emp.sel{outline:2px solid var(--primary);background:var(--hover-tint)}
+.emp.add{background:none;border:1.5px dashed var(--border);color:var(--primary-text);padding:2px 8px}
+.list{display:flex;flex-direction:column;gap:6px;overflow:hidden}
+
+/* bottom nav */
+.bn{flex:none;display:flex;background:var(--panel);border-top:1px solid var(--border);padding:5px 4px 14px}
+.bn a{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:9.5px;font-weight:600;color:var(--muted);text-decoration:none;cursor:pointer;position:relative}
+.bn a .pill{width:44px;height:24px;border-radius:12px;display:grid;place-items:center}
+.bn a.on{color:var(--primary-text)}
+.bn a.on .pill{background:var(--hover-tint)}
+.bn a .dot{position:absolute;top:0;right:16px;min-width:14px;height:14px;border-radius:7px;background:var(--danger);color:#fff;font-size:8.5px;display:grid;place-items:center;padding:0 3px}
+.bn.navy{background:var(--primary);border-top:none}
+.bn.navy a{color:rgba(255,255,255,.65)} .bn.navy a.on{color:#fff} .bn.navy a.on .pill{background:rgba(168,200,85,.28)}
+.bn .center{flex:1.1}
+.bn .center .fabin{width:44px;height:44px;margin-top:-20px;border-radius:14px;background:var(--green);color:var(--primary);display:grid;place-items:center;box-shadow:0 6px 14px rgba(0,58,102,.3)}
+.bn.bar a.on::before{content:"";position:absolute;top:-5px;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--green)}
+
+/* FAB + bottom bars */
+.fab{position:absolute;right:14px;bottom:76px;height:42px;border-radius:14px;background:var(--green);color:var(--primary);font-weight:700;font-size:12px;display:flex;align-items:center;gap:6px;padding:0 14px 0 11px;box-shadow:0 8px 18px rgba(0,58,102,.28)}
+.peek{position:absolute;left:0;right:0;bottom:62px;background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -6px 18px rgba(0,42,74,.14);padding:5px 12px 9px}
+.grab{width:34px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 6px}
+.peek-row{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700}
+.peek-row .sp{flex:1}
+.selbar{position:absolute;left:10px;right:10px;bottom:72px;background:var(--primary);color:#fff;border-radius:13px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-size:11.5px;box-shadow:0 8px 20px rgba(0,42,74,.35)}
+.selbar .sp{flex:1}
+.selbar .b{background:rgba(255,255,255,.14);border-radius:8px;padding:4px 9px;font-weight:600}
+.selbar .b.g{background:var(--green);color:var(--primary)}
+.toast{position:absolute;left:10px;right:10px;bottom:72px;background:#1c2430;color:#fff;border-radius:11px;padding:8px 11px;display:flex;align-items:center;gap:8px;font-size:11.5px}
+.toast .sp{flex:1} .toast b{color:var(--green)}
+
+/* sheets */
+.scrim{position:absolute;inset:0;background:rgba(15,23,42,.45)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--panel);border-radius:18px 18px 0 0;padding:6px 14px 18px;display:flex;flex-direction:column;gap:8px}
+.sheet h5{margin:0;font-size:14px;display:flex;align-items:center;justify-content:space-between}
+.field{border:1px solid var(--border);border-radius:9px;padding:6px 9px;font-size:11.5px}
+.field small{display:block;font-size:9.5px;color:var(--muted);font-weight:600}
+.seg{display:flex;background:var(--bg-soft);border-radius:9px;padding:2px}
+.seg span{flex:1;text-align:center;padding:4px 0;border-radius:7px;font-weight:600;font-size:11px;color:var(--muted)}
+.seg span.on{background:var(--panel);color:var(--primary-text);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.row2{display:flex;gap:7px}
+.btnm{flex:1;text-align:center;padding:9px 0;border-radius:10px;font-weight:700;font-size:12px;border:1px solid var(--border);background:var(--panel)}
+.btnm.p{background:var(--primary);border-color:var(--primary);color:#fff}
+.btnm.g{background:var(--green);border-color:var(--green);color:var(--primary)}
+.btnm.q{border:none;background:none;color:var(--primary-text)}
+.btnm.d{border-color:var(--danger-line);color:var(--danger-text)}
+.pickrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bg-soft);font-size:11.5px}
+.pickrow i{width:24px;height:24px;border-radius:8px;background:#9fb3c6;display:inline-block}
+.pickrow .sp{flex:1} .pickrow small{display:block;color:var(--muted);font-size:10px}
+.ck{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border)}
+.ck.on{background:var(--primary);border-color:var(--primary);position:relative}
+.ck.on::after{content:"";position:absolute;left:5px;top:1px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.search{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px 9px;color:var(--muted);font-size:11.5px;flex:none}
+.full{position:absolute;inset:0;background:var(--panel);display:flex;flex-direction:column}
+.full .fh{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);font-weight:700;font-size:13.5px}
+.full .fh .sp{flex:1}
+.full .fb{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.full .ff{padding:8px 12px 18px;border-top:1px solid var(--border);display:flex;gap:7px}
+.segtabs{display:flex;gap:14px;border-bottom:1px solid var(--border);padding:0 12px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.segtabs span{padding:7px 0}
+.segtabs span.on{color:var(--primary-text);box-shadow:inset 0 -2.5px 0 var(--primary)}
+.biglabel{font-size:21px;font-weight:700;letter-spacing:-.3px;padding:2px 2px 0}
+.menu{display:flex;flex-direction:column;background:var(--panel);border-radius:12px;border:1px solid var(--border);overflow:hidden}
+.menu div{display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid var(--bg-soft);font-size:12px;font-weight:600}
+.menu div:last-child{border-bottom:none}
+.menu div .sp{flex:1} .menu div small{color:var(--muted);font-weight:500}
+.leaverail{display:flex;gap:5px;overflow:hidden;flex:none}
+.lv{flex:none;border-radius:8px;background:var(--panel);border:1px solid var(--border);padding:3px 8px;font-size:10.5px;font-weight:600}
+.lv b{color:var(--stat-leave);margin-left:3px}
+.call{width:26px;height:26px;border-radius:8px;background:var(--ok-surface);color:var(--ok-text);display:grid;place-items:center}
+
+/* component sheet */
+.comp{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px}
+.cbox{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px}
+.cbox h4{margin:0 0 8px;font-size:13.5px}
+.cbox .ex{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.cbox p{font-size:12.5px;margin:0}
+.b{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border-radius:11px;font-weight:700;font-size:13.5px;border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;transition:transform .15s,background .2s}
+.b:active{transform:scale(.97)}
+.b.p{background:var(--primary);border-color:var(--primary);color:#fff}
+.b.g{background:var(--green);border-color:var(--green);color:var(--primary)}
+.b.t{border:none;background:none;color:var(--primary-text);padding:0 8px}
+.b.d{border-color:var(--danger-line);color:var(--danger-text)}
+.b.sm{min-height:36px;font-size:12.5px;padding:0 12px}
+.vote{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.vote label{display:flex;gap:9px;align-items:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer}
+.vote label:has(input:checked){border-color:var(--primary);background:var(--hover-tint)}
+.vote small{display:block;color:var(--muted)}
+.vote input{margin-top:3px}
+#choice{margin-top:10px;font-weight:600;color:var(--primary-text)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.7.8 2.7 2.5 3 5.2"/></symbol>
+  <symbol id="i-site" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="i-org" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></symbol>
+  <symbol id="i-cap" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h6"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></symbol>
+</svg>
+
+<main>
+<h1>Mobile redesign — directions</h1>
+<p class="lede">The board was built for a desktop with a mouse: a two-row navy header, a five-tab strip that scrolls sideways, a toolbar that hides under <b>⋯ More</b>, a floating employee pool, and side-panel modals. On a phone that leaves roughly a third of the screen for the actual missions. This page audits what's there today, then shows <b>four directions</b> as phone mockups. Pick one (or mix parts). Shared component changes that apply to all four are at the bottom.</p>
+
+<nav class="top">
+  <a href="#audit">1 · Audit</a><a href="#a">A · Classic bottom bar</a><a href="#b">B · Week strip + action button</a><a href="#c">C · Light, large titles</a><a href="#d">D · Field mode</a><a href="#components">Components</a><a href="#workflows">Workflows</a><a href="#pick">Pick</a>
+</nav>
+
+<!-- ================= AUDIT ================= -->
+<h2 id="audit">1 · What's wrong on a phone today</h2>
+<p>From <code>index.html</code>, <code>styles.css</code> (the <code>max-width: 640px</code> pass) and <code>app.js</code> (<code>renderTabs</code>, touch actions).</p>
+<div class="tablewrap">
+<table class="spec">
+<tr><th>Area</th><th>Today</th><th>Problem on a phone</th><th></th></tr>
+<tr><td><b>Top bar</b></td><td>Logo + "Manpower Board / Operations Planning", module tabs, board pill, mode pill, holds button, save status, date ‹ › , Lock, Settings, avatar — all in <code>#topbar</code></td><td>Wraps to 2–3 rows (~130px). Logo and subtitle use space that the date and board need. Lock, Settings and avatar compete with the date picker.</td><td><span class="sev h">High</span></td></tr>
+<tr><td><b>Module tabs</b></td><td>Overview · Org Chart · Manpower · Host · Capacity in a sideways-scrolling strip</td><td>The tab on the right is cut off, so you can't see what's there. It sits at the top, out of thumb reach. Swiping the strip clashes with swiping the board.</td><td><span class="sev h">High</span></td></tr>
+<tr><td><b>Board switcher</b></td><td>Per-board tabs → native <code>&lt;select&gt;</code> full width on its own row</td><td>Costs a whole row. The native picker hides which board is CONFIRMED or FORECAST and how many short days each one has.</td><td><span class="sev m">Med</span></td></tr>
+<tr><td><b>Toolbar</b></td><td>Row 1: New Mission / New Employee / Holiday toggle / filters / Hide / Undo / Reset Board (inside "⋯ More" below 640px). Row 2: stats + Export</td><td>Main actions are hidden behind "More". Undo and Reset Board sit side by side, so a destructive action is one mistap away. The stat tiles take 2 rows.</td><td><span class="sev h">High</span></td></tr>
+<tr><td><b>Leave tabs</b></td><td>5 tabs with long labels ("Exchange working day")</td><td>They wrap or overflow. The count is visually weaker than the label, but the count is what people scan for.</td><td><span class="sev m">Med</span></td></tr>
+<tr><td><b>Employee pool</b></td><td><code>#float-pool</code> fixed right on desktop; on ≤900px it becomes a static block <i>below</i> the board</td><td>To assign someone you scroll to the bottom, pick them, then scroll back up to the mission. That's the core task, and it's the hardest one to do on a phone.</td><td><span class="sev h">High</span></td></tr>
+<tr><td><b>Assign workflow</b></td><td>Tap card → <code>#touch-actions</code> bar "Tap a mission or leave area to place" + "Actions ▾"</td><td>Works, but you have to start from the person. Supervisors think from the mission ("who goes to Host X?"). Nothing tells you how many people a mission still needs.</td><td><span class="sev h">High</span></td></tr>
+<tr><td><b>Modals</b></td><td><code>.modal-side</code> slide-over (Mission, Employee, Host, User…); centred dialogs for confirmations; × in the header; actions at the end of the form</td><td>The side panel becomes a full-width page with the × at the top. The Save button scrolls off-screen under the keyboard. Employee modal has its own tab row (Host Record / Note / Edit).</td><td><span class="sev m">Med</span></td></tr>
+<tr><td><b>Buttons</b></td><td><code>.btn</code> 40px, <code>.btn-small</code> 32px, topbar 34px; primary is navy; danger is red</td><td>32–34px is under the 44px touch minimum. Every add action ("New Mission", "Host", "Add user") is a navy primary, so nothing stands out as the main action.</td><td><span class="sev m">Med</span></td></tr>
+<tr><td><b>Chips / filters</b></td><td><code>.ms-btn</code> "Contract: All", "Position: All"… 6 dropdowns on Manpower, 5 on Host</td><td>Six "X: All" buttons stacked in a dropdown. You can't see which filters are on without opening each one.</td><td><span class="sev m">Med</span></td></tr>
+<tr><td><b>Desktop-only cues</b></td><td>"Ctrl-click for many", double-click to rename a board, <code>title</code> tooltips</td><td>None of these exist on touch.</td><td><span class="sev l">Low</span></td></tr>
+</table>
+</div>
+
+<!-- ================= A ================= -->
+<h2 id="a">A · Classic bottom bar</h2>
+<div class="dir">
+  <div class="dir-head"><span class="dir-tag">A</span><h3>Navy top bar, 5-item bottom tab bar, green FAB</h3><span class="dir-fit">Least change · closest to today</span></div>
+  <p>The nearest match to a typical mobile app. The top bar shrinks to one line: board name (tap to switch) and the date chip. Modules move to a bottom bar. Org Chart, Capacity and Settings go under <b>More</b>. "New mission" becomes a floating button. Filters become one chip row.</p>
+  <div class="phones">
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row">
+          <div><div class="ttl">Board EEC<svg class="ic" style="width:15px;height:15px"><use href="#i-down"/></svg></div><div class="sub">Tue 14 Oct · <span class="mode">CONFIRMED</span></div></div>
+          <span class="sp"></span>
+          <span class="ib"><svg class="ic"><use href="#i-cal"/></svg></span>
+          <span class="av">NS</span>
+        </div></div>
+        <div class="body">
+          <div class="statline"><span><b>42</b> on missions</span><span><b>6</b> leave</span><span class="short">3 standby</span><span><b>9</b> free</span></div>
+          <div class="chips"><span class="chip"><svg class="ic" style="width:13px;height:13px"><use href="#i-filter"/></svg>Filter</span><span class="chip tint">Shift: Day ×</span><span class="chip">Leave <span class="n">6</span></span><span class="chip">Hidden <span class="n">2</span></span></div>
+          <div class="list">
+            <div class="mc"><div class="mc-h"><span class="no">#12</span>Hana Microdisplay<span class="sp"></span><span class="need">Need 1</span></div><div class="mc-m"><span>Day</span><span>Eng. Pakorn</span></div><div class="mc-b"><span class="emp"><i></i>สมชาย</span><span class="emp"><i></i>วิภา</span><span class="emp oc"><i></i>อนุชา</span><span class="emp add">+ Add</span></div></div>
+            <div class="mc"><div class="mc-h g"><span class="no">#13</span>Siam Kubota Amata<span class="sp"></span><span class="ok">4/4</span></div><div class="mc-m"><span>Day</span><span>Eng. Rattana</span></div><div class="mc-b"><span class="emp"><i></i>ธนพล</span><span class="emp"><i></i>กมล</span><span class="emp"><i></i>ปรียา</span><span class="emp"><i></i>ณัฐ</span></div></div>
+            <div class="mc"><div class="mc-h o"><span class="no">#14</span>Denso Wellgrow<span class="sp"></span><span class="ok">2/2</span></div><div class="mc-m"><span>Night</span></div><div class="mc-b"><span class="emp"><i></i>สุรชัย</span><span class="emp oc"><i></i>เอกชัย</span></div></div>
+          </div>
+        </div>
+        <div class="fab"><svg class="ic"><use href="#i-plus"/></svg>Mission</div>
+        <div class="bn" data-nav>
+          <a class="on"><span class="pill"><svg class="ic"><use href="#i-board"/></svg></span>Board</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-chart"/></svg></span>Overview</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-users"/></svg></span>Manpower</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-site"/></svg></span>Host</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-more"/></svg></span>More</a>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Board view. 1-line top bar, stats as one sentence, the FAB at the thumb.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row"><div><div class="ttl">Board EEC<svg class="ic" style="width:15px;height:15px"><use href="#i-down"/></svg></div><div class="sub">Tue 14 Oct</div></div><span class="sp"></span><span class="av">NS</span></div></div>
+        <div class="body" style="opacity:.5"><div class="statline"><span><b>42</b> on missions</span></div></div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <h5>Switch board <svg class="ic"><use href="#i-x"/></svg></h5>
+          <div class="menu">
+            <div>Board EEC<span class="sp"></span><span class="mode">CONFIRMED</span></div>
+            <div>Board Bangkok<span class="sp"></span><small>2 short days</small></div>
+            <div>Board Rayong<span class="sp"></span><span class="mode fc">FORECAST</span></div>
+            <div style="color:var(--primary-text)"><svg class="ic"><use href="#i-plus"/></svg>New board</div>
+          </div>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Board switcher as a bottom sheet instead of the native select. It shows each board's status.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row"><div class="ttl">More</div></div></div>
+        <div class="body">
+          <div class="menu">
+            <div><svg class="ic"><use href="#i-org"/></svg>Org Chart</div>
+            <div><svg class="ic"><use href="#i-cap"/></svg>Capacity<span class="sp"></span><small>3 short days</small></div>
+          </div>
+          <div class="menu">
+            <div><svg class="ic"><use href="#i-lock"/></svg>Lock this board</div>
+            <div><svg class="ic"><use href="#i-dl"/></svg>Export</div>
+            <div><svg class="ic"><use href="#i-moon"/></svg>Theme<span class="sp"></span><small>System</small></div>
+          </div>
+          <div class="menu">
+            <div><svg class="ic"><use href="#i-gear"/></svg>Settings</div>
+            <div style="color:var(--danger-text)">Sign out</div>
+          </div>
+        </div>
+        <div class="bn">
+          <a><span class="pill"><svg class="ic"><use href="#i-board"/></svg></span>Board</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-chart"/></svg></span>Overview</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-users"/></svg></span>Manpower</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-site"/></svg></span>Host</a>
+          <a class="on"><span class="pill"><svg class="ic"><use href="#i-more"/></svg></span>More</a>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">"More" holds the less-used modules and the board actions that were in the top bar.</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div><h4>Gains</h4><ul><li>Header 130px → 52px</li><li>Every module one tap away at the thumb</li><li>Easy to build: <code>#board-tabs</code> renders into a fixed bar below 640px</li></ul></div>
+    <div><h4>Costs</h4><ul><li>Date changes go through a picker (no ‹ › in the bar)</li><li>Org Chart and Capacity are 2 taps away</li></ul></div>
+  </div>
+</div>
+
+<!-- ================= B ================= -->
+<h2 id="b">B · Week strip + centre action button</h2>
+<div class="dir">
+  <div class="dir-head"><span class="dir-tag">B</span><h3>Date as a swipeable week, pool as a pull-up drawer</h3><span class="dir-fit">Best for daily planners</span></div>
+  <p>Built around how planners actually work: change the day, look at who's free, place them. The top bar shows a week strip (a dot marks forecast days). The employee pool becomes a <b>drawer that peeks from the bottom</b> ("Standby 3 · On-call 9") and is always one swipe away, so you don't scroll the page to find people. A raised centre button in the bottom bar opens a "Create" sheet (Mission / Employee / Host).</p>
+  <div class="phones">
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab">
+          <div class="ab-row"><div class="ttl">Board EEC<svg class="ic" style="width:15px;height:15px"><use href="#i-down"/></svg></div><span class="mode">CONFIRMED</span><span class="sp"></span><span class="ib plain"><svg class="ic"><use href="#i-search"/></svg></span><span class="av">NS</span></div>
+          <div class="week"><div class="wd">Mon<b>13</b></div><div class="wd on">Tue<b>14</b></div><div class="wd fc">Wed<b>15</b></div><div class="wd fc">Thu<b>16</b></div><div class="wd fc">Fri<b>17</b></div><div class="wd" style="opacity:.45">Sat<b>18</b></div><div class="wd" style="opacity:.45">Sun<b>19</b></div></div>
+        </div>
+        <div class="body">
+          <div class="stats"><div class="st a"><b>42</b><span>Missions</span></div><div class="st l"><b>6</b><span>Leave</span></div><div class="st s"><b>3</b><span>Standby</span></div><div class="st f"><b>9</b><span>On-call</span></div></div>
+          <div class="list">
+            <div class="mc"><div class="mc-h"><span class="no">#12</span>Hana Microdisplay<span class="sp"></span><span class="need">Need 1</span></div><div class="mc-b"><span class="emp"><i></i>สมชาย</span><span class="emp"><i></i>วิภา</span><span class="emp oc"><i></i>อนุชา</span><span class="emp add">+ Add</span></div></div>
+            <div class="mc"><div class="mc-h g"><span class="no">#13</span>Siam Kubota Amata<span class="sp"></span><span class="ok">4/4</span></div><div class="mc-b"><span class="emp"><i></i>ธนพล</span><span class="emp"><i></i>กมล</span><span class="emp"><i></i>ปรียา</span><span class="emp"><i></i>ณัฐ</span></div></div>
+          </div>
+        </div>
+        <div class="peek"><div class="grab"></div><div class="peek-row"><span style="color:var(--stat-standby)">Standby 3</span>·<span>On-call 9</span><span class="sp"></span><span style="color:var(--muted);font-weight:600">Swipe up</span></div></div>
+        <div class="bn bar">
+          <a class="on"><span class="pill"><svg class="ic"><use href="#i-board"/></svg></span>Board</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-users"/></svg></span>Manpower</a>
+          <a class="center"><span class="fabin"><svg class="ic"><use href="#i-plus"/></svg></span></a>
+          <a><span class="pill"><svg class="ic"><use href="#i-chart"/></svg></span>Overview</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-menu"/></svg></span>More</a>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Swipe the week to change day. The pool peeks above the bottom bar.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row"><div class="ttl">Board EEC</div><span class="sp"></span><span class="av">NS</span></div></div>
+        <div class="body" style="opacity:.45"><div class="stats"><div class="st a"><b>42</b><span>Missions</span></div><div class="st l"><b>6</b><span>Leave</span></div><div class="st s"><b>3</b><span>Standby</span></div><div class="st f"><b>9</b><span>On-call</span></div></div></div>
+        <div class="sheet" style="top:120px;box-shadow:0 -8px 24px rgba(0,42,74,.2)">
+          <div class="grab"></div>
+          <div class="search"><svg class="ic" style="width:14px;height:14px"><use href="#i-search"/></svg>Search name or TRIGO ID</div>
+          <div class="seg"><span class="on">Standby 3</span><span>On-call 9</span><span>Leave 6</span></div>
+          <div class="pickrow"><i></i><div class="sp">ประเสริฐ ใจดี<small>Inspector · Amata</small></div><span class="ck on"></span></div>
+          <div class="pickrow"><i></i><div class="sp">จิราพร สุขสม<small>Technician · Amata</small></div><span class="ck on"></span></div>
+          <div class="pickrow"><i></i><div class="sp">วรวุฒิ แก้วมณี<small>Senior Inspector · Pinthong</small></div><span class="ck"></span></div>
+        </div>
+        <div class="selbar"><span><b>2</b> selected</span><span class="sp"></span><span class="b">Leave…</span><span class="b g">Place on mission</span></div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Pool drawer pulled up. Select people → "Place on mission" → tap a mission.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row"><div class="ttl">Board EEC</div></div></div>
+        <div class="body" style="opacity:.5"></div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <h5>Create</h5>
+          <div class="menu">
+            <div><svg class="ic"><use href="#i-board"/></svg>New mission<span class="sp"></span><small>on Board EEC</small></div>
+            <div><svg class="ic"><use href="#i-swap"/></svg>Add mission from last confirmed day</div>
+            <div><svg class="ic"><use href="#i-users"/></svg>New employee</div>
+            <div><svg class="ic"><use href="#i-site"/></svg>New host</div>
+          </div>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">The centre button opens one Create sheet, replacing 4 separate navy buttons.</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div><h4>Gains</h4><ul><li>Planning a week becomes swiping, not ‹ › taps</li><li>Pool always reachable, so assigning never needs page scrolling</li><li>Forecast days visible at a glance</li></ul></div>
+    <div><h4>Costs</h4><ul><li>Biggest build of the four (drawer with snap points)</li><li>Host moves under More</li></ul></div>
+  </div>
+</div>
+
+<!-- ================= C ================= -->
+<h2 id="c">C · Light surfaces, large titles</h2>
+<div class="dir">
+  <div class="dir-head"><span class="dir-tag">C</span><h3>White top bar with a large title, navy bottom bar</h3><span class="dir-fit">Most "native app" feel</span></div>
+  <p>Flips the colours. Navy moves to the bottom bar, where the brand stays visible and the green active marker reads well. The page gets a large title (iOS style) that collapses on scroll. Long forms (Mission, Employee) open <b>full-screen with a sticky Save bar</b>, with sections as underline tabs instead of the boxed tab row.</p>
+  <div class="phones">
+    <div class="pc">
+      <div class="phone"><div class="scr" style="background:#f6f8fa">
+        <div class="sb"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab light"><div class="ab-row"><span class="datechip" style="background:var(--bg-soft)"><svg class="ic" style="width:14px;height:14px"><use href="#i-left"/></svg>Tue 14 Oct<svg class="ic" style="width:14px;height:14px"><use href="#i-right"/></svg></span><span class="sp"></span><span class="ib"><svg class="ic"><use href="#i-search"/></svg></span><span class="av">NS</span></div></div>
+        <div class="body">
+          <div class="biglabel">Board EEC <svg class="ic" style="width:16px;height:16px;vertical-align:-2px"><use href="#i-down"/></svg> <span class="mode" style="vertical-align:3px">CONFIRMED</span></div>
+          <div class="chips"><span class="chip on">All 18</span><span class="chip">Short <span class="n">2</span></span><span class="chip">Day</span><span class="chip">Night</span><span class="chip">Leave <span class="n">6</span></span></div>
+          <div class="list">
+            <div class="mc" style="border:none;box-shadow:0 1px 3px rgba(0,42,74,.08)"><div class="mc-h"><span class="no">#12</span>Hana Microdisplay<span class="sp"></span><span class="need">Need 1</span></div><div class="mc-b"><span class="emp"><i></i>สมชาย</span><span class="emp"><i></i>วิภา</span><span class="emp oc"><i></i>อนุชา</span><span class="emp add">+ Add</span></div></div>
+            <div class="mc" style="border:none;box-shadow:0 1px 3px rgba(0,42,74,.08)"><div class="mc-h g"><span class="no">#13</span>Siam Kubota Amata<span class="sp"></span><span class="ok">4/4</span></div><div class="mc-b"><span class="emp"><i></i>ธนพล</span><span class="emp"><i></i>กมล</span><span class="emp"><i></i>ปรียา</span><span class="emp"><i></i>ณัฐ</span></div></div>
+            <div class="mc" style="border:none;box-shadow:0 1px 3px rgba(0,42,74,.08)"><div class="mc-h o"><span class="no">#14</span>Denso Wellgrow<span class="sp"></span><span class="ok">2/2</span></div><div class="mc-b"><span class="emp"><i></i>สุรชัย</span><span class="emp oc"><i></i>เอกชัย</span></div></div>
+          </div>
+        </div>
+        <div class="fab" style="bottom:72px"><svg class="ic"><use href="#i-plus"/></svg>Mission</div>
+        <div class="bn navy">
+          <a class="on"><span class="pill"><svg class="ic"><use href="#i-board"/></svg></span>Board</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-chart"/></svg></span>Overview</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-users"/></svg></span>Manpower</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-site"/></svg></span>Host</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-more"/></svg></span>More<span class="dot">2</span></a>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Quick-filter chips ("Short 2") replace the Filter &amp; sort popover for the common cases.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="full" style="top:22px">
+          <div class="fh"><svg class="ic"><use href="#i-x"/></svg><span class="sp">Mission #12</span><span style="color:var(--primary-text);font-size:12px">Hide</span></div>
+          <div class="fb">
+            <div class="field"><small>Host</small>Hana Microdisplay</div>
+            <div class="field"><small>Customer</small>Hana Semiconductor</div>
+            <div class="seg"><span class="on">Day</span><span>Night</span><span>OT</span></div>
+            <div class="field"><small>Engineer</small>Pakorn S.</div>
+            <div class="field"><small>People needed</small>4</div>
+            <div class="field"><small>Note</small>Gate 3, bring ESD shoes</div>
+          </div>
+          <div class="ff"><span class="btnm d" style="flex:.6">Delete</span><span class="btnm p">Save</span></div>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Full-screen form, Save pinned above the keyboard, Day/Night as a segmented control.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="full" style="top:22px">
+          <div class="fh"><svg class="ic"><use href="#i-left"/></svg><span class="sp">สมชาย รักงาน</span><span class="call"><svg class="ic" style="width:14px;height:14px"><use href="#i-phone"/></svg></span></div>
+          <div class="segtabs"><span class="on">Details</span><span>Host record</span><span>Note</span></div>
+          <div class="fb">
+            <div class="row2"><div class="field" style="flex:1"><small>TRIGO ID</small>TQS-0418</div><div class="field" style="flex:1"><small>Contract</small>Permanent</div></div>
+            <div class="field"><small>Position</small>Senior Inspector</div>
+            <div class="field"><small>Service area</small>Amata City</div>
+            <div class="field"><small>Mobile</small>081 427 3916</div>
+          </div>
+          <div class="ff"><span class="btnm d" style="flex:.7">Deactivate</span><span class="btnm p">Save</span></div>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Employee: underline tabs, call button in the header, the same sticky footer.</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div><h4>Gains</h4><ul><li>Cleanest, calmest look</li><li>Forms fixed for the keyboard</li><li>Quick-filter chips show what's on</li></ul></div>
+    <div><h4>Costs</h4><ul><li>Moves navy off the header, which departs from the design system's "navy is structure" header rule (needs sign-off)</li><li>Exported JPG/PDF header stays navy, so app and export differ</li></ul></div>
+  </div>
+</div>
+
+<!-- ================= D ================= -->
+<h2 id="d">D · Field mode (read first, edit second)</h2>
+<div class="dir">
+  <div class="dir-head"><span class="dir-tag">D</span><h3>Search-first list for supervisors on site</h3><span class="dir-fit">Best if most phone users view rather than plan</span></div>
+  <p>Assumes that on a phone people mostly <i>look things up</i>: "where is Somchai today?", "who's at Hana?", "call the team lead". Home is a search bar plus "Today" grouped by host, with tap-to-call. Editing happens <b>from the mission</b>: tap "+ Add" and a sheet lists available people sorted by who has worked at that host before.</p>
+  <div class="phones">
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row"><div><div class="ttl">Today</div><div class="sub">Board EEC · Tue 14 Oct</div></div><span class="sp"></span><span class="av">NS</span></div>
+          <div class="search" style="margin-top:7px;border:none"><svg class="ic" style="width:14px;height:14px"><use href="#i-search"/></svg>Find a person, host or mission</div></div>
+        <div class="body">
+          <div class="statline"><span><b>42</b> deployed</span><span class="short">1 mission short</span><span><b>6</b> on leave</span></div>
+          <div class="menu">
+            <div><span style="width:4px;height:26px;border-radius:2px;background:var(--danger)"></span><span class="sp">Hana Microdisplay<br><small>#12 · Day · 3/4</small></span><span class="call"><svg class="ic" style="width:14px;height:14px"><use href="#i-phone"/></svg></span></div>
+            <div><span style="width:4px;height:26px;border-radius:2px;background:var(--green)"></span><span class="sp">Siam Kubota Amata<br><small>#13 · Day · 4/4</small></span><span class="call"><svg class="ic" style="width:14px;height:14px"><use href="#i-phone"/></svg></span></div>
+            <div><span style="width:4px;height:26px;border-radius:2px;background:var(--green)"></span><span class="sp">Denso Wellgrow<br><small>#14 · Night · 2/2</small></span><span class="call"><svg class="ic" style="width:14px;height:14px"><use href="#i-phone"/></svg></span></div>
+            <div><span style="width:4px;height:26px;border-radius:2px;background:var(--green)"></span><span class="sp">AAT Rayong<br><small>#15 · Day · 5/5</small></span><span class="call"><svg class="ic" style="width:14px;height:14px"><use href="#i-phone"/></svg></span></div>
+          </div>
+          <div class="leaverail"><span class="lv">Annual<b>3</b></span><span class="lv">Sick<b>1</b></span><span class="lv">Business<b>2</b></span><span class="lv">Unpaid<b>0</b></span></div>
+        </div>
+        <div class="bn bar">
+          <a class="on"><span class="pill"><svg class="ic"><use href="#i-board"/></svg></span>Today</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-users"/></svg></span>People</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-site"/></svg></span>Hosts</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-chart"/></svg></span>Overview</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-more"/></svg></span>More</a>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Compact list grouped by host. A red bar marks a short mission. Tap to expand the crew.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row"><div class="ttl">Today</div></div></div>
+        <div class="body" style="opacity:.5"></div>
+        <div class="scrim"></div>
+        <div class="sheet" style="top:90px">
+          <div class="grab"></div>
+          <h5>Add to Hana Microdisplay <svg class="ic"><use href="#i-x"/></svg></h5>
+          <div style="font-size:11px;color:var(--muted)">#12 · Day · needs 1 more</div>
+          <div class="seg"><span class="on">Knows this host</span><span>All standby</span><span>On-call</span></div>
+          <div class="pickrow"><i></i><div class="sp">ประเสริฐ ใจดี<small>14 days at this host · Standby</small></div><span class="ck on"></span></div>
+          <div class="pickrow"><i></i><div class="sp">จิราพร สุขสม<small>6 days at this host · Standby</small></div><span class="ck"></span></div>
+          <div class="pickrow"><i></i><div class="sp">เอกชัย พรหมมา<small>2 days at this host · On-call</small></div><span class="ck"></span></div>
+          <span style="flex:1"></span>
+          <div class="row2"><span class="btnm q">Cancel</span><span class="btnm g">Add 1 person</span></div>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Mission-first assignment. Uses the host history the app already keeps.</div>
+    </div>
+    <div class="pc">
+      <div class="phone"><div class="scr">
+        <div class="sb dark"><span>9:41</span><span>●●● 5G</span></div>
+        <div class="ab"><div class="ab-row"><div class="ttl">Today</div></div></div>
+        <div class="body">
+          <div class="mc"><div class="mc-h"><span class="no">#12</span>Hana Microdisplay<span class="sp"></span><span class="ok">4/4</span></div><div class="mc-b"><span class="emp"><i></i>สมชาย</span><span class="emp"><i></i>วิภา</span><span class="emp oc"><i></i>อนุชา</span><span class="emp sel"><i></i>ประเสริฐ</span></div></div>
+        </div>
+        <div class="toast" style="bottom:72px"><span>ประเสริฐ added to #12</span><span class="sp"></span><b>Undo</b></div>
+        <div class="bn bar">
+          <a class="on"><span class="pill"><svg class="ic"><use href="#i-board"/></svg></span>Today</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-users"/></svg></span>People</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-site"/></svg></span>Hosts</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-chart"/></svg></span>Overview</a>
+          <a><span class="pill"><svg class="ic"><use href="#i-more"/></svg></span>More</a>
+        </div>
+        <div class="home"></div>
+      </div></div>
+      <div class="cap">Undo becomes a toast after each change, so it no longer sits next to Reset Board.</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div><h4>Gains</h4><ul><li>Fastest for lookups and calls</li><li>Assigning from the mission matches how supervisors think</li><li>"Knows this host" uses data the app already has</li></ul></div>
+    <div><h4>Costs</h4><ul><li>No longer looks like the magnet board on a phone (desktop keeps it)</li><li>Two board renderers to maintain</li></ul></div>
+  </div>
+</div>
+
+<!-- ================= COMPONENTS ================= -->
+<h2 id="components">Shared component changes (any direction)</h2>
+<div class="comp">
+  <div class="cbox"><h4>Buttons</h4>
+    <div class="ex"><button class="b g">Save</button><button class="b p">Assign</button><button class="b">Cancel</button><button class="b t">Clear</button><button class="b d">Delete</button></div>
+    <p>44px minimum height on touch (today 32–40px). One <b>green</b> main action per screen; navy for structural confirms; outline for secondary; text style for tertiary. Press = <code>scale(.97)</code>. Destructive actions are outline only and never sit next to the main action.</p></div>
+  <div class="cbox"><h4>Chips</h4>
+    <div class="ex"><span class="chip on">All 18</span><span class="chip">Short <span class="n">2</span></span><span class="chip tint">Contract: Permanent ×</span><span class="chip sq">Night</span></div>
+    <p>Replace the "Contract: All / Position: All…" dropdown stack with a <b>Filter</b> chip that opens a sheet, plus a row of active-filter chips with × to remove each. Counts use tabular numbers. Leave tabs become chips: short label + count ("Annual 3").</p></div>
+  <div class="cbox"><h4>Modals → sheets</h4>
+    <div class="ex"><span class="chip sq">Pick / confirm → bottom sheet</span><span class="chip sq">Long form → full screen</span><span class="chip sq">Discard? → small dialog</span></div>
+    <p>Bottom sheets with a grab handle for pickers (board, filters, create, add people). Full-screen for Mission, Employee, Host, User, with Save pinned to the bottom and kept above the keyboard (<code>visualViewport</code>). Close on the left (×/‹), the one secondary action on the right. Keep the existing unsaved-changes guard.</p></div>
+  <div class="cbox"><h4>Top bar</h4>
+    <div class="ex"><span class="chip sq">Board ▾</span><span class="chip sq">Date</span><span class="chip sq">Mode pill</span><span class="chip sq">Avatar</span></div>
+    <p>Max 52px, one line. Logo and "Operations Planning" hidden on phones (keep them on the splash and export). Save status becomes a small dot on the avatar. Lock, Settings, Export, Sign out move to More / account.</p></div>
+  <div class="cbox"><h4>Bottom bar</h4>
+    <div class="ex"><span class="chip sq">4–5 items</span><span class="chip sq">Icon + label always</span><span class="chip sq">Badge for alerts</span></div>
+    <p>Shown only ≤640px; desktop keeps today's header tabs. Respect <code>env(safe-area-inset-bottom)</code>. Items follow permissions (<code>can()</code>) — if a user has fewer than 3 modules, hide the bar. The "holds taken from you" alert becomes a badge on More.</p></div>
+  <div class="cbox"><h4>Undo &amp; Reset</h4>
+    <div class="ex"><span class="chip sq">Undo → toast after each change</span><span class="chip sq">Reset board → More, with confirm</span></div>
+    <p>Removes the Undo/Reset pair from the toolbar on phones. Remove "Ctrl-click" and "double-click to rename" hints on touch; rename moves to a menu item.</p></div>
+</div>
+
+<!-- ================= WORKFLOWS ================= -->
+<h2 id="workflows">Core workflows, before → after</h2>
+<div class="tablewrap">
+<table class="spec">
+<tr><th>Task</th><th>Today (phone)</th><th>Proposed</th></tr>
+<tr><td><b>Put a person on a mission</b></td><td>Scroll down to the pool → tap card → scroll up to the mission → tap it (5+ steps, two long scrolls)</td><td>B: swipe up the drawer → tick → "Place" → tap mission. D/A: tap "+ Add" on the mission → tick → Add (3 taps, no scrolling)</td></tr>
+<tr><td><b>Mark someone on leave</b></td><td>Select → scroll to the leave tabs or open Actions ▾</td><td>Select → "Leave…" in the selection bar → pick type in a sheet</td></tr>
+<tr><td><b>Check tomorrow's forecast</b></td><td>Tap › in a crowded header</td><td>B: tap Wed in the week strip. A/C/D: swipe left/right on the board or tap the date chip</td></tr>
+<tr><td><b>Switch board</b></td><td>Native select (no status shown)</td><td>Tap the title → sheet with CONFIRMED/FORECAST and short days per board</td></tr>
+<tr><td><b>Find &amp; call a person</b></td><td>Manpower tab → search → card list → tap number</td><td>Global search in the top bar; call button on the result and in the employee header</td></tr>
+<tr><td><b>Create mission</b></td><td>More ⋯ → New Mission → side panel, Save under the keyboard</td><td>FAB / centre button → full-screen form with Save pinned</td></tr>
+</table>
+</div>
+
+<!-- ================= PICK ================= -->
+<h2 id="pick">Pick a direction</h2>
+<p>My recommendation: <b>A as the base</b> (bottom bar, 1-line top bar, sheets, chip filters) + <b>D's mission-first "+ Add" sheet</b> + <b>B's pool drawer</b> for planners. That fixes the biggest problems (header height, hidden modules, scroll-to-assign) without rebuilding the board. C's look is a branding call.</p>
+<div class="vote">
+  <label><input type="radio" name="d" value="A"><span><b>A · Classic bottom bar</b><small>Least change</small></span></label>
+  <label><input type="radio" name="d" value="B"><span><b>B · Week strip + drawer</b><small>Planner-focused</small></span></label>
+  <label><input type="radio" name="d" value="C"><span><b>C · Light, large titles</b><small>Native feel</small></span></label>
+  <label><input type="radio" name="d" value="D"><span><b>D · Field mode</b><small>Viewer-focused</small></span></label>
+  <label><input type="radio" name="d" value="A + D + B (recommended)"><span><b>Mix: A + D's add sheet + B's drawer</b><small>Recommended</small></span></label>
+</div>
+<div id="choice"></div>
+</main>
+<script>
+document.querySelectorAll('.bn[data-nav] a').forEach(a=>a.addEventListener('click',()=>{a.parentNode.querySelectorAll('a').forEach(x=>x.classList.remove('on'));a.classList.add('on');}));
+document.querySelectorAll('.vote input').forEach(i=>i.addEventListener('change',()=>{document.getElementById('choice').textContent='Selected: '+i.value+' — tell Claude this choice in the chat.';}));
+</script>
+</body>
+</html>
