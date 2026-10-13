@@ -18,13 +18,7 @@
   --bad-text:#a3271f; --bad-surface:#fef2f2; --bad-line:#e6c2be;
   --scrim:rgba(15,23,42,.55); --shadow:0 18px 48px rgba(0,0,0,.28);
 }
-@media (prefers-color-scheme: dark){ :root{
-  --page:#14171a; --surface:#1c2024; --line:#2c3236; --ink:#e8ebed; --mut:#a3aab1;
-  --navy-text:#6fb1e0; --navy-tint:rgba(111,177,224,.12); --soft:#232a33; --hover:#232c38;
-  --warn-text:#e0b070; --warn-surface:#2a2313; --warn-line:#6a5426;
-  --ok-text:#a8c855; --ok-surface:#1b2416; --ok-line:#46592a;
-  --bad-text:#fca5a5; --bad-surface:rgba(185,28,28,.16); --bad-line:#7f2222;
-  --scrim:rgba(0,0,0,.62); color-scheme:dark; } }
+:root{color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 "Noto Sans","Noto Sans Thai",system-ui,sans-serif}
 main{max-width:1180px;margin:0 auto;padding:28px 16px 80px}
@@ -380,7 +374,7 @@ ul.pc{margin:6px 0 14px;padding-left:18px;color:var(--mut)} ul.pc li{margin:2px 
 <tr><td><b>Risk to existing tests</b></td><td>low (ids/selectors kept)</td><td>medium</td><td>high</td><td>low</td></tr>
 </tbody></table></div>
 <div class="callout ok"><b>My recommendation: D.</b> It keeps every id and class the app and the e2e tests already use, covers all 26 dialogs with one rule set, and treats the phone as a first-class case. If you also want to <i>see the board while editing</i>, take D for everything and use B's side sheet only for Employee and Mission. Pick one letter (or a mix) and I'll implement it in <code>styles.css</code>, bring the e2e tests along, and bump the version.</div>
-<p class="note">Not loaded by the app. Sample data only. Colours, type and radii come from <code>styles.css</code> / the TRIGO design system; dark mode follows the system setting.</p>
+<p class="note">Not loaded by the app. Sample data only. Colours, type and radii come from <code>styles.css</code> / the TRIGO design system; light theme.</p>
 </main>
 </body>
 </html>
