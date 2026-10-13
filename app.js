@@ -1652,7 +1652,7 @@ function renderTabs() {
   if (can("board") && D().boards.length) {
   const bt = document.createElement("div");
   bt.className = "board-tab tab-boardmod" + (!isNonBoardView() ? " active" : "");
-  setIconLabel(bt, "board", "Board");
+  setIconLabel(bt, "appmark", "Board");   // the app mark (favicon's four squares), outlined
   bt.onclick = () => {
     if (!isNonBoardView()) return;
     clearSelection();
