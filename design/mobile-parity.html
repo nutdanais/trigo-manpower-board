@@ -1,0 +1,180 @@
+<title>Mobile Parity Review</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: review sheet. Each finding = desktop now | phone now | phone proposed, in one row. */
+:root{
+  --bg:#eef2f6; --panel:#ffffff; --fg:#14233a; --muted:#5b6b80; --line:#d7dfe8;
+  --navy:#003A66; --lime:#9BC53D; --warn:#b45309; --warnbg:#fff4e0; --bad:#c62828;
+  --chip:#eef3f8; --keep:#2f7d32; --keepbg:#e8f4e8;
+  --ui:"Geist","Noto Sans Thai",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1622;--panel:#152233;--fg:#e4ebf3;--muted:#93a3b8;--line:#2a3a50;--chip:#1d2d42;--warnbg:#3a2a10;--keepbg:#173019;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1622;--panel:#152233;--fg:#e4ebf3;--muted:#93a3b8;--line:#2a3a50;--chip:#1d2d42;--warnbg:#3a2a10;--keepbg:#173019;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:28px 64px}
+h1{font-size:28px;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
+h2{font-size:19px;margin:0;text-wrap:balance}
+p{max-width:70ch;margin:0}
+.lede{color:var(--muted)}
+.tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+.must{background:var(--navy);color:#fff}.should{background:var(--chip);color:var(--fg);border:1px solid var(--line)}
+.keep{background:var(--keepbg);color:var(--keep)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:14px;margin-top:20px}
+.hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:16px;align-items:start}
+.cols>div{min-width:0;display:grid;gap:6px}
+.cap{font-size:12px;font-weight:600;color:var(--muted)}
+.shot{width:100%;border:1px solid var(--line);border-radius:8px;display:block}
+.crop{overflow:hidden;border:1px solid var(--line);border-radius:8px}
+.crop img{display:block;width:100%}
+ul{margin:0;padding-left:18px;max-width:75ch}
+li+li{margin-top:4px}
+@media (max-width:820px){.cols{grid-template-columns:1fr}}
+/* phone mock */
+.ph{width:100%;max-width:300px;background:#f3f6f9;border:1px solid var(--line);border-radius:18px;overflow:hidden;color:#14233a;font-size:12px}
+.ph-hd{background:#fff;padding:10px 12px;display:grid;gap:8px;border-bottom:1px solid #dfe5ec}
+.r{display:flex;align-items:center;gap:8px}
+.ttl{font-size:17px;font-weight:700;flex:1}
+.pill{border:1px solid #f0c27a;background:#fff4e0;color:#b45309;border-radius:999px;padding:1px 8px;font-size:10px;font-weight:600}
+.date{background:#e9eef4;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;text-align:center;line-height:1.1}
+.date small{display:block;font-size:8px;color:#5b6b80}
+.sum{flex:1;background:#eef2f6;border-radius:10px;padding:6px 9px}
+.sum b{font-size:14px}
+.bar{display:flex;height:3px;gap:2px;margin-top:4px}.bar i{display:block;border-radius:2px}
+.ib{width:34px;height:34px;border:1px solid #d7dfe8;border-radius:10px;display:grid;place-items:center;background:#fff;font-weight:700}
+.btnp{background:#003A66;color:#fff;border-radius:8px;padding:6px 10px;font-weight:600}
+.body{padding:10px;display:grid;gap:8px}
+.card{background:#fff;border:1px solid #dfe5ec;border-radius:10px;padding:10px;display:grid;gap:4px}
+.card .n{font-weight:700;font-size:13px}
+.kv{display:flex;justify-content:space-between;color:#5b6b80}.kv span:last-child{color:#14233a}
+.chip{background:#7fb4e6;color:#0b2d4f;border-radius:999px;padding:0 6px;font-size:9px;font-weight:700}
+.chipg{background:#eef2f6;border-radius:999px;padding:0 6px;font-size:10px}
+.more{color:#003A66;font-weight:600;font-size:11px}
+.nav{background:#003A66;color:#cfe0f0;display:flex;justify-content:space-around;padding:8px 4px;font-size:10px}
+.nav b{color:#fff}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 2px 0 6px}
+.keepgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.keepgrid div{background:var(--keepbg);border-radius:8px;padding:10px 12px}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:18px}
+.summary div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+</style>
+
+<div class="wrap">
+  <h1>Mobile vs desktop: what to carry over</h1>
+  <p class="lede">Real screenshots from the current build (desktop 1440 px, phone 390 px, same test data). The phone Board tab already matches the desktop's Signal look well, so it stays as it is. The gaps are on the other tabs (Overview, Manpower, Host), which still use an older phone layout. Below are 4 changes, ordered by impact. Nothing is implemented yet.</p>
+
+  <div class="summary">
+    <div><span class="tag must">Must</span><p style="margin-top:6px"><b>1.</b> Every tab gets the Board's header: page title on the left, date pill on the right.</p></div>
+    <div><span class="tag must">Must</span><p style="margin-top:6px"><b>2.</b> Stat tiles become the Board's summary card (one line, colour dots, segmented bar, tap to expand).</p></div>
+    <div><span class="tag should">Should</span><p style="margin-top:6px"><b>3.</b> One ⋯ button: Bulk edit, Export and Filters go inside it, as on Board.</p></div>
+    <div><span class="tag should">Should</span><p style="margin-top:6px"><b>4.</b> Quieter record cards: sentence-case labels like the desktop tables, no card inside a card, 4 key fields with the rest folded.</p></div>
+  </div>
+
+  <section>
+    <div class="hd"><span class="tag keep">Keep as is</span><h2>Already consistent with desktop</h2></div>
+    <div class="keepgrid">
+      <div><b>Bottom navy bar + Me</b><br>Same navy as the desktop top bar; the active pill matches the white active tab.</div>
+      <div><b>Board header</b><br>Name ▾, Confirmed pill and date already mirror the desktop control deck.</div>
+      <div><b>Leave tabs, mission cards, people drawer</b><br>Same pills, shift colours, counts and person cards as desktop.</div>
+      <div><b>Summary card</b><br>The phone version of the desktop stat tiles (Total / Assigned / Leave / Standby + segmented bar). This is the pattern to reuse.</div>
+    </div>
+    <div class="cols">
+      <div><span class="cap">Desktop · Board</span><img class="shot" src="mobile-parity/d-board.png" alt="Desktop board: navy top bar, control deck, stat tiles, leave tabs, mission cards, people panel"></div>
+      <div><span class="cap">Phone · Board (keep)</span><img class="shot" src="mobile-parity/m-board.png" alt="Phone board: two-line header, summary card, leave pills, mission cards, drawer, navy bottom bar"></div>
+      <div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="hd"><span class="tag must">Must</span><h2>1 · One header on every tab</h2></div>
+    <ul>
+      <li>On Overview, Manpower and Host the phone header shows only a small date stepper top-left with nothing else on the line. It reads as unfinished and gives no sense of where you are.</li>
+      <li>Desktop puts the date in the same place on every tab. The phone should do the same: <b>tab title left, date pill right</b>, the exact shape the Board header has (on Board the title is still the board name ▾).</li>
+    </ul>
+    <div class="cols">
+      <div><span class="cap">Desktop · Manpower</span><img class="shot" src="mobile-parity/d-emplist.png" alt="Desktop manpower list"></div>
+      <div><span class="cap">Phone now · Manpower</span><img class="shot" src="mobile-parity/m-emplist.png" alt="Phone manpower now: date stepper alone in header, wrapped stat grid, loose buttons"></div>
+      <div><span class="cap">Phone proposed · Manpower</span>
+        <div class="ph">
+          <div class="ph-hd">
+            <div class="r"><span class="ttl">Manpower</span><span class="date"><small>TUE</small>13-Oct</span></div>
+            <div class="r"><div class="sum"><b>10</b> people <span class="dot" style="background:#2f7fd8"></span>8 <span class="dot" style="background:#6b7480"></span>2 <span class="dot" style="background:#cfd6de"></span>0 ▾
+              <div class="bar"><i style="flex:8;background:#2f7fd8"></i><i style="flex:2;background:#6b7480"></i></div></div><span class="ib">⌕</span><span class="ib">⋯</span></div>
+            <div class="r"><span class="btnp">+ New Employee</span><span class="chipg" style="background:#fff4e0;color:#b45309">10 no TRIGO ID</span></div>
+          </div>
+          <div class="body">
+            <div class="card"><div class="r"><span class="n" style="flex:1">Person A</span><span class="chip">AREA1</span></div>
+              <div class="kv"><span>Contract</span><span>Permanent</span></div>
+              <div class="kv"><span>Board</span><span>Board One</span></div>
+              <div class="kv"><span>30-day utilization</span><span>5%</span></div>
+              <span class="more">More details ▾</span></div>
+            <div class="card"><div class="r"><span class="n" style="flex:1">Person B</span><span class="chip">AREA1</span></div>
+              <div class="kv"><span>Contract</span><span>Permanent</span></div>
+              <div class="kv"><span>Board</span><span>Board One</span></div></div>
+          </div>
+          <div class="nav"><span>Board</span><span>Overview</span><b>Manpower</b><span>Host</span><span>Me</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="hd"><span class="tag must">Must</span><h2>2 · Summary card instead of the stat grid</h2></div>
+    <ul>
+      <li>Desktop shows these counts as one row of tiles over a segmented bar. On the phone, Manpower and Host break them into an uneven 2-column grid (Total on its own line, left borders misaligned), which costs about 170 px before the first record.</li>
+      <li>Overview on the phone shows "Boards: 2 | Utilization: 57.14% | …" as plain text that wraps, with the Standby alert and Export stacked below it.</li>
+      <li>Reuse the Board's summary card: <b>one headline number, coloured dots, the same segmented bar, tap to expand</b> for the full breakdown and By area. Same parts as desktop, phone-sized.</li>
+    </ul>
+    <div class="cols">
+      <div><span class="cap">Desktop · Overview</span><img class="shot" src="mobile-parity/d-overview.png" alt="Desktop overview"></div>
+      <div><span class="cap">Phone now · Overview</span><img class="shot" src="mobile-parity/m-overview.png" alt="Phone overview now"></div>
+      <div><span class="cap">Phone proposed · Overview</span>
+        <div class="ph">
+          <div class="ph-hd">
+            <div class="r"><span class="ttl">Overview</span><span class="date"><small>TUE</small>13-Oct</span></div>
+            <div class="r"><div class="sum"><b>57%</b> utilized · 4/10 <span class="dot" style="background:#d84a3a"></span>3 standby ▾
+              <div class="bar"><i style="flex:4;background:#2f7fd8"></i><i style="flex:1;background:#e2a400"></i><i style="flex:3;background:#d84a3a"></i><i style="flex:2;background:#6b7480"></i></div></div><span class="ib">⋯</span></div>
+            <div class="r"><span class="chipg"><b>All boards</b> 10</span><span class="chipg">Board One 8</span><span class="chipg">Board Two 2</span></div>
+          </div>
+          <div class="body">
+            <div class="card" style="border-left:3px solid #e2a400"><span class="n">⚠ 3 permanent staff have no mission</span><span style="color:#5b6b80">Board One: Person F · Board Two: Person I, Person J</span></div>
+            <div class="card"><span class="n" style="font-size:20px;color:#003A66">57%</span><span style="color:#5b6b80">Utilization · ▲ 11 pts</span></div>
+          </div>
+          <div class="nav"><span>Board</span><b>Overview</b><span>Manpower</span><span>Host</span><span>Me</span></div>
+        </div>
+        <span class="cap">The board selector becomes the pill row desktop already uses. Export moves into ⋯.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="hd"><span class="tag should">Should</span><h2>3 · One ⋯ button, one primary action</h2></div>
+    <ul>
+      <li>Board has a square ⋯ icon button. Manpower and Host have a wide "⋯ More" text button, plus Bulk edit and Export as loose outline buttons on a row of their own.</li>
+      <li>Desktop's rule is <i>one filled main action, everything else quiet</i>. On the phone: keep <b>+ New Employee / + Host</b> filled, put Search and Filter as icon buttons next to the summary card, and move Bulk edit, Export, Thai / English into ⋯. The ⋯ button looks the same on every tab.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="hd"><span class="tag should">Should</span><h2>4 · Quieter record cards (Manpower, Host)</h2></div>
+    <ul>
+      <li>The desktop tables use sentence-case headers in muted grey (Name, Contract type). The phone cards use UPPERCASE grey labels on all 10 fields, so one person takes a full screen.</li>
+      <li>Each card sits inside another white card (double border), and "SELECT ALL" is an uppercase grey strip.</li>
+      <li>Proposed: name and area chip on top, then Contract, Board and 30-day utilization, with the rest behind "More details". Sentence-case labels, one card level, and the Active toggle on the card's top row.</li>
+      <li>Small bug in passing: on Host cards, the divider under <b>Note</b> is shorter than the others.</li>
+    </ul>
+    <div class="cols">
+      <div><span class="cap">Phone now · Host</span><img class="shot" src="mobile-parity/m-hostlist.png" alt="Phone host list now"></div>
+      <div></div><div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="hd"><span class="tag should">Not carried over</span><h2>Desktop things that should stay desktop-only</h2></div>
+    <ul>
+      <li><b>The navy top bar with the lime line.</b> On the phone, the navy bottom bar already carries the brand. A navy header too would make the screen heavy and take back the space you liked saving.</li>
+      <li><b>Side people panel.</b> The drawer is the right phone form.</li>
+      <li><b>Full tables (By board, Engineer workload).</b> They already turn into cards on the phone. Keep that.</li>
+    </ul>
+  </section>
+</div>
