@@ -7113,7 +7113,9 @@ function layoutMasonry(forceCols) {
   if (!W) return;
   const cards = [...grid.children].filter(
     c => c.classList && c.classList.contains("mission-card") && c.style.display !== "none");
-  const cols = forceCols || Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
+  // only a number pins the count: a callback's argument (fonts.ready hands over
+  // its FontFaceSet) once got here and stacked every card in one column
+  const cols = (Number.isInteger(forceCols) && forceCols > 0) ? forceCols : Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
   const colW = Math.floor((W - MASONRY_GAP * (cols - 1)) / cols);
   cards.forEach(c => {
     c.style.position = "absolute"; c.style.width = colW + "px";
@@ -12071,7 +12073,7 @@ async function boot() {
   });
   await refreshAndRender();
   // fonts can settle after the first paint and change card heights — re-pack once ready
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => layoutMasonry());
   // The column count comes from the grid's width, and on start-up the first
   // pack can run before the page has its final width (one narrow column that
   // stayed until a refresh or a tab switch). Window "resize" doesn't fire for
