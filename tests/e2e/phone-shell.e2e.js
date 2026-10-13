@@ -228,6 +228,18 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       await tapNav(p, "Board");
     });
 
+    await step("no tab is wider than a narrow phone (320px, or a larger text size)", async () => {
+      await p.setViewportSize({ width: 320, height: 700 });
+      for (const tab of ["overview", "emplist", "hostlist", "orgchart", "capacity"]) {
+        await p.evaluate((t) => document.querySelector("#board-tabs .tab-" + t).onclick(), tab);
+        await p.waitForTimeout(400);
+        const w = await p.evaluate(() => document.documentElement.scrollWidth);
+        assert.ok(w <= 320, tab + " is " + w + "px wide");
+      }
+      await p.setViewportSize({ width: 390, height: 844 });
+      await tapNav(p, "Board");
+    });
+
     await step("Me holds the account, Org Chart, Lock, Settings and Sign out; Settings hides the bar", async () => {
       await tapNav(p, "Me");
       assert.equal(await visible(p, "#more-menu"), true);

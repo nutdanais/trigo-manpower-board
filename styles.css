@@ -2524,6 +2524,11 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   padding: 14px 16px;
 }
 .ov-kpi-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+/* the sparkline gives way when the tile is narrow (two tiles side by side on a phone,
+   or a larger text size) instead of running out of the tile: it shrinks to
+   a narrower copy of the same line */
+.ov-kpi-head > div:first-child { flex: none; }
+.ov-kpi-head > svg { flex: 0 1 92px; min-width: 0; max-width: 92px; height: auto; }
 /* proportional figures, not tabular: these are standalone display numbers that
    never line up vertically, and equal-width digits read loose at this size */
 .ov-kpi-value { font-size: 26px; font-weight: 700; color: var(--primary-text); }
@@ -2575,14 +2580,15 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-attn-sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 .ov-attn-shifts { display: flex; gap: 6px; flex-wrap: wrap; }
 .ov-attn-shift { font-size: 12.5px; border: 1px solid var(--border); background: var(--bg-soft); border-radius: 6px; padding: 2px 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ov-attn-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 18px; }
+.ov-attn-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 10px 18px; }
 .ov-attn-group h4 { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 0 0 6px; }
 .ov-attn-calm { display: flex; align-items: center; gap: 10px; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; color: var(--muted); }
 .ov-attn-calm span { flex: 1 1 auto; }
 
 /* "In detail": two fixed pairs — By engineer | By service area, Shifts | Host coverage */
 .ov-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
-@media (max-width: 900px) { .ov-detail-grid { grid-template-columns: 1fr; } }
+/* minmax(0, …), not 1fr: a bare 1fr column grows to its widest table, which pushed the cards past a phone screen */
+@media (max-width: 900px) { .ov-detail-grid { grid-template-columns: minmax(0, 1fr); } }
 
 .ov-table th.r, .ov-table td.r { text-align: right; padding-right: 10px; }
 .ov-row-click { cursor: pointer; }
@@ -2608,7 +2614,9 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .ov-shift-tag.day { color: var(--primary-text); background: var(--emp-pos-bg); }
 .ov-shift-tag.night { color: #fff; background: var(--night); }
 .ov-crewcell { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.ov-crewbar { display: block; }
+.ov-crewbar { display: block; width: max(12px, calc(var(--f, 1) * 100px)); }
+/* a phone gives the bar a shorter track, so the By engineer table fits the card */
+@media (max-width: 640px) { .ov-crewbar { width: max(8px, calc(var(--f, 1) * 48px)); } .ov-crewcell { gap: 6px; } }
 .ov-rk-sub { display: block; font-size: 11.5px; color: var(--muted); }
 .ov-eng-free { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
 .ov-eng-free .ov-table-nameinner { display: inline-flex; gap: 5px; }
@@ -4057,6 +4065,7 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
   font-weight: 800; font-size: 10px; color: #20323f; background: var(--oc-c, #c8d0d8); }
 .oc-phone { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .oc-cnt { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 640px) { .oc-cnt { white-space: normal; } }   /* "2 boards · 2 engineers · …" wraps on a phone instead of widening the page */
 .oc-lvl { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
   color: var(--muted); opacity: .85; }
 .oc-sub { font-weight: 500; color: var(--muted); font-size: 12px; }
