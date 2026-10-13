@@ -243,7 +243,7 @@ async function step(name, fn) {
       await tab("Overview"); await p.waitForTimeout(400);
       assert.equal(await p.evaluate(() => document.querySelector("#btn-export").parentNode.id), "row1-end");
       assert.match(await p.textContent("#stats-bar"), /Utilization/);
-      const rows = await p.evaluate(() => [document.getElementById("toolbar-row1").getBoundingClientRect(), document.getElementById("toolbar-row2").getBoundingClientRect()].map((r) => Math.round(r.top + r.height / 2)));
+      const rows = await p.evaluate(() => [document.getElementById("btn-export").getBoundingClientRect(), document.getElementById("stats-bar").getBoundingClientRect()].map((r) => Math.round(r.top + r.height / 2)));
       assert.ok(Math.abs(rows[0] - rows[1]) <= 6, "Overview: numbers and Export share one row " + rows);
       await tab("Manpower"); await p.waitForTimeout(400);
       assert.deepEqual(await p.evaluate(() => [...document.querySelector("#row1-end").children].filter((e) => !e.classList.contains("hidden")).map((e) => e.id).slice(-2)), ["btn-emplist-bulk", "btn-export"], "Manpower row 1 ends Bulk edit, Export");

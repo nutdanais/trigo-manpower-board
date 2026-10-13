@@ -5510,3 +5510,16 @@ body.toolbar-one-row #toolbar-row1 { order: 1; flex: 0 0 auto; }
   #emplist-filter-pop { position: static; display: block; width: 100%; padding: 0; box-shadow: none; background: none; }
   #emplist-filter-pop.hidden { display: block !important; }
 }
+
+/* Overview: the board dropdown leads the one toolbar row, and the toolbar stays
+   under the banner while the dashboard scrolls, so the board shown is always in view */
+body.toolbar-one-row #toolbar-row1 { display: contents; }
+body.toolbar-one-row #ov-board-select { order: -1; margin-left: 20px; }
+body.toolbar-one-row #row1-end { order: 2; padding: 7px 20px 7px 0; }
+#ov-board-select { height: 34px; min-width: 200px; padding: 0 30px 0 11px; border: 1px solid var(--border); border-radius: var(--r); background-color: var(--panel); font: inherit; font-size: 13.5px; font-weight: 600; color: var(--text); }
+#ov-board-select.hidden { display: none; }
+body.ov-view #toolbar { position: sticky; top: var(--bar-h, 56px); z-index: 30; }
+
+/* Host stats: "No location" in the warning key colour, the By area line on its own row */
+.st-noloc { --tc: var(--stat-leave); }
+body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 100%; gap: 6px 8px; }

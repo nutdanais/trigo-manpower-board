@@ -1002,6 +1002,8 @@ function render() {
   const planEmpty = board && planIsEmpty(getPlan());
   $("#btn-reset-board").classList.toggle("hidden", fc ? !(planEdit && planEmpty) : !boardEdit);
   $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
+  $("#ov-board-select").classList.toggle("hidden", !ov || D().boards.length < 2);
+  document.body.classList.toggle("ov-view", ov);
   placeBoardRow1Tools(board);
   renderStats();
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
@@ -2580,12 +2582,12 @@ function renderStats() {
   // Overview: the day across every board — same rule as the board tiles
   if (isOverview()) {
     let assigned = 0, total = 0, leave = 0, hol = 0, free = 0, standby = 0, unstaffed = 0, standbyBoards = 0;
-    for (const b of D().boards) {
+    for (const b of ovScopeBoards()) {   // the boards the toolbar's dropdown picked
       let st; try { st = boardStats(b.id); } catch (e) { continue; }
       assigned += st.assigned; total += st.total; leave += st.leave; hol += st.onHoliday; free += st.oncallAvailable;
       standby += st.standby; unstaffed += st.unstaffed; if (st.standby) standbyBoards++;
     }
-    bar.appendChild(statChip("Boards", D().boards.length));
+    if (ovScopeBoards().length > 1) bar.appendChild(statChip("Boards", ovScopeBoards().length));
     bar.appendChild(statChip("Utilization", utilizationPct2(assigned, standby) + "%"));
     bar.appendChild(statChip("Assigned", assigned));
     bar.appendChild(statChip("Standby", standby));
@@ -2664,10 +2666,25 @@ function renderStats() {
     const rows = allHostRows();
     const withLoc = rows.filter(r => r.location || r.mapUrl).length;
     const staffed = rows.filter(r => r.inspectors.length).length;
-    bar.appendChild(statChip("Hosts", rows.length));
-    bar.appendChild(statChip("With location", withLoc));
-    bar.appendChild(statChip("No location", rows.length - withLoc));
-    bar.appendChild(statChip("Ever staffed", staffed));
+    // the board's stats design: a Total lead, tiles that split it, a proportion bar,
+    // and a "By area" line of area-coloured chips that adds up to Total
+    const archived = rows.filter(r => r.archived).length;
+    const hTile = (label, n, kind, title = "") =>
+      `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"${title ? ` title="${title}"` : ""}><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
+    bar.classList.add("stats-tiles");
+    bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${rows.length}</b></div>` +
+      hTile("With location", withLoc, "perm") + hTile("No location", rows.length - withLoc, "noloc") +
+      hTile("Ever staffed", staffed, "oncall", "Hosts at least one person has ever been deployed to") +
+      hTile("Archived", archived, "inactive", "Counted in Total; kept for history") +
+      `<div class="st-split" aria-hidden="true">${[["perm", withLoc], ["noloc", rows.length - withLoc]].filter(([, n]) => n > 0)
+        .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
+    const hostAreaBar = $("#area-bar");
+    const areaChip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    let areaHtml = "";
+    for (const a of D().areas) { const n = rows.filter(r => r.area && r.area.id === a.id).length; if (n) areaHtml += areaChip(a.name, n, a.color); }
+    const noArea = rows.filter(r => !r.area).length;
+    if (noArea) areaHtml += areaChip("No area", noArea, "");
+    hostAreaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
     const noLoc = rows.filter(r => !r.archived && !(r.location || r.mapUrl)).length;
     const on = state.hostlist.filters.location.length === 1 && state.hostlist.filters.location[0] === "missing";
     statusGroup(bar, [noLoc ? statusChip("amber", noLoc, "without a location", () => {
@@ -2877,34 +2894,18 @@ function ovScopeBoards() {
 }
 const ovScopeName = (boards) => boards.length === 1 && D().boards.length > 1 ? boards[0].name : "all boards";
 
-/* The selector itself: one pill per board plus "All boards", each with its
-   roster count for the date on screen. Pills rather than a <select> — with a
-   handful of boards every choice is visible and one tap away; past that the
-   row scrolls sideways on its own (styles.css) instead of wrapping into a wall. */
-function ovScopeBar(scope) {
-  const bar = document.createElement("div");
-  bar.className = "ov-scope-bar";
-  bar.setAttribute("role", "group");
-  bar.setAttribute("aria-label", "Board shown on the dashboard");
-  bar.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-label", textContent: "Board" }));
-  const pills = document.createElement("div");
-  pills.className = "ov-scope-pills";
-  const current = scope.length === 1 ? scope[0].id : "";
-  const pill = (id, label, count, color) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "ov-scope-pill" + (id === current ? " active" : "");
-    btn.setAttribute("aria-pressed", id === current ? "true" : "false");
-    if (color) btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-table-dot" })).style.background = color;
-    btn.appendChild(document.createTextNode(label));   // board names are user data — never innerHTML
-    btn.appendChild(Object.assign(document.createElement("span"), { className: "ov-scope-count", textContent: String(count) }));
-    btn.onclick = () => { if (id !== current) setOvBoard(id); };
-    pills.appendChild(btn);
-  };
-  pill("", "All boards", D().employees.filter(onRoster).length);
-  D().boards.forEach((b, i) => pill(b.id, b.name, rosterEmployees(b.id).length, Charts.catColor(i)));
-  bar.appendChild(pills);
-  return bar;
+/* The toolbar's board dropdown on Overview: "All boards" and each board, with its
+   roster count for the date on screen. It lives in toolbar row 1, which stays in
+   view while the dashboard scrolls, so the board being shown is always visible. */
+function fillOvBoardSelect(scope) {
+  const sel = $("#ov-board-select");
+  const current = scope.length === 1 && D().boards.length > 1 ? scope[0].id : "";
+  sel.innerHTML = "";
+  const opt = (id, label, count) => sel.appendChild(Object.assign(document.createElement("option"), { value: id, textContent: `${label} (${count})` }));
+  opt("", "All boards", D().employees.filter(onRoster).length);
+  for (const b of D().boards) opt(b.id, b.name, rosterEmployees(b.id).length);   // textContent: board names are user data
+  sel.value = current;
+  sel.onchange = () => setOvBoard(sel.value);
 }
 /* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
    works carries no information, so it's dropped from the axis entirely
@@ -3635,16 +3636,7 @@ function renderOverview() {
   // Board selector first, above the attention card. Added last so the
   // empty-page check above still sees only real sections; pointless with a
   // single board, where "All boards" and that board are the same thing.
-  if (allBoards.length > 1) {
-    panel.prepend(ovScopeBar(boards));
-    // on a phone the pill row scrolls sideways: keep the picked board in view
-    // (set on the row itself, not scrollIntoView, which could move the page)
-    const pills = panel.querySelector(".ov-scope-pills");
-    const act = pills.querySelector(".ov-scope-pill.active");
-    if (act && pills.scrollWidth > pills.clientWidth) {
-      pills.scrollLeft = Math.max(0, act.offsetLeft + act.offsetWidth - pills.clientWidth + 8);
-    }
-  }
+  if (allBoards.length > 1) fillOvBoardSelect(boards);
 
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
