@@ -86,6 +86,7 @@ section.opt { margin: 26px 0 40px; scroll-margin-top: 64px; }
 .tile strong { display: block; font-size: 22px; line-height: 1.15; font-weight: 650; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
 .tile .split { display: inline-flex; gap: 8px; margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--muted); vertical-align: 3px; }
 .tile .split b { color: var(--text); font-weight: 650; }
+.tile .pct { display: block; font-style: normal; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .tile.alert strong, .tile.alert small { color: var(--red); }
 .tile.zero { opacity: .55; }
 .A .barwrap { margin-top: 8px; }
@@ -189,7 +190,7 @@ const OPTS = [
     html: () => `<div class="row r2">
         <div><div class="tiles">
           <div class="tile"><small>Total</small><strong>${S.total}</strong></div>
-          <div class="tile"><small><i style="background:var(--s-day)"></i>Assigned</small><strong>${S.assigned}<span class="split">☀ <b>${S.day}</b> ☾ <b>${S.night}</b></span></strong></div>
+          <div class="tile"><small><i style="background:var(--s-day)"></i>Assigned</small><strong>${S.assigned}<span class="split">☀ <b>${S.day}</b> ☾ <b>${S.night}</b></span></strong><em class="pct">${(S.assigned / (S.total - S.leave) * 100).toFixed(1)}% of ${S.total - S.leave} not on leave</em></div>
           <div class="tile"><small><i style="background:var(--s-leave)"></i>Leave</small><strong>${S.leave}</strong></div>
           <div class="tile alert"><small><i style="background:var(--s-standby)"></i>Standby ⚠</small><strong>${S.standby}</strong></div>
           <div class="tile zero"><small><i style="background:var(--s-hol)"></i>Holiday</small><strong>0</strong></div>
