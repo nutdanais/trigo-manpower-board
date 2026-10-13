@@ -1,0 +1,84 @@
+<title>Active Tab Colours</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: option B (active tab as a pill) in five colour pairs, each drawn on the real navy banner with a tab active and a board active, plus contrast notes. Light only, like the app. */
+:root {
+  color-scheme: light;
+  --page: #eef1f4; --panel: #ffffff; --line: #e3e8ee; --border: #d3dae2;
+  --text: #1f2937; --muted: #667085; --navy: #003a66; --green: #a8c855;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --r: 7px;
+}
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font: 14px/1.45 var(--font); }
+.page { max-width: 1280px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; font-weight: 650; letter-spacing: -.4px; margin: 0 0 8px; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 72ch; margin: 0 0 26px; text-wrap: pretty; }
+section { margin: 0 0 30px; }
+.head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 8px; }
+.n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--navy); color: #fff; font-weight: 700; }
+h2 { font-size: 17px; font-weight: 650; margin: 0; }
+.sw { display: inline-flex; gap: 4px; }
+.sw i { width: 18px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.head p { margin: 0; color: var(--muted); font-size: 13px; flex: 1 1 340px; }
+.frames { display: grid; gap: 8px; }
+.frame { border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,38,70,.08), 0 10px 24px -16px rgba(0,38,70,.4); }
+.bar { display: flex; align-items: center; gap: 4px; height: 56px; padding: 0 18px; background: var(--navy); border-bottom: 2px solid var(--green); color: #fff; overflow-x: auto; scrollbar-width: none; }
+.logo { font-weight: 800; letter-spacing: 2px; font-size: 17px; margin-right: 14px; }
+.logo i { color: var(--green); font-style: normal; }
+.t { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px; border-radius: var(--r); color: rgba(255,255,255,.74); font-weight: 550; font-size: 13.5px; white-space: nowrap; border: 1px solid transparent; }
+.t svg { width: 15px; height: 15px; flex: none; }
+.pick { border-color: rgba(255,255,255,.42); margin-left: 6px; color: #fff; }
+.on { background: var(--bg); color: var(--fg); font-weight: 700; border-color: var(--bd, var(--bg)); box-shadow: var(--sh, 0 1px 2px rgba(0,0,0,.22)); }
+.on svg { color: var(--ic, var(--fg)); }
+.right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.ghost { height: 34px; padding: 0 12px; border: 1px solid rgba(255,255,255,.42); border-radius: var(--r); display: inline-flex; align-items: center; font-size: 13px; white-space: nowrap; }
+.av { width: 32px; height: 32px; border-radius: 9px; background: var(--green); color: #1d2c05; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.tool { height: 46px; background: var(--panel); display: flex; align-items: center; gap: 8px; padding: 0 18px; }
+.tool span { height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 6px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 550; }
+.tool span.pri { background: var(--navy); border-color: var(--navy); color: #fff; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.facts b { color: var(--text); }
+</style>
+
+<div class="page">
+  <h1>Pill colours for the active tab</h1>
+  <p class="lead">Option B makes the active tab a pill. Below are five colour pairs, each drawn on the real banner with Manpower open and with a board (LCB Port) open. Contrast is the active text against its pill (4.5 : 1 is the minimum for small text).</p>
+  <div id="opts"></div>
+</div>
+
+<script>
+const ico = {
+  ov: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13V8M8 13V3M13 13V6"/></svg>',
+  org: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="1.5" width="4" height="3.5" rx="1"/><rect x="1.5" y="11" width="4" height="3.5" rx="1"/><rect x="10.5" y="11" width="4" height="3.5" rx="1"/><path d="M8 5v3M3.5 11V8.5h9V11"/></svg>',
+  mp: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 14c.5-2.6 2.3-4 4.5-4s4 1.4 4.5 4"/><path d="M11 3.2a2.4 2.4 0 0 1 0 4.6M12.5 10.3c1.2.6 1.9 1.9 2 3.7"/></svg>',
+  host: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14.5h12M3.5 14.5V5L8 2l4.5 3v9.5M6.5 14.5v-3h3v3"/></svg>',
+  cap: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"/></svg>',
+};
+const bar = (active) => `<div class="bar"><span class="logo">TRIGO<i>≡</i></span>
+  <span class="t${active === "ov" ? " on" : ""}">${ico.ov}Overview</span>
+  <span class="t${active === "org" ? " on" : ""}">${ico.org}Org Chart</span>
+  <span class="t${active === "mp" ? " on" : ""}">${ico.mp}Manpower</span>
+  <span class="t${active === "host" ? " on" : ""}">${ico.host}Host</span>
+  <span class="t${active === "cap" ? " on" : ""}">${ico.cap}Capacity</span>
+  <span class="t pick${active === "board" ? " on" : ""}">${active === "board" ? "LCB Port" : "Boards"} ▾</span>
+  <span class="right"><span class="ghost">‹ Wed 14-Oct-2026 ›</span><span class="ghost">Settings</span><span class="av">NS</span></span></div>`;
+const tool = (board) => `<div class="tool">${board ? '<span class="pri">+ New Mission</span><span>+ New Employee</span><span>Filter &amp; sort</span>' : '<span class="pri">+ New Employee</span><span>Search name, TRIGO ID or mobile…</span><span>Filters</span>'}</div>`;
+
+/* WCAG relative-luminance contrast, so the numbers on the page are computed, not guessed */
+const lum = (hex) => { const c = hex.match(/\w\w/g).map((x) => parseInt(x, 16) / 255).map((v) => v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4); return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return ((x + .05) / (y + .05)).toFixed(1); };
+
+const OPTS = [
+  { name: "White, navy text", bg: "#ffffff", fg: "#003a66", why: "The clearest: the brightest thing on the banner. Matches the white selected segments (Thai | English, board switch).", bannerVs: "#003a66" },
+  { name: "TRIGO green, dark text", bg: "#a8c855", fg: "#1d2c05", why: "Uses the brand green already in the green rule and the avatar. Reads as 'you are here' and ties the tab to the line under the banner.", bannerVs: "#003a66" },
+  { name: "Soft sky, navy text", bg: "#dbe9f6", fg: "#003a66", why: "A quieter white: a pale blue from the navy family, so the pill stands out without glaring.", bannerVs: "#003a66" },
+  { name: "White, navy text, green icon", bg: "#ffffff", fg: "#003a66", ic: "#6f8f1f", why: "Option 1 with the icon in a deeper TRIGO green, so the pill carries the brand colour too.", bannerVs: "#003a66" },
+  { name: "Lighter navy, white text", bg: "#1f5e93", fg: "#ffffff", bd: "#4a83b5", sh: "none", why: "Stays inside the navy: a lighter blue pill with a fine edge. The calmest, closest to today.", bannerVs: "#003a66" },
+];
+document.getElementById("opts").innerHTML = OPTS.map((o, i) => `
+  <section style="--bg:${o.bg};--fg:${o.fg};${o.ic ? `--ic:${o.ic};` : ""}${o.bd ? `--bd:${o.bd};` : ""}${o.sh ? `--sh:${o.sh};` : ""}">
+    <div class="head"><span class="n">${i + 1}</span><h2>${o.name}</h2><span class="sw"><i style="background:${o.bg}"></i><i style="background:${o.fg}"></i>${o.ic ? `<i style="background:${o.ic}"></i>` : ""}</span><p>${o.why}</p></div>
+    <div class="frames"><div class="frame">${bar("mp")}${tool(false)}</div><div class="frame">${bar("board")}${tool(true)}</div></div>
+    <div class="facts"><span>Text on pill <b>${ratio(o.bg, o.fg)} : 1</b></span><span>Pill on banner <b>${ratio(o.bg, o.bannerVs)} : 1</b></span>${o.ic ? `<span>Icon on pill <b>${ratio(o.bg, o.ic)} : 1</b></span>` : ""}</div>
+  </section>`).join("");
+</script>
