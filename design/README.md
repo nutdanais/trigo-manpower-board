@@ -101,3 +101,12 @@ page): audit of the real board and dialogs, the "Signal" direction (calmer canva
 type, one navy accent, dark mode), an interactive board mock with a side inspector, command
 palette and a queue-style Review & merge workbench, the 26-dialog map, tokens and a five-phase
 rollout. `modal-directions.html` (the Settings-shell proposal) is kept unchanged as the baseline.
+
+## Signal samples (2026-10-13)
+
+`signal-samples.html` applies the feedback on the Signal proposal: light theme only, and the
+board (mission cards, employee cards, leave cards) left exactly as it is. The board inside the
+mock is the app's own markup rendered with the app's own `styles.css`, so it is not a redrawn copy.
+It adds three alternative leave layouts (A columns, B strip, C side panel) with measured heights,
+and mission and employee inspectors that open from the real cards. `signal-proposal.html` and
+`modal-directions.html` are unchanged.
