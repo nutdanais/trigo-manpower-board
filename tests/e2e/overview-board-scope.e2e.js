@@ -4,7 +4,7 @@
        plus one pill per board, and picking a board scopes every section
        (attention card, KPIs, By board, the day's cards and History);
      - the page reads summary -> "In detail" (By engineer | By service area,
-       Shifts | Host coverage) -> "Over time" (History, Engineer workload);
+       Shifts | Host coverage) -> "Period" (History, Engineer workload);
      - the idle names follow the "Action queue" permission, and Engineer
        workload ranks engineers with missions and crew in one table;
      - a newcomer who later works a host leaves a past day's Host coverage risk
@@ -62,13 +62,13 @@ async function step(name, fn) {
       await p.click("#btn-ov-board");
     });
 
-    await step("the page reads summary, then In detail, then Over time", async () => {
+    await step("the page reads summary, then In detail, then Period", async () => {
       const order = await p.evaluate(() => [...document.querySelector("#overview-panel").children].map((c) =>
         c.classList.contains("ov-group-head") ? "head:" + c.querySelector("h2").textContent
           : c.classList.contains("ov-detail-grid") ? "detail-cards"
           : c.querySelector("h3") ? c.querySelector("h3").firstChild.textContent.trim() : c.className.split(" ")[0]));
       assert.deepEqual(order, ["ov-attn", "ov-kpi-row", "By board",
-        "head:In detail", "detail-cards", "head:Over time", "History", "Engineer workload"]);
+        "head:In detail", "detail-cards", "head:Period", "History", "Engineer workload"]);
       const cards = await p.$$eval(".ov-detail-grid > .ov-section > h3", (els) => els.map((e) => e.textContent));
       assert.deepEqual(cards, ["By engineer", "By service area", "Shifts", "Host coverage"]);
     });

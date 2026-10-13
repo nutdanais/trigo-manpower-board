@@ -3497,15 +3497,15 @@ function renderOverview() {
       const crewMax = Math.max(1, ...rows.map(x => x.crew));
       const wrap = document.createElement("div");
       wrap.className = "ov-table-wrap";
-      wrap.innerHTML = `<table class="ov-table"><thead><tr><th>Engineer</th><th class="r">Missions</th><th class="r">Crew</th></tr></thead><tbody>`
+      wrap.innerHTML = `<table class="ov-table"><thead><tr><th>Engineer</th><th class="ov-mcell"><span class="ov-mgrid"><span>Missions</span><span class="ov-mtags"></span></span></th><th class="r">Crew</th></tr></thead><tbody>`
         + rows.map((x, i) => `<tr class="${x.e ? "ov-row-click" : ""}" data-i="${i}" ${x.e ? 'tabindex="0"' : ""}>
           <td><span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${escapeHtml(x.e ? x.e.color : "var(--muted)")}"></span>
             <span class="ov-table-label">${escapeHtml(x.e ? x.e.name : (x.id ? "Removed engineer" : "— no engineer set —"))}<small>${escapeHtml([...x.r.boards.values()].join(" · "))}</small></span></span></td>
-          <td class="r"><b>${x.missions}</b> ${x.r.day ? `<span class="ov-shift-tag day">D ${x.r.day}</span>` : ""}${x.r.night ? `<span class="ov-shift-tag night">N ${x.r.night}</span>` : ""}</td>
+          <td class="ov-mcell"><span class="ov-mgrid"><b>${x.missions}</b><span class="ov-mtags">${x.r.day ? `<span class="ov-shift-tag day">D ${x.r.day}</span>` : ""}${x.r.night ? `<span class="ov-shift-tag night">N ${x.r.night}</span>` : ""}</span></span></td>
           <td class="r"><span class="ov-crewcell"><span class="ov-crewbar" style="width:${Math.max(12, (x.crew / crewMax) * 100)}px">${Charts.stackedBarH({ segments: [
               { label: "permanent", value: x.r.perm, color: "var(--chart-permanent)" }, { label: "on-call", value: x.r.oncall, color: "var(--chart-oncall)" }], height: 8 })}</span><b>${x.crew}</b></span>
             <span class="ov-rk-sub">${x.r.perm} permanent${x.r.oncall ? ` · ${x.r.oncall} on-call` : ""}</span></td></tr>`).join("")
-        + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td class="r"><b>${totalMissions}</b></td><td class="r"><b>${rows.reduce((s, x) => s + x.crew, 0)}</b></td></tr></tbody></table>`;
+        + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td class="ov-mcell"><span class="ov-mgrid"><b>${totalMissions}</b><span class="ov-mtags"></span></span></td><td class="r"><b>${rows.reduce((s, x) => s + x.crew, 0)}</b></td></tr></tbody></table>`;
       // open the first in-scope board this engineer has a mission on, with the
       // board's Engineer filter set to them
       wrap.querySelectorAll("tr.ov-row-click").forEach(tr => {
@@ -3567,7 +3567,7 @@ function renderOverview() {
     shiftSec.insertAdjacentHTML("beforeend", `<div class="ov-daynight-tiles">
       <div class="ov-daynight-tile"><div class="ov-daynight-num"><span class="num">${totalDayCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip day">DAY</span></div>
         <div class="ov-daynight-sub">on ${plural(todaysDayCount, "mission", "missions")} · ${Math.round((totalDayCrew / crewAll) * 100)}% of today's crew</div></div>
-      <div class="ov-daynight-tile"><div class="ov-daynight-num"><span class="num">${totalNightCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip night">NIGHT</span></div>
+      <div class="ov-daynight-tile ov-dn-night"><div class="ov-daynight-num"><span class="num">${totalNightCrew}</span><span class="ov-muted">crew</span><span class="ov-shift-chip night">NIGHT</span></div>
         <div class="ov-daynight-sub">on ${plural(todaysNightCount, "mission", "missions")} · ${Math.round((totalNightCrew / crewAll) * 100)}% of today's crew</div></div></div>`);
     if (boards.length > 1) {
       const max = Math.max(1, ...boards.map(b => stats[b.id].dayMissions + stats[b.id].nightMissions));
@@ -3665,7 +3665,7 @@ function renderOverview() {
     resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
     const histDates = historyDates(boards);
     const histRecs = histDates.map(d => historyDayRec(d, boards, state.overview.history || {}));
-    panel.appendChild(ovGroupHead("Over time", `${historyRangeCaption(histDates)}`));
+    panel.appendChild(ovGroupHead("Period", `${historyRangeCaption(histDates)}`));
     panel.appendChild(historySection(histDates, histRecs, pendingCharts));
     panel.appendChild(engineerHistorySection(histDates, histRecs));
   }
