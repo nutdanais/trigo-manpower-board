@@ -14,18 +14,7 @@
   --font: "Geist", "Noto Sans Thai", "Segoe UI", Arial, sans-serif;
   --r: 7px;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --page: #11161c; --panel: #1a2027; --soft: #161b21; --line: #29313a; --border: #333c46;
-  --text: #e6e9ed; --muted: #9aa3ad; --navy-ink: #8fb8e0; --hover: #222b35;
-  --red: #f3a39b; --red-bg: #2e1a19; --red-line: #5b2a26; --amber: #e7b66a; --amber-bg: #2b2215; --amber-line: #5a4321;
-  --grey: #c3c9d0; --grey-bg: #222932; --grey-line: #39424d; --s-night: #9fb6d6;
-  --shadow: 0 0 0 1px rgba(255,255,255,.06), 0 12px 30px -16px rgba(0,0,0,.7); color-scheme: dark; } }
-:root[data-theme="dark"] {
-  --page: #11161c; --panel: #1a2027; --soft: #161b21; --line: #29313a; --border: #333c46;
-  --text: #e6e9ed; --muted: #9aa3ad; --navy-ink: #8fb8e0; --hover: #222b35;
-  --red: #f3a39b; --red-bg: #2e1a19; --red-line: #5b2a26; --amber: #e7b66a; --amber-bg: #2b2215; --amber-line: #5a4321;
-  --grey: #c3c9d0; --grey-bg: #222932; --grey-line: #39424d; --s-night: #9fb6d6;
-  --shadow: 0 0 0 1px rgba(255,255,255,.06), 0 12px 30px -16px rgba(0,0,0,.7); color-scheme: dark; }
+:root { color-scheme: light; }   /* light only, like the app */
 * { box-sizing: border-box; }
 body { background: var(--page); color: var(--text); font: 14px/1.45 var(--font); }
 .page { max-width: 1320px; margin: 0 auto; padding: 32px 16px 72px; }
