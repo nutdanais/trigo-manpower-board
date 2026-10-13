@@ -5252,7 +5252,7 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 }
 .tb-item:hover, .tb-item:focus-visible { background: var(--hover-tint); color: var(--primary-text); outline: none; }
 #board-menu .board-tab.tab-board { height: auto; border: 0; margin: 0; color: var(--text); font-weight: 550; }
-#board-menu .board-tab.tab-board.active { color: var(--primary-text); font-weight: 700; background: var(--hover-tint); box-shadow: inset 3px 0 0 var(--brand-green); }
+#board-menu .board-tab.tab-board.active { color: var(--primary-text); font-weight: 700; background: var(--hover-tint); }
 .tb-item-add { color: var(--muted); border-top: 1px solid var(--border); border-radius: 0 0 var(--r) var(--r); margin-top: 4px; padding-top: 11px; }
 .tb-who { padding: 8px 11px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .tb-who b { display: block; font-size: 13.5px; font-weight: 650; }
@@ -5275,33 +5275,9 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 }
 body.settings-open #board-tabs, body.settings-open #board-dd { display: none !important; }
 
-/* Row 2: the toolbar on a board, in the deeper navy */
-@media (min-width: 641px) {
-  body.board-view #toolbar-row1 { background: #00325a; padding: 7px 20px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
-  body.board-view #toolbar-row1 .btn { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff; }
-  body.board-view #toolbar-row1 .btn:hover { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .4); }
-  body.board-view #toolbar-row1 .btn-primary { background: #fff; border-color: #fff; color: var(--primary); }
-  body.board-view #toolbar-row1 .btn-primary:hover { background: #e6eef6; border-color: #e6eef6; }
-  body.board-view #toolbar-row1 .btn-quiet,
-  body.board-view #toolbar-row1 .btn-reset,
-  body.board-view #toolbar-row1 .btn-hidden-chip { background: transparent; border-color: transparent; color: rgba(255, 255, 255, .85); }
-  body.board-view #toolbar-row1 .btn-quiet:hover,
-  body.board-view #toolbar-row1 .btn-reset:hover,
-  body.board-view #toolbar-row1 .btn-hidden-chip:hover { background: rgba(255, 255, 255, .14); color: #fff; }
-  body.board-view #toolbar-row1 .btn:disabled { opacity: .45; }
-  body.board-view #toolbar-row1 .ms-btn { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff; }
-  body.board-view #toolbar-row1 .ms-btn:hover { background: rgba(255, 255, 255, .16); }
-  body.board-view #toolbar-row1 .ms-btn .ms-val { color: rgba(255, 255, 255, .7); }
-  body.board-view #toolbar-row1 .ms-btn.ms-active,
-  body.board-view #toolbar-row1 .btn-hidden-chip.is-on { background: #fff; border-color: #fff; color: var(--primary); }
-  body.board-view #toolbar-row1 .ms-btn.ms-active .ms-val { color: var(--primary); }
-  body.board-view #toolbar-row1 #filters select {
-    background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff;
-  }
-  body.board-view #toolbar-row1 #filters select option { color: var(--text); background: var(--panel); }
-  body.board-view #toolbar-row1 .toggle-text { color: rgba(255, 255, 255, .88); }
-  body.board-view #toolbar-row2 { border-bottom: 1px solid var(--border); }
-}
+/* The board toolbar is the same white bar as every other tab (the deeper-navy
+   row 2 is gone): only row 1 of the banner is navy, everywhere. */
+body.board-view #toolbar-row2 { border-bottom: 1px solid var(--border); }
 
 /* Thai | English toggle (a select[data-seg] drawn as two buttons) */
 #card-names + .seg-pick, #emplist-name-view + .seg-pick { margin: 0; align-self: center; }
@@ -5420,15 +5396,6 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 #filter-pop .ms-btn { width: 100%; justify-content: space-between; }
 #filter-pop .filter-sort { display: grid; gap: 4px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--muted); }
 #filter-pop .filter-sort select { width: 100%; }
-@media (min-width: 641px) {
-  /* white controls again inside the popover, whatever the deep-navy toolbar behind it does */
-  body.board-view #toolbar-row1 #filter-pop .ms-btn { background: var(--panel); border-color: var(--border); color: var(--text); }
-  body.board-view #toolbar-row1 #filter-pop .ms-btn:hover { background: var(--hover-tint); }
-  body.board-view #toolbar-row1 #filter-pop .ms-btn .ms-val { color: var(--muted); }
-  body.board-view #toolbar-row1 #filter-pop .ms-btn.ms-active { background: var(--hover-tint); border-color: var(--primary-text); color: var(--primary-text); }
-  body.board-view #toolbar-row1 #filter-pop select { background: var(--panel); border-color: var(--border); color: var(--text); }
-  body.board-view #toolbar-row1 #btn-filter-pop.ms-active { background: #fff; border-color: #fff; color: var(--primary); }
-}
 /* phone: the popover is just the open list inside the More dropdown */
 @media (max-width: 640px) {
   #btn-filter-pop { display: none; }
@@ -5436,3 +5403,42 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #filter-pop { position: static; display: grid; width: 100%; padding: 0; box-shadow: none; background: none; }
   #filter-pop.hidden { display: grid !important; }
 }
+
+/* ===== Export dialogs as side panels (2026-10-13e) =====
+   Board / Overview / Org Chart, Capacity, Host List and Manpower List exports use
+   the same .modal-side shell as the record dialogs: header, scrolling body, pinned
+   footer. File type and File language become segmented controls (the radios stay
+   in the markup, so pickedExportType() and the saved choices work as before). */
+.modal-side > .modal-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 16px 22px 18px; display: flex; flex-direction: column;
+}
+.modal-side > .modal-actions { flex: none; margin: 0; position: static; justify-content: flex-end; }
+.modal-export .modal-body > .form-group:first-child,
+.modal-export #xlsx-part > .form-group:first-child { margin-top: 0; }
+.modal-export .import-note { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
+.modal-export .import-note:empty { display: none; }
+.modal-export .xlsx-lang {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px;
+  margin: 6px 0 14px; border-radius: var(--r); background: var(--bg-soft); position: relative;
+}
+.modal-export .xlsx-lang > b {
+  position: absolute; top: -22px; left: 0; font-size: 12.5px; font-weight: 650; color: var(--muted);
+}
+.modal-export .xlsx-lang { margin-top: 28px; }
+.modal-export .modal-body > .xlsx-lang:first-child { margin-top: 22px; }
+.modal-export .xlsx-lang label {
+  justify-content: center; height: 32px; padding: 0 10px; border-radius: 6px;
+  color: var(--muted); font-size: 13px; font-weight: 600; transition: background-color .16s, color .16s;
+}
+.modal-export .xlsx-lang label:hover { color: var(--text); }
+.modal-export .xlsx-lang label { position: relative; }
+.modal-export .xlsx-lang input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.modal-export .xlsx-lang label:has(input:checked) { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(8, 28, 56, .16); }
+.modal-export .xlsx-lang label:has(input:focus-visible) { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+.modal-export #xlsx-tools, .modal-export .cap-export-tools { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.modal-export #xlsx-cols, .modal-export .cap-export-list { gap: 2px 8px; margin-bottom: 14px; }
+.modal-export .import-row { padding: 7px 8px; border-radius: var(--r); font-size: 13px; }
+.modal-export #xlsx-sheets-wrap { margin-bottom: 14px; }
+.modal-export .form-group { margin: 6px 0 8px; font-size: 12.5px; font-weight: 650; color: var(--muted); }
+.modal-export #xlsx-hint { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }

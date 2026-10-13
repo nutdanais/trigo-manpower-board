@@ -213,6 +213,22 @@ async function step(name, fn) {
       assert.ok(await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th:not(.col-off)")].some((t) => /Host name/.test(t.textContent))));
     });
 
+    await step("the board toolbar is the white bar of every tab, the board menu has no edge, Export is a side panel", async () => {
+      await p.evaluate((id) => { D().activeBoardId = id; return refreshAndRender(); }, await p.evaluate(() => D().boards[0].id));
+      assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector("#toolbar")).backgroundColor), "rgb(255, 255, 255)");
+      assert.notEqual(await p.evaluate(() => getComputedStyle(document.querySelector("#toolbar-row1")).backgroundColor), "rgb(0, 50, 90)");
+      await p.click("#btn-board-dd");
+      assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector("#board-menu .tab-board.active")).boxShadow), "none");
+      await p.click("#btn-board-dd");
+      await p.click("#btn-export");
+      await p.waitForTimeout(450);   // the slide-in
+      const box = await p.evaluate(() => { const r = document.querySelector("#modal-xlsx").getBoundingClientRect(); return { right: Math.round(r.right), h: Math.round(r.height) }; });
+      assert.equal(box.right, 1400); assert.equal(box.h, 900);
+      await p.check('#board-export-type input[value="pdf"]');
+      assert.equal(await p.evaluate(() => pickedExportType(document.querySelector("#board-export-type"))), "pdf");
+      await p.click("#modal-xlsx [data-close]");
+    });
+
     await step("no page errors", async () => { assert.deepEqual(a.errors, []); });
     console.log("all signal-chrome checks passed");
   } finally {
