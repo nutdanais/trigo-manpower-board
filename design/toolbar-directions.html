@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toolbar directions</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="_deck.css">
+<style>
+  .pick { position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 0; margin-bottom: 8px; background: var(--bg); }
+  .pick button { height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font: 600 13.5px var(--font); color: var(--text); cursor: pointer; }
+  .pick button.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .why { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 6px 0 22px; }
+  .why div { background: var(--panel); border-radius: 10px; padding: 14px 16px; box-shadow: 0 0 0 1px var(--line); font-size: 13px; color: var(--muted); }
+  .why b.h { display: block; color: var(--text); margin-bottom: 4px; font-size: 13.5px; }
+  .why ul { margin: 0; padding-left: 18px; } .why li { margin-bottom: 3px; }
+  .stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .cap { font-size: 12.5px; font-weight: 650; color: var(--muted); margin: 0 0 6px 2px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 0 18px; overflow-x: auto; scrollbar-width: none; }
+  .row::-webkit-scrollbar { display: none; }
+  .note { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .body { height: 26px; background: repeating-linear-gradient(90deg, #f4f6f9 0 120px, #fafbfc 120px 128px); }
+
+  /* A: two fixed rows */
+  .A .r1 { height: 56px; border-bottom: 1px solid var(--line); }
+  .A .r2 { height: 44px; border-bottom: 1px solid var(--border); background: #fbfcfd; }
+
+  /* B: title row + tools strip */
+  .B .r1 { height: 60px; }
+  .B .title { font-size: 19px; font-weight: 650; letter-spacing: -.3px; margin-right: 6px; white-space: nowrap; }
+  .B .r2 { height: 48px; background: #f6f8fa; border-top: 1px solid var(--line); border-bottom: 1px solid var(--border); }
+  .B .r2 .btn:not(.pri), .B .r2 .search { background: var(--panel); }
+
+  /* C: one row, filters in a popover */
+  .C .r1 { height: 58px; border-bottom: 1px solid var(--border); }
+  .C .fcount { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; }
+  .C .r2 { height: 38px; background: #fbfcfd; border-bottom: 1px solid var(--border); }
+  .tok { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 5px; background: var(--hover); color: var(--primary); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  @media (max-width: 760px) { .why { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>One top area for every tab</h1>
+  <p class="lead">Your screenshots show five different layouts under the navy bar: an empty bar on Overview, stats on the left in Org Chart, two rows on Manpower and Host, and its own style on Capacity. Below are three directions, each drawn for all six tabs so you can see they line up. The navy bar stays as it is. Click the tabs in a frame to compare. Numbers are made up.</p>
+
+  <div class="pick" id="pick">
+    <button data-o="A" class="on">A · Two fixed rows</button>
+    <button data-o="B">B · Title + tools strip</button>
+    <button data-o="C">C · One row, filters in a popover</button>
+  </div>
+  <div class="why" id="why"></div>
+  <div class="stack" id="stack"></div>
+</div>
+<script src="_modules-data.js"></script>
+<script>
+  const WHY = {
+    A: ["Same two rows on every tab: <b>do</b> on top, <b>status</b> under it.", ["Row 1, 56px: main button, search, filters on the left. Undo, Bulk edit and Export always pinned right.", "Row 2, 44px: status chips first, then the numbers, all in one style.", "Overview and Org Chart get real filters (Board, Range, Engineer), so no tab has an empty bar.", "Closest to today's app, so it's the least work and lowest risk."],
+        "Two rows on every tab, even simple ones."],
+    B: ["Each tab says <b>what it is and how it stands</b> first, the tools sit in a strip below.", ["Row 1: tab name, the worst status in words, the numbers; Export right.", "Row 2: a soft grey strip with the main button, search and filters.", "Reads like a page header, good for managers glancing at Overview.", "Takes the most height (108px)."],
+        "Repeats the tab name that the navy bar already shows."],
+    C: ["The <b>most compact</b>: one row, with filters behind one button.", ["One 58px row: main button, search, Filters (count), chips; numbers and Export right.", "A thin second row only appears while a filter is on, listing it so it can be cleared.", "Most room for the board and the tables.", "Filters take one more click; the numbers get tight on a laptop."],
+        "Hides the filters; the Board tab already works this way (Filter & sort)."],
+  };
+  let opt = "A";
+  const cur = {};
+  const nav = (k) => '<div class="nav"><span class="logo">TRIGO<i>≡</i></span>' + MODS.map((x) => {
+    const w = x.chips.find((c) => c.tone === "red") || x.chips.find((c) => c.tone === "amber");
+    return `<button class="ntab${x.key === k ? " on" : ""}${x.key === "board" ? " npick" : ""}" data-k="${x.key}">${x.key === "board" ? "Boards ▾" : x.name}${w ? `<span class="nbadge ${w.tone}">${w.n}</span>` : ""}</button>`;
+  }).join("") + '<div class="nright"><span class="npill">‹ Wed 14-Oct-2026 ›</span><span class="npill">Settings</span><span class="avatar">NS</span></div></div>';
+  const chips = (m, max = 4) => m.chips.slice(0, max).map((c) => `<span class="chip ${c.tone}">${c.n != null ? `<b>${c.n}</b> ` : ""}${c.label}</span>`).join("");
+  const stats = (m) => m.stats.map(([k, v]) => `<span class="stat">${k} <b>${v}</b></span>`).join('<span class="sep"></span>');
+  const right = (m) => m.right.map((r) => r.includes("|") ? '<span class="seg"><span>Thai</span><span>English</span></span>' : `<button class="btn">${r}</button>`).join("");
+  const tools = (m) => m.tools.map((t) => `<button class="btn quiet">${t}</button>`).join("");
+  const make = (m) => (m.primary ? `<button class="btn pri">${m.key === "capacity" ? "" : "＋ "}${m.primary}</button>` : "") + m.secondary.map((s) => `<button class="btn">${s}</button>`).join("");
+  const search = (m) => m.search ? `<span class="search">${m.search}…</span>` : "";
+  const filters = (m) => m.filters.map((f) => `<button class="btn">${f}</button>`).join("");
+
+  const ROWS = {
+    A: (m) => `<div class="row r1">${make(m)}${search(m)}${filters(m)}<span class="grow"></span>${tools(m)}${right(m)}<button class="btn">⤓ Export</button></div>
+               <div class="row r2">${chips(m)}<span class="sep"></span>${stats(m)}</div>`,
+    B: (m) => `<div class="row r1"><span class="title">${m.name}</span>${chips(m, 2)}<span class="sep"></span>${stats(m)}<span class="grow"></span><button class="btn">⤓ Export</button></div>
+               <div class="row r2">${make(m)}${search(m)}${filters(m)}<span class="grow"></span>${tools(m)}${right(m)}</div>`,
+    C: (m) => {
+      const act = m.key === "emplist" ? ["Status: Active", "Board: LCB Port"] : m.key === "capacity" ? ["Board: Non-Rayong"] : [];
+      const fbtn = m.filters.length ? `<button class="btn">Filters${act.length ? ` <span class="fcount">${act.length}</span>` : ""}</button>` : "";
+      return `<div class="row r1">${make(m)}${search(m)}${fbtn}<span class="sep"></span>${chips(m, 2)}<span class="grow"></span>${stats(m)}${tools(m)}${right(m)}<button class="btn">⤓ Export</button></div>` +
+        (act.length ? `<div class="row r2"><span class="note">Filtered:</span>${act.map((a) => `<span class="tok">${a} ✕</span>`).join("")}<button class="btn quiet" style="height:26px">Clear all</button></div>` : "");
+    },
+  };
+  function render() {
+    for (const b of document.querySelectorAll("#pick button")) b.classList.toggle("on", b.dataset.o === opt);
+    const w = WHY[opt];
+    document.getElementById("why").innerHTML = `<div><b class="h">Idea</b>${w[0]}<ul>${w[1].map((x) => `<li>${x}</li>`).join("")}</ul></div><div><b class="h">Trade-off</b>${w[2]}</div>`;
+    document.getElementById("stack").innerHTML = MODS.map((m) => {
+      const k = cur[m.key] || m.key, mm = MODS.find((x) => x.key === k);
+      return `<section><p class="cap">${m.name}</p><div class="frame ${opt}" data-slot="${m.key}">${nav(k)}${ROWS[opt](mm)}<div class="body"></div></div></section>`;
+    }).join("");
+    for (const f of document.querySelectorAll(".frame")) for (const t of f.querySelectorAll(".ntab"))
+      t.onclick = () => { cur[f.dataset.slot] = t.dataset.k; render(); };
+  }
+  for (const b of document.querySelectorAll("#pick button")) b.onclick = () => { opt = b.dataset.o; render(); };
+  render();
+</script>
+</body>
+</html>
