@@ -110,3 +110,12 @@ mock is the app's own markup rendered with the app's own `styles.css`, so it is 
 It adds three alternative leave layouts (A columns, B strip, C side panel) with measured heights,
 and mission and employee inspectors that open from the real cards. `signal-proposal.html` and
 `modal-directions.html` are unchanged.
+
+## Signal samples, round two (2026-10-13)
+
+`signal-samples-2.html` answers four notes on the first build: a tidier leave area (Rows,
+A lanes, B tabs, C two tiers), three options for the top section (banner tabs, navy control
+deck, compact) with the people panel tucked under the banner and a two-way Thai | English
+toggle, and three table options (quiet, directory, grouped) for Manpower and Host. The
+boards and tables in it are the app's own markup and `styles.css`, loaded with data that
+matches the production screenshots (106 people, 19 on exchange days). Not loaded by the app.
