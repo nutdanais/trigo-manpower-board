@@ -208,10 +208,10 @@ const OPTS = [
         <div class="mini">${bar()}</div><span class="grow"></span><button type="button" class="chip">+2 more</button></div>
       <div class="row r3"><span class="lbl">By area</span>${areas()}</div>` },
   { id: "C", name: "Total + one number line", line: "Total and the status chips on one line, every count on the line under it. No bar.",
-    idea: ["Total and the status chips sit on the first line.", "Every count sits on the line under it, Assigned with its share of Total.", "No bar: the numbers carry the split on their own.", "By area keeps its own soft line."],
+    idea: ["Total and the status chips sit on the first line.", "Every count sits on the line under it, with Day and Night; Assigned shows its share of the people not on leave.", "No bar: the numbers carry the split on their own.", "By area keeps its own soft line."],
     cost: "Without a bar, the split between the counts is not visible at a glance.",
     html: () => `<div class="row r2"><div class="top"><span class="total"><b>${S.total}</b>people today</span><span class="sep"></span>${chips(4)}</div>
-        <div class="legend"><span>Assigned <b>${S.assigned}</b> (${pct(S.assigned)})</span><span>Leave <b>${S.leave}</b></span><span style="color:var(--red)">Standby <b>${S.standby}</b> ⚠</span><span>Holiday <b>0</b></span><span>On-call free <b>${S.oc}</b></span></div></div>
+        <div class="legend"><span>Assigned <b>${S.assigned}</b> (${(S.assigned / (S.total - S.leave) * 100).toFixed(1)}% of ${S.total - S.leave} not on leave)</span><span>☀ Day <b>${S.day}</b></span><span>☾ Night <b>${S.night}</b></span><span>Leave <b>${S.leave}</b></span><span style="color:var(--red)">Standby <b>${S.standby}</b> ⚠</span><span>Holiday <b>0</b></span><span>On-call free <b>${S.oc}</b></span></div></div>
       <div class="row r3"><span class="lbl">By area</span>${areas()}</div>` },
   { id: "D", name: "People | Areas", line: "Two halves under the buttons: who is doing what on the left, where they work on the right.",
     idea: ["Left: the status chips, then five small cards with each number and its share.", "Right: By area as short bars, so the biggest area stands out.", "No third row; everything fits in one band (about 104px).", "Areas get room for the No area count without wrapping."],
