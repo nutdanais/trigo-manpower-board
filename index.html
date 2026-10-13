@@ -209,12 +209,14 @@
     <!-- Phone only (styles.css, Phone header): HOLIDAY beside the status pill, since the
          Holiday switch itself lives in the ⋯ menu there -->
     <span id="m-hol-pill" class="mode-pill mode-holiday hidden">HOLIDAY</span>
+    <!-- Lock sits left of the date, so showing/hiding it never shifts the date
+         arrows (the row is right-aligned) -->
+    <button id="btn-lock" class="btn btn-top hidden" title="Lock this board so it's view-only for everyone"><svg class="ic" aria-hidden="true"><use href="#i-unlock"></use></svg><span class="btn-label">Lock</span></button>
     <div class="date-nav">
       <button id="btn-date-prev" class="btn btn-top btn-icon" title="Previous day" aria-label="Previous day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
       <button id="btn-date" class="btn btn-top btn-date" title="Click to pick a date"></button>
       <button id="btn-date-next" class="btn btn-top btn-icon" title="Next day" aria-label="Next day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
     </div>
-    <button id="btn-lock" class="btn btn-top hidden" title="Lock this board so it's view-only for everyone"><svg class="ic" aria-hidden="true"><use href="#i-unlock"></use></svg><span class="btn-label">Lock</span></button>
     <button id="btn-settings" class="btn btn-top" title="Settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg><span class="btn-label">Settings</span></button>
     <div id="user-dd" class="tb-dd">
       <button type="button" id="btn-avatar" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account" aria-label="Account menu"><span id="avatar-initials">?</span></button>
