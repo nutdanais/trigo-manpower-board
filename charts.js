@@ -48,7 +48,9 @@ const Charts = (() => {
     const range = max - min || 1;
     const n = points.length;
     const padY = 4;
-    const xAt = (i) => (n <= 1 ? width / 2 : (i / (n - 1)) * width);
+    // padX keeps the end dot (r 3 + its 1.5 outline) inside the drawing, not cut by its edge
+    const padX = 4;
+    const xAt = (i) => (n <= 1 ? width / 2 : padX + (i / (n - 1)) * (width - 2 * padX));
     const yAt = (v) => height - padY - ((v - min) / range) * (height - 2 * padY);
     let path = "", run = [];
     const flushRun = () => {

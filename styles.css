@@ -2524,6 +2524,11 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
   padding: 14px 16px;
 }
 .ov-kpi-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+/* the sparkline gives way when the tile is narrow (two tiles side by side on a phone,
+   or a larger text size) instead of running out of the tile: it shrinks to
+   a narrower copy of the same line */
+.ov-kpi-head > div:first-child { flex: none; }
+.ov-kpi-head > svg { flex: 0 1 92px; min-width: 0; max-width: 92px; height: auto; }
 /* proportional figures, not tabular: these are standalone display numbers that
    never line up vertically, and equal-width digits read loose at this size */
 .ov-kpi-value { font-size: 26px; font-weight: 700; color: var(--primary-text); }
