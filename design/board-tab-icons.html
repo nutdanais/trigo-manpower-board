@@ -31,13 +31,15 @@ h1 { font-size: 26px; font-weight: 650; letter-spacing: -.4px; margin: 0 0 8px; 
 
 <div class="page">
   <h1>An icon for the Board tab</h1>
-  <p class="lead">The Board tab now sits in the banner like the others. Each candidate is shown large, then in the banner twice: Board active (white pill, green icon), and another tab active with Board as a normal tab. All are drawn on the same 24px grid and 2px stroke as the app's other icons.</p>
+  <p class="lead">Options 1 and 2 take the app's favicon (four squares, one in TRIGO green). The Board tab now sits in the banner like the others. Each candidate is shown large, then in the banner twice: Board active (white pill, green icon), and another tab active with Board as a normal tab. All are drawn on the same 24px grid and 2px stroke as the app's other icons.</p>
   <div class="grid" id="grid"></div>
 </div>
 
 <script>
 const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 const ICONS = [
+  { name: "App mark (favicon)", note: "The app's own icon: four squares, the top-right one filled. Filled in green when Board is active, so the tab carries the brand.", tag: "matches the favicon", d: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>' },
+  { name: "App mark, outline", note: "The same four squares, all outlined, for a quieter tab.", d: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>' },
   { name: "Mission columns", note: "Three columns of cards: the board's missions side by side.", tag: "built in now", d: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/>' },
   { name: "Kanban", note: "Cards of different heights in columns, like mission cards with crews.", d: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/>' },
   { name: "Dashboard tiles", note: "A 2 × 2 layout of tiles: the board as a working surface.", d: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>' },
