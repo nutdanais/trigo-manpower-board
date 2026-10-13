@@ -183,13 +183,13 @@ async function step(name, fn) {
       await p.keyboard.press("Escape");
     });
 
-    await step("on a phone the panel is a bottom sheet", async () => {
+    await step("on a phone the panel fills the screen (phone shell: full-screen record dialogs)", async () => {
       await p.setViewportSize({ width: 390, height: 800 });
       await p.evaluate(() => openEmployeeModal());
       await p.waitForTimeout(450);
       const r = await p.evaluate(() => { const m = document.querySelector("#modal-employee").getBoundingClientRect(); return { w: Math.round(m.width), bottom: Math.round(m.bottom), top: Math.round(m.top), vw: innerWidth, vh: innerHeight }; });
       assert.equal(r.w, r.vw);
-      assert.ok(r.bottom >= r.vh - 1 && r.top > 0, "anchored to the bottom, with the board showing above");
+      assert.ok(r.bottom >= r.vh - 1 && r.top <= 1, "full screen, top to bottom");
       await p.keyboard.press("Escape");
     });
 

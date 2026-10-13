@@ -922,6 +922,7 @@ function render() {
   renderTabs();
   renderDateButton();
   renderLockButton();
+  renderBottomNav();   // again: More offers Lock, whose state renderLockButton just set
   const ov = isOverview();
   const org = isOrgChart();
   const eml = isEmployeeList();
@@ -1702,6 +1703,98 @@ function renderTabs() {
   }
   renderBoardPill();
   renderUserMenu();
+  renderBottomNav();
+}
+
+/* Phone bottom bar (shown only <=640px, see "Phone shell" in styles.css). It
+   reuses the header tabs' own click handlers, so switching views goes through
+   exactly the same path as on desktop. Board / Overview / Manpower / Host sit in
+   the bar; Org Chart, Capacity, Lock, Settings and Sign out go under More. */
+function renderBottomNav() {
+  const nav = $("#bottom-nav");
+  if (!nav) return;
+  const tabs = $("#board-tabs");
+  const boards = can("board") ? D().boards : [];
+  if (!isNonBoardView()) state.lastBoardId = D().activeBoardId;
+  const lastBoard = boards.find(b => b.id === state.lastBoardId) || boards[0];
+  const go = (cls) => () => { closeMoreMenu(); const t = tabs.querySelector("." + cls); if (t) t.onclick(); };
+  const items = [];
+  if (lastBoard) items.push({ label: "Board", ic: "board", on: !isNonBoardView(), run: () => {
+    closeMoreMenu(); clearSelection(); D().activeBoardId = lastBoard.id; refreshAndRender();
+  } });
+  for (const [cls, label, ic] of [["tab-overview", "Overview", "chart"], ["tab-emplist", "Manpower", "users"], ["tab-hostlist", "Host", "site"]]) {
+    const t = tabs.querySelector("." + cls);
+    if (t) items.push({ label, ic, on: t.classList.contains("active"), run: go(cls) });
+  }
+  const more = [];
+  for (const [cls, label, ic] of [["tab-orgchart", "Org Chart", "orgchart"], ["tab-capacity", "Capacity", "list"]]) {
+    const t = tabs.querySelector("." + cls);
+    if (t) more.push({ label, ic, on: t.classList.contains("active"), run: go(cls) });
+  }
+  const lockBtn = $("#btn-lock");
+  if (lockBtn && !lockBtn.classList.contains("hidden") && !lockBtn.disabled) {
+    const locked = lockBtn.classList.contains("locked");
+    more.push({ label: locked ? "Unlock this board" : "Lock this board", ic: locked ? "lock" : "unlock", run: () => { closeMoreMenu(); lockBtn.click(); } });
+  }
+  more.push({ label: "Settings", ic: "settings", run: () => { closeMoreMenu(); $("#btn-settings").click(); } });
+  more.push({ label: "Sign out", ic: "sign-out", danger: true, run: () => { closeMoreMenu(); $("#btn-signout").click(); } });
+  const moreOn = more.some(m => m.on);
+  nav.innerHTML = "";
+  const add = (it, extra) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bn-item" + (it.on ? " active" : "");
+    if (it.on) b.setAttribute("aria-current", "page");
+    b.innerHTML = `<span class="bn-pill">${icon(it.ic)}</span><span class="bn-label">${escapeHtml(it.label)}</span>`;
+    b.onclick = it.run;
+    if (extra) extra(b);
+    nav.appendChild(b);
+  };
+  for (const it of items) add(it);
+  add({ label: "More", ic: "more", on: moreOn, run: toggleMoreMenu }, (b) => {
+    b.id = "btn-bn-more";
+    b.setAttribute("aria-haspopup", "menu");
+    b.setAttribute("aria-expanded", "false");
+  });
+  const menu = $("#more-menu");
+  menu.innerHTML = "";
+  for (const m of more) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tb-item" + (m.on ? " active" : "") + (m.danger ? " tb-item-danger" : "");
+    b.setAttribute("role", "menuitem");
+    b.innerHTML = icon(m.ic) + escapeHtml(m.label);
+    b.onclick = (ev) => { ev.stopPropagation(); m.run(); };
+    menu.appendChild(b);
+  }
+}
+function toggleMoreMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = $("#more-menu");
+  const open = menu.classList.contains("hidden");
+  closeTopbarMenus();
+  menu.classList.toggle("hidden", !open);
+  const btn = $("#btn-bn-more");
+  if (btn) btn.setAttribute("aria-expanded", String(open));
+}
+function closeMoreMenu() {
+  const menu = $("#more-menu");
+  if (menu) menu.classList.add("hidden");
+  const btn = $("#btn-bn-more");
+  if (btn) btn.setAttribute("aria-expanded", "false");
+}
+
+/* Phone drawer for the available-people panel (see "Phone shell" in styles.css).
+   Closed, it peeks above the bottom bar with the two counts; open, it covers most
+   of the board so people can be picked, and closing it shows the missions again
+   to tap one and place them. */
+function setPoolDrawer(open) {
+  const fp = $("#float-pool");
+  fp.classList.toggle("fp-open", open);
+  document.body.classList.toggle("fp-drawer-open", open);
+  const h = $("#fp-drawer-handle");
+  h.setAttribute("aria-expanded", String(open));
+  h.querySelector(".fp-drawer-cue").textContent = open ? (state.selectedEmps.size ? "Place" : "Hide") : "Show";
 }
 
 /* The pill that stands for the per-board tabs: shows the board on screen, or just
@@ -1891,6 +1984,10 @@ function updateSelectionUI() {
     $("#selection-count").textContent = label;
   }
   // floating touch action bar (CSS only shows it on touch devices)
+  // the drawer's handle says "Place" once someone is picked: closing it is how
+  // the missions come back into view to tap one
+  const fp = $("#float-pool");
+  if (fp && fp.classList.contains("fp-open")) $("#fp-drawer-handle .fp-drawer-cue").textContent = n ? "Place" : "Hide";
   const tbar = $("#touch-actions");
   if (tbar) {
     tbar.classList.toggle("on", n > 0);
@@ -2270,6 +2367,7 @@ function renderFloatPool() {
   }
   $("#standby-count").textContent = standbyN;
   $("#oncall-count").textContent = oncallN;
+  $("#fp-drawer-sum").textContent = `${$("#standby-label").textContent} ${standbyN} · On-call ${oncallN}`;
   if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : (holiday ? "No one on holiday" : "Everyone permanent is assigned")}</span>`;
   if (!oncallBody.children.length) oncallBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "No on-call free"}</span>`;
   markSelectedCards();
@@ -11143,6 +11241,13 @@ function wireApp() {
     if (hint) hint.textContent = "Tap to select · tap again for more · tap a mission or leave area to place · long-press for actions";
   }
   $("#btn-touch-clear").onclick = clearSelection;
+  $("#fp-drawer-handle").onclick = () => setPoolDrawer(!$("#float-pool").classList.contains("fp-open"));
+  document.addEventListener("click", (ev) => { if (!ev.target.closest("#more-menu, #btn-bn-more")) closeMoreMenu(); });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    closeMoreMenu();
+    if ($("#float-pool").classList.contains("fp-open")) setPoolDrawer(false);
+  });
   $("#btn-touch-actions").onclick = (ev) => {
     ev.stopPropagation();
     const firstId = state.selectedEmps.values().next().value;

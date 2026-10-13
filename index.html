@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-13d">
+<link rel="stylesheet" href="styles.css?v=2026-10-13e">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-13d"></script>
+<script src="version.js?v=2026-10-13e"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -701,6 +701,13 @@
 
 <!-- floating available-employee panel (fixed to the right edge, scrolls independently) -->
 <aside id="float-pool">
+  <!-- Phone only (styles.css, Phone shell): the panel becomes a drawer that peeks
+       above the bottom bar; this handle opens and closes it. -->
+  <button type="button" id="fp-drawer-handle" aria-expanded="false" aria-controls="float-pool">
+    <span class="fp-grab" aria-hidden="true"></span>
+    <span id="fp-drawer-sum">Available people</span>
+    <span class="fp-drawer-cue">Show</span>
+  </button>
   <div class="fp-head">
     <input id="emp-search" type="search" placeholder="Search employee…" autocomplete="off">
     <p id="emp-search-note" class="fp-search-note hidden"></p>
@@ -735,6 +742,12 @@
   <button type="button" class="btn btn-small" id="btn-touch-actions">Actions ▾</button>
   <button type="button" class="btn btn-small" id="btn-touch-clear">Clear</button>
 </div>
+
+<!-- Phone only (styles.css, Phone shell): the app-wide views as a bottom tab bar,
+     built by renderBottomNav in app.js. "More" holds the rarer views and the
+     header actions that do not fit a phone's top bar. -->
+<nav id="bottom-nav" aria-label="Sections"></nav>
+<div id="more-menu" class="tb-pop hidden" role="menu" aria-label="More"></div>
 
 <!-- ===== Modals ===== -->
 <div id="modal-backdrop" class="hidden">
@@ -1279,12 +1292,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-13d"></script>
-<script src="employee-id.js?v=2026-10-13d"></script>
-<script src="cloud.js?v=2026-10-13d"></script>
-<script src="charts.js?v=2026-10-13d"></script>
-<script src="xlsx-export.js?v=2026-10-13d"></script>
-<script src="bulk-edit.js?v=2026-10-13d"></script>
-<script src="app.js?v=2026-10-13d"></script>
+<script src="planning.js?v=2026-10-13e"></script>
+<script src="employee-id.js?v=2026-10-13e"></script>
+<script src="cloud.js?v=2026-10-13e"></script>
+<script src="charts.js?v=2026-10-13e"></script>
+<script src="xlsx-export.js?v=2026-10-13e"></script>
+<script src="bulk-edit.js?v=2026-10-13e"></script>
+<script src="app.js?v=2026-10-13e"></script>
 </body>
 </html>

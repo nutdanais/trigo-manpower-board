@@ -5436,3 +5436,132 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #filter-pop { position: static; display: grid; width: 100%; padding: 0; box-shadow: none; background: none; }
   #filter-pop.hidden { display: grid !important; }
 }
+
+/* ===== Phone shell (2026-10-13, mobile direction C + pool drawer) =====
+   See design/mobile-directions.html. Below 640px only; desktop is untouched.
+   - Top bar: a light surface with the date and the avatar on one line, then the
+     board name as a large title. The module tabs, Lock and Settings leave the
+     header: the tabs become the navy bottom bar, the rest goes under More.
+   - Bottom bar (#bottom-nav, built by renderBottomNav in app.js).
+   - New Mission becomes a floating button above the bar.
+   - The available-people panel is a drawer that peeks above the bar.
+   - Record dialogs (.modal-side) open full screen with Save pinned. */
+#bottom-nav, #fp-drawer-handle { display: none; }
+#more-menu.hidden { display: none; }
+
+@media (max-width: 640px) {
+  :root { --bnav-h: calc(58px + env(safe-area-inset-bottom, 0px)); --peek-h: 52px; }
+
+  /* --- top bar --- */
+  #topbar {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 6px 12px 8px; gap: 6px 8px; flex-wrap: wrap; align-items: center;
+  }
+  #green-rule { display: none; }
+  #topbar .topbar-left, #board-tabs, #btn-settings, #btn-lock { display: none !important; }
+  #topbar .topbar-right { order: 1; flex: 1 0 100%; gap: 8px; }
+  #topbar .btn-top { color: var(--text); border-color: transparent; background: var(--bg-soft); }
+  #topbar .btn-top:hover { background: var(--hover-tint); }
+  #topbar .date-nav { border: 0; border-radius: 10px; background: var(--bg-soft); flex: 0 1 auto; }
+  #topbar .date-nav .btn-top { border-left: 1px solid var(--border); background: transparent; }
+  #topbar .date-nav .btn-top:first-child { border-left: 0; }
+  #topbar .btn-date { flex: 0 1 auto; font-weight: 650; }
+  /* date first, then the save dot, the avatar pushed to the right edge */
+  #topbar .date-nav { order: 1; }
+  #save-status { order: 2; color: var(--muted); }
+  #save-status.save-saving, #save-status.save-saved { color: var(--muted); }
+  #save-status.save-error { color: var(--warn-text); }
+  #user-dd { order: 3; margin-left: auto; }
+
+  /* the board name as the page's large title */
+  #board-dd { order: 2; flex: 0 1 auto; min-width: 0; }
+  #btn-board-dd {
+    width: auto; max-width: 100%; height: auto; min-height: 40px; padding: 0 2px; gap: 6px;
+    background: transparent !important; border: 0 !important; color: var(--text);
+    font-size: 22px; font-weight: 700; letter-spacing: -.3px; justify-content: flex-start;
+  }
+  #btn-board-dd #board-dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #btn-board-dd .ic:last-child { width: 18px; height: 18px; opacity: .6; }
+  body:not(.board-view) #board-dd { display: none; }
+  #mode-pill { order: 3; margin-left: 0; }
+  #btn-hold-alerts { order: 4; }
+  #board-menu { min-width: min(300px, calc(100vw - 24px)); }
+  #board-menu .tb-item, #user-menu .tb-item, #more-menu .tb-item { min-height: 44px; font-size: 14.5px; }
+
+  /* --- bottom bar --- */
+  #bottom-nav {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    padding: 6px 4px env(safe-area-inset-bottom, 0px); height: var(--bnav-h);
+    background: var(--primary); box-shadow: 0 -6px 18px rgba(0, 30, 56, .16);
+  }
+  body.settings-open #bottom-nav, body.settings-open #more-menu { display: none; }
+  .bn-item {
+    flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    border: 0; background: none; padding: 0; cursor: pointer; font: inherit;
+    font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, .68);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bn-pill { width: 52px; height: 28px; border-radius: 14px; display: grid; place-items: center; transition: background-color .2s; }
+  .bn-pill .ic { width: 20px; height: 20px; }
+  .bn-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bn-item.active { color: #fff; }
+  .bn-item.active .bn-pill { background: rgba(168, 200, 85, .3); }
+  .bn-item:active .bn-pill { transform: scale(.94); }
+  .bn-item:focus-visible { outline: none; }
+  .bn-item:focus-visible .bn-pill { box-shadow: 0 0 0 2px #fff; }
+  #more-menu {
+    position: fixed; right: 8px; left: auto; top: auto; bottom: calc(var(--bnav-h) + 8px);
+    min-width: 230px; z-index: 75;
+  }
+  #more-menu .tb-item.active { color: var(--primary-text); font-weight: 700; background: var(--hover-tint); }
+  .tb-item-danger { color: var(--danger-text); }
+
+  /* room under every view for the bar (and, on a board, the drawer's peek) */
+  #app-root { padding-bottom: calc(var(--bnav-h) + 16px); }
+  body.board-view #app-root { padding-bottom: calc(var(--bnav-h) + var(--peek-h) + 72px); }
+
+  /* --- New Mission as a floating button --- */
+  body.board-view #btn-new-mission:not(.hidden) {
+    position: fixed; right: 14px; bottom: calc(var(--bnav-h) + var(--peek-h) + 12px); z-index: 66;
+    min-height: 48px; padding: 0 18px 0 14px; border-radius: 16px; border: 0;
+    background: var(--brand-green); color: var(--primary); font-weight: 700; font-size: 14.5px;
+    box-shadow: 0 8px 20px rgba(0, 42, 74, .3);
+  }
+  body.has-selection #btn-new-mission, body.fp-drawer-open #btn-new-mission { display: none; }
+
+  /* --- available-people drawer --- */
+  #float-pool {
+    position: fixed; left: 0; right: 0; top: auto; bottom: var(--bnav-h); width: auto;
+    height: var(--peek-h); overflow: hidden; z-index: 65;
+    border: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -6px 20px rgba(0, 42, 74, .16);
+    transition: height .28s cubic-bezier(.2, .8, .2, 1);
+  }
+  #float-pool.hidden { display: none; }
+  #float-pool.fp-open { height: min(72dvh, calc(100dvh - var(--bnav-h) - 56px)); overflow-y: auto; overscroll-behavior: contain; }
+  #float-pool.fp-collapsed { width: auto; }
+  #fp-drawer-handle {
+    display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 2; flex: none;
+    width: 100%; min-height: var(--peek-h); padding: 14px 16px 8px; border: 0; background: var(--panel);
+    font: inherit; font-size: 14px; font-weight: 700; color: var(--text); cursor: pointer; text-align: left;
+  }
+  .fp-grab { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--border); }
+  #fp-drawer-sum { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fp-drawer-cue { flex: none; font-size: 13px; font-weight: 650; color: var(--primary-text); }
+  #fp-drawer-handle:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+  #float-pool:not(.fp-open) > :not(#fp-drawer-handle) { visibility: hidden; }
+  #float-pool .fp-hint { display: none; }
+  body.fp-drawer-open #touch-actions.on { bottom: calc(var(--bnav-h) + 8px); }
+  body.touch-mode #touch-actions.on { bottom: calc(var(--bnav-h) + var(--peek-h) + 8px); z-index: 68; }
+  body.touch-mode.fp-drawer-open #touch-actions.on { bottom: calc(var(--bnav-h) + 8px); }
+  body.fp-drawer-open.has-selection #float-pool.fp-open { padding-bottom: 64px; }
+
+  /* --- record dialogs full screen, Save pinned --- */
+  #modal-backdrop { z-index: 100; }
+  .modal.modal-side { height: 100dvh; max-height: none; border-radius: 0; }
+  .modal-side h3 { padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+  .modal-side .modal-actions .btn { min-height: 44px; }
+  .modal-side .modal-actions .btn-primary { flex: 1 1 auto; }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  #float-pool { transition: none; }
+}
