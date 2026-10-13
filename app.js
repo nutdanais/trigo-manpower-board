@@ -3859,7 +3859,7 @@ function renderOverview() {
           <td><span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${escapeHtml(x.e ? x.e.color : "var(--muted)")}"></span>
             <span class="ov-table-label">${escapeHtml(x.e ? x.e.name : (x.id ? "Removed engineer" : "— no engineer set —"))}<small>${escapeHtml([...x.r.boards.values()].join(" · "))}</small></span></span></td>
           <td class="ov-mcell"><span class="ov-mgrid"><b>${x.missions}</b><span class="ov-mtags">${x.r.day ? `<span class="ov-shift-tag day">D ${x.r.day}</span>` : ""}${x.r.night ? `<span class="ov-shift-tag night">N ${x.r.night}</span>` : ""}</span></span></td>
-          <td class="r"><span class="ov-crewcell"><span class="ov-crewbar" style="width:${Math.max(12, (x.crew / crewMax) * 100)}px">${Charts.stackedBarH({ segments: [
+          <td class="r"><span class="ov-crewcell"><span class="ov-crewbar" style="--f:${(x.crew / crewMax).toFixed(3)}">${Charts.stackedBarH({ segments: [
               { label: "permanent", value: x.r.perm, color: "var(--chart-permanent)" }, { label: "on-call", value: x.r.oncall, color: "var(--chart-oncall)" }], height: 8 })}</span><b>${x.crew}</b></span>
             <span class="ov-rk-sub">${x.r.perm} permanent${x.r.oncall ? ` · ${x.r.oncall} on-call` : ""}</span></td></tr>`).join("")
         + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td class="ov-mcell"><span class="ov-mgrid"><b>${totalMissions}</b><span class="ov-mtags"></span></span></td><td class="r"><b>${rows.reduce((s, x) => s + x.crew, 0)}</b></td></tr></tbody></table>`;
