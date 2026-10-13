@@ -2485,6 +2485,7 @@ function renderMissions() {
     // block from across the room, and the header text can follow the theme
     // like every other label again.
     card.style.borderTopColor = engColor;
+    card.dataset.missionId = m.id;   // the "mission with no crew" status chip scrolls to it
     const memberEmps = missionCrew(m);
     const header = document.createElement("div");
     header.className = "mission-header";
@@ -2755,12 +2756,36 @@ function renderPhoneSummary(s, areaHtml) {
     k("leave", s.leave, "Leave") + k("standby", s.standby, "Standby", s.standby > 0) + k("free", s.oncallAvailable, "On-call free") +
     `<span class="ms-chev">${icon("chevron-down")}</span></span>` + split;
   card.setAttribute("aria-label", `${s.assigned} of ${s.total} ${word}, ${s.leave} on leave, ${s.standby} standby, ${s.oncallAvailable} on-call free. Show details`);
-  const tile = (kind, n, label) => `<div class="md-tile st-${kind}"><b>${n}</b><span>${label}</span></div>`;
-  $("#m-details").innerHTML =
-    `<div class="md-tiles">${tile("asg", s.assigned, "Assigned")}${tile("leave", s.leave, "Leave")}${tile("standby", s.standby, "Standby")}` +
-    (s.isHoliday ? tile("hol", s.onHoliday, "Holiday") : "") + `${tile("free", s.oncallAvailable, "On-call free")}</div>` +
-    `<div class="md-shift"><span>${icon("sun")}<b>${s.dayMissions}</b> day</span><span>${icon("moon")}<b>${s.nightMissions}</b> night</span></div>` +
-    (areaHtml ? `<div class="md-areas">${areaHtml}</div>` : "");
+  // Opened, it is the desktop stats strip itself (the same markup and classes as
+  // #stats-bar, laid out for a phone in styles.css), so both screens read alike:
+  // Total, the tiles with Day / Night, the proportion bar, what needs a look, and
+  // the areas. Assigned also carries utilization, Assigned ÷ (Assigned + Standby):
+  // people on leave, on a holiday or on-call and not called in are left out.
+  const details = $("#m-details");
+  details.innerHTML = `<div class="m-stats">${$("#stats-bar").innerHTML}</div>`;
+  const denom = s.assigned + s.standby;
+  const util = denom > 0 ? Math.round(s.assigned / denom * 1000) / 10 : 0;
+  const asg = details.querySelector('.stat-tile[data-stat="Assigned"] .st-main b');
+  if (asg && !details.querySelector(".st-pct")) {
+    asg.insertAdjacentHTML("afterend", `<span class="st-pct" data-stat="Utilized" title="Assigned ÷ (Assigned + Standby). People on leave, on a holiday or on-call and not called in are left out.">${util}% utilized</span>`);
+  }
+  const plan = peekPlan(D().activeBoardId);
+  const hiddenN = plan.missions.filter(m => m.hidden).length;
+  const chips =
+    (s.unstaffed ? `<button type="button" class="status-chip sc-amber" data-status="unstaffed" title="Show the first mission with nobody on it"><b>${s.unstaffed}</b> ${s.unstaffed === 1 ? "mission" : "missions"} with no crew</button>` : "") +
+    (hiddenN ? `<button type="button" class="status-chip" data-status="hidden" title="Open Hide/Unhide"><b>${hiddenN}</b> ${hiddenN === 1 ? "mission" : "missions"} hidden</button>` : "");
+  if (chips) details.insertAdjacentHTML("beforeend", `<div class="m-status">${chips}</div>`);
+  if (areaHtml) details.insertAdjacentHTML("beforeend", `<div class="md-areas">${areaHtml}</div>`);
+  const firstEmpty = details.querySelector('[data-status="unstaffed"]');
+  if (firstEmpty) firstEmpty.onclick = () => {
+    const m = plan.missions.find(x => !x.hidden && !x.members.length);
+    const card = m && document.querySelector(`.mission-card[data-mission-id="${CSS.escape(String(m.id))}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("flash-outline"); void card.offsetWidth; card.classList.add("flash-outline");
+  };
+  const hiddenBtn = details.querySelector('[data-status="hidden"]');
+  if (hiddenBtn) hiddenBtn.onclick = () => $("#btn-hide-missions").click();
   $("#m-count").innerHTML = `<b>${s.assigned}</b>/${s.total}`;
   let open = false;
   try { open = localStorage.getItem("mpm-m-details") === "1"; } catch (e) { /* private mode */ }

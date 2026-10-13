@@ -5508,7 +5508,7 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   .ms-k i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .ms-k.st-leave i { background: var(--stat-leave); } .ms-k.st-standby i { background: var(--stat-standby); } .ms-k.st-free i { background: var(--stat-free); }
   .ms-k.ms-alert { color: var(--stat-standby); }
-  .ms-chev { margin-left: auto; display: inline-flex; color: var(--muted); transition: transform .2s; }
+  .ms-chev { margin-left: auto; display: inline-grid; place-items: center; width: 16px; height: 16px; color: var(--muted); transition: transform .2s; }
   .ms-chev .ic { width: 14px; height: 14px; }
   #m-summary.open .ms-chev { transform: rotate(180deg); }
   .ms-bar { display: flex; gap: 2px; height: 4px; border-radius: 2px; overflow: hidden; }
@@ -5528,15 +5528,28 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
     order: 11; flex: 1 0 100%; display: flex; flex-direction: column; gap: 8px;
     padding: 9px 10px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
   }
-  .md-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); gap: 4px; }
-  .md-tile b { display: block; font-size: 17px; line-height: 1.15; font-variant-numeric: tabular-nums; }
-  .md-tile span { font-size: 10.5px; font-weight: 600; }
-  .md-tile.st-asg b { color: var(--stat-asg); } .md-tile.st-leave b { color: var(--stat-leave); }
-  .md-tile.st-standby b { color: var(--stat-standby); } .md-tile.st-hol b { color: var(--stat-hol); } .md-tile.st-free b { color: var(--stat-free); }
-  .md-shift { display: flex; gap: 14px; font-weight: 600; }
-  .md-shift span { display: inline-flex; align-items: center; gap: 4px; }
-  .md-shift .ic { width: 14px; height: 14px; }
-  .md-shift b { color: var(--text); }
+  /* opened: the desktop stats strip (same markup, PR 56's look), two tiles a row */
+  .m-stats { display: flex; flex-wrap: wrap; row-gap: 10px; align-items: flex-start; }
+  .m-stats .stat-lead { flex: 0 0 100%; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: 8px; padding: 0 2px; }
+  .m-stats .stat-tile { flex: 1 1 calc(50% - 2px); min-width: 0; padding: 0 10px; gap: 10px; flex-wrap: wrap; }
+  /* Total is the first div, so the left-hand tiles (Assigned, Standby) are the even ones */
+  .m-stats .stat-tile:nth-of-type(even) { border-left: 0; padding-left: 2px; }
+  .m-stats .st-main { min-width: 0; }
+  .m-stats .st-split { margin-top: 0; }
+  .m-stats .st-pct { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--stat-asg); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .m-status { display: flex; flex-wrap: wrap; gap: 6px; }
+  .m-status .status-chip {
+    display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 9px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text);
+    font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  }
+  .m-status .status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--muted); }
+  .m-status .status-chip b { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .m-status .status-chip:active { transform: translateY(1px); }
+  .m-status .status-chip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+  .m-status .status-chip.sc-amber { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
+  .m-status .status-chip.sc-amber::before { background: var(--warn); }
+  .mission-card.flash-outline { animation: m-flash-outline 1.6s ease-out; }
   .md-areas { display: flex; flex-wrap: wrap; gap: 4px; }
   .md-areas .area-chip { background: var(--panel); }
 
@@ -5706,6 +5719,8 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   .modal-side .modal-actions .btn { min-height: 44px; }
   .modal-side .modal-actions .btn-primary { flex: 1 1 auto; }
 }
+@keyframes m-flash-outline { 0%, 60% { box-shadow: 0 0 0 3px var(--warn); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
   #float-pool { transition: none; }
+  .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); }
 }

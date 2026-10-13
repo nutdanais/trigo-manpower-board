@@ -96,7 +96,12 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.equal(await visible(p, "#m-details"), false);
       await p.click("#m-summary");
       assert.equal(await visible(p, "#m-details"), true);
-      assert.match(await p.textContent("#m-details"), /Assigned.*Leave.*Standby.*On-call free/s);
+      assert.match(await p.textContent("#m-details"), /Total.*Assigned.*Leave.*Standby.*On-call free/s);
+      // the desktop strip's own markup, plus utilization = Assigned ÷ (Assigned + Standby), one decimal
+      const r = await p.evaluate(() => ({ s: boardStats(D().activeBoardId), pct: document.querySelector("#m-details .st-pct").textContent, tiles: document.querySelectorAll("#m-details .stat-tile").length }));
+      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 1000) / 10 : 0;
+      assert.equal(r.pct, want + "% utilized");
+      assert.ok(r.tiles >= 4, "the stat tiles, got " + r.tiles);
       assert.equal(await p.evaluate(() => localStorage.getItem("mpm-m-details")), "1");
       await shot(p, "1b-details");
       await p.click("#m-summary");
