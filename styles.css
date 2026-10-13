@@ -516,6 +516,9 @@ button, input, select, textarea, optgroup {
 }
 .date-nav .btn-top:first-child { border-left: none; }
 .date-nav .btn-top.btn-icon { width: 38px; }
+/* One fixed width for every date ("Wed 08-May-2026" is the widest), so the arrows
+   never move as the day changes and can be clicked straight through. */
+.btn-date { width: 12em; justify-content: center; }
 
 /* save/sync status pill — plain text on the navy topbar, same treatment as
    #app-title's subtitle. Hidden until the first write of the session so it
@@ -5672,7 +5675,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   #topbar .date-nav .btn-top { border-left: 1px solid var(--border); background: transparent; min-height: 38px; height: 38px; }
   #topbar .date-nav .btn-top:first-child { border-left: 0; }
   #topbar .date-nav .btn-top.btn-icon { width: 28px; }
-  #topbar .btn-date { flex: none; padding: 0 7px; font-weight: 650; font-size: 12.5px; }
+  #topbar .btn-date { flex: none; width: 5.4em; padding: 0 7px; font-weight: 650; font-size: 12.5px; }
   #topbar .btn-date .d-txt { display: flex; flex-direction: column; align-items: center; line-height: 1.08; }
   #topbar .btn-date .d-dow { font-size: 9.5px; font-weight: 650; letter-spacing: .3px; text-transform: uppercase; color: var(--muted); }
 
