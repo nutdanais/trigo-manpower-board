@@ -3,378 +3,555 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Modal Redesign Directions</title>
+<title>Modal Workspace Proposal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;600&display=swap">
 <style>
-/* Design collateral, not loaded by the app. Tokens mirror styles.css. */
-:root {
-  --page:#eef1f4; --surface:#fff; --line:#d8dde4; --ink:#1f2937; --mut:#5f6773;
-  --navy:#003a66; --navy-d:#002a4a; --navy-text:#003a66; --navy-tint:rgba(0,58,102,.07);
-  --green:#a8c855; --soft:#eef1f5; --hover:#eef3fb;
-  --warn-text:#8a4f10; --warn-surface:#fdf8ef; --warn-line:#e0c9a4;
-  --ok-text:#4d6810; --ok-surface:#f7faef; --ok-line:#cfdcae;
-  --bad-text:#a3271f; --bad-surface:#fef2f2; --bad-line:#e6c2be;
-  --scrim:rgba(15,23,42,.55); --shadow:0 18px 48px rgba(0,0,0,.28);
+/* Design collateral, not loaded by the app. Every token below is copied from styles.css so the
+   mock and the real Settings page share one geometry. Light theme only. */
+:root{
+  color-scheme:light;
+  --bg:#eef1f4; --panel:#fff; --border:#d8dde4; --text:#1f2937; --muted:#6b7280;
+  --primary:#003a66; --primary-dark:#002a4a; --primary-text:#003a66; --hover-tint:#eef3fb; --bg-soft:#eef1f5;
+  --ok-surface:#f7faef; --ok-line:#cfdcae; --ok-text:#4d6810;
+  --warn-surface:#fdf8ef; --warn-line:#e0c9a4; --warn-text:#8a4f10;
+  --danger-surface:#fef2f2; --danger-line:#e6c2be; --danger-text:#a3271f;
+  --fc-1:#2a78d6; --fc-2:#c2410c;
+  --r:7px; --r-box:8px; --ctl-h:32px;
+  --shadow:0 18px 48px rgba(15,23,42,.28);
+  --scrim:rgba(15,23,42,.55);
+  --font:"Noto Sans","Noto Sans Thai",Arial,sans-serif;
 }
-:root{color-scheme:light}
 *{box-sizing:border-box}
-body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 "Noto Sans","Noto Sans Thai",system-ui,sans-serif}
-main{max-width:1180px;margin:0 auto;padding:28px 16px 80px}
-h1{font-size:28px;margin:0 0 6px} h2{font-size:21px;margin:44px 0 6px;scroll-margin-top:12px}
-h3{font-size:15px;margin:0 0 4px} p{margin:0 0 10px;color:var(--mut)} p b,li b{color:var(--ink)}
-a{color:var(--navy-text)}
-.lede{font-size:15px;max-width:76ch}
-nav.top{position:sticky;top:0;z-index:50;background:var(--page);padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-nav.top a{padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);text-decoration:none;font-weight:600;font-size:13px;min-height:32px;display:inline-flex;align-items:center}
-nav.top a:hover{border-color:var(--navy-text)}
-table.cmp{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:13px}
-table.cmp th,table.cmp td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-table.cmp th{background:var(--soft);font-weight:600}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--font)}
+main{max-width:1200px;margin:0 auto;padding:28px 16px 90px}
+h1{font-size:28px;letter-spacing:-.4px;margin:0 0 6px}
+h2{font-size:21px;letter-spacing:-.2px;margin:48px 0 6px;scroll-margin-top:56px}
+h3{font-size:15px;margin:0 0 4px}
+p{margin:0 0 10px;color:var(--muted)} p b,li b,td b{color:var(--text)}
+.lede{font-size:15px;max-width:78ch}
+a{color:var(--primary-text)}
+.ic{width:16px;height:16px;flex:none;stroke:currentColor}
+nav.top{position:sticky;top:0;z-index:40;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+nav.top a{padding:5px 12px;border:1px solid var(--border);border-radius:var(--r);background:var(--panel);text-decoration:none;font-weight:600;font-size:13px;min-height:32px;display:inline-flex;align-items:center;color:var(--text)}
+nav.top a:hover{border-color:var(--primary-text)}
+table.spec{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:var(--r-box);font-size:13px;overflow:hidden}
+table.spec th,table.spec td{padding:8px 11px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+table.spec tr:last-child td{border-bottom:0}
+table.spec th{background:var(--bg-soft);font-weight:600}
 .scroll-x{overflow-x:auto}
-.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--soft);color:var(--mut);border:1px solid var(--line)}
-.tag.bad{background:var(--bad-surface);color:var(--bad-text);border-color:var(--bad-line)}
+.tag{display:inline-block;padding:1px 9px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--bg-soft);color:var(--muted);border:1px solid var(--border)}
 .tag.ok{background:var(--ok-surface);color:var(--ok-text);border-color:var(--ok-line)}
-.tag.warn{background:var(--warn-surface);color:var(--warn-text);border-color:var(--warn-line)}
-.callout{background:var(--warn-surface);border:1px solid var(--warn-line);border-radius:8px;padding:10px 14px;color:var(--ink);margin:12px 0}
+.callout{background:var(--warn-surface);border:1px solid var(--warn-line);border-radius:var(--r-box);padding:10px 14px;color:var(--text);margin:12px 0}
 .callout.ok{background:var(--ok-surface);border-color:var(--ok-line)}
-.dir{border-top:3px solid var(--navy-text);margin-top:46px;padding-top:6px}
-.dir .badge{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:7px;background:var(--navy);color:#fff;font-weight:700;margin-right:8px}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media (max-width:820px){.cols{grid-template-columns:1fr}}
-ul.pc{margin:6px 0 14px;padding-left:18px;color:var(--mut)} ul.pc li{margin:2px 0}
+.cap{font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px}
+ol.find{margin:6px 0 16px;padding-left:20px;color:var(--muted)} ol.find li{margin:4px 0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:900px){.row2{grid-template-columns:1fr}}
 
-/* ================== mock stages ================== */
-.frames{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin:12px 0}
-.frame{flex:1 1 640px;min-width:0}
-.frame.phone{flex:0 0 300px}
-.cap{font-size:12px;font-weight:600;color:var(--mut);margin:0 0 5px;text-transform:uppercase;letter-spacing:.04em}
-.stage{position:relative;height:560px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#eef1f4;color:#1f2937}
-.stage.ph{height:560px;border-radius:26px;border:6px solid #111418}
-.stage.tall{height:620px}
-.bar{height:34px;background:#003a66;display:flex;align-items:center;gap:10px;padding:0 12px;color:#fff;font-weight:600;font-size:12px}
-.bar i{width:20px;height:6px;border-radius:2px;background:#a8c855;display:block}
-.bar span{opacity:.75;font-weight:500}
-.bg{padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.bg b{display:block;height:84px;border-radius:7px;background:#fff;border:1px solid #d8dde4}
-.bg b:nth-child(3n){height:56px}
-.scrim{position:absolute;inset:0;background:var(--scrim)}
-.scrim.light{background:rgba(15,23,42,.28)}
+/* ============ STAGES ============ */
+.stage{position:relative;height:640px;border:1px solid var(--border);border-radius:var(--r-box);overflow:hidden;background:var(--bg)}
+.stage.tall{height:700px}
+.stage .appbar{height:34px;background:var(--primary);display:flex;align-items:center;gap:10px;padding:0 12px;color:#fff;font-weight:600;font-size:12px}
+.stage .appbar i{width:20px;height:6px;border-radius:2px;background:#a8c855;display:block}
+.stage .appbar span{opacity:.75;font-weight:500}
+.stage .boardbg{padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stage .boardbg b{display:block;height:84px;border-radius:var(--r-box);background:#fff;border:1px solid var(--border)}
+.stage .scrim{position:absolute;inset:0;background:var(--scrim)}
+.phone{width:320px;height:620px;border:6px solid #111418;border-radius:28px;overflow:hidden;position:relative;background:var(--bg);flex:none}
+.phones{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
 
-/* shared dialog anatomy */
-.dlg{position:absolute;background:var(--surface);color:var(--ink);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;border-radius:10px}
-.dh{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);flex:none}
-.dh h4{margin:0;font-size:16px;font-weight:600;flex:1;min-width:0}
-.dh small{display:block;font-weight:400;color:var(--mut);font-size:12px}
-.x{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--mut);font-size:19px;line-height:1;flex:none}
-.db{padding:16px 18px;overflow:auto;flex:1;min-height:0}
-.df{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:11px 18px;border-top:1px solid var(--line);background:var(--soft);flex:none}
-.df .sp{flex:1}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border:1px solid var(--line);border-radius:7px;background:var(--surface);font:600 13px "Noto Sans",sans-serif;color:var(--ink)}
-.btn.p{background:var(--navy);border-color:var(--navy);color:#fff}
-.btn.d{color:var(--bad-text);border-color:var(--bad-line);background:var(--bad-surface)}
-.btn.s{height:26px;padding:0 9px;font-size:12px}
-.fld{display:block;font-size:12.5px;font-weight:600;margin-bottom:11px}
-.fld .in{margin-top:3px;height:32px;border:1px solid var(--line);border-radius:7px;background:var(--surface);padding:0 9px;display:flex;align-items:center;font-weight:400;font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden}
-.fld .in.ph{color:var(--mut)} .fld .in.ta{height:60px;align-items:flex-start;padding-top:6px}
-.fld .hint{display:block;font-weight:400;color:var(--mut);font-size:11.5px;margin-top:2px;white-space:normal}
-.req{color:var(--bad-text)}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px} .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
-.sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:4px 0 8px;display:flex;align-items:center;gap:8px}
-.sec::after{content:"";flex:1;height:1px;background:var(--line)}
-.tabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--line);flex:none}
-.tabs span{padding:9px 12px;font-weight:600;font-size:13px;color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs span.on{color:var(--navy-text);border-color:var(--navy-text)}
-.mini{width:100%;border-collapse:collapse;font-size:12.5px}
-.mini th{background:var(--soft);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0}
-.mini td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-.mini tr.chg td{background:var(--warn-surface)} .mini tr.new td{background:var(--ok-surface)}
-.pill{display:inline-block;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600;border:1px solid var(--line);background:var(--soft)}
-.pill.ok{background:var(--ok-surface);color:var(--ok-text);border-color:var(--ok-line)}
-.pill.warn{background:var(--warn-surface);color:var(--warn-text);border-color:var(--warn-line)}
-.chip{display:inline-block;padding:2px 9px;border-radius:7px;border:1px solid var(--line);font-size:12px;font-weight:600;margin-right:4px}
-.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
-.kpis{display:flex;gap:8px;margin-bottom:10px}
-.kpis div{flex:1;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface)}
-.kpis b{display:block;font-size:18px;line-height:1.2} .kpis span{font-size:11.5px;color:var(--mut)}
-.note{font-size:12px;color:var(--mut);margin:0 0 8px}
-.anno{position:absolute;z-index:4;background:#111418;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px}
+/* ============ THE SHELL (copied from #settings-view) ============ */
+.ws{display:grid;grid-template-columns:210px minmax(0,1fr);background:var(--bg);color:var(--text);min-height:0}
+.ws.dlg{position:absolute;left:3%;right:3%;top:16px;bottom:16px;border-radius:var(--r-box);box-shadow:var(--shadow);overflow:hidden}
+.ws.dlg.l{left:50%;right:auto;width:min(980px,96%);transform:translateX(-50%)}
+.ws.page{height:460px;border:1px solid var(--border);border-radius:var(--r-box);overflow:hidden}
+.ws .rail{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-right:1px solid var(--border);padding:14px 0 12px;overflow-y:auto}
+.ws .rail-title{margin:0 16px 6px;font-size:20px;line-height:1.3;letter-spacing:-.2px;font-weight:700}
+.ws .grp{margin:16px 16px 6px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.ws .rail .grp:first-of-type{margin-top:10px}
+.ws .tab{display:flex;align-items:center;gap:10px;width:calc(100% - 16px);min-height:40px;margin:1px 8px;padding:8px 12px;border:0;border-radius:var(--r);background:transparent;color:var(--muted);font:600 13px var(--font);text-align:left;cursor:pointer}
+.ws .tab:hover{background:var(--hover-tint);color:var(--text)}
+.ws .tab:focus-visible{outline:2.5px solid var(--primary-text);outline-offset:2px}
+.ws .tab.active{background:var(--primary);color:#fff}
+.ws .tab .n{margin-left:auto;min-width:22px;padding:0 6px;text-align:center;border-radius:999px;font-size:11.5px;background:var(--bg-soft);color:var(--muted)}
+.ws .tab.active .n{background:rgba(255,255,255,.2);color:#fff}
+.ws .tab .n.warn{background:var(--warn-surface);color:var(--warn-text);box-shadow:inset 0 0 0 1px var(--warn-line)}
+.ws .tab.active .n.warn{background:#fff;color:var(--warn-text)}
+.ws .main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ws .head{flex:none;display:flex;align-items:flex-start;gap:12px;padding:20px 28px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+.ws .heading{flex:1;min-width:0}
+.ws .crumb{font-size:11px;color:var(--muted);margin-bottom:4px}
+.ws .title{margin:0;font-size:20px;line-height:1.3;font-weight:700;letter-spacing:-.3px}
+.ws.page .title{font-size:22px}
+.ws .hint{margin:6px 0 0;font-size:12.5px;color:var(--muted);max-width:650px}
+.ws .acts{display:flex;align-items:center;gap:8px;flex:none}
+.ws .body{flex:1;min-height:0;overflow:auto;padding:20px 28px}
+.ws .foot{flex:none;display:flex;align-items:center;gap:10px;padding:11px 28px;background:var(--panel);border-top:1px solid var(--border)}
+.ws .status{flex:1;min-width:0;font-size:12.5px;line-height:1.4;color:var(--muted)}
+.ws .status.dirty{color:var(--warn-text);font-weight:600}
+.ws .status.saved{color:var(--ok-text);font-weight:600}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-box);padding:18px;margin-bottom:14px}
+.card h4{margin:0 0 12px;font-size:16px;line-height:1.3}
+.card p.note{font-size:12.5px;margin:-6px 0 12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--ctl-h);padding:0 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--panel);font:600 13px var(--font);color:var(--text);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--primary-text)}
+.btn.sm{height:26px;padding:0 10px;font-size:12px}
+.btn.p{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.p:hover{background:var(--primary-dark)}
+.btn.danger{color:var(--danger-text);border-color:var(--danger-line);background:var(--danger-surface)}
+.btn.icon{width:var(--ctl-h);padding:0}
+.btn:active{transform:translateY(1px)}
+.btn[hidden]{display:none}
+.btn:focus-visible,.opt:focus-visible,.chipb:focus-visible{outline:2.5px solid var(--primary-text);outline-offset:2px}
+
+/* forms inside the shell */
+.fld{display:block;font-size:13px;font-weight:600;margin-bottom:12px}
+.fld input,.fld select,.fld textarea{display:block;width:100%;margin-top:4px;height:var(--ctl-h);padding:0 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--panel);color:var(--text);font:400 14px var(--font)}
+.fld textarea{height:auto;padding:8px 10px;resize:vertical}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:2.5px solid var(--primary-text);outline-offset:1px;border-color:var(--primary-text)}
+.fld .help{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:3px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.settings-table{width:100%;border-collapse:collapse;font-size:13px}
+.settings-table th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg-soft)}
+.settings-table td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.settings-table tr:last-child td{border-bottom:0}
+.chipb{display:inline-flex;align-items:center;padding:3px 10px;border:1px solid var(--border);border-radius:var(--r);background:var(--panel);font:600 12px var(--font);color:var(--text);cursor:pointer;margin:0 4px 4px 0}
+.chipb[aria-pressed="true"],.chipb.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.note-item{border-bottom:1px solid var(--border);padding:9px 0;font-size:13px} .note-item:last-child{border-bottom:0}
+.note-item small{display:block;color:var(--muted)}
+.pane[hidden]{display:none}
+
+/* ============ REVIEW & MERGE ============ */
+.intro{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:var(--r-box);padding:12px 14px;margin-bottom:14px}
+.intro p{margin:0;color:var(--text);font-size:13px} .intro p+p{margin-top:4px;color:var(--muted)}
+.tb{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.tb .sp{flex:1}
+.tb .lab{font-size:12px;font-weight:600;color:var(--muted);margin-right:2px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;flex:none}
+.mis{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-box);margin-bottom:14px;overflow:hidden}
+.mis-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--border);border-left:4px solid var(--eng,var(--border));background:var(--panel)}
+.mis-h b{font-size:14px} .mis-h .site{color:var(--muted);font-size:12.5px}
+.mis-h .crew{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.mis-h .crew b{color:var(--text)}
+.pill{display:inline-block;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px;background:var(--bg-soft);color:var(--muted);border:1px solid var(--border)}
+.pill.night{background:#1c2430;color:#e8ebed;border-color:#1c2430}
+.pill.new{background:var(--ok-surface);color:var(--ok-text);border-color:var(--ok-line)}
+.pill.gone{background:var(--danger-surface);color:var(--danger-text);border-color:var(--danger-line)}
+.dc{padding:14px 16px;border-bottom:1px solid var(--border);position:relative}
+.dc:last-child{border-bottom:0}
+.dc.undecided{background:linear-gradient(90deg,var(--warn-surface),var(--panel) 38%)}
+.dc.flash{outline:3px solid var(--primary-text);outline-offset:-3px}
+.dc-top{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-bottom:10px}
+.dc-top .what{font-weight:700;font-size:14px}
+.dc-top .sub{color:var(--muted);font-size:12.5px}
+.dc-top .by{margin-left:auto;display:inline-flex;align-items:center;font-size:12px;color:var(--muted)}
+.state{font-size:11.5px;font-weight:700;padding:1px 9px;border-radius:999px}
+.state.need{background:var(--warn-surface);color:var(--warn-text);border:1px solid var(--warn-line)}
+.state.done{background:var(--ok-surface);color:var(--ok-text);border:1px solid var(--ok-line)}
+.state.lock{background:var(--bg-soft);color:var(--muted);border:1px solid var(--border)}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 14px;min-height:62px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--panel);cursor:pointer;font-family:var(--font);color:var(--text);position:relative;transition:border-color .15s,background-color .15s}
+.opt:hover:not(:disabled){border-color:var(--primary-text);background:var(--hover-tint)}
+.opt .k{font-size:11.5px;font-weight:600;color:var(--muted);display:flex;align-items:center}
+.opt .v{font-size:14px;font-weight:700}
+.opt .sel{display:none;position:absolute;top:9px;right:10px;font-size:11px;font-weight:700;color:var(--primary-text);align-items:center;gap:4px}
+.opt[aria-checked="true"]{border-color:var(--primary);background:var(--hover-tint);box-shadow:inset 0 0 0 1px var(--primary)}
+.opt[aria-checked="true"] .sel{display:inline-flex}
+.opt[aria-checked="false"].other{opacity:.62}
+.opt:disabled{cursor:not-allowed}
+.why{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:12.5px}
+.why .q{color:var(--muted);margin-right:8px;font-weight:600}
+.dc .lockmsg{margin-top:8px;font-size:12.5px;color:var(--muted)}
+.same{margin:0 0 14px;font-size:12.5px;color:var(--muted)}
+.sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.sumgrid{grid-template-columns:1fr}}
+.sumlist{margin:0;padding:0;list-style:none}
+.sumlist li{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.sumlist li:last-child{border-bottom:0}
+.sumlist .x{margin-left:auto;font-weight:700;white-space:nowrap}
+.empty{color:var(--muted);font-size:13px;padding:8px 0}
+
+/* "today" recreation */
+.cur{position:absolute;left:3%;right:3%;top:16px;bottom:16px;background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.cur .ch{padding:13px 18px;border-bottom:1px solid var(--border);font-weight:600;font-size:16px}
+.cur .cb{padding:12px 18px;overflow:hidden;flex:1}
+.cur .sm{font-size:11.5px;color:var(--muted);margin:0 0 8px}
+.mchip{display:inline-flex;gap:6px;align-items:center;padding:2px 8px;border:1px solid var(--border);border-radius:5px;font-size:11.5px;background:#e6e9ec;margin:2px 4px 2px 0;color:#1a1a1a}
+.mchip.conf{border-color:#c2410c;background:#fff7ed}
+.mchip.fc{border-style:dashed}
+.mchip.kept{box-shadow:inset 0 0 0 1.5px var(--primary)}
+.mchip.dropped{opacity:.45;text-decoration:line-through}
+.mchip.same{opacity:.8}
+.mgrid{display:grid;grid-template-columns:150px 1fr 1fr;gap:8px 12px;font-size:12px;border-top:1px solid var(--border);padding-top:8px}
+.mgrid .hd{font-weight:700;color:var(--muted)}
+.badge{position:absolute;z-index:3;width:22px;height:22px;border-radius:50%;background:#111418;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-3a8 8 0 0 1 16 0v3"/></symbol>
+<symbol id="i-hardhat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15h16M6 15v-3a6 6 0 0 1 12 0v3M12 4v4M7 15v3h10v-3"/></symbol>
+<symbol id="i-area" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6zM9 4v14M15 6v14"/></symbol>
+<symbol id="i-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3.5V12c0 4.5-3.4 7.6-8 9-4.6-1.4-8-4.5-8-9V6.5L12 3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+<symbol id="i-site" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+
+</defs></svg>
 <main>
-<h1>Modal redesign directions</h1>
-<p class="lede">The app has <b>26 dialogs</b>. 17 of them inherit the default <b>440&nbsp;px</b> card, and the nine that do have a width run from 640 to 1080&nbsp;px. The narrow ones squeeze long forms into a scrolling column. The wide ones are fixed pixel widths that don't use a big screen and don't adapt on a phone. Below: what is wrong today, then four directions, each shown on the same two dialogs (Edit Employee, a long form, and Review &amp; merge forecast, a wide data review) plus a phone view. The sample data is made up.</p>
+<h1>One look for every dialog</h1>
+<p class="lede">You chose direction C, the sectioned workspace, and asked for two fixes: dialogs and side panels should look like the Settings page, and Review &amp; merge should be easy to understand. This page shows both. Everything below is clickable. The colours, radii, rail, header and footer are copied from the real Settings page, so what you see is what would ship.</p>
+<nav class="top" aria-label="Sections"><a href="#shell">1 The shared shell</a><a href="#employee">2 Edit Employee</a><a href="#merge">3 Review &amp; merge</a><a href="#map">4 All 26 dialogs</a><a href="#approve">5 Approve</a></nav>
 
-<nav class="top" aria-label="Sections">
-  <a href="#audit">Audit</a><a href="#today">Today</a><a href="#a">A · Size tiers</a><a href="#b">B · Side sheet</a><a href="#c">C · Sectioned workspace</a><a href="#d">D · Adaptive hybrid</a><a href="#compare">Compare</a>
-</nav>
+<!-- ============ 1 SHELL ============ -->
+<h2 id="shell">1 · The shared shell: Settings, reused</h2>
+<p>In my first round the dialogs had their own side index, header sizes and footer. They looked like a different app. Now there are only two shapes, and both are built from Settings' own parts. I also dropped the right-hand side sheet (direction B), so there is one pattern for editing, not two.</p>
+<p class="cap">Settings, Board setup, Boards (the page that exists today, with the new + Board button)</p>
+<div class="ws page" aria-label="Settings page reference">
+  <aside class="rail">
+    <h2 class="rail-title" style="margin-top:0">Settings</h2>
+    <div class="grp">Personal</div>
+    <button class="tab" type="button"><svg class="ic"><use href="#i-person"/></svg><span>My account</span></button>
+    <div class="grp">Board setup</div>
+    <button class="tab" type="button"><svg class="ic"><use href="#i-hardhat"/></svg><span>Engineers</span></button>
+    <button class="tab" type="button"><svg class="ic"><use href="#i-area"/></svg><span>Service areas</span></button>
+    <button class="tab active" type="button"><svg class="ic"><use href="#i-board"/></svg><span>Boards</span></button>
+    <div class="grp">Administration</div>
+    <button class="tab" type="button"><svg class="ic"><use href="#i-users"/></svg><span>Users</span></button>
+    <button class="tab" type="button"><svg class="ic"><use href="#i-shield"/></svg><span>Roles &amp; permissions</span></button>
+  </aside>
+  <div class="main">
+    <header class="head"><div class="heading"><div class="crumb">Board setup</div><h1 class="title">Boards</h1><p class="hint">Ticked days are that board's non-working days (its weekend).</p></div>
+      <div class="acts"><button class="btn sm p" type="button"><svg class="ic"><use href="#i-plus"/></svg> Board</button></div></header>
+    <div class="body"><div class="card" style="padding:0;overflow:hidden"><table class="settings-table"><thead><tr><th>Board</th><th>Non-working days</th></tr></thead><tbody>
+      <tr><td><b>Board A</b></td><td>Sun, Sat</td></tr><tr><td><b>Board B</b></td><td>Sun, Sat</td></tr></tbody></table></div></div>
+    <footer class="foot"><div class="status saved">All changes saved</div></footer>
+  </div>
+</div>
 
-<!-- ========================= AUDIT ========================= -->
-<h2 id="audit">1 · Audit of every modal</h2>
-<p>Grouped by what the person is doing. The "Today" column is the width set in <code>styles.css</code>.</p>
-<div class="scroll-x"><table class="cmp">
-<thead><tr><th>Group</th><th>Dialogs</th><th>Today</th><th>Problem</th></tr></thead>
+<p class="cap">The same parts, as a dialog (Edit Employee)</p>
+<div class="callout ok"><b>Read across:</b> the rail, group labels, selected item, header, card body and footer are identical. Only three things differ: the dialog floats (it uses the app's one shadow), its title is 20 px instead of 22 px, and it has a Close button.</div>
+<div class="scroll-x"><table class="spec">
+<thead><tr><th>Part</th><th>Settings page today</th><th>Workspace dialog (new)</th><th>Compact dialog (new)</th></tr></thead>
 <tbody>
-<tr><td><b>Record forms</b><br><span class="tag">9</span></td><td>Mission · Employee (3 tabs) · Host · User · Add user · Add engineer · Add service area · New board · Change password</td><td>440 px, one column</td><td>Employee has 10 fields in a single column and scrolls. The 3 tabs share one dialog. Mission has 8 fields, with Shift, Start and End squeezed into 3 slivers of ~120 px. Hints and long labels wrap. The Thai name can be clipped.</td></tr>
-<tr><td><b>Review &amp; decide</b><br><span class="tag">6</span></td><td>Review changes (plandiff) · Review &amp; merge forecast · Merge decisions · Holds taken · Forecast view · Permission review</td><td>640–1080 px fixed</td><td>Tables sit in a fixed width. Below ~1100 px wide the merge dialog switches to a plain scrolling block. A 1080 px card on a 1920 px screen still leaves most of the screen empty. The phone view is a shrunken desktop table.</td></tr>
-<tr><td><b>Pick &amp; bulk</b><br><span class="tag">3</span></td><td>Hide/Unhide missions (920 × 86 vh) · Bulk edit (780) · Add Mission (import, 440)</td><td>mixed</td><td>Import is 440 px but holds a paste area and a checklist. Hide missions is the only dialog designed full-height.</td></tr>
-<tr><td><b>Export</b><br><span class="tag">4</span></td><td>Export board · Export capacity · Export host list · Export manpower list</td><td>440 px</td><td>Format, language, boards and column pickers are stacked into one column. There is no preview of what the file contains.</td></tr>
-<tr><td><b>Confirm / notice</b><br><span class="tag">4</span></td><td>Confirm · Unsaved changes · Temporary password · Copy forecast</td><td>440 px</td><td>These are fine at about 440 px. The one change: the temporary password needs a larger monospace display plus a copy button.</td></tr>
+<tr><td><b>Rail</b></td><td>210 px, white, hairline right edge, 10 px caps group labels, 40 px items, navy fill with white text when selected</td><td>Identical. Items can carry a count badge</td><td>None</td></tr>
+<tr><td><b>Header</b></td><td>Breadcrumb 11 px grey, title 22 px bold, hint 12.5 px grey, actions on the right</td><td>Same, title 20 px. Close button joins the actions</td><td>Title 16 px, optional one-line hint</td></tr>
+<tr><td><b>Body</b></td><td>Cool grey ground, white cards, 1 px border, 8 px corners</td><td>Identical</td><td>White</td></tr>
+<tr><td><b>Footer</b></td><td>Status text on the left (grey, amber when unsaved, green when saved), actions on the right</td><td>Identical, so "Unsaved changes (2)" reads the same everywhere</td><td>Same bar, no status</td></tr>
+<tr><td><b>Buttons</b></td><td>32 px, 7 px corners, one navy primary</td><td>Identical, one navy primary per footer</td><td>Identical</td></tr>
+<tr><td><b>Shadow</b></td><td>None (it is a page)</td><td>The app's one floating shadow</td><td>Same</td></tr>
+<tr><td><b>Phone (under 720 px)</b></td><td>Rail becomes a section picker</td><td>Full-screen page, rail becomes the same picker</td><td>Bottom sheet</td></tr>
 </tbody></table></div>
-<div class="callout"><b>Shared root causes:</b> (1) one size for everything, so every dialog gets 440 px unless someone hand-writes a width; (2) forms are always one column; (3) there is no phone behaviour except Hide missions, so most dialogs just shrink; (4) the dialog title, form and footer are good, with a sticky header, hairlines and a tinted action bar. <b>That anatomy stays in every direction.</b> The redesign is about size, layout and phone behaviour, not about replacing the markup.</div>
 
-<!-- ========================= TODAY ========================= -->
-<h2 id="today">2 · Today (for reference)</h2>
-<div class="frames">
- <div class="frame"><p class="cap">Edit Employee · 440 px</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:50%;top:14px;width:440px;margin-left:-220px;bottom:14px;border-radius:8px">
-    <div class="dh"><h4>Edit Employee</h4><span class="x">×</span></div>
-    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Edit Employee</span></div>
-    <div class="db">
-     <label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label>
-     <label class="fld">English name (optional)<span class="in">Somchai Jaidee</span></label>
-     <label class="fld">TRIGO ID (optional)<span class="in">T329</span></label>
-     <label class="fld">Contract type<span class="in">Permanent</span></label>
-     <label class="fld">Position<span class="in">Senior Inspector</span></label>
-     <label class="fld">Mobile number<span class="in">081-234-5678</span></label>
-     <label class="fld">Start date (optional)<span class="in">12 Mar 2023</span></label>
+<!-- ============ 2 EMPLOYEE ============ -->
+<h2 id="employee">2 · Edit Employee as a workspace</h2>
+<p>Click the rail items to move between sections. Type in any field: the footer switches to "Unsaved changes" with Discard and Save, exactly like Settings. The three old tabs (Host Record, Note, Edit Employee) become two rail groups.</p>
+<div class="stage tall" id="emp-stage"><div class="appbar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="boardbg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+ <div class="ws dlg l" role="dialog" aria-modal="true" aria-labelledby="emp-title">
+  <aside class="rail">
+    <div class="grp">Details</div>
+    <button class="tab active" data-pane="identity" type="button"><svg class="ic"><use href="#i-person"/></svg><span>Identity</span></button>
+    <button class="tab" data-pane="contract" type="button"><svg class="ic"><use href="#i-list"/></svg><span>Contract</span></button>
+    <button class="tab" data-pane="placement" type="button"><svg class="ic"><use href="#i-area"/></svg><span>Placement</span></button>
+    <div class="grp">History</div>
+    <button class="tab" data-pane="hosts" type="button"><svg class="ic"><use href="#i-site"/></svg><span>Host record</span></button>
+    <button class="tab" data-pane="notes" type="button"><svg class="ic"><use href="#i-edit"/></svg><span>Notes</span><span class="n">2</span></button>
+  </aside>
+  <div class="main">
+    <header class="head"><div class="heading"><div class="crumb">Employee T329</div><h1 class="title" id="emp-title">Somchai Jaidee</h1><p class="hint">Senior Inspector on Board A. Changes apply when you save.</p></div>
+      <div class="acts"><button class="btn sm danger" type="button"><svg class="ic"><use href="#i-ban"/></svg> Deactivate</button><button class="btn icon" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div></header>
+    <div class="body" id="emp-body">
+      <section class="pane" data-pane="identity"><div class="card"><h4>Identity</h4><div class="g2">
+        <label class="fld">Thai name <span style="color:var(--danger-text)">*</span><input data-k="thai" value="สมชาย ใจดี"><span class="help">Shown in the app by default.</span></label>
+        <label class="fld">English name<input data-k="en" value="Somchai Jaidee"><span class="help">Used for English Excel exports.</span></label>
+        <label class="fld">TRIGO ID<input data-k="id" value="T329"><span class="help">Letter T and digits, unique.</span></label>
+        <label class="fld">Mobile number<input data-k="phone" type="tel" value="081-234-5678"></label></div></div></section>
+      <section class="pane" data-pane="contract" hidden><div class="card"><h4>Contract</h4><div class="g2">
+        <label class="fld">Contract type<select data-k="contract"><option>Permanent</option><option>On-call</option></select></label>
+        <label class="fld">Position<select data-k="pos"><option>Senior Inspector</option><option>Inspector</option><option>Technician</option><option>Team Leader</option></select></label>
+        <label class="fld">Start date<input data-k="start" type="date" value="2023-03-12"></label>
+        <label class="fld">On the board from<input data-k="from" type="date" value="2023-04-01"><span class="help">Headcount counts this person from this day.</span></label></div></div></section>
+      <section class="pane" data-pane="placement" hidden><div class="card"><h4>Placement</h4><div class="g2">
+        <label class="fld">Service area<select data-k="area"><option>Eastern</option><option>Central</option><option>Rayong West</option></select></label>
+        <label class="fld">Board<select data-k="board"><option>Board A</option><option>Board B</option></select></label></div></div></section>
+      <section class="pane" data-pane="hosts" hidden><div class="card" style="padding:0;overflow:hidden"><table class="settings-table"><thead><tr><th>Host</th><th>Mission</th><th>Last day</th></tr></thead><tbody>
+        <tr><td>Fortune</td><td>BANGN.26.0007</td><td>13 Oct 2026</td></tr><tr><td>Hayashi</td><td>BANGN.26.0011</td><td>9 Oct 2026</td></tr><tr><td>Amata City Plt 2</td><td>BANGN.26.0003</td><td>2 Oct 2026</td></tr></tbody></table></div></section>
+      <section class="pane" data-pane="notes" hidden><div class="card"><h4>Notes</h4><p class="note">Visible to anyone who can edit the roster.</p>
+        <div class="note-item">Prefers day shifts.<small>Anan P., 3 Oct 2026</small></div><div class="note-item">Safety refresher due in November.<small>Nattaya, 29 Sep 2026</small></div>
+        <label class="fld" style="margin-top:12px">Add a note<textarea data-k="note" rows="2" placeholder="e.g. needs a safety refresher"></textarea></label></div></section>
     </div>
-    <div class="anno" style="right:14px;top:40%">scrolls ↓ 3 more fields</div>
-    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
-   </div></div></div>
- <div class="frame"><p class="cap">Review &amp; merge forecast · 1080 px (fixed)</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:6px;right:6px;top:14px;bottom:14px;border-radius:8px">
-    <div class="dh"><h4>Review &amp; merge forecast</h4><span class="x">×</span></div>
-    <div class="db"><table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Crew</th><th>Current</th><th>Forecast</th><th>Keep</th></tr></thead><tbody>
-     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>14 Oct</td><td>4</td><td>Somchai, Anan…</td><td>Somchai, Malee…</td><td>Forecast</td></tr>
-     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>14 Oct</td><td>2</td><td>—</td><td>Prasit, Kanya</td><td>Forecast</td></tr>
-     <tr><td>BANGN.26.0003</td><td>Amata Plt 2</td><td>15 Oct</td><td>3</td><td>Wichai…</td><td>Wichai…</td><td>—</td></tr>
-    </tbody></table></div>
-    <div class="df"><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
-   </div></div></div>
+    <footer class="foot"><div class="status" id="emp-status">No unsaved changes</div><button class="btn" id="emp-discard" type="button" hidden>Discard</button><button class="btn" type="button">Close</button><button class="btn p" id="emp-save" type="button" hidden>Save changes</button></footer>
+  </div>
+ </div>
 </div>
-<p class="note">Sample only. In the real dialog, a 1080 px card is centred and capped, so on wide monitors the table cannot use the room and long host / crew text truncates.</p>
-
-<!-- ========================= A ========================= -->
-<section class="dir" id="a">
-<h2 style="margin-top:6px"><span class="badge">A</span>Size tiers + two-column forms <span class="tag ok">Smallest change</span></h2>
-<p><b>Idea:</b> keep the centred dialog but stop treating every dialog the same. Four size tiers: <b>S 480</b> (confirm/notice), <b>M 720</b> (record forms, two columns), <b>L 1040</b> (review tables, export), <b>XL 94 vw × 90 vh</b> (merge, bulk, hide missions). The card grows with the viewport up to its tier. On a phone every tier becomes a full-screen page.</p>
-<div class="frames">
- <div class="frame"><p class="cap">M · Edit Employee · 720 px, 2 columns</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:50%;top:22px;width:720px;margin-left:-360px;bottom:22px">
-    <div class="dh"><h4>Edit Employee<small>สมชาย ใจดี · T329</small></h4><span class="x">×</span></div>
-    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Edit Employee</span></div>
-    <div class="db">
-     <div class="g2">
-      <label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label>
-      <label class="fld">English name<span class="in">Somchai Jaidee</span></label>
-      <label class="fld">TRIGO ID<span class="in">T329</span></label>
-      <label class="fld">Mobile number<span class="in">081-234-5678</span></label>
-      <label class="fld">Contract type<span class="in">Permanent</span></label>
-      <label class="fld">Position<span class="in">Senior Inspector</span></label>
-      <label class="fld">Start date<span class="in">12 Mar 2023</span></label>
-      <label class="fld">On the board from<span class="in">1 Apr 2023</span></label>
-      <label class="fld">Service area<span class="in">Eastern</span></label>
-      <label class="fld">Board<span class="in">Board A</span></label>
-     </div></div>
-    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
-   </div></div></div>
- <div class="frame"><p class="cap">XL · Review &amp; merge forecast · 94 vw × 90 vh</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:3%;right:3%;top:14px;bottom:14px">
-    <div class="dh"><h4>Review &amp; merge forecast<small>Forecast for 14–18 Oct · 12 changes, 3 conflicts</small></h4><span class="x">×</span></div>
-    <div class="db"><div class="kpis"><div><b>12</b><span>changes</span></div><div><b>3</b><span>conflicts</span></div><div><b>2</b><span>new missions</span></div><div><b>0</b><span>skipped</span></div></div>
-     <table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Current crew</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
-     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14 Oct</td><td>Somchai, Anan, Wichai, Kanya</td><td>Somchai, Malee, Wichai, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14 Oct</td><td>—</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-     <tr class="chg"><td>BANGN.26.0003</td><td>Amata City Plt 2</td><td>Wed 15 Oct</td><td>Wichai, Anan, Malee</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr>
-     <tr><td>BANGN.26.0015</td><td>Toyota Gateway</td><td>Thu 16 Oct</td><td>Prasit, Nok</td><td>Prasit, Nok</td><td>no change</td></tr>
-    </tbody></table></div>
-    <div class="df"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
-   </div></div></div>
- <div class="frame phone"><p class="cap">Phone · full-screen page</p>
-  <div class="stage ph"><div class="dlg" style="inset:0;border-radius:0">
-    <div class="dh" style="padding:12px 12px"><span class="x">‹</span><h4 style="font-size:15px">Edit Employee</h4></div>
-    <div class="db" style="padding:12px">
-     <label class="fld">Thai name <span class="req">*</span><span class="in" style="height:40px">สมชาย ใจดี</span></label>
-     <label class="fld">English name<span class="in" style="height:40px">Somchai Jaidee</span></label>
-     <label class="fld">Contract type<span class="in" style="height:40px">Permanent</span></label>
-     <label class="fld">Position<span class="in" style="height:40px">Senior Inspector</span></label>
-    </div>
-    <div class="df" style="padding:10px 12px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Save</span></div>
-   </div></div></div>
+<p class="cap">On a phone</p>
+<div class="phones">
+ <div class="phone"><div class="ws" style="display:flex;flex-direction:column;height:100%">
+   <header class="head" style="padding:12px 14px"><button class="btn icon" type="button" aria-label="Back"><svg class="ic"><use href="#i-chevron-left"/></svg></button><div class="heading"><div class="crumb">Employee T329</div><h1 class="title" style="font-size:17px">Somchai Jaidee</h1></div></header>
+   <div style="padding:12px 14px 0;background:var(--bg)"><label class="fld" style="margin:0">Section<select><option>Identity</option><option>Contract</option><option>Placement</option><option>Host record</option><option>Notes (2)</option></select></label></div>
+   <div class="body" style="padding:12px 14px"><div class="card" style="padding:14px"><label class="fld">Thai name <span style="color:var(--danger-text)">*</span><input value="สมชาย ใจดี" style="height:40px"></label><label class="fld">English name<input value="Somchai Jaidee" style="height:40px"></label><label class="fld">TRIGO ID<input value="T329" style="height:40px"></label></div></div>
+   <footer class="foot" style="padding:10px 14px"><button class="btn" style="flex:1;height:40px" type="button">Close</button><button class="btn p" style="flex:1;height:40px" type="button">Save changes</button></footer></div></div>
+ <div style="flex:1;min-width:240px;max-width:520px"><h3>Phone rules</h3><ul style="color:var(--muted);padding-left:18px;margin:6px 0">
+  <li>Full screen. The rail becomes the same section picker Settings already uses under 720 px.</li>
+  <li>Inputs are 40 px high and 16 px type, so iOS does not zoom.</li>
+  <li>The footer is pinned and respects the home-bar safe area.</li></ul></div>
 </div>
-<ul class="pc"><li><b>+</b> Almost pure CSS: add a <code>data-size</code> on each <code>.modal</code> and a 2-column grid on <code>.modal form</code>. No markup rewrite.</li>
-<li><b>+</b> Reviews finally use big screens; forms stay a familiar centred card.</li>
-<li><b>−</b> Still a card over the board, so you cannot see the board while editing. 10-field forms are shorter but not "sectioned".</li></ul>
-</section>
 
-<!-- ========================= B ========================= -->
-<section class="dir" id="b">
-<h2 style="margin-top:6px"><span class="badge">B</span>Right-hand side sheet <span class="tag warn">Keeps the board visible</span></h2>
-<p><b>Idea:</b> record forms slide in from the right as a full-height <b>sheet</b> (560–720 px) with a light scrim, so the board and the cards you are editing stay visible and you can see the effect of a change behind it. Review tables open a <b>wide sheet</b> (up to 90 vw). Confirm / notice stay small centred dialogs. On a phone the sheet is full-screen.</p>
-<div class="frames">
- <div class="frame"><p class="cap">Edit Employee · 640 px sheet, sections</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim light"></div>
-   <div class="dlg" style="right:0;top:0;bottom:0;width:640px;border-radius:12px 0 0 12px">
-    <div class="dh"><span class="x" style="background:var(--soft)">←</span><h4>Edit Employee<small>สมชาย ใจดี · T329 · Board A</small></h4><span class="x">×</span></div>
-    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Details</span></div>
-    <div class="db">
-     <div class="sec">Identity</div>
-     <div class="g2"><label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label><label class="fld">English name<span class="in">Somchai Jaidee</span></label><label class="fld">TRIGO ID<span class="in">T329</span></label><label class="fld">Mobile<span class="in">081-234-5678</span></label></div>
-     <div class="sec">Contract</div>
-     <div class="g2"><label class="fld">Contract type<span class="in">Permanent</span></label><label class="fld">Position<span class="in">Senior Inspector</span></label><label class="fld">Start date<span class="in">12 Mar 2023</span></label><label class="fld">On the board from<span class="in">1 Apr 2023</span></label></div>
-     <div class="sec">Placement</div>
-     <div class="g2"><label class="fld">Service area<span class="in">Eastern</span></label><label class="fld">Board<span class="in">Board A</span></label></div>
-    </div>
-    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
-   </div></div></div>
- <div class="frame"><p class="cap">Wide sheet · Review &amp; merge forecast · 90 vw</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim light"></div>
-   <div class="dlg" style="right:0;top:0;bottom:0;width:92%;border-radius:12px 0 0 12px">
-    <div class="dh"><span class="x" style="background:var(--soft)">←</span><h4>Review &amp; merge forecast<small>14–18 Oct · 12 changes, 3 conflicts</small></h4><span class="x">×</span></div>
-    <div class="db"><div class="kpis"><div><b>12</b><span>changes</span></div><div><b>3</b><span>conflicts</span></div><div><b>2</b><span>new missions</span></div></div>
-     <table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Current crew</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
-     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14 Oct</td><td>Somchai, Anan, Wichai…</td><td>Somchai, Malee, Wichai…</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14 Oct</td><td>—</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-     <tr class="chg"><td>BANGN.26.0003</td><td>Amata City Plt 2</td><td>Wed 15 Oct</td><td>Wichai, Anan, Malee</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr>
-    </tbody></table></div>
-    <div class="df"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
-   </div></div></div>
- <div class="frame phone"><p class="cap">Phone · full-screen sheet</p>
-  <div class="stage ph"><div class="dlg" style="inset:0;border-radius:0">
-    <div class="dh" style="padding:12px"><span class="x">‹</span><h4 style="font-size:15px">Edit Employee</h4></div>
-    <div class="db" style="padding:12px"><div class="sec">Identity</div>
-     <label class="fld">Thai name <span class="req">*</span><span class="in" style="height:40px">สมชาย ใจดี</span></label>
-     <label class="fld">English name<span class="in" style="height:40px">Somchai Jaidee</span></label>
-     <div class="sec">Contract</div>
-     <label class="fld">Contract type<span class="in" style="height:40px">Permanent</span></label></div>
-    <div class="df" style="padding:10px 12px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Save</span></div>
-   </div></div></div>
+<!-- ============ 3 MERGE ============ -->
+<h2 id="merge">3 · Review &amp; merge forecast, rebuilt around decisions</h2>
+<h3>What is hard to understand today</h3>
+<ol class="find">
+<li><b>Two words nobody defines.</b> "Carry-over" and "Forecast" appear everywhere, and the meaning is hidden in one dense paragraph.</li>
+<li><b>Meaning carried by line style.</b> "Solid" and "dashed" outlines tell you which side is which, and four chip styles (same, needs a decision, kept, not used) need a legend.</li>
+<li><b>You decide by clicking a tiny name tag.</b> It is unclear what the click does, and the same person can show up in two rows (where they are now, and where the forecast sends them).</li>
+<li><b>The effect is not in the choice.</b> A chip says "Somchai" with a small arrow. It never says "Somchai stays on 0007" or "Somchai moves to 0011".</li>
+<li><b>Bulk actions in three places:</b> a toolbar, per-forecaster chips, and per-mission buttons.</li>
+<li><b>The ending is a surprise.</b> Reasons for forecasters appear after the list, the Confirm step is a separate screen, and the footer button says "Apply (3 left)" then flashes something.</li>
+</ol>
+<p class="cap">Today (recreated, with the problems marked)</p>
+<div class="stage" style="height:420px"><div class="appbar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="boardbg"><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+ <div class="cur"><div class="ch">Review &amp; merge forecast, Tue 14 Oct</div><div class="cb">
+  <p class="sm">Left: carried over from Mon 13 Oct. Right: the forecast (dashed). Click a flagged person on the side you want to keep; hover to see where they are on the other side. Only the chosen side is written.</p>
+  <div style="margin-bottom:8px"><span class="mchip same">Same on both sides</span><span class="mchip conf">Needs a decision</span><span class="mchip kept">Kept</span><span class="mchip dropped">Not used</span></div>
+  <div style="margin-bottom:10px"><span class="mchip">All · 6</span><span class="mchip">Pim · 4</span><span class="mchip">Arthit · 2</span> <span class="btn sm" style="margin-left:6px">Keep carry-over for all</span> <span class="btn sm">Take forecast for all</span></div>
+  <div class="mgrid"><div class="hd">Mission</div><div class="hd">Carry-over (solid)</div><div class="hd">Forecast (dashed)</div>
+   <div><b>BANGN.26.0007</b> DAY<br>Fortune → Hayashi<br><span class="btn sm">Keep carry-over</span> <span class="btn sm">Use forecast</span></div>
+   <div><span class="mchip conf">Somchai J. → 0011</span><span class="mchip conf">Kanya R. → 0011</span><span class="mchip same">Anan P.</span></div>
+   <div><span class="mchip fc conf">Somchai J. ← 0007</span><span class="mchip fc conf">Kanya R. ← 0007</span></div></div></div>
+  <div class="foot" style="display:flex;padding:11px 18px;border-top:1px solid var(--border);background:var(--bg-soft);gap:10px;align-items:center"><span style="flex:1;font-size:12.5px;color:var(--muted)">0 of 6 differences decided</span><span class="btn">Cancel</span><span class="btn p">Apply (6 left)</span></div></div>
+ <span class="badge" style="left:6%;top:78px">1</span><span class="badge" style="left:6%;top:112px">2</span><span class="badge" style="right:20%;top:150px">5</span><span class="badge" style="left:38%;top:218px">3</span><span class="badge" style="left:56%;top:218px">4</span><span class="badge" style="right:4%;bottom:26px">6</span>
 </div>
-<ul class="pc"><li><b>+</b> Best for edit-in-context work (change an employee while seeing the board). The sheet is full height, so long forms and the notes list have room.</li>
-<li><b>+</b> One pattern for every "record" dialog and phone behaviour that matches it.</li>
-<li><b>−</b> A different feel from today. The focus trap, Esc and the unsaved-changes guard all need rework for a slide-in. A sheet that hides the right-hand cards can hide exactly what you were editing.</li></ul>
-</section>
 
-<!-- ========================= C ========================= -->
-<section class="dir" id="c">
-<h2 style="margin-top:6px"><span class="badge">C</span>Sectioned workspace (large, with a side index) <span class="tag warn">Most structure</span></h2>
-<p><b>Idea:</b> big forms become a ~960 px <b>workspace</b>: a left index (Identity · Contract · Placement · Notes) jumps to each section, the form is one scrolling column to its right, and a <b>live summary card</b> shows what the record will look like on the board. Review dialogs use the same shell with filters in the index column. Phone: the index becomes a sticky section selector.</p>
-<div class="frames">
- <div class="frame"><p class="cap">Edit Employee · 960 px workspace</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:50%;top:20px;bottom:20px;width:min(960px,98%);transform:translateX(-50%)">
-    <div class="dh"><h4>Edit Employee</h4><span class="x">×</span></div>
-    <div style="display:grid;grid-template-columns:170px 1fr 190px;flex:1;min-height:0">
-     <div style="border-right:1px solid var(--line);padding:12px 8px;background:var(--soft);font-size:13px;font-weight:600">
-      <div style="padding:7px 10px;border-radius:7px;background:var(--navy-tint);color:var(--navy-text)">Identity</div>
-      <div style="padding:7px 10px;color:var(--mut)">Contract</div><div style="padding:7px 10px;color:var(--mut)">Placement</div>
-      <div style="padding:7px 10px;color:var(--mut)">Host record</div><div style="padding:7px 10px;color:var(--mut)">Notes <span class="pill" style="margin-left:4px">2</span></div></div>
-     <div class="db"><div class="sec">Identity</div><div class="g2">
-      <label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label><label class="fld">English name<span class="in">Somchai Jaidee</span><span class="hint">Used for English Excel exports.</span></label>
-      <label class="fld">TRIGO ID<span class="in">T329</span></label><label class="fld">Mobile<span class="in">081-234-5678</span></label></div>
-      <div class="sec">Contract</div><div class="g2"><label class="fld">Contract type<span class="in">Permanent</span></label><label class="fld">Position<span class="in">Senior Inspector</span></label><label class="fld">Start date<span class="in">12 Mar 2023</span></label><label class="fld">On the board from<span class="in">1 Apr 2023</span></label></div>
-      <div class="sec">Placement</div></div>
-     <div style="border-left:1px solid var(--line);padding:14px;background:var(--surface)"><p class="cap">Preview on board</p>
-      <div style="border:1px solid #b4bcc4;border-radius:8px;background:#e6e9ec;color:#1a1a1a;padding:8px 10px;font-size:12.5px"><b>สมชาย ใจดี</b><br><span style="color:#545c66">Senior Inspector · Eastern</span></div>
-      <p class="note" style="margin-top:10px">Shown on Board A, permanent (solid border).</p></div>
-    </div>
-    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
-   </div></div></div>
- <div class="frame"><p class="cap">Workspace · Review &amp; merge forecast · filters in the index</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:2%;right:2%;top:14px;bottom:14px">
-    <div class="dh"><h4>Review &amp; merge forecast</h4><span class="x">×</span></div>
-    <div style="display:grid;grid-template-columns:170px 1fr;flex:1;min-height:0">
-     <div style="border-right:1px solid var(--line);padding:12px;background:var(--soft);font-size:12.5px;font-weight:600">
-      <p class="cap">Show</p><div style="padding:5px 8px;border-radius:7px;background:var(--navy-tint);color:var(--navy-text)">All · 12</div><div style="padding:5px 8px;color:var(--mut)">Conflicts · 3</div><div style="padding:5px 8px;color:var(--mut)">New missions · 2</div><div style="padding:5px 8px;color:var(--mut)">Unchanged · 4</div>
-      <p class="cap" style="margin-top:12px">Day</p><div style="padding:5px 8px;color:var(--mut)">Tue 14</div><div style="padding:5px 8px;color:var(--mut)">Wed 15</div></div>
-     <div class="db"><table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
-      <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14</td><td>Somchai, Malee, Wichai…</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-      <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-      <tr class="chg"><td>BANGN.26.0003</td><td>Amata Plt 2</td><td>Wed 15</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr></tbody></table></div></div>
-    <div class="df"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
-   </div></div></div>
- <div class="frame phone"><p class="cap">Phone · sticky section tabs</p>
-  <div class="stage ph"><div class="dlg" style="inset:0;border-radius:0">
-    <div class="dh" style="padding:12px"><span class="x">‹</span><h4 style="font-size:15px">Edit Employee</h4></div>
-    <div class="tabs" style="padding:0 8px;overflow:hidden"><span class="on">Identity</span><span>Contract</span><span>Placement</span></div>
-    <div class="db" style="padding:12px"><label class="fld">Thai name <span class="req">*</span><span class="in" style="height:40px">สมชาย ใจดี</span></label><label class="fld">English name<span class="in" style="height:40px">Somchai Jaidee</span></label><label class="fld">TRIGO ID<span class="in" style="height:40px">T329</span></label></div>
-    <div class="df" style="padding:10px 12px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Save</span></div>
-   </div></div></div>
+<h3 style="margin-top:22px">The new design</h3>
+<p>The page now asks one question per card: <b>which version do we keep?</b> Each option states its result in plain words. Try it: choose a side on each card. Choose "Don't add" on the new mission to see the locked cards, or choose a carry-over side on a forecaster's card to see the optional reason appear. The footer button tells you what is left.</p>
+<div class="stage tall" id="mg-stage" style="height:760px"><div class="appbar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="boardbg"><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
+ <div class="ws dlg" id="mg" role="dialog" aria-modal="true" aria-labelledby="mg-title">
+  <aside class="rail" id="mg-rail"></aside>
+  <div class="main">
+   <header class="head"><div class="heading"><div class="crumb" id="mg-crumb"></div><h1 class="title" id="mg-title"></h1><p class="hint" id="mg-hint"></p></div><div class="acts"><button class="btn icon" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div></header>
+   <div class="body" id="mg-body"></div>
+   <footer class="foot"><div class="status" id="mg-status"></div><button class="btn" id="mg-back" type="button" hidden>Back to review</button><button class="btn" type="button">Cancel</button><button class="btn p" id="mg-main" type="button"></button></footer>
+  </div>
+ </div>
 </div>
-<ul class="pc"><li><b>+</b> Best for the heaviest dialogs (employee, user, bulk, review). The live preview ties a form to what shows on the board.</li>
-<li><b>−</b> The most work: every form needs sections and a preview component. Overkill for 5-field forms (host, board, area), which would still use a smaller dialog, so you end up with two patterns.</li></ul>
-</section>
-
-<!-- ========================= D ========================= -->
-<section class="dir" id="d">
-<h2 style="margin-top:6px"><span class="badge">D</span>Adaptive hybrid: right size per job, bottom sheet on a phone <span class="tag ok">Recommended</span></h2>
-<p><b>Idea:</b> A's size tiers, plus two things A lacks: review/bulk dialogs get an <b>expand to full screen</b> button (and open full-screen by default under 1200 px), and on a phone every dialog becomes a <b>bottom sheet</b> (confirm and short forms, ~70% height) or a <b>full-screen page</b> (tall forms and tables), with a sticky action bar that respects the safe area. Long forms get light section headings (as in B), but no side index.</p>
-<div class="frames">
- <div class="frame"><p class="cap">Edit Employee · M tier, 760 px, sectioned</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:50%;top:18px;bottom:18px;width:760px;margin-left:-380px">
-    <div class="dh"><h4>Edit Employee<small>สมชาย ใจดี · T329</small></h4><span class="x" title="Expand">⤢</span><span class="x">×</span></div>
-    <div class="tabs"><span>Host Record</span><span>Note</span><span class="on">Edit Employee</span></div>
-    <div class="db">
-     <div class="sec">Who</div>
-     <div class="g3"><label class="fld">Thai name <span class="req">*</span><span class="in">สมชาย ใจดี</span></label><label class="fld">English name<span class="in">Somchai Jaidee</span></label><label class="fld">TRIGO ID<span class="in">T329</span></label></div>
-     <div class="sec">Contract</div>
-     <div class="g3"><label class="fld">Contract type<span class="in">Permanent</span></label><label class="fld">Position<span class="in">Senior Inspector</span></label><label class="fld">Mobile<span class="in">081-234-5678</span></label>
-      <label class="fld">Start date<span class="in">12 Mar 2023</span></label><label class="fld">On the board from<span class="in">1 Apr 2023</span></label></div>
-     <div class="sec">Where</div>
-     <div class="g3"><label class="fld">Service area<span class="in">Eastern</span></label><label class="fld">Board<span class="in">Board A</span></label></div>
-    </div>
-    <div class="df"><span class="btn d">Deactivate</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Save</span></div>
-   </div></div></div>
- <div class="frame"><p class="cap">XL tier · Review &amp; merge forecast · full-width with ⤢ toggle</p>
-  <div class="stage"><div class="bar"><i></i>TRIGO Manpower <span>Board A</span></div><div class="bg"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><div class="scrim"></div>
-   <div class="dlg" style="left:2%;right:2%;top:14px;bottom:14px">
-    <div class="dh"><h4>Review &amp; merge forecast<small>14–18 Oct · 12 changes, 3 conflicts</small></h4><span class="x" title="Full screen">⤢</span><span class="x">×</span></div>
-    <div class="db"><div class="kpis"><div><b>12</b><span>changes</span></div><div><b>3</b><span>conflicts</span></div><div><b>2</b><span>new missions</span></div></div>
-     <table class="mini"><thead><tr><th>Mission</th><th>Host</th><th>Date</th><th>Current crew</th><th>Forecast crew</th><th>Keep</th></tr></thead><tbody>
-     <tr class="chg"><td>BANGN.26.0007</td><td>Fortune</td><td>Tue 14 Oct</td><td>Somchai, Anan, Wichai, Kanya</td><td>Somchai, Malee, Wichai, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-     <tr class="new"><td>BANGN.26.0011</td><td>Hayashi</td><td>Tue 14 Oct</td><td>—</td><td>Prasit, Kanya</td><td><span class="chip on">Forecast</span><span class="chip">Current</span></td></tr>
-     <tr class="chg"><td>BANGN.26.0003</td><td>Amata City Plt 2</td><td>Wed 15 Oct</td><td>Wichai, Anan, Malee</td><td>Wichai, Anan</td><td><span class="chip">Forecast</span><span class="chip on">Current</span></td></tr></tbody></table></div>
-    <div class="df"><span class="note" style="margin:0">3 conflicts need a choice</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Apply 12 changes</span></div>
-   </div></div></div>
- <div class="frame phone"><p class="cap">Phone · bottom sheet (short form)</p>
-  <div class="stage ph" style="background:#eef1f4"><div class="bar"><i></i>TRIGO</div><div class="scrim"></div>
-   <div class="dlg" style="left:0;right:0;bottom:0;height:78%;border-radius:16px 16px 0 0">
-    <div style="width:38px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 0"></div>
-    <div class="dh" style="padding:8px 14px 10px"><h4 style="font-size:15px">New Board</h4><span class="x">×</span></div>
-    <div class="db" style="padding:12px 14px"><label class="fld">Board name <span class="req">*</span><span class="in" style="height:40px">Board B</span></label>
-     <p class="cap">Weekend days</p><div><span class="chip on">Sun</span><span class="chip">Mon</span><span class="chip">Tue</span><span class="chip">Wed</span><span class="chip">Thu</span><span class="chip">Fri</span><span class="chip on">Sat</span></div></div>
-    <div class="df" style="padding:10px 14px"><span class="btn" style="flex:1;height:40px">Cancel</span><span class="btn p" style="flex:1;height:40px">Create board</span></div>
-   </div></div></div>
+<p class="cap">On a phone (static)</p>
+<div class="phones">
+ <div class="phone"><div class="ws" style="display:flex;flex-direction:column;height:100%">
+  <header class="head" style="padding:12px 14px"><button class="btn icon" type="button" aria-label="Back"><svg class="ic"><use href="#i-chevron-left"/></svg></button><div class="heading"><div class="crumb">Tue 14 Oct</div><h1 class="title" style="font-size:17px">Review forecast</h1></div></header>
+  <div style="padding:10px 14px 0"><label class="fld" style="margin:0 0 8px">Show<select><option>All differences (6)</option><option>Crew moves (3)</option></select></label><div style="font-size:12.5px;color:var(--warn-text);font-weight:600;margin-bottom:6px">2 still need a decision</div></div>
+  <div class="body" style="padding:6px 14px"><div class="mis"><div class="mis-h" style="--eng:#2a78d6"><b>0007</b><span class="pill">DAY</span><span class="site">Fortune</span></div>
+   <div class="dc undecided"><div class="dc-top"><span class="what">Somchai J.</span><span class="state need">Needs a decision</span></div>
+   <div class="opts" style="grid-template-columns:1fr"><button class="opt" type="button"><span class="k">Carry-over</span><span class="v">Stay on 0007 Day</span></button><button class="opt" type="button"><span class="k"><i class="dot" style="background:var(--fc-1)"></i>Pim's forecast</span><span class="v">Move to 0011 Day</span></button></div></div></div></div>
+  <footer class="foot" style="padding:10px 14px"><button class="btn p" style="flex:1;height:44px" type="button">Next undecided (2 left)</button></footer></div></div>
+ <div style="flex:1;min-width:240px;max-width:520px"><h3>What changed, in one line each</h3><ul style="color:var(--muted);padding-left:18px;margin:6px 0">
+  <li><b>Plain words first:</b> Carry-over is the plan carried from the day before, the forecast is what engineers planned. Said once at the top, dismissible.</li>
+  <li><b>One decision per card, with the result in the button:</b> "Stay on 0007 Day" or "Move to 0011 Day".</li>
+  <li><b>No line-style code.</b> State is a word ("Needs a decision", "Selected") plus colour.</li>
+  <li><b>One bulk bar</b> that acts on what you are looking at.</li>
+  <li><b>Reasons sit on the card</b> they belong to, only when needed.</li>
+  <li><b>Summary is the last rail step</b>, in the same dialog, with the alerts that will go out.</li></ul></div>
 </div>
-<ul class="pc"><li><b>+</b> Closest to what the code already is (<code>h3</code> header, <code>form</code> body, <code>.modal-actions</code> footer), so most of it lands as CSS plus one <code>data-size</code> attribute per dialog. It covers all 26 dialogs, including the small ones.</li>
-<li><b>+</b> Fixes the phone, which no other direction treats as first-class for every dialog.</li>
-<li><b>−</b> The sectioned form headings need small markup additions to the 4–5 long forms (employee, mission, user, bulk). No live preview (that is C's extra).</li></ul>
-</section>
 
-<!-- ========================= COMPARE ========================= -->
-<h2 id="compare">3 · Comparison</h2>
-<div class="scroll-x"><table class="cmp">
-<thead><tr><th></th><th>A · Size tiers</th><th>B · Side sheet</th><th>C · Workspace</th><th>D · Adaptive hybrid</th></tr></thead>
+<!-- ============ 4 MAP ============ -->
+<h2 id="map">4 · Where each of the 26 dialogs goes</h2>
+<p>Three shapes, chosen by the job. The rail is used only when a dialog has real sections or views.</p>
+<div class="scroll-x"><table class="spec">
+<thead><tr><th>Shape</th><th>Size</th><th>Dialogs</th><th>Rail holds</th></tr></thead>
 <tbody>
-<tr><td><b>Fixes narrow forms</b></td><td>✔ 2 columns at 720</td><td>✔ 640 sheet, full height</td><td>✔✔ 960 + preview</td><td>✔ 3 columns at 760</td></tr>
-<tr><td><b>Fixes wide reviews</b></td><td>✔ XL tier</td><td>✔ 90 vw sheet</td><td>✔ filter index</td><td>✔ XL + full-screen toggle</td></tr>
-<tr><td><b>Phone behaviour</b></td><td>full-screen page</td><td>full-screen sheet</td><td>full-screen + tabs</td><td>bottom sheet or page by height</td></tr>
-<tr><td><b>Board stays visible</b></td><td>no</td><td>yes (right side)</td><td>no</td><td>no</td></tr>
-<tr><td><b>Changes the feel</b></td><td>little</td><td>a lot</td><td>a lot</td><td>moderate</td></tr>
-<tr><td><b>Effort</b></td><td><span class="tag ok">Low</span> CSS + attribute</td><td><span class="tag warn">Medium-high</span> motion, focus, guards</td><td><span class="tag bad">High</span> new components</td><td><span class="tag ok">Low-medium</span> CSS + headings in 4–5 forms</td></tr>
-<tr><td><b>Risk to existing tests</b></td><td>low (ids/selectors kept)</td><td>medium</td><td>high</td><td>low</td></tr>
+<tr><td><b>Workspace XL</b> <span class="tag">5</span></td><td>94 vw by 90 vh</td><td>Review &amp; merge, Review changes, Hide/Unhide missions, Bulk edit, Merge decisions</td><td>Views and filters (All, Crew, Details), then a Summary step</td></tr>
+<tr><td><b>Workspace L</b> <span class="tag">12</span></td><td>about 980 px, grows to 90 vh</td><td>Edit Employee, User, Mission, Host, Add Mission (import), Export board, Export capacity, Export host list, Export manpower list, Permission review, Holds taken, Forecast view</td><td>Sections of the form, or for exports: Format, Boards, Columns</td></tr>
+<tr><td><b>Compact</b> <span class="tag">9</span></td><td>480 px</td><td>Confirm, Unsaved changes, Temporary password, Copy forecast, New board, Add service area, Add engineer, Add user, Change password</td><td>No rail</td></tr>
 </tbody></table></div>
-<div class="callout ok"><b>My recommendation: D.</b> It keeps every id and class the app and the e2e tests already use, covers all 26 dialogs with one rule set, and treats the phone as a first-class case. If you also want to <i>see the board while editing</i>, take D for everything and use B's side sheet only for Employee and Mission. Pick one letter (or a mix) and I'll implement it in <code>styles.css</code>, bring the e2e tests along, and bump the version.</div>
-<p class="note">Not loaded by the app. Sample data only. Colours, type and radii come from <code>styles.css</code> / the TRIGO design system; light theme.</p>
+<p class="cap">Compact examples, same header and footer parts</p>
+<div class="row2">
+ <div class="stage" style="height:330px"><div class="scrim"></div>
+  <div style="position:absolute;left:50%;top:40px;width:min(440px,92%);transform:translateX(-50%);background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);overflow:hidden">
+   <div style="padding:16px 22px 14px;border-bottom:1px solid var(--border)"><div style="font-size:16px;font-weight:700">New board</div><p style="font-size:12.5px;margin:4px 0 0">It starts with no missions. Weekend days can be changed later in Settings.</p></div>
+   <div style="padding:18px 22px;background:var(--bg)"><div class="card" style="margin:0"><label class="fld">Board name <span style="color:var(--danger-text)">*</span><input value="Board C"></label>
+    <div style="font-size:13px;font-weight:600;margin-bottom:6px">Weekend days</div><span class="chipb on">Sun</span><span class="chipb">Mon</span><span class="chipb">Tue</span><span class="chipb">Wed</span><span class="chipb">Thu</span><span class="chipb">Fri</span><span class="chipb on">Sat</span></div></div>
+   <div class="foot" style="display:flex;gap:10px;justify-content:flex-end;padding:11px 22px;border-top:1px solid var(--border);background:var(--panel)"><button class="btn" type="button">Cancel</button><button class="btn p" type="button">Create board</button></div></div></div>
+ <div class="stage" style="height:330px"><div class="scrim"></div>
+  <div style="position:absolute;left:50%;top:60px;width:min(440px,92%);transform:translateX(-50%);background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);overflow:hidden">
+   <div style="padding:16px 22px 14px"><div style="font-size:16px;font-weight:700">You have unsaved changes</div><p style="font-size:13px;margin:6px 0 0">Employee Somchai Jaidee has 2 changes that are not saved yet.</p></div>
+   <div class="foot" style="display:flex;gap:10px;justify-content:flex-end;padding:11px 22px;border-top:1px solid var(--border);background:var(--panel)"><button class="btn" type="button">Keep editing</button><button class="btn danger" type="button">Discard</button><button class="btn p" type="button">Save and continue</button></div></div></div>
+</div>
+
+<!-- ============ 5 APPROVE ============ -->
+<h2 id="approve">5 · For your approval</h2>
+<div class="callout ok">
+<b>What I will build once you approve</b>
+<ol style="margin:6px 0 0;padding-left:20px;color:var(--text)">
+<li>One shared dialog shell in <code>styles.css</code> that reuses the Settings rail, header, card body and footer classes, with Workspace XL, Workspace L and Compact sizes.</li>
+<li>Edit Employee, User, Mission, Host, the four exports and the other L dialogs moved onto it, with the same ids kept so the tests still find them.</li>
+<li>Review &amp; merge rebuilt as decision cards inside Workspace XL. The merge model in <code>planning.js</code> stays untouched, so no data behaviour changes.</li>
+<li>Phone behaviour as shown: full-screen workspaces with the section picker, bottom sheets for compact dialogs.</li>
+</ol></div>
+<p><b>Please tell me:</b> (1) Is it right to drop the right-hand side sheet, so every dialog is either a Workspace or a Compact? (2) Is the decision-card layout for Review &amp; merge easier to follow than today's matrix? (3) Any dialog on the map that should change shape?</p>
 </main>
+
+<script>
+/* ---------- Employee workspace ---------- */
+(function(){
+  const stage=document.getElementById('emp-stage'); if(!stage) return;
+  const tabs=[...stage.querySelectorAll('.tab')], panes=[...stage.querySelectorAll('.pane')];
+  tabs.forEach(t=>t.addEventListener('click',()=>{tabs.forEach(x=>x.classList.toggle('active',x===t));panes.forEach(p=>p.hidden=p.dataset.pane!==t.dataset.pane);}));
+  const inputs=[...stage.querySelectorAll('[data-k]')], start=new Map(inputs.map(i=>[i,i.value]));
+  const st=stage.querySelector('#emp-status'), sv=stage.querySelector('#emp-save'), di=stage.querySelector('#emp-discard');
+  function sync(){const n=inputs.filter(i=>i.value!==start.get(i)).length;st.className='status'+(n?' dirty':'');st.textContent=n?'Unsaved changes ('+n+')':'No unsaved changes';sv.hidden=di.hidden=!n;}
+  inputs.forEach(i=>{i.addEventListener('input',sync);i.addEventListener('change',sync);});
+  di.addEventListener('click',()=>{inputs.forEach(i=>i.value=start.get(i));sync();});
+  sv.addEventListener('click',()=>{inputs.forEach(i=>start.set(i,i.value));sync();st.className='status saved';st.textContent='All changes saved';});
+})();
+
+/* ---------- Review & merge ---------- */
+(function(){
+  const ME='Nattaya';
+  const FC={pim:{name:'Pim',color:'#2a78d6'},arthit:{name:'Arthit',color:'#c2410c'}};
+  const MIS={
+    '0003':{n:'BANGN.26.0003',shift:'Day',site:'Amata City Plt 2 → Toyota',eng:'Prasert K.',color:'#0f8a5f',base:3},
+    '0007':{n:'BANGN.26.0007',shift:'Day',site:'Fortune → Hayashi',eng:'Anan P.',color:'#2a78d6',base:4},
+    '0011':{n:'BANGN.26.0011',shift:'Day',site:'Hayashi → Hayashi Plt 1',eng:'Pim',color:'#c2410c',base:0,fresh:true},
+    '0015':{n:'BANGN.26.0015',shift:'Night',site:'Toyota Gateway → Toyota',eng:'Arthit',color:'#8b5cf6',base:2}
+  };
+  const ORDER=['0003','0007','0011','0015'];
+  const ITEMS=[
+    {id:'d1',g:'0007',kind:'crew',by:'pim',what:'Somchai J.',sub:'Senior Inspector',carry:['Carry-over','Stay on 0007 Day'],fc:['Pim’s forecast','Move to 0011 Day'],dep:'d5',person:'somchai',to:'0011'},
+    {id:'d2',g:'0007',kind:'crew',by:'pim',what:'Kanya R.',sub:'Technician, on-call',carry:['Carry-over','Stay on 0007 Day'],fc:['Pim’s forecast','Move to 0011 Day'],dep:'d5',person:'kanya',to:'0011'},
+    {id:'d3',g:'0007',kind:'detail',by:'pim',what:'Start time',sub:'Mission detail',carry:['Carry-over','Start at 08:00'],fc:['Pim’s forecast','Start at 07:30']},
+    {id:'d4',g:'0003',kind:'crew',by:'arthit',what:'Wichai S.',sub:'Team Leader',carry:['Carry-over','Stay on 0003 Day'],fc:['Arthit’s forecast','Annual leave']},
+    {id:'d5',g:'0011',kind:'mission',by:'pim',what:'New mission 0011 Day',sub:'Not in the carry-over',carry:['Carry-over','Don’t add it'],fc:['Pim’s forecast','Add it, with 2 people']},
+    {id:'d6',g:'0015',kind:'mission',by:'arthit',what:'Mission 0015 Night',sub:'Missing from the forecast',carry:['Carry-over','Keep it, 2 people'],fc:['Arthit’s forecast','Remove it, people go to Standby']}
+  ];
+  const PEOPLE=[['somchai',"0007"],['kanya','0007'],['anan','0007'],['malee','0007'],['wichai','0003'],['prasit','0003'],['pailin','0003'],['ratree','0015'],['nok','0015']];
+  const REASONS=['Customer changed the schedule','Needed on this site','Certification or skill','Leave not approved'];
+  const S={dec:{},view:'all',fc:'all',step:'review',reasons:{},intro:true,done:false};
+  const $=id=>document.getElementById(id);
+  const ppl=n=>n+(n===1?' person':' people');
+  const item=id=>ITEMS.find(i=>i.id===id);
+  const locked=it=>!!it.dep && S.dec[it.dep]==='carry';
+  const eff=it=>locked(it)?'carry':S.dec[it.id];
+  const decided=it=>locked(it)||!!S.dec[it.id];
+  const pending=()=>ITEMS.filter(i=>!decided(i));
+  const shown=it=>(S.view==='all'||it.kind===S.view)&&(S.fc==='all'||it.by===S.fc);
+  function place(pid,base){
+    const it=ITEMS.find(i=>i.person===pid);
+    if(it&&eff(it)==='forecast')return it.to;
+    if(pid==='wichai'&&eff(item('d4'))==='forecast')return 'Leave';
+    if(base==='0015'&&eff(item('d6'))==='forecast')return 'Standby';
+    return base;
+  }
+  function crew(g){let n=0;for(const [p,b] of PEOPLE){if(place(p,b)===g)n++;}return n;}
+  function onBoard(g){if(g==='0011')return eff(item('d5'))==='forecast';if(g==='0015')return eff(item('d6'))!=='forecast';return true;}
+  function mark(){return pending().length;}
+  function btn(it,side){
+    const d=S.dec[it.id],l=locked(it),opt=side==='carry'?it.carry:it.fc;
+    const checked=(l?'carry':d)===side;
+    const dotc=side==='forecast'?FC[it.by].color:null;
+    return '<button type="button" class="opt'+(((l||d)&&!checked)?' other':'')+'" role="radio" aria-checked="'+checked+'" data-id="'+it.id+'" data-side="'+side+'"'+(l?' disabled':'')+'>'+
+      '<span class="k">'+(dotc?'<i class="dot" style="background:'+dotc+'"></i>':'')+opt[0]+'</span><span class="v">'+opt[1]+'</span><span class="sel">Selected</span></button>';
+  }
+  function card(it){
+    const l=locked(it),d=decided(it);
+    let h='<article class="dc'+(d?'':' undecided')+'" data-card="'+it.id+'"><div class="dc-top"><span class="what">'+it.what+'</span><span class="sub">'+it.sub+'</span>'+
+      '<span class="state '+(l?'lock':d?'done':'need')+'">'+(l?'Stays on carry-over':d?'Decided':'Needs a decision')+'</span>'+
+      '<span class="by"><i class="dot" style="background:'+FC[it.by].color+'"></i>'+FC[it.by].name+'’s forecast</span></div>'+
+      '<div class="opts" role="radiogroup" aria-label="'+it.what+'">'+btn(it,'carry')+btn(it,'forecast')+'</div>';
+    if(l)h+='<div class="lockmsg">Locked: mission 0011 Day is not being added, so this person stays where the carry-over has them.</div>';
+    if(!l&&S.dec[it.id]==='carry'&&it.by!==undefined&&FC[it.by].name!==ME){
+      h+='<div class="why"><span class="q">Tell '+FC[it.by].name+' why (optional)</span>'+REASONS.map(r=>'<button type="button" class="chipb" data-why="'+it.id+'" aria-pressed="'+(S.reasons[it.id]===r)+'">'+r+'</button>').join('')+'</div>';
+    }
+    return h+'</article>';
+  }
+  function railTab(k,label,icon,count,warn){
+    return '<button class="tab'+(S.step==='review'&&S.view===k?' active':'')+'" data-view="'+k+'" type="button"><svg class="ic"><use href="#'+icon+'"/></svg><span>'+label+'</span><span class="n'+(warn?' warn':'')+'">'+count+'</span></button>';
+  }
+  function counts(){const c={all:ITEMS.length,crew:0,detail:0,mission:0};ITEMS.forEach(i=>c[i.kind]++);return c;}
+  function renderRail(){
+    const c=counts(),left=mark();
+    $('mg-rail').innerHTML='<h2 class="rail-title" style="margin-top:0">Review</h2>'+
+     '<div class="grp">Differences</div>'+railTab('all','All differences','i-list',c.all,left>0)+railTab('crew','Crew moves','i-users',c.crew,false)+railTab('detail','Mission details','i-edit',c.detail,false)+railTab('mission','Mission changes','i-site',c.mission,false)+
+     '<div class="grp">Finish</div><button class="tab'+(S.step==='summary'?' active':'')+'" data-step="summary" type="button"><svg class="ic"><use href="#i-check"/></svg><span>Summary</span>'+(left?'<span class="n">Locked</span>':'')+'</button>';
+  }
+  function reviewBody(){
+    let h='';
+    if(S.intro)h+='<div class="intro"><div><p><b>Two versions of Tue 14 Oct.</b> The <b>carry-over</b> is the plan carried forward from Mon 13 Oct. The <b>forecast</b> is what engineers planned for today.</p><p>For each difference, pick the version to keep. Nothing is written until you confirm on the Summary step.</p></div><button class="btn sm" id="mg-hide-intro" type="button" style="margin-left:auto">Got it</button></div>';
+    h+='<div class="tb"><span class="lab">Forecaster</span>'+['all','pim','arthit'].map(k=>'<button type="button" class="chipb" data-fc="'+k+'" aria-pressed="'+(S.fc===k)+'">'+(k==='all'?'Everyone':'<i class="dot" style="background:'+FC[k].color+';margin-right:6px"></i>'+FC[k].name)+'</button>').join('')+'<span class="sp"></span>'+
+      '<button type="button" class="btn sm" data-bulk="carry">Keep carry-over for all shown</button><button type="button" class="btn sm" data-bulk="forecast">Take forecast for all shown</button></div>';
+    let any=false;
+    for(const g of ORDER){
+      const its=ITEMS.filter(i=>i.g===g&&shown(i)); if(!its.length)continue; any=true;
+      const m=MIS[g],ob=onBoard(g),after=crew(g),prov=ITEMS.some(i=>i.g===g&&!decided(i));
+      const tag=m.fresh?'<span class="pill new">NEW</span>':(!ob?'<span class="pill gone">REMOVED</span>':'');
+      const crewTxt=m.fresh?(ob?'Crew <b>'+after+'</b>':'Not added'):(!ob?'Removed':(after===m.base?'Crew <b>'+m.base+'</b>, no change so far':'Crew <b>'+m.base+' to '+after+'</b>'+(prov?' so far':'')));
+      h+='<section class="mis"><div class="mis-h" style="--eng:'+m.color+'"><b>'+m.n+'</b><span class="pill'+(m.shift==='Night'?' night':'')+'">'+m.shift.toUpperCase()+'</span>'+tag+'<span class="site">'+m.site+', engineer '+m.eng+'</span><span class="crew">'+crewTxt+'</span></div>'+its.map(card).join('')+'</section>';
+    }
+    if(!any)h+='<div class="card"><p class="empty" style="margin:0">Nothing matches this filter.</p></div>';
+    h+='<p class="same">9 people on 4 missions are the same on both sides, so they need no decision.</p>';
+    return h;
+  }
+  function summaryBody(){
+    const lines=[];
+    for(const g of ORDER){const m=MIS[g],ob=onBoard(g),a=crew(g);
+      if(m.fresh&&ob)lines.push([m.n+' '+m.shift,'New, '+ppl(a)]);
+      else if(!m.fresh&&!ob)lines.push([m.n+' '+m.shift,'Removed, '+ppl(m.base)+' go to Standby']);
+      else if(!m.fresh&&a!==m.base)lines.push([m.n+' '+m.shift,m.base+' to '+ppl(a)]);}
+    if(eff(item('d4'))==='forecast')lines.push(['Wichai S.','On annual leave']);
+    if(eff(item('d3'))==='forecast')lines.push(['BANGN.26.0007 start time','07:30']);
+    const alerts={};ITEMS.forEach(i=>{if(!locked(i)&&S.dec[i.id]==='carry'&&FC[i.by].name!==ME){alerts[i.by]=(alerts[i.by]||0)+1;}});
+    let h='<div class="sumgrid"><div class="card"><h4>What changes on the confirmed board</h4>'+
+      (lines.length?'<ul class="sumlist">'+lines.map(l=>'<li><span>'+l[0]+'</span><span class="x">'+l[1]+'</span></li>').join('')+'</ul>':'<p class="empty">No crew sizes change. Only the details you picked are written.</p>')+'</div>'+
+      '<div class="card"><h4>Alerts that will be sent</h4>'+
+      (Object.keys(alerts).length?'<ul class="sumlist">'+Object.keys(alerts).map(k=>'<li><span>'+FC[k].name+'</span><span class="x">'+alerts[k]+' '+(alerts[k]===1?'part':'parts')+' of their forecast not used</span></li>').join('')+'</ul><p style="margin:10px 0 0;font-size:12.5px">Reasons you added are included. Everything is saved in the merge log.</p>':'<p class="empty">Everything forecast by other engineers is used. Nobody gets an alert.</p>')+'</div></div>';
+    return h;
+  }
+  function render(){
+    const left=mark(),total=ITEMS.length,done=total-left;
+    $('mg-crumb').textContent='Forecast for Tue 14 Oct';
+    $('mg-title').textContent=S.step==='summary'?'Check the summary':'Review & merge forecast';
+    $('mg-hint').textContent=S.step==='summary'?'This is what Confirm will write. Go back to change any choice.':'Pick one side for each difference. '+done+' of '+total+' decided.';
+    renderRail();
+    $('mg-body').innerHTML=S.step==='summary'?summaryBody():reviewBody();
+    const st=$('mg-status');
+    if(S.done){st.className='status saved';st.textContent='Merged (demo only, nothing was written)';}
+    else if(S.step==='summary'){st.className='status saved';st.textContent='Every difference has a side';}
+    else if(left){st.className='status dirty';st.textContent=left+(left===1?' difference still needs':' differences still need')+' a decision';}
+    else{st.className='status saved';st.textContent='Every difference has a side';}
+    $('mg-back').hidden=S.step!=='summary';
+    const mb=$('mg-main');
+    mb.textContent=S.done?'Merged':S.step==='summary'?'Confirm merge':left?'Next undecided ('+left+' left)':'Check summary';
+    mb.disabled=S.done;
+  }
+  function jumpNext(){
+    const it=pending()[0]; if(!it)return;
+    if(S.view!=='all'&&S.view!==it.kind)S.view='all'; if(S.fc!=='all'&&S.fc!==it.by)S.fc='all'; render();
+    const el=document.querySelector('[data-card="'+it.id+'"]'); if(!el)return;
+    el.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});
+    el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1400);
+  }
+  $('mg').addEventListener('click',e=>{
+    const t=e.target.closest('button'); if(!t)return;
+    if(t.dataset.id){S.dec[t.dataset.id]=t.dataset.side;render();return;}
+    if(t.dataset.view){S.step='review';S.view=t.dataset.view;render();return;}
+    if(t.dataset.step){if(mark())jumpNext();else{S.step='summary';render();}return;}
+    if(t.dataset.fc){S.fc=t.dataset.fc;render();return;}
+    if(t.dataset.bulk){ITEMS.forEach(i=>{if(shown(i)&&!locked(i))S.dec[i.id]=t.dataset.bulk;});render();return;}
+    if(t.dataset.why){S.reasons[t.dataset.why]=S.reasons[t.dataset.why]===t.textContent?undefined:t.textContent;render();return;}
+    if(t.id==='mg-hide-intro'){S.intro=false;render();return;}
+    if(t.id==='mg-back'){S.step='review';render();return;}
+    if(t.id==='mg-main'){ if(S.step==='summary'){S.done=true;render();} else if(mark())jumpNext(); else {S.step='summary';render();} }
+  });
+  render();
+})();
+</script>
 </body>
 </html>
