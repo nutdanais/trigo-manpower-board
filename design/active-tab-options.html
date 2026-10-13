@@ -1,0 +1,112 @@
+<title>Active Tab Options</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one option per block, each showing the navy banner twice (a module tab active, then a board active) over a strip of white toolbar. Light only, like the app. */
+:root {
+  color-scheme: light;
+  --page: #eef1f4; --panel: #ffffff; --line: #e3e8ee; --border: #d3dae2;
+  --text: #1f2937; --muted: #667085; --navy: #003a66; --navy-deep: #002a4b; --green: #a8c855;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --r: 7px;
+}
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font: 14px/1.45 var(--font); }
+.page { max-width: 1280px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; font-weight: 650; letter-spacing: -.4px; margin: 0 0 8px; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 72ch; margin: 0 0 28px; text-wrap: pretty; }
+section { margin: 0 0 34px; }
+.head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 0 0 10px; }
+.letter { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--navy); color: #fff; font-weight: 700; }
+h2 { font-size: 18px; font-weight: 650; margin: 0; }
+.head p { margin: 0; color: var(--muted); font-size: 13px; flex: 1 1 360px; }
+.cap { font-size: 12px; font-weight: 600; color: var(--muted); margin: 10px 0 4px 2px; }
+.frame { border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,38,70,.08), 0 10px 26px -16px rgba(0,38,70,.4); }
+.bar { display: flex; align-items: center; gap: 4px; height: 56px; padding: 0 18px; background: var(--navy); border-bottom: 2px solid var(--green); color: #fff; overflow-x: auto; scrollbar-width: none; }
+.logo { font-weight: 800; letter-spacing: 2px; font-size: 17px; margin-right: 14px; }
+.logo i { color: var(--green); font-style: normal; }
+.t { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px; border-radius: var(--r); color: rgba(255,255,255,.74); font-weight: 550; font-size: 13.5px; white-space: nowrap; }
+.t svg { width: 15px; height: 15px; flex: none; }
+.pick { border: 1px solid rgba(255,255,255,.42); margin-left: 6px; color: #fff; }
+.right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.ghost { height: 34px; padding: 0 12px; border: 1px solid rgba(255,255,255,.42); border-radius: var(--r); display: inline-flex; align-items: center; font-size: 13px; white-space: nowrap; }
+.av { width: 32px; height: 32px; border-radius: 9px; background: var(--green); color: #1d2c05; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.tool { height: 48px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 18px; }
+.tool span { height: 30px; padding: 0 11px; border: 1px solid var(--border); border-radius: 6px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 550; }
+.tool span.pri { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+/* today: 2px green line, white text */
+.now .on { color: #fff; font-weight: 650; }
+.now .on::after { content: ""; position: absolute; left: 13px; right: 13px; bottom: -10px; height: 2px; border-radius: 2px; background: var(--green); }
+.now .pick.on { background: rgba(255,255,255,.16); }
+.now .pick.on::after { display: none; }
+
+/* A: strong underline */
+.A .on { color: #fff; font-weight: 700; }
+.A .on::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: -10px; height: 4px; border-radius: 4px 4px 0 0; background: var(--green); }
+.A .on svg { color: var(--green); }
+.A .t:not(.on) { color: rgba(255,255,255,.62); }
+
+/* B: white pill */
+.B .on { background: #fff; color: var(--navy); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.B .on svg { color: var(--navy); }
+.B .pick.on { border-color: #fff; }
+
+/* C: tint + green bar inside the tab */
+.C .on { background: rgba(255,255,255,.14); color: #fff; font-weight: 700; box-shadow: inset 0 -3px 0 var(--green); border-radius: var(--r) var(--r) 4px 4px; }
+.C .on svg { color: var(--green); }
+.C .pick.on { border-color: rgba(255,255,255,.7); }
+
+/* D: folder tab joined to the white toolbar */
+.D .bar { align-items: flex-end; padding-bottom: 0; border-bottom: 0; }
+.D .bar > .logo, .D .bar > .right { align-self: center; }
+.D .t { height: 44px; border-radius: 9px 9px 0 0; margin-bottom: 0; }
+.D .t.pick { height: 34px; align-self: center; border-radius: var(--r); }
+.D .on { background: var(--panel); color: var(--navy); font-weight: 700; }
+.D .on svg { color: var(--navy); }
+.D .pick.on { background: #fff; color: var(--navy); border-color: #fff; }
+.D .tool { border-top: 0; }
+.D .frame-wrap .tool { box-shadow: inset 0 2px 0 var(--green); }
+
+.notes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.notes div { background: var(--panel); border-radius: 10px; padding: 12px 14px; box-shadow: 0 0 0 1px var(--line); font-size: 13px; color: var(--muted); }
+.notes b { display: block; color: var(--text); margin-bottom: 3px; }
+@media (max-width: 760px) { .notes { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page">
+  <h1>Making the active tab obvious</h1>
+  <p class="lead">Today the active tab is white text with a thin green line, and a board shows only a slightly lighter "Boards" pill. Each option below is drawn twice: with Manpower open, then with a board (LCB Port) open. The board picker behaves like a tab in every option, so the Board module is as easy to spot as the others.</p>
+  <div id="opts"></div>
+</div>
+
+<script>
+const ico = {
+  ov: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13V8M8 13V3M13 13V6"/></svg>',
+  org: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="1.5" width="4" height="3.5" rx="1"/><rect x="1.5" y="11" width="4" height="3.5" rx="1"/><rect x="10.5" y="11" width="4" height="3.5" rx="1"/><path d="M8 5v3M3.5 11V8.5h9V11"/></svg>',
+  mp: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 14c.5-2.6 2.3-4 4.5-4s4 1.4 4.5 4"/><path d="M11 3.2a2.4 2.4 0 0 1 0 4.6M12.5 10.3c1.2.6 1.9 1.9 2 3.7"/></svg>',
+  host: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 14.5h12M3.5 14.5V5L8 2l4.5 3v9.5M6.5 14.5v-3h3v3"/></svg>',
+  cap: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5.5 4h8M5.5 8h8M5.5 12h8M2.5 4h.01M2.5 8h.01M2.5 12h.01"/></svg>',
+};
+const bar = (active) => `<div class="bar"><span class="logo">TRIGO<i>≡</i></span>
+  <span class="t${active === "ov" ? " on" : ""}">${ico.ov}Overview</span>
+  <span class="t${active === "org" ? " on" : ""}">${ico.org}Org Chart</span>
+  <span class="t${active === "mp" ? " on" : ""}">${ico.mp}Manpower</span>
+  <span class="t${active === "host" ? " on" : ""}">${ico.host}Host</span>
+  <span class="t${active === "cap" ? " on" : ""}">${ico.cap}Capacity</span>
+  <span class="t pick${active === "board" ? " on" : ""}">${active === "board" ? "LCB Port" : "Boards"} ▾</span>
+  <span class="right"><span class="ghost">‹ Wed 14-Oct-2026 ›</span><span class="ghost">Settings</span><span class="av">NS</span></span></div>`;
+const tool = (board) => `<div class="tool">${board ? '<span class="pri">+ New Mission</span><span>+ New Employee</span><span>Filter &amp; sort</span>' : '<span class="pri">+ New Employee</span><span>Search name, TRIGO ID or mobile…</span><span>Filters</span>'}</div>`;
+const OPTS = [
+  ["now", "Today", "For comparison: white text and a 2px green line; a board only lightens the Boards pill.", "Quiet and familiar.", "Hard to spot, especially on a board."],
+  ["A", "A · Strong underline", "A 4px green bar under the active tab, the icon turns green, the other tabs dim a little more.", "Smallest change; keeps the calm navy bar.", "Still only a line; on a board the picker gets the same bar."],
+  ["B", "B · White pill", "The active tab becomes a white pill with navy text, like the selected segment elsewhere in the app.", "Unmistakable from across the room; matches the Thai | English and board switches.", "The loudest option; two white shapes when a menu is open."],
+  ["C", "C · Tinted tab with a green base", "A light tint behind the active tab with a green line inside its bottom edge.", "Clear without being loud; the tint makes the board picker read as selected too.", "Less contrast than B on a bright screen."],
+  ["D", "D · Folder tab", "The active tab turns white and joins the white toolbar below, like a folder tab.", "Shows which page the toolbar belongs to; very clear.", "Changes the banner's shape; the green line moves under the tabs."],
+];
+document.getElementById("opts").innerHTML = OPTS.map(([k, name, how, pro, con]) => `
+  <section class="${k}">
+    <div class="head">${k === "now" ? "" : `<span class="letter">${k}</span>`}<h2>${name}</h2><p>${how}</p></div>
+    <p class="cap">Manpower open</p><div class="frame frame-wrap">${bar("mp")}${tool(false)}</div>
+    <p class="cap">A board open</p><div class="frame frame-wrap">${bar("board")}${tool(true)}</div>
+    <div class="notes"><div><b>Good</b>${pro}</div><div><b>Watch out</b>${con}</div></div>
+  </section>`).join("");
+</script>

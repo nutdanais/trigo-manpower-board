@@ -1,0 +1,61 @@
+<title>Board Tab Icons</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: a grid of icon candidates, each shown large and inside the real banner (active and inactive). Light only, like the app. */
+:root {
+  color-scheme: light;
+  --page: #eef1f4; --panel: #ffffff; --line: #e3e8ee; --text: #1f2937; --muted: #667085;
+  --navy: #003a66; --green: #a8c855; --green-ink: #6f8f1f;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --r: 7px;
+}
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font: 14px/1.45 var(--font); }
+.page { max-width: 1200px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; font-weight: 650; letter-spacing: -.4px; margin: 0 0 8px; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 72ch; margin: 0 0 24px; text-wrap: pretty; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+.card { background: var(--panel); border-radius: 12px; box-shadow: 0 0 0 1px var(--line); overflow: hidden; min-width: 0; }
+.top { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+.big { width: 52px; height: 52px; border-radius: 12px; background: #f2f5f9; display: grid; place-items: center; color: var(--navy); flex: none; }
+.big svg { width: 28px; height: 28px; }
+.top h2 { margin: 0; font-size: 15px; font-weight: 650; display: flex; gap: 8px; align-items: center; }
+.top p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.tag { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: #eef5dd; color: #4d6810; }
+.bars { display: grid; gap: 1px; background: var(--navy); }
+.bar { display: flex; align-items: center; gap: 4px; height: 50px; padding: 0 12px; background: var(--navy); color: #fff; overflow: hidden; white-space: nowrap; }
+.t { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 11px; border-radius: var(--r); color: rgba(255,255,255,.74); font-weight: 550; font-size: 13px; }
+.t svg { width: 15px; height: 15px; flex: none; }
+.t.on { background: #fff; color: var(--navy); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.22); }
+.t.on svg { color: var(--green-ink); }
+</style>
+
+<div class="page">
+  <h1>An icon for the Board tab</h1>
+  <p class="lead">Options 1 and 2 take the app's favicon (four squares, one in TRIGO green). The Board tab now sits in the banner like the others. Each candidate is shown large, then in the banner twice: Board active (white pill, green icon), and another tab active with Board as a normal tab. All are drawn on the same 24px grid and 2px stroke as the app's other icons.</p>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const svg = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONS = [
+  { name: "App mark (favicon)", note: "The app's own icon: four squares, the top-right one filled. Filled in green when Board is active, so the tab carries the brand.", tag: "matches the favicon", d: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" fill="currentColor"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>' },
+  { name: "App mark, outline", note: "The same four squares, all outlined, for a quieter tab.", d: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>' },
+  { name: "Mission columns", note: "Three columns of cards: the board's missions side by side.", tag: "built in now", d: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/>' },
+  { name: "Kanban", note: "Cards of different heights in columns, like mission cards with crews.", d: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7v7M12 7v4M16 7v9"/>' },
+  { name: "Dashboard tiles", note: "A 2 × 2 layout of tiles: the board as a working surface.", d: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>' },
+  { name: "Clipboard plan", note: "A day's plan on a clipboard: who goes where today.", d: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/>' },
+  { name: "Calendar day", note: "A day with a tick: the plan for the date on screen.", d: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 15l2 2 4-4"/>' },
+  { name: "Crew on a site", note: "A person beside a building: people placed on a host.", d: '<path d="M14 21V8l5-3v16M14 21h7M14 12h5"/><circle cx="7" cy="9" r="2.5"/><path d="M3 20c.4-3 2-4.5 4-4.5s3.6 1.5 4 4.5"/>' },
+  { name: "Assignment board", note: "A pinned board with cards: a planning wall.", d: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M12 2v3"/><rect x="6" y="9" width="5" height="4" rx="1"/><rect x="13" y="9" width="5" height="7" rx="1"/>' },
+  { name: "Hard hat", note: "The field crew. Already used for engineers in the app, so it may read as \"engineer\".", d: '<path d="M4 15h16M6 15v-3a6 6 0 0 1 12 0v3M12 4v4M7 15v3h10v-3"/>' },
+];
+const others = [
+  ["Overview", '<path d="M18 20V10M12 20V4M6 20v-6"/>'],
+  ["Org Chart", '<rect x="8" y="3" width="8" height="5" rx="1"/><rect x="2" y="16" width="7" height="5" rx="1"/><rect x="15" y="16" width="7" height="5" rx="1"/><path d="M12 8v4M5.5 16v-4h13v4"/>'],
+  ["Manpower", '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.6c1.7.8 2.7 2.6 3 5.4"/>'],
+];
+const bar = (ic, active) => `<div class="bar"><span class="t${active ? " on" : ""}">${svg(ic)}Board</span>${others.map(([n, d], i) => `<span class="t${!active && i === 0 ? " on" : ""}">${svg(d)}${n}</span>`).join("")}</div>`;
+document.getElementById("grid").innerHTML = ICONS.map((x, i) => `
+  <div class="card"><div class="top"><span class="big">${svg(x.d)}</span><div><h2>${i + 1} · ${x.name}${x.tag ? `<span class="tag">${x.tag}</span>` : ""}</h2><p>${x.note}</p></div></div>
+  <div class="bars">${bar(x.d, true)}${bar(x.d, false)}</div></div>`).join("");
+</script>

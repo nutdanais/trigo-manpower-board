@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-13j">
+<link rel="stylesheet" href="styles.css?v=2026-10-13t">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-13j"></script>
+<script src="version.js?v=2026-10-13t"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -110,6 +110,7 @@
 <symbol id="i-area" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6zM9 4v14M15 6v14"/></symbol>
 <symbol id="i-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/></symbol>
 <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3.5V12c0 4.5-3.4 7.6-8 9-4.6-1.4-8-4.5-8-9V6.5L12 3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+<symbol id="i-appmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
 </defs></svg>
 
 <div id="login-screen" class="hidden">
@@ -200,24 +201,14 @@
        per-board tabs live in the board menu next to it (#board-dd), so adding a
        board no longer widens this strip. -->
   <nav id="board-tabs" aria-label="Modules"></nav>
-  <!-- Which board is on screen, as one pill. The boards themselves are the
-       .board-tab.tab-board items of #board-menu (see renderTabs in app.js). -->
-  <div id="board-dd" class="tb-dd">
-    <button type="button" id="btn-board-dd" class="btn btn-top" aria-haspopup="menu" aria-expanded="false" title="Switch board"><span id="board-dd-label">Board</span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
-    <div id="board-menu" class="tb-pop hidden" role="menu" aria-label="Boards">
-      <div id="board-menu-list"></div>
-      <button id="btn-add-board" class="tb-item tb-item-add" type="button" role="menuitem" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New board</button>
-    </div>
-  </div>
-  <!-- CONFIRMED / FORECAST for the board and date on screen, and the
-       "holds taken from you" counter (forward planning; see app.js) -->
-  <span id="mode-pill" class="mode-pill hidden"></span>
-  <!-- Phone only (styles.css, Phone header): HOLIDAY beside the status pill, since the
-       Holiday switch itself lives in the ⋯ menu there -->
-  <span id="m-hol-pill" class="mode-pill mode-holiday hidden">HOLIDAY</span>
-  <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
   <div class="topbar-right">
     <span id="save-status" class="hidden"></span>
+    <!-- the date's state, beside the date it describes: CONFIRMED, CONFIRMED · READ-ONLY
+         (past date) or · LOCKED, or FORECAST (renderModePill in app.js) -->
+    <span id="mode-pill" class="mode-pill hidden"></span>
+    <!-- Phone only (styles.css, Phone header): HOLIDAY beside the status pill, since the
+         Holiday switch itself lives in the ⋯ menu there -->
+    <span id="m-hol-pill" class="mode-pill mode-holiday hidden">HOLIDAY</span>
     <div class="date-nav">
       <button id="btn-date-prev" class="btn btn-top btn-icon" title="Previous day" aria-label="Previous day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
       <button id="btn-date" class="btn btn-top btn-date" title="Click to pick a date"></button>
@@ -445,6 +436,24 @@
      one combined row did once enough boards/areas were in play. -->
 <div id="toolbar">
   <div id="toolbar-row1">
+    <!-- Overview: which board the dashboard shows. In the toolbar (not the page) so it
+         stays in view while the dashboard scrolls; filled by renderOverview. -->
+    <!-- Board tab: which board is on screen. Same place and look as Overview's board
+           picker; the boards are the .board-tab.tab-board items of #board-menu (renderTabs). -->
+    <div id="board-dd" class="tb-dd hidden">
+      <button type="button" id="btn-board-dd" class="btn" aria-haspopup="menu" aria-expanded="false" title="Switch board"><span class="ovb-cap">Board</span><span id="board-dd-label" class="ovb-label">Board</span><span class="ovb-count" id="board-dd-count"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+      <div id="board-menu" class="tb-pop hidden" role="menu" aria-label="Boards">
+        <div id="board-menu-list"></div>
+        <button id="btn-add-board" class="tb-item tb-item-add" type="button" role="menuitem" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New board</button>
+      </div>
+    </div>
+    <!-- CONFIRMED / FORECAST for the board and date on screen, and the
+         "holds taken from you" counter (forward planning; see app.js) -->
+    <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
+    <div id="ov-board-dd" class="tb-dd hidden">
+      <button type="button" id="btn-ov-board" class="btn" aria-haspopup="menu" aria-expanded="false" title="Board shown on the dashboard"><span class="ovb-cap">Board</span><span class="ovb-label">All boards</span><span class="ovb-count"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+      <div id="ov-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the dashboard"></div>
+    </div>
     <button id="btn-import-mission" class="btn btn-danger hidden"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add Mission</button>
     <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
     <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
@@ -490,13 +499,21 @@
           <option value="th">Thai</option>
           <option value="en">English</option>
         </select>
-        <div id="emplist-filters">
-          <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
-          <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
-          <div class="ms" data-filter="service"><button type="button" class="ms-btn">Years of service: All</button><div class="ms-pop hidden"></div></div>
-          <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
-          <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
-          <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+        <!-- Six filters behind one "Filters" button (with how many are on), like the board's
+             Filter & sort, so row 1 keeps room for Bulk edit and Export. On a phone the
+             popover is simply open inside the More dropdown. -->
+        <div id="emplist-filter-dd" class="tb-dd">
+          <button type="button" id="btn-emplist-filter-pop" class="btn" aria-haspopup="true" aria-expanded="false" title="Filter the list"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg> Filters<span id="emplist-filter-count" class="fcount hidden"></span></button>
+          <div id="emplist-filter-pop" class="tb-pop hidden" aria-label="Filters">
+            <div id="emplist-filters">
+              <div class="ms" data-filter="contract"><button type="button" class="ms-btn">Contract: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="position"><button type="button" class="ms-btn">Position: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="service"><button type="button" class="ms-btn">Years of service: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+            </div>
+          </div>
         </div>
       </div>
       <!-- Host's search/filters — same idea, folded up from its old standalone
@@ -568,6 +585,7 @@
          right instead of stranding it at the left (the old spacer only worked while
          the stats and these shared a line). -->
     <div id="toolbar-right">
+      <span id="board-status" class="st-status hidden" aria-label="Needs a look"></span>
       <span id="emplist-count" class="hidden"></span>
       <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
       <span id="hostlist-count" class="hidden"></span>
@@ -1112,8 +1130,9 @@
     </div>
   </div>
 
-  <div class="modal hidden" id="modal-xlsx">
+  <div class="modal modal-side modal-export hidden" id="modal-xlsx" role="dialog" aria-modal="true">
     <h3><span id="board-export-title">Export</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="modal-body">
     <div class="xlsx-lang export-type" id="board-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="xlsx-summary"></p>
     <p class="import-note" id="board-export-hint"></p>
@@ -1130,10 +1149,11 @@
     </div>
     <div id="xlsx-cols"></div>
     <div id="xlsx-sheets-wrap" class="hidden">
-      <h4 id="xlsx-sheets-title">Extra sheets for people not on a mission</h4>
+      <div class="form-group" id="xlsx-sheets-title">Extra sheets for people not on a mission</div>
       <div id="xlsx-sheets"></div>
     </div>
     <p class="import-note" id="xlsx-hint">Sheet 1 has one row per person on a mission, in mission order. Every sheet carries the TRIGO header, board name, date and total. The columns above also apply to the extra sheets (Name is always kept). The file language (English / Thai) changes the headers and wording in the file; names, hosts and customers stay as typed. Your choices are remembered on this device.</p>
+    </div>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
@@ -1142,38 +1162,43 @@
   </div>
 
   <!-- Capacity tab export: format, which boards, which Host-list columns -->
-  <div class="modal hidden" id="modal-cap-export">
+  <div class="modal modal-side modal-export hidden" id="modal-cap-export" role="dialog" aria-modal="true">
     <h3>Export Capacity<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="modal-body">
     <div class="xlsx-lang export-type" id="cap-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="cap-export-summary"></p>
-    <h4>Boards</h4>
+    <div class="form-group">Boards</div>
     <div class="cap-export-tools">
       <button type="button" class="btn btn-small" id="btn-cap-export-all">All boards</button>
       <button type="button" class="btn btn-small" id="btn-cap-export-this">This board only</button>
     </div>
     <div id="cap-export-boards" class="cap-export-list"></div>
-    <h4>Host columns</h4>
+    <div class="form-group">Host columns</div>
     <div id="cap-export-extras" class="cap-export-list"></div>
     <p class="import-note" id="cap-export-hint"></p>
+    </div>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-cap-export-go">Export</button>
     </div>
   </div>
 
-  <div class="modal hidden" id="modal-hostlist-export">
+  <div class="modal modal-side modal-export hidden" id="modal-hostlist-export" role="dialog" aria-modal="true">
     <h3>Export Host List<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="modal-body">
     <div class="xlsx-lang export-type" id="hostlist-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="hostlist-export-summary"></p>
     <p class="import-note">One sheet with every column of the list: location, Google Maps link, service area, note, inspectors, deployment days, boards, missions and first / last seen.</p>
+    </div>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-hostlist-export-go">Export</button>
     </div>
   </div>
 
-  <div class="modal hidden" id="modal-emplist-xlsx">
+  <div class="modal modal-side modal-export hidden" id="modal-emplist-xlsx" role="dialog" aria-modal="true">
     <h3>Export Manpower List<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="modal-body">
     <div class="xlsx-lang export-type" id="emplist-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="emplist-xlsx-summary"></p>
     <div class="xlsx-lang" id="emplist-xlsx-lang" role="radiogroup" aria-label="File language">
@@ -1182,6 +1207,7 @@
       <label><input type="radio" name="emplist-xlsx-lang" value="th"> ไทย (Thai)</label>
     </div>
     <p class="import-note">One sheet with the same columns as the table (plus Years of Service, counted up to today), in the order shown. Only the table header — no banner. The language choice is remembered on this device.</p>
+    </div>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-emplist-xlsx-go">Export</button>
@@ -1308,12 +1334,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-13j"></script>
-<script src="employee-id.js?v=2026-10-13j"></script>
-<script src="cloud.js?v=2026-10-13j"></script>
-<script src="charts.js?v=2026-10-13j"></script>
-<script src="xlsx-export.js?v=2026-10-13j"></script>
-<script src="bulk-edit.js?v=2026-10-13j"></script>
-<script src="app.js?v=2026-10-13j"></script>
+<script src="planning.js?v=2026-10-13t"></script>
+<script src="employee-id.js?v=2026-10-13t"></script>
+<script src="cloud.js?v=2026-10-13t"></script>
+<script src="charts.js?v=2026-10-13t"></script>
+<script src="xlsx-export.js?v=2026-10-13t"></script>
+<script src="bulk-edit.js?v=2026-10-13t"></script>
+<script src="app.js?v=2026-10-13t"></script>
 </body>
 </html>

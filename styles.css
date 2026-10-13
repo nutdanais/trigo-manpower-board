@@ -5272,36 +5272,16 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
   body.board-view #sticky-header #update-banner { margin-right: calc(-1 * var(--fp-w, 264px)); }
   #float-pool { top: var(--bar-h, 56px); }
   #fp-resizer { top: var(--bar-h, 56px); }
+  /* People panel position B: toolbar row 1 runs the full width over the panel, and
+     the panel starts under it (--fp-top, set in app.js; the banner once row 1 has scrolled away). */
+  body.board-view #toolbar-row1 { margin-right: calc(-1 * var(--fp-w, 264px)); padding-right: 20px; position: relative; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line, var(--border)); }
+  body.board-view #float-pool, body.board-view #fp-resizer { top: var(--fp-top, var(--bar-h, 56px)); }
 }
 body.settings-open #board-tabs, body.settings-open #board-dd { display: none !important; }
 
-/* Row 2: the toolbar on a board, in the deeper navy */
-@media (min-width: 641px) {
-  body.board-view #toolbar-row1 { background: #00325a; padding: 7px 20px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
-  body.board-view #toolbar-row1 .btn { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff; }
-  body.board-view #toolbar-row1 .btn:hover { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .4); }
-  body.board-view #toolbar-row1 .btn-primary { background: #fff; border-color: #fff; color: var(--primary); }
-  body.board-view #toolbar-row1 .btn-primary:hover { background: #e6eef6; border-color: #e6eef6; }
-  body.board-view #toolbar-row1 .btn-quiet,
-  body.board-view #toolbar-row1 .btn-reset,
-  body.board-view #toolbar-row1 .btn-hidden-chip { background: transparent; border-color: transparent; color: rgba(255, 255, 255, .85); }
-  body.board-view #toolbar-row1 .btn-quiet:hover,
-  body.board-view #toolbar-row1 .btn-reset:hover,
-  body.board-view #toolbar-row1 .btn-hidden-chip:hover { background: rgba(255, 255, 255, .14); color: #fff; }
-  body.board-view #toolbar-row1 .btn:disabled { opacity: .45; }
-  body.board-view #toolbar-row1 .ms-btn { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff; }
-  body.board-view #toolbar-row1 .ms-btn:hover { background: rgba(255, 255, 255, .16); }
-  body.board-view #toolbar-row1 .ms-btn .ms-val { color: rgba(255, 255, 255, .7); }
-  body.board-view #toolbar-row1 .ms-btn.ms-active,
-  body.board-view #toolbar-row1 .btn-hidden-chip.is-on { background: #fff; border-color: #fff; color: var(--primary); }
-  body.board-view #toolbar-row1 .ms-btn.ms-active .ms-val { color: var(--primary); }
-  body.board-view #toolbar-row1 #filters select {
-    background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .28); color: #fff;
-  }
-  body.board-view #toolbar-row1 #filters select option { color: var(--text); background: var(--panel); }
-  body.board-view #toolbar-row1 .toggle-text { color: rgba(255, 255, 255, .88); }
-  body.board-view #toolbar-row2 { border-bottom: 1px solid var(--border); }
-}
+/* The board toolbar is the same white bar as every other tab (the deeper-navy
+   row 2 is gone): only row 1 of the banner is navy, everywhere. */
+body.board-view #toolbar-row2 { border-bottom: 1px solid var(--border); }
 
 /* Thai | English toggle (a select[data-seg] drawn as two buttons) */
 #card-names + .seg-pick, #emplist-name-view + .seg-pick { margin: 0; align-self: center; }
@@ -5420,15 +5400,6 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 #filter-pop .ms-btn { width: 100%; justify-content: space-between; }
 #filter-pop .filter-sort { display: grid; gap: 4px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--muted); }
 #filter-pop .filter-sort select { width: 100%; }
-@media (min-width: 641px) {
-  /* white controls again inside the popover, whatever the deep-navy toolbar behind it does */
-  body.board-view #toolbar-row1 #filter-pop .ms-btn { background: var(--panel); border-color: var(--border); color: var(--text); }
-  body.board-view #toolbar-row1 #filter-pop .ms-btn:hover { background: var(--hover-tint); }
-  body.board-view #toolbar-row1 #filter-pop .ms-btn .ms-val { color: var(--muted); }
-  body.board-view #toolbar-row1 #filter-pop .ms-btn.ms-active { background: var(--hover-tint); border-color: var(--primary-text); color: var(--primary-text); }
-  body.board-view #toolbar-row1 #filter-pop select { background: var(--panel); border-color: var(--border); color: var(--text); }
-  body.board-view #toolbar-row1 #btn-filter-pop.ms-active { background: #fff; border-color: #fff; color: var(--primary); }
-}
 /* phone: the popover is just the open list inside the More dropdown */
 @media (max-width: 640px) {
   #btn-filter-pop { display: none; }
@@ -5437,6 +5408,208 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #filter-pop.hidden { display: grid !important; }
 }
 
+/* ===== Export dialogs as side panels (2026-10-13e) =====
+   Board / Overview / Org Chart, Capacity, Host List and Manpower List exports use
+   the same .modal-side shell as the record dialogs: header, scrolling body, pinned
+   footer. File type and File language become segmented controls (the radios stay
+   in the markup, so pickedExportType() and the saved choices work as before). */
+.modal-side > .modal-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 16px 22px 18px; display: flex; flex-direction: column;
+}
+.modal-side > .modal-actions { flex: none; margin: 0; position: static; justify-content: flex-end; }
+.modal-export .modal-body > .form-group:first-child,
+.modal-export #xlsx-part > .form-group:first-child { margin-top: 0; }
+.modal-export .import-note { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
+.modal-export .import-note:empty { display: none; }
+.modal-export .xlsx-lang {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px;
+  margin: 6px 0 14px; border-radius: var(--r); background: var(--bg-soft); position: relative;
+}
+.modal-export .xlsx-lang > b {
+  position: absolute; top: -22px; left: 0; font-size: 12.5px; font-weight: 650; color: var(--muted);
+}
+.modal-export .xlsx-lang { margin-top: 28px; }
+.modal-export .modal-body > .xlsx-lang:first-child { margin-top: 22px; }
+.modal-export .xlsx-lang label {
+  justify-content: center; height: 32px; padding: 0 10px; border-radius: 6px;
+  color: var(--muted); font-size: 13px; font-weight: 600; transition: background-color .16s, color .16s;
+}
+.modal-export .xlsx-lang label:hover { color: var(--text); }
+.modal-export .xlsx-lang label { position: relative; }
+.modal-export .xlsx-lang input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.modal-export .xlsx-lang label:has(input:checked) { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(8, 28, 56, .16); }
+.modal-export .xlsx-lang label:has(input:focus-visible) { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+.modal-export #xlsx-tools, .modal-export .cap-export-tools { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.modal-export #xlsx-cols, .modal-export .cap-export-list { gap: 2px 8px; margin-bottom: 14px; }
+.modal-export .import-row { padding: 7px 8px; border-radius: var(--r); font-size: 13px; }
+.modal-export #xlsx-sheets-wrap { margin-bottom: 14px; }
+.modal-export .form-group { margin: 6px 0 8px; font-size: 12.5px; font-weight: 650; color: var(--muted); }
+.modal-export #xlsx-hint { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* ===== Board stats, option A (2026-10-13f) =====
+   The Assigned tile gains a "N% utilized" line (Assigned ÷ (Assigned + Standby)),
+   and status chips sit at the right end of the strip. Standby has no chip: its
+   tile already flags it. Grey = for information, amber = check it. */
+.st-num { display: inline-flex; align-items: baseline; gap: 7px; }
+.st-pct { font-size: 11.5px; font-weight: 550; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.st-status { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-status.hidden { display: none; }
+.status-chip {
+  display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 9px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-soft); color: var(--text);
+  font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: box-shadow .16s, transform .1s;
+}
+.status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--muted); }
+.status-chip b { font-variant-numeric: tabular-nums; font-weight: 700; }
+.status-chip:hover { box-shadow: 0 1px 3px rgba(8, 28, 56, .14); }
+.status-chip:active { transform: translateY(1px); }
+.status-chip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+.status-chip.sc-amber { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
+.status-chip.sc-amber::before { background: var(--warn); }
+.mission-card.flash-outline { animation: flash-outline 1.6s ease-out; }
+@keyframes flash-outline { 0%, 60% { box-shadow: 0 0 0 3px var(--warn); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); } }
+body.exporting .st-status { display: none; }
+
+/* Layout A on the other tabs: status chips sit in #board-status, as on the board. */
+.status-chip.sc-static { cursor: default; }
+.status-chip.sc-static:hover { box-shadow: none; }
+.status-chip.sc-static:active { transform: none; }
+.status-chip.sc-red { background: var(--danger-tint); border-color: var(--danger-line); color: var(--danger-text); }
+.status-chip.sc-red::before { background: var(--danger); }
+.status-chip.sc-on { box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* Manpower stats in the board's design: the tile keys and the proportion bar */
+.st-perm { --tc: var(--stat-asg); }
+.st-oncall { --tc: var(--stat-free); }
+.st-inactive { --tc: var(--border); }
+body:not(.board-view) #emplist-area-bar:not(.hidden) { flex: 0 0 100%; order: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+#emplist-area-bar:empty { display: none !important; }
+#stats-bar.stats-tiles .st-split { flex-basis: 100%; }
+
+/* Overview and Org Chart: one toolbar row, numbers and chips left, Export right */
+body.toolbar-one-row #toolbar { flex-direction: row; align-items: center; }
+body.toolbar-one-row #toolbar-row2 { order: 0; flex: 1 1 auto; min-width: 0; }
+body.toolbar-one-row #toolbar-row1 { order: 1; flex: 0 0 auto; }
+
+/* Manpower's Filters popover, same as the board's Filter & sort */
+#btn-emplist-filter-pop .fcount {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px;
+  background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+}
+#btn-emplist-filter-pop .fcount.hidden { display: none; }
+#emplist-filter-pop { width: 280px; padding: 12px; }
+#emplist-filter-pop #emplist-filters { display: grid; gap: 8px; }
+#emplist-filter-pop .ms { display: block; }
+#emplist-filter-pop .ms-btn { width: 100%; justify-content: space-between; }
+@media (max-width: 640px) {
+  #btn-emplist-filter-pop { display: none; }
+  #emplist-filter-dd { display: block; width: 100%; }
+  #emplist-filter-pop { position: static; display: block; width: 100%; padding: 0; box-shadow: none; background: none; }
+  #emplist-filter-pop.hidden { display: block !important; }
+}
+
+/* Overview: the board dropdown leads the one toolbar row, and the toolbar stays
+   under the banner while the dashboard scrolls, so the board shown is always in view */
+body.toolbar-one-row #toolbar-row1 { display: contents; }
+body.toolbar-one-row #ov-board-dd { order: -1; margin-left: 14px; }
+body.toolbar-one-row #row1-end { order: 2; padding: 7px 20px 7px 0; }
+/* the board picker: an outline button like every toolbar control, opening the app's menu */
+#ov-board-dd.hidden { display: none; }
+#btn-ov-board { gap: 8px; min-width: 210px; }
+#btn-ov-board .ovb-cap { color: var(--muted); font-weight: 550; }
+#btn-ov-board .ovb-label { font-weight: 650; }
+#btn-ov-board .ic { margin-left: auto; width: 14px; height: 14px; opacity: .7; }
+.ovb-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+#btn-ov-board .ovb-dot[style*="transparent"] { display: none; }
+.ovb-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: 11.5px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+#ov-board-menu { min-width: 240px; }
+#ov-board-menu .tb-item .ovb-name { flex: 1; }
+#ov-board-menu .tb-item.is-current { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; }
+#ov-board-menu .tb-item .ovb-dot[style*="transparent"] { box-shadow: inset 0 0 0 1.5px var(--border); }
+body.ov-view #toolbar { position: sticky; top: var(--bar-h, 56px); z-index: 30; }
+
+/* Host stats: "No location" in the warning key colour, the By area line on its own row */
+.st-noloc { --tc: var(--stat-leave); }
+body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 100%; gap: 6px 8px; }
+
+/* History: the charted measure explained in plain words */
+.ov-htile-help { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; text-wrap: pretty; }
+
+/* Overview "In detail": two independent columns so a short card never leaves a hole
+   beside a tall one (the grid made every row as tall as its tallest card) */
+@media (min-width: 901px) {
+  .ov-detail-grid { display: block; columns: 2; column-gap: 18px; }
+  .ov-detail-grid > * { break-inside: avoid; margin: 0 0 18px; display: block; width: 100%; }
+}
+
+/* Active tab: a white pill with navy text and a TRIGO-green icon (option B, colour 4).
+   The board picker is the Board module's tab, so it takes the same pill when a board is open. */
+#board-tabs .board-tab.active { background: #fff; color: var(--primary); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .22); }
+#board-tabs .board-tab.active::after { display: none; }
+#board-tabs .board-tab.active .ic { color: #6f8f1f; opacity: 1; }
+#board-tabs .board-tab:not(.active) { color: rgba(255, 255, 255, .74); }
+#btn-board-dd.is-current { background: #fff; border-color: #fff; color: var(--primary); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .22); }
+#btn-board-dd.is-current .ic { color: var(--primary); opacity: 1; }
+#btn-board-dd.is-current:hover { background: #eef4fa; }
+
+/* Board is an ordinary tab; its board picker sits at the left of toolbar row 1,
+   the same control as Overview's (button + menu), followed by CONFIRMED / FORECAST */
+#board-dd.hidden { display: none; }
+#board-dd { flex: none; }
+@media (min-width: 641px) {
+#btn-board-dd { gap: 8px; min-width: 210px; background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: none; font-weight: 550; }
+#btn-board-dd:hover { background: var(--hover-tint); }
+#btn-board-dd .ovb-cap { color: var(--muted); font-weight: 550; }
+#btn-board-dd .ovb-label { font-weight: 650; }
+#btn-board-dd > .ic:last-child { margin-left: auto; width: 14px; height: 14px; opacity: .7; color: inherit; }
+}
+/* phone: the header keeps the board name alone, as the phone layout designed it */
+@media (max-width: 640px) { #btn-board-dd .ovb-cap, #btn-board-dd .ovb-count { display: none; } }
+#board-menu { min-width: 240px; }
+#board-menu .board-tab.tab-board.active { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; box-shadow: none; }
+#toolbar-row1 #mode-pill { margin-left: 0; }
+@media (max-width: 640px) {
+  #ov-board-dd { flex: 1 1 100%; }
+  #btn-ov-board { width: 100%; justify-content: flex-start; }
+}
+
+/* the date pill beside the date picker, on the navy banner */
+.topbar-right #mode-pill { margin: 0 2px 0 0; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.topbar-right #mode-pill.hidden { display: none; }
+#mode-pill .ic { width: 13px; height: 13px; }
+#mode-pill.mode-ro { color: #8a4f10; border-color: #ebd3a9; background: #fdf7ec; }
+#board-menu .board-tab.tab-board { display: flex; align-items: center; gap: 9px; }
+#board-menu .board-tab.tab-board .ovb-name { flex: 1; }
+.topbar-right #mode-pill { height: 26px; padding: 0 10px; border-radius: 13px; letter-spacing: .2px; font-size: 11.5px; }
+/* room for the date pill: the module tabs scroll rather than run under it, and Lock
+   shows as an icon (its tooltip says what it does) on screens under 1600px */
+#board-tabs { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+#board-tabs::-webkit-scrollbar { display: none; }
+@media (max-width: 1600px) and (min-width: 641px) { #btn-lock .btn-label { display: none; } #btn-lock { padding: 0 10px; } }
+
+/* By engineer, Missions: the counts line up in one column, the D / N pills follow them */
+.ov-table .ov-mcell { text-align: right; }
+.ov-mgrid { display: inline-grid; grid-template-columns: 3ch 92px; column-gap: 8px; align-items: center; text-align: left; }
+.ov-mgrid > :first-child { text-align: right; font-variant-numeric: tabular-nums; }
+.ov-mtags { display: inline-flex; gap: 4px; }
+th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; justify-self: end; margin-right: 100px; }
+
+/* Shifts: the night card on a soft night-blue wash */
+.ov-daynight-tile.ov-dn-night { background: #eef2f8; border-color: #d4dceb; }
+
+/* Overview group headers ("In detail", "Period"): a real section header — a navy bar
+   with a white title, so it no longer melts into the page background */
+.ov-group-head {
+  margin: 14px 0 -2px; padding: 9px 14px; border-radius: 10px;
+  background: var(--primary); color: #fff; align-items: center;
+  box-shadow: 0 1px 2px rgba(0, 38, 70, .18);
+}
+.ov-group-head h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: .2px; text-transform: none; color: #fff; }
+.ov-group-head .ov-group-sub { color: rgba(255, 255, 255, .78); font-size: 12.5px; }
+.ov-group-head::before { content: ""; width: 4px; align-self: stretch; border-radius: 2px; background: var(--brand-green); margin-right: 2px; }
 /* ===== Phone shell (2026-10-13, mobile direction C + pool drawer) =====
    See design/mobile-directions.html. Below 640px only; desktop is untouched.
    - Top bar: a light surface with the date and the avatar on one line, then the
@@ -5734,3 +5907,4 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #float-pool { transition: none; }
   .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); }
 }
+@media (max-width: 640px) { #mode-pill .mp-extra { display: none; } #mode-pill .ic { width: 10px; height: 10px; } }
