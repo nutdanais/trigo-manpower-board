@@ -98,9 +98,11 @@ async function step(name, fn) {
       assert.deepEqual(r.shown.sort(), ["annual", "sick"]);
     });
 
-    await step("the banner: module tabs, a board pill that opens the boards, and Sign out inside the avatar menu", async () => {
+    await step("the banner: Board is a tab like the others, its board picker leads toolbar row 1, Sign out inside the avatar menu", async () => {
       assert.equal(await p.isVisible("#btn-signout"), false, "Sign out is not in the banner itself");
-      assert.equal((await p.textContent("#btn-board-dd")).trim(), "Board One");
+      assert.equal((await p.textContent("#board-tabs .board-tab.active")).trim(), "Board", "the Board tab is the active tab");
+      assert.equal(await p.evaluate(() => document.getElementById("board-dd").closest("#toolbar-row1") !== null), true, "the board picker is in the toolbar");
+      assert.equal((await p.textContent("#board-dd-label")).trim(), "Board One");
       await p.click("#btn-board-dd");
       assert.deepEqual(await p.$$eval("#board-menu .tab-board", (e) => e.map((x) => x.textContent.trim())), ["Board One", "Board Two"]);
       assert.equal(await p.isVisible("#btn-add-board"), true);

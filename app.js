@@ -1647,6 +1647,22 @@ function renderTabs() {
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
   }
+  // Board: an ordinary module tab. It opens the board last shown (the toolbar's
+  // board picker then switches between boards, like Overview's).
+  if (can("board") && D().boards.length) {
+  const bt = document.createElement("div");
+  bt.className = "board-tab tab-boardmod" + (!isNonBoardView() ? " active" : "");
+  setIconLabel(bt, "board", "Board");
+  bt.onclick = () => {
+    if (!isNonBoardView()) return;
+    clearSelection();
+    let last = null;
+    try { last = localStorage.getItem("manpower.lastBoard"); } catch (e) { /* not remembered */ }
+    D().activeBoardId = (D().boards.find(b => b.id === last) || D().boards[0]).id;
+    refreshAndRender();
+  };
+  el.prepend(bt);
+  }
   if (can("orgchart")) {
   const oc = document.createElement("div");
   oc.className = "board-tab tab-orgchart" + (isOrgChart() ? " active" : "");
@@ -1681,7 +1697,7 @@ function renderTabs() {
   };
   el.appendChild(cp);
   }
-  // The per-board tabs live in the board menu (#board-menu-list) behind one pill,
+  // The boards themselves are listed in the toolbar's board picker (#board-menu-list),
   // so a new board never widens the strip above.
   const list = $("#board-menu-list");
   list.innerHTML = "";
@@ -1716,13 +1732,17 @@ function renderTabs() {
    "Boards" while an app-wide view (Overview, Manpower, Host…) is showing. Hidden for
    a role that cannot see boards at all. */
 function renderBoardPill() {
+  // the toolbar's board picker: shown on the Board tab only, like Overview's
   const wrap = $("#board-dd");
   const boards = can("board") ? D().boards : [];
-  wrap.classList.toggle("hidden", !boards.length && !can("settings", "edit"));
   const onBoard = !isNonBoardView();
   const cur = boards.find(b => b.id === D().activeBoardId);
-  $("#board-dd-label").textContent = onBoard && cur ? cur.name : "Boards";
-  $("#btn-board-dd").classList.toggle("is-current", !!(onBoard && cur));
+  wrap.classList.toggle("hidden", !onBoard || !cur);
+  if (!cur) return;
+  try { localStorage.setItem("manpower.lastBoard", cur.id); } catch (e) { /* remembering is a courtesy */ }
+  $("#board-dd-label").textContent = cur.name;   // textContent: board names are user data
+  $("#board-dd-count").textContent = rosterEmployees(cur.id).length;
+  $("#board-dd-dot").style.background = Charts.catColor(D().boards.indexOf(cur));
 }
 
 /* Initials + role in the account menu (Sign out lives there). */

@@ -5514,7 +5514,7 @@ body.toolbar-one-row #toolbar-row1 { order: 1; flex: 0 0 auto; }
 /* Overview: the board dropdown leads the one toolbar row, and the toolbar stays
    under the banner while the dashboard scrolls, so the board shown is always in view */
 body.toolbar-one-row #toolbar-row1 { display: contents; }
-body.toolbar-one-row #ov-board-dd { order: -1; margin-left: 20px; }
+body.toolbar-one-row #ov-board-dd { order: -1; margin-left: 14px; }
 body.toolbar-one-row #row1-end { order: 2; padding: 7px 20px 7px 0; }
 /* the board picker: an outline button like every toolbar control, opening the app's menu */
 #ov-board-dd.hidden { display: none; }
@@ -5554,3 +5554,20 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
 #btn-board-dd.is-current { background: #fff; border-color: #fff; color: var(--primary); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .22); }
 #btn-board-dd.is-current .ic { color: var(--primary); opacity: 1; }
 #btn-board-dd.is-current:hover { background: #eef4fa; }
+
+/* Board is an ordinary tab; its board picker sits at the left of toolbar row 1,
+   the same control as Overview's (button + menu), followed by CONFIRMED / FORECAST */
+#board-dd.hidden { display: none; }
+#board-dd { flex: none; }
+#btn-board-dd { gap: 8px; min-width: 210px; background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: none; font-weight: 550; }
+#btn-board-dd:hover { background: var(--hover-tint); }
+#btn-board-dd .ovb-cap { color: var(--muted); font-weight: 550; }
+#btn-board-dd .ovb-label { font-weight: 650; }
+#btn-board-dd > .ic:last-child { margin-left: auto; width: 14px; height: 14px; opacity: .7; color: inherit; }
+#board-menu { min-width: 240px; }
+#board-menu .board-tab.tab-board.active { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; box-shadow: none; }
+#toolbar-row1 #mode-pill { margin-left: 0; }
+@media (max-width: 640px) {
+  #board-dd, #ov-board-dd { flex: 1 1 100%; }
+  #btn-board-dd, #btn-ov-board { width: 100%; justify-content: flex-start; }
+}

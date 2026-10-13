@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-13n">
+<link rel="stylesheet" href="styles.css?v=2026-10-13o">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-13n"></script>
+<script src="version.js?v=2026-10-13o"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -199,19 +199,6 @@
        per-board tabs live in the board menu next to it (#board-dd), so adding a
        board no longer widens this strip. -->
   <nav id="board-tabs" aria-label="Modules"></nav>
-  <!-- Which board is on screen, as one pill. The boards themselves are the
-       .board-tab.tab-board items of #board-menu (see renderTabs in app.js). -->
-  <div id="board-dd" class="tb-dd">
-    <button type="button" id="btn-board-dd" class="btn btn-top" aria-haspopup="menu" aria-expanded="false" title="Switch board"><span id="board-dd-label">Board</span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
-    <div id="board-menu" class="tb-pop hidden" role="menu" aria-label="Boards">
-      <div id="board-menu-list"></div>
-      <button id="btn-add-board" class="tb-item tb-item-add" type="button" role="menuitem" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New board</button>
-    </div>
-  </div>
-  <!-- CONFIRMED / FORECAST for the board and date on screen, and the
-       "holds taken from you" counter (forward planning; see app.js) -->
-  <span id="mode-pill" class="mode-pill hidden"></span>
-  <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
   <div class="topbar-right">
     <span id="save-status" class="hidden"></span>
     <div class="date-nav">
@@ -431,6 +418,19 @@
   <div id="toolbar-row1">
     <!-- Overview: which board the dashboard shows. In the toolbar (not the page) so it
          stays in view while the dashboard scrolls; filled by renderOverview. -->
+    <!-- Board tab: which board is on screen. Same place and look as Overview's board
+           picker; the boards are the .board-tab.tab-board items of #board-menu (renderTabs). -->
+    <div id="board-dd" class="tb-dd hidden">
+      <button type="button" id="btn-board-dd" class="btn" aria-haspopup="menu" aria-expanded="false" title="Switch board"><span class="ovb-dot" id="board-dd-dot"></span><span class="ovb-cap">Board</span><span id="board-dd-label" class="ovb-label">Board</span><span class="ovb-count" id="board-dd-count"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+      <div id="board-menu" class="tb-pop hidden" role="menu" aria-label="Boards">
+        <div id="board-menu-list"></div>
+        <button id="btn-add-board" class="tb-item tb-item-add" type="button" role="menuitem" title="Create new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New board</button>
+      </div>
+    </div>
+    <!-- CONFIRMED / FORECAST for the board and date on screen, and the
+         "holds taken from you" counter (forward planning; see app.js) -->
+    <span id="mode-pill" class="mode-pill hidden"></span>
+    <button type="button" id="btn-hold-alerts" class="btn btn-small hidden"></button>
     <div id="ov-board-dd" class="tb-dd hidden">
       <button type="button" id="btn-ov-board" class="btn" aria-haspopup="menu" aria-expanded="false" title="Board shown on the dashboard"><span class="ovb-dot"></span><span class="ovb-cap">Board</span><span class="ovb-label">All boards</span><span class="ovb-count"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
       <div id="ov-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the dashboard"></div>
@@ -1302,12 +1302,12 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-13n"></script>
-<script src="employee-id.js?v=2026-10-13n"></script>
-<script src="cloud.js?v=2026-10-13n"></script>
-<script src="charts.js?v=2026-10-13n"></script>
-<script src="xlsx-export.js?v=2026-10-13n"></script>
-<script src="bulk-edit.js?v=2026-10-13n"></script>
-<script src="app.js?v=2026-10-13n"></script>
+<script src="planning.js?v=2026-10-13o"></script>
+<script src="employee-id.js?v=2026-10-13o"></script>
+<script src="cloud.js?v=2026-10-13o"></script>
+<script src="charts.js?v=2026-10-13o"></script>
+<script src="xlsx-export.js?v=2026-10-13o"></script>
+<script src="bulk-edit.js?v=2026-10-13o"></script>
+<script src="app.js?v=2026-10-13o"></script>
 </body>
 </html>
