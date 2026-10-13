@@ -5544,3 +5544,13 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
   .ov-detail-grid { display: block; columns: 2; column-gap: 18px; }
   .ov-detail-grid > * { break-inside: avoid; margin: 0 0 18px; display: block; width: 100%; }
 }
+
+/* Active tab: a white pill with navy text and a TRIGO-green icon (option B, colour 4).
+   The board picker is the Board module's tab, so it takes the same pill when a board is open. */
+#board-tabs .board-tab.active { background: #fff; color: var(--primary); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .22); }
+#board-tabs .board-tab.active::after { display: none; }
+#board-tabs .board-tab.active .ic { color: #6f8f1f; opacity: 1; }
+#board-tabs .board-tab:not(.active) { color: rgba(255, 255, 255, .74); }
+#btn-board-dd.is-current { background: #fff; border-color: #fff; color: var(--primary); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, .22); }
+#btn-board-dd.is-current .ic { color: var(--primary); opacity: 1; }
+#btn-board-dd.is-current:hover { background: #eef4fa; }
