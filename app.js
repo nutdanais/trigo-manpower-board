@@ -2586,7 +2586,7 @@ function renderStats() {
       standby += st.standby; unstaffed += st.unstaffed; if (st.standby) standbyBoards++;
     }
     bar.appendChild(statChip("Boards", D().boards.length));
-    bar.appendChild(statChip("Utilization", utilizationPct(assigned, total, leave, hol, free) + "%"));
+    bar.appendChild(statChip("Utilization", utilizationPct2(assigned, standby) + "%"));
     bar.appendChild(statChip("Assigned", assigned));
     bar.appendChild(statChip("Standby", standby));
     statusGroup(bar, [
@@ -2682,7 +2682,7 @@ function renderStats() {
   // Utilization = Assigned ÷ (Assigned + Standby): people on leave (exchange
   // working day included), on a holiday or on-call and not called in are left out,
   // so the missing share is exactly Standby and 0 Standby reads 100%.
-  const util = utilizationPct(s.assigned, s.total, s.leave, s.onHoliday, s.oncallAvailable);
+  const util = utilizationPct2(s.assigned, s.standby);
   const utilLine = `<span class="st-pct" data-stat="Utilized" title="Assigned ÷ (Assigned + Standby). People on leave, on a holiday or on-call and not called in are left out.">${util}% utilized</span>`;
   // Status chips: what needs a look, beside the numbers. Standby has no chip — its tile already flags it.
   const plan = peekPlan(D().activeBoardId);
@@ -2746,6 +2746,13 @@ function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); 
    denominator.) "On-call free" keeps its own chip in the stats bar and its own
    column in Overview's By board table — the number isn't hidden, it just
    doesn't drag utilization down. */
+/* The same utilization to two decimals, for the board's own stats: assigned ÷
+   (assigned + standby), which is the denominator above once leave, holiday and
+   free on-call are taken out. Trailing zeros dropped: 97.85, 98.5, 100. */
+function utilizationPct2(assigned, standby) {
+  const denom = assigned + standby;
+  return denom > 0 ? Math.round(assigned / denom * 10000) / 100 : 0;
+}
 function utilizationPct(assigned, headcount, leave, onHoliday = 0, oncallFree = 0) {
   const denom = headcount - leave - onHoliday - oncallFree;
   return denom > 0 ? Math.round((assigned / denom) * 100) : 0;

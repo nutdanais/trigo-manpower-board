@@ -184,7 +184,8 @@ async function step(name, fn) {
         const s = boardStats(D().activeBoardId);
         return { s, pct: document.querySelector("#stats-bar .st-pct").textContent, chips: document.querySelector("#board-status").textContent };
       });
-      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 100) : 0;
+      // two decimals, trailing zeros dropped (97.85, 98.5, 100)
+      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 10000) / 100 : 0;
       assert.equal(r.pct, want + "% utilized");
       assert.ok(!/standby/i.test(r.chips), "no Standby status chip: " + r.chips);
     });
