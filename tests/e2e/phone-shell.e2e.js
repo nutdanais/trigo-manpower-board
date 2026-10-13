@@ -1,6 +1,7 @@
-/* Acceptance run for the phone layout (styles.css "Phone shell"): the light top
-   bar, the navy bottom bar with More, the available-people drawer, and
-   full-screen record dialogs — at a 390px phone width.
+/* Acceptance run for the phone layout (styles.css "Phone shell"): the two-line
+   header (name, status and date; summary card, Filter and ⋯) that folds to one
+   line on scroll, the navy bottom bar with the Me tab, the available-people
+   drawer, and full-screen record dialogs — at a 390px phone width.
      NODE_PATH=$(npm root -g) node tests/e2e/phone-shell.e2e.js
    Pass SHOTS=<dir> to also save screenshots. Exits non-zero on the first failed check. */
 "use strict";
@@ -22,6 +23,7 @@ const visible = (p, sel) => p.evaluate((s) => { const el = document.querySelecto
 const navLabels = (p) => p.$$eval("#bottom-nav .bn-item .bn-label", (els) => els.map((e) => e.textContent));
 const activeNav = (p) => p.$eval("#bottom-nav .bn-item.active .bn-label", (e) => e.textContent);
 const tapNav = (p, label) => p.locator("#bottom-nav .bn-item", { hasText: label }).click();
+const menuItems = (p, sel) => p.$$eval(sel + " .tb-item", (els) => els.map((e) => e.textContent.trim()));
 const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height, width: r.width }; });
 
 (async () => {
@@ -35,34 +37,92 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
     await p.setViewportSize({ width: 390, height: 844 });
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
 
-    await step("the header tabs give way to a bottom bar: Board, Overview, Manpower, Host, More", async () => {
+    await step("the header tabs give way to a bottom bar: Board, Overview, Manpower, Host, Me", async () => {
       assert.equal(await visible(p, "#board-tabs"), false);
       assert.equal(await visible(p, "#bottom-nav"), true);
-      assert.deepEqual(await navLabels(p), ["Board", "Overview", "Manpower", "Host", "More"]);
+      assert.deepEqual(await navLabels(p), ["Board", "Overview", "Manpower", "Host", "Me"]);
+      assert.equal(await p.textContent("#btn-bn-more .bn-me"), "EA", "Me shows the account's initials");
       assert.equal(await activeNav(p), "Board");
       const nav = await rect(p, "#bottom-nav");
       assert.ok(Math.abs(nav.bottom - 844) < 1, "pinned to the bottom edge");
     });
 
-    await step("the top bar is one light row plus the board name as a large title", async () => {
+    await step("line 1: board name, status pill and date share one row; the avatar has left the header", async () => {
       assert.equal(await visible(p, "#app-logo"), false);
       assert.equal(await visible(p, "#btn-settings"), false);
-      assert.equal(await visible(p, "#btn-date"), true);
-      const fs = await p.$eval("#btn-board-dd", (e) => parseFloat(getComputedStyle(e).fontSize));
-      assert.ok(fs >= 20, "large title, got " + fs);
+      assert.equal(await visible(p, "#btn-avatar"), false);
       assert.equal(await p.$eval("#board-dd-label", (e) => e.textContent), "Board One");
-      assert.ok((await rect(p, "#topbar")).height < 110, "top bar stays compact");
+      const name = await rect(p, "#btn-board-dd"), date = await rect(p, "#btn-date");
+      assert.ok(Math.abs((name.top + name.bottom) / 2 - (date.top + date.bottom) / 2) < 6, "same line");
+      assert.ok(await p.$eval("#board-dd-label", (e) => e.scrollWidth <= e.clientWidth), "the name fits whole");
+    });
+
+    await step("line 2: the summary card, Filter and ⋯; the old toolbar and stats are gone from the board", async () => {
+      assert.equal(await visible(p, "#toolbar"), false);
+      for (const sel of ["#m-summary", "#m-filter", "#m-more"]) assert.equal(await visible(p, sel), true, sel);
+      const card = await rect(p, "#m-summary"), more = await rect(p, "#m-more");
+      assert.ok(Math.abs(card.top - more.top) < 2, "one line");
+      assert.match(await p.textContent("#m-summary"), /^\d+\/\d+ assigned/);
+      assert.ok((await rect(p, "#sticky-header")).height < 130, "two compact lines, got " + (await rect(p, "#sticky-header")).height);
       await shot(p, "1-board");
+    });
+
+    await step("the summary card opens to the details and remembers it", async () => {
+      assert.equal(await visible(p, "#m-details"), false);
+      await p.click("#m-summary");
+      assert.equal(await visible(p, "#m-details"), true);
+      assert.match(await p.textContent("#m-details"), /Assigned.*Leave.*Standby.*On-call free/s);
+      assert.equal(await p.evaluate(() => localStorage.getItem("mpm-m-details")), "1");
+      await shot(p, "1b-details");
+      await p.click("#m-summary");
+      assert.equal(await visible(p, "#m-details"), false);
+    });
+
+    await step("⋯ leads with New mission and New employee, then the board's other actions", async () => {
+      await p.click("#m-more");
+      assert.equal(await visible(p, "#m-more-menu"), true);
+      const items = await menuItems(p, "#m-more-menu");
+      assert.deepEqual(items.slice(0, 2), ["New mission", "New employee"]);
+      for (const want of ["Export", "Undo last change"]) assert.ok(items.includes(want), want + " in " + items);
+      await shot(p, "1c-more");
+      await p.evaluate(() => document.body.click());
+      assert.equal(await visible(p, "#m-more-menu"), false, "a tap elsewhere closes it");
+    });
+
+    await step("Filter opens the filter list as a sheet, and a filter on shows a count", async () => {
+      await p.click("#m-filter");
+      assert.equal(await visible(p, "#filter-pop"), true);
+      assert.equal(await visible(p, "#btn-reset-board"), false, "only the filters, no toolbar buttons");
+      await p.evaluate(() => { state.filters.shift = ["day"]; render(); });
+      assert.equal(await p.getAttribute("#m-filter", "data-count"), "1");
+      await p.evaluate(() => { state.filters.shift = []; render(); });
+      await p.evaluate(() => document.body.click());
+      assert.equal(await visible(p, "#filter-pop"), false);
+    });
+
+    await step("scrolled down, the header folds into one line with the count, Filter and ⋯", async () => {
+      await p.evaluate(() => { document.body.style.minHeight = "3000px"; window.scrollTo(0, 400); });
+      await p.waitForTimeout(150);
+      assert.ok(await p.evaluate(() => document.body.classList.contains("hdr-compact")));
+      assert.equal(await visible(p, "#m-summary"), false);
+      assert.equal(await visible(p, "#m-count"), true);
+      const head = await rect(p, "#sticky-header"), more = await rect(p, "#m-more"), name = await rect(p, "#btn-board-dd");
+      assert.ok(head.height < 60, "one line, got " + head.height);
+      assert.ok(Math.abs(more.top - name.top) < 8, "⋯ on the same line");
+      await shot(p, "1d-compact");
+      await p.evaluate(() => { window.scrollTo(0, 0); document.body.style.minHeight = ""; });
+      await p.waitForTimeout(150);
+      assert.ok(await p.evaluate(() => !document.body.classList.contains("hdr-compact")), "unfolds at the top");
     });
 
     await step("the page never scrolls sideways", async () => {
       assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= 390));
     });
 
-    await step("New Mission floats above the drawer's peek", async () => {
-      assert.equal(await p.$eval("#btn-new-mission", (e) => getComputedStyle(e).position), "fixed");
-      const fab = await rect(p, "#btn-new-mission"), pool = await rect(p, "#float-pool");
-      assert.ok(fab.bottom <= pool.top, "FAB clears the drawer");
+    await step("leave tabs are one row of short names", async () => {
+      const r = await p.$eval("#leave-tabs", (e) => ({ h: e.getBoundingClientRect().height, text: e.querySelector(".lv-tab span").innerText.trim() }));
+      assert.ok(r.h < 45, "one row, got " + r.h);
+      assert.equal(r.text, "Annual");
     });
 
     await step("the drawer peeks with the counts, opens, and closes again", async () => {
@@ -104,16 +164,17 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.equal(await visible(p, "#missions-grid"), true);
     });
 
-    await step("More holds Org Chart, Lock, Settings and Sign out; Settings hides the bar", async () => {
-      await tapNav(p, "More");
+    await step("Me holds the account, Org Chart, Lock, Settings and Sign out; Settings hides the bar", async () => {
+      await tapNav(p, "Me");
       assert.equal(await visible(p, "#more-menu"), true);
-      const items = await p.$$eval("#more-menu .tb-item", (els) => els.map((e) => e.textContent.trim()));
+      assert.equal(await p.textContent("#more-menu .tb-who b"), await p.textContent("#user-menu-name"), "the account's name on top");
+      const items = await menuItems(p, "#more-menu");
       for (const want of ["Org Chart", "Settings", "Sign out"]) assert.ok(items.includes(want), want + " in " + items);
       assert.ok(items.some((t) => /Lock this board|Unlock this board/.test(t)), "Lock in " + items);
       await shot(p, "4-more");
       await p.evaluate(() => document.body.click());
       assert.equal(await visible(p, "#more-menu"), false, "a tap elsewhere closes it");
-      await tapNav(p, "More");
+      await tapNav(p, "Me");
       await p.locator("#more-menu .tb-item", { hasText: "Settings" }).click();
       assert.ok(await p.evaluate(() => document.body.classList.contains("settings-open")));
       assert.equal(await visible(p, "#bottom-nav"), false);
@@ -121,8 +182,9 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.equal(await visible(p, "#bottom-nav"), true);
     });
 
-    await step("a record dialog opens full screen with its Save in view", async () => {
-      await p.click("#btn-new-mission");
+    await step("New mission from ⋯ opens full screen with its Save in view", async () => {
+      await p.click("#m-more");
+      await p.locator("#m-more-menu .tb-item", { hasText: "New mission" }).click();
       await p.waitForSelector("#modal-mission:not(.hidden)");
       await p.waitForTimeout(350);
       const m = await rect(p, "#modal-mission");
@@ -142,6 +204,9 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.equal(await visible(p, "#bottom-nav"), false);
       assert.equal(await visible(p, "#board-tabs"), true);
       assert.equal(await visible(p, "#fp-drawer-handle"), false);
+      assert.equal(await visible(p, "#m-row2"), false);
+      assert.equal(await visible(p, "#toolbar"), true);
+      assert.equal(await visible(p, "#btn-avatar"), true);
     });
   } catch (e) {
     failed = true;

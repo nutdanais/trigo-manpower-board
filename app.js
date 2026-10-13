@@ -327,6 +327,7 @@ function setSaveStatus(kind) {
   const el = $("#save-status");
   if (!el) return;
   el.classList.remove("hidden", "save-saving", "save-saved", "save-error");
+  document.body.dataset.save = kind;   // the phone's Me tab shows this as a dot
   if (kind === "saving") {
     el.classList.add("save-saving");
     el.textContent = "Saving…";
@@ -1751,13 +1752,21 @@ function renderBottomNav() {
     nav.appendChild(b);
   };
   for (const it of items) add(it);
-  add({ label: "More", ic: "more", on: moreOn, run: toggleMoreMenu }, (b) => {
+  // "Me": the account avatar lives here on a phone (styles.css hides the header's),
+  // with the save state as a dot on it and the rarer views in its menu
+  add({ label: "Me", ic: "more", on: moreOn, run: toggleMoreMenu }, (b) => {
     b.id = "btn-bn-more";
     b.setAttribute("aria-haspopup", "menu");
     b.setAttribute("aria-expanded", "false");
+    b.setAttribute("aria-label", "Me: account, settings and more views");
+    b.querySelector(".bn-pill").innerHTML = `<span class="bn-me">${escapeHtml($("#avatar-initials").textContent || "?")}</span>`;
   });
   const menu = $("#more-menu");
   menu.innerHTML = "";
+  const who = document.createElement("div");
+  who.className = "tb-who";
+  who.innerHTML = `<b>${escapeHtml($("#user-menu-name").textContent)}</b><small>${escapeHtml($("#user-menu-role").textContent)}</small>`;
+  menu.appendChild(who);
   for (const m of more) {
     const b = document.createElement("button");
     b.type = "button";
@@ -1773,6 +1782,7 @@ function toggleMoreMenu(ev) {
   const menu = $("#more-menu");
   const open = menu.classList.contains("hidden");
   closeTopbarMenus();
+  closePhoneMenus();
   menu.classList.toggle("hidden", !open);
   const btn = $("#btn-bn-more");
   if (btn) btn.setAttribute("aria-expanded", String(open));
@@ -1862,7 +1872,7 @@ function renderDateButton() {
   const full = fmtDate(state.date);
   const [d, mon, yr] = full.split("-");
   const btn = $("#btn-date");
-  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt">${dow} ${d}-${mon}<span class="d-yr">-${yr}</span></span>`;
+  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt"><span class="d-dow">${dow}</span> <span class="d-dm">${d}-${mon}</span><span class="d-yr">-${yr}</span></span>`;
   btn.title = `${dow} ${full} — click to pick a date`;
 }
 
@@ -2727,6 +2737,129 @@ function renderStats() {
   const noArea = roster.filter(e => !known.has(e.areaId)).length;
   if (noArea) areaHtml += areaChip("No area", noArea, "");
   areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+  renderPhoneSummary(s, areaHtml);
+}
+
+/* Phone header (styles.css, Phone header): the same numbers as the tiles above,
+   folded into one card. Closed it reads "89/106 assigned" plus the leave, standby
+   and on-call counts as coloured dots; opened (#m-details) it adds the tiles, the
+   Day / Night split and the area chips. Open or closed is remembered per device. */
+function renderPhoneSummary(s, areaHtml) {
+  const card = $("#m-summary");
+  if (!card) return;
+  const word = isForecastView() ? "planned" : "assigned";
+  const parts = [["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]];
+  const split = `<span class="ms-bar" aria-hidden="true">${parts.filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</span>`;
+  const k = (kind, n, label, alert) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}</span>`;
+  card.innerHTML = `<span class="ms-row"><span class="ms-t"><b>${s.assigned}</b>/${s.total} ${word}</span>` +
+    k("leave", s.leave, "Leave") + k("standby", s.standby, "Standby", s.standby > 0) + k("free", s.oncallAvailable, "On-call free") +
+    `<span class="ms-chev">${icon("chevron-down")}</span></span>` + split;
+  card.setAttribute("aria-label", `${s.assigned} of ${s.total} ${word}, ${s.leave} on leave, ${s.standby} standby, ${s.oncallAvailable} on-call free. Show details`);
+  const tile = (kind, n, label) => `<div class="md-tile st-${kind}"><b>${n}</b><span>${label}</span></div>`;
+  $("#m-details").innerHTML =
+    `<div class="md-tiles">${tile("asg", s.assigned, "Assigned")}${tile("leave", s.leave, "Leave")}${tile("standby", s.standby, "Standby")}` +
+    (s.isHoliday ? tile("hol", s.onHoliday, "Holiday") : "") + `${tile("free", s.oncallAvailable, "On-call free")}</div>` +
+    `<div class="md-shift"><span>${icon("sun")}<b>${s.dayMissions}</b> day</span><span>${icon("moon")}<b>${s.nightMissions}</b> night</span></div>` +
+    (areaHtml ? `<div class="md-areas">${areaHtml}</div>` : "");
+  $("#m-count").innerHTML = `<b>${s.assigned}</b>/${s.total}`;
+  let open = false;
+  try { open = localStorage.getItem("mpm-m-details") === "1"; } catch (e) { /* private mode */ }
+  setPhoneDetails(open);
+}
+function setPhoneDetails(open) {
+  $("#m-details").classList.toggle("hidden", !open);
+  $("#m-summary").setAttribute("aria-expanded", String(open));
+  $("#m-summary").classList.toggle("open", open);
+}
+
+/* Phone ⋯ menu: the board toolbar's actions, listed from the real (hidden on a
+   phone) toolbar buttons so permissions and state follow whatever render() set
+   on them. Built fresh on every open. */
+function buildPhoneMoreMenu() {
+  const menu = $("#m-more-menu");
+  menu.innerHTML = "";
+  const shown = (sel) => { const el = $(sel); return el && !el.classList.contains("hidden"); };
+  const item = (label, ic, run, cls = "", disabled = false) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tb-item" + (cls ? " " + cls : "");
+    b.setAttribute("role", "menuitem");
+    b.innerHTML = icon(ic) + `<span class="tb-grow">${escapeHtml(label)}</span>`;
+    b.disabled = disabled;
+    b.onclick = (ev) => { ev.stopPropagation(); closePhoneMenus(); run(); };
+    menu.appendChild(b);
+    return b;
+  };
+  const sep = () => { if (menu.lastChild && menu.lastChild.tagName !== "HR") menu.appendChild(document.createElement("hr")); };
+  const click = (sel) => () => $(sel).click();
+  if (shown("#btn-new-mission")) item("New mission", "plus", click("#btn-new-mission"), "tb-item-pri");
+  if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Add mission", "plus", click("#btn-import-mission"), "tb-item-pri");
+  if (shown("#btn-new-employee")) item("New employee", "plus", click("#btn-new-employee"), "tb-item-pri");
+  sep();
+  if (shown("#holiday-toggle")) {
+    const on = $("#holiday-check").checked;
+    const b = item("Holiday", "calendar", click("#holiday-check"));
+    b.setAttribute("role", "menuitemcheckbox");
+    b.setAttribute("aria-checked", String(on));
+    b.insertAdjacentHTML("beforeend", `<span class="tb-switch${on ? " on" : ""}" aria-hidden="true"></span>`);
+  }
+  const names = $("#card-names");
+  if (names && !names.classList.contains("hidden")) {
+    const row = document.createElement("div");
+    row.className = "tb-item tb-item-static";
+    row.innerHTML = icon("users") + `<span class="tb-grow">Names</span>`;
+    const seg = document.createElement("span");
+    seg.className = "tb-seg";
+    for (const o of names.options) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = o.value === "th" ? "ไทย" : o.value === "en" ? "EN" : o.textContent;
+      b.setAttribute("aria-pressed", String(names.value === o.value));
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        names.value = o.value;
+        names.dispatchEvent(new Event("change", { bubbles: true }));
+        for (const x of seg.children) x.setAttribute("aria-pressed", String(x === b));
+      };
+      seg.appendChild(b);
+    }
+    row.appendChild(seg);
+    menu.appendChild(row);
+  }
+  if (shown("#btn-hide-missions")) item("Hide / unhide missions", "eye-off", click("#btn-hide-missions"));
+  if (shown("#btn-forecast-copy")) item("Copy forecast forward", "arrow-right", click("#btn-forecast-copy"));
+  if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+  sep();
+  if (shown("#btn-undo")) item("Undo last change", "undo", click("#btn-undo"), "", $("#btn-undo").disabled);
+  if (shown("#btn-reset-board")) item($("#btn-reset-board").textContent.trim() || "Reset board", "reset", click("#btn-reset-board"), "tb-item-danger");
+  if (menu.lastChild && menu.lastChild.tagName === "HR") menu.lastChild.remove();
+}
+function togglePhoneMoreMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = $("#m-more-menu");
+  const open = menu.classList.contains("hidden");
+  closePhoneMenus();
+  if (!open) return;
+  buildPhoneMoreMenu();
+  menu.classList.remove("hidden");
+  $("#m-more").setAttribute("aria-expanded", "true");
+}
+function togglePhoneFilter(ev) {
+  if (ev) ev.stopPropagation();
+  const open = !document.body.classList.contains("m-filter-open");
+  closePhoneMenus();
+  document.body.classList.toggle("m-filter-open", open);
+  $("#m-filter").setAttribute("aria-expanded", String(open));
+}
+function closePhoneMenus() {
+  closeMoreMenu();
+  const menu = $("#m-more-menu");
+  if (menu) menu.classList.add("hidden");
+  const mm = $("#m-more");
+  if (mm) mm.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("m-filter-open");
+  const mf = $("#m-filter");
+  if (mf) mf.setAttribute("aria-expanded", "false");
 }
 
 /* ---------- overview tab ---------- */
@@ -3704,6 +3837,8 @@ function updateFilterBadge() {
   b.textContent = n;
   b.classList.toggle("hidden", !n);
   $("#btn-filter-pop").classList.toggle("ms-active", n > 0);
+  const mf = $("#m-filter");
+  if (mf) { mf.dataset.count = n ? String(n) : ""; mf.classList.toggle("on", n > 0); }
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
@@ -7808,6 +7943,8 @@ function nextWorkingDates(boardId, after, n) {
 
 /* ---------- mode pill ---------- */
 function renderModePill() {
+  const hol = $("#m-hol-pill");
+  if (hol) hol.classList.toggle("hidden", isNonBoardView() || !isNonWorkingDate(state.date));
   const pill = $("#mode-pill");
   const show = !isNonBoardView() && !!D().activeBoardId && !!feat().forecast && can("board");
   if (!show) { pill.className = "mode-pill hidden"; return; }
@@ -11243,9 +11380,31 @@ function wireApp() {
   $("#btn-touch-clear").onclick = clearSelection;
   $("#fp-drawer-handle").onclick = () => setPoolDrawer(!$("#float-pool").classList.contains("fp-open"));
   document.addEventListener("click", (ev) => { if (!ev.target.closest("#more-menu, #btn-bn-more")) closeMoreMenu(); });
+  // phone header: summary card, Filter sheet, ⋯ menu, and folding to one line on scroll
+  $("#m-summary").onclick = () => {
+    const open = $("#m-details").classList.contains("hidden");
+    setPhoneDetails(open);
+    try { localStorage.setItem("mpm-m-details", open ? "1" : "0"); } catch (e) { /* private mode */ }
+  };
+  $("#m-more").onclick = togglePhoneMoreMenu;
+  $("#m-filter").onclick = togglePhoneFilter;
+  document.addEventListener("click", (ev) => {
+    if (!ev.target.closest("#m-more-menu, #m-more")) { $("#m-more-menu").classList.add("hidden"); $("#m-more").setAttribute("aria-expanded", "false"); }
+    if (document.body.classList.contains("m-filter-open") && !ev.target.closest("#toolbar, #m-filter, .ms-pop")) {
+      document.body.classList.remove("m-filter-open");
+      $("#m-filter").setAttribute("aria-expanded", "false");
+    }
+  });
+  // two thresholds, so the header changing height as it folds can't flip it back
+  window.addEventListener("scroll", () => {
+    const y = window.scrollY, c = document.body.classList.contains("hdr-compact");
+    if (!c && y > 72) document.body.classList.add("hdr-compact");
+    else if (c && y < 8) document.body.classList.remove("hdr-compact");
+  }, { passive: true });
   document.addEventListener("keydown", (ev) => {
     if (ev.key !== "Escape") return;
     closeMoreMenu();
+    closePhoneMenus();
     if ($("#float-pool").classList.contains("fp-open")) setPoolDrawer(false);
   });
   $("#btn-touch-actions").onclick = (ev) => {
