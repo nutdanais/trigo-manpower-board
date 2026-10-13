@@ -5502,7 +5502,7 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
     font: inherit; color: var(--muted); text-align: left; cursor: pointer;
   }
   #m-summary:focus-visible, .m-sq:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
-  .ms-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 12px; font-weight: 600; min-width: 0; }
+  .ms-row { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 12px; font-weight: 600; min-width: 0; }
   .ms-t b { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
   .ms-k { display: inline-flex; align-items: center; gap: 3px; color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
   .ms-k i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -5526,32 +5526,40 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   }
   body.board-view #m-details:not(.hidden) {
     order: 11; flex: 1 0 100%; display: flex; flex-direction: column; gap: 8px;
-    padding: 9px 10px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
+    padding: 8px 10px 9px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
   }
-  /* opened: the desktop stats strip (same markup, PR 56's look), two tiles a row */
-  .m-stats { display: flex; flex-wrap: wrap; row-gap: 10px; align-items: flex-start; }
-  .m-stats .stat-lead { flex: 0 0 100%; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: 8px; padding: 0 2px; }
-  .m-stats .stat-tile { flex: 1 1 calc(50% - 2px); min-width: 0; padding: 0 10px; gap: 10px; flex-wrap: wrap; }
-  /* Total is the first div, so the left-hand tiles (Assigned, Standby) are the even ones */
-  .m-stats .stat-tile:nth-of-type(even) { border-left: 0; padding-left: 2px; }
-  .m-stats .st-main { min-width: 0; }
-  .m-stats .st-split { margin-top: 0; }
-  .m-stats .st-pct { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--stat-asg); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .m-status { display: flex; flex-wrap: wrap; gap: 6px; }
-  .m-status .status-chip {
-    display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 9px;
-    border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text);
+  /* opened: one row of status counts, one line of Total / Day / Night / utilization,
+     then status and area chips in one run */
+  .md-grid { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); }
+  .md-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; padding: 0 8px; border-left: 1px solid var(--border); }
+  .md-t:first-child { border-left: 0; padding-left: 2px; }
+  .md-l { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .md-l i { width: 8px; height: 8px; border-radius: 3px; flex: none; background: var(--tc, var(--border)); }
+  .md-t b { font-size: 20px; line-height: 1.1; font-weight: 700; letter-spacing: -.3px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .md-t.md-zero b { color: var(--muted); font-weight: 600; }
+  .md-t.md-alert .md-l, .md-t.md-alert b { color: var(--warn-text); }
+  .md-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 7px 2px 0; border-top: 1px solid var(--border); font-size: 12px; font-weight: 550; color: var(--muted); }
+  .md-line span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .md-line b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .md-line .ic { width: 13px; height: 13px; }
+  .md-line .md-util { margin-left: auto; }
+  .md-line .md-util b { color: var(--stat-asg); }
+  .md-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .md-chips .area-chip { background: var(--panel); height: 26px; }
+  .ms-u { color: var(--stat-asg); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .ms-k { gap: 2px; }
+  .md-chips .status-chip {
+    display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px 0 8px;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--text);
     font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
   }
-  .m-status .status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--muted); }
-  .m-status .status-chip b { font-variant-numeric: tabular-nums; font-weight: 700; }
-  .m-status .status-chip:active { transform: translateY(1px); }
-  .m-status .status-chip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
-  .m-status .status-chip.sc-amber { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
-  .m-status .status-chip.sc-amber::before { background: var(--warn); }
+  .md-chips .status-chip::before { content: ""; width: 7px; height: 7px; border-radius: 2px; background: var(--muted); }
+  .md-chips .status-chip b { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .md-chips .status-chip:active { transform: translateY(1px); }
+  .md-chips .status-chip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+  .md-chips .status-chip.sc-amber { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
+  .md-chips .status-chip.sc-amber::before { background: var(--warn); }
   .mission-card.flash-outline { animation: m-flash-outline 1.6s ease-out; }
-  .md-areas { display: flex; flex-wrap: wrap; gap: 4px; }
-  .md-areas .area-chip { background: var(--panel); }
 
   /* ⋯ menu */
   #board-menu .tb-item, #more-menu .tb-item, #m-more-menu .tb-item { min-height: 44px; font-size: 14.5px; }
@@ -5719,6 +5727,8 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   .modal-side .modal-actions .btn { min-height: 44px; }
   .modal-side .modal-actions .btn-primary { flex: 1 1 auto; }
 }
+/* a narrow phone keeps the number and the % but drops the word "assigned" */
+@media (max-width: 369px) { .ms-w { display: none; } }
 @keyframes m-flash-outline { 0%, 60% { box-shadow: 0 0 0 3px var(--warn); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
   #float-pool { transition: none; }

@@ -87,7 +87,10 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       for (const sel of ["#m-summary", "#m-filter", "#m-more"]) assert.equal(await visible(p, sel), true, sel);
       const card = await rect(p, "#m-summary"), more = await rect(p, "#m-more");
       assert.ok(Math.abs(card.top - more.top) < 2, "one line");
-      assert.match(await p.textContent("#m-summary"), /^\d+\/\d+ assigned/);
+      // closed: assigned with utilization beside it, Assigned ÷ (Assigned + Standby) to two decimals
+      const c = await p.evaluate(() => ({ s: boardStats(D().activeBoardId), t: document.querySelector("#m-summary .ms-t").textContent }));
+      const want = c.s.assigned + c.s.standby > 0 ? Math.round(c.s.assigned / (c.s.assigned + c.s.standby) * 10000) / 100 : 0;
+      assert.equal(c.t, `${c.s.assigned} (${want}%) assigned`);
       assert.ok((await rect(p, "#sticky-header")).height < 130, "two compact lines, got " + (await rect(p, "#sticky-header")).height);
       await shot(p, "1-board");
     });
@@ -96,12 +99,16 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.equal(await visible(p, "#m-details"), false);
       await p.click("#m-summary");
       assert.equal(await visible(p, "#m-details"), true);
-      assert.match(await p.textContent("#m-details"), /Total.*Assigned.*Leave.*Standby.*On-call free/s);
-      // the desktop strip's own markup, plus utilization = Assigned ÷ (Assigned + Standby), one decimal
-      const r = await p.evaluate(() => ({ s: boardStats(D().activeBoardId), pct: document.querySelector("#m-details .st-pct").textContent, tiles: document.querySelectorAll("#m-details .stat-tile").length }));
-      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 1000) / 10 : 0;
-      assert.equal(r.pct, want + "% utilized");
-      assert.ok(r.tiles >= 4, "the stat tiles, got " + r.tiles);
+      // opened: one row of status counts, then Total / Day / Night / utilization on one line
+      const d = await p.evaluate(() => {
+        const tiles = [...document.querySelectorAll("#m-details .md-t")];
+        const tops = new Set(tiles.map((t) => Math.round(t.getBoundingClientRect().top)));
+        return { labels: tiles.map((t) => t.dataset.stat), rows: tops.size, line: document.querySelector("#m-details .md-line").textContent, h: document.querySelector("#m-details").getBoundingClientRect().height };
+      });
+      assert.deepEqual(d.labels, ["Assigned", "Leave", "Standby", "On-call"]);
+      assert.equal(d.rows, 1, "the counts share one row");
+      assert.match(d.line, /Total \d+.*day.*night.*% utilized/s);
+      assert.ok(d.h < 150, "compact, got " + d.h);
       assert.equal(await p.evaluate(() => localStorage.getItem("mpm-m-details")), "1");
       await shot(p, "1b-details");
       await p.click("#m-summary");

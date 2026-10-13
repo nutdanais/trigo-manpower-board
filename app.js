@@ -2752,30 +2752,30 @@ function renderPhoneSummary(s, areaHtml) {
   const parts = [["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]];
   const split = `<span class="ms-bar" aria-hidden="true">${parts.filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</span>`;
   const k = (kind, n, label, alert) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}</span>`;
-  card.innerHTML = `<span class="ms-row"><span class="ms-t"><b>${s.assigned}</b>/${s.total} ${word}</span>` +
+  // Utilization = Assigned ÷ (Assigned + Standby), to two decimals: people on leave,
+  // on a holiday or on-call and not called in are left out, so 0 Standby reads 100%.
+  const util = utilizationPct2(s.assigned, s.standby);
+  card.innerHTML = `<span class="ms-row"><span class="ms-t"><b>${s.assigned}</b> <span class="ms-u">(${util}%)</span><span class="ms-w"> ${word}</span></span>` +
     k("leave", s.leave, "Leave") + k("standby", s.standby, "Standby", s.standby > 0) + k("free", s.oncallAvailable, "On-call free") +
     `<span class="ms-chev">${icon("chevron-down")}</span></span>` + split;
-  card.setAttribute("aria-label", `${s.assigned} of ${s.total} ${word}, ${s.leave} on leave, ${s.standby} standby, ${s.oncallAvailable} on-call free. Show details`);
-  // Opened, it is the desktop stats strip itself (the same markup and classes as
-  // #stats-bar, laid out for a phone in styles.css), so both screens read alike:
-  // Total, the tiles with Day / Night, the proportion bar, what needs a look, and
-  // the areas. Assigned also carries utilization, Assigned ÷ (Assigned + Standby):
-  // people on leave, on a holiday or on-call and not called in are left out.
+  card.setAttribute("aria-label", `${s.assigned} ${word}, ${util}% utilized, ${s.leave} on leave, ${s.standby} standby, ${s.oncallAvailable} on-call free. Show details`);
+  // Opened: one row of the status counts (they add up to Total), one line with
+  // Total and the Day / Night split, then what needs a look and the areas as one
+  // run of chips. The proportion bar is already on the card above.
   const details = $("#m-details");
-  details.innerHTML = `<div class="m-stats">${$("#stats-bar").innerHTML}</div>`;
-  const denom = s.assigned + s.standby;
-  const util = denom > 0 ? Math.round(s.assigned / denom * 1000) / 10 : 0;
-  const asg = details.querySelector('.stat-tile[data-stat="Assigned"] .st-main b');
-  if (asg && !details.querySelector(".st-pct")) {
-    asg.insertAdjacentHTML("afterend", `<span class="st-pct" data-stat="Utilized" title="Assigned ÷ (Assigned + Standby). People on leave, on a holiday or on-call and not called in are left out.">${util}% utilized</span>`);
-  }
+  const tiles = [["asg", s.assigned, "Assigned"], ["leave", s.leave, "Leave"], ["standby", s.standby, "Standby"]]
+    .concat(s.isHoliday ? [["hol", s.onHoliday, "Holiday"]] : [], [["free", s.oncallAvailable, "On-call"]]);
+  const tileHtml = tiles.map(([kind, n, label]) =>
+    `<div class="md-t st-${kind}${kind === "standby" && n > 0 ? " md-alert" : ""}${n === 0 ? " md-zero" : ""}" data-stat="${label}"><span class="md-l"><i></i>${label}</span><b>${n}</b></div>`).join("");
+  details.innerHTML = `<div class="md-grid" style="--n:${tiles.length}">${tileHtml}</div>` +
+    `<div class="md-line"><span>Total <b>${s.total}</b></span><span>${icon("sun")}<b>${s.dayMissions}</b> day</span>` +
+    `<span>${icon("moon")}<b>${s.nightMissions}</b> night</span><span class="md-util"><b>${util}%</b> utilized</span></div>`;
   const plan = peekPlan(D().activeBoardId);
   const hiddenN = plan.missions.filter(m => m.hidden).length;
   const chips =
     (s.unstaffed ? `<button type="button" class="status-chip sc-amber" data-status="unstaffed" title="Show the first mission with nobody on it"><b>${s.unstaffed}</b> ${s.unstaffed === 1 ? "mission" : "missions"} with no crew</button>` : "") +
     (hiddenN ? `<button type="button" class="status-chip" data-status="hidden" title="Open Hide/Unhide"><b>${hiddenN}</b> ${hiddenN === 1 ? "mission" : "missions"} hidden</button>` : "");
-  if (chips) details.insertAdjacentHTML("beforeend", `<div class="m-status">${chips}</div>`);
-  if (areaHtml) details.insertAdjacentHTML("beforeend", `<div class="md-areas">${areaHtml}</div>`);
+  if (chips || areaHtml) details.insertAdjacentHTML("beforeend", `<div class="md-chips">${chips}${areaHtml}</div>`);
   const firstEmpty = details.querySelector('[data-status="unstaffed"]');
   if (firstEmpty) firstEmpty.onclick = () => {
     const m = plan.missions.find(x => !x.hidden && !x.members.length);
@@ -2903,6 +2903,13 @@ function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); 
    denominator.) "On-call free" keeps its own chip in the stats bar and its own
    column in Overview's By board table — the number isn't hidden, it just
    doesn't drag utilization down. */
+/* The same utilization to two decimals, for the board's own stats: assigned ÷
+   (assigned + standby), which is the denominator above once leave, holiday and
+   free on-call are taken out. Trailing zeros dropped: 97.85, 98.5, 100. */
+function utilizationPct2(assigned, standby) {
+  const denom = assigned + standby;
+  return denom > 0 ? Math.round(assigned / denom * 10000) / 100 : 0;
+}
 function utilizationPct(assigned, headcount, leave, onHoliday = 0, oncallFree = 0) {
   const denom = headcount - leave - onHoliday - oncallFree;
   return denom > 0 ? Math.round((assigned / denom) * 100) : 0;
