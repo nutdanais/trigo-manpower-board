@@ -1255,7 +1255,7 @@ const cloud = {
   /* Two bulk queries (not one per day) covering `boardIds` over
      [fromDate, toDate] inclusive. Returns { [boardId]: { [date]: { assigned,
      leave, headcount, oncallAssigned, oncallLeave, oncallHeadcount,
-     staffedMissions, byEngineer } } } with
+     staffedMissions, byEngineer, holiday } } } with
      an entry for EVERY calendar date in range — working day, weekend, and
      holiday alike. Different charts need different subsets of dates (the
      utilization trend skips non-working days; the on-call availability trend
@@ -1327,6 +1327,7 @@ const cloud = {
           assigned: 0, leave: 0, headcount: emps.length,
           oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: emps.filter((e) => e.contract === "oncall").length,
           staffedMissions: 0, byEngineer: {},
+          holiday: isNonWorkingDate(d, boardId),   // weekend or holiday override: unassigned permanent staff are off, not on standby
         };
       }
     }

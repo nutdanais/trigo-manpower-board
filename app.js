@@ -265,7 +265,7 @@ const POSITIONS = {
 const OV_HISTORY_MEASURES = [
   { key: "util",     label: "Utilization",    suffix: "%", value: (r) => trendMetricValue("util", r) },
   { key: "deployed", label: "Deployed / day", suffix: "",  value: (r) => r.assigned },
-  { key: "idle",     label: "Idle / day",     suffix: "",  value: (r) => trendMetricValue("idle", r) },
+  { key: "idle",     label: "Standby / day",     suffix: "",  value: (r) => trendMetricValue("idle", r) },
   { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions },
 ];
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
@@ -2961,11 +2961,13 @@ function ovGroupHead(title, subtitle) {
 function trendMetricValue(metric, rec) {
   if (metric === "oncallFree") return Math.max(0, rec.oncallHeadcount - rec.oncallAssigned - rec.oncallLeave);
   if (metric === "idle") {
-    // permanent unassigned ≈ permanent headcount − permanent assigned − permanent
-    // leave. An approximation for past dates only in that it doesn't split out
-    // holidays (getUtilizationRange doesn't track them per-day); today's own
-    // figure — the KPI tile and status bar — comes from boardStats() instead,
-    // which does.
+    // Standby = permanent headcount − permanent assigned − permanent leave,
+    // same as boardStats() for today. On a board's holiday (weekend or a
+    // holiday override) its unassigned permanent staff are off, not on
+    // standby, so that day counts 0 — getUtilizationRange flags it per board
+    // per day, and the cross-board sums (historyDayRec / aggregateMetricPoint)
+    // already drop boards that are off that date.
+    if (rec.holiday) return 0;
     const permHeadcount = rec.headcount - rec.oncallHeadcount;
     const permAssigned = rec.assigned - rec.oncallAssigned;
     const permLeave = rec.leave - rec.oncallLeave;
