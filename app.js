@@ -1732,7 +1732,7 @@ function renderUserMenu() {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2561,12 +2561,12 @@ function statusChip(tone, n, label, onClick, title = "") {
   return c;
 }
 function statusGroup(bar, chips) {
+  // every tab's chips sit in the same place as the board's: #board-status, before the count
+  const g = $("#board-status");
+  g.innerHTML = "";
   const list = chips.filter(Boolean);
-  if (!list.length) return;
-  const g = document.createElement("div");
-  g.className = "st-status st-status-lead";
   for (const c of list) g.appendChild(c);
-  bar.prepend(g);
+  g.classList.toggle("hidden", !list.length);
 }
 const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
 
@@ -2616,18 +2616,27 @@ function renderStats() {
     return;
   }
   if (isEmployeeList()) {
-    const permN = D().employees.filter(e => e.contract === "permanent").length;
-    bar.appendChild(statChip("Total employees", D().employees.length));
-    bar.appendChild(statChip("Permanent", permN));
-    bar.appendChild(statChip("On-call", D().employees.length - permN));
-    // per-service-area counts, same idea as a board's #area-bar — its own chip
-    // group right after the ones above, still inside the shared #toolbar row
+    // the board's stats design: a Total lead, tiles that split it, a proportion bar,
+    // and a "By area" line of area-coloured chips that also adds up to Total
+    const emps = D().employees;
+    const permN = emps.filter(e => e.contract === "permanent").length;
+    const inactiveN = emps.filter(e => e.active === false).length;
+    const tileHtml = (label, n, kind, title = "") =>
+      `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"${title ? ` title="${title}"` : ""}><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
+    bar.classList.add("stats-tiles");
+    bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${emps.length}</b></div>` +
+      tileHtml("Permanent", permN, "perm") + tileHtml("On-call", emps.length - permN, "oncall") +
+      tileHtml("Inactive", inactiveN, "inactive", "Counted in Total; not on any board today") +
+      `<div class="st-split" aria-hidden="true">${[["perm", permN], ["oncall", emps.length - permN]].filter(([, n]) => n > 0)
+        .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
     const emplistAreaBar = $("#emplist-area-bar");
-    emplistAreaBar.innerHTML = "";
-    for (const a of D().areas) {
-      const n = D().employees.filter(e => e.areaId === a.id).length;
-      if (n) emplistAreaBar.appendChild(statChip(a.name, n));
-    }
+    const known = new Set(D().areas.map(a => a.id));
+    const chip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    let html = "";
+    for (const a of D().areas) { const n = emps.filter(e => e.areaId === a.id).length; if (n) html += chip(a.name, n, a.color); }
+    const noArea = emps.filter(e => !known.has(e.areaId)).length;
+    if (noArea) html += chip("No area", noArea, "");
+    emplistAreaBar.innerHTML = html ? `<span class="ar-cap">By area</span>${html}` : "";
     const knownAreas = new Set(D().areas.map(a => a.id));
     const act = D().employees.filter(e => e.active !== false);
     const issueChip = (key, tone, n, label) => n ? statusChip(tone, n, label, () => {
@@ -2639,7 +2648,7 @@ function renderStats() {
       issueChip("area", "amber", act.filter(e => !knownAreas.has(e.areaId)).length, "no service area"),
       issueChip("en", "", act.filter(e => !(e.nameEn || "").trim()).length, "no English name"),
     ]);
-    for (const c of bar.querySelectorAll(".st-status .status-chip")) c.classList.toggle("sc-on", c.title.startsWith("Click again"));
+    for (const c of $$("#board-status .status-chip")) c.classList.toggle("sc-on", c.title.startsWith("Click again"));
     return;
   }
   if (isCapacity()) {
@@ -2665,7 +2674,7 @@ function renderStats() {
       state.hostlist.filters.location = on ? [] : ["missing"];
       renderHostlistFilterOptions(); renderHostRows(); renderStats();
     }, on ? "Click again to show every host" : "Show only active hosts with no location or Maps link") : null]);
-    if (on) bar.querySelector(".st-status .status-chip").classList.add("sc-on");
+    if (on) $("#board-status .status-chip").classList.add("sc-on");
     return;
   }
   const s = boardStats(D().activeBoardId);
@@ -3780,6 +3789,11 @@ function renderEmplistFilterOptions() {
     D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
   $("#emplist-bulk-board").innerHTML = `<option value="">Move to board…</option>` +
     D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
+  // how many of the six filters are on, shown on the "Filters" button
+  const on = Object.values(state.emplist.filters).filter(v => v && v.length).length;
+  $("#emplist-filter-count").textContent = on;
+  $("#emplist-filter-count").classList.toggle("hidden", !on);
+  $("#btn-emplist-filter-pop").classList.toggle("ms-active", on > 0);
 }
 
 /* Manpower List name display: the Thai name (the app's default), the English name, or both.
@@ -7002,8 +7016,8 @@ function setXlsxTicks(on) {
 }
 
 /* Layout A (computer widths): row 1 ends with the tab's tools and Export at the
-   right edge. On a board that is Names → Undo → Reset → Export. The Manpower and
-   Host lists keep Bulk edit and Export at the end of row 2 (row 1 is full). Phones (where row 1 folds into the More dropdown) keep
+   right edge. On a board that is Names → Undo → Reset → Export; on the lists,
+   Bulk edit → Export. Phones (where row 1 folds into the More dropdown) keep
    them in #toolbar-right. */
 const ROW1_TOOLS_MQ = window.matchMedia("(min-width: 641px)");
 function placeBoardRow1Tools(board) {
@@ -7018,12 +7032,11 @@ function placeBoardRow1Tools(board) {
     right.insertBefore(names, $("#readonly-badge"));
     if (seg) names.after(seg);
   }
-  // the two lists keep Bulk edit and Export in row 2, beside their "N of M" count:
-  // their row 1 (search + six filters) already fills a laptop's width
-  const list = isEmployeeList() || isHostList();
-  const home = wide && !list ? end : right;
-  for (const b of bulk) if (b.parentNode !== right) right.append(b);
+  const home = wide ? end : right;
+  for (const b of bulk) if (b.parentNode !== home) home.append(b);
   if (home.lastElementChild !== exp) home.append(exp);
+  // Overview and Org Chart have no row-1 controls but Export: one row, numbers left, Export right
+  document.body.classList.toggle("toolbar-one-row", wide && (isOverview() || isOrgChart()));
 }
 ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.body.classList.contains("board-view")); });
 

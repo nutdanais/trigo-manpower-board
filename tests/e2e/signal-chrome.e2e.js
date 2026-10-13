@@ -238,20 +238,25 @@ async function step(name, fn) {
       await p.click("#modal-xlsx [data-close]");
     });
 
-    await step("layout A on the other tabs: Export in row 1 on Overview, status chips lead row 2, a Manpower chip narrows the list", async () => {
+    await step("layout A on the other tabs: Export in row 1 everywhere, Overview on one row, a Manpower chip narrows the list", async () => {
       const tab = (t) => p.evaluate((t) => { [...document.querySelectorAll("#board-tabs .board-tab")].find((x) => x.textContent.includes(t)).click(); }, t);
       await tab("Overview"); await p.waitForTimeout(400);
       assert.equal(await p.evaluate(() => document.querySelector("#btn-export").parentNode.id), "row1-end");
       assert.match(await p.textContent("#stats-bar"), /Utilization/);
+      const rows = await p.evaluate(() => [document.getElementById("toolbar-row1").getBoundingClientRect(), document.getElementById("toolbar-row2").getBoundingClientRect()].map((r) => Math.round(r.top + r.height / 2)));
+      assert.ok(Math.abs(rows[0] - rows[1]) <= 6, "Overview: numbers and Export share one row " + rows);
       await tab("Manpower"); await p.waitForTimeout(400);
-      assert.equal(await p.evaluate(() => document.querySelector("#btn-export").parentNode.id), "toolbar-right", "the lists keep Export beside their count");
+      assert.deepEqual(await p.evaluate(() => [...document.querySelector("#row1-end").children].filter((e) => !e.classList.contains("hidden")).map((e) => e.id).slice(-2)), ["btn-emplist-bulk", "btn-export"], "Manpower row 1 ends Bulk edit, Export");
+      await p.click("#btn-emplist-filter-pop");
+      assert.equal(await p.isVisible("#emplist-filters .ms[data-filter=status] .ms-btn"), true, "the six filters live in the Filters popover");
+      await p.click("#btn-emplist-filter-pop");
       await p.evaluate(() => { D().employees[0].trigoId = "T1"; renderStats(); renderEmployeeRows(); });
       const all = await p.locator("#emplist-table tbody tr").count();
-      const chip = p.locator("#stats-bar .st-status .status-chip", { hasText: "missing TRIGO ID" });
+      const chip = p.locator("#board-status .status-chip", { hasText: "missing TRIGO ID" });
       assert.equal(await chip.count(), 1);
       await chip.click();
       assert.equal(await p.locator("#emplist-table tbody tr").count(), all - 1, "the chip shows only the people it counts");
-      await p.locator("#stats-bar .st-status .status-chip", { hasText: "missing TRIGO ID" }).click();
+      await p.locator("#board-status .status-chip", { hasText: "missing TRIGO ID" }).click();
       assert.equal(await p.locator("#emplist-table tbody tr").count(), all, "a second click shows everyone again");
       await p.evaluate(() => { D().employees[0].trigoId = null; });
     });

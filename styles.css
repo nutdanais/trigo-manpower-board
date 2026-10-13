@@ -5473,11 +5473,40 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 @media (prefers-reduced-motion: reduce) { .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); } }
 body.exporting .st-status { display: none; }
 
-/* Layout A, row 2 on the other tabs: status chips first, then the numbers. */
-.st-status-lead { margin-right: 8px; padding-right: 14px; border-right: 1px solid var(--border); }
+/* Layout A on the other tabs: status chips sit in #board-status, as on the board. */
 .status-chip.sc-static { cursor: default; }
 .status-chip.sc-static:hover { box-shadow: none; }
 .status-chip.sc-static:active { transform: none; }
 .status-chip.sc-red { background: var(--danger-tint); border-color: var(--danger-line); color: var(--danger-text); }
 .status-chip.sc-red::before { background: var(--danger); }
 .status-chip.sc-on { box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* Manpower stats in the board's design: the tile keys and the proportion bar */
+.st-perm { --tc: var(--stat-asg); }
+.st-oncall { --tc: var(--stat-free); }
+.st-inactive { --tc: var(--border); }
+body:not(.board-view) #emplist-area-bar:not(.hidden) { flex: 0 0 100%; order: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+#emplist-area-bar:empty { display: none !important; }
+#stats-bar.stats-tiles .st-split { flex-basis: 100%; }
+
+/* Overview and Org Chart: one toolbar row, numbers and chips left, Export right */
+body.toolbar-one-row #toolbar { flex-direction: row; align-items: center; }
+body.toolbar-one-row #toolbar-row2 { order: 0; flex: 1 1 auto; min-width: 0; }
+body.toolbar-one-row #toolbar-row1 { order: 1; flex: 0 0 auto; }
+
+/* Manpower's Filters popover, same as the board's Filter & sort */
+#btn-emplist-filter-pop .fcount {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px;
+  background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+}
+#btn-emplist-filter-pop .fcount.hidden { display: none; }
+#emplist-filter-pop { width: 280px; padding: 12px; }
+#emplist-filter-pop #emplist-filters { display: grid; gap: 8px; }
+#emplist-filter-pop .ms { display: block; }
+#emplist-filter-pop .ms-btn { width: 100%; justify-content: space-between; }
+@media (max-width: 640px) {
+  #btn-emplist-filter-pop { display: none; }
+  #emplist-filter-dd { display: block; width: 100%; }
+  #emplist-filter-pop { position: static; display: block; width: 100%; padding: 0; box-shadow: none; background: none; }
+  #emplist-filter-pop.hidden { display: block !important; }
+}
