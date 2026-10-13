@@ -1756,6 +1756,20 @@ function wireTopbarMenus() {
   const setBar = () => document.documentElement.style.setProperty("--bar-h", head.offsetHeight + "px");
   setBar();
   if (window.ResizeObserver) new ResizeObserver(setBar).observe(head);
+  // On a board the people panel starts under toolbar row 1 (the buttons run the full
+  // width), and once that row has scrolled away it stops at the banner instead.
+  const row1 = $("#toolbar-row1");
+  let fpRaf = 0;
+  const setFpTop = () => {
+    fpRaf = 0;
+    const top = Math.max(head.offsetHeight, Math.round(row1.getBoundingClientRect().bottom));
+    document.documentElement.style.setProperty("--fp-top", top + "px");
+  };
+  const queueFpTop = () => { if (!fpRaf) fpRaf = requestAnimationFrame(setFpTop); };
+  window.addEventListener("scroll", queueFpTop, { passive: true });
+  window.addEventListener("resize", queueFpTop);
+  if (window.ResizeObserver) new ResizeObserver(queueFpTop).observe(row1);
+  setFpTop();
 }
 
 /* Built from spans rather than one string so the phone header can drop the

@@ -5272,6 +5272,10 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
   body.board-view #sticky-header #update-banner { margin-right: calc(-1 * var(--fp-w, 264px)); }
   #float-pool { top: var(--bar-h, 56px); }
   #fp-resizer { top: var(--bar-h, 56px); }
+  /* People panel position B: toolbar row 1 runs the full width over the panel, and
+     the panel starts under it (--fp-top, set in app.js; the banner once row 1 has scrolled away). */
+  body.board-view #toolbar-row1 { margin-right: calc(-1 * var(--fp-w, 264px)); padding-right: 20px; position: relative; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line, var(--border)); }
+  body.board-view #float-pool, body.board-view #fp-resizer { top: var(--fp-top, var(--bar-h, 56px)); }
 }
 body.settings-open #board-tabs, body.settings-open #board-dd { display: none !important; }
 

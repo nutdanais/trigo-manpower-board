@@ -129,9 +129,18 @@ async function step(name, fn) {
       assert.equal(await p.isVisible("#filter-count"), false);
     });
 
-    await step("the people panel starts under the banner, and the Names control is a Thai | English toggle", async () => {
-      const r = await p.evaluate(() => ({ pool: document.getElementById("float-pool").getBoundingClientRect().top, bar: document.getElementById("sticky-header").getBoundingClientRect().bottom, bannerRight: document.getElementById("topbar").getBoundingClientRect().right, vw: innerWidth }));
-      assert.ok(Math.abs(r.pool - r.bar) <= 1, JSON.stringify(r));
+    await step("the people panel starts under toolbar row 1 (the banner once it scrolls away), and the Names control is a Thai | English toggle", async () => {
+      const r = await p.evaluate(() => ({ pool: document.getElementById("float-pool").getBoundingClientRect().top, row1: document.getElementById("toolbar-row1").getBoundingClientRect().bottom, row1Right: document.getElementById("toolbar-row1").getBoundingClientRect().right, bannerRight: document.getElementById("topbar").getBoundingClientRect().right, vw: innerWidth }));
+      assert.ok(Math.abs(r.pool - r.row1) <= 1, JSON.stringify(r));
+      assert.ok(r.row1Right >= r.vw - 1, "toolbar row 1 spans the full width, over the panel");
+      const scrolled = await p.evaluate(async () => {
+        document.body.style.minHeight = "3000px"; window.scrollTo(0, 400);
+        await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+        const out = { pool: document.getElementById("float-pool").getBoundingClientRect().top, bar: document.getElementById("sticky-header").getBoundingClientRect().bottom };
+        window.scrollTo(0, 0); document.body.style.minHeight = "";
+        return out;
+      });
+      assert.ok(Math.abs(scrolled.pool - scrolled.bar) <= 1, "scrolled: the panel stops at the banner " + JSON.stringify(scrolled));
       assert.ok(r.bannerRight >= r.vw - 1, "the banner spans the full width");
       assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
     });
