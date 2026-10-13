@@ -267,8 +267,8 @@ const OV_HISTORY_MEASURES = [
     help: "Assigned ÷ (Assigned + Standby), averaged over the working days. People on leave (exchange working day included), on a holiday or on-call and not called in are left out, so a day with no one on Standby reads 100%." },
   { key: "deployed", label: "Deployed / day", suffix: "",  value: (r) => r.assigned,
     help: "People on a mission each working day (permanent and on-call), averaged over the range." },
-  { key: "idle",     label: "Idle / day",     suffix: "",  value: (r) => trendMetricValue("idle", r),
-    help: "Permanent people on no mission and no leave each working day, the board's Standby, averaged over the range. It is the share Utilization misses. On-call people who were not called in are not idle." },
+  { key: "idle",     label: "Standby / day",  suffix: "",  value: (r) => trendMetricValue("idle", r),
+    help: "Permanent people on no mission, no leave and no holiday each working day, the board's Standby, averaged over the range. It is the share Utilization misses. On-call people who were not called in are not idle." },
   { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions,
     help: "Missions with at least one person on them each working day, averaged over the range." },
 ];
@@ -3112,11 +3112,13 @@ function ovGroupHead(title, subtitle) {
 function trendMetricValue(metric, rec) {
   if (metric === "oncallFree") return Math.max(0, rec.oncallHeadcount - rec.oncallAssigned - rec.oncallLeave);
   if (metric === "idle") {
-    // permanent unassigned ≈ permanent headcount − permanent assigned − permanent
-    // leave. An approximation for past dates only in that it doesn't split out
-    // holidays (getUtilizationRange doesn't track them per-day); today's own
-    // figure — the KPI tile and status bar — comes from boardStats() instead,
-    // which does.
+    // Standby = permanent headcount − permanent assigned − permanent leave,
+    // same as boardStats() for today. On a board's holiday (weekend or a
+    // holiday override) its unassigned permanent staff are off, not on
+    // standby, so that day counts 0 — getUtilizationRange flags it per board
+    // per day, and the cross-board sums (historyDayRec / aggregateMetricPoint)
+    // already drop boards that are off that date.
+    if (rec.holiday) return 0;
     const permHeadcount = rec.headcount - rec.oncallHeadcount;
     const permAssigned = rec.assigned - rec.oncallAssigned;
     const permLeave = rec.leave - rec.oncallLeave;
