@@ -93,3 +93,11 @@ loaded by the app.
 default 440 px card), then four directions — A Size tiers, B Side sheet, C Sectioned
 workspace, D Adaptive hybrid (recommended) — each mocked on Edit Employee, Review &
 merge forecast and a phone view, with a comparison table. Not loaded by the app.
+
+## Signal redesign proposal (2026-10-13)
+
+`signal-proposal.html` is an independent whole-app proposal (not based on the Settings
+page): audit of the real board and dialogs, the "Signal" direction (calmer canvas, Geist
+type, one navy accent, dark mode), an interactive board mock with a side inspector, command
+palette and a queue-style Review & merge workbench, the 26-dialog map, tokens and a five-phase
+rollout. `modal-directions.html` (the Settings-shell proposal) is kept unchanged as the baseline.
