@@ -471,7 +471,10 @@
          menu that keeps Reset to 0 out of the everyday row (on a phone it also
          holds the two actions) — a display:contents group like #emplist-toolbar. -->
     <div id="capacity-toolbar" class="hidden">
-      <div id="cap-board-switch" role="group" aria-label="Board"></div>
+      <div id="cap-board-dd" class="tb-dd">
+        <button type="button" id="btn-cap-board" class="btn" aria-haspopup="menu" aria-expanded="false" title="Board shown on the Capacity tab"><span class="ovb-cap">Board</span><span class="ovb-label"></span><span class="ovb-count"></span><span class="cap-board-badge hidden"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+        <div id="cap-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the Capacity tab"></div>
+      </div>
       <label class="cap-field" for="cap-range"><span class="cap-tool-label">Range</span>
       <select id="cap-range" title="How far ahead">
         <option value="1">Next 1 week</option>
@@ -1139,6 +1142,10 @@
     <div class="xlsx-lang export-type" id="board-export-type" role="radiogroup" aria-label="File type"></div>
     <p class="import-note" id="xlsx-summary"></p>
     <p class="import-note" id="board-export-hint"></p>
+    <div id="pptx-part" class="hidden">
+      <p class="import-note" id="pptx-summary"></p>
+      <div id="pptx-preview" aria-label="Slide preview"></div>
+    </div>
     <div id="xlsx-part">
     <div class="xlsx-lang" id="xlsx-lang" role="radiogroup" aria-label="File language">
       <b>File language</b>
@@ -1342,6 +1349,7 @@
 <script src="cloud.js?v=2026-10-13x"></script>
 <script src="charts.js?v=2026-10-13x"></script>
 <script src="xlsx-export.js?v=2026-10-13x"></script>
+<script src="orgchart-pptx.js?v=2026-10-13x"></script>
 <script src="bulk-edit.js?v=2026-10-13x"></script>
 <script src="app.js?v=2026-10-13x"></script>
 </body>

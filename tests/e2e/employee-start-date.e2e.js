@@ -56,7 +56,7 @@ const X = require("../../xlsx-export.js");
     const cells = await p.locator("#emplist-body tr:has(td:text-is(\"Dated Person\"))").locator("td[data-label='Start date']").allTextContents();
     assert.deepEqual(cells, ["20-Apr-2023"]);
     const none = await p.locator("#emplist-body tr:has(td:text-is(\"Undated Person\"))").locator("td[data-label='Start date']").allTextContents();
-    assert.deepEqual(none, ["—"]);
+    assert.deepEqual(none.map((x) => x.trim()), ["+ Add"], "a blank start date offers + Add");
     console.log("ok - the Manpower List shows it");
 
     // ---- Years of service, its filter, and the Excel export of the list ----

@@ -7,7 +7,7 @@ Two separate PDFs, matching direction B (navy step rail and real app screenshots
 - [Preview](./manual-preview.png)
 - [Validation results](./pdf-validation.json)
 
-Each language contains 43 slides. The app is pinned to production commit `98250982f3f04813478d70c3fb969ce4fe252e6d`.
+Each language contains 43 slides. The app is pinned to repository commit `722bf9d1083bec9a4f9b37d1fdd3bd5e53f897b5`.
 Screenshots are captured from the real repository application using synthetic demonstration records and the existing fake-database test harness. Mobile screens are captured in a touch-enabled 390 × 844 emulated viewport. Browser installation flows are explicitly labeled diagrams; they are not fabricated screenshots.
 
 ## Updated coverage

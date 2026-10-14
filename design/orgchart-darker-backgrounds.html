@@ -1,0 +1,87 @@
+<title>Org Chart Backgrounds</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: a short intro, then one row per colour (B, C, D) with its four background styles side by side */
+  :root {
+    --page: #eef1f4; --panel: #ffffff; --ink: #1d2733; --muted: #5b6b7b; --line: #d8dde4; --navy: #00325a; --chip: #e3ecf5;
+    --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #eef1f4; } }
+  :root[data-theme="dark"] { --page: #eef1f4; }
+  body { background: var(--page); color: var(--ink); font-family: var(--font);
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 40px; }
+  .wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 26px; }
+  h1 { font-size: 24px; margin: 0; color: var(--navy); text-wrap: balance; }
+  .intro { margin: 6px 0 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+  .styles { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+  .styles b { color: var(--ink); }
+  section.color { display: grid; gap: 10px; }
+  section.color h2 { font-size: 16px; margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  section.color h2 code { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+  .opt { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 8px; min-width: 0; }
+  .opt header { display: flex; gap: 8px; align-items: baseline; }
+  .opt .id { font-weight: 800; color: var(--navy); background: var(--chip); border-radius: 5px; padding: 1px 7px; font-size: 13px; }
+  .opt .nm { font-size: 13px; font-weight: 600; }
+  /* the mini chart: the app's own card style on the option's ground */
+  .canvas { border-radius: 9px; padding: 22px 10px 26px; display: grid; justify-items: center; min-height: 230px; align-content: start; }
+  .card { background: #fff; border: 1px solid #d8dde4; border-top: 3px solid var(--c, var(--navy)); border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(16, 32, 52, .14); padding: 5px 8px; font-size: 10px; min-width: 88px; }
+  .card small { display: block; font-size: 8.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .card b { display: block; font-size: 11px; }
+  .stem { width: 1.5px; height: 13px; background: var(--rail); }
+  .bus { height: 1.5px; background: var(--rail); width: 62%; }
+  .kids { display: flex; gap: 8px; width: 100%; justify-content: space-around; }
+  .kid { display: grid; justify-items: center; }
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Org chart canvas: B, C and D with a fade</h1>
+    <p class="intro">Your three colours, each in four styles. Every tile is the app's own cards on that background, at the size the chart shows them. Tell me the code you want (for example <b>C1</b>), and I'll apply it with connector lines to match.</p>
+    <ul class="styles">
+      <li><b>1 Corner glow</b>: today's style, navy glow top-left and green bottom-right</li>
+      <li><b>2 Top fade</b>: lighter at the top, settling into the colour below</li>
+      <li><b>3 Spotlight</b>: lighter behind the chart, deeper toward the edges</li>
+      <li><b>4 Brand sweep</b>: a diagonal from navy to green across the canvas</li>
+    </ul>
+  </div>
+  <div id="rows"></div>
+</div>
+
+<script>
+  const COLORS = [
+    { k: "B", name: "Steel", g: "#cbd5e0", rail: "#8f9fb0",
+      glowA: "rgba(0,73,131,.14)", glowB: "rgba(168,200,85,.22)", light: "#e2e8ef", edge: "#b7c3d0", navy: "rgba(0,50,90,.16)", green: "rgba(140,180,60,.18)" },
+    { k: "C", name: "Navy wash", g: "#c3d1e0", rail: "#7f95ad",
+      glowA: "rgba(0,73,131,.18)", glowB: "rgba(168,200,85,.24)", light: "#dde6f0", edge: "#aebfd2", navy: "rgba(0,50,90,.20)", green: "rgba(140,180,60,.20)" },
+    { k: "D", name: "Deep navy", g: "#1f3a57", rail: "#6f89a6",
+      glowA: "rgba(84,148,210,.30)", glowB: "rgba(168,200,85,.22)", light: "#2d4d70", edge: "#152a40", navy: "rgba(70,130,190,.28)", green: "rgba(150,190,70,.22)" },
+  ];
+  const STYLES = [
+    { n: 1, name: "Corner glow", bg: c => `radial-gradient(120% 90% at 0% 0%, ${c.glowA}, transparent 60%), radial-gradient(120% 90% at 100% 100%, ${c.glowB}, transparent 60%), ${c.g}` },
+    { n: 2, name: "Top fade", bg: c => `linear-gradient(180deg, ${c.light} 0%, ${c.g} 70%)` },
+    { n: 3, name: "Spotlight", bg: c => `radial-gradient(75% 70% at 50% 40%, ${c.light}, ${c.g} 70%, ${c.edge} 100%)` },
+    { n: 4, name: "Brand sweep", bg: c => `linear-gradient(135deg, ${c.navy} 0%, transparent 50%, ${c.green} 100%), ${c.g}` },
+  ];
+  const card = (lvl, name, col) => `<div class="card" style="--c:${col}"><small>${lvl}</small><b>${name}</b></div>`;
+  const chart = `
+    ${card("Manager", "Akekaluk.A", "#a8d98a")}
+    <div class="stem"></div>
+    ${card("Service area", "AMATA", "#7fb8ec")}
+    <div class="stem"></div><div class="bus"></div>
+    <div class="kids">
+      <div class="kid"><div class="stem"></div>${card("Mission", "AMATA.26.0003", "#7fb8ec")}</div>
+      <div class="kid"><div class="stem"></div>${card("Mission", "AMATA.26.0011", "#7fb8ec")}</div>
+    </div>`;
+  document.getElementById("rows").innerHTML = COLORS.map(c => `
+    <section class="color">
+      <h2>${c.k} · ${c.name} <code>${c.g}</code></h2>
+      <div class="row">${STYLES.map(s => `
+        <div class="opt">
+          <header><span class="id">${c.k}${s.n}</span><span class="nm">${s.name}</span></header>
+          <div class="canvas" style="background:${s.bg(c)};--rail:${c.rail}">${chart}</div>
+        </div>`).join("")}
+      </div>
+    </section>`).join("");
+</script>

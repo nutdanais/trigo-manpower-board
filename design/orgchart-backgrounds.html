@@ -1,0 +1,92 @@
+<title>Org Chart Backgrounds</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&display=swap">
+<style>
+/* Layout: a zoom control on top, then one card per background, each with a live mini org chart */
+:root {
+  --bg: #f3f5f8; --panel: #ffffff; --text: #14273a; --muted: #5d6b7a; --border: #d9e0e8;
+  --navy: #004983; --green: #a8c855; --rail: #c3ccd6; --rail-soft: #dfe5ec; --tint: #f7f9fb;
+  --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f151c; --panel: #17202a; --text: #e6edf4; --muted: #95a3b2; --border: #2a3542;
+  --navy: #6fa8dc; --rail: #3a434d; --rail-soft: #252f3a; --tint: #131b24; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f151c; --panel: #17202a; --text: #e6edf4; --muted: #95a3b2; --border: #2a3542;
+  --navy: #6fa8dc; --rail: #3a434d; --rail-soft: #252f3a; --tint: #131b24; color-scheme: dark }
+body { background: var(--bg); color: var(--text); font-family: var(--font); padding: 24px 16px 48px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font-size: 22px; margin: 0; text-wrap: balance; }
+p.lede { margin: 0; color: var(--muted); max-width: 70ch; line-height: 1.5; }
+.ctl { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.ctl button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+.ctl button[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.opt { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.opt header { padding: 12px 14px; display: grid; gap: 4px; }
+.opt h2 { font-size: 15px; margin: 0; display: flex; gap: 8px; align-items: center; }
+.tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.rec { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: var(--green); color: #1d2b05; }
+.opt p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.vp { height: 200px; position: relative; overflow: hidden; border-top: 1px solid var(--border); }
+.canvas { position: absolute; left: 50%; top: 18px; transform-origin: 50% 0; transform: translateX(-50%) scale(var(--z)); }
+/* mini tree */
+.tree, .tree ul { display: flex; justify-content: center; gap: 14px; list-style: none; margin: 0; padding: 0; }
+.tree li { display: flex; flex-direction: column; align-items: center; position: relative; }
+.tree ul { padding-top: 18px; position: relative; }
+.tree ul::before { content: ""; position: absolute; top: 0; left: 50%; height: 9px; border-left: 1.5px solid var(--rail); }
+.tree ul > li { padding-top: 9px; }
+.tree ul > li::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: 1.5px solid var(--rail); }
+.tree ul > li:first-child::before { left: 50%; } .tree ul > li:last-child::before { right: 50%; }
+.tree ul > li:only-child::before { display: none; }
+.tree ul > li::after { content: ""; position: absolute; top: 0; left: 50%; height: 9px; border-left: 1.5px solid var(--rail); }
+.box { background: var(--panel); border: 1px solid var(--border); border-top: 3px solid var(--navy); border-radius: 7px; padding: 6px 10px; font-size: 11px; white-space: nowrap; box-shadow: 0 1px 2px rgba(16,32,52,.08); }
+.box b { display: block; font-size: 11.5px; }
+.box.y { border-top-color: #e3b800; } .box.g { border-top-color: var(--green); }
+/* backgrounds */
+.bg-now { background: radial-gradient(var(--rail) 1.3px, transparent 1.3px); background-size: 22px 22px; }
+.bg-fine { background: var(--tint) radial-gradient(var(--rail-soft) 1px, transparent 1px); background-size: 16px 16px; }
+.bg-scaled { background: radial-gradient(var(--rail) calc(1.3px * var(--z)), transparent calc(1.3px * var(--z))); background-size: calc(22px * var(--z)) calc(22px * var(--z)); background-position: 50% 0; }
+.bg-lines { background-color: var(--tint);
+  background-image: linear-gradient(var(--rail-soft) 1px, transparent 1px), linear-gradient(90deg, var(--rail-soft) 1px, transparent 1px);
+  background-size: calc(24px * var(--z)) calc(24px * var(--z)); background-position: 50% 0; }
+.bg-blue { background-color: var(--tint);
+  background-image: linear-gradient(var(--rail) 1px, transparent 1px), linear-gradient(90deg, var(--rail) 1px, transparent 1px),
+    linear-gradient(var(--rail-soft) 1px, transparent 1px), linear-gradient(90deg, var(--rail-soft) 1px, transparent 1px);
+  background-size: calc(120px * var(--z)) calc(120px * var(--z)), calc(120px * var(--z)) calc(120px * var(--z)), calc(24px * var(--z)) calc(24px * var(--z)), calc(24px * var(--z)) calc(24px * var(--z));
+  background-position: 50% 0; }
+.bg-plain { background: var(--tint); }
+.bg-wash { background: radial-gradient(600px 300px at 0% 0%, rgba(0,73,131,.08), transparent 60%), radial-gradient(600px 300px at 100% 100%, rgba(168,200,85,.14), transparent 60%), var(--tint); }
+</style>
+
+<div class="wrap">
+  <h1>Org chart backgrounds</h1>
+  <p class="lede">Today the dots stay 22px apart at every zoom, so at 30% they look huge next to the shrunken cards. Switch the zoom to see how each option holds up, then tell me the letter you want.</p>
+  <div class="ctl" role="group" aria-label="Zoom">Zoom
+    <button type="button" id="z30" data-z="0.45" aria-pressed="true">Zoomed out (30%)</button>
+    <button type="button" id="z100" data-z="1" aria-pressed="false">100%</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const opts = [
+  ["Now", "Current dots", "bg-now", "For reference: 1.3px dots every 22px, fixed size whatever the zoom."],
+  ["A", "Fine, faint dots", "bg-fine", "Smaller, lighter dots closer together on a soft tint. Reads as texture, never competes with the cards."],
+  ["B", "Dots that zoom with the chart", "bg-scaled", "The same dots, but they shrink and spread with the zoom, like Figma or Miro. Keeps the canvas feel, fixes the scale problem.", true],
+  ["C", "Light grid lines", "bg-lines", "A quiet square grid that zooms with the chart. Feels like planning paper and helps line up columns by eye."],
+  ["D", "Blueprint grid", "bg-blue", "Minor grid plus a stronger line every 5 squares. The most technical look; busier than C."],
+  ["E", "Plain soft panel", "bg-plain", "No pattern at all, just a slightly tinted panel. Cleanest; drag-to-pan is shown by the hint only."],
+  ["F", "Brand wash", "bg-wash", "The page's own navy and green corner glow, inside the chart. Calm and on brand, no pattern."],
+];
+const tree = `<ul class="tree"><li><div class="box"><b>Board lead</b>4 hosts</div><ul>
+  <li><div class="box y"><b>NPT</b>Day</div><ul><li><div class="box g"><b>Mission 1</b>3 crew</div></li><li><div class="box g"><b>Mission 2</b>2 crew</div></li></ul></li>
+  <li><div class="box y"><b>ANAPA</b>Night</div><ul><li><div class="box g"><b>Mission 3</b>4 crew</div></li></ul></li></ul></li></ul>`;
+document.getElementById("grid").innerHTML = opts.map(([k, name, cls, desc, rec]) => `
+  <section class="opt"><header><span class="tag">${k === "Now" ? "Current" : "Option " + k}</span>
+  <h2>${name}${rec ? '<span class="rec">Recommended</span>' : ""}</h2><p>${desc}</p></header>
+  <div class="vp ${cls}"><div class="canvas">${tree}</div></div></section>`).join("");
+const setZ = (z) => { document.documentElement.style.setProperty("--z", z);
+  for (const b of document.querySelectorAll(".ctl button")) b.setAttribute("aria-pressed", String(b.dataset.z === String(z))); };
+for (const b of document.querySelectorAll(".ctl button")) b.onclick = () => setZ(b.dataset.z);
+setZ("0.45");
+</script>

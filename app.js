@@ -1008,7 +1008,7 @@ function render() {
   const planEmpty = board && planIsEmpty(getPlan());
   $("#btn-reset-board").classList.toggle("hidden", fc ? !(planEdit && planEmpty) : !boardEdit);
   $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
-  $("#ov-board-dd").classList.toggle("hidden", !ov || D().boards.length < 2);
+  $("#ov-board-dd").classList.toggle("hidden", !(ov || org) || D().boards.length < 2);
   document.body.classList.toggle("ov-view", ov);
   document.body.classList.toggle("el-view", eml);
   document.body.classList.toggle("hl-view", hl);
@@ -1099,7 +1099,8 @@ function buildOrgTree() {
   };
 
   const root = { type: "root", _id: "root", name: "TRIGO Manpower", children: [] };
-  for (const b of D().boards) {
+  // the toolbar's Board dropdown (shared with Overview) picks all boards or one
+  for (const b of ovScopeBoards()) {
     const plan = (D().plans[b.id] || {})[date] || { missions: [], zones: {} };
     const boardId = "b:" + b.id;
     const boardNode = { type: "board", _id: boardId, name: b.name, color: "var(--primary)", children: [] };
@@ -1113,6 +1114,9 @@ function buildOrgTree() {
       const node = {
         type: "engineer", _id: boardId + "/e:" + key,
         name: eng ? eng.name : "Unassigned engineer", sub: eng ? (eng.phone || "") : "",
+        // the tier is "mission lead", but the label says who they are: a linked
+        // account's own role (a Manager leading a mission reads Manager)
+        role: eng && eng.account && eng.account.roleKey ? roleLabel(eng.account.roleKey) : "",
         color: eng ? eng.color : "#c3ccd6", _areas: new Map(), children: [],
       };
       engMap.set(key, node); boardNode.children.push(node);
@@ -1291,6 +1295,7 @@ function renderOrgChart() {
     (function w(n) { if (n.type === "mission" || n.type === "bucket") org.collapsed.add(n._id); n.children.forEach(w); })(full);
     org.seeded = true;
   }
+  fillOvBoardSelect(ovScopeBoards());
   org.filterOpts = orgFilterOptions(full);
   // forget filter selections whose board/engineer/area is gone from this snapshot
   for (const dim of ["boards", "engineers", "areas"]) {
@@ -1313,7 +1318,6 @@ function renderOrgChart() {
         <div class="oc-spacer"></div>
         <span class="oc-flabel">Filter</span>
         <div class="oc-filters">
-          ${orgFilterDropdown("boards", "Board", org.filterOpts.boards)}
           ${orgFilterDropdown("engineers", "Engineer", org.filterOpts.engineers)}
           ${orgFilterDropdown("areas", "Service area", org.filterOpts.areas)}
           ${orgFilterDropdown("statuses", "Standby / Leave", org.filterOpts.statuses)}
@@ -1440,7 +1444,8 @@ function orgOutlineNode(n) {
   if (n.type === "employee") right = `<span class="oc-meta">${orgEmpChips(n)}<span class="oc-phone">${escapeHtml(n.phone)}</span></span>`;
   else {
     const shift = n.type === "mission" ? `<span class="oc-chip oc-${n.shift}">${n.shift === "night" ? "Night" : "Day"}</span>` : "";
-    right = `<span class="oc-meta">${shift}<span class="oc-cnt">${orgCountText(n)}</span></span>`;
+    const role = n.role ? `<span class="oc-chip oc-pos">${escapeHtml(n.role)}</span>` : "";
+    right = `<span class="oc-meta">${role}${shift}<span class="oc-cnt">${orgCountText(n)}</span></span>`;
   }
   row.innerHTML = `${caret}${tagEl}<span class="oc-nm">${escapeHtml(n.name)}${sub}</span><span class="oc-grow"></span>${right}`;
   box.appendChild(row);
@@ -1498,7 +1503,7 @@ function orgChartBox(n) {
   }
   const sub = n.sub ? `<span class="oc-sub">${escapeHtml(n.sub)}</span>` : "";
   const btn = orgIsLeaf(n) ? "" : `<button type="button" class="oc-tog" title="Collapse / expand">${org.collapsed.has(n._id) ? "+" : "–"}</button>`;
-  el.innerHTML = `${head}<div class="oc-body"><span class="oc-lvl">${orgLevelLabel(n.type)}</span>` +
+  el.innerHTML = `${head}<div class="oc-body"><span class="oc-lvl">${escapeHtml(n.role || orgLevelLabel(n.type))}</span>` +
     `<div class="oc-ttl">${escapeHtml(n.name)} ${sub}</div>${meta}</div>${btn}`;
   const t = el.querySelector(".oc-tog");
   if (t) t.onclick = (e) => { e.stopPropagation(); orgToggle(n._id); };
@@ -1868,7 +1873,7 @@ function renderUserMenu() {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2750,7 +2755,8 @@ function renderStats() {
   }
   if (isOrgChart()) {
     let missions = 0, crew = 0, emptyMissions = 0; const engs = new Set();
-    for (const b of D().boards) {
+    const scope = ovScopeBoards();
+    for (const b of scope) {
       const plan = (D().plans[b.id] || {})[state.date];
       if (!plan) continue;
       for (const m of plan.missions) {
@@ -2761,7 +2767,7 @@ function renderStats() {
         if (!m.members.length) emptyMissions++;
       }
     }
-    bar.appendChild(statChip("Boards", D().boards.length));
+    bar.appendChild(statChip("Boards", scope.length));
     bar.appendChild(statChip("Engineers", engs.size));
     bar.appendChild(statChip("Missions", missions));
     bar.appendChild(statChip("Crew deployed", crew));
@@ -2784,12 +2790,13 @@ function renderStats() {
         .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
     const emplistAreaBar = $("#emplist-area-bar");
     const known = new Set(D().areas.map(a => a.id));
-    const chip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    const chip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.emplist.filters.areaId);
     let html = "";
-    for (const a of D().areas) { const n = emps.filter(e => e.areaId === a.id).length; if (n) html += chip(a.name, n, a.color); }
+    for (const a of D().areas) { const n = emps.filter(e => e.areaId === a.id).length; if (n) html += chip(a.id, a.name, n, a.color); }
     const noArea = emps.filter(e => !known.has(e.areaId)).length;
-    if (noArea) html += chip("No area", noArea, "");
+    if (noArea) html += chip("__none__", "No area", noArea, "");
     emplistAreaBar.innerHTML = html ? `<span class="ar-cap">By area</span>${html}` : "";
+    wireAreaFilterChips(emplistAreaBar, state.emplist.filters, () => { renderEmplistFilterOptions(); renderEmployeeRows(); renderStats(); });
     const knownAreas = new Set(D().areas.map(a => a.id));
     const act = D().employees.filter(e => e.active !== false);
     const issueChip = (key, tone, n, label) => n ? statusChip(tone, n, label, () => {
@@ -2840,12 +2847,13 @@ function renderStats() {
       `<div class="st-split" aria-hidden="true">${[["perm", withLoc], ["noloc", rows.length - withLoc]].filter(([, n]) => n > 0)
         .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
     const hostAreaBar = $("#area-bar");
-    const areaChip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    const areaChip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.hostlist.filters.areaId);
     let areaHtml = "";
-    for (const a of D().areas) { const n = rows.filter(r => r.area && r.area.id === a.id).length; if (n) areaHtml += areaChip(a.name, n, a.color); }
+    for (const a of D().areas) { const n = rows.filter(r => r.area && r.area.id === a.id).length; if (n) areaHtml += areaChip(a.id, a.name, n, a.color); }
     const noArea = rows.filter(r => !r.area).length;
-    if (noArea) areaHtml += areaChip("No area", noArea, "");
+    if (noArea) areaHtml += areaChip("__none__", "No area", noArea, "");
     hostAreaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+    wireAreaFilterChips(hostAreaBar, state.hostlist.filters, () => { renderHostlistFilterOptions(); renderHostRows(); renderStats(); });
     const noLoc = rows.filter(r => !r.archived && !(r.location || r.mapUrl)).length;
     const on = state.hostlist.filters.location.length === 1 && state.hostlist.filters.location[0] === "missing";
     statusGroup(bar, [noLoc ? statusChip("amber", noLoc, "without a location", () => {
@@ -2927,6 +2935,23 @@ function renderStats() {
   renderPhoneSummary(s, areaHtml);
 }
 
+/* Manpower and Host: the "By area" chips double as a one-click area filter.
+   A click shows only that area (the same filter as Filters → Service area);
+   clicking the chip that is on again shows every area. "__none__" is No area. */
+function areaFilterChip(key, name, n, color, picked) {
+  const on = picked.length === 1 && picked[0] === key;
+  const dot = /^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)";
+  return `<button type="button" class="area-chip ac-btn${on ? " ac-on" : ""}" data-area="${escapeHtml(name)}" data-area-key="${escapeHtml(key)}" aria-pressed="${on}"` +
+    ` title="${on ? "Click again to show every area" : `Show only ${escapeHtml(name)}`}"><i class="ac-dot" style="background:${dot}"></i>${escapeHtml(name)} <b>${n}</b></button>`;
+}
+function wireAreaFilterChips(barEl, filters, redraw) {
+  for (const b of barEl.querySelectorAll(".ac-btn")) b.onclick = () => {
+    const key = b.dataset.areaKey;
+    filters.areaId = filters.areaId.length === 1 && filters.areaId[0] === key ? [] : [key];
+    redraw();
+  };
+}
+
 /* Phone header (styles.css, Phone header): the same numbers as the tiles above,
    folded into one card. Closed it reads "89/106 assigned" plus the leave, standby
    and on-call counts as coloured dots; opened (#m-details) it adds the tiles, the
@@ -3002,6 +3027,11 @@ function renderPhoneViewCard(o) {
     chips.appendChild(x);
   }
   if (o.areaHtml) chips.insertAdjacentHTML("beforeend", o.areaHtml);
+  // area filter chips: a tap does what the same chip in row 2 does
+  for (const x of chips.querySelectorAll(".ac-btn")) {
+    const twin = $$(`${isEmployeeList() ? "#emplist-area-bar" : "#area-bar"} .ac-btn`).find(b => b.dataset.areaKey === x.dataset.areaKey);
+    if (twin) x.onclick = () => twin.click();
+  }
   if (chips.children.length) details.appendChild(chips);
   const mf = $("#m-filter");
   if (mf && o.filterCount != null) { mf.dataset.count = o.filterCount ? String(o.filterCount) : ""; mf.classList.toggle("on", o.filterCount > 0); }
@@ -4140,7 +4170,7 @@ function emplistFilterOptions(key) {
     return [...Object.keys(POSITIONS).map(k => ({ value: k, label: POSITIONS[k].label })), { value: "__none__", label: "— none —" }];
   }
   if (key === "service") return SERVICE_BUCKETS.map(b => ({ value: b.value, label: b.label }));
-  if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name }));
+  if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name })).concat([{ value: "__none__", label: "No area" }]);
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
   if (key === "status") return [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }];
   return [];
@@ -4212,7 +4242,7 @@ function emplistFilteredSorted() {
     if (f.contract.length && !f.contract.includes(e.contract)) return false;
     if (f.position.length && !f.position.includes(e.position || "__none__")) return false;
     if (f.service.length && !f.service.includes(serviceBucketOf(e))) return false;
-    if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
+    if (f.areaId.length && !f.areaId.includes(D().areas.some(a => a.id === e.areaId) ? e.areaId : "__none__")) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
     if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
     const issue = state.emplist.issue;   // a status chip narrowing the list to active people missing one thing
@@ -4571,6 +4601,10 @@ function renderEmployeeRows() {
     const pos = e.position ? POSITIONS[e.position] : null;
     const isActive = e.active !== false;   // undefined (pre-migration) counts as active
     const util = state.emplist.util ? state.emplist.util[e.id] : undefined;
+    // what an alert pill counts as missing gets a "+ Add …" button in its own
+    // column (as Host does for a location), for active people a user may edit
+    const fixable = isActive && can("emplist", "edit");
+    const add = (field, what) => fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="${field}" title="Add ${what}">+ Add</button>` : "—";
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
@@ -4580,15 +4614,15 @@ function renderEmployeeRows() {
     // card list on phone with no separate render path
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td data-label="Name" class="el-name">${emplistNameHtml(e)}</td>
-      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : "—"}</td>
+      <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? " " + add("nameEn", "English name") : ""}</td>
+      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : add("trigoId", "TRIGO ID")}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td data-label="Position" class="m-x">${pos ? pos.label : "—"}</td>
-      <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
-      <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : "—"}</td>
+      <td data-label="Position" class="m-x">${pos ? pos.label : add("position", "position")}</td>
+      <td data-label="Mobile number">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
+      <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
       <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
-      <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
+      <td data-label="Current board">${board ? escapeHtml(board.name) : add("boardId", "current board")}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
@@ -4618,6 +4652,7 @@ function renderEmployeeRows() {
       updateEmplistBulkBar();
       $("#emplist-select-all").checked = emps.length > 0 && emps.every(x => state.selectedEmps.has(x.id));
     };
+    for (const b of tr.querySelectorAll(".el-fix")) b.onclick = (ev) => { ev.stopPropagation(); openEmployeeModal(e.id, b.dataset.fix); };   // roster master data: no day lock, as with Status
     tr.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(e.id)));
     tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(e, ev.clientX, ev.clientY); });
     attachLongPress(tr, (x, y) => openEmpMenu(e, x, y));
@@ -4642,10 +4677,10 @@ function renderEmployeeRows() {
    information. Each table's service-area pill also hands its colour to CSS as --ac, which
    draws it as a small colour key beside plain text. Re-run after every row render; the
    header cells are static, so their marks are reset first. */
-/* empty for this purpose: nothing but the hover-only "add note" invitation or an "none" marker */
+/* empty for this purpose: nothing but a "none" marker ("+ Add" buttons count as content) */
 function quietCellEmpty(td) {
   let t = td.textContent.replace("\u2014", "");
-  for (const x of td.querySelectorAll(".hl-add-note, .hl-empty")) t = t.replace(x.textContent, "");
+  for (const x of td.querySelectorAll(".hl-empty")) t = t.replace(x.textContent, "");
   return t.trim() === "";
 }
 function quietTable(sel) {
@@ -5031,7 +5066,7 @@ function hostlistFilteredSorted() {
 function hostLocationCell(r) {
   const href = safeHttpUrl(r.mapUrl);
   const text = r.location || (href ? "Open in Google Maps" : "");
-  if (!text) return `<button type="button" class="hl-add-loc">+ Add location</button>`;
+  if (!text) return `<button type="button" class="hl-add-loc" title="Add location">+ Add</button>`;
   return href
     ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
          title="Open in Google Maps" onclick="event.stopPropagation()">${icon("pin")}${escapeHtml(text)}</a>`
@@ -5043,7 +5078,7 @@ function hostLocationCell(r) {
    front of every mission card's PPE line), so it sorts, reads and gets filled
    in on its own terms — including for a host that has no location yet. */
 function hostNoteCell(r) {
-  if (!r.note) return `<button type="button" class="hl-add-loc hl-add-note">+ Add note</button>`;
+  if (!r.note) return `<button type="button" class="hl-add-loc hl-add-note" title="Add note">+ Add</button>`;
   return `<span class="hl-note">${escapeHtml(r.note)}</span>`;
 }
 
@@ -5096,7 +5131,7 @@ function renderHostRows() {
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
       <td data-label="Service area" class="hl-area-cell">${r.area
         ? areaPillHtml(r.area, "area-pill")
-        : `<button type="button" class="hl-add-loc hl-add-area">+ Set area</button>`}</td>
+        : `<button type="button" class="hl-add-loc hl-add-area" title="Set service area">+ Add</button>`}</td>
       <td data-label="Note" class="hl-note-cell m-x">${hostNoteCell(r)}</td>
       <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
       <td data-label="Appear on board" class="hl-board-cell m-x">${hostBoardCell(r)}</td>
@@ -5907,7 +5942,9 @@ function hideMission() {
 }
 
 /* employee modal */
-function openEmployeeModal(empId) {
+/* focusField: open straight on the Edit tab with that input focused — the
+   Manpower list's "+ Add TRIGO ID" style buttons land on the one thing missing */
+function openEmployeeModal(empId, focusField) {
   if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
   state.editingEmployeeId = empId || null;
   const form = $("#form-employee");
@@ -5936,11 +5973,12 @@ function openEmployeeModal(empId) {
   // Edit Employee is one tab away. It only makes sense once the employee has
   // been saved (and thus could actually have an assignment history) though,
   // so a brand-new employee skips straight to the edit form with no tab strip.
-  state.employeeTab = empId ? "hosts" : "edit";
+  state.employeeTab = empId && !focusField ? "hosts" : "edit";
   $("#employee-tabs").classList.toggle("hidden", !empId);
   applyEmployeeTab();
   if (empId) { loadEmployeeHostRecord(empId); loadEmployeeNotes(empId); }
   openModal("#modal-employee");
+  if (focusField && form[focusField]) requestAnimationFrame(() => form[focusField].focus());
 }
 
 function saveEmployee(ev) {
@@ -7113,7 +7151,9 @@ function layoutMasonry(forceCols) {
   if (!W) return;
   const cards = [...grid.children].filter(
     c => c.classList && c.classList.contains("mission-card") && c.style.display !== "none");
-  const cols = forceCols || Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
+  // only a number pins the count: a callback's argument (fonts.ready hands over
+  // its FontFaceSet) once got here and stacked every card in one column
+  const cols = (Number.isInteger(forceCols) && forceCols > 0) ? forceCols : Math.max(1, Math.floor((W + MASONRY_GAP) / (MASONRY_MIN_CARD + MASONRY_GAP)));
   const colW = Math.floor((W - MASONRY_GAP * (cols - 1)) / cols);
   cards.forEach(c => {
     c.style.position = "absolute"; c.style.width = colW + "px";
@@ -7404,7 +7444,8 @@ function updateXlsxCount() {
   $("#xlsx-count").textContent = `${n} of ${boxes.length} columns`;
   // only Excel needs columns (and somebody on the board)
   const xlsx = pickedExportType($("#board-export-type")) === "xlsx";
-  $("#btn-xlsx-go").disabled = xlsx && (n === 0 || xlsxEmpty);
+  const type = pickedExportType($("#board-export-type"));
+  $("#btn-xlsx-go").disabled = xlsx ? (n === 0 || xlsxEmpty) : type === "pptx" && !(pptxDeck && pptxDeck.slides.length);
 }
 function setXlsxTicks(on) {
   for (const b of $$("#xlsx-cols input[type=checkbox]")) b.checked = on;
@@ -7460,7 +7501,7 @@ ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.bo
    opens that tab's export dialog, which starts with the file type: JPG, PDF
    and/or Excel, whichever the tab offers. The last type picked is remembered
    per tab on this device. */
-const EXPORT_TYPES = { jpg: "JPG image", pdf: "PDF", xlsx: "Excel" };
+const EXPORT_TYPES = { jpg: "JPG image", pdf: "PDF", xlsx: "Excel", pptx: "PowerPoint (editable)" };
 const EXPORT_TYPE_KEY = "manpower.exportType.";   // + tab
 function exportTypeSaved(tab, types) {
   try { const t = localStorage.getItem(EXPORT_TYPE_KEY + tab); if (types.includes(t)) return t; } catch (e) { /* remembering is a courtesy */ }
@@ -7497,7 +7538,7 @@ function openBoardExportModal() {
   if (isForecastView()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
   const board = isOverview() || isOrgChart() ? null : D().boards.find(b => b.id === D().activeBoardId);
   $("#board-export-title").textContent = "Export — " + (isOrgChart() ? "Org Chart" : board ? board.name : "Overview");
-  const types = board ? ["jpg", "pdf", "xlsx"] : ["jpg", "pdf"];
+  const types = board ? ["jpg", "pdf", "xlsx"] : isOrgChart() ? ["jpg", "pdf", "pptx"] : ["jpg", "pdf"];
   if (board) prepareXlsxPart(board);
   renderExportTypes($("#board-export-type"), board ? "board" : isOrgChart() ? "orgchart" : "overview", types, updateBoardExportModal);
   updateBoardExportModal();
@@ -7507,10 +7548,15 @@ function updateBoardExportModal() {
   const type = pickedExportType($("#board-export-type")) || "jpg";
   const xlsx = type === "xlsx";
   $("#xlsx-part").classList.toggle("hidden", !xlsx);
+  $("#pptx-part").classList.toggle("hidden", type !== "pptx");
+  $("#btn-xlsx-go").textContent = "Export";
+  if (type === "pptx") renderPptxPreview();
   $("#board-export-hint").classList.toggle("hidden", xlsx);
   const what = `${isOrgChart() ? "Org Chart" : isOverview() ? "Overview" : (D().boards.find(b => b.id === D().activeBoardId) || {}).name} · ${fmtDow(state.date)} ${fmtDate(state.date)}.`;
   $("#xlsx-summary").textContent = xlsx ? xlsxSummaryText : what;
-  $("#board-export-hint").textContent = type === "pdf"
+  $("#board-export-hint").textContent = type === "pptx"
+    ? "Every card is a PowerPoint shape with its own text: retype, move or recolour it. The lines are separate shapes, so after moving a card, move its line too. The slides follow what is on screen: the board picked, the filters and Show to."
+    : type === "pdf"
     ? "Opens the print dialog — choose Save as PDF. Sharp at any zoom, and the host and phone links stay tappable. Send it as a file."
     : "Saves a high-resolution image. Use it where only an image will do; send it as a file, not a photo, so it stays sharp.";
   updateXlsxCount();
@@ -7542,8 +7588,75 @@ function prepareXlsxPart(board) {
 function runBoardExport() {
   const type = pickedExportType($("#board-export-type")) || "jpg";
   if (type === "xlsx") return exportXlsx();
+  if (type === "pptx") return exportOrgPptx();
   closeModal();
   if (type === "pdf") printBoard(); else exportBoard();
+}
+
+/* ---- Org Chart → editable PowerPoint (layout and file: orgchart-pptx.js) ----
+   The boards exactly as on screen: filtered (org.tree is already pruned) and
+   cut at every collapsed node, which is what "Show to" sets. */
+function orgPptxBoards() {
+  const cut = (n) => ({
+    type: n.type, name: n.name, sub: n.sub || "", role: n.role || "", color: n.color, shift: n.shift,
+    position: n.position, contract: n.contract, areaColor: n.areaColor, status: n.status,
+    count: n.type === "employee" ? "" : orgCountText(n),
+    children: org.collapsed.has(n._id) ? [] : n.children.map(cut),
+  });
+  return org.tree ? org.tree.children.map(cut) : [];
+}
+function orgPptxScopeText() {
+  const lvl = $("#oc-level");
+  const show = lvl && lvl.selectedIndex >= 0 ? `Show to: ${lvl.options[lvl.selectedIndex].text}` : "Show to: as expanded on screen";
+  const hidden = ["engineers", "areas", "statuses"].filter(d => orgFilterState(d).hidden).length;
+  return show + (hidden ? ` · ${hidden} filter${hidden === 1 ? "" : "s"} on` : "");
+}
+let pptxDeck = null;
+/* the dialog says how many slides, how big boards are split, and shows each slide */
+function renderPptxPreview() {
+  pptxDeck = OrgPptx.layoutDeck(orgPptxBoards());
+  const n = pptxDeck.slides.length;
+  $("#pptx-summary").textContent = n ? OrgPptx.summaryText(pptxDeck) + " Check the slides below, then Export." : "Nothing on the chart to export: no boards are shown.";
+  $("#pptx-preview").innerHTML = pptxDeck.slides.map((sl, i) =>
+    `<figure class="pptx-thumb">${OrgPptx.slideSvg(sl, pptxDeck, escapeHtml)}<figcaption>${i + 1}. ${escapeHtml(sl.board)}${sl.parts > 1 ? ` · part ${sl.part} of ${sl.parts}` : ""}</figcaption></figure>`).join("");
+  $("#btn-xlsx-go").textContent = n ? `Export ${n} slide${n === 1 ? "" : "s"}` : "Export";
+  $("#btn-xlsx-go").disabled = !n;
+}
+let pptxLibPromise = null;
+function loadPptxGen() {
+  if (window.PptxGenJS) return Promise.resolve(window.PptxGenJS);
+  if (!pptxLibPromise) {
+    pptxLibPromise = loadJSZip().then(() => new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "vendor/pptxgen.min.js";
+      s.onload = () => resolve(window.PptxGenJS);
+      s.onerror = () => { pptxLibPromise = null; reject(new Error("Could not load the PowerPoint library. Check the connection and try again.")); };
+      document.head.appendChild(s);
+    }));
+  }
+  return pptxLibPromise;
+}
+async function exportOrgPptx() {
+  if (!pptxDeck || !pptxDeck.slides.length) return;
+  const btn = $("#btn-xlsx-go");
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try {
+    const PptxGenJS = await loadPptxGen();
+    const blob = await OrgPptx.buildPptx(PptxGenJS, pptxDeck, {
+      title: "Org Chart " + state.date, dateText: `${fmtDow(state.date)} ${fmtDate(state.date)}`, scopeText: orgPptxScopeText(),
+    });
+    const scope = ovScopeBoards();
+    const tag = scope.length === 1 && D().boards.length > 1 ? "_" + scope[0].name.replace(/[^A-Za-z0-9]+/g, "-") : "";
+    bulkSaveBlob(blob, `org_chart${tag}_${state.date}.pptx`);
+    closeModal();
+    toast(`Saved ${pptxDeck.slides.length} slide${pptxDeck.slides.length === 1 ? "" : "s"} as PowerPoint.`, "info");
+  } catch (e) {
+    toast(e.message || String(e), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Export";
+  }
 }
 
 async function exportXlsx() {
@@ -9657,31 +9770,34 @@ if (capPhoneMQ) {
   if (capPhoneMQ.addEventListener) capPhoneMQ.addEventListener("change", redraw); else capPhoneMQ.addListener(redraw);
 }
 
-/* the board switch (each board with its count of short days), range and the
+/* the board dropdown (the same button + menu as Board and Overview, each board
+   with its headcount and a red count of its short days), range and the
    actions in the toolbar row */
 function renderCapacityToolbar() {
-  const sw = $("#cap-board-switch");
-  sw.innerHTML = "";
   const current = capBoardId();
+  const btn = $("#btn-cap-board"), menu = $("#cap-board-menu");
+  const shortBadge = (el, n) => { el.textContent = n ? String(n) : ""; el.classList.toggle("hidden", !n); };
+  const picked = D().boards.find(b => b.id === current);
+  btn.querySelector(".ovb-label").textContent = picked ? picked.name : "No boards";   // textContent: board names are user data
+  btn.querySelector(".ovb-count").textContent = picked ? rosterEmployees(picked.id).length : "";
+  const curShort = picked ? capacityModel(picked.id).short : 0;
+  shortBadge(btn.querySelector(".cap-board-badge"), curShort);
+  btn.title = picked && curShort ? `${picked.name}: ${curShort} short day${curShort === 1 ? "" : "s"} in the range` : "Board shown on the Capacity tab";
+  menu.innerHTML = "";
   for (const b of D().boards) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "cap-board-btn" + (b.id === current ? " on" : "");
-    btn.setAttribute("aria-pressed", String(b.id === current));
-    const name = document.createElement("span");
-    name.textContent = b.name;
-    btn.appendChild(name);
+    const it = document.createElement("button");
+    it.type = "button";
+    it.className = "tb-item" + (b.id === current ? " is-current" : "");
+    it.setAttribute("aria-current", b.id === current ? "true" : "false");
+    it.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: b.name }));
     const short = capacityModel(b.id).short;
-    if (short) {
-      const n = document.createElement("span");
-      n.className = "cap-board-badge";
-      n.textContent = String(short);
-      btn.appendChild(n);
-      btn.title = `${b.name}: ${short} short day${short === 1 ? "" : "s"} in the range`;
-      btn.setAttribute("aria-label", btn.title);
-    }
-    btn.onclick = () => { state.capacity.boardId = b.id; render(); };
-    sw.appendChild(btn);
+    const badge = Object.assign(document.createElement("span"), { className: "cap-board-badge" });
+    shortBadge(badge, short);
+    if (short) badge.title = `${short} short day${short === 1 ? "" : "s"} in the range`;
+    it.appendChild(badge);
+    it.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(rosterEmployees(b.id).length) }));
+    it.onclick = () => { closeTopbarMenus(); if (b.id !== current) { state.capacity.boardId = b.id; render(); } };
+    menu.appendChild(it);
   }
   $("#cap-range").value = String(state.capacity.weeks);
   const mayEdit = can("capacity", "edit");
@@ -12071,7 +12187,7 @@ async function boot() {
   });
   await refreshAndRender();
   // fonts can settle after the first paint and change card heights — re-pack once ready
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutMasonry);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => layoutMasonry());
   // The column count comes from the grid's width, and on start-up the first
   // pack can run before the page has its final width (one narrow column that
   // stayed until a refresh or a tab switch). Window "resize" doesn't fire for

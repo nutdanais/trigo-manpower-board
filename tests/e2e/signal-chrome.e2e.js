@@ -220,7 +220,8 @@ async function step(name, fn) {
       assert.equal(emp.box, "0px");
       await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
       const hidden = await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th.col-off")].map((t) => t.textContent.trim()));
-      assert.ok(hidden.includes("Note") && hidden.includes("Inspectors deployed"), "columns empty on every row are left out: " + hidden);
+      assert.ok(hidden.includes("Inspectors deployed"), "columns empty on every row are left out: " + hidden);
+      assert.ok(!hidden.includes("Note"), "a blank note shows + Add, so its column stays: " + hidden);
       assert.ok(await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th:not(.col-off)")].some((t) => /Host name/.test(t.textContent))));
     });
 
