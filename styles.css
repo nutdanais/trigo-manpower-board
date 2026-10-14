@@ -4010,10 +4010,10 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
    inside #orgchart-panel, because this subtree is captured by html2canvas
    for the JPG export and that parser chokes on them (see app.js exportBoard).
    ====================================================================== */
-#orgchart-panel { --oc-rail: #c3ccd6; }
-[data-theme="dark"] #orgchart-panel { --oc-rail: #3a434d; }
+#orgchart-panel { --oc-rail: #c3ccd6; --oc-ground: #f6f8fb; --oc-glow-a: rgba(0, 73, 131, 0.08); --oc-glow-b: rgba(168, 200, 85, 0.14); }
+[data-theme="dark"] #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #orgchart-panel { --oc-rail: #3a434d; }
+  :root:not([data-theme="light"]) #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
 }
 
 .oc-wrap { display: flex; flex-direction: column; gap: 12px; }
@@ -4103,7 +4103,11 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
   pointer-events: none; opacity: .9; }
 .oc-viewport { height: min(68vh, 600px); overflow: hidden; cursor: grab; position: relative;
   border: 1px solid var(--border); border-radius: var(--r-box);
-  background: radial-gradient(var(--oc-rail) 1.3px, transparent 1.3px); background-size: 22px 22px; }
+  /* the page's own navy / green corner glow, no pattern (design/orgchart-backgrounds.html, option F) */
+  background:
+    radial-gradient(900px 480px at 0% 0%, var(--oc-glow-a), transparent 60%),
+    radial-gradient(900px 480px at 100% 100%, var(--oc-glow-b), transparent 60%),
+    var(--oc-ground); }
 .oc-viewport.grabbing { cursor: grabbing; }
 .oc-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; padding: 24px; }
 /* Connectors use the classic pure-CSS tree pattern: each li draws the two
