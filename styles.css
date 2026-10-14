@@ -4633,26 +4633,16 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   --cap-sel: rgba(111, 177, 224, .2);
 }
 #capacity-toolbar { display: contents; }
-#cap-board-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-soft); flex-wrap: wrap; }
-.cap-board-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.cap-board-btn:hover { background: var(--hover-tint); }
-.cap-board-btn.on { background: var(--primary); color: #fff; font-weight: 700; }
+#btn-cap-board { gap: 8px; min-width: 210px; }
+#btn-cap-board .ovb-cap { color: var(--muted); font-weight: 550; }
+#btn-cap-board .ovb-label { font-weight: 650; }
+#btn-cap-board .ic { margin-left: auto; width: 14px; height: 14px; opacity: .7; }
+#cap-board-menu { min-width: 240px; }
+#cap-board-menu .tb-item .ovb-name { flex: 1; }
+#cap-board-menu .tb-item.is-current { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; }
 /* this board's short days in the range: a red count, absent when there are none */
 .cap-board-badge { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--cap-over); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.cap-board-badge.hidden { display: none; }
 .cap-field {
   display: inline-flex;
   align-items: center;
@@ -4921,7 +4911,8 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 @media (max-width: 640px) {
   /* the two actions move into ⋯ so the toolbar stays one row */
   #btn-cap-seed, #btn-cap-copy-week { display: none; }
-  .cap-board-btn { padding: 0 10px; }
+  #cap-board-dd { flex: 1 1 100%; }
+  #btn-cap-board { width: 100%; }
   /* the summary wraps here, so the separating dots would start lines */
   .cap-summary > span + span::before { display: none; }
   .cap-summary { gap: 4px 10px; }

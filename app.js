@@ -1868,7 +1868,7 @@ function renderUserMenu() {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -9659,31 +9659,34 @@ if (capPhoneMQ) {
   if (capPhoneMQ.addEventListener) capPhoneMQ.addEventListener("change", redraw); else capPhoneMQ.addListener(redraw);
 }
 
-/* the board switch (each board with its count of short days), range and the
+/* the board dropdown (the same button + menu as Board and Overview, each board
+   with its headcount and a red count of its short days), range and the
    actions in the toolbar row */
 function renderCapacityToolbar() {
-  const sw = $("#cap-board-switch");
-  sw.innerHTML = "";
   const current = capBoardId();
+  const btn = $("#btn-cap-board"), menu = $("#cap-board-menu");
+  const shortBadge = (el, n) => { el.textContent = n ? String(n) : ""; el.classList.toggle("hidden", !n); };
+  const picked = D().boards.find(b => b.id === current);
+  btn.querySelector(".ovb-label").textContent = picked ? picked.name : "No boards";   // textContent: board names are user data
+  btn.querySelector(".ovb-count").textContent = picked ? rosterEmployees(picked.id).length : "";
+  const curShort = picked ? capacityModel(picked.id).short : 0;
+  shortBadge(btn.querySelector(".cap-board-badge"), curShort);
+  btn.title = picked && curShort ? `${picked.name}: ${curShort} short day${curShort === 1 ? "" : "s"} in the range` : "Board shown on the Capacity tab";
+  menu.innerHTML = "";
   for (const b of D().boards) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "cap-board-btn" + (b.id === current ? " on" : "");
-    btn.setAttribute("aria-pressed", String(b.id === current));
-    const name = document.createElement("span");
-    name.textContent = b.name;
-    btn.appendChild(name);
+    const it = document.createElement("button");
+    it.type = "button";
+    it.className = "tb-item" + (b.id === current ? " is-current" : "");
+    it.setAttribute("aria-current", b.id === current ? "true" : "false");
+    it.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: b.name }));
     const short = capacityModel(b.id).short;
-    if (short) {
-      const n = document.createElement("span");
-      n.className = "cap-board-badge";
-      n.textContent = String(short);
-      btn.appendChild(n);
-      btn.title = `${b.name}: ${short} short day${short === 1 ? "" : "s"} in the range`;
-      btn.setAttribute("aria-label", btn.title);
-    }
-    btn.onclick = () => { state.capacity.boardId = b.id; render(); };
-    sw.appendChild(btn);
+    const badge = Object.assign(document.createElement("span"), { className: "cap-board-badge" });
+    shortBadge(badge, short);
+    if (short) badge.title = `${short} short day${short === 1 ? "" : "s"} in the range`;
+    it.appendChild(badge);
+    it.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(rosterEmployees(b.id).length) }));
+    it.onclick = () => { closeTopbarMenus(); if (b.id !== current) { state.capacity.boardId = b.id; render(); } };
+    menu.appendChild(it);
   }
   $("#cap-range").value = String(state.capacity.weeks);
   const mayEdit = can("capacity", "edit");

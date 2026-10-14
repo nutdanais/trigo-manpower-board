@@ -421,9 +421,11 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       const gapChip = async (p, date) => ((await p.textContent(`.cap-gaprow .cap-gapchip[data-date="${date}"]`)) || "").trim();
 
       await step("B0: the board to plan is picked in the toolbar, one board at a time", async () => {
-        assert.ok(await pa.isVisible("#capacity-toolbar #cap-board-switch"));
-        const btns = await pa.$$eval("#cap-board-switch .cap-board-btn", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-pressed")]));
-        assert.deepEqual(btns, [["Board One", "true"], ["Board Two", "false"]], "no short days yet, so no badges");
+        assert.ok(await pa.isVisible("#capacity-toolbar #btn-cap-board"));
+        assert.equal((await pa.textContent("#btn-cap-board .ovb-label")).trim(), "Board One");
+        const items = await pa.$$eval("#cap-board-menu .tb-item", (els) => els.map((e) => [e.querySelector(".ovb-name").textContent, e.getAttribute("aria-current")]));
+        assert.deepEqual(items, [["Board One", "true"], ["Board Two", "false"]]);
+        assert.equal(await pa.locator("#capacity-toolbar .cap-board-badge:not(.hidden)").count(), 0, "no short days yet, so no badges");
         assert.match(await pa.textContent(".cap-card-title"), /Board One/);
       });
 
@@ -447,8 +449,9 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         assert.equal(await pa.locator(".cap-strip .cap-gb.dn").count(), 1, "the shortfall hangs below the zero line");
         assert.match(await pa.textContent("#stats-bar"), /1 short day\b/);
         assert.match(await pa.textContent("#stats-bar"), /Worst.*−7/);
-        assert.equal(await pa.textContent("#cap-board-switch .cap-board-btn:nth-child(1) .cap-board-badge"), "1", "Board One's switch counts its short day");
-        assert.equal(await pa.locator("#cap-board-switch .cap-board-btn:nth-child(2) .cap-board-badge").count(), 0);
+        assert.equal(await pa.textContent("#btn-cap-board .cap-board-badge"), "1", "the dropdown counts Board One's short day");
+        assert.equal(await pa.textContent("#cap-board-menu .tb-item:nth-child(1) .cap-board-badge"), "1");
+        assert.equal(await pa.locator("#cap-board-menu .tb-item:nth-child(2) .cap-board-badge:not(.hidden)").count(), 0);
         assert.match(await pa.textContent(".cap-demrow"), /15/, "Demand row sums the hosts");
         assert.equal(await gapChip(pa, F), "▲ +8", "a day with no demand shows its spare people");
       });
@@ -475,11 +478,13 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       });
 
       await step("B3: switching board shows only that board's demand and people", async () => {
-        await pa.click("#cap-board-switch .cap-board-btn:nth-child(2)");
+        await pa.click("#btn-cap-board");
+        await pa.click("#cap-board-menu .tb-item:nth-child(2)");
         await until(async () => /Board Two/.test(await pa.textContent(".cap-card-title")), "board two");
         assert.equal(await pa.locator(".cap-cell input").count(), 0, "Board One's host rows are not shown");
         assert.equal(await gapChip(pa, H), "▲ +2", "Board Two's own roster of 2");
-        await pa.click("#cap-board-switch .cap-board-btn:nth-child(1)");
+        await pa.click("#btn-cap-board");
+        await pa.click("#cap-board-menu .tb-item:nth-child(1)");
         await until(async () => /Board One/.test(await pa.textContent(".cap-card-title")), "back to board one");
       });
 
