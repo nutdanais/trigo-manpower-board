@@ -112,7 +112,13 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
 .s7 h2.h{font-size:3.5cqw}
 .s7 .d1{left:46cqw; top:9.6cqw; width:60cqw; height:27cqw; border-radius:1.2cqw 0 0 1.2cqw}
 .s7 .d2{left:56cqw; top:39cqw; width:50cqw; height:21cqw; border-radius:1.2cqw 0 0 0}
-.s7 .d2 img{object-position:0 8%}
+.s7 .d2 img{width:60.3cqw; height:auto; max-width:none; object-fit:initial; margin:-11cqw 0 0 -10.3cqw}
+/* S7b customer parts */
+.s9 .copy{left:4.4cqw; top:9.6cqw; width:37cqw}
+.s9 h2.h{font-size:3.5cqw}
+.s9 .d1{left:46cqw; top:9.6cqw; width:60cqw; height:27cqw; border-radius:1.2cqw 0 0 1.2cqw}
+.s9 .d2{left:52cqw; top:39cqw; width:54cqw; height:21cqw; border-radius:1.2cqw 0 0 0}
+.s9 .d2 img{width:63cqw; height:auto; max-width:none; object-fit:initial; margin:-8.7cqw 0 0 -10.9cqw}
 /* S8 phones and QR */
 .s8 .copy{left:4.4cqw; top:9.6cqw; width:44cqw; gap:1.6cqw}
 .s8 h2.h{font-size:4.2cqw}
@@ -124,6 +130,8 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
 .s8 .chips{left:4.4cqw; bottom:4.4cqw}
 .apps{position:absolute; left:52cqw; right:4.4cqw; top:9.6cqw; bottom:4.4cqw; display:grid; grid-template-columns:1fr 1fr; gap:2cqw}
 .app{background:rgba(255,255,255,.05); border:.12cqw solid rgba(255,255,255,.12); border-radius:1.4cqw; padding:1.8cqw; display:grid; grid-template-rows:auto auto 1fr auto; gap:1cqw; min-width:0}
+.app-name{display:flex; align-items:center; gap:1cqw}
+.app-name img{width:3.6cqw; height:3.6cqw; border-radius:.9cqw; box-shadow:0 .3cqw .8cqw rgba(0,0,0,.35)}
 .app h3{margin:0; font-size:1.7cqw; font-variation-settings:"wdth" 108; font-weight:700; color:#fff}
 .app .url{font-family:var(--f-mono); font-size:.95cqw; color:var(--on-navy-mut); overflow-wrap:anywhere}
 .app .qr{background:#fff; border-radius:1cqw; padding:1.2cqw; align-self:center; justify-self:center; width:100%; max-width:17cqw}
@@ -151,7 +159,7 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
   <header class="top">
     <div>
       <h1>TRIGO apps intro deck</h1>
-      <p>Eight slides introducing the Manpower Board and the Inventory &amp; Quality System, in the Control Room style. Screenshots come from both apps running on their sample data. Talking points sit under each slide.</p>
+      <p>Nine slides introducing the Manpower Board and the Inventory &amp; Quality System, in the Control Room style. Screenshots come from both apps running on their sample data. Talking points sit under each slide.</p>
     </div>
     <button class="btn" id="btn-present" type="button"><span class="ms">slideshow</span>Present</button>
   </header>
@@ -187,7 +195,7 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
           </ul>
         </div>
         <div class="shot d1"><img src="img/mp-board-desktop.jpg" alt="Manpower Board with missions, leave and the standby pool"></div>
-        <div class="phone"><img src="img/mp-board-phone.jpg" alt="Manpower Board on a phone"></div>
+        <div class="phone"><img src="img/mp-overview-phone.jpg" alt="Manpower Overview on a phone, naming idle staff"></div>
       </div>
       <div class="meta"><b>2 · Manpower: the daily board</b><span>Each card is a person, each column a mission with host, customer, shift and engineer. The tiles on top always add up: assigned plus leave plus standby equals total.</span></div>
     </section>
@@ -236,7 +244,7 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
       <div class="slide s5">
         <img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO" style="left:auto; right:4.4cqw">
         <div class="shot d1"><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div>
-        <div class="phone"><img src="img/inv-dashboard-phone.jpg" alt="Inventory dashboard on a phone"></div>
+        <div class="phone"><img src="img/inv-cart-phone.jpg" alt="Inventory cart on a phone with items ready to request"></div>
         <div class="copy">
           <h2 class="h">Every tool, part and consumable, accounted for.</h2>
           <ul class="list">
@@ -270,6 +278,25 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
     </section>
 
     <section class="item">
+      <div class="slide s9">
+        <img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO">
+        <div class="tag">Inventory &amp; Quality</div>
+        <div class="copy">
+          <h2 class="h"><span class="bar"></span>Customer parts, lot by lot.</h2>
+          <ul class="list">
+            <li><span class="ms">fact_check</span><div><b>Inspection status per lot</b><span>OK, NG, Sorting and Hold, with the total and the lots</span></div></li>
+            <li><span class="ms">hourglass_bottom</span><div><b>Aged parts flagged</b><span>Amber past the aged threshold, red past twice it</span></div></li>
+            <li><span class="ms">local_shipping</span><div><b>Deliveries in and out</b><span>Several parts on one Asset In-Out Form; booked stock is reserved</span></div></li>
+            <li><span class="ms">done_all</span><div><b>Confirm what really arrived</b><span>Actual quantities per line; any difference goes in the log</span></div></li>
+          </ul>
+        </div>
+        <div class="shot d1"><img src="img/inv-customerparts-desktop.jpg" alt="Customer Parts list with OK, NG, Sorting and Hold per part"></div>
+        <div class="shot d2"><img src="img/inv-todo-desktop.jpg" alt="An inbound delivery waiting to be confirmed"></div>
+      </div>
+      <div class="meta"><b>7 · Inventory: customer parts</b><span>Parts are tracked by the customer's part number, mission number and responsible engineer. A delivery due today shows on the To-Do list and in the bell until someone confirms it.</span></div>
+    </section>
+
+    <section class="item">
       <div class="slide s7">
         <img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO">
         <div class="tag">Inventory &amp; Quality</div>
@@ -283,9 +310,9 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
           </ul>
         </div>
         <div class="shot d1"><img src="img/inv-consumables-desktop.jpg" alt="Consumables with stock per warehouse against safety levels"></div>
-        <div class="shot d2"><img src="img/inv-usage-desktop.jpg" alt="Usage by site compared with the usual"></div>
+        <div class="shot d2"><img src="img/inv-usage-site-desktop.jpg" alt="Usage at one site, broken down by engineer and item"></div>
       </div>
-      <div class="meta"><b>7 · Inventory: for management</b><span>Usage compares this period with the average of the previous three months. It is a fact to review, not a ranking of people.</span></div>
+      <div class="meta"><b>8 · Inventory: for management</b><span>Usage compares this period with the average of the previous three months. Open a site to see who issued what there. It is a fact to review, not a ranking of people.</span></div>
     </section>
 
     <section class="item">
@@ -303,25 +330,25 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
         <div class="chips"><span><span class="ms">install_mobile</span>Installable app (PWA)</span><span><span class="ms">smartphone</span>Phone layout</span></div>
         <div class="apps">
           <div class="app">
-            <h3>Manpower Board</h3><div class="url">trigo-manpower.netlify.app</div>
+            <div class="app-name"><img src="img/icon-manpower.png" alt="Manpower Board app icon"><h3>Manpower Board</h3></div><div class="url">trigo-manpower.netlify.app</div>
             <div class="qr"><img src="img/qr-manpower.svg" alt="QR code for the Manpower Board"></div>
             <ul><li><span class="ms">check_circle</span>Bottom bar: Board, Overview, Manpower, Host</li><li><span class="ms">check_circle</span>Tap people, then tap a mission</li></ul>
           </div>
           <div class="app">
-            <h3>Inventory &amp; Quality</h3><div class="url">trigo-inventory-preview.pages.dev</div>
+            <div class="app-name"><img src="img/icon-inventory.png" alt="Inventory and Quality app icon"><h3>Inventory &amp; Quality</h3></div><div class="url">trigo-inventory-preview.pages.dev</div>
             <div class="qr"><img src="img/qr-inventory.svg" alt="QR code for the Inventory and Quality System"></div>
             <ul><li><span class="ms">check_circle</span>Bottom bar: Dashboard, Tools, To-Do</li><li><span class="ms">check_circle</span>Phone notifications</li></ul>
           </div>
         </div>
       </div>
-      <div class="meta"><b>8 · On your phone</b><span>New accounts are approved once by an admin. After installing, the app opens full screen from the home screen.</span></div>
+      <div class="meta"><b>9 · On your phone</b><span>New accounts are approved once by an admin. After installing, the app opens full screen from the home screen.</span></div>
     </section>
   </main>
 </div>
 
 <div class="stage" id="stage" hidden></div>
 <div class="stage-bar" id="stage-bar" hidden>
-  <span id="stage-count">1 / 8</span>
+  <span id="stage-count">1 / 9</span>
   <button type="button" id="st-prev" aria-label="Previous slide"><span class="ms">chevron_left</span></button>
   <button type="button" id="st-next" aria-label="Next slide"><span class="ms">chevron_right</span></button>
   <button type="button" id="st-exit" aria-label="Exit presentation"><span class="ms">close</span></button>
