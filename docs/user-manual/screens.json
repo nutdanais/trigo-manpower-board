@@ -64,17 +64,17 @@
     "file": "screens/filter.png"
   },
   "mission": {
-    "w": 500,
+    "w": 500.00006103515625,
     "h": 900,
     "marks": [
       {
         "x": 22,
         "y": 421.125,
-        "w": 1440,
+        "w": 500.00006103515625,
         "h": 16
       },
       {
-        "x": 388,
+        "x": 387.95977783203125,
         "y": 856,
         "w": 90,
         "h": 32
@@ -383,11 +383,23 @@
     "marks": [],
     "file": "screens/phone-drawer.png"
   },
+  "phone-target": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-target.png"
+  },
   "phone-manpower": {
     "w": 390,
     "h": 844,
     "marks": [],
     "file": "screens/phone-manpower.png"
+  },
+  "phone-manpower-detail": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-manpower-detail.png"
   },
   "phone-capacity": {
     "w": 390,
