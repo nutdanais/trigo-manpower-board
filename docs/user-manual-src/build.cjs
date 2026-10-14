@@ -96,7 +96,7 @@ async function capture(){
  await mp.click("#fp-drawer-handle");await mp.locator('#float-pool [data-emp-id="e6"]').first().tap();await shot(mp,"phone-drawer");
  await mp.click("#fp-drawer-handle");await mp.evaluate(()=>clearSelection());
  await mp.locator("#bottom-nav .bn-item").filter({hasText:"Manpower"}).click();await shot(mp,"phone-manpower");
- await mp.click("#btn-bn-more");await mp.locator("#bn-more .tb-item").filter({hasText:"Capacity"}).click();await shot(mp,"phone-capacity");
+ await mp.click("#btn-bn-more");await mp.locator("#more-menu .tb-item").filter({hasText:"Capacity"}).click();await shot(mp,"phone-capacity");
  await mc.close();
  fs.writeFileSync(path.join(OUT,"capture-info.json"),JSON.stringify({appVersion:config.version,appCommit:config.appCommit,date:day,screenshots:Object.keys(registry).length,source:"Real repository app, synthetic demonstration records; desktop 1440x900 and emulated phone 390x844"},null,2));
  }finally{await env.close();}
