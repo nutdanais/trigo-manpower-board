@@ -102,7 +102,7 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     assert.deepEqual((await p.locator("#emplist-body td[data-label=Name]").allTextContents()), ["Person A"], "search finds the TRIGO ID");
     await p.fill("#emplist-search", "");
     await p.click('#emplist-table th[data-sort="trigoId"]');
-    const sorted = (await col()).filter((x) => x !== "—" && !/Add TRIGO ID/.test(x));
+    const sorted = (await col()).filter((x) => x !== "—" && !/^\+ Add$/.test(x.trim()));
     assert.deepEqual(sorted.slice(0, 3), ["T9", "T20", "T101"], "T9 sorts before T20 before T101");
     console.log("ok - the Manpower List has a TRIGO ID column that searches and sorts numerically");
 

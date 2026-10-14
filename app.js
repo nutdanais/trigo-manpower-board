@@ -4613,14 +4613,14 @@ function renderEmployeeRows() {
     // card list on phone with no separate render path
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? ` <button type="button" class="hl-add-loc el-fix" data-fix="nameEn">+ Add English name</button>` : ""}</td>
-      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="trigoId">+ Add TRIGO ID</button>` : "—"}</td>
+      <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? ` <button type="button" class="hl-add-loc el-fix" data-fix="nameEn" title="Add English name">+ Add</button>` : ""}</td>
+      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="trigoId" title="Add TRIGO ID">+ Add</button>` : "—"}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position" class="m-x">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : "—"}</td>
       <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="areaId">+ Set area</button>` : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="areaId" title="Set service area">+ Add</button>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
@@ -5065,7 +5065,7 @@ function hostlistFilteredSorted() {
 function hostLocationCell(r) {
   const href = safeHttpUrl(r.mapUrl);
   const text = r.location || (href ? "Open in Google Maps" : "");
-  if (!text) return `<button type="button" class="hl-add-loc">+ Add location</button>`;
+  if (!text) return `<button type="button" class="hl-add-loc" title="Add location">+ Add</button>`;
   return href
     ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
          title="Open in Google Maps" onclick="event.stopPropagation()">${icon("pin")}${escapeHtml(text)}</a>`
@@ -5130,7 +5130,7 @@ function renderHostRows() {
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
       <td data-label="Service area" class="hl-area-cell">${r.area
         ? areaPillHtml(r.area, "area-pill")
-        : `<button type="button" class="hl-add-loc hl-add-area">+ Set area</button>`}</td>
+        : `<button type="button" class="hl-add-loc hl-add-area" title="Set service area">+ Add</button>`}</td>
       <td data-label="Note" class="hl-note-cell m-x">${hostNoteCell(r)}</td>
       <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
       <td data-label="Appear on board" class="hl-board-cell m-x">${hostBoardCell(r)}</td>
