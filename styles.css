@@ -3672,7 +3672,7 @@ body.settings-open #touch-actions,
 body.settings-open #app-footer,
 body.settings-open #topbar .date-nav,
 body.settings-open #btn-lock { display: none !important; }
-body.settings-open #btn-settings { background: var(--on-navy-fill); border-color: var(--on-navy-line-strong); }
+body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong); }
 
 #settings-view {
   flex: 1 1 auto;

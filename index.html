@@ -217,11 +217,11 @@
       <button id="btn-date" class="btn btn-top btn-date" title="Click to pick a date"></button>
       <button id="btn-date-next" class="btn btn-top btn-icon" title="Next day" aria-label="Next day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
     </div>
-    <button id="btn-settings" class="btn btn-top" title="Settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg><span class="btn-label">Settings</span></button>
     <div id="user-dd" class="tb-dd">
       <button type="button" id="btn-avatar" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account" aria-label="Account menu"><span id="avatar-initials">?</span></button>
       <div id="user-menu" class="tb-pop tb-pop-right hidden" role="menu" aria-label="Account">
         <div class="tb-who"><b id="user-menu-name"></b><small id="user-menu-role"></small></div>
+        <button id="btn-settings" class="tb-item" type="button" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg> Settings</button>
         <button id="btn-signout" class="tb-item" type="button" role="menuitem" title="Sign out"><svg class="ic" aria-hidden="true"><use href="#i-sign-out"></use></svg> Sign out</button>
       </div>
     </div>
@@ -1248,7 +1248,6 @@
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-bulk-apply" disabled>Apply changes</button>
     </div>
-  </div>
   </div>
 
   <!-- PlanDiff: "Review changes" (stale carry-over) and "Review & merge" (forecast) -->

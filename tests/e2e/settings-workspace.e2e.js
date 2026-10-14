@@ -50,7 +50,7 @@ async function step(name, fn) {
     const p = a.page;
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
     const status = () => p.locator("#sv-status").innerText();
-    const openSettings = async () => { await p.click("#btn-settings"); await p.waitForSelector("#settings-view:not(.hidden)"); };
+    const openSettings = async () => { await p.click("#btn-avatar"); await p.click("#btn-settings"); await p.waitForSelector("#settings-view:not(.hidden)"); };
     const tab = async (t) => { await p.click(`#settings-tabs [data-tab=${t}]`); await p.waitForFunction((x) => state.settingsTab === x, t); };
     const closeDialog = async () => { await p.keyboard.press("Escape"); await p.waitForSelector("#modal-backdrop", { state: "hidden" }); };
 
@@ -84,7 +84,7 @@ async function step(name, fn) {
       assert.equal(after.date, before.date);
       assert.equal(after.board, before.board);
       assert.ok(Math.abs(after.y - before.y) <= 2, `scroll ${before.y} -> ${after.y}`);
-      assert.equal(after.focus, "btn-settings", "focus returns to the Settings button");
+      assert.equal(after.focus, "btn-avatar", "focus returns to the avatar menu that holds Settings");
       assert.equal(await p.locator("#board-capture").isVisible(), true);
     });
 
@@ -407,7 +407,7 @@ async function step(name, fn) {
 
     await step("a view-only Users section stays read-only; Roles is not offered", async () => {
       const m = await env.openAs(db, MANAGER);
-      await m.page.click("#btn-settings");
+      await m.page.click("#btn-avatar"); await m.page.click("#btn-settings");
       await m.page.waitForSelector("#settings-view:not(.hidden)");
       const tabs = await m.page.evaluate(() => [...document.querySelectorAll("#settings-tabs .settings-tab")].filter((e) => e.getClientRects().length).map((e) => e.dataset.tab));
       // (the Roles step above took the Manager's Settings down to View, so the board-setup sections are gone)
@@ -423,7 +423,7 @@ async function step(name, fn) {
 
     await step("a viewer sees only My account, with no empty group headings", async () => {
       const v = await env.openAs(db, h.USERS.v);
-      await v.page.click("#btn-settings");
+      await v.page.click("#btn-avatar"); await v.page.click("#btn-settings");
       await v.page.waitForSelector("#settings-view:not(.hidden)");
       const vis = await v.page.evaluate(() => [...document.querySelectorAll("#settings-tabs .settings-tab, #settings-tabs .settings-group")].filter((e) => e.getClientRects().length).map((e) => e.textContent.trim()));
       assert.deepEqual(vis, ["Personal", "My account"]);

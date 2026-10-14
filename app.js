@@ -6414,7 +6414,7 @@ function closeSettingsView() {
     render();
     const y = state.settingsReturn ? state.settingsReturn.scrollY : 0;
     requestAnimationFrame(() => window.scrollTo(0, y));
-    $("#btn-settings").focus({ preventScroll: true });
+    $("#btn-avatar").focus({ preventScroll: true });   // Settings lives in this menu
   });
 }
 
