@@ -5081,6 +5081,16 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
   font-size: 12px; font-weight: 550; color: var(--text);
 }
 .area-chip b { font-size: 12px; font-weight: 700; color: var(--muted); }
+/* Manpower / Host: each chip is a one-click area filter */
+.area-chip.ac-btn {
+  display: inline-flex; border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 550;
+  cursor: pointer; transition: background-color .18s ease, border-color .18s ease, transform .1s ease;
+}
+.area-chip.ac-btn:hover { border-color: var(--border); background: var(--hover-tint, var(--bg-soft)); }
+.area-chip.ac-btn:active { transform: translateY(1px); }
+.area-chip.ac-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.area-chip.ac-btn.ac-on { border-color: var(--primary); background: var(--panel); box-shadow: inset 0 0 0 1px var(--primary); }
+.area-chip.ac-btn.ac-on b { color: var(--text); }
 .ac-dot { width: 10px; height: 10px; border-radius: 4px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); }
 
 /* ----- Leave: one band, people grouped by type (layout B) -----

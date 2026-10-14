@@ -1008,7 +1008,7 @@ function render() {
   const planEmpty = board && planIsEmpty(getPlan());
   $("#btn-reset-board").classList.toggle("hidden", fc ? !(planEdit && planEmpty) : !boardEdit);
   $("#btn-forecast-copy").classList.toggle("hidden", !(fc && planEdit && !planEmpty));
-  $("#ov-board-dd").classList.toggle("hidden", !ov || D().boards.length < 2);
+  $("#ov-board-dd").classList.toggle("hidden", !(ov || org) || D().boards.length < 2);
   document.body.classList.toggle("ov-view", ov);
   document.body.classList.toggle("el-view", eml);
   document.body.classList.toggle("hl-view", hl);
@@ -1099,7 +1099,8 @@ function buildOrgTree() {
   };
 
   const root = { type: "root", _id: "root", name: "TRIGO Manpower", children: [] };
-  for (const b of D().boards) {
+  // the toolbar's Board dropdown (shared with Overview) picks all boards or one
+  for (const b of ovScopeBoards()) {
     const plan = (D().plans[b.id] || {})[date] || { missions: [], zones: {} };
     const boardId = "b:" + b.id;
     const boardNode = { type: "board", _id: boardId, name: b.name, color: "var(--primary)", children: [] };
@@ -1113,6 +1114,9 @@ function buildOrgTree() {
       const node = {
         type: "engineer", _id: boardId + "/e:" + key,
         name: eng ? eng.name : "Unassigned engineer", sub: eng ? (eng.phone || "") : "",
+        // the tier is "mission lead", but the label says who they are: a linked
+        // account's own role (a Manager leading a mission reads Manager)
+        role: eng && eng.account && eng.account.roleKey ? roleLabel(eng.account.roleKey) : "",
         color: eng ? eng.color : "#c3ccd6", _areas: new Map(), children: [],
       };
       engMap.set(key, node); boardNode.children.push(node);
@@ -1291,6 +1295,7 @@ function renderOrgChart() {
     (function w(n) { if (n.type === "mission" || n.type === "bucket") org.collapsed.add(n._id); n.children.forEach(w); })(full);
     org.seeded = true;
   }
+  fillOvBoardSelect(ovScopeBoards());
   org.filterOpts = orgFilterOptions(full);
   // forget filter selections whose board/engineer/area is gone from this snapshot
   for (const dim of ["boards", "engineers", "areas"]) {
@@ -1313,7 +1318,6 @@ function renderOrgChart() {
         <div class="oc-spacer"></div>
         <span class="oc-flabel">Filter</span>
         <div class="oc-filters">
-          ${orgFilterDropdown("boards", "Board", org.filterOpts.boards)}
           ${orgFilterDropdown("engineers", "Engineer", org.filterOpts.engineers)}
           ${orgFilterDropdown("areas", "Service area", org.filterOpts.areas)}
           ${orgFilterDropdown("statuses", "Standby / Leave", org.filterOpts.statuses)}
@@ -1440,7 +1444,8 @@ function orgOutlineNode(n) {
   if (n.type === "employee") right = `<span class="oc-meta">${orgEmpChips(n)}<span class="oc-phone">${escapeHtml(n.phone)}</span></span>`;
   else {
     const shift = n.type === "mission" ? `<span class="oc-chip oc-${n.shift}">${n.shift === "night" ? "Night" : "Day"}</span>` : "";
-    right = `<span class="oc-meta">${shift}<span class="oc-cnt">${orgCountText(n)}</span></span>`;
+    const role = n.role ? `<span class="oc-chip oc-pos">${escapeHtml(n.role)}</span>` : "";
+    right = `<span class="oc-meta">${role}${shift}<span class="oc-cnt">${orgCountText(n)}</span></span>`;
   }
   row.innerHTML = `${caret}${tagEl}<span class="oc-nm">${escapeHtml(n.name)}${sub}</span><span class="oc-grow"></span>${right}`;
   box.appendChild(row);
@@ -1498,7 +1503,7 @@ function orgChartBox(n) {
   }
   const sub = n.sub ? `<span class="oc-sub">${escapeHtml(n.sub)}</span>` : "";
   const btn = orgIsLeaf(n) ? "" : `<button type="button" class="oc-tog" title="Collapse / expand">${org.collapsed.has(n._id) ? "+" : "–"}</button>`;
-  el.innerHTML = `${head}<div class="oc-body"><span class="oc-lvl">${orgLevelLabel(n.type)}</span>` +
+  el.innerHTML = `${head}<div class="oc-body"><span class="oc-lvl">${escapeHtml(n.role || orgLevelLabel(n.type))}</span>` +
     `<div class="oc-ttl">${escapeHtml(n.name)} ${sub}</div>${meta}</div>${btn}`;
   const t = el.querySelector(".oc-tog");
   if (t) t.onclick = (e) => { e.stopPropagation(); orgToggle(n._id); };
@@ -2750,7 +2755,8 @@ function renderStats() {
   }
   if (isOrgChart()) {
     let missions = 0, crew = 0, emptyMissions = 0; const engs = new Set();
-    for (const b of D().boards) {
+    const scope = ovScopeBoards();
+    for (const b of scope) {
       const plan = (D().plans[b.id] || {})[state.date];
       if (!plan) continue;
       for (const m of plan.missions) {
@@ -2761,7 +2767,7 @@ function renderStats() {
         if (!m.members.length) emptyMissions++;
       }
     }
-    bar.appendChild(statChip("Boards", D().boards.length));
+    bar.appendChild(statChip("Boards", scope.length));
     bar.appendChild(statChip("Engineers", engs.size));
     bar.appendChild(statChip("Missions", missions));
     bar.appendChild(statChip("Crew deployed", crew));
@@ -2784,12 +2790,13 @@ function renderStats() {
         .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
     const emplistAreaBar = $("#emplist-area-bar");
     const known = new Set(D().areas.map(a => a.id));
-    const chip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    const chip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.emplist.filters.areaId);
     let html = "";
-    for (const a of D().areas) { const n = emps.filter(e => e.areaId === a.id).length; if (n) html += chip(a.name, n, a.color); }
+    for (const a of D().areas) { const n = emps.filter(e => e.areaId === a.id).length; if (n) html += chip(a.id, a.name, n, a.color); }
     const noArea = emps.filter(e => !known.has(e.areaId)).length;
-    if (noArea) html += chip("No area", noArea, "");
+    if (noArea) html += chip("__none__", "No area", noArea, "");
     emplistAreaBar.innerHTML = html ? `<span class="ar-cap">By area</span>${html}` : "";
+    wireAreaFilterChips(emplistAreaBar, state.emplist.filters, () => { renderEmplistFilterOptions(); renderEmployeeRows(); renderStats(); });
     const knownAreas = new Set(D().areas.map(a => a.id));
     const act = D().employees.filter(e => e.active !== false);
     const issueChip = (key, tone, n, label) => n ? statusChip(tone, n, label, () => {
@@ -2840,12 +2847,13 @@ function renderStats() {
       `<div class="st-split" aria-hidden="true">${[["perm", withLoc], ["noloc", rows.length - withLoc]].filter(([, n]) => n > 0)
         .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
     const hostAreaBar = $("#area-bar");
-    const areaChip = (name, n, color) => `<span class="area-chip" data-area="${escapeHtml(name)}"><i class="ac-dot" style="background:${/^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)"}"></i>${escapeHtml(name)} <b>${n}</b></span>`;
+    const areaChip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.hostlist.filters.areaId);
     let areaHtml = "";
-    for (const a of D().areas) { const n = rows.filter(r => r.area && r.area.id === a.id).length; if (n) areaHtml += areaChip(a.name, n, a.color); }
+    for (const a of D().areas) { const n = rows.filter(r => r.area && r.area.id === a.id).length; if (n) areaHtml += areaChip(a.id, a.name, n, a.color); }
     const noArea = rows.filter(r => !r.area).length;
-    if (noArea) areaHtml += areaChip("No area", noArea, "");
+    if (noArea) areaHtml += areaChip("__none__", "No area", noArea, "");
     hostAreaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+    wireAreaFilterChips(hostAreaBar, state.hostlist.filters, () => { renderHostlistFilterOptions(); renderHostRows(); renderStats(); });
     const noLoc = rows.filter(r => !r.archived && !(r.location || r.mapUrl)).length;
     const on = state.hostlist.filters.location.length === 1 && state.hostlist.filters.location[0] === "missing";
     statusGroup(bar, [noLoc ? statusChip("amber", noLoc, "without a location", () => {
@@ -2927,6 +2935,23 @@ function renderStats() {
   renderPhoneSummary(s, areaHtml);
 }
 
+/* Manpower and Host: the "By area" chips double as a one-click area filter.
+   A click shows only that area (the same filter as Filters → Service area);
+   clicking the chip that is on again shows every area. "__none__" is No area. */
+function areaFilterChip(key, name, n, color, picked) {
+  const on = picked.length === 1 && picked[0] === key;
+  const dot = /^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)";
+  return `<button type="button" class="area-chip ac-btn${on ? " ac-on" : ""}" data-area="${escapeHtml(name)}" data-area-key="${escapeHtml(key)}" aria-pressed="${on}"` +
+    ` title="${on ? "Click again to show every area" : `Show only ${escapeHtml(name)}`}"><i class="ac-dot" style="background:${dot}"></i>${escapeHtml(name)} <b>${n}</b></button>`;
+}
+function wireAreaFilterChips(barEl, filters, redraw) {
+  for (const b of barEl.querySelectorAll(".ac-btn")) b.onclick = () => {
+    const key = b.dataset.areaKey;
+    filters.areaId = filters.areaId.length === 1 && filters.areaId[0] === key ? [] : [key];
+    redraw();
+  };
+}
+
 /* Phone header (styles.css, Phone header): the same numbers as the tiles above,
    folded into one card. Closed it reads "89/106 assigned" plus the leave, standby
    and on-call counts as coloured dots; opened (#m-details) it adds the tiles, the
@@ -3002,6 +3027,11 @@ function renderPhoneViewCard(o) {
     chips.appendChild(x);
   }
   if (o.areaHtml) chips.insertAdjacentHTML("beforeend", o.areaHtml);
+  // area filter chips: a tap does what the same chip in row 2 does
+  for (const x of chips.querySelectorAll(".ac-btn")) {
+    const twin = $$(`${isEmployeeList() ? "#emplist-area-bar" : "#area-bar"} .ac-btn`).find(b => b.dataset.areaKey === x.dataset.areaKey);
+    if (twin) x.onclick = () => twin.click();
+  }
   if (chips.children.length) details.appendChild(chips);
   const mf = $("#m-filter");
   if (mf && o.filterCount != null) { mf.dataset.count = o.filterCount ? String(o.filterCount) : ""; mf.classList.toggle("on", o.filterCount > 0); }
@@ -4140,7 +4170,7 @@ function emplistFilterOptions(key) {
     return [...Object.keys(POSITIONS).map(k => ({ value: k, label: POSITIONS[k].label })), { value: "__none__", label: "— none —" }];
   }
   if (key === "service") return SERVICE_BUCKETS.map(b => ({ value: b.value, label: b.label }));
-  if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name }));
+  if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name })).concat([{ value: "__none__", label: "No area" }]);
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
   if (key === "status") return [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }];
   return [];
@@ -4212,7 +4242,7 @@ function emplistFilteredSorted() {
     if (f.contract.length && !f.contract.includes(e.contract)) return false;
     if (f.position.length && !f.position.includes(e.position || "__none__")) return false;
     if (f.service.length && !f.service.includes(serviceBucketOf(e))) return false;
-    if (f.areaId.length && !f.areaId.includes(e.areaId)) return false;
+    if (f.areaId.length && !f.areaId.includes(D().areas.some(a => a.id === e.areaId) ? e.areaId : "__none__")) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
     if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
     const issue = state.emplist.issue;   // a status chip narrowing the list to active people missing one thing
@@ -4571,6 +4601,9 @@ function renderEmployeeRows() {
     const pos = e.position ? POSITIONS[e.position] : null;
     const isActive = e.active !== false;   // undefined (pre-migration) counts as active
     const util = state.emplist.util ? state.emplist.util[e.id] : undefined;
+    // what an alert pill counts as missing gets a "+ Add …" button in its own
+    // column (as Host does for a location), for active people a user may edit
+    const fixable = isActive && can("emplist", "edit");
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
@@ -4580,14 +4613,14 @@ function renderEmployeeRows() {
     // card list on phone with no separate render path
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td data-label="Name" class="el-name">${emplistNameHtml(e)}</td>
-      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : "—"}</td>
+      <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? ` <button type="button" class="hl-add-loc el-fix" data-fix="nameEn">+ Add English name</button>` : ""}</td>
+      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="trigoId">+ Add TRIGO ID</button>` : "—"}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
       <td data-label="Position" class="m-x">${pos ? pos.label : "—"}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : "—"}</td>
       <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="areaId">+ Set area</button>` : "—"}</td>
       <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
@@ -4618,6 +4651,7 @@ function renderEmployeeRows() {
       updateEmplistBulkBar();
       $("#emplist-select-all").checked = emps.length > 0 && emps.every(x => state.selectedEmps.has(x.id));
     };
+    for (const b of tr.querySelectorAll(".el-fix")) b.onclick = (ev) => { ev.stopPropagation(); openEmployeeModal(e.id, b.dataset.fix); };   // roster master data: no day lock, as with Status
     tr.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(e.id)));
     tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(e, ev.clientX, ev.clientY); });
     attachLongPress(tr, (x, y) => openEmpMenu(e, x, y));
@@ -5907,7 +5941,9 @@ function hideMission() {
 }
 
 /* employee modal */
-function openEmployeeModal(empId) {
+/* focusField: open straight on the Edit tab with that input focused — the
+   Manpower list's "+ Add TRIGO ID" style buttons land on the one thing missing */
+function openEmployeeModal(empId, focusField) {
   if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
   state.editingEmployeeId = empId || null;
   const form = $("#form-employee");
@@ -5936,11 +5972,12 @@ function openEmployeeModal(empId) {
   // Edit Employee is one tab away. It only makes sense once the employee has
   // been saved (and thus could actually have an assignment history) though,
   // so a brand-new employee skips straight to the edit form with no tab strip.
-  state.employeeTab = empId ? "hosts" : "edit";
+  state.employeeTab = empId && !focusField ? "hosts" : "edit";
   $("#employee-tabs").classList.toggle("hidden", !empId);
   applyEmployeeTab();
   if (empId) { loadEmployeeHostRecord(empId); loadEmployeeNotes(empId); }
   openModal("#modal-employee");
+  if (focusField && form[focusField]) requestAnimationFrame(() => form[focusField].focus());
 }
 
 function saveEmployee(ev) {
