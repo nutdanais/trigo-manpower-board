@@ -1523,68 +1523,16 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 }
 .fp-empty { font-size: 11.5px; color: var(--muted); font-style: italic; padding: 4px 2px; }
 
-/* Collapsed float pool (see renderFloatPool in app.js): when both Standby and
-   Available On-call are genuinely empty, the panel shrinks to a thin rail
-   instead of reserving 264px to say "nobody's here" twice. Scoped to the
-   fixed right-edge desktop layout only (min-width matches the breakpoint
-   right below) — on a stacked mobile layout the panel is already full-width
-   and this collapse wouldn't make sense. */
-@media (min-width: 901px) {
-  #float-pool.fp-collapsed { width: 44px; }
-  body.fp-collapsed #app-root { margin-right: 44px; }
-  #float-pool.fp-collapsed .fp-head { display: none; }
-  #float-pool.fp-collapsed .fp-section { padding: 0; }
-  /* just the count, centered — the full label ("Available On-call") rotated
-     sideways could run taller than the window in a short viewport; a bare
-     "0" can't */
-  #float-pool.fp-collapsed .fp-label {
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 0;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  #float-pool.fp-collapsed .fp-label-text,
-  #float-pool.fp-collapsed .fp-label small { display: none; }
-  #float-pool.fp-collapsed .fp-body { min-height: 20px; padding-bottom: 0; }
-  /* "Everyone permanent is assigned" etc. — at 44px wide this wraps into an
-     unreadable one-character-per-line column; the rail's whole point (both
-     pools are empty) already says the same thing via the "0" above it */
-  #float-pool.fp-collapsed .fp-empty { display: none; }
-
-  /* mouse hover expands it via plain CSS; an active drag toward it gets the
-     same look through .fp-drag-hover (app.js), since native drag doesn't
-     reliably keep :hover active in every browser. Either way this is an
-     overlay, not a reflow — #app-root's margin stays at 44px (above), so
-     nothing on the board shifts while a drag is in progress. */
-  #float-pool.fp-collapsed:hover,
-  #float-pool.fp-collapsed.fp-drag-hover { width: var(--fp-w, 264px); }
-  #float-pool.fp-collapsed:hover .fp-head,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-head { display: block; }
-  #float-pool.fp-collapsed:hover .fp-section,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-section { padding: 8px 10px 4px; }
-  #float-pool.fp-collapsed:hover .fp-label,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-label {
-    justify-content: flex-start;
-    align-items: baseline;
-    margin-bottom: 7px;
-    padding: 0;
-    border-bottom: none;
-  }
-  #float-pool.fp-collapsed:hover .fp-label-text,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-label-text { display: inline; }
-  #float-pool.fp-collapsed:hover .fp-label small,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-label small { display: block; }
-  #float-pool.fp-collapsed:hover .fp-body,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-body { min-height: 40px; padding-bottom: 6px; }
-  #float-pool.fp-collapsed:hover .fp-empty,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-empty { display: inline; }
-}
+/* Both pools empty (see renderFloatPool in app.js): the panel stays, at its
+   minimum width (FP_MIN_W in app.js), so the board never jumps between a wide
+   panel and a thin rail. Set on body so the board's margin and the resize
+   handle follow the same width. */
+body.fp-pools-empty { --fp-w: 264px; }
 
 /* the handle only exists while the panel is a fixed right-edge column, visible and
-   not collapsed to its rail */
+   with someone in it (empty, it is held at its minimum width) */
 @media (min-width: 901px) {
-  #float-pool:not(.hidden):not(.fp-collapsed) + #fp-resizer { display: block; }
+  #float-pool:not(.hidden):not(.fp-pools-empty) + #fp-resizer { display: block; }
 }
 
 @media (max-width: 900px) {
@@ -5920,7 +5868,6 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   }
   #float-pool.hidden { display: none; }
   #float-pool.fp-open { height: min(72dvh, calc(100dvh - var(--bnav-h) - 56px)); overflow-y: auto; overscroll-behavior: contain; }
-  #float-pool.fp-collapsed { width: auto; }
   #fp-drawer-handle {
     display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 2; flex: none;
     width: 100%; min-height: var(--peek-h); padding: 14px 16px 8px; border: 0; background: var(--panel);

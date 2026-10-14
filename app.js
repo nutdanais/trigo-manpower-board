@@ -2434,14 +2434,15 @@ function renderFloatPool() {
   if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : (holiday ? "No one on holiday" : "Everyone permanent is assigned")}</span>`;
   if (!oncallBody.children.length) oncallBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "No on-call free"}</span>`;
   markSelectedCards();
-  // Both pools genuinely empty (not just filtered down by search/area) — the
-  // panel is reserving 264px to say "nobody's here" twice. Collapse it to a
-  // thin rail; it still expands on hover/drag (see the .fp-collapsed CSS and
-  // the dragenter/dragleave wiring in wireApp) so it's never actually gone as
-  // a drop target, just out of the way when there's nothing in it.
+  // Both pools genuinely empty (not just filtered down by search/area): the
+  // panel keeps its minimum width instead of the width it was dragged to
+  // (see body.fp-pools-empty in styles.css) — never collapsed to a rail
   const bothEmpty = standbyN === 0 && oncallN === 0;
-  $("#float-pool").classList.toggle("fp-collapsed", bothEmpty);
-  document.body.classList.toggle("fp-collapsed", bothEmpty);
+  $("#float-pool").classList.toggle("fp-pools-empty", bothEmpty);
+  if (document.body.classList.contains("fp-pools-empty") !== bothEmpty) {
+    document.body.classList.toggle("fp-pools-empty", bothEmpty);
+    requestAnimationFrame(layoutMasonry);   // the board just got wider or narrower
+  }
 }
 
 /* The floating panel above only ever searches the two UNASSIGNED pools, so
@@ -11828,26 +11829,6 @@ function wireApp() {
     const open = panel.classList.toggle("open");
     $("#btn-toolbar-more").setAttribute("aria-expanded", String(open));
   };
-  // Collapsed float pool (see renderFloatPool/.fp-collapsed): mouse hover expands
-  // it via plain CSS, but native HTML5 drag doesn't reliably keep :hover active
-  // in every browser, so a card dragged toward the empty pool needs this too.
-  // dragenter/dragleave bubble from every child as the cursor crosses them, so
-  // a depth counter (not a single boolean) is what keeps the panel open while
-  // the drag is still somewhere inside it.
-  let fpDragDepth = 0;
-  const floatPool = $("#float-pool");
-  floatPool.addEventListener("dragenter", () => {
-    fpDragDepth++;
-    floatPool.classList.add("fp-drag-hover");
-  });
-  floatPool.addEventListener("dragleave", () => {
-    fpDragDepth = Math.max(0, fpDragDepth - 1);
-    if (fpDragDepth === 0) floatPool.classList.remove("fp-drag-hover");
-  });
-  floatPool.addEventListener("drop", () => { fpDragDepth = 0; floatPool.classList.remove("fp-drag-hover"); });
-  // a cancelled drag (Escape, dropped outside any dropzone) fires dragend with
-  // no matching dragleave — reset here too or the panel could stay stuck open
-  document.addEventListener("dragend", () => { fpDragDepth = 0; floatPool.classList.remove("fp-drag-hover"); });
   $("#btn-new-mission").onclick = () => guardEdit(() => openMissionModal(null));
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
