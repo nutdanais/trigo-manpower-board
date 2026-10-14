@@ -7444,7 +7444,8 @@ function updateXlsxCount() {
   $("#xlsx-count").textContent = `${n} of ${boxes.length} columns`;
   // only Excel needs columns (and somebody on the board)
   const xlsx = pickedExportType($("#board-export-type")) === "xlsx";
-  $("#btn-xlsx-go").disabled = xlsx && (n === 0 || xlsxEmpty);
+  const type = pickedExportType($("#board-export-type"));
+  $("#btn-xlsx-go").disabled = xlsx ? (n === 0 || xlsxEmpty) : type === "pptx" && !(pptxDeck && pptxDeck.slides.length);
 }
 function setXlsxTicks(on) {
   for (const b of $$("#xlsx-cols input[type=checkbox]")) b.checked = on;
@@ -7500,7 +7501,7 @@ ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.bo
    opens that tab's export dialog, which starts with the file type: JPG, PDF
    and/or Excel, whichever the tab offers. The last type picked is remembered
    per tab on this device. */
-const EXPORT_TYPES = { jpg: "JPG image", pdf: "PDF", xlsx: "Excel" };
+const EXPORT_TYPES = { jpg: "JPG image", pdf: "PDF", xlsx: "Excel", pptx: "PowerPoint (editable)" };
 const EXPORT_TYPE_KEY = "manpower.exportType.";   // + tab
 function exportTypeSaved(tab, types) {
   try { const t = localStorage.getItem(EXPORT_TYPE_KEY + tab); if (types.includes(t)) return t; } catch (e) { /* remembering is a courtesy */ }
@@ -7537,7 +7538,7 @@ function openBoardExportModal() {
   if (isForecastView()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
   const board = isOverview() || isOrgChart() ? null : D().boards.find(b => b.id === D().activeBoardId);
   $("#board-export-title").textContent = "Export — " + (isOrgChart() ? "Org Chart" : board ? board.name : "Overview");
-  const types = board ? ["jpg", "pdf", "xlsx"] : ["jpg", "pdf"];
+  const types = board ? ["jpg", "pdf", "xlsx"] : isOrgChart() ? ["jpg", "pdf", "pptx"] : ["jpg", "pdf"];
   if (board) prepareXlsxPart(board);
   renderExportTypes($("#board-export-type"), board ? "board" : isOrgChart() ? "orgchart" : "overview", types, updateBoardExportModal);
   updateBoardExportModal();
@@ -7547,10 +7548,15 @@ function updateBoardExportModal() {
   const type = pickedExportType($("#board-export-type")) || "jpg";
   const xlsx = type === "xlsx";
   $("#xlsx-part").classList.toggle("hidden", !xlsx);
+  $("#pptx-part").classList.toggle("hidden", type !== "pptx");
+  $("#btn-xlsx-go").textContent = "Export";
+  if (type === "pptx") renderPptxPreview();
   $("#board-export-hint").classList.toggle("hidden", xlsx);
   const what = `${isOrgChart() ? "Org Chart" : isOverview() ? "Overview" : (D().boards.find(b => b.id === D().activeBoardId) || {}).name} · ${fmtDow(state.date)} ${fmtDate(state.date)}.`;
   $("#xlsx-summary").textContent = xlsx ? xlsxSummaryText : what;
-  $("#board-export-hint").textContent = type === "pdf"
+  $("#board-export-hint").textContent = type === "pptx"
+    ? "Every card is a PowerPoint shape with its own text: retype, move or recolour it. The lines are separate shapes, so after moving a card, move its line too. The slides follow what is on screen: the board picked, the filters and Show to."
+    : type === "pdf"
     ? "Opens the print dialog — choose Save as PDF. Sharp at any zoom, and the host and phone links stay tappable. Send it as a file."
     : "Saves a high-resolution image. Use it where only an image will do; send it as a file, not a photo, so it stays sharp.";
   updateXlsxCount();
@@ -7582,8 +7588,75 @@ function prepareXlsxPart(board) {
 function runBoardExport() {
   const type = pickedExportType($("#board-export-type")) || "jpg";
   if (type === "xlsx") return exportXlsx();
+  if (type === "pptx") return exportOrgPptx();
   closeModal();
   if (type === "pdf") printBoard(); else exportBoard();
+}
+
+/* ---- Org Chart → editable PowerPoint (layout and file: orgchart-pptx.js) ----
+   The boards exactly as on screen: filtered (org.tree is already pruned) and
+   cut at every collapsed node, which is what "Show to" sets. */
+function orgPptxBoards() {
+  const cut = (n) => ({
+    type: n.type, name: n.name, sub: n.sub || "", role: n.role || "", color: n.color, shift: n.shift,
+    position: n.position, contract: n.contract, areaColor: n.areaColor, status: n.status,
+    count: n.type === "employee" ? "" : orgCountText(n),
+    children: org.collapsed.has(n._id) ? [] : n.children.map(cut),
+  });
+  return org.tree ? org.tree.children.map(cut) : [];
+}
+function orgPptxScopeText() {
+  const lvl = $("#oc-level");
+  const show = lvl && lvl.selectedIndex >= 0 ? `Show to: ${lvl.options[lvl.selectedIndex].text}` : "Show to: as expanded on screen";
+  const hidden = ["engineers", "areas", "statuses"].filter(d => orgFilterState(d).hidden).length;
+  return show + (hidden ? ` · ${hidden} filter${hidden === 1 ? "" : "s"} on` : "");
+}
+let pptxDeck = null;
+/* the dialog says how many slides, how big boards are split, and shows each slide */
+function renderPptxPreview() {
+  pptxDeck = OrgPptx.layoutDeck(orgPptxBoards());
+  const n = pptxDeck.slides.length;
+  $("#pptx-summary").textContent = n ? OrgPptx.summaryText(pptxDeck) + " Check the slides below, then Export." : "Nothing on the chart to export: no boards are shown.";
+  $("#pptx-preview").innerHTML = pptxDeck.slides.map((sl, i) =>
+    `<figure class="pptx-thumb">${OrgPptx.slideSvg(sl, pptxDeck, escapeHtml)}<figcaption>${i + 1}. ${escapeHtml(sl.board)}${sl.parts > 1 ? ` · part ${sl.part} of ${sl.parts}` : ""}</figcaption></figure>`).join("");
+  $("#btn-xlsx-go").textContent = n ? `Export ${n} slide${n === 1 ? "" : "s"}` : "Export";
+  $("#btn-xlsx-go").disabled = !n;
+}
+let pptxLibPromise = null;
+function loadPptxGen() {
+  if (window.PptxGenJS) return Promise.resolve(window.PptxGenJS);
+  if (!pptxLibPromise) {
+    pptxLibPromise = loadJSZip().then(() => new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "vendor/pptxgen.min.js";
+      s.onload = () => resolve(window.PptxGenJS);
+      s.onerror = () => { pptxLibPromise = null; reject(new Error("Could not load the PowerPoint library. Check the connection and try again.")); };
+      document.head.appendChild(s);
+    }));
+  }
+  return pptxLibPromise;
+}
+async function exportOrgPptx() {
+  if (!pptxDeck || !pptxDeck.slides.length) return;
+  const btn = $("#btn-xlsx-go");
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try {
+    const PptxGenJS = await loadPptxGen();
+    const blob = await OrgPptx.buildPptx(PptxGenJS, pptxDeck, {
+      title: "Org Chart " + state.date, dateText: `${fmtDow(state.date)} ${fmtDate(state.date)}`, scopeText: orgPptxScopeText(),
+    });
+    const scope = ovScopeBoards();
+    const tag = scope.length === 1 && D().boards.length > 1 ? "_" + scope[0].name.replace(/[^A-Za-z0-9]+/g, "-") : "";
+    bulkSaveBlob(blob, `org_chart${tag}_${state.date}.pptx`);
+    closeModal();
+    toast(`Saved ${pptxDeck.slides.length} slide${pptxDeck.slides.length === 1 ? "" : "s"} as PowerPoint.`, "info");
+  } catch (e) {
+    toast(e.message || String(e), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Export";
+  }
 }
 
 async function exportXlsx() {

@@ -4010,7 +4010,9 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
    inside #orgchart-panel, because this subtree is captured by html2canvas
    for the JPG export and that parser chokes on them (see app.js exportBoard).
    ====================================================================== */
-#orgchart-panel { --oc-rail: #c3ccd6; --oc-ground: #f6f8fb; --oc-glow-a: rgba(0, 73, 131, 0.08); --oc-glow-b: rgba(168, 200, 85, 0.14); }
+/* canvas: Navy wash with a navy-to-green brand sweep (design/orgchart-darker-backgrounds.html, option C4),
+   darker than the page so the white cards stand out; the rails darken with it */
+#orgchart-panel { --oc-rail: #7f95ad; --oc-ground: #c3d1e0; --oc-sweep-a: rgba(0, 50, 90, 0.20); --oc-sweep-b: rgba(140, 180, 60, 0.20); }
 /* light only, like the rest of the app (applyTheme): no dark values keyed off
    the computer's own dark mode, which turned this canvas dark on a light page */
 
@@ -4101,11 +4103,7 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
   pointer-events: none; opacity: .9; }
 .oc-viewport { height: min(68vh, 600px); overflow: hidden; cursor: grab; position: relative;
   border: 1px solid var(--border); border-radius: var(--r-box);
-  /* the page's own navy / green corner glow, no pattern (design/orgchart-backgrounds.html, option F) */
-  background:
-    radial-gradient(900px 480px at 0% 0%, var(--oc-glow-a), transparent 60%),
-    radial-gradient(900px 480px at 100% 100%, var(--oc-glow-b), transparent 60%),
-    var(--oc-ground); }
+  background: linear-gradient(135deg, var(--oc-sweep-a) 0%, transparent 50%, var(--oc-sweep-b) 100%), var(--oc-ground); }
 .oc-viewport.grabbing { cursor: grabbing; }
 .oc-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; padding: 24px; }
 /* Connectors use the classic pure-CSS tree pattern: each li draws the two
@@ -6003,3 +6001,11 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   .m-fold:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 4px; }
 }
 @media (max-width: 640px) and (prefers-reduced-motion: reduce) { .m-fold::after { transition: none; } }
+
+/* ----- Export → PowerPoint: one thumbnail per slide, to check before saving ----- */
+#pptx-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;
+  max-height: 46vh; overflow-y: auto; padding: 2px; }
+.pptx-thumb { margin: 0; display: grid; gap: 4px; min-width: 0; }
+.pptx-thumb svg { width: 100%; height: auto; aspect-ratio: 16 / 9; display: block;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.pptx-thumb figcaption { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
