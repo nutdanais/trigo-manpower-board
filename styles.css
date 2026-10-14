@@ -5600,6 +5600,13 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
 .topbar-right #mode-pill.hidden { display: none; }
 #mode-pill .ic { width: 13px; height: 13px; }
 #mode-pill.mode-ro { color: #8a4f10; border-color: #ebd3a9; background: #fdf7ec; }
+/* where the plan stands: nothing yet (grey), a holiday (violet, like the phone's
+   HOLIDAY pill), missions added but not carried over or merged (amber, dashed),
+   carried over but its source changed since (a small amber dot) */
+#mode-pill.mode-empty { color: var(--muted); border: 1px solid var(--border); background: transparent; }
+#mode-pill.mode-holiday { color: #5b4bb8; border: 1px solid #cfc8f2; background: #f1effc; }
+#mode-pill.mode-draft { color: #8a4f10; border: 1px dashed #d9a95b; background: #fdf7ec; }
+#mode-pill.mode-stale::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); margin-right: 5px; flex: none; }
 #board-menu .board-tab.tab-board { display: flex; align-items: center; gap: 9px; }
 #board-menu .board-tab.tab-board .ovb-name { flex: 1; }
 .topbar-right #mode-pill { height: 26px; padding: 0 10px; border-radius: 13px; letter-spacing: .2px; font-size: 11.5px; }

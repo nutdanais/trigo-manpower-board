@@ -1,7 +1,7 @@
 // node --test tests/
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { PlanDiff, Horizon, Capacity } = require("../planning.js");
+const { PlanDiff, Horizon, PlanStatus, Capacity } = require("../planning.js");
 
 const zones = (o = {}) => ({ annual: [], sick: [], business: [], unpaid: [], exchange: [], ...o });
 const mission = (number, members, extra = {}) => ({
@@ -295,4 +295,23 @@ test("capacity export: one board's grid as data, with only the ticked host colum
   assert.deepEqual(out.summary, { available: [2, null], demand: [3, 0], gap: [-1, null], kind: ["short", null], named: [1, null] });
   assert.deepEqual(out.rows[0], { host: "Host A", shift: "day", extra: { area: "LCB", mapUrl: "https://m.example.com" }, values: [3, 0] }, "a 0 stays 0");
   assert.deepEqual(out.rows[1], { host: "Host Z", shift: "night", extra: { area: "", mapUrl: "" }, values: [null, null] }, "no Host-list record: blank columns");
+});
+
+test("PlanStatus: the date pill says where the plan stands", () => {
+  const base = { forecast: false, locked: false, empty: false, nonWorking: false, stamped: true, stale: false, date: "2026-10-15", today: "2026-10-14" };
+  const s = (o) => PlanStatus.of({ ...base, ...o }).state;
+  assert.equal(s({ forecast: true, empty: true }), "forecast");
+  assert.equal(s({ locked: true, stamped: false }), "locked");
+  assert.equal(s({ empty: true }), "empty");
+  assert.equal(s({ empty: true, nonWorking: true }), "holiday");
+  // a holiday with anything on it is planned, no review expected
+  assert.equal(s({ nonWorking: true, stamped: false }), "planned");
+  // missions added one by one, never carried over or merged
+  assert.equal(s({ stamped: false }), "draft");
+  assert.equal(s({}), "planned");
+  assert.equal(s({ stale: true }), "stale");
+  // stamps unknown (older database): no false Draft
+  assert.equal(s({ stamped: null }), "planned");
+  assert.deepEqual(PlanStatus.of({ ...base, date: "2026-10-14" }), { state: "planned", past: false, today: true });
+  assert.deepEqual(PlanStatus.of({ ...base, date: "2026-10-01", stamped: false }), { state: "draft", past: true, today: false });
 });
