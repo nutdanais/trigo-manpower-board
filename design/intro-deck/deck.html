@@ -129,16 +129,13 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
 .step b{color:#fff}
 .s8 .chips{left:4.4cqw; bottom:4.4cqw}
 .apps{position:absolute; left:48cqw; right:4.4cqw; top:9.6cqw; bottom:4.4cqw; display:grid; grid-template-columns:1fr 1fr; gap:2cqw}
-.app{background:rgba(255,255,255,.05); border:.12cqw solid rgba(255,255,255,.12); border-radius:1.4cqw; padding:1.8cqw; display:grid; grid-template-rows:auto auto 1fr auto; gap:1cqw; min-width:0}
-.app-name{display:flex; align-items:center; gap:1cqw}
-.app-name img{width:3.2cqw; height:3.2cqw; flex:none; border-radius:.9cqw; box-shadow:0 .3cqw .8cqw rgba(0,0,0,.35)}
-.app h3{margin:0; font-size:1.4cqw; white-space:nowrap; font-variation-settings:"wdth" 100; font-weight:700; color:#fff}
-.app .url{font-family:var(--f-mono); font-size:.88cqw; color:var(--on-navy-mut); white-space:nowrap}
-.app .qr{background:#fff; border-radius:1cqw; padding:1.2cqw; align-self:center; justify-self:center; width:100%; max-width:17cqw}
+.app{background:rgba(255,255,255,.05); border:.12cqw solid rgba(255,255,255,.12); border-radius:1.6cqw; padding:2.2cqw 1.6cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.4cqw; min-width:0; text-align:center}
+.app-icon{width:5.4cqw; height:5.4cqw; border-radius:1.25cqw; box-shadow:0 .5cqw 1.4cqw rgba(0,0,0,.4)}
+.app h3{margin:0; font-size:1.6cqw; line-height:1.15; white-space:nowrap; font-variation-settings:"wdth" 100; font-weight:700; color:#fff}
+.app .qr{background:#fff; border-radius:1.2cqw; padding:1.1cqw; width:15.5cqw; box-shadow:0 .6cqw 1.8cqw rgba(0,0,0,.35)}
 .app .qr img{width:100%; height:auto}
-.app ul{margin:0; padding:0; list-style:none; display:grid; gap:.5cqw; font-family:var(--f-body); font-size:1.05cqw; color:var(--on-navy-mut)}
-.app li{display:flex; gap:.6cqw; align-items:center}
-.app li .ms{font-size:1.3cqw; color:var(--green)}
+.app .url{font-family:var(--f-mono); font-size:.9cqw; color:#fff; white-space:nowrap; background:rgba(255,255,255,.08); border:.1cqw solid rgba(255,255,255,.16); border-radius:99cqw; padding:.45cqw 1cqw; display:inline-flex; align-items:center; gap:.5cqw}
+.app .url .ms{font-size:1.1cqw; color:var(--green)}
 
 /* ---------- present mode ---------- */
 .stage{position:fixed; inset:0; z-index:10; background:var(--stage); display:grid; place-items:center;
@@ -330,14 +327,16 @@ h2.h{font-variation-settings:"wdth" 112; font-weight:800; letter-spacing:-.01em;
         <div class="chips"><span><span class="ms">install_mobile</span>Installable app (PWA)</span><span><span class="ms">smartphone</span>Phone layout</span></div>
         <div class="apps">
           <div class="app">
-            <div class="app-name"><img src="img/icon-manpower.png" alt="Manpower Board app icon"><h3>Manpower Board</h3></div><div class="url">trigo-manpower.netlify.app</div>
+            <img class="app-icon" src="img/icon-manpower.png" alt="Manpower Board app icon">
+            <h3>Manpower Board</h3>
             <div class="qr"><img src="img/qr-manpower.svg" alt="QR code for the Manpower Board"></div>
-            <ul><li><span class="ms">check_circle</span>Bottom bar: Board, Overview, Manpower, Host</li><li><span class="ms">check_circle</span>Tap people, then tap a mission</li></ul>
+            <div class="url"><span class="ms">language</span>trigo-manpower.netlify.app</div>
           </div>
           <div class="app">
-            <div class="app-name"><img src="img/icon-inventory.png" alt="Inventory and Quality app icon"><h3>Inventory &amp; Quality</h3></div><div class="url">trigo-inventory-preview.pages.dev</div>
+            <img class="app-icon" src="img/icon-inventory.png" alt="Inventory and Quality app icon">
+            <h3>Inventory &amp; Quality</h3>
             <div class="qr"><img src="img/qr-inventory.svg" alt="QR code for the Inventory and Quality System"></div>
-            <ul><li><span class="ms">check_circle</span>Bottom bar: Dashboard, Tools, To-Do</li><li><span class="ms">check_circle</span>Phone notifications</li></ul>
+            <div class="url"><span class="ms">language</span>trigo-inventory-preview.pages.dev</div>
           </div>
         </div>
       </div>
