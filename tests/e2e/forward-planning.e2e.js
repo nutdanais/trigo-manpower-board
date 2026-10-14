@@ -351,8 +351,8 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       const fa = (emp) => db.t("forecast_assignments").find((r) => r.employee_id === emp && r.plan_date === F);
       const pick = async (p, numbers, withCrew) => {
         await p.click("#btn-import-mission");
-        await until(async () => (await p.locator("#import-list .import-row").count()) === 3, "three missions to pick from");
-        for (const n of numbers) await p.locator("#import-list .import-row", { hasText: new RegExp("^\\s*" + n + " ") }).locator("input").check();
+        await until(async () => (await p.locator("#import-list .hm-row").count()) === 3, "three missions to pick from");
+        for (const n of numbers) await p.locator("#import-list .hm-row", { has: p.locator(".hm-no", { hasText: new RegExp("^" + n + "$") }) }).locator("input").check();
         await p.locator("#import-with-crew").setChecked(withCrew);
         await p.click("#btn-import-confirm");
         await until(async () => !(await p.isVisible("#modal-import")), "picker closes");
@@ -380,10 +380,10 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         asUser(db, h.USERS.b)({ op: "rpc", fn: "set_forecast_assignment", args: { p_employee_id: "e1", p_plan_date: F, p_mission_id: fm("103", "night").id, p_zone: null } });
         // A picks 101 with crew: Person B joins, Person A stays on B's 103
         await pa.click("#btn-import-mission");
-        await until(async () => (await pa.locator("#import-list .import-row").count()) === 3, "list");
-        const disabled = await pa.$$eval("#import-list .import-row", (els) => els.filter((e) => e.querySelector("input").disabled).map((e) => e.querySelector("b").textContent));
+        await until(async () => (await pa.locator("#import-list .hm-row").count()) === 3, "list");
+        const disabled = await pa.$$eval("#import-list .hm-row", (els) => els.filter((e) => e.querySelector("input").disabled).map((e) => e.querySelector(".hm-no").textContent));
         assert.deepEqual(disabled.sort(), ["102", "103"], "already on the forecast");
-        await pa.locator("#import-list .import-row", { hasText: /^\s*101 / }).locator("input").check();
+        await pa.locator("#import-list .hm-row", { has: pa.locator(".hm-no", { hasText: /^101$/ }) }).locator("input").check();
         await pa.click("#btn-import-confirm");
         await until(() => !!fm("101"), "101 added");
         await until(() => fa("e2") && fa("e2").forecast_mission_id === fm("101").id, "Person B placed on 101");

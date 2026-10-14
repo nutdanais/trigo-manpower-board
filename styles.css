@@ -1523,68 +1523,16 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 }
 .fp-empty { font-size: 11.5px; color: var(--muted); font-style: italic; padding: 4px 2px; }
 
-/* Collapsed float pool (see renderFloatPool in app.js): when both Standby and
-   Available On-call are genuinely empty, the panel shrinks to a thin rail
-   instead of reserving 264px to say "nobody's here" twice. Scoped to the
-   fixed right-edge desktop layout only (min-width matches the breakpoint
-   right below) — on a stacked mobile layout the panel is already full-width
-   and this collapse wouldn't make sense. */
-@media (min-width: 901px) {
-  #float-pool.fp-collapsed { width: 44px; }
-  body.fp-collapsed #app-root { margin-right: 44px; }
-  #float-pool.fp-collapsed .fp-head { display: none; }
-  #float-pool.fp-collapsed .fp-section { padding: 0; }
-  /* just the count, centered — the full label ("Available On-call") rotated
-     sideways could run taller than the window in a short viewport; a bare
-     "0" can't */
-  #float-pool.fp-collapsed .fp-label {
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 0;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  #float-pool.fp-collapsed .fp-label-text,
-  #float-pool.fp-collapsed .fp-label small { display: none; }
-  #float-pool.fp-collapsed .fp-body { min-height: 20px; padding-bottom: 0; }
-  /* "Everyone permanent is assigned" etc. — at 44px wide this wraps into an
-     unreadable one-character-per-line column; the rail's whole point (both
-     pools are empty) already says the same thing via the "0" above it */
-  #float-pool.fp-collapsed .fp-empty { display: none; }
-
-  /* mouse hover expands it via plain CSS; an active drag toward it gets the
-     same look through .fp-drag-hover (app.js), since native drag doesn't
-     reliably keep :hover active in every browser. Either way this is an
-     overlay, not a reflow — #app-root's margin stays at 44px (above), so
-     nothing on the board shifts while a drag is in progress. */
-  #float-pool.fp-collapsed:hover,
-  #float-pool.fp-collapsed.fp-drag-hover { width: var(--fp-w, 264px); }
-  #float-pool.fp-collapsed:hover .fp-head,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-head { display: block; }
-  #float-pool.fp-collapsed:hover .fp-section,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-section { padding: 8px 10px 4px; }
-  #float-pool.fp-collapsed:hover .fp-label,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-label {
-    justify-content: flex-start;
-    align-items: baseline;
-    margin-bottom: 7px;
-    padding: 0;
-    border-bottom: none;
-  }
-  #float-pool.fp-collapsed:hover .fp-label-text,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-label-text { display: inline; }
-  #float-pool.fp-collapsed:hover .fp-label small,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-label small { display: block; }
-  #float-pool.fp-collapsed:hover .fp-body,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-body { min-height: 40px; padding-bottom: 6px; }
-  #float-pool.fp-collapsed:hover .fp-empty,
-  #float-pool.fp-collapsed.fp-drag-hover .fp-empty { display: inline; }
-}
+/* Both pools empty (see renderFloatPool in app.js): the panel stays, at its
+   minimum width (FP_MIN_W in app.js), so the board never jumps between a wide
+   panel and a thin rail. Set on body so the board's margin and the resize
+   handle follow the same width. */
+body.fp-pools-empty { --fp-w: 264px; }
 
 /* the handle only exists while the panel is a fixed right-edge column, visible and
-   not collapsed to its rail */
+   with someone in it (empty, it is held at its minimum width) */
 @media (min-width: 901px) {
-  #float-pool:not(.hidden):not(.fp-collapsed) + #fp-resizer { display: block; }
+  #float-pool:not(.hidden):not(.fp-pools-empty) + #fp-resizer { display: block; }
 }
 
 @media (max-width: 900px) {
@@ -2176,8 +2124,14 @@ body.fp-resizing { cursor: ew-resize; user-select: none; -webkit-user-select: no
 .import-info small { display: block; color: var(--muted); }
 .import-row.is-present { cursor: default; opacity: .55; }
 .import-row.is-present:hover { background: none; }
+/* Add Mission (#modal-import) uses the Hide/Unhide rows (.hm-*): a mission already
+   on the forecast stays listed, ticked and locked */
+.modal .hm-row.is-present { cursor: default; opacity: .55; }
+.modal .hm-row.is-present:hover { background: none; }
+#import-tools.hidden { display: none; }
+#import-list .hm-group-head .hm-select { margin-left: auto; }
 /* forecast "Add Mission": bring each picked mission's people too */
-.import-crew { display: flex; align-items: flex-start; gap: 9px; margin: 10px 0 2px; padding: 9px 10px; border-radius: 7px; background: var(--bg-soft); font-size: 13px; font-weight: 600; cursor: pointer; }
+.import-crew { flex: none; display: flex; align-items: flex-start; gap: 9px; margin: 12px 0 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-box); background: var(--panel); font-size: 13px; font-weight: 600; cursor: pointer; }
 .import-crew.hidden { display: none; }
 .import-crew input { width: auto; margin-top: 3px; }
 .import-crew small { display: block; font-weight: 400; color: var(--muted); }
@@ -3718,7 +3672,7 @@ body.settings-open #touch-actions,
 body.settings-open #app-footer,
 body.settings-open #topbar .date-nav,
 body.settings-open #btn-lock { display: none !important; }
-body.settings-open #btn-settings { background: var(--on-navy-fill); border-color: var(--on-navy-line-strong); }
+body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong); }
 
 #settings-view {
   flex: 1 1 auto;
@@ -3842,9 +3796,13 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
 .rm-role-pick label { display: block; margin-bottom: 4px; font-size: 12.5px; font-weight: 600; }
 .rm-role-pick select { width: 100%; }
 .rm-stale { color: var(--warn-text); font-size: 11.5px; }
-#perm-review-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-#perm-review-table th, #perm-review-table td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--border); }
-#perm-review-table th { font-size: 12px; color: var(--muted); }
+/* Review permission changes: a box per role, a row per area (Before → After) */
+#perm-review-body { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.pr-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.hm-group-head + .pr-row { border-top: 0; }
+.pr-area { flex: 1; min-width: 0; }
+.pr-change { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.pr-change .ic { width: 13px; height: 13px; color: var(--muted); }
 #modal-perm-review { width: min(640px, 94vw); }
 
 /* ----- form controls on the page (they used to inherit these from .modal) ----- */
@@ -4259,6 +4217,8 @@ body.forecast-mode .zone { border-style: dashed; }
 }
 .hold-badge.mine { background: var(--danger); border-color: var(--danger); color: #fff; }
 .hold-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.hold-box .hold-row { padding: 9px 12px; border-bottom: 0; border-top: 1px solid var(--border); }
+.hold-box .hold-row:first-child { border-top: 0; }
 .hold-row .hold-text { flex: 1; min-width: 0; font-size: 13px; }
 .hold-row .hold-text small { display: block; color: var(--muted); margin-top: 2px; }
 .hold-row .btn { flex: none; }
@@ -4276,10 +4236,10 @@ body.forecast-mode .zone { border-style: dashed; }
 /* Hide/Unhide missions: wide on a desktop with only the list scrolling between a
    fixed header and footer; full-screen on a phone (see the 640px block below).
    Rows are one grid whose areas reflow on a phone, so there is one markup. */
-#modal-hide-missions { width: min(920px, 94vw); max-width: 94vw; height: 86vh; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; }
-#modal-hide-missions > h3 { position: relative; top: 0; flex: none; }
-#hide-missions-sub { display: block; margin-top: 1px; font-size: 12px; font-weight: 400; color: var(--muted); }
-#hide-missions-tools { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 12px; }
+#modal-hide-missions, #modal-import { width: min(920px, 94vw); max-width: 94vw; height: 86vh; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; }
+#modal-hide-missions > h3, #modal-import > h3 { position: relative; top: 0; flex: none; }
+#hide-missions-sub, #import-source-note { display: block; margin-top: 1px; font-size: 12px; font-weight: 400; color: var(--muted); }
+#hide-missions-tools, #import-tools { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 12px; }
 .modal .hm-search {
   flex: 1 1 260px;
   min-width: 0;
@@ -4296,7 +4256,7 @@ body.forecast-mode .zone { border-style: dashed; }
   background: var(--panel);
 }
 .modal .hm-search:focus-within { border-color: var(--primary-text); }
-.modal #hide-missions-q { flex: 1; min-width: 0; margin: 0; padding: 0; border: 0; outline: 0; background: none; font-size: 13px; }
+.modal #hide-missions-q, .modal #import-q { flex: 1; min-width: 0; margin: 0; padding: 0; border: 0; outline: 0; background: none; font-size: 13px; }
 .hm-filters { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .hm-filter {
   flex: none;
@@ -4315,8 +4275,8 @@ body.forecast-mode .zone { border-style: dashed; }
 .hm-filter.warn { border-color: var(--warn-line); background: var(--warn-surface); color: var(--warn-text); }
 .hm-filter.on { border-color: var(--primary); background: var(--primary); color: #fff; }
 .hm-filter.on .n { color: rgba(255,255,255,.75); }
-#hide-missions-list { flex: 1 1 auto; min-height: 60px; overflow-y: auto; margin: 0 -20px; padding: 0 20px 4px; display: flex; flex-direction: column; gap: 12px; }
-#hide-missions-list > * { flex: none; }
+#hide-missions-list, #import-list { flex: 1 1 auto; min-height: 60px; overflow-y: auto; margin: 0 -20px; padding: 0 20px 4px; display: flex; flex-direction: column; gap: 12px; }
+#hide-missions-list > *, #import-list > * { flex: none; }
 .hm-empty { margin: 0; padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
 .hm-group { border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; }
 .hm-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 9px 12px; background: var(--bg-soft); font-size: 12px; font-weight: 700; }
@@ -4366,21 +4326,21 @@ body.forecast-mode .zone { border-style: dashed; }
 .hm-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .hm-tag.will-hide { border: 1px solid var(--warn-line); background: var(--warn-surface); color: var(--warn-text); }
 .hm-tag.will-unhide { border: 1px solid var(--ok-line); background: var(--ok-surface); color: var(--ok-text); }
-#modal-hide-missions > .modal-actions { flex: none; }
-#hide-missions-summary { margin-left: 0; margin-right: auto; min-width: 0; font-size: 12.5px; color: var(--muted); }
-#hide-missions-summary b { color: var(--text); }
+#modal-hide-missions > .modal-actions, #modal-import > .modal-actions { flex: none; }
+#hide-missions-summary, #import-summary { margin-left: 0; margin-right: auto; min-width: 0; font-size: 12.5px; color: var(--muted); }
+#hide-missions-summary b, #import-summary b { color: var(--text); }
 #hide-missions-summary .hm-warn { color: var(--warn-text); font-weight: 600; }
-#btn-hide-missions-save:disabled { opacity: .45; cursor: default; }
+#btn-hide-missions-save:disabled, #btn-import-confirm:disabled { opacity: .45; cursor: default; }
 @media (max-width: 640px) {
-  #modal-hide-missions {
+  #modal-hide-missions, #modal-import {
     width: 100vw; max-width: 100vw;
     height: 100vh; height: 100dvh; max-height: 100dvh;
     border-radius: 0;
     padding-top: calc(20px + env(safe-area-inset-top, 0px));
   }
-  #modal-hide-missions > h3 { margin-top: calc(-20px - env(safe-area-inset-top, 0px)); padding-top: calc(15px + env(safe-area-inset-top, 0px)); }
+  #modal-hide-missions > h3, #modal-import > h3 { margin-top: calc(-20px - env(safe-area-inset-top, 0px)); padding-top: calc(15px + env(safe-area-inset-top, 0px)); }
   .modal .hm-search { flex-basis: 100%; height: 40px; }
-  .modal #hide-missions-q { font-size: 16px; }   /* 16px stops iOS zooming into the field */
+  .modal #hide-missions-q, .modal #import-q { font-size: 16px; }   /* 16px stops iOS zooming into the field */
   .hm-filter { height: 32px; }
   .modal .hm-row {
     grid-template-columns: auto minmax(0, 1fr) auto 28px;
@@ -4392,45 +4352,51 @@ body.forecast-mode .zone { border-style: dashed; }
   .hm-state { justify-self: start; }
   .modal .hm-row input { width: 22px; height: 22px; justify-self: end; }
   .hm-when, .hm-eng { font-size: 12px; }
-  #modal-hide-missions > .modal-actions { flex-wrap: wrap; padding-bottom: calc(13px + env(safe-area-inset-bottom, 0px)); }
-  #hide-missions-summary { flex-basis: 100%; }
-  #modal-hide-missions > .modal-actions .btn { flex: 1; height: 40px; justify-content: center; }
+  #modal-hide-missions > .modal-actions, #modal-import > .modal-actions { flex-wrap: wrap; padding-bottom: calc(13px + env(safe-area-inset-bottom, 0px)); }
+  #hide-missions-summary, #import-summary { flex-basis: 100%; }
+  #modal-hide-missions > .modal-actions .btn, #modal-import > .modal-actions .btn { flex: 1; height: 40px; justify-content: center; }
 }
 #plandiff-count { color: var(--muted); font-size: 12.5px; margin-right: auto; margin-left: 0; }
-.pd-group { margin-bottom: 12px; }
+/* Review changes: a box per mission (or Leave / Back to Standby), one row per
+   change with its kind as a tag on the right, like the Hide/Unhide rows */
+.pd-group { margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; }
 .pd-group-head {
-  padding: 6px 10px;
-  border-left: 4px solid var(--border);
+  padding: 9px 12px;
+  border-left: 3px solid transparent;   /* the mission's engineer colour, set inline */
   background: var(--bg-soft);
-  border-radius: 4px;
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 .pd-item {
   display: flex !important;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   margin: 0 !important;
-  padding: 7px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
   font-weight: 400 !important;
   cursor: pointer;
 }
+.pd-group-head + .pd-item { border-top: 0; }
 .pd-item:hover { background: var(--hover-tint); }
-.pd-item input { width: auto !important; margin: 3px 0 0 !important; flex: none; }
+.pd-item:has(input:checked) { background: color-mix(in srgb, var(--primary-text) 7%, var(--panel)); }
+.pd-item input { width: 18px !important; height: 18px; margin: 0 !important; flex: none; accent-color: var(--primary); }
 .pd-tag {
+  order: 2;
   flex: none;
-  min-width: 62px;
-  padding: 1px 6px;
-  border-radius: 4px;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
   background: var(--bg-soft);
   color: var(--muted);
 }
-.pd-add .pd-tag { background: var(--ok-surface); color: var(--ok-text); }
-.pd-leave .pd-tag { background: var(--warn-surface); color: var(--warn-text); }
+.pd-add .pd-tag { background: var(--ok-surface); color: var(--ok-text); border: 1px solid var(--ok-line); }
+.pd-leave .pd-tag { background: var(--warn-surface); color: var(--warn-text); border: 1px solid var(--warn-line); }
 .pd-remove .pd-tag { background: var(--danger-tint); color: var(--danger-text); }
 .pd-text { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
 
@@ -4587,8 +4553,8 @@ button.mini-emp:hover { box-shadow: 0 0 0 2px var(--hover-tint), 0 1px 2px rgba(
 .merge-log-when { margin: 10px 0 6px; font-size: 12.5px; color: var(--muted); }
 .merge-log-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
 table.merge-log { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 12.5px; }
-table.merge-log th { background: var(--primary); color: #fff; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 6px 8px; }
-table.merge-log td { padding: 6px 8px; border-top: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+table.merge-log th { background: var(--bg-soft); color: var(--muted); text-align: left; font-size: 11.5px; font-weight: 700; padding: 8px 10px; }
+table.merge-log td { padding: 8px 10px; border-top: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
 table.merge-log tr.not-used td { background: var(--danger-tint); }
 .merge-log-item { font-weight: 600; }
 .merge-log-reason { font-style: italic; }
@@ -4949,14 +4915,19 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .modal .xlsx-lang input { width: auto; margin: 0; }
 
 /* ---------- Bulk edit by file (bulk-edit.js) ---------- */
-#modal-bulk { width: 780px; max-width: calc(100vw - 24px); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
-#modal-bulk > h3 { position: relative; top: 0; flex: none; }
-#modal-bulk > .modal-actions { flex: none; align-items: center; }
-.bulk-step { margin-bottom: 12px; flex: none; }
-.bulk-step > b { display: block; margin-bottom: 6px; }
-.bulk-step-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-.bulk-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-#bulk-preview { flex: 1 1 auto; min-height: 80px; overflow-y: auto; margin: 0 -20px 8px; padding: 0 20px; border-top: 1px solid var(--line, #d8e0e7); padding-top: 10px; }
+/* Bulk edit: a side panel like the exports (.modal-side.modal-export), a bit
+   wider so the change preview table fits */
+#modal-bulk.modal-side { width: min(620px, 100vw); }
+.bulk-step { flex: none; display: flex; flex-direction: column; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-box); }
+.bulk-step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; font-weight: 700; }
+.bulk-num { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; }
+.bulk-step .import-note { margin: 8px 0 0; font-size: 12.5px; }
+.bulk-step > .btn { align-self: flex-start; }
+.modal .bulk-drop { display: block; margin: 0; padding: 14px; border: 1.5px dashed var(--border); border-radius: var(--r); background: var(--bg-soft); font-weight: 400; cursor: pointer; }
+.modal .bulk-drop:hover { border-color: var(--primary-text); }
+.modal .bulk-drop input { width: 100%; margin: 0; padding: 0; border: 0; background: none; font-size: 13px; cursor: pointer; }
+.bulk-check { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; font-size: 12.5px; color: var(--muted); }
+#bulk-preview { flex: none; padding-top: 12px; border-top: 1px solid var(--border); }
 #bulk-preview.hidden { display: none; }
 .bulk-chips { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; }
 .bulk-extra { color: var(--muted); font-size: 12.5px; margin: 2px 0 8px; }
@@ -5289,14 +5260,6 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
      the panel starts under it (--fp-top, set in app.js; the banner once row 1 has scrolled away). */
   body.board-view #toolbar-row1 { margin-right: calc(-1 * var(--fp-w, 264px)); padding-right: 20px; position: relative; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line, var(--border)); }
   body.board-view #float-pool, body.board-view #fp-resizer { top: var(--fp-top, var(--bar-h, 56px)); }
-  /* A collapsed panel is a 44px rail and #app-root's margin shrinks to match
-     (Collapsed float pool, above), so these must reach over 44px too. Left at
-     --fp-w they ran ~220px past the window on a day with nobody free, pushing
-     Settings, the avatar, Reset Board and Export off the screen. */
-  body.board-view.fp-collapsed #sticky-header #topbar,
-  body.board-view.fp-collapsed #sticky-header #green-rule,
-  body.board-view.fp-collapsed #sticky-header #update-banner,
-  body.board-view.fp-collapsed #toolbar-row1 { margin-right: -44px; }
 }
 body.settings-open #board-tabs, body.settings-open #board-dd { display: none !important; }
 
@@ -5463,6 +5426,21 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 .modal-export #xlsx-cols, .modal-export .cap-export-list { gap: 2px 8px; margin-bottom: 14px; }
 .modal-export .import-row { padding: 7px 8px; border-radius: var(--r); font-size: 13px; }
 .modal-export #xlsx-sheets-wrap { margin-bottom: 14px; }
+/* the pickers are one box of flat rows, like the Hide/Unhide and Add Mission
+   lists, instead of a grid of separately bordered cards */
+.modal-export #xlsx-cols, .modal-export #xlsx-sheets, .modal-export .cap-export-list {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden;
+}
+.modal-export #xlsx-cols .import-row, .modal-export #xlsx-sheets .import-row, .modal-export .cap-export-list .import-row {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: center;
+  margin: 0; padding: 8px 12px; border: 0; border-top: 1px solid var(--border); border-radius: 0;
+}
+.modal-export #xlsx-cols .import-row:first-child, .modal-export #xlsx-sheets .import-row:first-child, .modal-export .cap-export-list .import-row:first-child { border-top: 0; }
+.modal-export .import-row input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
+.modal-export .import-row .import-info { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.modal-export .import-row .import-info small { display: inline; margin: 0 0 0 auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.modal-export .import-row:has(input:checked) { background: color-mix(in srgb, var(--primary-text) 7%, var(--panel)); }
 .modal-export .form-group { margin: 6px 0 8px; font-size: 12.5px; font-weight: 650; color: var(--muted); }
 .modal-export #xlsx-hint { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
 
@@ -5678,7 +5656,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   /* one pill only: on a holiday, HOLIDAY stands in for CONFIRMED / FORECAST, or the
      name would be left with almost no room */
   #topbar:has(#m-hol-pill:not(.hidden)) #mode-pill { display: none; }
-  #m-hol-pill { display: inline-flex; color: #5b4bb8; background: #f1effc; border: 1px solid #cfc8f2; }
+  #m-hol-pill { display: inline-flex; color: #2b1700; background: var(--warn); border: 1px solid var(--warn); }
   #m-hol-pill.hidden { display: none; }
   #btn-hold-alerts { order: 4; }
   #topbar .topbar-right { order: 3; flex: 0 0 auto; margin-left: auto; gap: 0; }
@@ -5902,7 +5880,6 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   }
   #float-pool.hidden { display: none; }
   #float-pool.fp-open { height: min(72dvh, calc(100dvh - var(--bnav-h) - 56px)); overflow-y: auto; overscroll-behavior: contain; }
-  #float-pool.fp-collapsed { width: auto; }
   #fp-drawer-handle {
     display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 2; flex: none;
     width: 100%; min-height: var(--peek-h); padding: 14px 16px 8px; border: 0; background: var(--panel);
@@ -6024,3 +6001,70 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 .pptx-thumb svg { width: 100%; height: auto; aspect-ratio: 16 / 9; display: block;
   border: 1px solid var(--border); border-radius: 6px; background: #fff; }
 .pptx-thumb figcaption { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Forecast viewer (read-only): missions in one box, then who is not on a mission */
+#forecast-view-list { display: flex; flex-direction: column; gap: 12px; }
+.fv-row { display: grid; grid-template-columns: minmax(0, 1.2fr) 150px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.fv-row:first-child, .hm-group-head + .fv-row { border-top: 0; }
+.fv-row.fv-zone { grid-template-columns: 150px minmax(0, 1fr); }
+.fv-people { min-width: 0; overflow-wrap: anywhere; }
+.fv-none { color: var(--warn-text); }
+@media (max-width: 640px) {
+  .fv-row, .fv-row.fv-zone { grid-template-columns: 1fr; row-gap: 3px; }
+}
+
+/* Copy forecast: − / + around the number, and the days it will copy onto */
+.fc-stepper { display: inline-flex; align-items: center; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.fc-stepper .btn { width: 36px; height: var(--ctl-h); padding: 0; justify-content: center; border: 0; border-radius: 0; background: var(--bg-soft); font-size: 16px; }
+.modal .fc-stepper input { width: 52px; height: var(--ctl-h); margin: 0; border: 0; border-radius: 0; text-align: center; font-weight: 700; -moz-appearance: textfield; }
+.fc-stepper input::-webkit-inner-spin-button, .fc-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.fc-days { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.fc-days span { padding: 3px 10px; border-radius: 999px; background: var(--bg-soft); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+#modal-rename-board { width: min(420px, 94vw); }
+
+/* Bulk edit on a phone: the backup tick gets its own line above the buttons */
+@media (max-width: 640px) {
+  #modal-bulk > .modal-actions { flex-wrap: wrap; }
+  #modal-bulk .bulk-check { flex-basis: 100%; }
+}
+
+/* ===== Holiday (design/holiday-selector-options.html: A3 desktop, C phone; amber 3, 5, 6) ===== */
+/* A3: the switch beside the date, on the navy top bar */
+#topbar #holiday-toggle { color: #fff; margin: 0 4px 0 2px; white-space: nowrap; }
+#topbar #holiday-toggle.hidden { display: none; }
+#topbar #holiday-toggle .toggle-track { width: 36px; height: 20px; background: rgba(255, 255, 255, .28); }
+#topbar #holiday-toggle .toggle-thumb { width: 16px; height: 16px; }
+#topbar #holiday-toggle input:checked + .toggle-track { background: var(--warn); }
+#topbar #holiday-toggle input:checked + .toggle-track .toggle-thumb { left: 18px; }
+#topbar #holiday-toggle input:focus-visible + .toggle-track { outline: 2px solid #fff; outline-offset: 2px; }
+/* 3: the date box outlined in amber on a holiday */
+body.holiday-day #topbar .date-nav { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+/* 5: Add Mission in amber on a holiday (red on a working forecast day) */
+.btn.btn-holiday { background: var(--warn); border-color: var(--warn); color: #2b1700; }
+.btn.btn-holiday:hover { background: #e08e06; border-color: #e08e06; }
+/* 6: a light amber wash behind the board, and the banner */
+body.holiday-day #board-capture { background: #fffaf0; }
+#holiday-banner {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 12px; padding: 10px 14px;
+  border: 1px solid #f2c96b; border-left: 4px solid var(--warn); border-radius: var(--r-box);
+  background: #fef3c7; color: #8a4f10; font-size: 13px;
+}
+#holiday-banner b { color: #6b3a06; }
+#holiday-banner .ic { flex: none; width: 18px; height: 18px; }
+#holiday-banner.hidden, body.exporting #holiday-banner { display: none; }
+body.exporting #board-capture { background: var(--bg); }
+@media print { #holiday-banner { display: none !important; } body.holiday-day #board-capture { background: none; } }
+/* C: the switch inside the date picker, on a phone only */
+.dp-holiday { display: none; }
+@media (max-width: 640px) {
+  #topbar #holiday-toggle { display: none !important; }
+  body.holiday-day #topbar .date-nav { box-shadow: 0 0 0 2px var(--warn); }
+  .dp-holiday {
+    display: flex; align-items: center; gap: 12px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .dp-holiday > span:first-child { flex: 1; }
+  .dp-holiday small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+}

@@ -48,7 +48,7 @@ async function step(name, fn) {
     await step("the footer and the Settings rail show it", async () => {
       await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
       assert.match(await p.locator("#app-footer").innerText(), new RegExp("Version " + LOADED));
-      await p.click("#btn-settings");
+      await p.click("#btn-avatar"); await p.click("#btn-settings");
       await p.waitForSelector("#settings-view:not(.hidden)");
       assert.equal(await p.locator("#settings-version").isVisible(), true);
       assert.match(await p.locator("#settings-version").innerText(), new RegExp("Version " + LOADED));

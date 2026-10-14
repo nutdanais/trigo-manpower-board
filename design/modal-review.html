@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="color-scheme" content="light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modal Style Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#eef1f4; --panel:#fff; --border:#d8dde4; --text:#1f2937; --muted:#6b7280;
+  --primary:#003a66; --primary-text:#003a66; --bg-soft:#eef1f5; --hover-tint:#eef3fb;
+  --warn-text:#8a4f10; --warn-surface:#fdf8ef; --warn-line:#e0c9a4;
+  --ok-text:#4d6810; --ok-surface:#f7faef; --ok-line:#cfdcae; --danger-text:#a3271f;
+  --night:#1c2430; --r:7px; --r-box:8px; --ctl-h:32px;
+  --font:"Geist","Noto Sans Thai",Arial,sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 var(--font); }
+.page { max-width:1100px; margin:0 auto; padding:28px 16px 60px; }
+h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:18px; margin:40px 0 6px; }
+.lead { color:var(--muted); margin:0 0 18px; max-width:760px; }
+table.inv { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-box); overflow:hidden; font-size:13px; }
+.inv th, .inv td { text-align:left; padding:7px 10px; border-top:1px solid var(--border); vertical-align:top; }
+.inv th { background:var(--bg-soft); font-size:12px; border-top:0; }
+.inv code { font-size:11.5px; color:var(--muted); }
+.st { display:inline-block; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+.st.ok { background:var(--ok-surface); color:var(--ok-text); border:1px solid var(--ok-line); }
+.st.up { background:var(--warn-surface); color:var(--warn-text); border:1px solid var(--warn-line); }
+.wrap-tbl { overflow-x:auto; }
+.pair { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.cap { font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin:0 0 6px; }
+@media (max-width:820px) { .pair { grid-template-columns:1fr; } }
+
+/* ---- modal (matches the app's shell) ---- */
+.modal { background:var(--panel); border-radius:12px; box-shadow:0 12px 40px rgba(0,20,40,.18); border:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.modal h3 { margin:0; padding:14px 20px; font-size:16px; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:10px; }
+.modal h3 small { display:block; font-size:12px; font-weight:400; color:var(--muted); margin-top:1px; }
+.modal h3 .x { margin-left:auto; color:var(--muted); font-weight:400; font-size:20px; line-height:1; }
+.body { padding:14px 20px; display:flex; flex-direction:column; gap:12px; }
+.foot { display:flex; align-items:center; gap:8px; padding:12px 20px; border-top:1px solid var(--border); background:var(--bg-soft); }
+.foot .sum { margin-right:auto; font-size:12.5px; color:var(--muted); } .foot .sum b { color:var(--text); }
+.btn { height:var(--ctl-h); padding:0 14px; border:1px solid var(--border); border-radius:var(--r); background:var(--panel); color:var(--text); font:inherit; font-size:13px; font-weight:600; }
+.btn.p { background:var(--primary); border-color:var(--primary); color:#fff; }
+.search { display:flex; align-items:center; gap:6px; height:var(--ctl-h); padding:0 9px; border:1px solid var(--border); border-radius:var(--r); color:var(--muted); font-size:13px; flex:1 1 240px; }
+.tools { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; }
+.chips { display:flex; gap:6px; flex-wrap:wrap; }
+.chip { height:28px; padding:0 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel); font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; }
+.chip .n { color:var(--muted); } .chip.on { background:var(--primary); border-color:var(--primary); color:#fff; } .chip.on .n { color:rgba(255,255,255,.75); }
+.chip.warn { border-color:var(--warn-line); background:var(--warn-surface); color:var(--warn-text); }
+.grp { border:1px solid var(--border); border-radius:var(--r-box); overflow:hidden; }
+.gh { display:flex; align-items:center; gap:10px; padding:9px 12px; background:var(--bg-soft); font-size:12px; font-weight:700; }
+.gh small { display:block; font-weight:400; color:var(--muted); }
+.gh .sel { margin-left:auto; font-weight:600; color:var(--primary-text); }
+.row { display:grid; grid-template-columns:20px minmax(0,1fr) 140px 110px 44px 96px; gap:10px; align-items:center; padding:8px 12px; border-top:1px solid var(--border); font-size:13px; }
+.gh + .row { border-top:0; }
+.row.pend { background:color-mix(in srgb, var(--primary-text) 7%, var(--panel)); }
+.row.off { opacity:.5; }
+.cb { width:18px; height:18px; border:1.5px solid #9aa4b1; border-radius:4px; display:grid; place-items:center; background:var(--panel); }
+.cb.on { background:var(--primary); border-color:var(--primary); color:#fff; font-size:12px; font-weight:700; }
+.no { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rt { font-size:12.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.when { color:var(--muted); display:flex; gap:6px; align-items:center; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.shift { padding:0 5px; border:1px solid color-mix(in srgb, var(--primary-text) 35%, transparent); border-radius:3px; color:var(--primary-text); font-size:9.5px; font-weight:700; line-height:1.7; }
+.shift.night { background:var(--night); border-color:var(--night); color:#fff; }
+.eng { display:flex; gap:5px; align-items:center; white-space:nowrap; overflow:hidden; }
+.eng i { width:8px; height:8px; border-radius:50%; flex:none; }
+.crew { font-weight:700; font-variant-numeric:tabular-nums; } .crew.zero { color:var(--warn-text); }
+.tag { justify-self:end; padding:1px 8px; border-radius:999px; background:var(--bg-soft); color:var(--muted); font-size:11px; font-weight:700; white-space:nowrap; }
+.tag.add { background:var(--ok-surface); color:var(--ok-text); border:1px solid var(--ok-line); }
+.crewopt { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--border); border-radius:var(--r-box); font-size:13px; font-weight:600; }
+.crewopt small { display:block; font-weight:400; color:var(--muted); }
+.toggle { flex:none; width:34px; height:20px; border-radius:999px; background:var(--primary); position:relative; margin-top:1px; }
+.toggle::after { content:""; position:absolute; right:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; }
+/* old style, for the "before" column */
+.old .orow { display:flex; gap:9px; padding:7px 8px; border:1px solid var(--border); border-radius:7px; margin-bottom:6px; font-size:13px; }
+.old .orow small { display:block; color:var(--muted); }
+/* small pickers (export) */
+.pick { display:grid; grid-template-columns:20px 1fr auto; gap:10px; align-items:center; padding:8px 12px; border-top:1px solid var(--border); font-size:13px; }
+.gh + .pick { border-top:0; }
+.pick .n { color:var(--muted); font-size:12px; }
+.lbl { font-size:12px; font-weight:700; color:var(--muted); margin-bottom:-6px; }
+.seg { display:flex; background:var(--bg-soft); border-radius:var(--r); padding:2px; }
+.seg span { flex:1; text-align:center; padding:5px; font-size:13px; font-weight:600; border-radius:6px; color:var(--muted); }
+.seg span.on { background:var(--panel); color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.08); }
+.stepper { display:flex; align-items:center; gap:0; width:max-content; border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+.stepper span { width:34px; height:32px; display:grid; place-items:center; font-weight:700; background:var(--bg-soft); }
+.stepper b { width:48px; text-align:center; }
+.dates { display:flex; gap:6px; flex-wrap:wrap; } .dates span { padding:3px 9px; border-radius:999px; background:var(--bg-soft); font-size:12px; font-weight:600; } .dates span.skip { text-decoration:line-through; color:var(--muted); }
+input.f { height:var(--ctl-h); border:1px solid var(--primary-text); border-radius:var(--r); padding:0 10px; font:inherit; width:100%; background:var(--panel); color:var(--text); }
+/* phone frame */
+.phone { width:360px; max-width:100%; height:640px; border:8px solid #1b2230; border-radius:28px; overflow:hidden; margin:0 auto; }
+.phone .modal { height:100%; border-radius:0; border:0; }
+.phone .row { grid-template-columns:minmax(0,1fr) auto 28px; grid-template-areas:"m crew cb" "w w cb" "t t cb"; row-gap:2px; padding:10px 12px; }
+.phone .row .cb { grid-area:cb; justify-self:end; width:22px; height:22px; } .phone .row .mm { grid-area:m; min-width:0; } .phone .row .when { grid-area:w; font-size:12px; }
+.phone .row .eng { display:none; } .phone .row .crew { grid-area:crew; } .phone .row .tag { grid-area:t; justify-self:start; }
+.phone .list { flex:1; overflow:auto; } .phone .search { flex:none; }
+.phone .foot { flex-wrap:wrap; } .phone .foot .sum { flex-basis:100%; } .phone .foot .btn { flex:1; height:40px; }
+.notes { margin:10px 0 0; padding-left:18px; color:var(--muted); font-size:13px; } .notes li { margin:3px 0; }
+.grid3 { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:18px; align-items:start; }
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Modal style review</h1>
+<p class="lead">I opened all 26 modals in the app and checked each one. Every modal already has the new frame: a header bar, a footer bar, and a side panel for forms. What is still old is the <b>inside</b> of 11 of them (the bordered checkbox cards, <code>.import-row</code>, and a few loose lists), plus a Rename board box that still uses the browser's own pop-up. Below you can see the new style for each of those, starting with Add Mission.</p>
+
+<h2>1 · Add Mission (before → after)</h2>
+<p class="lead">This uses the same pattern as Hide/Unhide missions: a search box, filter chips, rows grouped in one box, columns for shift and time, engineer and crew, a tag on each row that says what Save will do, and a running total in the footer. Missions that are already on the forecast stay in the list but greyed out and locked.</p>
+<div class="pair">
+<div>
+<p class="cap">Before (today)</p>
+<div class="modal old">
+  <h3>Add Mission <span class="x">×</span></h3>
+  <div class="body" style="gap:0">
+    <p style="margin:0 0 10px;color:var(--muted);font-size:13px">Missions on the confirmed board for Thu 15-Oct-2026 — tick the ones you will work on for Fri 16-Oct-2026:</p>
+    <div class="orow"><span class="cb"></span><span><b>AMATA New mission</b> — SNS logistic phase8 → NAGOYA DENKI<small>Day 08:30-17:00 • Suriya.P • 4 people</small></span></div>
+    <div class="orow"><span class="cb"></span><span><b>AMATA.26.0003</b> — Office AMATA(9) → HTT<small>Day 07:00-11:00 • Tanakit.K • 0 people</small></span></div>
+    <div class="orow"><span class="cb"></span><span><b>AMATA.26.0004</b> — TTKL → Wolong Elec<small>Day 08:00-17:00 • Tanakit.K • 9 people</small></span></div>
+    <div class="orow"><span class="cb"></span><span><b>AMATA.26.0006</b> — TBKK(9) → MMC<small>Day 08:00-17:00 • Tanakit.K • 2 people</small></span></div>
+    <div class="orow"><span class="cb"></span><span><b>BANGN.26.0030</b> — Surtec Ayutthaya → Surtec<small>Day 08:00-17:00 • Phada.C • 16 people</small></span></div>
+  </div>
+  <div class="foot"><span class="sum"></span><span class="btn">Cancel</span><span class="btn p">Add selected</span></div>
+</div>
+</div>
+<div>
+<p class="cap">After — phone</p>
+<div class="phone"><div class="modal">
+  <h3><span>Add Mission<small>Fri 16-Oct · from Thu 15-Oct</small></span><span class="x">×</span></h3>
+  <div class="body" style="padding-bottom:8px"><div class="search">⌕ Search mission, host, customer</div>
+  <div class="chips"><span class="chip on">All <span class="n">15</span></span><span class="chip">Day <span class="n">15</span></span><span class="chip">Night <span class="n">0</span></span></div></div>
+  <div class="list" style="padding:0 20px 10px"><div class="grp">
+    <div class="row pend"><span class="cb on">✓</span><span class="mm"><div class="no">AMATA New mission</div><div class="rt">SNS logistic phase8 → NAGOYA DENKI</div></span><span class="when"><span class="shift">DAY</span>08:30-17:00</span><span class="eng"></span><span class="crew">4</span><span class="tag add">Will add</span></div>
+    <div class="row"><span class="cb"></span><span class="mm"><div class="no">AMATA.26.0003</div><div class="rt">Office AMATA(9) → HTT</div></span><span class="when"><span class="shift">DAY</span>07:00-11:00</span><span class="eng"></span><span class="crew zero">0</span></div>
+    <div class="row pend"><span class="cb on">✓</span><span class="mm"><div class="no">AMATA.26.0004</div><div class="rt">TTKL → Wolong Elec</div></span><span class="when"><span class="shift">DAY</span>08:00-17:00</span><span class="eng"></span><span class="crew">9</span><span class="tag add">Will add</span></div>
+    <div class="row off"><span class="cb on">✓</span><span class="mm"><div class="no">AMATA.26.0006</div><div class="rt">TBKK(9) → MMC</div></span><span class="when"><span class="shift">DAY</span>08:00-17:00</span><span class="eng"></span><span class="crew">2</span><span class="tag">Already added</span></div>
+    <div class="row"><span class="cb"></span><span class="mm"><div class="no">BANGN.26.0030</div><div class="rt">Surtec Ayutthaya → Surtec</div></span><span class="when"><span class="shift">DAY</span>08:00-17:00</span><span class="eng"></span><span class="crew">16</span></div>
+  </div></div>
+  <div class="foot"><span class="sum"><b>2</b> missions · <b>13</b> people</span><span class="btn">Cancel</span><span class="btn p">Add 2</span></div>
+</div></div>
+</div>
+</div>
+
+<p class="cap" style="margin-top:22px">After — desktop (wide, only the list scrolls)</p>
+<div class="modal">
+  <h3><span>Add Mission<small>Missions on the confirmed board for Thu 15-Oct-2026 · tick the ones you will work on for Fri 16-Oct-2026</small></span><span class="x">×</span></h3>
+  <div class="body">
+    <div class="tools"><div class="search">⌕ Search mission, host, customer or engineer</div>
+      <div class="chips"><span class="chip on">All <span class="n">15</span></span><span class="chip">Day <span class="n">15</span></span><span class="chip">Night <span class="n">0</span></span><span class="chip warn">No crew <span class="n">8</span></span><span class="chip">Mine <span class="n">5</span></span></div></div>
+    <div class="grp">
+      <div class="gh"><span>AMATA<small>11 missions</small></span><span class="sel">Select all</span></div>
+      <div class="row pend"><span class="cb on">✓</span><span><div class="no">AMATA New mission</div><div class="rt">SNS logistic phase8 → NAGOYA DENKI</div></span><span class="when"><span class="shift">DAY</span>08:30-17:00</span><span class="eng"><i style="background:#a8d98a"></i>Suriya.P</span><span class="crew">4</span><span class="tag add">Will add</span></div>
+      <div class="row"><span class="cb"></span><span><div class="no">AMATA.26.0003</div><div class="rt">Office AMATA(9) → HTT</div></span><span class="when"><span class="shift">DAY</span>07:00-11:00</span><span class="eng"><i style="background:#f6a06b"></i>Tanakit.K</span><span class="crew zero">0</span><span></span></div>
+      <div class="row pend"><span class="cb on">✓</span><span><div class="no">AMATA.26.0004</div><div class="rt">TTKL → Wolong Elec</div></span><span class="when"><span class="shift">DAY</span>08:00-17:00</span><span class="eng"><i style="background:#f6a06b"></i>Tanakit.K</span><span class="crew">9</span><span class="tag add">Will add</span></div>
+      <div class="row off"><span class="cb on">✓</span><span><div class="no">AMATA.26.0006</div><div class="rt">TBKK(9) → MMC</div></span><span class="when"><span class="shift">DAY</span>08:00-17:00</span><span class="eng"><i style="background:#f6a06b"></i>Tanakit.K</span><span class="crew">2</span><span class="tag">Already added</span></div>
+      <div class="gh"><span>BANGN<small>4 missions</small></span><span class="sel">Select all</span></div>
+      <div class="row"><span class="cb"></span><span><div class="no">BANGN.26.0030</div><div class="rt">Surtec Ayutthaya → Surtec</div></span><span class="when"><span class="shift">DAY</span>08:00-17:00</span><span class="eng"><i style="background:#7fb8ec"></i>Phada.C</span><span class="crew">16</span><span></span></div>
+      <div class="row"><span class="cb"></span><span><div class="no">BANGN.26.0073</div><div class="rt">UD Truck (6) → HMAB</div></span><span class="when"><span class="shift">DAY</span>07:30-16:30</span><span class="eng"><i style="background:#c9a2e6"></i>Sunicha.C</span><span class="crew zero">0</span><span></span></div>
+    </div>
+    <div class="crewopt"><span class="toggle"></span><span>Bring each mission's crew too<small>People already placed somewhere on this forecast day stay where they are. Everyone brought in is held by you.</small></span></div>
+  </div>
+  <div class="foot"><span class="sum"><b>2</b> missions selected · <b>13</b> people will come with them</span><span class="btn">Cancel</span><span class="btn p">Add 2 missions</span></div>
+</div>
+<ul class="notes">
+  <li>Groups use the area prefix of the mission number (AMATA, BANGN…). If a number has no prefix, the mission goes into an "Other" group.</li>
+  <li>The "Mine" chip only shows when you are the engineer on at least one mission. The "No crew" chip shows missions with 0 people.</li>
+  <li>The Holiday version (copy from a recent weekday) uses the same layout, without the crew option.</li>
+</ul>
+
+<h2>2 · Export pickers (4 modals)</h2>
+<p class="lead">Export, Export Capacity, Export Host List and Export Manpower List show their sheet, board and column choices as loose bordered cards. In the new style they become one grouped box, the same as the Add Mission rows. Each group has a "Select all" link, and each row shows its count on the right.</p>
+<div class="grid3">
+<div class="modal">
+  <h3><span>Export Capacity</span><span class="x">×</span></h3>
+  <div class="body">
+    <div class="lbl">File type</div><div class="seg"><span class="on">JPG image</span><span>PDF</span><span>Excel</span></div>
+    <div class="grp"><div class="gh"><span>Boards</span><span class="sel">All · This board only</span></div>
+      <div class="pick"><span class="cb on">✓</span>Board One<span class="n">8 people</span></div>
+      <div class="pick"><span class="cb"></span>Board Two<span class="n">2 people</span></div></div>
+    <div class="grp"><div class="gh"><span>Host columns</span><span class="sel">Select all</span></div>
+      <div class="pick"><span class="cb on">✓</span>Service area<span></span></div>
+      <div class="pick"><span class="cb"></span>Location<span></span></div>
+      <div class="pick"><span class="cb"></span>Note<span></span></div>
+      <div class="pick"><span class="cb"></span>Google Maps link<span></span></div></div>
+  </div>
+  <div class="foot"><span class="sum"></span><span class="btn">Cancel</span><span class="btn p">Export</span></div>
+</div>
+<div class="modal">
+  <h3><span>Export — Board One<small>Excel · Wed 14-Oct-2026</small></span><span class="x">×</span></h3>
+  <div class="body">
+    <div class="lbl">File type</div><div class="seg"><span>JPG image</span><span>PDF</span><span class="on">Excel</span></div>
+    <div class="grp"><div class="gh"><span>Sheets</span><span class="sel">Select all</span></div>
+      <div class="pick"><span class="cb on">✓</span>On missions<span class="n">4 people</span></div>
+      <div class="pick"><span class="cb on">✓</span>Standby<span class="n">1 person</span></div>
+      <div class="pick"><span class="cb on">✓</span>On leave<span class="n">1 person</span></div>
+      <div class="pick"><span class="cb"></span>On-call<span class="n">2 people</span></div></div>
+  </div>
+  <div class="foot"><span class="sum"></span><span class="btn">Cancel</span><span class="btn p">Export</span></div>
+</div>
+</div>
+
+<h2>3 · Review lists (Review changes, Merge decisions, Holds taken, Forecast)</h2>
+<p class="lead">These four lists use their own old styles: a group header with a left stripe, loose rows with a bottom border, and a plain list for the read-only Forecast viewer. In the new style they use the same grouped box, and the change type (Add, Move, Remove) moves into the tag on the right, so it looks like Hide/Unhide.</p>
+<div class="grid3">
+<div class="modal">
+  <h3><span>Review changes<small>Board One · Thu 15-Oct · 4 changes</small></span><span class="x">×</span></h3>
+  <div class="body">
+    <div class="chips"><span class="chip">Tick all</span><span class="chip">Untick all</span></div>
+    <div class="grp"><div class="gh"><span>101 · Host Alpha → Cust Alpha<small>Day 08:00-17:00</small></span></div>
+      <div class="pick"><span class="cb on">✓</span>Person E joins<span class="tag add">Add</span></div>
+      <div class="pick"><span class="cb on">✓</span>Person B moves to 102<span class="tag">Move</span></div></div>
+    <div class="grp"><div class="gh"><span>103 · Host Gamma → Cust Alpha<small>Night 20:00-05:00</small></span></div>
+      <div class="pick"><span class="cb"></span>Person D leaves<span class="tag" style="color:var(--danger-text)">Remove</span></div></div>
+  </div>
+  <div class="foot"><span class="sum"><b>2</b> of 3 ticked</span><span class="btn">Cancel</span><span class="btn p">Apply</span></div>
+</div>
+<div class="modal">
+  <h3><span>Holds taken</span><span class="x">×</span></h3>
+  <div class="body">
+    <p style="margin:0;font-size:13px;color:var(--muted)">Someone moved these people out of a forecast they were held in. The flag stays on the mission until it is acknowledged.</p>
+    <div class="grp"><div class="gh"><span>AMATA.26.0004 · TTKL → Wolong Elec</span></div>
+      <div class="pick"><span></span><span><b>Person C</b><div class="rt">moved to 102 by eng.b · 09:12</div></span><span class="tag">Held by you</span></div>
+      <div class="pick"><span></span><span><b>Person F</b><div class="rt">set to leave by eng.b · 09:14</div></span><span class="tag">Held by you</span></div></div>
+  </div>
+  <div class="foot"><span class="sum"></span><span class="btn">Acknowledge all</span><span class="btn p">Close</span></div>
+</div>
+</div>
+
+<h2>4 · Small one-offs</h2>
+<div class="grid3">
+<div class="modal">
+  <h3><span>Copy forecast to the next working days</span><span class="x">×</span></h3>
+  <div class="body">
+    <div class="lbl">How many working days</div>
+    <div class="stepper"><span>−</span><b>5</b><span>+</span></div>
+    <div class="dates"><span>Thu 15</span><span>Fri 16</span><span>Mon 19</span><span class="skip" title="already has a forecast">Tue 20</span><span>Wed 21</span></div>
+    <p style="margin:0;font-size:12px;color:var(--muted)">A day that already has a forecast (crossed out) is skipped and never overwritten.</p>
+  </div>
+  <div class="foot"><span class="sum"><b>4</b> days</span><span class="btn">Cancel</span><span class="btn p">Copy</span></div>
+</div>
+<div class="modal">
+  <h3><span>Rename board</span><span class="x">×</span></h3>
+  <div class="body"><div class="lbl">Board name</div><input class="f" value="Board One"></div>
+  <div class="foot"><span class="sum"></span><span class="btn">Cancel</span><span class="btn p">Rename</span></div>
+</div>
+<div class="modal">
+  <h3><span>Review permission changes</span><span class="x">×</span></h3>
+  <div class="body"><div class="grp">
+    <div class="gh"><span>Engineer</span></div>
+    <div class="pick" style="grid-template-columns:1fr auto"><span>Capacity</span><span><span class="tag">View</span> → <span class="tag add">Edit</span></span></div>
+    <div class="pick" style="grid-template-columns:1fr auto"><span>Host list</span><span><span class="tag add">Edit</span> → <span class="tag">View</span></span></div>
+  </div></div>
+  <div class="foot"><span class="sum"></span><span class="btn">Keep editing</span><span class="btn p">Apply changes</span></div>
+</div>
+</div>
+<ul class="notes">
+  <li><b>Rename board</b> still uses the browser's own <code>prompt()</code> box today. This replaces it with a real modal.</li>
+  <li><b>Review permission changes</b> becomes a grouped box per role in place of the 4-column table.</li>
+</ul>
+
+<h2>5 · All modals</h2>
+<div class="wrap-tbl"><table class="inv">
+<tr><th>#</th><th>Modal</th><th>Type</th><th>Status</th><th>Change</th></tr>
+<tr><td>1</td><td>Add Mission <code>#modal-import</code> (forecast + holiday)</td><td>centered</td><td><span class="st up">Update</span></td><td>Section 1</td></tr>
+<tr><td>2</td><td>Export (board) <code>#modal-xlsx</code></td><td>side panel</td><td><span class="st up">Update</span></td><td>Section 2: sheet picker</td></tr>
+<tr><td>3</td><td>Export Capacity <code>#modal-cap-export</code></td><td>side panel</td><td><span class="st up">Update</span></td><td>Section 2: boards + columns</td></tr>
+<tr><td>4</td><td>Export Host List <code>#modal-hostlist-export</code></td><td>side panel</td><td><span class="st up">Update</span></td><td>Section 2: column picker</td></tr>
+<tr><td>5</td><td>Export Manpower List <code>#modal-emplist-xlsx</code></td><td>side panel</td><td><span class="st up">Update</span></td><td>Section 2: column picker</td></tr>
+<tr><td>6</td><td>Review changes <code>#modal-plandiff</code></td><td>centered</td><td><span class="st up">Update</span></td><td>Section 3</td></tr>
+<tr><td>7</td><td>Merge decisions <code>#modal-merge-log</code></td><td>centered</td><td><span class="st up">Update</span></td><td>Section 3</td></tr>
+<tr><td>8</td><td>Holds taken <code>#modal-holds</code></td><td>centered</td><td><span class="st up">Update</span></td><td>Section 3</td></tr>
+<tr><td>9</td><td>Forecast (read-only) <code>#modal-forecast-view</code></td><td>centered</td><td><span class="st up">Update</span></td><td>Section 3: list rows</td></tr>
+<tr><td>10</td><td>Copy forecast <code>#modal-forecast-copy</code></td><td>centered</td><td><span class="st up">Update</span></td><td>Section 4: stepper + day preview</td></tr>
+<tr><td>11</td><td>Review permission changes <code>#modal-perm-review</code></td><td>centered</td><td><span class="st up">Update</span></td><td>Section 4</td></tr>
+<tr><td>12</td><td>Rename board (browser <code>prompt()</code>)</td><td>native</td><td><span class="st up">New</span></td><td>Section 4: real modal</td></tr>
+<tr><td>13</td><td>Hide/Unhide missions <code>#modal-hide-missions</code></td><td>wide</td><td><span class="st ok">Reference</span></td><td>The pattern used above</td></tr>
+<tr><td>14</td><td>Review &amp; merge forecast <code>#modal-merge</code></td><td>wide</td><td><span class="st ok">Current</span></td><td>None (restyled recently)</td></tr>
+<tr><td>15</td><td>Bulk edit <code>#modal-bulk</code></td><td>centered</td><td><span class="st ok">Current</span></td><td>None</td></tr>
+<tr><td>16–22</td><td>New/Edit Mission, Edit Employee, Host, User, Add someone, Add an engineer, New Board</td><td>side panel</td><td><span class="st ok">Current</span></td><td>None (form panels)</td></tr>
+<tr><td>23</td><td>Add a service area <code>#modal-add-area</code></td><td>side panel</td><td><span class="st ok">Current</span></td><td>None</td></tr>
+<tr><td>24–27</td><td>Save your changes?, Change password, Account created, Confirm</td><td>centered</td><td><span class="st ok">Current</span></td><td>None</td></tr>
+</table></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="color-scheme" content="light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holiday Selector Ideas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#eef1f4; --panel:#fff; --border:#d8dde4; --text:#1f2937; --muted:#6b7280;
+  --primary:#003a66; --primary-text:#003a66; --bg-soft:#eef1f5; --navy:#003a66; --green:#8dc63f;
+  --amber:#f59e0b; --amber-soft:#fef3c7; --amber-line:#f2c96b; --amber-text:#8a4f10; --amber-wash:#fffaf0;
+  --ok-text:#4d6810; --ok-surface:#f7faef; --ok-line:#cfdcae; --r:7px; --r-box:8px;
+  --font:"Geist",Arial,sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 var(--font); }
+.page { max-width:1180px; margin:0 auto; padding:28px 16px 60px; }
+h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:19px; margin:40px 0 4px; } h3 { font-size:15px; margin:22px 0 6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.lead { color:var(--muted); max-width:860px; margin:0 0 14px; }
+.tag { font-size:11px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--ok-surface); color:var(--ok-text); border:1px solid var(--ok-line); }
+.note { font-size:12.5px; color:var(--muted); margin:6px 0 0; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:820px) { .grid2 { grid-template-columns:1fr; } }
+.lbl { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin:0 0 4px; }
+
+/* ---------- top bar strip ---------- */
+.strip { border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--panel); }
+.top { background:var(--navy); color:#fff; display:flex; align-items:center; gap:8px; padding:9px 14px; font-size:13px; border-bottom:3px solid var(--green); overflow-x:auto; }
+.top.hol { border-bottom-color:var(--amber); }
+.sp { flex:1; min-width:10px; }
+.pill-c { height:24px; padding:0 10px; border-radius:999px; background:#f2f8e4; color:#4d6810; font-weight:700; font-size:12px; display:inline-flex; align-items:center; white-space:nowrap; }
+.pill-h { height:24px; padding:0 10px; border-radius:999px; background:var(--amber); color:#2b1700; font-weight:700; font-size:12px; display:inline-flex; align-items:center; white-space:nowrap; }
+.tbtn { height:30px; padding:0 10px; display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.35); border-radius:7px; white-space:nowrap; }
+.datebox { display:inline-flex; border:1px solid rgba(255,255,255,.35); border-radius:7px; overflow:hidden; flex:none; }
+.datebox > span { height:30px; display:inline-flex; align-items:center; padding:0 10px; border-left:1px solid rgba(255,255,255,.25); white-space:nowrap; }
+.datebox > span:first-child { border-left:0; }
+.datebox.hol { border-color:var(--amber); box-shadow:0 0 0 1px var(--amber); }
+.av { width:30px; height:30px; border-radius:50%; background:#c6e07a; color:#1f3a0c; display:grid; place-items:center; font-weight:700; font-size:12px; flex:none; }
+
+/* on navy selectors */
+.nseg { display:inline-flex; padding:2px; border-radius:8px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); height:30px; flex:none; }
+.nseg span { display:inline-flex; align-items:center; gap:5px; padding:0 10px; border-radius:6px; font-size:12.5px; font-weight:600; color:rgba(255,255,255,.75); white-space:nowrap; }
+.nseg span.on { background:#fff; color:var(--navy); }
+.nseg span.on.h { background:var(--amber); color:#2b1700; }
+.nseg.ic span { padding:0 9px; font-size:15px; }
+.nsw { display:inline-flex; align-items:center; gap:8px; font-weight:600; white-space:nowrap; flex:none; }
+.trk { width:36px; height:20px; border-radius:999px; background:rgba(255,255,255,.3); position:relative; flex:none; }
+.trk::after { content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; }
+.trk.on { background:var(--amber); } .trk.on::after { left:18px; }
+.trk.lt { background:#c9d0d9; } .trk.lt.on { background:var(--amber); }
+.dtab { background:rgba(255,255,255,.14); font-weight:700; font-size:12px; gap:5px; }
+.dtab.h { background:var(--amber); color:#2b1700; }
+
+/* ---------- numbers row ---------- */
+.stats { display:flex; align-items:center; gap:22px; padding:12px 14px; font-size:12px; color:var(--muted); background:var(--panel); overflow-x:auto; }
+.stats.hol { background:var(--amber-wash); }
+.stat b { display:block; font-size:20px; color:var(--text); line-height:1.2; }
+.lseg { display:inline-flex; background:var(--bg-soft); border-radius:var(--r); padding:2px; height:32px; flex:none; }
+.lseg span { display:inline-flex; align-items:center; gap:5px; padding:0 11px; border-radius:6px; font-size:13px; font-weight:600; color:var(--muted); white-space:nowrap; }
+.lseg span.on { background:var(--panel); color:var(--text); box-shadow:0 1px 2px rgba(8,28,56,.16); }
+.lseg span.on.h { background:var(--amber); color:#2b1700; box-shadow:none; }
+.chip { display:inline-flex; align-items:center; gap:8px; height:32px; padding:0 4px 0 11px; border:1px solid var(--border); border-radius:999px; font-size:12.5px; font-weight:700; color:var(--text); background:var(--panel); white-space:nowrap; flex:none; }
+.chip a { padding:4px 10px; border-radius:999px; background:var(--bg-soft); color:var(--primary-text); font-weight:600; text-decoration:none; }
+.chip.h { background:var(--amber-soft); border-color:var(--amber-line); color:var(--amber-text); }
+.chip.h a { background:var(--panel); }
+.tile { display:flex; align-items:center; gap:10px; padding:6px 12px; border:1px solid var(--border); border-radius:var(--r-box); flex:none; }
+.tile .t { font-size:11px; color:var(--muted); } .tile .v { font-size:14px; font-weight:700; color:var(--text); }
+.tile.h { background:var(--amber-soft); border-color:var(--amber-line); } .tile.h .v { color:var(--amber-text); }
+.radio2 { display:inline-flex; gap:6px; flex:none; }
+.radio2 span { display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 12px; border:1px solid var(--border); border-radius:var(--r); font-size:13px; font-weight:600; color:var(--muted); background:var(--panel); white-space:nowrap; }
+.radio2 span i { width:14px; height:14px; border-radius:50%; border:1.5px solid #9aa4b1; flex:none; }
+.radio2 span.on { color:var(--text); border-color:var(--primary-text); } .radio2 span.on i { border:4px solid var(--primary); }
+.radio2 span.on.h { border-color:var(--amber); background:var(--amber-soft); color:var(--amber-text); } .radio2 span.on.h i { border-color:var(--amber); }
+
+/* ---------- full holiday mock ---------- */
+.bar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--border); font-size:13px; background:var(--panel); overflow-x:auto; }
+.btn { height:32px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:var(--r); background:var(--panel); color:var(--text); font-weight:600; white-space:nowrap; flex:none; }
+.btn.p { background:var(--primary); border-color:var(--primary); color:#fff; }
+.btn.o { border-color:var(--primary-text); color:var(--primary-text); }
+.btn.am { background:var(--amber); border-color:var(--amber); color:#2b1700; }
+.bdot { width:8px; height:8px; border-radius:50%; background:var(--amber); display:inline-block; }
+.boardarea { background:var(--amber-wash); padding:16px 14px 22px; border-top:1px solid var(--amber-line); }
+.banner { display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid var(--amber-line); border-left:4px solid var(--amber); border-radius:var(--r-box); background:var(--amber-soft); color:var(--amber-text); font-size:13px; }
+.banner b { color:#6b3a06; }
+.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+.mcard { border:1px solid var(--border); border-top:4px solid var(--amber); border-radius:8px; background:var(--panel); padding:10px; font-size:12px; }
+.mcard b { font-size:13px; }
+.num { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 5px; border-radius:999px; background:var(--amber); color:#2b1700; font-size:11px; font-weight:700; }
+.where { background:var(--panel); border:1px solid var(--border); border-radius:var(--r-box); padding:4px 0; }
+.where div { display:grid; grid-template-columns:28px 210px 1fr 110px; gap:10px; align-items:start; padding:9px 14px; border-top:1px solid var(--border); font-size:13px; }
+.where div:first-child { border-top:0; }
+.where small { color:var(--muted); }
+.st { font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; justify-self:start; white-space:nowrap; }
+.st.now { background:var(--bg-soft); color:var(--muted); } .st.new { background:var(--amber-soft); color:var(--amber-text); border:1px solid var(--amber-line); }
+@media (max-width:820px) { .where div { grid-template-columns:28px 1fr; } .where div > :nth-child(3), .where div > :nth-child(4) { grid-column:2; } }
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Holiday selector ideas</h1>
+<p class="lead">You picked A (next to the date) and D (start of the numbers row) for desktop, and C (inside the date picker) for phones. Below are non-dropdown selectors for A and D, each shown as <b>Working day</b> and as <b>Holiday</b>. Holiday is always amber. Every option still asks for confirmation before it changes the day, because switching to Holiday clears the day's missions.</p>
+
+<h2>A · Next to the date (navy top bar)</h2>
+
+<h3>A1 · Two-way segmented, words <span class="tag">Recommended for A</span></h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="top"><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="nseg"><span class="on">☀ Working</span><span class="h">☂ Holiday</span></span><span class="sp"></span><span class="av">EA</span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="top hol"><span class="pill-h">HOLIDAY</span><span class="tbtn">🔓 Lock</span><span class="datebox hol"><span>‹</span><span>📅 Sat 17-Oct-2026</span><span>›</span></span><span class="nseg"><span>☀ Working</span><span class="on h">☂ Holiday</span></span><span class="sp"></span><span class="av">EA</span></div></div></div>
+</div>
+<p class="note">Both choices are always visible and it takes one click to change. It's the same shape as Thai | English, but the amber fill marks it as a change to the day rather than a view setting.</p>
+
+<h3>A2 · Two-way segmented, icons only</h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="top"><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="nseg ic"><span class="on" title="Working day">☀</span><span class="h" title="Holiday">☂</span></span><span class="sp"></span><span class="av">EA</span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="top hol"><span class="pill-h">HOLIDAY</span><span class="tbtn">🔓 Lock</span><span class="datebox hol"><span>‹</span><span>📅 Sat 17-Oct-2026</span><span>›</span></span><span class="nseg ic"><span title="Working day">☀</span><span class="on h" title="Holiday">☂</span></span><span class="sp"></span><span class="av">EA</span></div></div></div>
+</div>
+<p class="note">The narrowest option. It relies on the icons and a tooltip, so it's less clear the first time someone sees it.</p>
+
+<h3>A3 · The current switch, moved next to the date</h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="top"><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="nsw"><span class="trk"></span>Holiday</span><span class="sp"></span><span class="av">EA</span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="top hol"><span class="pill-h">HOLIDAY</span><span class="tbtn">🔓 Lock</span><span class="datebox hol"><span>‹</span><span>📅 Sat 17-Oct-2026</span><span>›</span></span><span class="nsw"><span class="trk on"></span>Holiday</span><span class="sp"></span><span class="av">EA</span></div></div></div>
+</div>
+<p class="note">The control people already know, with the same amber track. Only its place changes.</p>
+
+<h3>A4 · A tab joined to the date box</h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="top"><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span><span class="dtab">☀ Working</span></span><span class="sp"></span><span class="av">EA</span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="top hol"><span class="pill-h">HOLIDAY</span><span class="tbtn">🔓 Lock</span><span class="datebox hol"><span>‹</span><span>📅 Sat 17-Oct-2026</span><span>›</span><span class="dtab h">☂ Holiday</span></span><span class="sp"></span><span class="av">EA</span></div></div></div>
+</div>
+<p class="note">The day type becomes the last part of the date control, and clicking it flips the day. It reads as one unit: "Sat 17 Oct, Holiday". It shows only the current state, so the other choice is one click away but not visible.</p>
+
+<h2>D · At the start of the numbers row</h2>
+
+<h3>D1 · Two-way segmented <span class="tag">Recommended for D</span></h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="stats"><span class="lseg"><span class="on">☀ Working day</span><span class="h">☂ Holiday</span></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>99</b></span><span class="stat">Leave<b>5</b></span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="stats hol"><span class="lseg"><span>☀ Working day</span><span class="on h">☂ Holiday</span></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>0</b></span><span class="stat">Leave<b>5</b></span></div></div></div>
+</div>
+
+<h3>D2 · Status chip with one action</h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="stats"><span class="chip">☀ Working day <a>Make holiday</a></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>99</b></span><span class="stat">Leave<b>5</b></span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="stats hol"><span class="chip h">☂ Holiday <a>Make working day</a></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>0</b></span><span class="stat">Leave<b>5</b></span></div></div></div>
+</div>
+<p class="note">It says what the day is and names the one thing you can do. That's the clearest wording, and it matches the confirmation that follows.</p>
+
+<h3>D3 · A "Day" tile with a switch</h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="stats"><span class="tile"><span><span class="t">Day</span><br><span class="v">Working day</span></span><span class="trk lt"></span></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>99</b></span><span class="stat">Leave<b>5</b></span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="stats hol"><span class="tile h"><span><span class="t">Day</span><br><span class="v">Holiday</span></span><span class="trk lt on"></span></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>0</b></span><span class="stat">Leave<b>5</b></span></div></div></div>
+</div>
+<p class="note">It looks like the Total and Assigned tiles next to it, and keeps the familiar switch.</p>
+
+<h3>D4 · Two radio buttons</h3>
+<div class="grid2">
+<div><p class="lbl">Working day</p><div class="strip"><div class="stats"><span class="radio2"><span class="on"><i></i>Working day</span><span><i></i>Holiday</span></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>99</b></span></div></div></div>
+<div><p class="lbl">Holiday</p><div class="strip"><div class="stats hol"><span class="radio2"><span><i></i>Working day</span><span class="on h"><i></i>Holiday</span></span><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>0</b></span></div></div></div>
+</div>
+<p class="note">The plainest "pick one of two", but the widest option and the most form-like.</p>
+
+<h2>Making a holiday board easy to spot</h2>
+<p class="lead">A full holiday board with the amber applied everywhere suggested below (shown with A1 in the top bar). Today, only the switch and the date-picker cell are amber on desktop.</p>
+<div class="strip">
+  <div class="top hol"><b style="letter-spacing:2px;margin-right:8px">TRIGO</b><span class="tbtn" style="background:#fff;color:var(--navy);border-color:#fff;font-weight:700">Board</span><span class="tbtn" style="border-color:transparent">Overview</span><span class="tbtn" style="border-color:transparent">Capacity</span><span class="sp"></span><span class="pill-h">HOLIDAY</span><span class="tbtn">🔓 Lock</span><span class="datebox hol"><span>‹</span><span>📅 Sat 17-Oct-2026</span><span>›</span></span><span class="nseg"><span>☀ Working</span><span class="on h">☂ Holiday</span></span><span class="av">EA</span></div>
+  <div class="bar"><span class="btn"><span class="bdot"></span> Board <b>Non-Rayong</b> 104 ▾</span><span class="btn am">+ Add Mission</span><span class="btn o">+ New Employee</span><span class="btn">⌕ Filter &amp; sort</span><span class="sp"></span><span class="lseg"><span class="on">Thai</span><span>English</span></span></div>
+  <div class="stats hol"><span class="stat">Total<b>104</b></span><span class="stat">Assigned<b>12</b></span><span class="stat">Leave<b>5</b></span><span class="stat">Standby<b>87</b></span></div>
+  <div class="boardarea">
+    <div class="banner"><span style="font-size:20px">☂</span><span><b>Holiday on Non-Rayong.</b> The board starts empty. Use <b>Add Mission</b> to bring in only the missions that run today. Other boards are not affected.</span></div>
+    <div class="cards">
+      <div class="mcard"><b>AMATA.26.0004</b> · TTKL<br><span style="color:var(--muted)">Day 08:00-17:00 · Tanakit.K</span> <span class="num">9</span></div>
+      <div class="mcard"><b>BANGN.26.0030</b> · Surtec<br><span style="color:var(--muted)">Day 08:00-17:00 · Phada.C</span> <span class="num">3</span></div>
+      <div class="mcard" style="border-style:dashed;border-top-style:solid;color:var(--muted);display:grid;place-items:center">+ Add Mission</div>
+    </div>
+  </div>
+</div>
+
+<h3>Where amber would go</h3>
+<div class="where">
+  <div><span>1</span><b>Line under the top bar</b><span>The green line under the navy bar turns amber. It's visible on every tab, even while scrolling.</span><span class="st new">New</span></div>
+  <div><span>2</span><b>Status pill</b><span>HOLIDAY (amber) replaces Confirmed / Forecast on desktop, as the phone already does.</span><span class="st new">New on desktop</span></div>
+  <div><span>3</span><b>Date box</b><span>An amber outline around ‹ date ›, so the date and its day type read together.</span><span class="st new">New</span></div>
+  <div><span>4</span><b>Day selector (A or D)</b><span>The Holiday choice fills amber.</span><span class="st now">Already (switch)</span></div>
+  <div><span>5</span><b>Add Mission button</b><span>Amber instead of the red it is today. Red reads as an error or danger; amber ties it to the holiday.</span><span class="st new">Change</span></div>
+  <div><span>6</span><b>Board area and banner</b><span>A light amber wash behind the board, with one banner that explains the holiday and points to Add Mission.</span><span class="st new">New</span></div>
+  <div><span>7</span><b>Mission cards on a holiday</b><span>An amber top edge and amber crew count, so missions pulled into a holiday stand out from a normal day's.</span><span class="st new">Optional</span></div>
+  <div><span>8</span><b>Board selector</b><span>An amber dot before the board name when the day on screen is a holiday for that board.</span><span class="st new">Optional</span></div>
+  <div><span>9</span><b>Date picker</b><span>Holiday days in amber.</span><span class="st now">Already</span></div>
+  <div><span>10</span><b>Overview and Capacity</b><span>Holiday columns or days get an amber header, so planners see them in the trends and the capacity grid.</span><span class="st new">Optional</span></div>
+</div>
+<p class="note">Amber is only for "this day is a holiday". Read-only past days keep their own beige "Read-only" badge, and warnings keep their orange, so the meanings don't get mixed up.</p>
+
+<h2>Phone (C)</h2>
+<p class="lead">As agreed: a "This day is a holiday" switch inside the date picker, with amber on the phone header's HOLIDAY pill and the same banner on the board.</p>
+</div>
+</body>
+</html>

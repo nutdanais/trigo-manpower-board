@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="color-scheme" content="light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Holiday Switch Options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#eef1f4; --panel:#fff; --border:#d8dde4; --text:#1f2937; --muted:#6b7280;
+  --primary:#003a66; --primary-text:#003a66; --bg-soft:#eef1f5; --navy:#003a66;
+  --warn-text:#8a4f10; --warn-surface:#fdf8ef; --warn-line:#e0c9a4; --amber:#f59e0b;
+  --ok-text:#4d6810; --ok-surface:#f7faef; --ok-line:#cfdcae; --r:7px; --r-box:8px;
+  --font:"Geist",Arial,sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 var(--font); }
+.page { max-width:1180px; margin:0 auto; padding:28px 16px 60px; }
+h1 { font-size:24px; margin:0 0 4px; } h2 { font-size:18px; margin:36px 0 4px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.lead { color:var(--muted); max-width:820px; margin:0 0 14px; }
+.rec { font-size:11px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--ok-surface); color:var(--ok-text); border:1px solid var(--ok-line); }
+.facts { background:var(--panel); border:1px solid var(--border); border-radius:var(--r-box); padding:14px 18px; margin:0 0 8px; }
+.facts li { margin:3px 0; }
+.pc { display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; font-size:13px; margin-top:10px; }
+.pc div b { display:block; font-size:12px; color:var(--muted); margin-bottom:2px; }
+@media (max-width:760px) { .pc { grid-template-columns:1fr; } }
+
+/* app chrome mock */
+.app { border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--panel); overflow-x:auto; }
+.app-in { min-width:1060px; }
+.top { background:var(--navy); color:#fff; display:flex; align-items:center; gap:8px; padding:8px 14px; font-size:13px; }
+.logo { font-weight:800; letter-spacing:2px; margin-right:10px; }
+.tab { padding:6px 10px; border-radius:7px; opacity:.85; } .tab.on { background:#fff; color:var(--navy); opacity:1; font-weight:700; }
+.sp { flex:1; }
+.tbtn { height:30px; padding:0 10px; display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,.35); border-radius:7px; white-space:nowrap; }
+.pill-c { height:24px; padding:0 10px; border-radius:999px; background:#f2f8e4; color:#4d6810; font-weight:700; font-size:12px; display:inline-flex; align-items:center; }
+.datebox { display:inline-flex; border:1px solid rgba(255,255,255,.35); border-radius:7px; overflow:hidden; }
+.datebox span { height:30px; display:inline-flex; align-items:center; padding:0 10px; border-left:1px solid rgba(255,255,255,.25); white-space:nowrap; }
+.datebox span:first-child { border-left:0; }
+.av { width:30px; height:30px; border-radius:50%; background:#c6e07a; color:#1f3a0c; display:grid; place-items:center; font-weight:700; font-size:12px; }
+.bar { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--border); font-size:13px; }
+.btn { height:32px; padding:0 12px; display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:var(--r); background:var(--panel); color:var(--text); font-weight:600; white-space:nowrap; }
+.btn.p { background:var(--primary); border-color:var(--primary); color:#fff; }
+.btn.o { border-color:var(--primary-text); color:var(--primary-text); }
+.btn.q { border-color:transparent; color:var(--muted); }
+.n { font-size:11px; padding:0 6px; border-radius:999px; background:#fde68a; color:#78350f; font-weight:700; }
+.sw { display:inline-flex; align-items:center; gap:8px; font-weight:600; }
+.track { width:38px; height:20px; border-radius:999px; background:#c9d0d9; position:relative; }
+.track::after { content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; }
+.track.on { background:var(--amber); } .track.on::after { left:20px; }
+.seg { display:inline-flex; background:var(--bg-soft); border-radius:var(--r); padding:2px; height:32px; align-items:stretch; }
+.seg span { display:inline-flex; align-items:center; gap:5px; padding:0 11px; border-radius:6px; font-size:13px; font-weight:600; color:var(--muted); white-space:nowrap; }
+.seg span.on { background:var(--panel); color:var(--text); box-shadow:0 1px 2px rgba(8,28,56,.16); }
+.seg span.hol.on { background:var(--warn-surface); color:var(--warn-text); box-shadow:inset 0 0 0 1px var(--warn-line); }
+.stats { display:flex; align-items:center; gap:22px; padding:10px 14px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); }
+.stats b { display:block; font-size:20px; color:var(--text); }
+.day { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 10px; border-radius:999px; font-size:12.5px; font-weight:700; border:1px solid var(--border); color:var(--text); background:var(--panel); }
+.day.hol { background:var(--warn-surface); color:var(--warn-text); border-color:var(--warn-line); }
+.day .chev { opacity:.6; }
+.day-nav { background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.35); color:#fff; }
+.day-nav.hol { background:var(--amber); border-color:var(--amber); color:#2b1700; }
+.board { padding:14px; color:var(--muted); font-size:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.card { height:54px; border:1px solid var(--border); border-radius:8px; background:var(--bg-soft); }
+.cal { position:absolute; right:110px; top:46px; width:290px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:10px; box-shadow:0 14px 34px rgba(0,20,40,.22); padding:12px; font-size:12px; z-index:3; }
+.cal .g { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; text-align:center; margin:8px 0 10px; }
+.cal .g span { padding:5px 0; border-radius:5px; } .cal .g .we { background:#fee2e2; } .cal .g .sel { background:var(--primary); color:#fff; font-weight:700; } .cal .g .h { color:var(--muted); font-weight:700; }
+.cal .row { display:flex; align-items:center; gap:8px; padding-top:10px; border-top:1px solid var(--border); font-weight:600; font-size:13px; }
+.cal .row small { display:block; font-weight:400; color:var(--muted); font-size:11.5px; }
+.menu { position:absolute; left:14px; top:96px; width:260px; background:var(--panel); border:1px solid var(--border); border-radius:10px; box-shadow:0 14px 34px rgba(0,20,40,.22); padding:6px; font-size:13px; z-index:3; }
+.menu div { padding:8px 10px; border-radius:6px; } .menu div.on { background:var(--bg-soft); font-weight:700; }
+.menu small { display:block; color:var(--muted); font-size:11.5px; }
+.rel { position:relative; }
+.mark { outline:2px dashed #e11d48; outline-offset:3px; border-radius:8px; }
+.cap { font-size:12px; color:var(--muted); margin:8px 0 0; }
+</style>
+</head>
+<body>
+<div class="page">
+<h1>Holiday switch: where and how</h1>
+<p class="lead">The Holiday switch sits in the board toolbar between "New Employee" and "Filter &amp; sort", styled as an on/off switch. The red dashed outline in each mock below marks where the control would go.</p>
+<div class="facts">
+<b>What the switch does (from the code)</b>
+<ul>
+  <li>It sets the <b>date on screen</b> to a non-working day for <b>this board only</b>. It is a property of the day, not of the view.</li>
+  <li>Switching it on <b>clears that day's planned missions for everyone</b>. It asks for confirmation first. Switching it off copies the latest working-day plan back.</li>
+  <li>It only shows on editable future dates (it is hidden on past dates and today).</li>
+  <li>Thai | English only changes which names <b>you</b> see. It changes no data.</li>
+</ul>
+<p style="margin:6px 0 0;font-size:13px">So the Holiday control belongs with the <b>date</b>, and it should look different from a harmless view preference. Making it look the same as Thai | English would make clearing a day look as safe as switching names.</p>
+</div>
+
+<!-- ============ CURRENT ============ -->
+<h2>Now</h2>
+<div class="app"><div class="app-in">
+  <div class="top"><span class="logo">TRIGO</span><span class="tab on">Board</span><span class="tab">Overview</span><span class="tab">Org Chart</span><span class="tab">Manpower</span><span class="tab">Host</span><span class="tab">Capacity</span><span class="sp"></span><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="av">EA</span></div>
+  <div class="bar"><span class="btn">Board <b>Non-Rayong</b> 104 ▾</span><span class="btn p">+ New Mission</span><span class="btn o">+ New Employee</span><span class="sw mark"><span class="track"></span>Holiday</span><span class="btn">⌕ Filter &amp; sort</span><span class="btn q">Hide/Unhide <span class="n">21</span></span><span class="sp"></span><span class="seg"><span class="on">Thai</span><span>English</span></span><span class="btn q">↶</span><span class="btn q">⟲ Reset Board</span><span class="btn q">⤓ Export</span></div>
+</div></div>
+<p class="cap">Problem: it sits among the "create" buttons and filters, but it changes the whole day. A switch that looks like a view setting hides how much it does.</p>
+
+<!-- ============ A ============ -->
+<h2>A · Day chip next to the date, in the top bar <span class="rec">Recommended</span></h2>
+<p class="lead">The date already says which day you are on, so the day type goes right beside it: a small chip that reads <b>Working day</b> or, in amber, <b>Holiday</b>. Clicking it opens a 2-choice menu with what each choice does. It is visible in one glance next to the date, and it can't be flipped by accident.</p>
+<div class="app"><div class="app-in rel">
+  <div class="top"><span class="logo">TRIGO</span><span class="tab on">Board</span><span class="tab">Overview</span><span class="tab">Org Chart</span><span class="tab">Manpower</span><span class="tab">Host</span><span class="tab">Capacity</span><span class="sp"></span><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="day day-nav mark">Working day <span class="chev">▾</span></span><span class="av">EA</span></div>
+  <div class="bar"><span class="btn">Board <b>Non-Rayong</b> 104 ▾</span><span class="btn p">+ New Mission</span><span class="btn o">+ New Employee</span><span class="btn">⌕ Filter &amp; sort</span><span class="btn q">Hide/Unhide <span class="n">21</span></span><span class="sp"></span><span class="seg"><span class="on">Thai</span><span>English</span></span><span class="btn q">↶</span><span class="btn q">⟲ Reset Board</span><span class="btn q">⤓ Export</span></div>
+  <div class="board"><div class="card"></div><div class="card"></div><div class="card"></div></div>
+</div></div>
+<p class="cap">Holiday state and the open menu:</p>
+<div class="app"><div class="app-in rel" style="min-height:230px">
+  <div class="top"><span class="logo">TRIGO</span><span class="tab on">Board</span><span class="tab">Overview</span><span class="tab">Org Chart</span><span class="tab">Manpower</span><span class="tab">Host</span><span class="tab">Capacity</span><span class="sp"></span><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Sat 17-Oct-2026</span><span>›</span></span><span class="day day-nav hol mark">Holiday <span class="chev">▾</span></span><span class="av">EA</span></div>
+  <div class="menu" style="left:auto;right:60px;top:46px">
+    <div>Working day<small>Copies the latest working-day plan onto this day</small></div>
+    <div class="on">✓ Holiday<small>Clears this day's missions on Non-Rayong. Other boards are not affected.</small></div>
+  </div>
+  <div class="bar"><span class="btn">Board <b>Non-Rayong</b> 104 ▾</span><span class="btn" style="background:#b91c1c;border-color:#b91c1c;color:#fff">+ Add Mission</span><span class="btn o">+ New Employee</span><span class="btn">⌕ Filter &amp; sort</span></div>
+</div></div>
+<div class="pc"><div><b>Good</b>The day type sits next to the date it belongs to. It frees space in the busy toolbar. The menu explains what each choice does before the confirmation appears.</div><div><b>Watch</b>On a phone the top bar is already full, so there the chip goes into the date sheet (as in option C).</div></div>
+
+<!-- ============ B ============ -->
+<h2>B · Segmented "Working day | Holiday" in the toolbar</h2>
+<p class="lead">This is what you asked about: the same segmented style as Thai | English, kept where the switch is today. Holiday turns amber when it is selected, so it doesn't read as just a view choice.</p>
+<div class="app"><div class="app-in">
+  <div class="top"><span class="logo">TRIGO</span><span class="tab on">Board</span><span class="tab">Overview</span><span class="tab">Org Chart</span><span class="tab">Manpower</span><span class="tab">Host</span><span class="tab">Capacity</span><span class="sp"></span><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="av">EA</span></div>
+  <div class="bar"><span class="btn">Board <b>Non-Rayong</b> 104 ▾</span><span class="btn p">+ New Mission</span><span class="btn o">+ New Employee</span><span class="seg mark"><span class="on">Working day</span><span class="hol">Holiday</span></span><span class="btn">⌕ Filter &amp; sort</span><span class="btn q">Hide/Unhide <span class="n">21</span></span><span class="sp"></span><span class="seg"><span class="on">Thai</span><span>English</span></span><span class="btn q">↶</span><span class="btn q">⟲ Reset</span><span class="btn q">⤓ Export</span></div>
+</div></div>
+<div class="app" style="margin-top:8px"><div class="app-in">
+  <div class="bar"><span class="btn">Board <b>Non-Rayong</b> 104 ▾</span><span class="btn" style="background:#b91c1c;border-color:#b91c1c;color:#fff">+ Add Mission</span><span class="btn o">+ New Employee</span><span class="seg mark"><span>Working day</span><span class="hol on">Holiday</span></span><span class="btn">⌕ Filter &amp; sort</span><span class="sp"></span><span class="seg"><span class="on">Thai</span><span>English</span></span></div>
+</div></div>
+<div class="pc"><div><b>Good</b>Both states can be read at a glance, it matches the app's controls, and it's the smallest change.</div><div><b>Watch</b>It looks like the Thai | English preference but clears data. It also stays in the busiest row, and it's wider than the switch.</div></div>
+
+<!-- ============ C ============ -->
+<h2>C · Inside the date picker</h2>
+<p class="lead">You choose days in the date picker, and it already shows weekends and holidays in colour. The picker gets a "This day is a holiday" switch at the bottom, and the toolbar loses the control altogether. On the board, the day shows the HOLIDAY pill as it does today.</p>
+<div class="app"><div class="app-in rel" style="min-height:330px">
+  <div class="top"><span class="logo">TRIGO</span><span class="tab on">Board</span><span class="tab">Overview</span><span class="tab">Org Chart</span><span class="tab">Manpower</span><span class="tab">Host</span><span class="tab">Capacity</span><span class="sp"></span><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="av">EA</span></div>
+  <div class="cal"><b>October 2026</b>
+    <div class="g"><span class="h">Su</span><span class="h">Mo</span><span class="h">Tu</span><span class="h">We</span><span class="h">Th</span><span class="h">Fr</span><span class="h">Sa</span>
+      <span class="we">11</span><span>12</span><span>13</span><span>14</span><span>15</span><span class="sel">16</span><span class="we">17</span>
+      <span class="we">18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span class="we">24</span></div>
+    <div class="row mark"><span style="flex:1">This day is a holiday<small>Non-Rayong only · clears the day's missions</small></span><span class="track"></span></div>
+  </div>
+  <div class="bar"><span class="btn">Board <b>Non-Rayong</b> 104 ▾</span><span class="btn p">+ New Mission</span><span class="btn o">+ New Employee</span><span class="btn">⌕ Filter &amp; sort</span><span class="btn q">Hide/Unhide <span class="n">21</span></span><span class="sp"></span><span class="seg"><span class="on">Thai</span><span>English</span></span></div>
+</div></div>
+<div class="pc"><div><b>Good</b>The toolbar is cleanest of all four options, and the setting sits right where days are chosen. It works the same on a phone.</div><div><b>Watch</b>It's hidden: people who don't open the picker won't find it. The day type is only shown when the day is already a holiday.</div></div>
+
+<!-- ============ D ============ -->
+<h2>D · Day chip at the start of the numbers row</h2>
+<p class="lead">The chip from A sits on the light background, at the start of the row with Total, Assigned and Leave, because the day type explains those numbers (a holiday has an empty board).</p>
+<div class="app"><div class="app-in rel" style="min-height:240px">
+  <div class="top"><span class="logo">TRIGO</span><span class="tab on">Board</span><span class="tab">Overview</span><span class="tab">Org Chart</span><span class="tab">Manpower</span><span class="tab">Host</span><span class="tab">Capacity</span><span class="sp"></span><span class="pill-c">Confirmed</span><span class="tbtn">🔓 Lock</span><span class="datebox"><span>‹</span><span>📅 Fri 16-Oct-2026</span><span>›</span></span><span class="av">EA</span></div>
+  <div class="bar"><span class="btn">Board <b>Non-Rayong</b> 104 ▾</span><span class="btn p">+ New Mission</span><span class="btn o">+ New Employee</span><span class="btn">⌕ Filter &amp; sort</span><span class="btn q">Hide/Unhide <span class="n">21</span></span><span class="sp"></span><span class="seg"><span class="on">Thai</span><span>English</span></span><span class="btn q">⤓ Export</span></div>
+  <div class="stats"><span class="day mark">📅 Working day <span class="chev">▾</span></span><span>Total<b>104</b></span><span>Assigned<b>99</b></span><span>Leave<b>5</b></span><span>Standby<b>0</b></span><span>On-call free<b>0</b></span></div>
+  <div class="menu" style="top:150px">
+    <div class="on">✓ Working day<small>Copies the latest working-day plan onto this day</small></div>
+    <div>Holiday<small>Clears this day's missions on Non-Rayong</small></div>
+  </div>
+</div></div>
+<div class="pc"><div><b>Good</b>The control can be seen and is easy to find, it sits next to the numbers it changes, and it takes nothing from the toolbar.</div><div><b>Watch</b>The numbers row is a summary, so a control there is a little unusual. It's also further from the date than in A.</div></div>
+
+<h2>My recommendation</h2>
+<p class="lead"><b>A</b>, with <b>C</b> as the phone version. The day type sits next to the date it describes, the toolbar drops a control, and the menu says what each choice does. I'd keep it <b>different from Thai | English on purpose</b>, because one changes data and the other only changes what you see. If you'd rather keep it in the toolbar, <b>B</b> is the better way to do that than the current switch.</p>
+</div>
+</body>
+</html>
