@@ -4915,14 +4915,19 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .modal .xlsx-lang input { width: auto; margin: 0; }
 
 /* ---------- Bulk edit by file (bulk-edit.js) ---------- */
-#modal-bulk { width: 780px; max-width: calc(100vw - 24px); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
-#modal-bulk > h3 { position: relative; top: 0; flex: none; }
-#modal-bulk > .modal-actions { flex: none; align-items: center; }
-.bulk-step { margin-bottom: 12px; flex: none; }
-.bulk-step > b { display: block; margin-bottom: 6px; }
-.bulk-step-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-.bulk-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-#bulk-preview { flex: 1 1 auto; min-height: 80px; overflow-y: auto; margin: 0 -20px 8px; padding: 0 20px; border-top: 1px solid var(--line, #d8e0e7); padding-top: 10px; }
+/* Bulk edit: a side panel like the exports (.modal-side.modal-export), a bit
+   wider so the change preview table fits */
+#modal-bulk.modal-side { width: min(620px, 100vw); }
+.bulk-step { flex: none; display: flex; flex-direction: column; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-box); }
+.bulk-step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; font-weight: 700; }
+.bulk-num { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; }
+.bulk-step .import-note { margin: 8px 0 0; font-size: 12.5px; }
+.bulk-step > .btn { align-self: flex-start; }
+.modal .bulk-drop { display: block; margin: 0; padding: 14px; border: 1.5px dashed var(--border); border-radius: var(--r); background: var(--bg-soft); font-weight: 400; cursor: pointer; }
+.modal .bulk-drop:hover { border-color: var(--primary-text); }
+.modal .bulk-drop input { width: 100%; margin: 0; padding: 0; border: 0; background: none; font-size: 13px; cursor: pointer; }
+.bulk-check { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; font-size: 12.5px; color: var(--muted); }
+#bulk-preview { flex: none; padding-top: 12px; border-top: 1px solid var(--border); }
 #bulk-preview.hidden { display: none; }
 .bulk-chips { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; }
 .bulk-extra { color: var(--muted); font-size: 12.5px; margin: 2px 0 8px; }
@@ -6010,3 +6015,9 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 .fc-days span { padding: 3px 10px; border-radius: 999px; background: var(--bg-soft); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 #modal-rename-board { width: min(420px, 94vw); }
+
+/* Bulk edit on a phone: the backup tick gets its own line above the buttons */
+@media (max-width: 640px) {
+  #modal-bulk > .modal-actions { flex-wrap: wrap; }
+  #modal-bulk .bulk-check { flex-basis: 100%; }
+}

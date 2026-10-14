@@ -1227,28 +1227,28 @@
   </div>
 
   <!-- Bulk edit by file: Manpower List and Host List (see bulk-edit.js) -->
-  <div class="modal hidden" id="modal-bulk">
+  <div class="modal modal-side modal-export hidden" id="modal-bulk" role="dialog" aria-modal="true" aria-labelledby="bulk-title">
     <h3><span id="bulk-title">Bulk edit</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="modal-body">
     <p class="import-note" id="bulk-intro"></p>
     <div class="bulk-step">
-      <b>1. Get the file</b>
-      <div class="bulk-step-row">
-        <button type="button" class="btn" id="btn-bulk-dl-xlsx"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Download Excel template</button>
-      </div>
+      <div class="bulk-step-head"><span class="bulk-num">1</span>Get the file</div>
+      <button type="button" class="btn" id="btn-bulk-dl-xlsx"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Download Excel template</button>
       <span class="import-note" id="bulk-dl-note"></span>
     </div>
     <div class="bulk-step">
-      <b>2. Upload it back</b>
-      <div class="bulk-step-row"><input type="file" id="bulk-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+      <div class="bulk-step-head"><span class="bulk-num">2</span>Upload it back</div>
+      <label class="bulk-drop"><input type="file" id="bulk-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
       <span class="import-note">Nothing is saved yet — you review every change first.</span>
     </div>
     <div id="bulk-preview" class="hidden"></div>
+    </div>
     <div class="modal-actions">
       <label id="bulk-backup-row" class="bulk-check"><input type="checkbox" id="bulk-backup" checked> Download a backup of the current list first</label>
-      <span class="toolbar-spacer"></span>
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-bulk-apply" disabled>Apply changes</button>
     </div>
+  </div>
   </div>
 
   <!-- PlanDiff: "Review changes" (stale carry-over) and "Review & merge" (forecast) -->
