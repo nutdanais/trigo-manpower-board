@@ -5289,6 +5289,14 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
      the panel starts under it (--fp-top, set in app.js; the banner once row 1 has scrolled away). */
   body.board-view #toolbar-row1 { margin-right: calc(-1 * var(--fp-w, 264px)); padding-right: 20px; position: relative; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line, var(--border)); }
   body.board-view #float-pool, body.board-view #fp-resizer { top: var(--fp-top, var(--bar-h, 56px)); }
+  /* A collapsed panel is a 44px rail and #app-root's margin shrinks to match
+     (Collapsed float pool, above), so these must reach over 44px too. Left at
+     --fp-w they ran ~220px past the window on a day with nobody free, pushing
+     Settings, the avatar, Reset Board and Export off the screen. */
+  body.board-view.fp-collapsed #sticky-header #topbar,
+  body.board-view.fp-collapsed #sticky-header #green-rule,
+  body.board-view.fp-collapsed #sticky-header #update-banner,
+  body.board-view.fp-collapsed #toolbar-row1 { margin-right: -44px; }
 }
 body.settings-open #board-tabs, body.settings-open #board-dd { display: none !important; }
 
