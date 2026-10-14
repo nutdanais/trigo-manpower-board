@@ -1725,8 +1725,7 @@ function renderTabs() {
     t.onclick = () => { closeTopbarMenus(); clearSelection(); D().activeBoardId = b.id; refreshAndRender(); };
     t.ondblclick = () => {
       if (!can("settings", "edit")) return;
-      const name = prompt("Rename board:", b.name);
-      if (name && name.trim()) safely(async () => { await cloud.renameBoard(b.id, name.trim()); render(); });
+      openRenameBoardModal(b);
     };
     list.appendChild(t);
   }
@@ -6602,18 +6601,30 @@ function openPermReview(then) {
   const body = $("#perm-review-body");
   body.innerHTML = "";
   let stale = 0;
+  // one box per role, a row per area: Before → After
+  const byRole = new Map();
   for (const [, e] of entries) {
-    let cur;
-    try { cur = e.base(); } catch (x) { cur = e.before; }
-    const changedUnderneath = cur !== e.before;
-    if (changedUnderneath) stale++;
-    const tr = document.createElement("tr");
-    tr.innerHTML =
-      `<td>${escapeHtml(e.roleLabel)}</td>` +
-      `<td>${escapeHtml(e.areaLabel)}</td>` +
-      `<td>${escapeHtml(lv(e, cur))}${changedUnderneath ? ` <span class="rm-stale">(was ${escapeHtml(lv(e, e.before))} when you started)</span>` : ""}</td>` +
-      `<td><b>${escapeHtml(lv(e, e.after))}</b></td>`;
-    body.appendChild(tr);
+    if (!byRole.has(e.roleLabel)) byRole.set(e.roleLabel, []);
+    byRole.get(e.roleLabel).push(e);
+  }
+  const tag = (e, v) => `<span class="hm-tag${v === "edit" ? " will-unhide" : ""}">${escapeHtml(lv(e, v))}</span>`;
+  for (const [role, list] of byRole) {
+    const g = document.createElement("div");
+    g.className = "hm-group";
+    g.innerHTML = `<div class="hm-group-head"><span class="hm-group-title">${escapeHtml(role)}</span></div>`;
+    for (const e of list) {
+      let cur;
+      try { cur = e.base(); } catch (x) { cur = e.before; }
+      const changedUnderneath = cur !== e.before;
+      if (changedUnderneath) stale++;
+      const row = document.createElement("div");
+      row.className = "pr-row";
+      row.innerHTML =
+        `<span class="pr-area">${escapeHtml(e.areaLabel)}${changedUnderneath ? ` <span class="rm-stale">(was ${escapeHtml(lv(e, e.before))} when you started)</span>` : ""}</span>` +
+        `<span class="pr-change">${tag(e, cur)}${icon("arrow-right")}${tag(e, e.after)}</span>`;
+      g.appendChild(row);
+    }
+    body.appendChild(g);
   }
   const roles = [...new Set(entries.map(([, e]) => e.roleLabel))];
   $("#perm-review-intro").textContent =
@@ -7999,44 +8010,187 @@ function renderDatePicker() {
 /* ---------- weekend "Add Mission" (import from latest weekday) ---------- */
 let importCandidates = [];
 let importMode = "holiday";      // "holiday" | "forecast" — which list #modal-import is showing
-let importForecastSrc = null;    // forecast mode: the confirmed day the list came from
+let importForecastSrc = null;    // forecast mode: the confirmed date the picked missions are copied from
+/* the rows #modal-import lists, and what is ticked (by key), so search and the
+   filter chips can re-draw the list without losing a tick */
+let importUi = { items: [], picked: new Set(), q: "", f: "all" };
+
+/* "AMATA.26.0004" and "AMATA New mission" -> "AMATA"; no letters first -> "Other" */
+function missionArea(number) {
+  const m = /^[A-Za-z]+/.exec(String(number || "").trim());
+  return m ? m[0].toUpperCase() : "Other";
+}
+
+function importMsg(text) {
+  importUi = { items: [], picked: new Set(), q: "", f: "all" };
+  $("#import-tools").classList.add("hidden");
+  $("#import-list").innerHTML = `<p class="hm-empty">${text}</p>`;
+  updateImportSummary();
+}
+
+function startImportModal(mode) {
+  importMode = mode;
+  importUi = { items: [], picked: new Set(), q: "", f: "all" };
+  $("#import-q").value = "";
+  $("#import-crew").classList.toggle("hidden", mode !== "forecast");
+  $("#import-source-note").textContent = "";
+  importMsg("Loading…");
+  openModal("#modal-import");
+}
+
+/* items: { key, number, host, customer, shift, startTime, endTime, engineerId, crew (null = not known), present } */
+function showImportItems(items, note) {
+  importUi.items = items;
+  $("#import-source-note").textContent = note;
+  $("#import-tools").classList.remove("hidden");
+  renderImportList();
+  $("#import-list").scrollTop = 0;
+}
+
+function importFilters() {
+  const me = D().me;
+  const mine = (it) => {
+    const e = D().engineers.find(x => x.id === it.engineerId);
+    return !!(me && e && e.profileId && e.profileId === me.id);
+  };
+  const f = [["all", "All", () => true], ["day", "Day", it => it.shift !== "night"], ["night", "Night", it => it.shift === "night"]];
+  if (importMode === "forecast") f.push(["empty", "No crew", it => it.crew === 0]);
+  if (importUi.items.some(mine)) f.push(["mine", "Mine", mine]);
+  return f;
+}
+
+function importStateTag(it) {
+  if (it.present) return '<span class="hm-tag">Already added</span>';
+  return importUi.picked.has(it.key) ? '<span class="hm-tag will-unhide">Will add</span>' : "";
+}
+
+function importRowHtml(it) {
+  const eng = D().engineers.find(e => e.id === it.engineerId);
+  const night = it.shift === "night";
+  const picked = importUi.picked.has(it.key);
+  return `<label class="hm-row${picked ? " pend" : ""}${it.present ? " is-present" : ""}">
+    <input type="checkbox" value="${escapeHtml(it.key)}"${picked || it.present ? " checked" : ""}${it.present ? " disabled" : ""} aria-label="Add ${escapeHtml(it.number)}">
+    <span class="hm-mission">
+      <span class="hm-no" title="${escapeHtml(it.number)}">${escapeHtml(it.number)}</span>
+      <span class="hm-route" title="${escapeHtml(it.host)} → ${escapeHtml(it.customer)}">${escapeHtml(it.host)} ${icon("arrow-right")} ${escapeHtml(it.customer)}</span>
+    </span>
+    <span class="hm-when"><span class="hm-shift${night ? " night" : ""}">${night ? icon("moon") + "NIGHT" : "DAY"}</span>${escapeHtml(it.startTime)}-${escapeHtml(it.endTime)}</span>
+    <span class="hm-eng">${eng ? `<i style="background:${escapeHtml(eng.color)}"></i>${escapeHtml(eng.name)}` : ""}</span>
+    <span class="hm-crew${it.crew === 0 ? " zero" : ""}"${it.crew == null ? "" : ` title="${it.crew} on this mission"`}>${it.crew == null ? "" : icon("users") + it.crew}</span>
+    <span class="hm-state">${importStateTag(it)}</span>
+  </label>`;
+}
+
+function renderImportList() {
+  const list = $("#import-list");
+  const filters = importFilters();
+  if (!filters.some(([k]) => k === importUi.f)) importUi.f = "all";
+  $("#import-filters").innerHTML = filters.map(([k, label, fn]) => {
+    const n = importUi.items.filter(fn).length;
+    return `<button type="button" class="hm-filter${importUi.f === k ? " on" : ""}${k === "empty" && n ? " warn" : ""}" data-f="${k}" aria-pressed="${importUi.f === k}">${label} <span class="n">${n}</span></button>`;
+  }).join("");
+  const pass = filters.find(([k]) => k === importUi.f)[2];
+  const q = importUi.q.trim().toLowerCase();
+  const engName = (it) => (D().engineers.find(e => e.id === it.engineerId) || {}).name || "";
+  const shown = importUi.items.filter(it => pass(it) &&
+    (!q || `${it.number} ${it.host} ${it.customer} ${engName(it)}`.toLowerCase().includes(q)));
+  const groups = new Map();
+  for (const it of shown) {
+    const g = missionArea(it.number);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(it);
+  }
+  // "Other" (numbers with no area prefix) goes last
+  const names = [...groups.keys()].sort((x, y) => (x === "Other") - (y === "Other") || x.localeCompare(y));
+  let html = "";
+  for (const g of names) {
+    const rows = groups.get(g);
+    const open = rows.filter(it => !it.present);
+    const all = open.length && open.every(it => importUi.picked.has(it.key));
+    const act = open.length
+      ? `<button type="button" class="btn btn-small hm-select" data-im-group="${escapeHtml(g)}">${all ? "Clear" : "Select all"}</button>` : "";
+    html += `<div class="hm-group">
+      <div class="hm-group-head"><span class="hm-group-title">${escapeHtml(g)}<small>${rows.length} ${rows.length === 1 ? "mission" : "missions"}</small></span>${act}</div>
+      ${rows.map(importRowHtml).join("")}</div>`;
+  }
+  if (!html) html = `<p class="hm-empty">No missions match${q ? ` “${escapeHtml(importUi.q.trim())}”` : " this filter"}.</p>`;
+  const top = list.scrollTop;
+  list.innerHTML = html;
+  list.scrollTop = top;
+  updateImportSummary();
+}
+
+function updateImportSummary() {
+  const picked = importUi.items.filter(it => importUi.picked.has(it.key));
+  const btn = $("#btn-import-confirm");
+  btn.disabled = !picked.length;
+  btn.textContent = picked.length ? `Add ${picked.length} ${picked.length === 1 ? "mission" : "missions"}` : "Add selected";
+  const el = $("#import-summary");
+  if (!importUi.items.length) { el.textContent = ""; return; }
+  if (!picked.length) { el.textContent = "Nothing selected yet."; return; }
+  let txt = `<b>${picked.length}</b> selected`;
+  if (importMode === "forecast") {
+    const people = picked.reduce((n, it) => n + (it.crew || 0), 0);
+    txt += $("#import-with-crew").checked
+      ? ` · <b>${people}</b> ${people === 1 ? "person comes" : "people come"} with them`
+      : " · without their crew";
+  }
+  el.innerHTML = txt;
+}
+
+function bindImportModal() {
+  $("#import-q").oninput = (e) => { importUi.q = e.target.value; renderImportList(); };
+  $("#import-filters").onclick = (e) => {
+    const b = e.target.closest("[data-f]");
+    if (!b) return;
+    importUi.f = b.dataset.f;
+    renderImportList();
+  };
+  $("#import-with-crew").onchange = updateImportSummary;
+  const list = $("#import-list");
+  list.onchange = (e) => {
+    const c = e.target;
+    if (c.type !== "checkbox") return;
+    if (c.checked) importUi.picked.add(c.value); else importUi.picked.delete(c.value);
+    // re-draw: the row's tag and its group's Select all / Clear both change
+    renderImportList();
+    const again = Array.from(list.querySelectorAll("input[type=checkbox]")).find(x => x.value === c.value);
+    if (again) again.focus();
+  };
+  list.onclick = (e) => {
+    const b = e.target.closest("[data-im-group]");
+    if (!b) return;
+    e.preventDefault();
+    const rows = Array.from(list.querySelectorAll("input[type=checkbox]:not(:disabled)"))
+      .filter(c => c.closest(".hm-group") === b.closest(".hm-group")).map(c => c.value);
+    const all = rows.every(k => importUi.picked.has(k));
+    for (const k of rows) { if (all) importUi.picked.delete(k); else importUi.picked.add(k); }
+    renderImportList();
+  };
+}
 
 function openImportModal() {
   if (isForecastView()) { openForecastAddModal(); return; }
   guardEdit(async () => {
-    importMode = "holiday";
-    $("#import-crew").classList.add("hidden");
-    $("#import-list").innerHTML = '<p class="import-note">Loading…</p>';
-    $("#import-source-note").textContent = "";
-    openModal("#modal-import");
+    startImportModal("holiday");
     try {
       const boardId = D().activeBoardId;
       const srcDate = await cloud.findLatestWeekdayMissionDate(boardId, state.date);
       if (!srcDate) {
         importCandidates = [];
-        $("#import-list").innerHTML = '<p class="import-note">No missions found on recent weekdays to copy from.</p>';
+        importMsg("No missions found on recent weekdays to copy from.");
         return;
       }
       importCandidates = (await cloud.getMissionsForDate(boardId, srcDate)).filter(m => !m.hidden);
       if (!importCandidates.length) {
-        $("#import-list").innerHTML = '<p class="import-note">Every mission from that date is hidden. Unhide from "Hide/Unhide" first if you want to bring one forward.</p>';
+        importMsg('Every mission from that date is hidden. Unhide from "Hide/Unhide" first if you want to bring one forward.');
         return;
       }
-      $("#import-source-note").textContent =
-        `Missions from ${fmtDow(srcDate)} ${fmtDate(srcDate)} — tick the ones that also run on ${fmtDow(state.date)} ${fmtDate(state.date)}:`;
-      const list = $("#import-list");
-      list.innerHTML = "";
-      for (const m of importCandidates) {
-        const eng = D().engineers.find(e => e.id === m.engineerId);
-        const row = document.createElement("label");
-        row.className = "import-row";
-        row.innerHTML = `<input type="checkbox" value="${m.id}">
-          <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
-          <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""}</small></span>`;
-        list.appendChild(row);
-      }
+      // the crew is not copied on a holiday, so the count column stays empty
+      showImportItems(importCandidates.map(m => ({ ...m, key: m.id, crew: null, present: false })),
+        `Missions from ${fmtDow(srcDate)} ${fmtDate(srcDate)} · tick the ones that also run on ${fmtDow(state.date)} ${fmtDate(state.date)}`);
     } catch (e) {
-      $("#import-list").innerHTML = `<p class="import-note">Could not load missions: ${e.message || e}</p>`;
+      importMsg(`Could not load missions: ${escapeHtml(e.message || String(e))}`);
     }
   });
 }
@@ -8047,46 +8201,30 @@ function openImportModal() {
    already has (same number + shift) are shown but can't be ticked. */
 function openForecastAddModal() {
   guardEdit(async () => {
-    importMode = "forecast";
     importForecastSrc = null;
     const boardId = D().activeBoardId, date = state.date;
-    $("#import-crew").classList.remove("hidden");
-    $("#import-list").innerHTML = '<p class="import-note">Loading…</p>';
-    $("#import-source-note").textContent = "";
-    openModal("#modal-import");
+    startImportModal("forecast");
     try {
       const src = await cloud.findLatestWeekdayMissionDate(boardId, date);
       if (!src) {
-        $("#import-list").innerHTML = '<p class="import-note">There is no confirmed working day with missions to pick from yet. Use "New Mission" to create one.</p>';
+        importMsg('There is no confirmed working day with missions to pick from yet. Use "New Mission" to create one.');
         return;
       }
       const preview = await cloud.buildCarryPreview(boardId, src);
       const missions = preview.missions.filter(m => !m.hidden)
         .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }) || (a.shift === "night") - (b.shift === "night"));
       if (!missions.length) {
-        $("#import-list").innerHTML = '<p class="import-note">Every mission on the latest confirmed day is hidden, so there is nothing to pick.</p>';
+        importMsg("Every mission on the latest confirmed day is hidden, so there is nothing to pick.");
         return;
       }
       importForecastSrc = src;
       const have = new Set(getPlan().missions.map(m => m.number + "|" + m.shift));
-      $("#import-source-note").textContent =
-        `Missions on the confirmed board for ${fmtDow(src)} ${fmtDate(src)} — tick the ones you will work on for ${fmtDow(date)} ${fmtDate(date)}:`;
-      const list = $("#import-list");
-      list.innerHTML = "";
-      for (const m of missions) {
+      showImportItems(missions.map(m => {
         const key = m.number + "|" + m.shift;
-        const present = have.has(key);
-        const eng = D().engineers.find(e => e.id === m.engineerId);
-        const n = m.members.length;
-        const row = document.createElement("label");
-        row.className = "import-row" + (present ? " is-present" : "");
-        row.innerHTML = `<input type="checkbox" value="${escapeHtml(key)}"${present ? " disabled" : ""}>
-          <span class="import-info"><b>${escapeHtml(m.number)}</b> — ${escapeHtml(m.host)} → ${escapeHtml(m.customer)}
-          <small>${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime}${eng ? " • " + escapeHtml(eng.name) : ""} • ${n} ${n === 1 ? "person" : "people"}${present ? " • already on this forecast" : ""}</small></span>`;
-        list.appendChild(row);
-      }
+        return { ...m, key, crew: m.members.length, present: have.has(key) };
+      }), `Missions on the confirmed board for ${fmtDow(src)} ${fmtDate(src)} · tick the ones you will work on for ${fmtDow(date)} ${fmtDate(date)}`);
     } catch (e) {
-      $("#import-list").innerHTML = `<p class="import-note">Could not load missions: ${escapeHtml(e.message || String(e))}</p>`;
+      importMsg(`Could not load missions: ${escapeHtml(e.message || String(e))}`);
     }
   });
 }
@@ -8108,7 +8246,8 @@ function confirmForecastAdd(keys) {
 }
 
 function confirmImport() {
-  const ids = Array.from($$("#import-list input[type=checkbox]:checked")).map(c => c.value);
+  // from importUi, not the DOM: a ticked row can be filtered out of view
+  const ids = importUi.items.filter(it => importUi.picked.has(it.key)).map(it => it.key);
   if (importMode === "forecast") {
     if (!ids.length || !importForecastSrc || !isForecastView()) { closeModal(); return; }
     confirmForecastAdd(ids);
@@ -8503,6 +8642,7 @@ function renderHoldEventsModal() {
   }
   if (merges.length) list.appendChild(mergeAlertsEl(merges, mayAck));
   if (merges.length && taken.length) list.appendChild(mkEl("h4", "holds-subhead", "Taken by other engineers on the forecast"));
+  const takenBox = taken.length ? list.appendChild(mkEl("div", "hm-group hold-box")) : null;
   for (const e of taken) {
     const row = document.createElement("div");
     row.className = "hold-row";
@@ -8535,7 +8675,7 @@ function renderHoldEventsModal() {
       ack.onclick = () => safely(async () => { await cloud.acknowledgeHoldEvents([e.id]); renderHoldEventsModal(); render(); });
       row.appendChild(ack);
     }
-    list.appendChild(row);
+    takenBox.appendChild(row);
   }
 }
 
@@ -9607,7 +9747,13 @@ function forecastCopyTargets() {
 }
 function updateForecastCopyPreview() {
   const dates = forecastCopyTargets();
-  $("#forecast-copy-dates").textContent = `Copies ${fmtShort(state.date)}'s forecast onto: ${dates.map(fmtShort).join(", ")}. A day that already has a forecast is skipped, never overwritten.`;
+  $("#forecast-copy-days").innerHTML = dates.map(d => `<span>${escapeHtml(fmtShort(d))}</span>`).join("");
+  $("#forecast-copy-dates").textContent = `Copies ${fmtShort(state.date)}'s forecast onto these days. A day that already has a forecast is skipped, never overwritten.`;
+}
+function stepForecastCopy(by) {
+  const i = $("#forecast-copy-n");
+  i.value = String(Math.max(1, Math.min(10, (parseInt(i.value, 10) || 1) + by)));
+  updateForecastCopyPreview();
 }
 function confirmForecastCopy() {
   const dates = forecastCopyTargets();
@@ -9627,27 +9773,31 @@ function openForecastViewer() {
   const list = $("#forecast-view-list");
   list.innerHTML = "";
   const missions = [...plan.missions].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
-  for (const m of missions) {
-    const row = document.createElement("div");
-    row.className = "import-row";
-    const info = document.createElement("span");
-    info.className = "import-info";
-    const b = document.createElement("b");
-    b.textContent = m.number;
-    info.appendChild(b);
-    info.appendChild(document.createTextNode(` — ${m.host} → ${m.customer}`));
-    const small = document.createElement("small");
-    small.textContent = `${m.shift === "night" ? "Night" : "Day"} ${m.startTime}-${m.endTime} • ${m.members.length ? m.members.map(empName).join(", ") : "nobody yet"}`;
-    info.appendChild(small);
-    row.appendChild(info);
-    list.appendChild(row);
+  if (missions.length) {
+    const g = mkEl("div", "hm-group");
+    for (const m of missions) {
+      const night = m.shift === "night";
+      const row = mkEl("div", "fv-row");
+      row.innerHTML = `<span class="hm-mission">
+          <span class="hm-no">${escapeHtml(m.number)}</span>
+          <span class="hm-route">${escapeHtml(m.host)} ${icon("arrow-right")} ${escapeHtml(m.customer)}</span>
+        </span>
+        <span class="hm-when"><span class="hm-shift${night ? " night" : ""}">${night ? icon("moon") + "NIGHT" : "DAY"}</span>${escapeHtml(m.startTime)}-${escapeHtml(m.endTime)}</span>
+        <span class="fv-people">${m.members.length ? escapeHtml(m.members.map(empName).join(", ")) : '<span class="fv-none">Nobody yet</span>'}</span>`;
+      g.appendChild(row);
+    }
+    list.appendChild(g);
   }
-  for (const z of ZONES) {
-    if (!plan.zones[z].length) continue;
-    const p = document.createElement("p");
-    p.className = "import-note";
-    p.textContent = `${ZONE_LABELS[z]}: ${plan.zones[z].map(empName).join(", ")}`;
-    list.appendChild(p);
+  const zones = ZONES.filter(z => plan.zones[z].length);
+  if (zones.length) {
+    const g = mkEl("div", "hm-group");
+    g.innerHTML = '<div class="hm-group-head"><span class="hm-group-title">Not on a mission</span></div>';
+    for (const z of zones) {
+      const row = mkEl("div", "fv-row fv-zone");
+      row.innerHTML = `<span class="hm-no">${escapeHtml(ZONE_LABELS[z])}</span><span class="fv-people">${escapeHtml(plan.zones[z].map(empName).join(", "))}</span>`;
+      g.appendChild(row);
+    }
+    list.appendChild(g);
   }
   if (!list.children.length) list.innerHTML = '<p class="import-note">This forecast is empty.</p>';
   openModal("#modal-forecast-view");
@@ -10847,6 +10997,25 @@ function capOnPaste(ev) {
 /* ---------- new board (with weekend-day config) ---------- */
 const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+/* Rename board: a double-click on a board in the switcher (was the browser's prompt()) */
+let renameBoardId = null;
+function openRenameBoardModal(b) {
+  renameBoardId = b.id;
+  $("#rename-board-name").value = b.name;
+  openModal("#modal-rename-board");
+  setTimeout(() => { const i = $("#rename-board-name"); i.focus(); i.select(); }, 0);
+}
+function bindRenameBoardModal() {
+  $("#form-rename-board").onsubmit = (ev) => {
+    ev.preventDefault();
+    const name = $("#rename-board-name").value.trim();
+    const b = D().boards.find(x => x.id === renameBoardId);
+    if (!name || !b) return;
+    if (name === b.name) { closeModal(); return; }
+    safely(async () => { await cloud.renameBoard(b.id, name); closeModal(); render(); });
+  };
+}
+
 function openBoardModal() {
   const form = $("#form-board");
   form.reset();
@@ -11690,6 +11859,8 @@ function wireApp() {
   $("#btn-hide-missions").onclick = openHideMissionsModal;
   $("#btn-hide-missions-save").onclick = saveHideMissions;
   bindHideMissionsModal();
+  bindImportModal();
+  bindRenameBoardModal();
   $("#btn-deactivate-employee").onclick = deactivateEmployee;
 
   $("#btn-settings").onclick = () => openSettingsView();
@@ -11801,6 +11972,8 @@ function wireApp() {
   // ---------- forward planning ----------
   $("#btn-forecast-copy").onclick = openForecastCopyModal;
   $("#forecast-copy-n").addEventListener("input", updateForecastCopyPreview);
+  $("#btn-forecast-copy-minus").onclick = () => stepForecastCopy(-1);
+  $("#btn-forecast-copy-plus").onclick = () => stepForecastCopy(1);
   $("#btn-forecast-copy-confirm").onclick = confirmForecastCopy;
   $("#btn-hold-alerts").onclick = () => openHoldEventsModal(myLostHolds().map(e => e.id), "Your forecast alerts");
   $("#btn-holds-ack-all").onclick = () => safely(async () => {

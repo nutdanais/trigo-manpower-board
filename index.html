@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-14a">
+<link rel="stylesheet" href="styles.css?v=2026-10-14b">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-14a"></script>
+<script src="version.js?v=2026-10-14b"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -969,12 +969,7 @@
   <div class="modal hidden" id="modal-perm-review" role="dialog" aria-modal="true" aria-labelledby="perm-review-title">
     <h3 id="perm-review-title">Review permission changes</h3>
     <p id="perm-review-intro" class="import-note"></p>
-    <div class="table-wrap">
-      <table id="perm-review-table">
-        <thead><tr><th>Role</th><th>Area</th><th>Before</th><th>After</th></tr></thead>
-        <tbody id="perm-review-body"></tbody>
-      </table>
-    </div>
+    <div id="perm-review-body"></div>
     <p id="perm-review-warn" class="import-note hidden"></p>
     <div class="modal-actions">
       <button type="button" class="btn" id="btn-perm-cancel">Keep editing</button>
@@ -1107,13 +1102,20 @@
     </form>
   </div>
 
-  <div class="modal hidden" id="modal-import">
-    <h3>Add Mission<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <p id="import-source-note" class="import-note"></p>
+  <!-- Same layout as Hide/Unhide missions: search, filter chips, rows grouped by
+       the area prefix of the mission number, a tag on what Add will do, and a
+       running total next to the button (see renderImportList). -->
+  <div class="modal hidden" id="modal-import" role="dialog" aria-labelledby="import-title">
+    <h3><span id="import-title">Add Mission</span><small id="import-source-note"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div id="import-tools" class="hidden">
+      <label class="hm-search"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="import-q" placeholder="Search mission, host, customer or engineer" aria-label="Search missions" autocomplete="off"></label>
+      <div class="hm-filters" id="import-filters" role="group" aria-label="Show"></div>
+    </div>
     <div id="import-list"></div>
     <label id="import-crew" class="import-crew hidden"><input type="checkbox" id="import-with-crew" checked>
       <span>Bring each mission's crew too<small>People already placed somewhere on this forecast day stay where they are. Everyone brought in is held by you.</small></span></label>
     <div class="modal-actions">
+      <span id="import-summary" aria-live="polite"></span>
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-import-confirm">Add selected</button>
     </div>
@@ -1303,9 +1305,13 @@
 
   <div class="modal hidden" id="modal-forecast-copy">
     <h3>Copy forecast to the next working days<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <label>How many working days
-      <input type="number" id="forecast-copy-n" min="1" max="10" value="5">
-    </label>
+    <div class="form-group" id="forecast-copy-label">How many working days</div>
+    <div class="fc-stepper" role="group" aria-labelledby="forecast-copy-label">
+      <button type="button" class="btn" id="btn-forecast-copy-minus" aria-label="One day fewer">&minus;</button>
+      <input type="number" id="forecast-copy-n" min="1" max="10" value="5" aria-labelledby="forecast-copy-label">
+      <button type="button" class="btn" id="btn-forecast-copy-plus" aria-label="One day more">+</button>
+    </div>
+    <div id="forecast-copy-days" class="fc-days"></div>
     <p id="forecast-copy-dates" class="import-note"></p>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
@@ -1320,6 +1326,19 @@
     <div class="modal-actions">
       <button type="button" class="btn btn-primary" data-close>Close</button>
     </div>
+  </div>
+
+  <div class="modal hidden" id="modal-rename-board" role="dialog" aria-modal="true" aria-labelledby="rename-board-title">
+    <h3><span id="rename-board-title">Rename board</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-rename-board">
+      <label>Board name <span class="req">*</span>
+        <input type="text" id="rename-board-name" required maxlength="80" autocomplete="off">
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Rename</button>
+      </div>
+    </form>
   </div>
 
   <div class="modal hidden" id="modal-confirm">
@@ -1344,13 +1363,13 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-14a"></script>
-<script src="employee-id.js?v=2026-10-14a"></script>
-<script src="cloud.js?v=2026-10-14a"></script>
-<script src="charts.js?v=2026-10-14a"></script>
-<script src="xlsx-export.js?v=2026-10-14a"></script>
-<script src="orgchart-pptx.js?v=2026-10-14a"></script>
-<script src="bulk-edit.js?v=2026-10-14a"></script>
-<script src="app.js?v=2026-10-14a"></script>
+<script src="planning.js?v=2026-10-14b"></script>
+<script src="employee-id.js?v=2026-10-14b"></script>
+<script src="cloud.js?v=2026-10-14b"></script>
+<script src="charts.js?v=2026-10-14b"></script>
+<script src="xlsx-export.js?v=2026-10-14b"></script>
+<script src="orgchart-pptx.js?v=2026-10-14b"></script>
+<script src="bulk-edit.js?v=2026-10-14b"></script>
+<script src="app.js?v=2026-10-14b"></script>
 </body>
 </html>

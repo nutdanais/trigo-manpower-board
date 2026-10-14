@@ -308,9 +308,10 @@ async function step(name, fn) {
       assert.equal(perm("manager", "settings"), "edit", "nothing is written before Apply");
       await p.click("#btn-sv-save");
       await p.waitForSelector("#modal-perm-review:not(.hidden)");
-      const rows = await p.locator("#perm-review-body tr").allInnerTexts();
+      const rows = await p.locator("#perm-review-body .pr-row").allInnerTexts();
       assert.equal(rows.length, 1);
-      assert.match(rows[0].replace(/\s+/g, " "), /Manager Settings Edit View/);
+      assert.match(await p.locator("#perm-review-body .hm-group-title").innerText(), /^Manager$/);
+      assert.match(rows[0].replace(/\s+/g, " "), /Settings Edit View/);
       await p.click("#btn-perm-cancel");
       assert.equal(await sel.inputValue(), "view", "Keep editing keeps the staged change");
       assert.equal(perm("manager", "settings"), "edit");
