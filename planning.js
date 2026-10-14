@@ -362,6 +362,30 @@
   }
   const Horizon = { end: horizonEnd, N: 1 };
 
+  /* ================= PlanStatus =================
+     What the pill beside the date picker says about the plan on screen.
+       forecast   the date is after the horizon
+       locked     the day is locked
+       empty      nothing on the board (no mission, nobody on leave)
+       holiday    nonWorking: no review is expected, so empty reads "holiday"
+                  and anything on it is already planned
+       stamped    carried over from a working day or had its forecast merged
+                  (null = stamps unknown: older database or not read yet,
+                  read as planned so nothing raises a false alarm)
+       stale      the source day changed after the carry
+     Returns { state, past, today } with state one of
+     forecast | locked | holiday | empty | planned | stale | draft. */
+  function planStatus({ forecast, locked, empty, nonWorking, stamped, stale, date, today }) {
+    const out = (state) => ({ state, past: !!date && !!today && date < today, today: !!date && date === today });
+    if (forecast) return out("forecast");
+    if (locked) return out("locked");
+    if (empty) return out(nonWorking ? "holiday" : "empty");
+    if (nonWorking || stamped === null || stamped === undefined) return out("planned");
+    if (!stamped) return out("draft");
+    return out(stale ? "stale" : "planned");
+  }
+  const PlanStatus = { of: planStatus };
+
   /* ================= Capacity =================
      Everything the Capacity grid shows is derived here from raw rows, so the
      numbers can be tested without a browser. */
@@ -562,7 +586,7 @@
 
   const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, seedFromPlan, fillEmpty, parseClip, pastePlan, exportBoard, EXPORT_HOST_COLUMNS };
 
-  const api = { PlanDiff, Horizon, Capacity };
+  const api = { PlanDiff, Horizon, PlanStatus, Capacity };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(root, api);
 })(globalThis);
