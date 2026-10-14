@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-14b">
+<link rel="stylesheet" href="styles.css?v=2026-10-14d">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-14b"></script>
+<script src="version.js?v=2026-10-14d"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -207,7 +207,7 @@
          (past date) or · LOCKED, or FORECAST (renderModePill in app.js) -->
     <span id="mode-pill" class="mode-pill hidden"></span>
     <!-- Phone only (styles.css, Phone header): HOLIDAY beside the status pill, since the
-         Holiday switch itself lives in the date picker there -->
+         Holiday switch itself lives in the ⋯ menu there -->
     <span id="m-hol-pill" class="mode-pill mode-holiday hidden">HOLIDAY</span>
     <!-- Lock sits left of the date, so showing/hiding it never shifts the date
          arrows (the row is right-aligned) -->
@@ -217,18 +217,11 @@
       <button id="btn-date" class="btn btn-top btn-date" title="Click to pick a date"></button>
       <button id="btn-date-next" class="btn btn-top btn-icon" title="Next day" aria-label="Next day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
     </div>
-    <!-- Holiday: beside the date it changes (design/holiday-selector-options.html, A3).
-         On a phone the same switch is drawn inside the date picker instead. -->
-    <label id="holiday-toggle" class="toggle hidden" title="Make this day a holiday or a working day for this board">
-      <input type="checkbox" id="holiday-check">
-      <span class="toggle-track"><span class="toggle-thumb"></span></span>
-      <span class="toggle-text">Holiday</span>
-    </label>
+    <button id="btn-settings" class="btn btn-top" title="Settings"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg><span class="btn-label">Settings</span></button>
     <div id="user-dd" class="tb-dd">
       <button type="button" id="btn-avatar" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account" aria-label="Account menu"><span id="avatar-initials">?</span></button>
       <div id="user-menu" class="tb-pop tb-pop-right hidden" role="menu" aria-label="Account">
         <div class="tb-who"><b id="user-menu-name"></b><small id="user-menu-role"></small></div>
-        <button id="btn-settings" class="tb-item" type="button" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-settings"></use></svg> Settings</button>
         <button id="btn-signout" class="tb-item" type="button" role="menuitem" title="Sign out"><svg class="ic" aria-hidden="true"><use href="#i-sign-out"></use></svg> Sign out</button>
       </div>
     </div>
@@ -468,6 +461,11 @@
     <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
     <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
     <button id="btn-add-host" class="btn btn-primary hidden" title="Record a host that isn't on any mission yet"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Host</button>
+    <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
+      <input type="checkbox" id="holiday-check">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-text">Holiday</span>
+    </label>
     <!-- Capacity tab: the board it shows (one at a time, each with its count of
          short days), how far ahead, the main action, the week copy, and a ⋯
          menu that keeps Reset to 0 out of the everyday row (on a phone it also
@@ -623,8 +621,6 @@
     </div>
     <span id="capture-date"></span>
   </div>
-  <!-- a holiday on this board (renderHolidayBanner in app.js); screen only -->
-  <div id="holiday-banner" class="hidden" role="status"></div>
   <!-- Leave, one type at a time. The tabs are part of the screen only (hidden while
        exporting, when every non-empty type is drawn); each one is also a drop target,
        so a person can be dropped straight onto "Sick leave" without opening it. -->
@@ -973,7 +969,12 @@
   <div class="modal hidden" id="modal-perm-review" role="dialog" aria-modal="true" aria-labelledby="perm-review-title">
     <h3 id="perm-review-title">Review permission changes</h3>
     <p id="perm-review-intro" class="import-note"></p>
-    <div id="perm-review-body"></div>
+    <div class="table-wrap">
+      <table id="perm-review-table">
+        <thead><tr><th>Role</th><th>Area</th><th>Before</th><th>After</th></tr></thead>
+        <tbody id="perm-review-body"></tbody>
+      </table>
+    </div>
     <p id="perm-review-warn" class="import-note hidden"></p>
     <div class="modal-actions">
       <button type="button" class="btn" id="btn-perm-cancel">Keep editing</button>
@@ -1106,20 +1107,13 @@
     </form>
   </div>
 
-  <!-- Same layout as Hide/Unhide missions: search, filter chips, rows grouped by
-       the area prefix of the mission number, a tag on what Add will do, and a
-       running total next to the button (see renderImportList). -->
-  <div class="modal hidden" id="modal-import" role="dialog" aria-labelledby="import-title">
-    <h3><span id="import-title">Add Mission</span><small id="import-source-note"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <div id="import-tools" class="hidden">
-      <label class="hm-search"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="import-q" placeholder="Search mission, host, customer or engineer" aria-label="Search missions" autocomplete="off"></label>
-      <div class="hm-filters" id="import-filters" role="group" aria-label="Show"></div>
-    </div>
+  <div class="modal hidden" id="modal-import">
+    <h3>Add Mission<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p id="import-source-note" class="import-note"></p>
     <div id="import-list"></div>
     <label id="import-crew" class="import-crew hidden"><input type="checkbox" id="import-with-crew" checked>
       <span>Bring each mission's crew too<small>People already placed somewhere on this forecast day stay where they are. Everyone brought in is held by you.</small></span></label>
     <div class="modal-actions">
-      <span id="import-summary" aria-live="polite"></span>
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-import-confirm">Add selected</button>
     </div>
@@ -1231,24 +1225,25 @@
   </div>
 
   <!-- Bulk edit by file: Manpower List and Host List (see bulk-edit.js) -->
-  <div class="modal modal-side modal-export hidden" id="modal-bulk" role="dialog" aria-modal="true" aria-labelledby="bulk-title">
+  <div class="modal hidden" id="modal-bulk">
     <h3><span id="bulk-title">Bulk edit</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <div class="modal-body">
     <p class="import-note" id="bulk-intro"></p>
     <div class="bulk-step">
-      <div class="bulk-step-head"><span class="bulk-num">1</span>Get the file</div>
-      <button type="button" class="btn" id="btn-bulk-dl-xlsx"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Download Excel template</button>
+      <b>1. Get the file</b>
+      <div class="bulk-step-row">
+        <button type="button" class="btn" id="btn-bulk-dl-xlsx"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Download Excel template</button>
+      </div>
       <span class="import-note" id="bulk-dl-note"></span>
     </div>
     <div class="bulk-step">
-      <div class="bulk-step-head"><span class="bulk-num">2</span>Upload it back</div>
-      <label class="bulk-drop"><input type="file" id="bulk-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <b>2. Upload it back</b>
+      <div class="bulk-step-row"><input type="file" id="bulk-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
       <span class="import-note">Nothing is saved yet — you review every change first.</span>
     </div>
     <div id="bulk-preview" class="hidden"></div>
-    </div>
     <div class="modal-actions">
       <label id="bulk-backup-row" class="bulk-check"><input type="checkbox" id="bulk-backup" checked> Download a backup of the current list first</label>
+      <span class="toolbar-spacer"></span>
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-bulk-apply" disabled>Apply changes</button>
     </div>
@@ -1308,13 +1303,9 @@
 
   <div class="modal hidden" id="modal-forecast-copy">
     <h3>Copy forecast to the next working days<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <div class="form-group" id="forecast-copy-label">How many working days</div>
-    <div class="fc-stepper" role="group" aria-labelledby="forecast-copy-label">
-      <button type="button" class="btn" id="btn-forecast-copy-minus" aria-label="One day fewer">&minus;</button>
-      <input type="number" id="forecast-copy-n" min="1" max="10" value="5" aria-labelledby="forecast-copy-label">
-      <button type="button" class="btn" id="btn-forecast-copy-plus" aria-label="One day more">+</button>
-    </div>
-    <div id="forecast-copy-days" class="fc-days"></div>
+    <label>How many working days
+      <input type="number" id="forecast-copy-n" min="1" max="10" value="5">
+    </label>
     <p id="forecast-copy-dates" class="import-note"></p>
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
@@ -1329,19 +1320,6 @@
     <div class="modal-actions">
       <button type="button" class="btn btn-primary" data-close>Close</button>
     </div>
-  </div>
-
-  <div class="modal hidden" id="modal-rename-board" role="dialog" aria-modal="true" aria-labelledby="rename-board-title">
-    <h3><span id="rename-board-title">Rename board</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <form id="form-rename-board">
-      <label>Board name <span class="req">*</span>
-        <input type="text" id="rename-board-name" required maxlength="80" autocomplete="off">
-      </label>
-      <div class="modal-actions">
-        <button type="button" class="btn" data-close>Cancel</button>
-        <button type="submit" class="btn btn-primary">Rename</button>
-      </div>
-    </form>
   </div>
 
   <div class="modal hidden" id="modal-confirm">
@@ -1366,13 +1344,13 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-14b"></script>
-<script src="employee-id.js?v=2026-10-14b"></script>
-<script src="cloud.js?v=2026-10-14b"></script>
-<script src="charts.js?v=2026-10-14b"></script>
-<script src="xlsx-export.js?v=2026-10-14b"></script>
-<script src="orgchart-pptx.js?v=2026-10-14b"></script>
-<script src="bulk-edit.js?v=2026-10-14b"></script>
-<script src="app.js?v=2026-10-14b"></script>
+<script src="planning.js?v=2026-10-14d"></script>
+<script src="employee-id.js?v=2026-10-14d"></script>
+<script src="cloud.js?v=2026-10-14d"></script>
+<script src="charts.js?v=2026-10-14d"></script>
+<script src="xlsx-export.js?v=2026-10-14d"></script>
+<script src="orgchart-pptx.js?v=2026-10-14d"></script>
+<script src="bulk-edit.js?v=2026-10-14d"></script>
+<script src="app.js?v=2026-10-14d"></script>
 </body>
 </html>

@@ -8551,33 +8551,81 @@ function nextWorkingDates(boardId, after, n) {
 }
 
 /* ---------- mode pill ---------- */
-/* One pill beside the date picker says what the date on screen is:
-   Confirmed, Confirmed · Read-only (today or a past date), Confirmed · Locked, or Forecast.
-   Without forward planning there is no confirmed / forecast split, so the pill
-   only appears for a read-only or locked day. */
+/* One pill beside the date picker says where the plan on screen stands
+   (PlanStatus in planning.js): Forecast, Not planned, Holiday, Draft · Not
+   reviewed, Planned (carried over or merged), Planned · Out of date, or
+   Final · Locked — plus · Read-only on today and Record · Read-only on a past
+   date. Without forward planning there is no confirmed / forecast split, so
+   the pill only appears for a read-only or locked day. */
+const MODE_PILL = {
+  forecast: { label: "Forecast", cls: "forecast" },
+  locked:   { label: "Final", cls: "confirmed" },
+  holiday:  { label: "Holiday", cls: "holiday" },
+  empty:    { label: "Not planned", cls: "empty" },
+  draft:    { label: "Draft", cls: "draft" },
+  planned:  { label: "Planned", cls: "confirmed" },
+  stale:    { label: "Planned", cls: "confirmed mode-stale" },
+};
+function planIsEmpty(plan) {
+  return !plan.missions.length && !Object.values(plan.zones || {}).some(z => z && z.length);
+}
 function renderModePill() {
-  const hol = $("#m-hol-pill");
-  if (hol) hol.classList.toggle("hidden", isNonBoardView() || !isNonWorkingDate(state.date));
-  const pill = $("#mode-pill");
+  const pill = $("#mode-pill"), hol = $("#m-hol-pill");
   const onBoard = !isNonBoardView() && !!D().activeBoardId && can("board");
-  if (!onBoard) { pill.className = "mode-pill hidden"; return; }
+  const nonWorking = !isNonBoardView() && isNonWorkingDate(state.date);
+  const hide = () => { pill.className = "mode-pill hidden"; hol && hol.classList.toggle("hidden", !nonWorking); };
+  if (!onBoard) return hide();
+  const boardId = D().activeBoardId;
   const planning = !!feat().forecast;
   const fc = planning && isForecastView();
-  const lock = lockInfo(D().activeBoardId, state.date);
+  const lock = lockInfo(boardId, state.date);
   const ro = !fc && isReadOnly();
-  if (!planning && !ro) { pill.className = "mode-pill hidden"; return; }
-  const state2 = fc ? "forecast" : ro ? (lock ? "locked" : "readonly") : "confirmed";
-  pill.className = "mode-pill mode-" + (fc ? "forecast" : "confirmed") + (ro ? " mode-ro" : "");
-  pill.dataset.state = state2;
-  const main = planning ? (fc ? "Forecast" : "Confirmed") : "";
-  const extra = state2 === "locked" ? "Locked" : state2 === "readonly" ? "Read-only" : "";
-  // the second part (· Read-only / · Locked) drops on a phone, where the lock icon carries it
-  pill.innerHTML = (ro ? icon("lock") : "") + (main ? `<span>${escapeHtml(main)}</span>` : "") +
-    (extra ? `<span class="mp-extra">${main ? "· " : ""}${escapeHtml(extra)}</span>` : "");
-  const end = planning ? horizonEndFor(D().activeBoardId) : null;
-  pill.title = (fc ? "Tentative plan — never exported, never in the Host Record. " : planning ? "The operational plan. " : "") +
-    (state2 === "locked" ? `Locked by ${lock.lockedBy}: view-only for everyone until someone unlocks it. ` : "") +
-    (state2 === "readonly" ? "Today or a past date: view-only (editing asks first). " : "") +
+  if (!planning && !ro) return hide();
+  // the pill names the holiday itself, so the phone's separate HOLIDAY pill steps aside
+  if (hol) hol.classList.add("hidden");
+  const plan = getPlan();
+  const holidayDay = isNonWorkingDate(state.date, boardId);
+  const sig = signalsForScreen();
+  const stamp = sig ? sig.stamp : null;
+  const st = PlanStatus.of({
+    forecast: fc, locked: !!lock, empty: planIsEmpty(plan), nonWorking: holidayDay,
+    // stamps unknown (older database, or signals not read yet) → null: no Draft
+    stamped: feat().stamps && sig ? !!(stamp && (stamp.carried_from || stamp.forecast_merged_at)) : null,
+    stale: !!currentStale(), date: state.date, today: todayStr(),
+  });
+  const look = planning ? MODE_PILL[st.state] : { label: "", cls: "confirmed" };
+  // a past day is a record of what happened: no Draft / Out of date there
+  const record = st.past && planning && ["planned", "draft", "stale"].includes(st.state);
+  const main = record ? "Record" : look.label;
+  const extra = record ? "Read-only"
+    : st.state === "locked" ? "Locked"
+    : st.state === "draft" ? "Not reviewed"
+    : st.state === "stale" ? "Out of date"
+    : ro ? "Read-only"
+    : st.state === "planned" && holidayDay ? "Holiday" : "";
+  pill.className = "mode-pill mode-" + (record ? "confirmed" : look.cls) + (ro || st.state === "locked" ? " mode-ro" : "");
+  pill.dataset.state = st.state + (st.past ? " past" : st.today ? " today" : "");
+  // the second part (· Read-only / · Locked …) drops on a phone, where the lock icon carries it
+  pill.innerHTML = (ro || lock ? icon("lock") : "") + (main ? `<span>${escapeHtml(main)}</span>` : "") +
+    (extra ? `<span class="mp-extra">${main ? "· " : ""}${escapeHtml(extra)}</span>` : "") +
+    (extra && ro && st.state !== "locked" && extra !== "Read-only" ? `<span class="mp-extra">· Read-only</span>` : "");
+  const end = planning ? horizonEndFor(boardId) : null;
+  const authors = fc ? (plan.authors || []) : [];
+  const n = plan.missions.length;
+  const tips = {
+    forecast: "Tentative plan — never exported, never in the Host Record. " +
+      (n ? `${n} mission${n === 1 ? "" : "s"} booked${authors.length ? " by " + authors.map(who).join(", ") : ""}. Not reviewed with the team yet. ` : ""),
+    locked: `Locked by ${lock ? lock.lockedBy : ""}: final, view-only for everyone until someone unlocks it. `,
+    holiday: "A holiday for this board: nothing is planned, and nothing needs to be. ",
+    empty: "Nothing is planned for this day yet. Use Carry over to start from the last working day, or Review & merge if there is a forecast. ",
+    draft: "Missions were added one by one, but the day has not been carried over from the last working day or merged from the forecast yet, so the whole team has not reviewed it. ",
+    planned: holidayDay ? "Holiday work: missions on a holiday count as planned as soon as they are added. "
+      : "Carried over from the last working day or merged from the forecast — the operational plan. ",
+    record: "What was planned for this day. ",
+    stale: "Carried over, but the day it was copied from has changed since — see the banner to review the changes. ",
+  };
+  pill.title = (planning ? tips[record ? "record" : st.state] : "") +
+    (ro && st.state !== "locked" ? "Today or a past date: view-only (editing asks first). " : "") +
     (planning ? `Confirmed plans run up to ${fmtShort(end)} (the next working day); every later date opens as a forecast.` : "");
 }
 
