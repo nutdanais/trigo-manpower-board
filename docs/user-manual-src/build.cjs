@@ -94,8 +94,8 @@ async function capture(){
  await mp.click("#m-more");await shot(mp,"phone-more");await mp.evaluate(()=>document.body.click());
  await mp.click("#btn-bn-more");await shot(mp,"phone-me");await mp.evaluate(()=>closeMoreMenu());
  await mp.click("#fp-drawer-handle");await mp.locator('#float-pool [data-emp-id="e6"]').first().tap();await shot(mp,"phone-drawer");
- await mp.click("#fp-drawer-handle");await mp.evaluate(()=>clearSelection());
- await mp.locator("#bottom-nav .bn-item").filter({hasText:"Manpower"}).click();await shot(mp,"phone-manpower");
+ await mp.click("#fp-drawer-handle");await shot(mp,"phone-target");await mp.evaluate(()=>clearSelection());
+ await mp.locator("#bottom-nav .bn-item").filter({hasText:"Manpower"}).click();await shot(mp,"phone-manpower");await mp.locator("#emplist-body .m-fold").first().click();await shot(mp,"phone-manpower-detail");
  await mp.click("#btn-bn-more");await mp.locator("#more-menu .tb-item").filter({hasText:"Capacity"}).click();await shot(mp,"phone-capacity");
  await mc.close();
  fs.writeFileSync(path.join(OUT,"capture-info.json"),JSON.stringify({appVersion:config.version,appCommit:config.appCommit,date:day,screenshots:Object.keys(registry).length,source:"Real repository app, synthetic demonstration records; desktop 1440x900 and emulated phone 390x844"},null,2));
@@ -122,7 +122,7 @@ const CSS=[
 ].join("\n");
 function frame(key){
  const r=registry[key];if(!r)throw new Error("Missing screenshot "+key);
- const small=r.w<1200,width=small?Math.min(1138,532*r.w/r.h):1138,height=width*r.h/r.w;
+ const small=r.w<1200||key.startsWith("settings"),width=small?Math.min(1138,532*r.w/r.h):1138,height=width*r.h/r.w;
  const boxes=r.marks.filter(b=>b.w<r.w*.95&&b.h<r.h*.8).map(b=>'<rect x="'+b.x+'" y="'+b.y+'" width="'+b.w+'" height="'+b.h+'" rx="6" fill="none" stroke="#E8960C" stroke-width="3"/>').join("");
  return '<div class="visual '+(small?'contain':'')+'"><div class="wrap" style="width:'+width+'px;height:'+height+'px"><img src="'+data(path.join(OUT,r.file))+'"><svg viewBox="0 0 '+r.w+' '+r.h+'">'+boxes+'</svg></div></div>';
 }
@@ -140,7 +140,7 @@ function phoneVisual(l,lang){
   const cap=lang==="en"?"Menu flow diagram, not a browser screenshot. Labels vary by browser version.":"แผนภาพลำดับเมนู ไม่ใช่ภาพหน้าจอเบราว์เซอร์ ชื่ออาจต่างตามรุ่น";
   return '<div class="visual contain"><div class="phonegrid"><div class="phoneframe"><img src="'+img+'"></div><div class="flow"><h3>'+ (android?"Android Chrome":"iPhone Safari")+'</h3>'+flow.map(t=>'<div>'+esc(t)+'</div>').join("")+'<p>'+cap+'</p></div></div></div>';
  }
- const second=l.key==="phone-nav"?"phone-me":l.key==="phone-place"?"phone-more":l.key==="phone-lists"?"phone-board":null;
+ const second=l.key==="phone-nav"?"phone-me":l.key==="phone-place"?"phone-target":l.key==="phone-lists"?"phone-manpower-detail":null;
  return '<div class="visual contain"><div class="phonegrid"><div><div class="phoneframe"><img src="'+img+'"></div></div>'+(second?'<div><div class="phoneframe"><img src="'+data(path.join(SHOTS,second+".png"))+'"></div></div>':'')+'<div class="flow" style="width:380px"><h3>'+(lang==="en"?"Use the phone controls":"ใช้ปุ่มสำหรับมือถือ")+'</h3><p style="font-size:23px">'+esc(l[lang][3])+'</p><p>'+(lang==="en"?"Real app in a 390px emulated phone viewport.":"ภาพแอปจริงในขนาดหน้าจอมือถือจำลอง 390px")+'</p></div></div></div>';
 }
 async function render(){
@@ -185,6 +185,7 @@ async function render(){
    return (steps.length&&steps[steps.length-1].getBoundingClientRect().bottom>top+798)||(tip&&tip.getBoundingClientRect().bottom>foot.getBoundingClientRect().top)||(h&&v&&h.getBoundingClientRect().bottom>v.getBoundingClientRect().top)?[{slide:i+1,id:s.id}]:[];
   }));
   if(finalIssues.length)throw new Error("Unresolved layout overflow "+lang+" "+JSON.stringify(finalIssues));
+  fs.writeFileSync(path.join(OUT,"TRIGO-User-Manual-"+lang.toUpperCase()+".html"),await p.content());
   await p.pdf({path:path.join(OUT,"TRIGO-User-Manual-"+lang.toUpperCase()+".pdf"),printBackground:true,preferCSSPageSize:true,outline:true});
   validations.push({language:lang,slides:n,layoutIssues:finalIssues});
   for(const key of ["design","phone-nav","phone-place","settings-save","capacity","pptx"])await p.locator("#"+key).screenshot({path:path.join(OUT,"preview-"+lang+"-"+key+".png")});
