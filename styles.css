@@ -4011,10 +4011,8 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
    for the JPG export and that parser chokes on them (see app.js exportBoard).
    ====================================================================== */
 #orgchart-panel { --oc-rail: #c3ccd6; --oc-ground: #f6f8fb; --oc-glow-a: rgba(0, 73, 131, 0.08); --oc-glow-b: rgba(168, 200, 85, 0.14); }
-[data-theme="dark"] #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
-}
+/* light only, like the rest of the app (applyTheme): no dark values keyed off
+   the computer's own dark mode, which turned this canvas dark on a light page */
 
 .oc-wrap { display: flex; flex-direction: column; gap: 12px; }
 .oc-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

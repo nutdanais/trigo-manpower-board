@@ -80,6 +80,13 @@ async function step(name, fn) {
       assert.deepEqual(boards, ["Board Two"]);
       await p.evaluate(() => setOvBoard(""));
     });
+
+    await step("Org chart canvas stays light when the computer is in dark mode", async () => {
+      await p.emulateMedia({ colorScheme: "dark" });
+      const ground = await p.evaluate(() => getComputedStyle(document.querySelector("#orgchart-panel")).getPropertyValue("--oc-ground").trim());
+      assert.equal(ground, "#f6f8fb");
+      await p.emulateMedia({ colorScheme: "light" });
+    });
   } catch (e) {
     failed = true;
   } finally {
