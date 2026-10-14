@@ -45,7 +45,7 @@ async function capture(){
  await p.click("#btn-reset-board");await p.waitForSelector("#missions-grid .mission-card");
  await shot(p,"board",null,["#btn-board-dd","#mode-pill","#btn-date"]);
  await p.click("#btn-board-dd");await shot(p,"board-menu",null,["#board-menu"]);await p.keyboard.press("Escape");
- await p.click("#btn-filter-pop");await shot(p,"filter",null,["#filter-pop"]);await p.keyboard.press("Escape");await p.mouse.click(700,400);
+ await p.click("#btn-filter-pop");await shot(p,"filter",null,["#filter-pop"]);await p.click("#btn-filter-pop");await close(p);
  await p.click("#btn-new-mission");
  await p.fill("#form-mission [name=number]","DEMO.26.0006");await p.fill("#form-mission [name=host]","Host Alpha");await p.fill("#form-mission [name=customer]","Example customer");await p.fill("#form-mission [name=ppe]","Safety shoes, helmet");await p.fill("#form-mission [name=engineer]","Eng One");
  await shot(p,"mission","#modal-mission",["#form-mission [name=shift]","#form-mission button[type=submit]"]);await close(p);
