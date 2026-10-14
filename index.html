@@ -471,7 +471,10 @@
          menu that keeps Reset to 0 out of the everyday row (on a phone it also
          holds the two actions) — a display:contents group like #emplist-toolbar. -->
     <div id="capacity-toolbar" class="hidden">
-      <div id="cap-board-switch" role="group" aria-label="Board"></div>
+      <div id="cap-board-dd" class="tb-dd">
+        <button type="button" id="btn-cap-board" class="btn" aria-haspopup="menu" aria-expanded="false" title="Board shown on the Capacity tab"><span class="ovb-cap">Board</span><span class="ovb-label"></span><span class="ovb-count"></span><span class="cap-board-badge hidden"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
+        <div id="cap-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the Capacity tab"></div>
+      </div>
       <label class="cap-field" for="cap-range"><span class="cap-tool-label">Range</span>
       <select id="cap-range" title="How far ahead">
         <option value="1">Next 1 week</option>

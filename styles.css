@@ -4010,10 +4010,10 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
    inside #orgchart-panel, because this subtree is captured by html2canvas
    for the JPG export and that parser chokes on them (see app.js exportBoard).
    ====================================================================== */
-#orgchart-panel { --oc-rail: #c3ccd6; }
-[data-theme="dark"] #orgchart-panel { --oc-rail: #3a434d; }
+#orgchart-panel { --oc-rail: #c3ccd6; --oc-ground: #f6f8fb; --oc-glow-a: rgba(0, 73, 131, 0.08); --oc-glow-b: rgba(168, 200, 85, 0.14); }
+[data-theme="dark"] #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #orgchart-panel { --oc-rail: #3a434d; }
+  :root:not([data-theme="light"]) #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
 }
 
 .oc-wrap { display: flex; flex-direction: column; gap: 12px; }
@@ -4103,7 +4103,11 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
   pointer-events: none; opacity: .9; }
 .oc-viewport { height: min(68vh, 600px); overflow: hidden; cursor: grab; position: relative;
   border: 1px solid var(--border); border-radius: var(--r-box);
-  background: radial-gradient(var(--oc-rail) 1.3px, transparent 1.3px); background-size: 22px 22px; }
+  /* the page's own navy / green corner glow, no pattern (design/orgchart-backgrounds.html, option F) */
+  background:
+    radial-gradient(900px 480px at 0% 0%, var(--oc-glow-a), transparent 60%),
+    radial-gradient(900px 480px at 100% 100%, var(--oc-glow-b), transparent 60%),
+    var(--oc-ground); }
 .oc-viewport.grabbing { cursor: grabbing; }
 .oc-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; padding: 24px; }
 /* Connectors use the classic pure-CSS tree pattern: each li draws the two
@@ -4633,26 +4637,16 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   --cap-sel: rgba(111, 177, 224, .2);
 }
 #capacity-toolbar { display: contents; }
-#cap-board-switch { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--bg-soft); flex-wrap: wrap; }
-.cap-board-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.cap-board-btn:hover { background: var(--hover-tint); }
-.cap-board-btn.on { background: var(--primary); color: #fff; font-weight: 700; }
+#btn-cap-board { gap: 8px; min-width: 210px; }
+#btn-cap-board .ovb-cap { color: var(--muted); font-weight: 550; }
+#btn-cap-board .ovb-label { font-weight: 650; }
+#btn-cap-board .ic { margin-left: auto; width: 14px; height: 14px; opacity: .7; }
+#cap-board-menu { min-width: 240px; }
+#cap-board-menu .tb-item .ovb-name { flex: 1; }
+#cap-board-menu .tb-item.is-current { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; }
 /* this board's short days in the range: a red count, absent when there are none */
 .cap-board-badge { min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--cap-over); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.cap-board-badge.hidden { display: none; }
 .cap-field {
   display: inline-flex;
   align-items: center;
@@ -4921,7 +4915,8 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 @media (max-width: 640px) {
   /* the two actions move into ⋯ so the toolbar stays one row */
   #btn-cap-seed, #btn-cap-copy-week { display: none; }
-  .cap-board-btn { padding: 0 10px; }
+  #cap-board-dd { flex: 1 1 100%; }
+  #btn-cap-board { width: 100%; }
   /* the summary wraps here, so the separating dots would start lines */
   .cap-summary > span + span::before { display: none; }
   .cap-summary { gap: 4px 10px; }
