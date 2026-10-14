@@ -5397,8 +5397,6 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   :is(#emplist-table, #hostlist-table) .toggle-active input:checked ~ .toggle-text { display: none; }
   :is(#emplist-table, #hostlist-table) .el-util-meter { height: 4px; border-radius: 2px; }
   :is(#emplist-table, #hostlist-table) .el-util-val { font-weight: 600; color: var(--muted); }
-  #hostlist-table .hl-add-note { opacity: 0; transition: opacity .15s; }
-  #hostlist-table tr:hover .hl-add-note, #hostlist-table .hl-add-note:focus-visible { opacity: 1; }
   #hostlist-table .hl-empty { display: none; }
 }
 @media (min-width: 641px) { #emplist-search { min-width: 330px; } }

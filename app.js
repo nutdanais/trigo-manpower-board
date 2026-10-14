@@ -4604,6 +4604,7 @@ function renderEmployeeRows() {
     // what an alert pill counts as missing gets a "+ Add …" button in its own
     // column (as Host does for a location), for active people a user may edit
     const fixable = isActive && can("emplist", "edit");
+    const add = (field, what) => fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="${field}" title="Add ${what}">+ Add</button>` : "—";
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
@@ -4613,15 +4614,15 @@ function renderEmployeeRows() {
     // card list on phone with no separate render path
     tr.innerHTML = `
       <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? ` <button type="button" class="hl-add-loc el-fix" data-fix="nameEn" title="Add English name">+ Add</button>` : ""}</td>
-      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="trigoId" title="Add TRIGO ID">+ Add</button>` : "—"}</td>
+      <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? " " + add("nameEn", "English name") : ""}</td>
+      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : add("trigoId", "TRIGO ID")}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td data-label="Position" class="m-x">${pos ? pos.label : "—"}</td>
-      <td data-label="Mobile number">${e.phone ? telLink(e.phone) : "—"}</td>
-      <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : "—"}</td>
+      <td data-label="Position" class="m-x">${pos ? pos.label : add("position", "position")}</td>
+      <td data-label="Mobile number">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
+      <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
       <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="areaId" title="Set service area">+ Add</button>` : "—"}</td>
-      <td data-label="Current board">${board ? escapeHtml(board.name) : "—"}</td>
+      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
+      <td data-label="Current board">${board ? escapeHtml(board.name) : add("boardId", "current board")}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
@@ -4676,10 +4677,10 @@ function renderEmployeeRows() {
    information. Each table's service-area pill also hands its colour to CSS as --ac, which
    draws it as a small colour key beside plain text. Re-run after every row render; the
    header cells are static, so their marks are reset first. */
-/* empty for this purpose: nothing but the hover-only "add note" invitation or an "none" marker */
+/* empty for this purpose: nothing but a "none" marker ("+ Add" buttons count as content) */
 function quietCellEmpty(td) {
   let t = td.textContent.replace("\u2014", "");
-  for (const x of td.querySelectorAll(".hl-add-note, .hl-empty")) t = t.replace(x.textContent, "");
+  for (const x of td.querySelectorAll(".hl-empty")) t = t.replace(x.textContent, "");
   return t.trim() === "";
 }
 function quietTable(sel) {
@@ -5077,7 +5078,7 @@ function hostLocationCell(r) {
    front of every mission card's PPE line), so it sorts, reads and gets filled
    in on its own terms — including for a host that has no location yet. */
 function hostNoteCell(r) {
-  if (!r.note) return `<button type="button" class="hl-add-loc hl-add-note">+ Add note</button>`;
+  if (!r.note) return `<button type="button" class="hl-add-loc hl-add-note" title="Add note">+ Add</button>`;
   return `<span class="hl-note">${escapeHtml(r.note)}</span>`;
 }
 

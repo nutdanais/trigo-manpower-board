@@ -56,6 +56,17 @@ async function step(name, fn) {
       await p.click('#board-status .status-chip:has-text("missing TRIGO ID")');
     });
 
+    await step("Manpower: every blank field a person fills in shows + Add (mobile, start date, position)", async () => {
+      for (const f of ["phone", "startDate", "position"]) {
+        const b = p.locator(`#emplist-body .el-fix[data-fix=${f}]`).first();
+        assert.equal((await b.textContent()).trim(), "+ Add");
+        await b.click();
+        await p.waitForSelector("#modal-employee:not(.hidden)");
+        assert.equal(await p.evaluate(() => document.activeElement.name), f);
+        await p.evaluate(() => closeModal());
+      }
+    });
+
     await step("Host: an area chip filters the table", async () => {
       await go("HOSTLIST_ID");
       await p.waitForFunction(() => allHostRows().length >= 3);
