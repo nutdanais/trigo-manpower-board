@@ -5649,7 +5649,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   /* one pill only: on a holiday, HOLIDAY stands in for CONFIRMED / FORECAST, or the
      name would be left with almost no room */
   #topbar:has(#m-hol-pill:not(.hidden)) #mode-pill { display: none; }
-  #m-hol-pill { display: inline-flex; color: #5b4bb8; background: #f1effc; border: 1px solid #cfc8f2; }
+  #m-hol-pill { display: inline-flex; color: #2b1700; background: var(--warn); border: 1px solid var(--warn); }
   #m-hol-pill.hidden { display: none; }
   #btn-hold-alerts { order: 4; }
   #topbar .topbar-right { order: 3; flex: 0 0 auto; margin-left: auto; gap: 0; }
@@ -6020,4 +6020,44 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 @media (max-width: 640px) {
   #modal-bulk > .modal-actions { flex-wrap: wrap; }
   #modal-bulk .bulk-check { flex-basis: 100%; }
+}
+
+/* ===== Holiday (design/holiday-selector-options.html: A3 desktop, C phone; amber 3, 5, 6) ===== */
+/* A3: the switch beside the date, on the navy top bar */
+#topbar #holiday-toggle { color: #fff; margin: 0 4px 0 2px; white-space: nowrap; }
+#topbar #holiday-toggle.hidden { display: none; }
+#topbar #holiday-toggle .toggle-track { width: 36px; height: 20px; background: rgba(255, 255, 255, .28); }
+#topbar #holiday-toggle .toggle-thumb { width: 16px; height: 16px; }
+#topbar #holiday-toggle input:checked + .toggle-track { background: var(--warn); }
+#topbar #holiday-toggle input:checked + .toggle-track .toggle-thumb { left: 18px; }
+#topbar #holiday-toggle input:focus-visible + .toggle-track { outline: 2px solid #fff; outline-offset: 2px; }
+/* 3: the date box outlined in amber on a holiday */
+body.holiday-day #topbar .date-nav { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+/* 5: Add Mission in amber on a holiday (red on a working forecast day) */
+.btn.btn-holiday { background: var(--warn); border-color: var(--warn); color: #2b1700; }
+.btn.btn-holiday:hover { background: #e08e06; border-color: #e08e06; }
+/* 6: a light amber wash behind the board, and the banner */
+body.holiday-day #board-capture { background: #fffaf0; }
+#holiday-banner {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 12px; padding: 10px 14px;
+  border: 1px solid #f2c96b; border-left: 4px solid var(--warn); border-radius: var(--r-box);
+  background: #fef3c7; color: #8a4f10; font-size: 13px;
+}
+#holiday-banner b { color: #6b3a06; }
+#holiday-banner .ic { flex: none; width: 18px; height: 18px; }
+#holiday-banner.hidden, body.exporting #holiday-banner { display: none; }
+body.exporting #board-capture { background: var(--bg); }
+@media print { #holiday-banner { display: none !important; } body.holiday-day #board-capture { background: none; } }
+/* C: the switch inside the date picker, on a phone only */
+.dp-holiday { display: none; }
+@media (max-width: 640px) {
+  #topbar #holiday-toggle { display: none !important; }
+  body.holiday-day #topbar .date-nav { box-shadow: 0 0 0 2px var(--warn); }
+  .dp-holiday {
+    display: flex; align-items: center; gap: 12px; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .dp-holiday > span:first-child { flex: 1; }
+  .dp-holiday small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
 }

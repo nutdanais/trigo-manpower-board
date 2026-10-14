@@ -207,7 +207,7 @@
          (past date) or · LOCKED, or FORECAST (renderModePill in app.js) -->
     <span id="mode-pill" class="mode-pill hidden"></span>
     <!-- Phone only (styles.css, Phone header): HOLIDAY beside the status pill, since the
-         Holiday switch itself lives in the ⋯ menu there -->
+         Holiday switch itself lives in the date picker there -->
     <span id="m-hol-pill" class="mode-pill mode-holiday hidden">HOLIDAY</span>
     <!-- Lock sits left of the date, so showing/hiding it never shifts the date
          arrows (the row is right-aligned) -->
@@ -217,6 +217,13 @@
       <button id="btn-date" class="btn btn-top btn-date" title="Click to pick a date"></button>
       <button id="btn-date-next" class="btn btn-top btn-icon" title="Next day" aria-label="Next day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
     </div>
+    <!-- Holiday: beside the date it changes (design/holiday-selector-options.html, A3).
+         On a phone the same switch is drawn inside the date picker instead. -->
+    <label id="holiday-toggle" class="toggle hidden" title="Make this day a holiday or a working day for this board">
+      <input type="checkbox" id="holiday-check">
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-text">Holiday</span>
+    </label>
     <div id="user-dd" class="tb-dd">
       <button type="button" id="btn-avatar" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account" aria-label="Account menu"><span id="avatar-initials">?</span></button>
       <div id="user-menu" class="tb-pop tb-pop-right hidden" role="menu" aria-label="Account">
@@ -461,11 +468,6 @@
     <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
     <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
     <button id="btn-add-host" class="btn btn-primary hidden" title="Record a host that isn't on any mission yet"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Host</button>
-    <label id="holiday-toggle" class="toggle hidden" title="Toggle this day between working day and holiday">
-      <input type="checkbox" id="holiday-check">
-      <span class="toggle-track"><span class="toggle-thumb"></span></span>
-      <span class="toggle-text">Holiday</span>
-    </label>
     <!-- Capacity tab: the board it shows (one at a time, each with its count of
          short days), how far ahead, the main action, the week copy, and a ⋯
          menu that keeps Reset to 0 out of the everyday row (on a phone it also
@@ -621,6 +623,8 @@
     </div>
     <span id="capture-date"></span>
   </div>
+  <!-- a holiday on this board (renderHolidayBanner in app.js); screen only -->
+  <div id="holiday-banner" class="hidden" role="status"></div>
   <!-- Leave, one type at a time. The tabs are part of the screen only (hidden while
        exporting, when every non-empty type is drawn); each one is also a drop target,
        so a person can be dropped straight onto "Sick leave" without opening it. -->

@@ -971,6 +971,13 @@ function render() {
   const showHoliday = boardEdit && !isReadOnly();
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
+  // amber marks a holiday board: the date box, an amber Add Mission, a wash
+  // behind the board and the banner (design/holiday-selector-options.html 3, 5, 6)
+  const holidayBoard = board && isNonWorkingDate(state.date);   // a forecast day can be a holiday too
+  document.body.classList.toggle("holiday-day", holidayBoard);
+  $("#btn-import-mission").classList.toggle("btn-danger", !holidayBoard);
+  $("#btn-import-mission").classList.toggle("btn-holiday", holidayBoard);
+  renderHolidayBanner(holidayBoard);
   $("#filters").classList.toggle("hidden", !board);
   $("#emplist-area-bar").classList.toggle("hidden", !eml);
   // Manpower's and Host's search/filters group — each is a display:contents
@@ -3100,13 +3107,6 @@ function buildPhoneMoreMenu() {
   if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Add mission", "plus", click("#btn-import-mission"), "tb-item-pri");
   if (shown("#btn-new-employee")) item("New employee", "plus", click("#btn-new-employee"), "tb-item-pri");
   sep();
-  if (shown("#holiday-toggle")) {
-    const on = $("#holiday-check").checked;
-    const b = item("Holiday", "calendar", click("#holiday-check"));
-    b.setAttribute("role", "menuitemcheckbox");
-    b.setAttribute("aria-checked", String(on));
-    b.insertAdjacentHTML("beforeend", `<span class="tb-switch${on ? " on" : ""}" aria-hidden="true"></span>`);
-  }
   const names = $("#card-names");
   if (names && !names.classList.contains("hidden")) {
     const row = document.createElement("div");
@@ -7923,6 +7923,19 @@ function printBoard() {
   window.print();
 }
 
+/* the board on a holiday: one line that says what that means and where to go */
+function renderHolidayBanner(on) {
+  const el = $("#holiday-banner");
+  el.classList.toggle("hidden", !on);
+  if (!on) return;
+  const board = D().boards.find(b => b.id === D().activeBoardId);
+  const canAdd = !$("#btn-import-mission").classList.contains("hidden");
+  el.innerHTML = `${icon("calendar")}<span><b>Holiday on ${escapeHtml(board ? board.name : "this board")}.</b> ` +
+    (canAdd ? "The board starts empty. Use <b>Add Mission</b> to bring in only the missions that run today."
+            : "Only the missions brought in for today are on the board.") +
+    " Other boards are not affected.</span>";
+}
+
 /* ---------- custom date picker (weekend columns highlighted) ---------- */
 let dpMonth = null; // "YYYY-MM" currently displayed
 
@@ -7990,7 +8003,21 @@ function renderDatePicker() {
     html += `<div class="${cls.join(" ")}"${title} data-date="${iso}">${d}</div>`;
   }
   html += `</div>`;
+  // Phone (design C): the Holiday switch lives here, for the date on screen —
+  // the same control as the desktop one beside the date, which it drives
+  if (!$("#holiday-toggle").classList.contains("hidden")) {
+    const on = $("#holiday-check").checked;
+    html += `<label class="dp-holiday"><span>This day is a holiday<small>${escapeHtml(fmtShort(state.date))} · this board only</small></span>
+      <span class="toggle"><input type="checkbox" id="dp-holiday-check"${on ? " checked" : ""}><span class="toggle-track"><span class="toggle-thumb"></span></span></span></label>`;
+  }
   pop.innerHTML = html;
+  const dpHol = pop.querySelector("#dp-holiday-check");
+  if (dpHol) dpHol.onchange = () => {
+    hideDatePicker();
+    const real = $("#holiday-check");
+    real.checked = dpHol.checked;
+    real.dispatchEvent(new Event("change"));   // same confirm and save as the desktop switch
+  };
 
   for (const b of pop.querySelectorAll(".dp-nav")) {
     b.onclick = (ev) => {
