@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<meta name="color-scheme" content="light">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Modal Style Review</title>
@@ -15,16 +16,6 @@
   --night:#1c2430; --r:7px; --r-box:8px; --ctl-h:32px;
   --font:"Geist","Noto Sans Thai",Arial,sans-serif;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg:#0f141b; --panel:#171e27; --border:#2c3643; --text:#e5e9ef; --muted:#97a1ae;
-  --primary-text:#8fbbe6; --bg-soft:#1e2631; --hover-tint:#1d2836;
-  --warn-text:#e6b874; --warn-surface:#2a2214; --warn-line:#5a4523;
-  --ok-text:#b3d07a; --ok-surface:#1c2414; --ok-line:#3f4f22; --danger-text:#f08a80; } }
-:root[data-theme="dark"] {
-  --bg:#0f141b; --panel:#171e27; --border:#2c3643; --text:#e5e9ef; --muted:#97a1ae;
-  --primary-text:#8fbbe6; --bg-soft:#1e2631; --hover-tint:#1d2836;
-  --warn-text:#e6b874; --warn-surface:#2a2214; --warn-line:#5a4523;
-  --ok-text:#b3d07a; --ok-surface:#1c2414; --ok-line:#3f4f22; --danger-text:#f08a80; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 var(--font); }
 .page { max-width:1100px; margin:0 auto; padding:28px 16px 60px; }
