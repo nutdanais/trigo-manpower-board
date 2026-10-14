@@ -4011,10 +4011,8 @@ body.settings-open #btn-settings { background: var(--on-navy-fill); border-color
    for the JPG export and that parser chokes on them (see app.js exportBoard).
    ====================================================================== */
 #orgchart-panel { --oc-rail: #c3ccd6; --oc-ground: #f6f8fb; --oc-glow-a: rgba(0, 73, 131, 0.08); --oc-glow-b: rgba(168, 200, 85, 0.14); }
-[data-theme="dark"] #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) #orgchart-panel { --oc-rail: #3a434d; --oc-ground: #12171d; --oc-glow-a: rgba(22, 92, 152, 0.16); --oc-glow-b: rgba(96, 128, 44, 0.12); }
-}
+/* light only, like the rest of the app (applyTheme): no dark values keyed off
+   the computer's own dark mode, which turned this canvas dark on a light page */
 
 .oc-wrap { display: flex; flex-direction: column; gap: 12px; }
 .oc-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -5081,6 +5079,16 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
   font-size: 12px; font-weight: 550; color: var(--text);
 }
 .area-chip b { font-size: 12px; font-weight: 700; color: var(--muted); }
+/* Manpower / Host: each chip is a one-click area filter */
+.area-chip.ac-btn {
+  display: inline-flex; border: 1px solid transparent; font: inherit; font-size: 12px; font-weight: 550;
+  cursor: pointer; transition: background-color .18s ease, border-color .18s ease, transform .1s ease;
+}
+.area-chip.ac-btn:hover { border-color: var(--border); background: var(--hover-tint, var(--bg-soft)); }
+.area-chip.ac-btn:active { transform: translateY(1px); }
+.area-chip.ac-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.area-chip.ac-btn.ac-on { border-color: var(--primary); background: var(--panel); box-shadow: inset 0 0 0 1px var(--primary); }
+.area-chip.ac-btn.ac-on b { color: var(--text); }
 .ac-dot { width: 10px; height: 10px; border-radius: 4px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.14); }
 
 /* ----- Leave: one band, people grouped by type (layout B) -----
@@ -5389,8 +5397,6 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   :is(#emplist-table, #hostlist-table) .toggle-active input:checked ~ .toggle-text { display: none; }
   :is(#emplist-table, #hostlist-table) .el-util-meter { height: 4px; border-radius: 2px; }
   :is(#emplist-table, #hostlist-table) .el-util-val { font-weight: 600; color: var(--muted); }
-  #hostlist-table .hl-add-note { opacity: 0; transition: opacity .15s; }
-  #hostlist-table tr:hover .hl-add-note, #hostlist-table .hl-add-note:focus-visible { opacity: 1; }
   #hostlist-table .hl-empty { display: none; }
 }
 @media (min-width: 641px) { #emplist-search { min-width: 330px; } }
