@@ -6031,7 +6031,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 
 /* ===== Holiday (design/holiday-selector-options.html: A3 desktop, C phone; amber 3, 5, 6) ===== */
 /* A3: the switch beside the date, on the navy top bar */
-#topbar #holiday-toggle { color: #fff; margin: 0 4px 0 2px; white-space: nowrap; }
+#topbar #holiday-toggle { color: #fff; margin: 0 4px 0 4px; white-space: nowrap; }
 #topbar #holiday-toggle.hidden { display: none; }
 #topbar #holiday-toggle .toggle-track { width: 36px; height: 20px; background: rgba(255, 255, 255, .28); }
 #topbar #holiday-toggle .toggle-thumb { width: 16px; height: 16px; }

@@ -212,18 +212,19 @@
     <!-- Lock sits left of the date, so showing/hiding it never shifts the date
          arrows (the row is right-aligned) -->
     <button id="btn-lock" class="btn btn-top hidden" title="Lock this board so it's view-only for everyone"><svg class="ic" aria-hidden="true"><use href="#i-unlock"></use></svg><span class="btn-label">Lock</span></button>
-    <div class="date-nav">
-      <button id="btn-date-prev" class="btn btn-top btn-icon" title="Previous day" aria-label="Previous day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
-      <button id="btn-date" class="btn btn-top btn-date" title="Click to pick a date"></button>
-      <button id="btn-date-next" class="btn btn-top btn-icon" title="Next day" aria-label="Next day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
-    </div>
-    <!-- Holiday: beside the date it changes (design/holiday-selector-options.html, A3).
-         On a phone the same switch is drawn inside the date picker instead. -->
+    <!-- Holiday: just left of the date it changes, so showing/hiding it (it is hidden
+         on past dates) never shifts the date picker. On a phone the same switch is
+         drawn inside the date picker instead. -->
     <label id="holiday-toggle" class="toggle hidden" title="Make this day a holiday or a working day for this board">
       <input type="checkbox" id="holiday-check">
       <span class="toggle-track"><span class="toggle-thumb"></span></span>
       <span class="toggle-text">Holiday</span>
     </label>
+    <div class="date-nav">
+      <button id="btn-date-prev" class="btn btn-top btn-icon" title="Previous day" aria-label="Previous day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
+      <button id="btn-date" class="btn btn-top btn-date" title="Click to pick a date"></button>
+      <button id="btn-date-next" class="btn btn-top btn-icon" title="Next day" aria-label="Next day"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
+    </div>
     <div id="user-dd" class="tb-dd">
       <button type="button" id="btn-avatar" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" title="Account" aria-label="Account menu"><span id="avatar-initials">?</span></button>
       <div id="user-menu" class="tb-pop tb-pop-right hidden" role="menu" aria-label="Account">
