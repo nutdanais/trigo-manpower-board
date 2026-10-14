@@ -1,0 +1,68 @@
+<title>Org Chart Backgrounds</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: a short intro, then one tile per option: the swatch's name and hex, and a mini org chart on that ground */
+  :root {
+    --page: #eef1f4; --panel: #ffffff; --ink: #1d2733; --muted: #5b6b7b; --line: #d8dde4; --navy: #00325a;
+    --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #eef1f4; } }
+  :root[data-theme="dark"] { --page: #eef1f4; }
+  body { background: var(--page); color: var(--ink); font-family: var(--font);
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 40px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 22px; }
+  h1 { font-size: 24px; margin: 0; color: var(--navy); text-wrap: balance; }
+  .intro { margin: 6px 0 0; color: var(--muted); max-width: 68ch; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  .opt { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+  .opt header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .opt h2 { font-size: 15px; margin: 0; }
+  .opt code { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .opt p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+  .tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--navy); background: #e3ecf5; border-radius: 4px; padding: 2px 6px; }
+  /* the mini chart: the app's own card style on the option's ground */
+  .canvas { background: var(--g); border-radius: 10px; padding: 18px 12px 20px; display: grid; justify-items: center; gap: 0; }
+  .card { background: #fff; border: 1px solid #d8dde4; border-top: 3px solid var(--c, var(--navy)); border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(16, 32, 52, .1); padding: 6px 9px; font-size: 11px; min-width: 96px; }
+  .card small { display: block; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .card b { display: block; font-size: 12px; }
+  .stem { width: 1.5px; height: 14px; background: var(--rail); }
+  .bus { height: 1.5px; background: var(--rail); width: 64%; }
+  .kids { display: flex; gap: 10px; width: 100%; justify-content: space-around; }
+  .kid { display: grid; justify-items: center; }
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Org chart canvas: darker ground</h1>
+    <p class="intro">Each tile shows the Org chart's white cards on one background. Today the canvas (<code>#f6f8fb</code>) is lighter than the page itself (<code>#eef1f4</code>), so the cards blend in. Every option below is darker than the page. Tell me the letter you want; the connector lines change with it so they stay visible.</p>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+  const OPTIONS = [
+    { k: "Now", name: "Current", g: "#f6f8fb", rail: "#c3ccd6", note: "For comparison: lighter than the page around it, so the white cards have little to stand against." },
+    { k: "A", name: "Slate mist", g: "#dfe5ec", rail: "#a9b5c2", note: "One clear step darker than the page. Quiet, and the cards now read as cards." },
+    { k: "B", name: "Steel", g: "#cbd5e0", rail: "#93a2b2", note: "Stronger contrast while still light. Good if the chart is printed or projected." },
+    { k: "C", name: "Navy wash", g: "#c3d1e0", rail: "#7f95ad", note: "The brand navy, heavily tinted. Ties the canvas to the top bar.", tag: "Recommended" },
+    { k: "D", name: "Deep navy", g: "#1f3a57", rail: "#6f89a6", note: "A dark well like a blueprint. Highest contrast; a bold change from the rest of the light app." },
+    { k: "E", name: "Graphite", g: "#3a424b", rail: "#7d8893", note: "Neutral dark grey. Strong contrast without the brand colour." },
+  ];
+  const card = (lvl, name, c) => `<div class="card" style="--c:${c}"><small>${lvl}</small><b>${name}</b></div>`;
+  document.getElementById("grid").innerHTML = OPTIONS.map(o => `
+    <section class="opt">
+      <header><h2>${o.k === "Now" ? "" : o.k + " · "}${o.name}</h2><code>${o.g}</code>${o.tag ? `<span class="tag">${o.tag}</span>` : ""}</header>
+      <div class="canvas" style="--g:${o.g};--rail:${o.rail}">
+        ${card("Manager", "Akekaluk.A", "#a8d98a")}
+        <div class="stem"></div>
+        ${card("Service area", "AMATA", "#7fb8ec")}
+        <div class="stem"></div><div class="bus"></div>
+        <div class="kids">
+          <div class="kid"><div class="stem"></div>${card("Mission", "AMATA.26.0003", "#7fb8ec")}</div>
+          <div class="kid"><div class="stem"></div>${card("Mission", "AMATA.26.0011", "#7fb8ec")}</div>
+        </div>
+      </div>
+      <p>${o.note}</p>
+    </section>`).join("");
+</script>

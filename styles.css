@@ -6003,3 +6003,11 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   .m-fold:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 4px; }
 }
 @media (max-width: 640px) and (prefers-reduced-motion: reduce) { .m-fold::after { transition: none; } }
+
+/* ----- Export → PowerPoint: one thumbnail per slide, to check before saving ----- */
+#pptx-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;
+  max-height: 46vh; overflow-y: auto; padding: 2px; }
+.pptx-thumb { margin: 0; display: grid; gap: 4px; min-width: 0; }
+.pptx-thumb svg { width: 100%; height: auto; aspect-ratio: 16 / 9; display: block;
+  border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.pptx-thumb figcaption { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
