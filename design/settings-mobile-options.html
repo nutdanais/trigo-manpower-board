@@ -136,6 +136,29 @@ ul.notes{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px;max-
 .swrow i.on{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--primary)}
 .readonly{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--border);font-size:13px}.readonly span{color:var(--muted)}
 .dangerlink{color:var(--danger-text);font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;margin-top:6px}
+
+/* review table + extra parts */
+.wrap-t{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-box);background:var(--panel)}
+table.rv{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+.rv th,.rv td{text-align:left;padding:8px 10px;border-top:1px solid var(--border);vertical-align:top}
+.rv th{background:var(--bg-soft);font-size:12px;border-top:0}
+.rv td:first-child{font-weight:600;white-space:nowrap}
+.rv tr.gr td{background:var(--bg-soft);font-size:11.5px;font-weight:700;color:var(--muted);padding:6px 10px}
+.rv td:nth-child(3){color:var(--muted);width:42%}
+.sev{display:inline-block;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:700;border:1px solid;white-space:nowrap}
+.sev.h{background:#fdf1f0;color:var(--danger-text);border-color:#e6c2be}.sev.m{background:var(--warn-surface);color:var(--warn-text);border-color:var(--warn-line)}.sev.l{background:var(--bg-soft);color:var(--muted);border-color:var(--border)}
+h3.sub{font-size:16px;margin:28px 0 6px}
+.pr{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--border)}
+.gh+.pr{border-top:0}.pr .who{flex:1;min-width:0}.pr .who b{display:block;font-size:13px}.pr .who span{display:block;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr.dirty{box-shadow:inset 3px 0 0 var(--warn-text);background:var(--warn-surface)}
+.seg3{display:grid;grid-template-columns:repeat(3,40px);background:var(--bg-soft);border-radius:var(--r);padding:2px;gap:2px;flex:none}
+.seg3.two{grid-template-columns:repeat(2,40px);margin-left:42px}
+.seg3 span{text-align:center;font-size:11px;font-weight:600;color:var(--muted);padding:6px 0;border-radius:5px}
+.seg3 span.on{background:var(--primary);color:#fff}
+.radio{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px}
+.radio b{display:block;font-size:13px}.radio small{display:block;font-size:11.5px;color:var(--muted)}
+.rb{width:18px;height:18px;border-radius:50%;border:1.5px solid #9aa4b1;flex:none}
+.radio.on{border-color:var(--primary);background:var(--hover-tint)}.radio.on .rb{border:5px solid var(--primary)}
 </style>
 </head>
 <body>
@@ -342,6 +365,175 @@ ul.notes{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px;max-
 </div></div>
 </div>
 <ul class="notes"><li><b>Pros:</b> the least code to change (the trigger replaces <code>#sv-mobile-nav select</code>). It keeps today's flow and looks like the app.</li><li><b>Cons:</b> it still costs a band of height, and the header still has an × and a picker both doing navigation.</li></ul>
+
+<h2 id="full">Full review: every section and dialog</h2>
+<p class="lead">This covers all six sections and the nine dialogs they open, as they render at phone width today (<code>styles.css</code> lines 3828–3890 and the <code>.modal-side</code> bottom sheet). The ⚑ column marks how much each problem hurts: <b>High</b> means it looks broken or out of place, <b>Med</b> means it's clumsy, and <b>Low</b> means it's a polish item.</p>
+<div class="wrap-t"><table class="rv">
+<thead><tr><th>Screen</th><th>⚑</th><th>What's wrong today</th><th>Fix</th></tr></thead>
+<tbody>
+<tr class="gr"><td colspan="4">Shared shell (every section)</td></tr>
+<tr><td>Section picker</td><td><span class="sev h">High</span></td><td>A native <code>&lt;select&gt;</code> opens Android's dark radio list.</td><td>Option A, B or C above.</td></tr>
+<tr><td>Header</td><td><span class="sev h">High</span></td><td>A text button (Add engineer / Add area / Board / Add user) sits beside the title, so the title and hint wrap onto 4–5 lines. The hint is repeated in the pane.</td><td>Icon-only <b>+</b> (36px, with an aria-label). The hint is one line, cut off with "…". The long explanation moves into an "About this list" note that opens on tap.</td></tr>
+<tr><td>Footer</td><td><span class="sev h">High</span></td><td>Discard and Save are hidden until something changes, so you only see the status text. The page stops short of the bottom and the board's green gradient shows underneath.</td><td>Save is always shown and disabled when there's nothing to save. The section fills <code>100dvh</code> and pads for <code>env(safe-area-inset-bottom)</code>.</td></tr>
+<tr><td>Focus ring</td><td><span class="sev l">Low</span></td><td>A 2.5px outline around a box that already has a border reads as a double frame, and it shows after a tap.</td><td>Use the 2px outline with a 1px offset from <code>.modal-side</code>, so it's the same everywhere.</td></tr>
+<tr><td>Touch sizing</td><td><span class="sev m">Med</span></td><td>The rule that makes every <code>.btn</code>, input and select at least 44px tall also makes small buttons and weekday chips huge.</td><td>Make each <b>row</b> the 44px target, not each control inside it. Controls stay 36–38px tall.</td></tr>
+<tr class="gr"><td colspan="4">My account</td></tr>
+<tr><td>Profile card</td><td><span class="sev m">Med</span></td><td>The email is the headline, in bold, and nearly overflows. The two notes are 3–4 lines each. There's no avatar, so it doesn't look like the avatar menu it opened from.</td><td>Avatar + display name + email (muted, cut off with "…") at the top, then the Admin and Active chips. Each note is cut to one line.</td></tr>
+<tr><td>Password card</td><td><span class="sev l">Low</span></td><td>It's a separate card with a heading-row button and an expandable "Who can edit my account?".</td><td>Make it a "Password" row with a chevron in a <b>Sign-in</b> group that opens the Change password sheet. The "Who can edit" text becomes a one-line note under the group.</td></tr>
+<tr><td>Change password</td><td><span class="sev m">Med</span></td><td>It's a centred dialog, while the other dialogs on phone are bottom sheets.</td><td>Make it a bottom sheet with a show/hide eye on the password fields.</td></tr>
+<tr class="gr"><td colspan="4">Engineers</td></tr>
+<tr><td>List</td><td><span class="sev h">High</span></td><td>A stacked table: Colour, Phone and Account each on a labelled line, a "—" for an empty phone, and a × alone on the last line. That's about 300px per person.</td><td>A 56px row: swatch, name, role chip and phone (or "No phone yet"), then a chevron. Tapping it opens an edit sheet.</td></tr>
+<tr><td>Add engineer</td><td><span class="sev m">Med</span></td><td>The Person field is a native select, so it's the dark list again, with no search, and the list holds every manager and admin.</td><td>A sheet with a search box and a list of people (avatar, name, role). Tap one to add them.</td></tr>
+<tr class="gr"><td colspan="4">Service areas</td></tr>
+<tr><td>List</td><td><span class="sev h">High</span></td><td>The same stacked-table problem. The name input, the colour pill with its hex code, and the × each get their own line.</td><td>The same 56px row as Engineers: swatch + name + "<i>7 employees</i>". The edit sheet holds the name, a colour grid, and Delete (disabled while the area still has people, with the reason shown).</td></tr>
+<tr><td>Add area</td><td><span class="sev l">Low</span></td><td>The colour field is a browser colour well with a hex label, so on Android you get the system colour picker.</td><td>The same swatch grid as the edit sheet, with "Custom…" at the end.</td></tr>
+<tr class="gr"><td colspan="4">Boards</td></tr>
+<tr><td>Weekdays</td><td><span class="sev h">High</span></td><td>44px-minimum chips with a gap: 7 × 44 doesn't fit in the card, so Sat wraps.</td><td>A 7-wide segmented control (S M T W T F S), each 1/7 of the width.</td></tr>
+<tr><td>Rows</td><td><span class="sev m">Med</span></td><td>The × and a stray "⌄" (Rayong) sit on their own line below the days. The hint mentions four features in one sentence.</td><td>A trash icon on the name line. The hint is one line: "Ticked days are this board's weekend."</td></tr>
+<tr><td>New board</td><td><span class="sev l">Low</span></td><td>Uses <code>.weekday-picker</code>, a different weekday control from the list.</td><td>The same segmented control in both places.</td></tr>
+<tr class="gr"><td colspan="4">Users</td></tr>
+<tr><td>Toolbar</td><td><span class="sev h">High</span></td><td>A half-width search, two dropdown buttons, then Excel on its own row. The count floats on the right.</td><td>A full-width search and a row of chips (All, Waiting, Admin, Manager, Engineer, Disabled), each with a count. Excel becomes an icon in the header.</td></tr>
+<tr><td>List</td><td><span class="sev h">High</span></td><td>Seven labelled lines per person (Email, Role, Status, Last seen, Requested, actions). A "—" chip is shown when the full name is empty.</td><td>A 56px row: initials, display name, email, and a role chip. Anything not Active gets a status chip. Last seen goes in the user sheet.</td></tr>
+<tr><td>Waiting banner</td><td><span class="sev m">Med</span></td><td>A big amber card with a full-width button on its own line.</td><td>One line: "1 person is waiting · <u>Review</u>". Review sets the chips to Waiting.</td></tr>
+<tr><td>User sheet</td><td><span class="sev h">High</span></td><td>Role and Status are native selects (the dark list), and the Status options are long sentences. Reset password and Delete sit <b>above</b> Save.</td><td>Role as a radio list with a one-line description each. Status as a 3-part segmented control. Reset password and Delete move into an "Account actions" group at the bottom, below the Save bar's reach.</td></tr>
+<tr><td>Add user / temp password</td><td><span class="sev m">Med</span></td><td>The Role select is the dark list again. The temporary password is a small <code>code</code> line with a small Copy button.</td><td>The same role radio list. The password shown large in a monospaced font, with a full-width Copy button.</td></tr>
+<tr class="gr"><td colspan="4">Roles &amp; permissions</td></tr>
+<tr><td>Role picker</td><td><span class="sev h">High</span></td><td>A native select labelled "Role to review", so the dark list again.</td><td>Segmented chips: Admin, Manager, Engineer, Viewer.</td></tr>
+<tr><td>Matrix</td><td><span class="sev h">High</span></td><td>19 rows, each with a native select (Edit / View / —). That's 19 chances to open the dark list, and you can't see the levels at a glance.</td><td>Each row gets a 3-part segmented control (<b>Edit · View · Off</b>). View-only areas show 2 parts. Grouped boxes: "Tabs &amp; menus" and "Overview sections". A changed row gets an amber edge.</td></tr>
+<tr><td>Notes</td><td><span class="sev m">Med</span></td><td>An amber banner and then a 4-line paragraph before the first row.</td><td>Keep the amber banner, cut to one line. The paragraph becomes an "About levels" note that opens on tap.</td></tr>
+<tr><td>Review changes</td><td><span class="sev m">Med</span></td><td>A centred dialog on phone.</td><td>A bottom sheet with Before → After rows (already in the new row style) and Apply in the footer.</td></tr>
+<tr class="gr"><td colspan="4">Unsaved-changes dialog</td></tr>
+<tr><td>Leave with edits</td><td><span class="sev l">Low</span></td><td>Three buttons (Keep editing, Discard, Save &amp; continue) wrap onto two lines on phone.</td><td>A sheet with the buttons stacked full width: Save &amp; continue (primary), Discard (red text), Keep editing (plain).</td></tr>
+</tbody></table></div>
+
+<h3 class="sub">Before → after: the sections not shown above</h3>
+<p class="lead">These are drawn in Option A's frame (back chevron, section page). They look the same in B and C, only without the section switcher.</p>
+<div class="frames">
+
+<div class="fr"><span class="cap">My account</span>
+<div class="phone"><div class="topbar">TRIGO Manpower<span class="av">NS</span></div>
+ <div class="mh"><button class="ib ghost"><svg class="ic"><use href="#i-back"/></svg></button><div class="t"><b>My account</b><small>Personal</small></div></div>
+ <div class="scroll pad">
+  <div class="grp" style="padding:12px">
+   <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px"><span class="avt" style="width:44px;height:44px;font-size:14px">NS</span><div style="min-width:0"><b style="display:block;font-size:15px">Nutdanai.S</b><span style="font-size:12px;color:var(--muted);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">nutdanai.sirinapanont@trigo-group.com</span><div style="display:flex;gap:6px;margin-top:4px"><span class="role a">Admin</span><span class="role ok">Active</span></div></div></div>
+   <div class="f"><div class="lbl">Display name</div><div class="inp">Nutdanai.S</div><p class="hint" style="margin:4px 0 0">Leave empty to use first name . last initial.</p></div>
+   <div class="f" style="margin:0"><div class="lbl">Mobile number</div><div class="inp ph">081-234-5678</div><p class="hint" style="margin:4px 0 0">Tap-to-call on your mission cards.</p></div>
+  </div>
+  <div class="gl">Sign-in</div>
+  <div class="grp"><div class="nav-row"><span class="ico"><svg class="ic"><use href="#i-key"/></svg></span><div>Password<small>At least 8 characters</small></div><span class="meta"><svg class="ic chev"><use href="#i-chev"/></svg></span></div></div>
+  <p class="hint" style="margin-top:8px">You own your name and number. An admin sets your role and status.</p>
+ </div>
+ <div class="foot"><span class="sum">All changes saved</span><button class="btn p" style="opacity:.45">Save</button></div>
+</div></div>
+
+<div class="fr"><span class="cap">Service areas</span>
+<div class="phone"><div class="topbar">TRIGO Manpower<span class="av">NS</span></div>
+ <div class="mh"><button class="ib ghost"><svg class="ic"><use href="#i-back"/></svg></button><div class="t"><b>Service areas</b><small>Board setup · 8 areas</small></div><button class="ib p"><svg class="ic"><use href="#i-plus"/></svg></button></div>
+ <div class="scroll pad">
+  <p class="hint">The colour is the pill on employee and mission cards.</p>
+  <div class="grp">
+   <div class="er"><span class="sw" style="background:#7fb4e6"></span><div class="who"><b>Amata City</b><span>14 employees</span></div><svg class="ic chev"><use href="#i-chev"/></svg></div>
+   <div class="er"><span class="sw" style="background:#a8c855"></span><div class="who"><b>Rayong</b><span>9 employees</span></div><svg class="ic chev"><use href="#i-chev"/></svg></div>
+   <div class="er dirty"><span class="sw" style="background:#e98b8b"></span><div class="who"><b>Laem Chabang</b><span>6 employees · edited</span></div><svg class="ic chev"><use href="#i-chev"/></svg></div>
+   <div class="er"><span class="sw" style="background:#e7c35a"></span><div class="who"><b>Bang Na</b><span>4 employees</span></div><svg class="ic chev"><use href="#i-chev"/></svg></div>
+   <div class="er"><span class="sw" style="background:#c79be0"></span><div class="who"><b>Pinthong</b><span>3 employees</span></div><svg class="ic chev"><use href="#i-chev"/></svg></div>
+   <div class="er"><span class="sw" style="background:#9ca3af"></span><div class="who"><b>Ayutthaya</b><span>No employees</span></div><svg class="ic chev"><use href="#i-chev"/></svg></div>
+  </div>
+ </div>
+ <div class="foot"><span class="sum"><b>1 unsaved change</b></span><button class="btn">Discard</button><button class="btn p">Save</button></div>
+</div></div>
+
+<div class="fr"><span class="cap">Area edit sheet</span>
+<div class="phone"><div class="topbar">TRIGO Manpower<span class="av">NS</span></div>
+ <div class="mh"><button class="ib ghost"><svg class="ic"><use href="#i-back"/></svg></button><div class="t"><b>Service areas</b><small>Board setup · 8 areas</small></div></div>
+ <div class="scroll"></div><div class="scrim"></div>
+ <div class="sheet"><div class="grab"></div>
+  <div class="sh"><b>Rayong</b><button class="ib ghost"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="sb" style="padding:12px 14px">
+   <div class="f"><div class="lbl">Name</div><div class="inp">Rayong</div></div>
+   <div class="f"><div class="lbl">Colour</div><div class="swrow"><i style="background:#7fb4e6"></i><i class="on" style="background:#a8c855"></i><i style="background:#e98b8b"></i><i style="background:#e7c35a"></i><i style="background:#c79be0"></i><i style="background:#6fc7b6"></i><i style="background:#f6a06b"></i><i style="background:#9ca3af"></i></div></div>
+   <div class="dangerlink" style="color:var(--muted)"><svg class="ic"><use href="#i-trash"/></svg>Delete: move its 9 employees first</div>
+  </div>
+  <div class="foot"><span class="sum"></span><button class="btn">Cancel</button><button class="btn p">Done</button></div>
+ </div>
+</div></div>
+
+<div class="fr"><span class="cap">Roles &amp; permissions</span>
+<div class="phone"><div class="topbar">TRIGO Manpower<span class="av">NS</span></div>
+ <div class="mh"><button class="ib ghost"><svg class="ic"><use href="#i-back"/></svg></button><div class="t"><b>Roles &amp; permissions</b><small>Administration</small></div></div>
+ <div class="scroll pad">
+  <div class="banner" style="font-weight:500">Changes reach everyone with that role.</div>
+  <div class="days" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px"><span>Admin</span><span class="on">Manager</span><span>Engineer</span><span>Viewer</span></div>
+  <div class="grp">
+   <div class="gh">Tabs &amp; menus</div>
+   <div class="pr"><div class="who"><b>Board</b><span>Missions, assignments, day lock</span></div><div class="seg3"><span class="on">Edit</span><span>View</span><span>Off</span></div></div>
+   <div class="pr"><div class="who"><b>Overview tab</b><span>The dashboard</span></div><div class="seg3 two"><span class="on">View</span><span>Off</span></div></div>
+   <div class="pr dirty"><div class="who"><b>Manpower</b><span>The employee roster</span></div><div class="seg3"><span>Edit</span><span class="on">View</span><span>Off</span></div></div>
+   <div class="pr"><div class="who"><b>Host</b><span>Sites and their records</span></div><div class="seg3"><span class="on">Edit</span><span>View</span><span>Off</span></div></div>
+   <div class="pr"><div class="who"><b>Settings</b><span>Engineers, areas, weekends</span></div><div class="seg3"><span>Edit</span><span class="on">View</span><span>Off</span></div></div>
+   <div class="pr"><div class="who"><b>Users &amp; roles</b><span>This screen, sign-in</span></div><div class="seg3"><span>Edit</span><span>View</span><span class="on">Off</span></div></div>
+  </div>
+ </div>
+ <div class="foot"><span class="sum"><b>1 change</b> to Manager</span><button class="btn">Discard</button><button class="btn p">Review</button></div>
+</div></div>
+
+<div class="fr"><span class="cap">User sheet</span>
+<div class="phone"><div class="topbar">TRIGO Manpower<span class="av">NS</span></div>
+ <div class="mh"><button class="ib ghost"><svg class="ic"><use href="#i-back"/></svg></button><div class="t"><b>Users</b><small>Administration</small></div></div>
+ <div class="scroll"></div><div class="scrim"></div>
+ <div class="sheet" style="max-height:92%"><div class="grab"></div>
+  <div class="sh"><div style="flex:1;min-width:0"><b style="display:block">Akekaluk.A</b><small style="font-size:11.5px;color:var(--muted)">akekaluk.aksornnarong@trigo-group.com</small></div><button class="ib ghost"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="sb" style="padding:10px 14px">
+   <div class="f"><div class="lbl">Display name</div><div class="inp">Akekaluk.A</div></div>
+   <div class="f"><div class="lbl">Role</div>
+    <div class="radio"><span class="rb"></span><div><b>Engineer</b><small>Runs missions, edits the board</small></div></div>
+    <div class="radio on"><span class="rb"></span><div><b>Manager</b><small>All boards, Manpower, Host</small></div></div>
+    <div class="radio"><span class="rb"></span><div><b>Admin</b><small>Everything, including users</small></div></div>
+   </div>
+   <div class="f"><div class="lbl">Status</div><div class="days" style="grid-template-columns:repeat(3,1fr)"><span>Pending</span><span class="on">Active</span><span>Disabled</span></div></div>
+   <div class="lbl" style="margin-top:4px">Account actions</div>
+   <div class="grp"><div class="nav-row" style="min-height:44px;font-size:13px">Reset password<span class="meta"><svg class="ic chev"><use href="#i-chev"/></svg></span></div><div class="nav-row" style="min-height:44px;font-size:13px;color:var(--danger-text)">Delete permanently</div></div>
+   <p class="hint" style="margin:8px 0 0">Last seen today 08:42 · added 3 Mar 2026</p>
+  </div>
+  <div class="foot"><span class="sum"></span><button class="btn">Cancel</button><button class="btn p">Save</button></div>
+ </div>
+</div></div>
+
+<div class="fr"><span class="cap">Add engineer sheet</span>
+<div class="phone"><div class="topbar">TRIGO Manpower<span class="av">NS</span></div>
+ <div class="mh"><button class="ib ghost"><svg class="ic"><use href="#i-back"/></svg></button><div class="t"><b>Engineers</b><small>Board setup · 12 people</small></div></div>
+ <div class="scroll"></div><div class="scrim"></div>
+ <div class="sheet"><div class="grab"></div>
+  <div class="sh"><b>Add an engineer</b><button class="ib ghost"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="sb" style="padding:10px 14px">
+   <p class="hint">For a manager or admin who runs missions too.</p>
+   <div class="search" style="margin-bottom:8px"><svg class="ic"><use href="#i-search"/></svg>Search people</div>
+   <div class="grp">
+    <div class="ur"><span class="avt">WR</span><div class="who"><b>Wipada.R</b><span>wipada.rattana@trigo-group.com</span></div><span class="role m">Manager</span></div>
+    <div class="ur"><span class="avt">KS</span><div class="who"><b>Kittipong.S</b><span>kittipong.saelim@trigo-group.com</span></div><span class="role a">Admin</span></div>
+    <div class="ur"><span class="avt">CM</span><div class="who"><b>Chalida.M</b><span>chalida.meesuk@trigo-group.com</span></div><span class="role m">Manager</span></div>
+   </div>
+  </div>
+ </div>
+</div></div>
+
+<div class="fr"><span class="cap">Review permission changes</span>
+<div class="phone"><div class="topbar">TRIGO Manpower<span class="av">NS</span></div>
+ <div class="mh"><button class="ib ghost"><svg class="ic"><use href="#i-back"/></svg></button><div class="t"><b>Roles &amp; permissions</b><small>Administration</small></div></div>
+ <div class="scroll"></div><div class="scrim"></div>
+ <div class="sheet"><div class="grab"></div>
+  <div class="sh"><b>Review 1 change</b><button class="ib ghost"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="sb" style="padding:10px 14px">
+   <p class="hint">Applies to 3 managers, including anyone signed in now.</p>
+   <div class="grp"><div class="gh">Manager</div>
+    <div class="pr"><div class="who"><b>Manpower</b></div><span style="font-size:12.5px;font-weight:600">Edit <span style="color:var(--muted)">→</span> <span style="color:var(--warn-text)">View</span></span></div>
+   </div>
+  </div>
+  <div class="foot"><span class="sum"></span><button class="btn">Keep editing</button><button class="btn p">Apply</button></div>
+ </div>
+</div></div>
+
+</div>
 
 <h2>Next step</h2>
 <p class="lead">Tell me A, B or C, or mix them, for example A with B's chips. I'll then build it in <code>styles.css</code> and <code>app.js</code> for the ≤720px layout only. Desktop and tablet stay as they are.</p>
