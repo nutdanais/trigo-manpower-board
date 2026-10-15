@@ -161,6 +161,23 @@ function tintOf(color, alpha) {
    AYT 152, NPT 150, Wellgrow 171, AMATA 188, BENZ 232 and the #9ca3af
    new-area default 157 all stay black; reds #e05a5a → 100 and #f87171 →
    126 go white. */
+/* Signal 4A: the area pill on a board card is a pale tint of the area's colour
+   with a darker shade of it as text, instead of the full colour. Plain rgb(),
+   not color-mix(): the card sits inside the export capture, and html2canvas
+   cannot parse color-mix(). An unparseable colour falls back to the old pill. */
+function areaSoftStyle(color) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color || "").trim());
+  if (!m) return `background:${escapeHtml(color)};color:${inkOn(color)}`;
+  const hex = m[1].length === 3 ? m[1].split("").map(c => c + c).join("") : m[1];
+  const n = parseInt(hex, 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const bg = c.map(v => Math.round(v * 0.22 + 255 * 0.78));   // 22% of the colour on white
+  const ink = c.map(v => Math.round(v * 0.45));                 // the colour, darkened
+  // a very light colour still needs readable text: never lighter than #44
+  const luma = (ink[0] * 299 + ink[1] * 587 + ink[2] * 114) / 1000;
+  const k = luma > 90 ? 90 / luma : 1;
+  return `background:rgb(${bg.join(",")});color:rgb(${ink.map(v => Math.round(v * k)).join(",")});box-shadow:inset 0 0 0 1px rgb(${c.map(v => Math.round(v * 0.45 + 255 * 0.55)).join(",")})`;
+}
 function inkOn(bg) {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(bg).trim());
   if (!m) return "var(--card-ink)";
@@ -291,6 +308,8 @@ function toast(message, type = "info", opts = {}) {
   const el = document.createElement("div");
   el.className = "toast toast-" + type;
   el.setAttribute("role", type === "error" ? "alert" : "status");
+  // an icon tile says which kind of message this is before it is read
+  el.insertAdjacentHTML("afterbegin", `<span class="toast-ic">${icon(type === "error" ? "close" : type === "warn" ? "alert" : "info")}</span>`);
   const msg = document.createElement("span");
   msg.className = "toast-msg";
   msg.textContent = message;
@@ -1330,7 +1349,7 @@ function renderOrgChart() {
           ${orgFilterDropdown("statuses", "Standby / Leave", org.filterOpts.statuses)}
         </div>
         <label class="oc-levelctl">Show to
-          <select id="oc-level" class="oc-select">${levelOpts}</select>
+          <select id="oc-level" class="oc-select" data-picker>${levelOpts}</select>
         </label>
       </div>
       <div class="oc-legend">
@@ -1879,7 +1898,7 @@ function renderUserMenu() {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2015,7 +2034,7 @@ function empCard(emp) {
     (alsoEn ? ` <span class="emp-name-en">${escapeHtml(alsoEn)}</span>` : "") +
     `<span class="emp-meta">` +
       role +
-      (area ? `<span class="emp-area" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
+      (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
@@ -4390,6 +4409,14 @@ async function bulkWriteFile(kind, all, name) {
   bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name + ".xlsx");
 }
 
+/* the drop zone names the file once one is chosen */
+function bulkDropLabel() {
+  const f = $("#bulk-file").files && $("#bulk-file").files[0];
+  $("#bulk-drop").classList.toggle("has-file", !!f);
+  $("#bulk-drop-title").textContent = f ? f.name : "Drop the .xlsx here";
+  $("#bulk-drop-sub").innerHTML = f ? "Choose a different file" : "or <u>choose a file</u>";
+}
+
 function openBulkModal(kind) {
   const area = kind === "employees" ? "emplist" : "hostlist";
   if (!can(area, "edit")) { toast("Your role can view this list but not change it.", "info"); return; }
@@ -4402,6 +4429,7 @@ function openBulkModal(kind) {
   const n = bulkTemplateRows(kind, false).length;
   $("#bulk-dl-note").textContent = `${n} ${emp ? (n === 1 ? "employee" : "employees") : (n === 1 ? "host" : "hosts")} — the rows the list is showing now. Clear the search and filters first to include everyone. The Excel file has dropdowns, real dates and keeps Thai text intact.`;
   $("#bulk-file").value = "";
+  bulkDropLabel();
   $("#bulk-preview").classList.add("hidden");
   $("#bulk-preview").innerHTML = "";
   $("#btn-bulk-apply").disabled = true;
@@ -5008,6 +5036,11 @@ function renderHostlistFilterOptions() {
       pop.appendChild(row);
     }
   }
+  // how many filters are on, shown on the "Filters" button (as Manpower does)
+  const on = Object.values(state.hostlist.filters).filter(v => v && v.length).length;
+  $("#hostlist-filter-count").textContent = on;
+  $("#hostlist-filter-count").classList.toggle("hidden", !on);
+  $("#btn-hostlist-filter-pop").classList.toggle("ms-active", on > 0);
 }
 
 function hostlistFilteredSorted() {
@@ -5280,7 +5313,7 @@ function openHostModal(name, opts = {}) {
   form.mapUrl.value = rec ? rec.mapUrl : "";
   form.note.value = rec ? rec.note : "";
   form.areaId.innerHTML = `<option value="">— none —</option>`
-    + D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+    + D().areas.map(a => `<option value="${a.id}" data-color="${escapeHtml(a.color || "")}">${escapeHtml(a.name)}</option>`).join("");
   form.areaId.value = rec ? (rec.areaId || "") : "";
   form.archived.checked = !!(rec && rec.archived);
   $("#btn-delete-host").classList.toggle("hidden", !rec);
@@ -5589,7 +5622,35 @@ function openModal(id) {
   for (const m of $$(".modal")) m.classList.add("hidden");
   $(id).classList.remove("hidden");
   syncSegmented($(id));
+  pickerClose();
+  // long help text in a record panel folds to one line, after the content is
+  // filled in (several notes are set right after openModal returns)
+  if ($(id).classList.contains("modal-side")) requestAnimationFrame(() => foldNotes($(id)));
   if (state.settingsOpen) focusModal($(id));
+}
+
+/* Help text in the side panels: one line, with "More" to read the rest in
+   place. A note that already fits gets no button. Notes whose text is set
+   later are measured again on the next open. */
+function foldNotes(root) {
+  for (const p of root.querySelectorAll("p.import-note")) {
+    if (p.closest(".modal-actions") || p.classList.contains("settings-error") || p.id === "user-modal-note") continue;
+    // a short status line (the ✓ under Host, a count) is never folded
+    if (p.textContent.trim().length < 90) continue;
+    let more = p.nextElementSibling && p.nextElementSibling.classList.contains("note-more") ? p.nextElementSibling : null;
+    p.classList.add("note-fold");
+    p.classList.remove("open");
+    const long = p.offsetParent !== null && p.scrollHeight > p.clientHeight + 2;
+    if (!long) { if (more) more.remove(); p.classList.remove("note-fold"); continue; }
+    if (!more) {
+      more = document.createElement("button");
+      more.type = "button";
+      more.className = "note-more";
+      more.onclick = () => { const open = p.classList.toggle("open"); more.textContent = open ? "Less" : "More"; };
+      p.after(more);
+    }
+    more.textContent = "More";
+  }
 }
 
 /* ---------- segmented controls ----------
@@ -5602,6 +5663,155 @@ function syncSegmented(root = document) {
     for (const btn of sel._seg.children) btn.setAttribute("aria-pressed", String(btn.dataset.v === sel.value));
   }
 }
+/* ----- in-app dropdown standing in for a native <select> -----
+   On a phone a native select opens the system's own list (a dark sheet on
+   Android) that matches nothing else in the app. Any <select data-picker> gets
+   a button in its place and a light popover list in the Signal menu style: a
+   search box once there are more than six options, a colour square when an
+   option carries data-color, a tick on the current one. The select stays in
+   the DOM as the source of truth — forms still read and submit it, and code
+   that sets .value or rebuilds its options is followed (see pickerWatch). */
+let _pickerOpen = null;
+function pickerLabel(sel) {
+  const o = sel.options[sel.selectedIndex];
+  return o ? { text: o.textContent, color: o.dataset.color || "" } : { text: "", color: "" };
+}
+function pickerSync(sel) {
+  const pk = sel._pk;
+  if (!pk) return;
+  const { text, color } = pickerLabel(sel);
+  pk.text.textContent = text;
+  pk.sw.style.background = color;
+  pk.sw.classList.toggle("hidden", !color);
+  pk.btn.disabled = sel.disabled;
+}
+function pickerClose() {
+  if (!_pickerOpen) return;
+  const { pop, btn } = _pickerOpen;
+  pop.remove();
+  btn.setAttribute("aria-expanded", "false");
+  _pickerOpen = null;
+}
+function pickerOpen(sel) {
+  pickerClose();
+  const pk = sel._pk;
+  const pop = document.createElement("div");
+  pop.className = "pk-pop";
+  pop.setAttribute("role", "listbox");
+  pop.setAttribute("aria-label", pk.btn.getAttribute("aria-label") || "");
+  const opts = [...sel.options];
+  let q = null;
+  if (opts.length > 6) {
+    q = document.createElement("input");
+    q.type = "search";
+    q.className = "pk-q";
+    q.placeholder = "Search…";
+    q.setAttribute("aria-label", "Search");
+    pop.appendChild(q);
+  }
+  const list = document.createElement("div");
+  list.className = "pk-list";
+  pop.appendChild(list);
+  const draw = () => {
+    const term = q ? q.value.trim().toLowerCase() : "";
+    list.innerHTML = "";
+    let n = 0;
+    for (const o of opts) {
+      if (term && !o.textContent.toLowerCase().includes(term)) continue;
+      n++;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pk-opt";
+      b.setAttribute("role", "option");
+      const on = o.value === sel.value;
+      b.setAttribute("aria-selected", String(on));
+      b.disabled = o.disabled;
+      if (o.dataset.color) { const i = document.createElement("i"); i.className = "pk-sw"; i.style.background = o.dataset.color; b.appendChild(i); }
+      const t = document.createElement("span"); t.textContent = o.textContent; b.appendChild(t);
+      if (on) b.insertAdjacentHTML("beforeend", icon("check", "pk-tick"));
+      b.onclick = () => {
+        pickerClose();
+        if (sel.value !== o.value) { sel.value = o.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        pk.btn.focus();
+      };
+      list.appendChild(b);
+    }
+    if (!n) list.innerHTML = `<p class="pk-none">No matches</p>`;
+  };
+  draw();
+  if (q) q.oninput = draw;
+  pop.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") { ev.stopPropagation(); pickerClose(); pk.btn.focus(); }
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      ev.preventDefault();
+      const items = [...list.querySelectorAll(".pk-opt:not(:disabled)")];
+      const i = items.indexOf(document.activeElement);
+      const next = items[ev.key === "ArrowDown" ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1)];
+      if (next) next.focus();
+    }
+  });
+  pk.wrap.appendChild(pop);
+  // open upwards when there is no room below (a picker low in a panel)
+  const r = pk.btn.getBoundingClientRect();
+  pop.classList.toggle("up", window.innerHeight - r.bottom < 260 && r.top > 260);
+  pk.btn.setAttribute("aria-expanded", "true");
+  _pickerOpen = { pop, btn: pk.btn };
+  (q || list.querySelector('[aria-selected="true"]') || list.querySelector(".pk-opt") || pop).focus();
+}
+function pickerWatch(sel) {
+  // follow code that sets .value / .selectedIndex directly (no change event)
+  for (const prop of ["value", "selectedIndex"]) {
+    const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, prop);
+    Object.defineProperty(sel, prop, {
+      configurable: true,
+      get() { return d.get.call(this); },
+      set(v) { d.set.call(this, v); pickerSync(this); },
+    });
+  }
+  new MutationObserver(() => pickerSync(sel)).observe(sel, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
+  sel.addEventListener("change", () => pickerSync(sel));
+}
+function initPicker(sel) {
+  if (sel._pk) return;
+  const wrap = document.createElement("span");
+  wrap.className = "pk";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pk-btn";
+  btn.setAttribute("aria-haspopup", "listbox");
+  btn.setAttribute("aria-expanded", "false");
+  const lab = sel.closest("label");
+  const name = sel.getAttribute("aria-label") || (lab && lab.childNodes[0] && lab.childNodes[0].textContent.trim()) || sel.title || "";
+  if (name) btn.setAttribute("aria-label", name);
+  if (sel.title) btn.title = sel.title;
+  const sw = document.createElement("i"); sw.className = "pk-sw hidden";
+  const text = document.createElement("span"); text.className = "pk-text";
+  btn.append(sw, text);
+  btn.insertAdjacentHTML("beforeend", icon("chevron-down", "pk-chev"));
+  btn.onclick = (ev) => { ev.stopPropagation(); if (_pickerOpen && _pickerOpen.btn === btn) pickerClose(); else pickerOpen(sel); };
+  sel.classList.add("pk-source");
+  sel.tabIndex = -1;
+  sel.setAttribute("aria-hidden", "true");
+  sel.after(wrap);
+  wrap.appendChild(btn);
+  sel._pk = { wrap, btn, sw, text };
+  pickerWatch(sel);
+  pickerSync(sel);
+}
+function initPickers(root = document) {
+  for (const sel of root.querySelectorAll("select[data-picker]")) initPicker(sel);
+}
+document.addEventListener("click", (ev) => { if (_pickerOpen && !_pickerOpen.pop.contains(ev.target)) pickerClose(); });
+// selects built later (the org chart toolbar, the capacity add-host row, the
+// Settings tables) are picked up as they are added
+new MutationObserver((muts) => {
+  for (const m of muts) for (const n of m.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    if (n.matches && n.matches("select[data-picker]")) initPicker(n);
+    else if (n.querySelector && n.querySelector("select[data-picker]")) initPickers(n);
+  }
+}).observe(document.documentElement, { childList: true, subtree: true });
+
 function initSegmented() {
   for (const sel of $$("select[data-seg]")) {
     if (sel._seg) continue;
@@ -5676,10 +5886,45 @@ function trapModalTab(ev) {
   else if (!ev.shiftKey && (!inside || document.activeElement === lastEl)) { ev.preventDefault(); firstEl.focus(); }
 }
 
+/* Signal's small dialog names the action on its button, and a destructive one
+   is red. Callers pass a title; the label and the danger flag come from it here,
+   so the 30-odd callers didn't each need a new argument. A caller's own
+   yesLabel still wins. "Cannot …" titles are notices: one OK, no Cancel. */
+const CONFIRM_ACTIONS = [
+  [/^Cannot /, "OK", false, true],
+  [/^Unlock board/, "Unlock"],
+  [/^Edit (today's board|a past date)/, "Edit anyway"],
+  [/^Deactivate employees?/, "Deactivate", true],
+  [/^Merge hosts/, "Merge hosts", true],
+  [/^Rename this host/, "Rename"],
+  [/^Clear host record/, "Clear record", true],
+  [/^Take /, "Take them"],
+  [/^Create this host/, "Create host"],
+  [/^Delete (forecast )?mission/, "Delete mission", true],
+  [/^Hide mission/, "Hide mission"],
+  [/^Delete note/, "Delete note", true],
+  [/^Remove this engineer/, "Remove engineer", true],
+  [/^Delete this account/, "Delete account", true],
+  [/^Delete /, "Delete", true],
+  [/^Reset board/, "Reset board", true],
+  [/^Start from the confirmed plan/, "Start over", true],
+  [/^Reset all numbers/, "Reset to 0", true],
+  [/^Copy this week/, "Copy"],
+  [/^Remove /, "Remove", true],
+  [/^Turn down/, "Turn down", true],
+  [/^Issue a new password/, "Issue password"],
+  [/^Mark as holiday/, "Mark as holiday"],
+  [/^Make it a working day/, "Make it a working day"],
+];
 function showConfirm(title, message, onYes, onCancel, yesLabel) {
+  const act = CONFIRM_ACTIONS.find(([re]) => re.test(title)) || [null, "OK", false, false];
   $("#confirm-title").textContent = title;
   $("#confirm-message").textContent = message;
-  $("#btn-confirm-yes").textContent = yesLabel || "Yes";
+  const yes = $("#btn-confirm-yes");
+  yes.textContent = yesLabel || act[1];
+  yes.classList.toggle("btn-danger-solid", !!act[2]);
+  yes.classList.toggle("btn-primary", !act[2]);
+  $("#btn-confirm-no").classList.toggle("hidden", !!act[3]);
   _confirmCancel = onCancel || null;
   openModal("#modal-confirm");
   $("#btn-confirm-yes").onclick = () => { _confirmCancel = null; closeModal(); onYes(); };
@@ -5949,9 +6194,18 @@ function openEmployeeModal(empId, focusField) {
   state.editingEmployeeId = empId || null;
   const form = $("#form-employee");
   form.reset();
-  $("#employee-modal-title").textContent = empId ? "Edit Employee" : "New Employee";
+  // an existing person: their name leads the panel, with board · contract · area under it
+  const who0 = empId ? D().employees.find(e => e.id === empId) : null;
+  $("#employee-modal-title").textContent = who0 ? (who0.name || "Edit employee") : "New employee";
+  const sub = $("#employee-modal-sub");
+  if (who0) {
+    const b = D().boards.find(x => x.id === who0.boardId);
+    const ar = D().areas.find(x => x.id === who0.areaId);
+    sub.textContent = [b && b.name, who0.contract === "oncall" ? "On-call" : "Permanent", ar && ar.name].filter(Boolean).join(" · ");
+  }
+  sub.classList.toggle("hidden", !who0);
   $("#btn-deactivate-employee").classList.toggle("hidden", !empId);
-  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}" data-color="${escapeHtml(a.color || "")}">${escapeHtml(a.name)}</option>`).join("");
   form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
   if (empId) {
     const e = D().employees.find(x => x.id === empId);
@@ -6810,6 +7064,7 @@ function renderEngineerRows() {
       acctCell.appendChild(unlink);
     } else {
       const link = document.createElement("select");
+      link.dataset.picker = "";
       link.setAttribute("aria-label", `Account for ${r.name}`);
       link.innerHTML = `<option value="">— no account —</option>` +
         linkable.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.displayName || d.fullName || "?")}</option>`).join("");
@@ -7520,7 +7775,19 @@ function exportTypeSaved(tab, types) {
   return types[0];
 }
 /* the File type radios at the top of an export dialog */
+const EXPORT_FILE_NAMES = { manpower: "Manpower list", hostlist: "Host list" };
 function renderExportTypes(el, tab, types, onChange) {
+  // One file type is nothing to choose between: say what the file is instead
+  // of drawing a one-option switch. The checked radio stays (hidden) so
+  // pickedExportType() reads the same either way.
+  if (types.length === 1) {
+    const t = types[0];
+    el.classList.add("export-type-single");
+    el.innerHTML = `<input type="radio" name="${tab}-export-type" value="${t}" checked hidden>` +
+      `<div class="file-chip"><span class="fc-ic">${escapeHtml(t.toUpperCase())}</span><span><b>${escapeHtml(EXPORT_FILE_NAMES[tab] || "Export")}.${escapeHtml(t)}</b><small>${escapeHtml(EXPORT_TYPES[t])} workbook</small></span></div>`;
+    return;
+  }
+  el.classList.remove("export-type-single");
   const selected = exportTypeSaved(tab, types);
   el.innerHTML = "<b>File type</b>" + types.map(t =>
     `<label><input type="radio" name="${tab}-export-type" value="${t}"${t === selected ? " checked" : ""}> ${EXPORT_TYPES[t]}</label>`).join("");
@@ -8049,6 +8316,12 @@ function missionArea(number) {
   return m ? m[0].toUpperCase() : "Other";
 }
 
+/* A composed empty state for a list that has nothing in it: an icon tile,
+   what is (not) here, and the next step where there is one. */
+function emptyStateHtml(title, text, iconName = "inbox") {
+  return `<div class="empty-state">${icon(iconName, "es-ic")}<b>${escapeHtml(title)}</b>${text ? `<p>${escapeHtml(text)}</p>` : ""}</div>`;
+}
+
 function importMsg(text) {
   importUi = { items: [], picked: new Set(), q: "", f: "all" };
   $("#import-tools").classList.add("hidden");
@@ -8206,7 +8479,13 @@ function openImportModal() {
       const srcDate = await cloud.findLatestWeekdayMissionDate(boardId, state.date);
       if (!srcDate) {
         importCandidates = [];
-        importMsg("No missions found on recent weekdays to copy from.");
+        importMsg("");
+        $("#import-list").innerHTML = emptyStateHtml("Nothing to copy yet",
+          "No missions on this board in the last few working days. Start the day with a new mission instead.");
+        const go = mkEl("button", "btn btn-primary", "New mission");
+        go.type = "button";
+        go.onclick = () => { closeModal(); openMissionModal(null); };
+        $("#import-list .empty-state").appendChild(go);
         return;
       }
       importCandidates = (await cloud.getMissionsForDate(boardId, srcDate)).filter(m => !m.hidden);
@@ -8713,7 +8992,7 @@ function renderHoldEventsModal() {
       ? "Forecasts not used when a day was confirmed, and people moved out of a forecast they were held in. Each flag stays until it is acknowledged."
       : "Someone moved these people out of a forecast they were held in. The flag stays on the mission until it is acknowledged.";
   if (!events.length) {
-    list.innerHTML = '<p class="import-note">All acknowledged — nothing left here.</p>';
+    list.innerHTML = emptyStateHtml("Nothing to acknowledge", "Every alert here has been acknowledged.", "check");
     return;
   }
   if (merges.length) list.appendChild(mergeAlertsEl(merges, mayAck));
@@ -10057,7 +10336,8 @@ function renderMergeLog() {
   const nu = rows.filter(decisionNotUsed).length;
   $("#merge-log-sub").textContent = rows.length
     ? `${rows.length} ${rows.length === 1 ? "decision" : "decisions"}; ${nu} ${nu === 1 ? "part" : "parts"} of the forecast not used. Highlighted rows alerted the engineer who forecast them.`
-    : "No decisions were recorded for this merge.";
+    : "";
+  if (!rows.length) body.innerHTML = emptyStateHtml("No decisions recorded", "This merge had no differences to decide.");
   for (const [, list] of merges) {
     const r0 = list[0];
     body.appendChild(mkEl("p", "merge-log-when", `Merged by ${who(r0.merged_by)} · ${fmtStamp(r0.merged_at)}`));
@@ -10157,7 +10437,8 @@ function openForecastViewer() {
     }
     list.appendChild(g);
   }
-  if (!list.children.length) list.innerHTML = '<p class="import-note">This forecast is empty.</p>';
+  if (!list.children.length) list.innerHTML = emptyStateHtml(`No forecast for ${fmtDow(state.date)} ${shortDateLabel(state.date)}`,
+    "Nobody has planned this day ahead yet. A forecast stays here for reference after it is merged.");
   openModal("#modal-forecast-view");
 }
 
@@ -10882,6 +11163,7 @@ function capacityAddRowForm(boardId) {
   inp.setAttribute("list", "cap-host-list");
   inp.setAttribute("aria-label", "Host");
   const sh = document.createElement("select");
+  sh.dataset.picker = "";
   sh.setAttribute("aria-label", "Shift");
   sh.innerHTML = '<option value="day">Day</option><option value="night">Night</option>';
   const btn = document.createElement("button");
@@ -12190,6 +12472,7 @@ function wireApp() {
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
   initSegmented();
+  initPickers();
   $("#form-employee").onsubmit = saveEmployee;
   $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = deleteMission;
@@ -12402,7 +12685,18 @@ function wireApp() {
   $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
   $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
   $("#btn-bulk-dl-xlsx").onclick = () => safely(bulkDownload);
-  $("#bulk-file").onchange = (e) => safely(() => onBulkFile(e));
+  $("#bulk-file").onchange = (e) => { bulkDropLabel(); safely(() => onBulkFile(e)); };
+  const drop = $("#bulk-drop");
+  drop.addEventListener("dragover", (ev) => { ev.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    drop.classList.remove("over");
+    const f = ev.dataTransfer && ev.dataTransfer.files;
+    if (!f || !f.length) return;
+    $("#bulk-file").files = f;
+    $("#bulk-file").dispatchEvent(new Event("change"));
+  });
   $("#btn-bulk-apply").onclick = () => safely(applyBulk);
   $("#btn-emplist-xlsx-go").onclick = exportEmplistXlsx;
   $("#emplist-name-view").addEventListener("change", (e) => {
