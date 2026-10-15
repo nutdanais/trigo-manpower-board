@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal Gaps Review</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&family=Noto+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f6f8;--panel:#fff;--line:#e3e7ec;--border:#d8dde4;--ink:#0f1b2a;--text:#1f2937;--muted:#6f7c8d;
+  --navy:#003a66;--navy-soft:#eef3fb;--green:#a8c855;
+  --warn:#9a4a07;--warn-s:#fff6ea;--warn-l:#efd2ab;--danger:#b42318;--danger-s:#fef3f2;--danger-l:#f3c3bd;
+  --ok:#4d6810;--ok-s:#f7faef;--ok-l:#cfdcae;
+  --r:8px;--r-box:12px;--shadow:0 1px 2px rgba(8,28,56,.08),0 18px 40px -10px rgba(8,40,80,.30);
+  --font:"Geist","Noto Sans Thai",Arial,sans-serif;--mono:"Geist Mono","Noto Sans Thai",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--font)}
+.page{max-width:1180px;margin:0 auto;padding:32px 16px 72px}
+h1{font-size:26px;letter-spacing:-.4px;margin:0 0 6px;color:var(--ink)}
+h2{font-size:19px;letter-spacing:-.2px;margin:44px 0 4px;color:var(--ink)}
+.lead{color:var(--muted);max-width:780px;margin:0 0 14px;text-wrap:pretty}
+code{font-family:var(--mono);font-size:12px;background:#eef1f5;padding:1px 5px;border-radius:5px}
+.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px 18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);padding:14px 18px;margin:14px 0 6px}
+.toc a{color:var(--text);text-decoration:none;font-size:13px;display:flex;gap:8px;align-items:baseline}
+.toc a:hover{color:var(--navy)}
+.toc .n{font-family:var(--mono);color:var(--muted);font-size:12px;flex:none;width:22px}
+.sev{display:inline-block;flex:none;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:700;line-height:18px;border:1px solid}
+.sev.h{background:var(--danger-s);color:var(--danger);border-color:var(--danger-l)}
+.sev.m{background:var(--warn-s);color:var(--warn);border-color:var(--warn-l)}
+.sev.l{background:#eef1f5;color:var(--muted);border-color:var(--line)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:8px 0 0}
+
+.item{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);margin:18px 0;overflow:hidden}
+.ih{display:flex;gap:10px;align-items:baseline;padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+.ih .n{font-family:var(--mono);color:var(--muted);font-size:13px}
+.ih h3{margin:0;font-size:16px;color:var(--ink);flex:1}
+.why{padding:10px 18px 0;margin:0;color:var(--muted);font-size:13px;max-width:900px}
+.why b{color:var(--text);font-weight:600}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:14px 18px 18px;align-items:start}
+@media (max-width:860px){.cmp{grid-template-columns:1fr}}
+.cap{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.today img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px}
+.today.narrow img{max-width:360px}
+.after{background:#e9edf2;border-radius:10px;padding:16px;display:flex;justify-content:center}
+.changes{margin:0;padding:0 18px 16px 36px;font-size:13px;color:var(--text)}
+.changes li{margin:2px 0}
+.changes.full{padding-top:0}
+
+/* ---- Signal kit used by the "after" mockups ---- */
+.dlg{width:360px;max-width:100%;background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);padding:18px 18px 14px}
+.dlg h4{margin:0 0 6px;font-size:16px;color:var(--ink);letter-spacing:-.2px}
+.dlg p{margin:0 0 14px;color:var(--muted);font-size:13px}
+.acts{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.btn{height:36px;padding:0 14px;border-radius:var(--r);border:1px solid var(--border);background:var(--panel);font:inherit;font-size:13px;font-weight:600;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn.p{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.d{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.q{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.dq{border-color:transparent;background:transparent;color:var(--danger)}
+.btn.sm{height:30px;padding:0 10px;font-size:12px}
+.ic{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.undo{display:flex;align-items:center;gap:8px;margin-top:12px;padding:8px 10px;border-radius:var(--r);background:#eef1f5;font-size:12px;color:var(--muted)}
+
+.panel{width:380px;max-width:100%;background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.panel .ph{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.panel .ph b{flex:1;font-size:16px;color:var(--ink)}
+.panel .ph small{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.panel .pb{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.panel .pf{display:flex;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:#f7f9fb}
+.panel .pf .sp{flex:1}
+.f label{display:block;font-size:12.5px;font-weight:600;margin-bottom:5px;color:var(--ink)}
+.inp{height:36px;border:1px solid var(--border);border-radius:var(--r);padding:0 11px;display:flex;align-items:center;font-size:13.5px;background:var(--panel)}
+.inp.ph{color:#9aa4b1}
+.hint{font-size:12px;color:var(--muted);margin:4px 0 0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--border);display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;background:var(--panel)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip i{width:9px;height:9px;border-radius:3px;display:block}
+.chip .c{color:var(--muted);font-weight:500}.chip.on .c{color:rgba(255,255,255,.75)}
+.seg{display:flex;background:#eef1f5;border-radius:var(--r);padding:2px;gap:2px}
+.seg span{flex:1;text-align:center;padding:6px 8px;border-radius:6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.seg span.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(8,28,56,.12)}
+.disc{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.disc .dh{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:13px;font-weight:600}
+.disc .dh .ic:last-child{margin-left:auto;color:var(--muted)}
+.disc .db{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--muted)}
+.row2{display:flex;gap:8px;align-items:center}
+
+.wb{width:100%;max-width:560px;background:var(--panel);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.wb .wh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.wb .wh b{font-size:15px;color:var(--ink)}
+.wb .wh small{font-size:12px;color:var(--muted)}
+.prog{flex:1;height:6px;border-radius:3px;background:#eef1f5;overflow:hidden;max-width:140px;margin-left:auto}
+.prog i{display:block;height:100%;width:33%;background:var(--navy)}
+.wbody{display:grid;grid-template-columns:170px 1fr;min-height:250px}
+.queue{border-right:1px solid var(--line);background:#f7f9fb;padding:6px}
+.q{display:flex;align-items:center;gap:8px;padding:8px;border-radius:7px;font-size:12.5px}
+.q.on{background:var(--panel);box-shadow:0 1px 2px rgba(8,28,56,.12)}
+.q .st{margin-left:auto;font-size:10.5px;font-weight:700;padding:0 6px;border-radius:999px}
+.q .st.need{background:var(--warn-s);color:var(--warn)}
+.q .st.done{background:var(--ok-s);color:var(--ok)}
+.q .no{font-family:var(--mono);font-weight:600}
+.detail{padding:14px}
+.detail h5{margin:0 0 2px;font-size:14px;color:var(--ink)}
+.detail .sub{font-size:12px;color:var(--muted);margin-bottom:10px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:8px}
+.opt.on{border-color:var(--navy);background:var(--navy-soft)}
+.opt .k{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 5px;margin-left:auto;background:var(--panel)}
+.opt b{display:block;font-size:13px}.opt small{font-size:12px;color:var(--muted)}
+.rad{width:16px;height:16px;border-radius:50%;border:1.5px solid #9aa4b1;flex:none;margin-top:2px}
+.opt.on .rad{border:5px solid var(--navy)}
+.pp{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.wf{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:#f7f9fb;font-size:12px;color:var(--muted)}
+.wf .sp{flex:1}
+
+/* people chip + mission card */
+.pc{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 9px 0 4px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--ink)}
+.sq{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:700;background:var(--navy-soft);color:var(--navy)}
+.pc .ar{font-size:10.5px;font-weight:600;color:var(--muted)}
+.pc.oc{border-style:dashed}
+.pc.oc .sq{background:#fff6ea;color:var(--warn)}
+.mc{background:var(--panel);border-radius:var(--r-box);box-shadow:0 0 0 1px var(--line);overflow:hidden;width:100%}
+.mc .bar{height:3px}
+.mc .mh{display:flex;align-items:baseline;gap:8px;padding:9px 12px 2px}
+.mc .mh .no{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--muted)}
+.mc .mh b{font-size:14.5px;color:var(--ink);flex:1}
+.tag{font-size:10px;font-weight:700;padding:0 6px;border-radius:5px;line-height:18px;display:inline-flex;align-items:center;gap:3px}
+.tag.day{background:#eef1f5;color:var(--muted)}
+.tag.night{background:#1e2a3b;color:#e8eef5}
+.mc .meta{display:flex;gap:8px;align-items:center;padding:0 12px 8px;font-size:12px;color:var(--muted)}
+.mc .meta .dot{width:8px;height:8px;border-radius:50%}
+.mc .meta .crew{margin-left:auto;font-family:var(--mono);font-weight:600;color:var(--ink)}
+.mc .ppl{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 12px;border-top:1px solid var(--line);background:#fbfcfd}
+.mc.night .ppl{background:#f3f5f9}
+.stack{display:flex;flex-direction:column;gap:12px;width:100%;max-width:470px}
+
+/* menu, toast, empty */
+.menu{width:230px;background:var(--panel);border-radius:10px;box-shadow:var(--shadow);padding:6px}
+.menu .mh{padding:6px 8px 4px;font-size:11px;font-weight:700;color:var(--muted)}
+.mi{display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;border-radius:6px;font-size:13px;color:var(--text)}
+.mi .ic{color:var(--muted)}
+.mi.hov{background:var(--navy-soft)}
+.mi .sc{margin-left:auto;color:#9aa4b1}
+.mi.dg{color:var(--danger)}.mi.dg .ic{color:var(--danger)}
+.msep{height:1px;background:var(--line);margin:5px 4px}
+.toasts{display:flex;flex-direction:column;gap:8px;width:330px}
+.tst{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;font-size:13px}
+.tst .ti{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:none}
+.tst .ti.ok{background:var(--ok-s);color:var(--ok)}.tst .ti.er{background:var(--danger-s);color:var(--danger)}.tst .ti.wn{background:var(--warn-s);color:var(--warn)}
+.tst b{display:block;color:var(--ink);font-weight:600}.tst small{color:var(--muted);font-size:12px}
+.tst .ta{margin-left:auto;font-weight:600;color:var(--navy);font-size:12.5px;white-space:nowrap}
+.empty{text-align:center;padding:26px 18px}
+.empty .eico{width:44px;height:44px;border-radius:12px;background:#eef1f5;color:var(--muted);display:grid;place-items:center;margin:0 auto 10px}
+.empty b{display:block;color:var(--ink);font-size:14.5px;margin-bottom:4px}
+.empty p{margin:0 auto 14px;color:var(--muted);font-size:13px;max-width:300px}
+.drop{border:1.5px dashed #b8c2ce;border-radius:var(--r-box);padding:18px;text-align:center;background:#f7f9fb}
+.drop b{display:block;color:var(--ink);font-size:13.5px}
+.drop small{color:var(--muted);font-size:12px}
+.step{display:flex;gap:10px;align-items:flex-start}
+.step .sn{width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;flex:none}
+.step .sn.off{background:#eef1f5;color:var(--muted)}
+.pw{font-family:var(--mono);font-size:24px;font-weight:600;letter-spacing:1.5px;color:var(--ink);text-align:center;padding:16px;border-radius:var(--r);background:#f7f9fb;border:1px solid var(--line)}
+.file{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r)}
+.file .fi{width:30px;height:34px;border-radius:5px;background:#e7f3ea;color:#1f7a3d;display:grid;place-items:center;font-size:9px;font-weight:800}
+.file b{display:block;font-size:13px;color:var(--ink)}.file small{color:var(--muted);font-size:12px}
+
+/* page-level mocks */
+.bar-mock{width:100%;background:var(--panel);border-radius:10px;box-shadow:0 0 0 1px var(--line);padding:10px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bar-mock .lbl{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+.bar-mock .sp{flex:1}
+.sechead{width:100%;display:flex;align-items:baseline;gap:10px;padding:4px 2px 8px;border-bottom:1px solid var(--line)}
+.sechead b{font-size:15px;color:var(--ink)}.sechead small{color:var(--muted);font-size:12.5px}
+
+.phone{width:300px;height:520px;border:7px solid #1b2230;border-radius:26px;overflow:hidden;background:var(--panel);display:flex;flex-direction:column}
+.phone .ph{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.phone .ph b{flex:1;font-size:15px;color:var(--ink)}
+.phone .pb{flex:1;overflow:hidden;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.phone .pf{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:#f7f9fb}
+.phone .pf .btn{flex:1;justify-content:center;height:40px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+.summary{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);overflow:hidden}
+.summary table{width:100%;border-collapse:collapse;font-size:13px}
+.summary th,.summary td{text-align:left;padding:8px 12px;border-top:1px solid var(--line);vertical-align:top}
+.summary th{background:#f7f9fb;font-size:12px;color:var(--muted);border-top:0}
+.summary td:first-child{font-family:var(--mono);color:var(--muted);width:36px}
+.wrapt{overflow-x:auto}
+.ok-list{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:13px;columns:2;max-width:900px}
+@media (max-width:700px){.ok-list{columns:1}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+ <symbol id="trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+ <symbol id="chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+ <symbol id="down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+ <symbol id="edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></symbol>
+ <symbol id="move" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+ <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+ <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></symbol>
+ <symbol id="moon" viewBox="0 0 24 24"><path d="M20 14A8 8 0 1110 4a6 6 0 0010 10z"/></symbol>
+ <symbol id="back" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 010 10h-3"/></symbol>
+ <symbol id="ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></symbol>
+ <symbol id="check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+ <symbol id="alert" viewBox="0 0 24 24"><path d="M12 3l9 16H3L12 3zM12 10v4M12 17h.01"/></symbol>
+ <symbol id="up" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></symbol>
+ <symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h8"/></symbol>
+ <symbol id="inbox" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3v-6zM3 13h5l1 3h6l1-3h5"/></symbol>
+ <symbol id="merge" viewBox="0 0 24 24"><path d="M6 3v6a6 6 0 006 6h6M15 12l3 3-3 3M6 21v-6"/></symbol>
+ <symbol id="leave" viewBox="0 0 24 24"><path d="M12 3v18M5 8c2-3 12-3 14 0"/></symbol>
+</svg>
+<div class="page">
+<h1>Signal: what still needs updating</h1>
+<p class="lead">I opened every tab, dialog, menu, popover and toast in the real app, at desktop width (1400px) and phone width (390px), using the test harness's sample data. I compared each one with the Signal direction (<code>design/signal-proposal.html</code>): three surfaces (a side <b>inspector</b> for one record, a <b>workbench</b> for many items, a small <b>dialog</b> for one decision), navy as the only action colour, Geist type with mono for numbers, 8/12px corners, and structure from space rather than a box around everything.</p>
+<p class="lead">Most of the app already follows Signal. Below are the <b>21 places that don't yet</b>. Each one shows today's screenshot and how it would look after the update. The Settings screens on phone aren't in this list; they're in the separate PR #73.</p>
+<div class="legend"><span><span class="sev h">High</span> looks broken or contradicts Signal</span><span><span class="sev m">Med</span> clumsy or off-pattern</span><span><span class="sev l">Low</span> polish</span></div>
+
+<nav class="toc" aria-label="Items">
+ <a href="#i1"><span class="n">01</span>Confirm dialog <span class="sev h">High</span></a>
+ <a href="#i2"><span class="n">02</span>Review &amp; merge forecast <span class="sev h">High</span></a>
+ <a href="#i3"><span class="n">03</span>Host panel: Merge below the footer <span class="sev h">High</span></a>
+ <a href="#i4"><span class="n">04</span>People cards on the board <span class="sev h">High</span></a>
+ <a href="#i5"><span class="n">05</span>Mission card header and night block <span class="sev m">Med</span></a>
+ <a href="#i6"><span class="n">06</span>Employee right-click menu <span class="sev m">Med</span></a>
+ <a href="#i7"><span class="n">07</span>Bulk edit: file upload <span class="sev m">Med</span></a>
+ <a href="#i8"><span class="n">08</span>Add Mission: empty state <span class="sev m">Med</span></a>
+ <a href="#i9"><span class="n">09</span>Mission panel on phone: Start / End <span class="sev m">Med</span></a>
+ <a href="#i10"><span class="n">10</span>Remaining native dropdowns <span class="sev m">Med</span></a>
+ <a href="#i11"><span class="n">11</span>Host list filters vs Manpower <span class="sev m">Med</span></a>
+ <a href="#i12"><span class="n">12</span>Temporary password <span class="sev m">Med</span></a>
+ <a href="#i13"><span class="n">13</span>Toasts <span class="sev l">Low</span></a>
+ <a href="#i14"><span class="n">14</span>Empty read-only dialogs <span class="sev l">Low</span></a>
+ <a href="#i15"><span class="n">15</span>One-option export pickers <span class="sev l">Low</span></a>
+ <a href="#i16"><span class="n">16</span>Employee panel tabs <span class="sev l">Low</span></a>
+ <a href="#i17"><span class="n">17</span>Overview "In detail" navy band <span class="sev l">Low</span></a>
+ <a href="#i18"><span class="n">18</span>Date picker weekends <span class="sev l">Low</span></a>
+ <a href="#i19"><span class="n">19</span>Small dialogs on phone <span class="sev l">Low</span></a>
+ <a href="#i20"><span class="n">20</span>Long help text in panels <span class="sev l">Low</span></a>
+ <a href="#i21"><span class="n">21</span>Close buttons styled as primary <span class="sev l">Low</span></a>
+</nav>
+
+<h2>Dialogs</h2>
+
+<section class="item" id="i1">
+ <div class="ih"><span class="n">01</span><h3>Confirm dialog (Delete mission, Remove engineer, Delete area, Deactivate…)</h3><span class="sev h">High</span></div>
+ <p class="why">Every destructive confirm says <b>"Yes"</b> in navy, the same look as Save. Signal's small dialog names the action on the button, makes a destructive one red, and offers <b>Undo</b> where the app can do it.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/confirm.jpg" alt="Delete mission 101? dialog with Cancel and a navy Yes button" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="dlg"><h4>Delete mission 101?</h4><p>It has 4 people assigned. They move to Standby for Thu 15 Oct.</p>
+    <div class="acts"><button class="btn q">Keep it</button><button class="btn d"><svg class="ic"><use href="#trash"/></svg>Delete mission</button></div>
+   </div></div></div>
+ </div>
+ <ul class="changes"><li><code>showConfirm()</code> gets a verb label from every caller ("Delete mission", "Remove engineer", "Deactivate") and a <code>danger</code> flag that turns the button red.</li><li>No header band or ×. Title, the consequence, then the buttons, the way Signal's small dialog is drawn.</li><li>Non-destructive confirms ("Edit today's board?") keep a navy button, labelled "Edit anyway".</li></ul>
+</section>
+
+<section class="item" id="i2">
+ <div class="ih"><span class="n">02</span><h3>Review &amp; merge forecast</h3><span class="sev h">High</span></div>
+ <p class="why">This is still the old three-column table. A legend of four chips, inline orange Keep/Remove boxes in every row, a hatched "forecast" column, and the whole list at once. Signal makes it a <b>workbench</b>: a queue on the left, one decision at a time on the right, a progress bar, and keys 1/2 with J/K to move.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/merge.jpg" alt="Review and merge forecast as a three-column table" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="wb">
+    <div class="wh"><div><b>Review &amp; merge forecast</b><br><small>Board One · Thu 15 Oct</small></div><div class="prog"><i></i></div><small>1 of 3 decided</small></div>
+    <div class="wbody">
+     <div class="queue">
+      <div class="q"><span class="no">101</span>Host Alpha<span class="st done">Kept</span></div>
+      <div class="q on"><span class="no">102</span>Host Beta<span class="st need">Decide</span></div>
+      <div class="q"><span class="no">103</span>Host Gamma<span class="st need">Decide</span></div>
+      <div class="q" style="color:var(--muted)">Leave · 1 person</div>
+     </div>
+     <div class="detail"><h5>102 · Host Beta → Cust Beta</h5><div class="sub">Day 08:00–17:00 · not in the forecast</div>
+      <div class="opt on"><span class="rad"></span><div><b>Keep carry-over</b><small>1 person stays on this mission</small><div class="pp"><span class="pc"><span class="sq">PC</span>Person C</span></div></div><span class="k">1</span></div>
+      <div class="opt"><span class="rad"></span><div><b>Use the forecast</b><small>The mission is removed; Person C goes to Standby</small></div><span class="k">2</span></div>
+     </div>
+    </div>
+    <div class="wf"><span>J / K to move · 1 / 2 to choose</span><span class="sp"></span><button class="btn sm">Cancel</button><button class="btn sm p" style="opacity:.5">Apply (2 left)</button></div>
+   </div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i3">
+ <div class="ih"><span class="n">03</span><h3>Host panel: "Merge into another host" sits below the footer</h3><span class="sev h">High</span></div>
+ <p class="why"><code>#host-merge</code> is outside the form in <code>index.html</code>, so it renders <b>under</b> Clear record / Cancel / Save, outside the pinned footer. On a phone you scroll past Save to find it. Service area is also a native dropdown.</p>
+ <div class="cmp">
+  <div class="today narrow"><p class="cap">Today (phone, scrolled to the end)</p><img src="app-review/phone-host.jpg" alt="Host panel on a phone with the merge section below the Save button" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="panel"><div class="ph"><b>Host Alpha<small>3 missions · 12 deployment days</small></b><svg class="ic"><use href="#x"/></svg></div>
+    <div class="pb">
+     <div class="f"><label>Location</label><div class="inp ph">e.g. Amata City Chonburi, Plant 2</div></div>
+     <div class="f"><label>Service area</label><div class="chips"><span class="chip on"><i style="background:#7fb8ec"></i>AREA1</span><span class="chip"><i style="background:#a8c855"></i>Rayong</span><span class="chip">None</span></div></div>
+     <div class="disc"><div class="dh"><svg class="ic"><use href="#merge"/></svg>Merge into another host<svg class="ic"><use href="#down"/></svg></div>
+      <div class="db">Moves 3 missions and 12 days to the host you pick, and removes "Host Alpha".<div class="row2"><div class="inp ph" style="flex:1">Search hosts…</div><button class="btn sm" style="color:var(--danger)">Merge</button></div></div></div>
+    </div>
+    <div class="pf"><button class="btn dq">Clear record</button><span class="sp"></span><button class="btn">Cancel</button><button class="btn p">Save</button></div>
+   </div></div></div>
+ </div>
+</section>
+
+<h2>Board</h2>
+
+<section class="item" id="i4">
+ <div class="ih"><span class="n">04</span><h3>People cards on the board</h3><span class="sev h">High</span></div>
+ <p class="why">Signal's third principle is "data over decoration: name first, no grey-on-grey", with people as <b>name-first chips with squircle initials</b>. Today they are still grey tiles: a bold "Person" and a tiny second line, with the area pill in the corner. On-call is shown only by a dashed outline and a dark "OC" badge.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/cards.jpg" alt="Board with grey person tiles" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after"><div class="stack">
+   <div class="mc"><div class="bar" style="background:#a8d98a"></div><div class="mh"><span class="no">101</span><b>Host Alpha</b><span class="tag day"><svg class="ic" style="width:11px;height:11px"><use href="#sun"/></svg>DAY</span></div>
+    <div class="meta"><span>Cust Alpha</span>·<span>08:00–17:00</span>·<span class="dot" style="background:#a8d98a"></span>Eng One<span class="crew">2 / 2</span></div>
+    <div class="ppl"><span class="pc"><span class="sq">PA</span>Person A<span class="ar">AREA1</span></span><span class="pc"><span class="sq">PB</span>Person B<span class="ar">AREA1</span></span></div></div>
+   <div class="ppl" style="display:flex;gap:6px;flex-wrap:wrap"><span class="pc oc"><span class="sq">PG</span>Person G<span class="ar">On-call</span></span><span class="pc oc"><span class="sq">PH</span>Person H<span class="ar">On-call</span></span></div>
+  </div></div></div>
+ </div>
+ <ul class="changes"><li>This is the biggest change on the list. It touches the board, drag and drop, the printed board and the image export, so I'd ship it on its own and check the export at each step.</li><li>The chip stays one line high, so more people fit per mission. The full name (and Thai/English) shows on hover and in the inspector.</li></ul>
+</section>
+
+<section class="item" id="i5">
+ <div class="ih"><span class="n">05</span><h3>Mission card: pastel header wash and the near-black night block</h3><span class="sev m">Med</span></div>
+ <p class="why">Each header is tinted with the engineer's colour, and a night mission gets a near-black body under its header. The Signal review called that out as "reads as an error state, not a shift". After: a white card with a 3px engineer-colour bar and a dot by the engineer's name. Night gets a dark <b>NIGHT</b> tag and a faint cool tint, not a black slab.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/cards.jpg" alt="Mission cards with tinted headers and a black night mission" loading="lazy" style="object-fit:cover;object-position:0 100%;max-height:220px;width:100%"></div>
+  <div><p class="cap">After</p><div class="after"><div class="stack">
+   <div class="mc night"><div class="bar" style="background:#a8d98a"></div><div class="mh"><span class="no">103</span><b>Host Gamma</b><span class="tag night"><svg class="ic" style="width:11px;height:11px"><use href="#moon"/></svg>NIGHT</span></div>
+    <div class="meta"><span>Cust Alpha</span>·<span>20:00–05:00</span>·<span class="dot" style="background:#a8d98a"></span>Eng One<span class="crew">1 / 1</span></div>
+    <div class="ppl"><span class="pc"><span class="sq">PD</span>Person D<span class="ar">AREA1</span></span></div></div>
+  </div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i6">
+ <div class="ih"><span class="n">06</span><h3>Employee right-click menu</h3><span class="sev m">Med</span></div>
+ <p class="why">The icons don't line up: "Move to board" and "Leave" are indented further than the rest, and the icons are a mix of outline and filled. The header is in capitals. Signal menus use one icon column, sentence case, 34px rows and a hover tint, with the destructive item last behind a divider.</p>
+ <div class="cmp">
+  <div class="today narrow"><p class="cap">Today</p><img src="app-review/ctx.jpg" alt="Context menu with misaligned icons" loading="lazy" style="max-width:240px"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="menu"><div class="mh">Person A</div>
+    <div class="mi hov"><svg class="ic"><use href="#edit"/></svg>Edit employee<span class="sc">E</span></div>
+    <div class="mi"><svg class="ic"><use href="#move"/></svg>Move to board<svg class="ic sc"><use href="#chev"/></svg></div>
+    <div class="mi"><svg class="ic"><use href="#plus"/></svg>Assign to mission<svg class="ic sc"><use href="#chev"/></svg></div>
+    <div class="mi"><svg class="ic"><use href="#leave"/></svg>Leave<svg class="ic sc"><use href="#chev"/></svg></div>
+    <div class="mi"><svg class="ic"><use href="#back"/></svg>Return to Standby</div>
+    <div class="msep"></div>
+    <div class="mi dg"><svg class="ic"><use href="#ban"/></svg>Deactivate employee</div>
+   </div></div></div>
+ </div>
+</section>
+
+<h2>Panels and workbenches</h2>
+
+<section class="item" id="i7">
+ <div class="ih"><span class="n">07</span><h3>Bulk edit: the browser's own "Choose File / No file chosen"</h3><span class="sev m">Med</span></div>
+ <p class="why">Step 2 is the unstyled browser file input inside a grey box, and both steps sit in bordered cards. After: two numbered steps, and a proper drop zone that shows the chosen file's name and row count.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/bulk.jpg" alt="Bulk edit panel with a native file input" loading="lazy" style="max-height:520px;object-fit:cover;object-position:top"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="panel"><div class="ph"><b>Bulk edit employees<small>10 rows in the current view</small></b><svg class="ic"><use href="#x"/></svg></div>
+    <div class="pb">
+     <div class="step"><span class="sn">1</span><div style="flex:1"><b style="font-size:13px">Get the file</b><p class="hint" style="margin:2px 0 8px">The template holds the 10 rows you are looking at.</p><button class="btn sm"><svg class="ic"><use href="#up"/></svg>Download Excel template</button></div></div>
+     <div class="step"><span class="sn off">2</span><div style="flex:1"><b style="font-size:13px">Upload it back</b><div class="drop" style="margin-top:8px"><b>Drop the .xlsx here</b><small>or <u>choose a file</u> · you review every change first</small></div></div></div>
+    </div>
+    <div class="pf"><label style="font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center"><span style="width:14px;height:14px;border-radius:4px;background:var(--navy);display:inline-block"></span>Back up the list first</label><span class="sp"></span><button class="btn">Cancel</button><button class="btn p" style="opacity:.5">Apply changes</button></div>
+   </div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i8">
+ <div class="ih"><span class="n">08</span><h3>Add Mission: an empty, full-height dialog</h3><span class="sev m">Med</span></div>
+ <p class="why">When there is nothing to copy, the 900px workbench shows one grey sentence at the top and a disabled "Add selected". After: a composed empty state that says why, and offers the next step (create a mission instead).</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/import.jpg" alt="Add Mission with one line of text and empty space" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="dlg" style="width:420px"><div class="empty"><div class="eico"><svg class="ic" style="width:22px;height:22px"><use href="#inbox"/></svg></div><b>Nothing to copy yet</b><p>No missions on Board One in the last 5 working days. Start this day with a new mission instead.</p><div class="acts" style="justify-content:center"><button class="btn">Close</button><button class="btn p"><svg class="ic"><use href="#plus"/></svg>New mission</button></div></div></div>
+  </div></div>
+ </div>
+</section>
+
+<section class="item" id="i9">
+ <div class="ih"><span class="n">09</span><h3>Mission panel on a phone: Start beside Shift, End on its own row</h3><span class="sev m">Med</span></div>
+ <p class="why">At 390px the When row wraps, so "Start" sits beside the Day/Night switch and "End" drops onto a line of its own. After: Shift takes its own full row, with Start and End side by side below it.</p>
+ <div class="cmp">
+  <div class="today narrow"><p class="cap">Today</p><img src="app-review/phone-mission.jpg" alt="Mission panel on a phone with End on its own row" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="phone"><div class="ph"><b>Edit mission 101</b><svg class="ic"><use href="#x"/></svg></div>
+    <div class="pb">
+     <div class="f"><label>Host (company)</label><div class="inp">Host Alpha</div></div>
+     <div class="f"><label>Shift</label><div class="seg"><span class="on">Day</span><span>Night</span></div></div>
+     <div class="grid2"><div class="f"><label>Start</label><div class="inp">08:00</div></div><div class="f"><label>End</label><div class="inp">17:00</div></div></div>
+     <div class="f"><label>Engineer</label><div class="inp">Eng One</div></div>
+    </div>
+    <div class="pf"><button class="btn">Cancel</button><button class="btn p">Save</button></div>
+   </div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i10">
+ <div class="ih"><span class="n">10</span><h3>Native dropdowns still left outside Settings</h3><span class="sev m">Med</span></div>
+ <p class="why">On Android each of these opens the system's dark list, the same problem as the old Settings picker:</p>
+ <ul class="changes full" style="padding-top:8px"><li><b>Capacity:</b> Range (Next 2 weeks) and the shift picker in the "Add host" row.</li><li><b>Org chart:</b> "Show to".</li><li><b>Host panel:</b> Service area, and "Choose the host to keep".</li><li><b>Engineers (Settings):</b> the account link on an unlinked record.</li></ul>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/capacity.jpg" alt="Capacity toolbar with a native Range select" loading="lazy"><img src="app-review/orgchart.jpg" alt="Org chart toolbar with a native Show to select" loading="lazy" style="margin-top:8px"></div>
+  <div><p class="cap">After</p><div class="after" style="flex-direction:column;gap:10px">
+   <div class="bar-mock"><span class="lbl">Range</span><div class="seg" style="width:auto"><span>1 week</span><span class="on">2 weeks</span><span>4 weeks</span><span>8 weeks</span></div><span class="sp"></span><button class="btn p sm">Start from confirmed plan</button></div>
+   <div class="bar-mock"><span class="lbl">Show to</span><div class="seg" style="width:auto"><span>Board</span><span>Engineer</span><span class="on">Mission</span><span>Crew</span></div></div>
+  </div></div>
+ </div>
+</section>
+
+<section class="item" id="i11">
+ <div class="ih"><span class="n">11</span><h3>Host list filters don't match Manpower's</h3><span class="sev m">Med</span></div>
+ <p class="why">Manpower has one <b>Filters</b> button. Host has five separate dropdown buttons ("Service area: All", "Board: All", "Inspector: All", "Location: All", "Status: All"), which crowd the toolbar. After: one Filters button, the same as Manpower, with the active filters shown as removable chips.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/hostlist.jpg" alt="Host list toolbar with five filter buttons" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="bar-mock"><button class="btn p sm"><svg class="ic"><use href="#plus"/></svg>Host</button><div class="inp ph" style="height:30px;flex:1;min-width:140px">Search host, location, inspector…</div><button class="btn sm">Filters · 1</button><span class="chip" style="height:26px">No location <svg class="ic" style="width:12px;height:12px"><use href="#x"/></svg></span></div>
+  </div></div>
+ </div>
+</section>
+
+<section class="item" id="i12">
+ <div class="ih"><span class="n">12</span><h3>Temporary password</h3><span class="sev m">Med</span></div>
+ <p class="why">The one thing the admin has to read out or copy is a small code line with a small Copy button, under a header band. After: the Signal small dialog, with the password large in mono and a full-width Copy that confirms when it's done.</p>
+ <div class="cmp">
+  <div class="today narrow"><p class="cap">Today</p><img src="app-review/temp-password.jpg" alt="Account created dialog with a small password" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after">
+   <div class="dlg"><h4>Account created for Mgr M.</h4><p>Share this temporary password once. They set their own at first sign-in.</p>
+    <div class="pw">k7Rm-4xQv-92</div>
+    <button class="btn" style="width:100%;justify-content:center;margin:10px 0 12px"><svg class="ic"><use href="#copy"/></svg>Copy password</button>
+    <div class="acts"><button class="btn p">Done</button></div></div>
+  </div></div>
+ </div>
+</section>
+
+<h2>Small things</h2>
+
+<section class="item" id="i13">
+ <div class="ih"><span class="n">13</span><h3>Toasts</h3><span class="sev l">Low</span></div>
+ <p class="why">Each toast is a white box with a coloured left stripe. There is no icon, and success, warning and error all look alike at a glance. After: an icon tile, a title line, and an action where there is one (Undo, Retry).</p>
+ <div class="cmp">
+  <div class="today narrow"><p class="cap">Today</p><img src="app-review/toast.jpg" alt="Three toasts with coloured left stripes" loading="lazy" style="max-width:280px"></div>
+  <div><p class="cap">After</p><div class="after"><div class="toasts">
+   <div class="tst"><span class="ti ok"><svg class="ic" style="width:13px;height:13px"><use href="#check"/></svg></span><div><b>Mission 101 saved</b></div><span class="ta">Undo</span></div>
+   <div class="tst"><span class="ti er"><svg class="ic" style="width:13px;height:13px"><use href="#x"/></svg></span><div><b>Couldn't save</b><small>The network dropped.</small></div><span class="ta">Retry</span></div>
+   <div class="tst"><span class="ti wn"><svg class="ic" style="width:13px;height:13px"><use href="#alert"/></svg></span><div><b>Board is locked for this date</b></div></div>
+  </div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i14">
+ <div class="ih"><span class="n">14</span><h3>Empty read-only dialogs (Forecast, Holds taken, Merge decisions)</h3><span class="sev l">Low</span></div>
+ <p class="why">When there is nothing to show, these are a header band, one grey sentence and a navy <b>Close</b>, so the only button looks like an action. After: the same empty-state block as item 08, with a quiet Close.</p>
+ <div class="cmp">
+  <div class="today narrow"><p class="cap">Today</p><img src="app-review/forecast-view.jpg" alt="Forecast dialog saying the forecast is empty" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after"><div class="dlg"><div class="empty" style="padding:8px 4px"><div class="eico"><svg class="ic" style="width:22px;height:22px"><use href="#inbox"/></svg></div><b>No forecast for Thu 15 Oct</b><p>Nobody has planned this day ahead yet. A forecast stays here for reference after it is merged.</p><button class="btn">Close</button></div></div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i15">
+ <div class="ih"><span class="n">15</span><h3>Export pickers with only one file type</h3><span class="sev l">Low</span></div>
+ <p class="why">Manpower and Host list exports draw a segmented "File type" control that has a single option, "Excel". After: a file chip that says what you'll get, so there is no control with nothing to choose.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/emplist-xlsx.jpg" alt="Export Manpower List with a one-option file type control" loading="lazy" style="max-height:330px;object-fit:cover;object-position:top"></div>
+  <div><p class="cap">After</p><div class="after"><div class="panel"><div class="ph"><b>Export Manpower list</b><svg class="ic"><use href="#x"/></svg></div><div class="pb"><div class="file"><span class="fi">XLSX</span><div><b>Manpower list.xlsx</b><small>10 employees · the rows the table shows now</small></div></div><div class="f"><label>Language</label><div class="seg"><span class="on">English</span><span>ไทย (Thai)</span></div></div></div><div class="pf"><span class="sp"></span><button class="btn">Cancel</button><button class="btn p">Export</button></div></div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i16">
+ <div class="ih"><span class="n">16</span><h3>Employee panel tabs</h3><span class="sev l">Low</span></div>
+ <p class="why">The Host Record / Note / Edit Employee tabs use the old underline style. When there's no history the panel is empty apart from one line, with a lone "Close" in the footer. After: a segmented control like the rest of the inspector, the person's name and board in the header, and an empty state.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/employee.jpg" alt="Edit Employee panel with underline tabs and an empty pane" loading="lazy" style="max-height:330px;object-fit:cover;object-position:top"></div>
+  <div><p class="cap">After</p><div class="after"><div class="panel"><div class="ph"><span class="sq" style="width:34px;height:34px;font-size:12px">PA</span><b>Person A<small>Board One · Permanent · AREA1</small></b><svg class="ic"><use href="#x"/></svg></div><div class="pb"><div class="seg"><span class="on">Host record</span><span>Note</span><span>Details</span></div><div class="empty" style="padding:14px 4px"><b>No deployments yet</b><p>Hosts appear here once Person A has worked a mission.</p></div></div><div class="pf"><span class="sp"></span><button class="btn">Close</button></div></div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i17">
+ <div class="ih"><span class="n">17</span><h3>Overview: the full-width navy "In detail" band</h3><span class="sev l">Low</span></div>
+ <p class="why">A solid navy bar breaks the light page between the summary and the detail cards. Signal reserves navy for actions and selection. After: a plain section heading with a hairline.</p>
+ <div class="cmp">
+  <div class="today"><p class="cap">Today</p><img src="app-review/overview.jpg" alt="Overview with a navy In detail band" loading="lazy"></div>
+  <div><p class="cap">After</p><div class="after"><div class="sechead"><b>In detail</b><small>Thu 15 Oct · all boards</small></div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i18">
+ <div class="ih"><span class="n">18</span><h3>Date picker weekends</h3><span class="sev l">Low</span></div>
+ <p class="why">Weekend days are filled pink-red, which reads as an error and clashes with the amber now used for holidays. After: weekend dates in muted text with no fill, holidays as a small amber dot, and today ringed in navy.</p>
+ <div class="cmp">
+  <div><p class="cap">Today</p><div class="after" style="background:#fff;border:1px solid var(--line)"><div style="display:grid;grid-template-columns:repeat(7,30px);gap:3px;font-size:12px;text-align:center">
+   <span style="background:#fde2e1;color:#b42318;border-radius:5px;padding:5px 0">4</span><span style="padding:5px 0">5</span><span style="padding:5px 0">6</span><span style="padding:5px 0">7</span><span style="padding:5px 0">8</span><span style="padding:5px 0">9</span><span style="background:#fde2e1;color:#b42318;border-radius:5px;padding:5px 0">10</span>
+   <span style="background:#fde2e1;color:#b42318;border-radius:5px;padding:5px 0">11</span><span style="padding:5px 0">12</span><span style="padding:5px 0">13</span><span style="padding:5px 0">14</span><span style="background:var(--navy);color:#fff;border-radius:5px;padding:5px 0">15</span><span style="padding:5px 0">16</span><span style="background:#fde2e1;color:#b42318;border-radius:5px;padding:5px 0">17</span></div></div></div>
+  <div><p class="cap">After</p><div class="after" style="background:#fff;border:1px solid var(--line)"><div style="display:grid;grid-template-columns:repeat(7,30px);gap:3px;font-size:12px;text-align:center">
+   <span style="color:#9aa4b1;padding:5px 0">4</span><span style="padding:5px 0">5</span><span style="padding:5px 0">6</span><span style="padding:5px 0">7</span><span style="padding:5px 0;position:relative">8<i style="position:absolute;left:50%;bottom:1px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:#d98b17"></i></span><span style="padding:5px 0">9</span><span style="color:#9aa4b1;padding:5px 0">10</span>
+   <span style="color:#9aa4b1;padding:5px 0">11</span><span style="padding:5px 0">12</span><span style="padding:5px 0;box-shadow:inset 0 0 0 1.5px var(--navy);border-radius:5px">13</span><span style="padding:5px 0">14</span><span style="background:var(--navy);color:#fff;border-radius:5px;padding:5px 0">15</span><span style="padding:5px 0">16</span><span style="color:#9aa4b1;padding:5px 0">17</span></div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i19">
+ <div class="ih"><span class="n">19</span><h3>Small dialogs on a phone</h3><span class="sev l">Low</span></div>
+ <p class="why">Confirm, Unsaved changes, Change password, Review permission changes and Rename board stay as centred boxes on a phone, while every record panel there is a sheet. After: they rise from the bottom as short sheets, with full-width stacked buttons and the main action on top.</p>
+ <div class="cmp">
+  <div><p class="cap">Today</p><div class="after"><div class="phone" style="height:380px;background:#8c95a1;justify-content:center;align-items:center"><div class="dlg" style="width:250px;padding:14px"><h4 style="font-size:14px">Save your changes?</h4><p style="font-size:12px">You have unsaved changes in Service areas.</p><div class="acts" style="flex-wrap:wrap"><button class="btn sm">Keep editing</button><button class="btn sm" style="color:var(--danger)">Discard</button><button class="btn sm p">Save &amp; continue</button></div></div></div></div></div>
+  <div><p class="cap">After</p><div class="after"><div class="phone" style="height:380px;background:#8c95a1;justify-content:flex-end"><div style="background:#fff;border-radius:16px 16px 0 0;padding:16px 14px"><h4 style="margin:0 0 4px;font-size:15px;color:var(--ink)">Save your changes?</h4><p style="margin:0 0 12px;font-size:12.5px;color:var(--muted)">You have unsaved changes in Service areas.</p><button class="btn p" style="width:100%;justify-content:center;height:42px;margin-bottom:6px">Save &amp; continue</button><button class="btn" style="width:100%;justify-content:center;height:42px;margin-bottom:6px">Keep editing</button><button class="btn dq" style="width:100%;justify-content:center;height:38px">Discard</button></div></div></div></div>
+ </div>
+</section>
+
+<section class="item" id="i20">
+ <div class="ih"><span class="n">20</span><h3>Long help text in the record panels</h3><span class="sev l">Low</span></div>
+ <p class="why">Host name, Google Maps link, Bulk edit and the export panels each carry a 3–5 line paragraph under a field (see the screenshots in items 03, 07 and 15). After: one line under the field. The rest moves behind a "How this works" link that opens inline, so forms stay short enough to scan.</p>
+</section>
+
+<section class="item" id="i21">
+ <div class="ih"><span class="n">21</span><h3>"Close" styled as the primary action</h3><span class="sev l">Low</span></div>
+ <p class="why">The read-only dialogs (Forecast, Holds taken, Merge decisions, Temporary password's Done is fine) end on a filled navy <b>Close</b>. Signal keeps one filled button per surface for an action that changes something. Close becomes a plain button. This is the rule behind item 14, applied everywhere.</p>
+</section>
+
+<h2>Already in line with Signal</h2>
+<p class="lead">These were checked and need nothing (apart from what's listed above):</p>
+<ul class="ok-list"><li>Top bar, board tabs and the numbers strip</li><li>Mission, Host and User side panels (frame, header, pinned footer)</li><li>Hide/Unhide missions and Add Mission lists (when there is data)</li><li>Copy forecast, Rename board, Review permission changes</li><li>Board, Capacity, Host list and Manpower export panels</li><li>New board, Add service area, Add user</li><li>Overview cards, By board and By engineer tables</li><li>Manpower and Host tables on desktop, and as cards on a phone</li><li>Capacity grid</li><li>Avatar menu and the board dropdown</li><li>Phone shell: bottom bar, drawer and full-screen panels</li><li>Settings, once PR #73 is merged</li></ul>
+
+<h2>Suggested order</h2>
+<div class="summary wrapt"><table>
+<thead><tr><th>#</th><th>Batch</th><th>Items</th><th>Size</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Dialog rules: verb buttons, red for destructive, quiet Close, empty states, sheets on a phone</td><td>01, 08, 12, 14, 19, 21</td><td>Small, mostly <code>showConfirm()</code> callers and CSS</td></tr>
+<tr><td>2</td><td>Panel fixes: Host merge inside the panel, phone When row, file drop zone, one-option exports, shorter help</td><td>03, 07, 09, 15, 16, 20</td><td>Small–medium</td></tr>
+<tr><td>3</td><td>Controls: replace the remaining native dropdowns, one Filters pattern</td><td>10, 11</td><td>Medium</td></tr>
+<tr><td>4</td><td>Menus and feedback: context menu, toasts, date picker, Overview heading</td><td>06, 13, 17, 18</td><td>Small</td></tr>
+<tr><td>5</td><td>Merge forecast as a workbench</td><td>02</td><td>Medium–large</td></tr>
+<tr><td>6</td><td>Board cards: people chips and mission cards (check print and image export)</td><td>04, 05</td><td>Large</td></tr>
+</tbody></table></div>
+<p class="lead" style="margin-top:14px">Tell me which items or batches to build. You can approve all of them, drop some, or change an "after" first.</p>
+</div>
+</body>
+</html>
