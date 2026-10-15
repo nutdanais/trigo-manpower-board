@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-15d">
+<link rel="stylesheet" href="styles.css?v=2026-10-15e">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-15d"></script>
+<script src="version.js?v=2026-10-15e"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -291,19 +291,18 @@
         <p id="sv-hint"></p>
       </div>
       <div id="sv-head-actions">
-        <button class="btn btn-small btn-primary hidden" id="btn-add-engineer" type="button"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add engineer</button>
-        <button class="btn btn-small btn-primary hidden" id="btn-add-area" type="button"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add area</button>
-        <button class="btn btn-small btn-primary hidden" id="btn-add-board-settings" type="button" title="Create a new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Board</button>
-        <button class="btn btn-small btn-primary hidden" id="btn-add-user" type="button" title="Create an account and get a temporary password to hand over"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add user</button>
+        <button class="btn btn-small btn-primary hidden" id="btn-add-engineer" type="button" aria-label="Add engineer"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg><span class="btn-label"> Add engineer</span></button>
+        <button class="btn btn-small btn-primary hidden" id="btn-add-area" type="button" aria-label="Add area"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg><span class="btn-label"> Add area</span></button>
+        <button class="btn btn-small btn-primary hidden" id="btn-add-board-settings" type="button" aria-label="Add board" title="Create a new board"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg><span class="btn-label"> Board</span></button>
+        <button class="btn btn-small btn-primary hidden" id="btn-add-user" type="button" aria-label="Add user" title="Create an account and get a temporary password to hand over"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg><span class="btn-label"> Add user</span></button>
       </div>
-      <button type="button" class="btn btn-icon sv-back-icon" id="btn-settings-back-icon" aria-label="Back to board" title="Back to board"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"></use></svg></button>
+      <button type="button" class="btn btn-icon sv-back-icon" id="btn-settings-back-icon" aria-label="Back to board" title="Back to board"><svg class="ic sv-ic-back" aria-hidden="true"><use href="#i-chevron-left"></use></svg><svg class="ic sv-ic-close" aria-hidden="true"><use href="#i-close"></use></svg></button>
     </header>
 
-    <!-- Phone only: the rail is gone at 720px, this takes its place -->
-    <div id="sv-mobile-nav">
-      <label for="sv-select" class="sr-only">Settings section</label>
-      <select id="sv-select"></select>
-    </div>
+    <!-- Phone only: the rail is gone at 720px. Settings opens on this list of
+         sections (grouped like the rail); a section then has the whole screen,
+         and its back chevron comes back here (see renderSvHome in app.js). -->
+    <nav id="sv-home" aria-label="Settings sections"></nav>
 
     <div id="sv-scroll">
       <!-- My account: the one pane every role can open, which is why user
@@ -385,6 +384,7 @@
           <span id="users-pending-text"></span>
           <button type="button" class="btn btn-small" id="btn-users-pending">Review requests</button>
         </div>
+        <div id="users-chips" class="sv-chips" role="group" aria-label="Show"></div>
         <div id="users-toolbar">
           <input id="users-search" type="search" placeholder="Search name or email…" aria-label="Search users" autocomplete="off">
           <div id="users-filters">
@@ -393,7 +393,7 @@
           </div>
           <div class="toolbar-spacer"></div>
           <span id="users-count"></span>
-          <button type="button" class="btn btn-small" id="btn-users-xlsx" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Excel</button>
+          <button type="button" class="btn btn-small" id="btn-users-xlsx" aria-label="Export to Excel" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span class="btn-label"> Excel</span></button>
         </div>
         <div class="table-wrap">
           <table id="users-table" class="sv-responsive">
@@ -422,6 +422,7 @@
           <div><b>Changes affect everyone with that role</b>, including anyone with the app open right now. You review them before they apply. Admin always keeps full access, so nobody can lock themselves out of this screen.</div>
         </div>
         <p class="import-note"><b>Edit</b> also grants view. <b>—</b> removes access. Hiding an Overview section keeps it off the page and skips its query; it is not a data barrier — those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
+        <div id="rm-role-chips" class="sv-chips" role="group" aria-label="Role to review"></div>
         <div class="rm-role-pick">
           <label for="rm-role-select">Role to review</label>
           <select id="rm-role-select"></select>
@@ -1031,12 +1032,14 @@
       <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off"></label>
       <p class="import-note">The short name the board shows. Left empty it comes from their email address — <b>first name . last initial</b>. Their mobile number is theirs to set, under Settings → My account.</p>
       <label>Role <select name="roleKey" required></select></label>
+      <div class="role-pick" data-for="roleKey" role="radiogroup" aria-label="Role"></div>
       <p id="user-role-hint" class="import-note"></p>
-      <label>Status <select name="status" required>
-        <option value="pending">Pending — waiting for approval</option>
-        <option value="active">Active — can sign in</option>
-        <option value="disabled">Disabled — kept on record, cannot sign in</option>
+      <label>Status <select name="status" required data-seg>
+        <option value="pending">Pending</option>
+        <option value="active">Active</option>
+        <option value="disabled">Disabled</option>
       </select></label>
+      <p class="import-note field-hint-tight">Pending is waiting for approval. Disabled keeps the record but stops them signing in.</p>
       <p id="user-modal-note" class="import-note hidden"></p>
       <!-- Things you do TO the account, kept apart from saving the form above:
            four buttons on one row wrapped even on a desktop, and these two are
@@ -1062,6 +1065,7 @@
       <label>Display name <input name="displayName" type="text" maxlength="40" autocomplete="off" placeholder="from their email address"></label>
       <label>Email <input name="email" type="email" required autocomplete="off" placeholder="name@trigo-group.com"></label>
       <label>Role <select name="roleKey" required></select></label>
+      <div class="role-pick" data-for="roleKey" role="radiogroup" aria-label="Role"></div>
       <p class="import-note">The account is created straight away, already approved. You'll get a temporary password to pass on — they choose their own the first time they sign in. Only <span class="invite-domain">@trigo-group.com</span> addresses can be added.</p>
       <div class="modal-actions">
         <button type="button" class="btn" data-close>Cancel</button>
@@ -1077,6 +1081,10 @@
     <h3>Add an engineer<button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-add-engineer">
       <label>Person <select name="profileId" required></select></label>
+      <div class="ae-pick">
+        <label class="hm-search ae-search"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="ae-q" placeholder="Search people" aria-label="Search people" autocomplete="off"></label>
+        <div id="ae-list" class="hm-list ae-list" role="radiogroup" aria-label="Person"></div>
+      </div>
       <p id="add-engineer-note" class="import-note">They get a colour of their own and can be picked in the Engineer box on a mission. Their name and phone number come from their account.</p>
       <div class="modal-actions">
         <button type="button" class="btn" id="btn-add-engineer-cancel">Cancel</button>
@@ -1383,13 +1391,13 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-15d"></script>
-<script src="employee-id.js?v=2026-10-15d"></script>
-<script src="cloud.js?v=2026-10-15d"></script>
-<script src="charts.js?v=2026-10-15d"></script>
-<script src="xlsx-export.js?v=2026-10-15d"></script>
-<script src="orgchart-pptx.js?v=2026-10-15d"></script>
-<script src="bulk-edit.js?v=2026-10-15d"></script>
-<script src="app.js?v=2026-10-15d"></script>
+<script src="planning.js?v=2026-10-15e"></script>
+<script src="employee-id.js?v=2026-10-15e"></script>
+<script src="cloud.js?v=2026-10-15e"></script>
+<script src="charts.js?v=2026-10-15e"></script>
+<script src="xlsx-export.js?v=2026-10-15e"></script>
+<script src="orgchart-pptx.js?v=2026-10-15e"></script>
+<script src="bulk-edit.js?v=2026-10-15e"></script>
+<script src="app.js?v=2026-10-15e"></script>
 </body>
 </html>
