@@ -57,6 +57,7 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
 .chip .sq{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;font-size:8px;font-weight:700;background:var(--navy-soft);color:var(--navy)}
 .chip.oc{box-shadow:0 0 0 1px var(--warn-l);background:#fffaf2}
 .chip.oc .sq{background:#fff1dd;color:var(--warn)}
+.chip .ocb{font-size:8.5px;font-weight:700;padding:0 4px;border-radius:999px;background:#fff1dd;color:#8a4f10;box-shadow:inset 0 0 0 1px #efd2ab;line-height:13px;margin-left:2px}
 .chip.me{box-shadow:0 0 0 2px var(--navy)}
 .chip.out{opacity:.45;text-decoration:line-through}
 .dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11.5px;margin:6px 0 0}
@@ -168,16 +169,16 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
 </svg>
 <div class="page">
 <h1>Merge forecast: the card stack, with the full picture</h1>
-<p class="lead">This is option <b>2A·2</b> for desktop and phone, with every mission and employee detail the app already has on each card, so you can decide without leaving the merge. The example is one day: Board One, Thu 15 Oct. Kanya R. made the forecast on Mon 12 Oct, and there are three clashes. Names and numbers are made up.</p>
+<p class="lead"><b>Approved, with your edits:</b> no engineer phone, PPE or time unless that is what changed; the contract shows only as an OC badge on on-call people. This is option <b>2A·2</b> for desktop and phone, with every mission and employee detail the app already has on each card, so you can decide without leaving the merge. The example is one day: Board One, Thu 15 Oct. Kanya R. made the forecast on Mon 12 Oct, and there are three clashes. Names and numbers are made up.</p>
 
 <div class="info wrapt"><b style="color:var(--ink)">What each card shows, and where it comes from</b>
 <table>
 <thead><tr><th>On the card</th><th>Details</th><th>Source in the app today</th></tr></thead>
 <tbody>
-<tr><td>The person</td><td>Thai and English name, TRIGO ID, position, contract (permanent / on-call), service area, phone, years of service</td><td>Employee record (Manpower list)</td></tr>
+<tr><td>The person</td><td>Thai and English name, TRIGO ID, position, service area, phone, years of service; an OC badge only for on-call people</td><td>Employee record (Manpower list)</td></tr>
 <tr><td>Their recent work</td><td>Days on a mission in the last 30 days, and days already this week</td><td>Assignments, the same as Manpower's 30D utilization</td></tr>
 <tr><td>Host experience</td><td>Days worked at each host in the choice, plus their top hosts</td><td>Host record (deployment history)</td></tr>
-<tr><td>Each mission</td><td>Number, shift, time, host and its location and area, customer, engineer and phone, PPE, remark</td><td>Mission</td></tr>
+<tr><td>Each mission</td><td>Number, shift, host and its location and area, customer, engineer, remark. Time, PPE and the engineer's phone only appear when they are what changed</td><td>Mission</td></tr>
 <tr><td>Crew under each choice</td><td>Who is on the mission and the count, if you pick this side</td><td>The plan and the forecast</td></tr>
 <tr><td>Fit checks</td><td>Area match, has worked this host, on leave or held elsewhere, shift change from yesterday</td><td>Worked out from the above, never a rule that blocks you</td></tr>
 <tr><td>Who forecast it</td><td>The forecaster, when, and their note if they left one</td><td>Forecast</td></tr>
@@ -195,7 +196,7 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
     <div class="q">Clash 1 of 3 · a person in two places<span class="pill fc">Kanya R. · Mon 12 Oct</span></div>
     <h3>Where does Somsak J. work on Thu?</h3>
     <div class="who"><span class="av">SJ</span><div style="flex:1;min-width:0"><b>สมศักดิ์ ใจดี <span class="en">Somsak Jaidee · TG-10482</span></b>
-      <div class="tags"><span class="pill perm">Permanent</span><span class="pill perm">Senior Inspector</span><span class="pill area">AREA1</span><span class="pill perm"><svg class="ic"><use href="#phone"/></svg>081-447-2093</span></div></div></div>
+      <div class="tags"><span class="pill perm">Senior Inspector</span><span class="pill area">AREA1</span><span class="pill perm"><svg class="ic"><use href="#phone"/></svg>081-447-2093</span></div></div></div>
     <div class="stats"><div><b>6 yr</b><small>service</small></div><div><b>21 / 30</b><small>days on a mission</small></div><div><b>4</b><small>days this week</small></div><div><b>Day</b><small>yesterday's shift</small></div></div>
     <div class="hist">Top hosts:<span>Host Beta <b>38</b>d</span><span>Host Alpha <b>12</b>d</span><span>Host Delta <b>3</b>d</span></div>
     <div class="opts">
@@ -203,7 +204,7 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
       <div class="src">Keep · carry-over<span class="k kbd">1 · ←</span></div>
       <div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div>
       <div class="loc"><svg class="ic"><use href="#pin"/></svg> Amata City, Plant 3 · <span class="pill area">AREA1</span></div>
-      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd>08:00–17:00</dd><dt>Engineer</dt><dd>Eng Two · 089-312-7740</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Engineer</dt><dd>Eng Two</dd></dl>
       <div class="crewl">Crew if kept <b>2</b></div>
       <div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip"><span class="sq">PK</span>Person K</span></div>
       <div class="fit"><span class="g"><svg class="ic"><use href="#check"/></svg>Same area (AREA1)</span><span class="g"><svg class="ic"><use href="#check"/></svg>38 days at Host Beta</span><span class="n"><svg class="ic"><use href="#dot"/></svg>Same as yesterday</span></div>
@@ -213,10 +214,10 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
       <div class="src">Use · Kanya's forecast<span class="k kbd">2 · →</span></div>
       <div class="mt"><span class="no">105</span><b>Host Delta</b><span class="tag day">DAY</span></div>
       <div class="loc"><svg class="ic"><use href="#pin"/></svg> Rayong, Map Ta Phut · <span class="pill area2">Rayong</span></div>
-      <dl class="dl"><dt>Customer</dt><dd>Cust Delta</dd><dt>Time</dt><dd>07:00–16:00</dd><dt>Engineer</dt><dd>Eng One · 086-905-1182</dd><dt>PPE</dt><dd>Safety shoes, helmet, glasses, gloves</dd><dt>Remark</dt><dd>Gate pass needed, ask at security</dd></dl>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Delta</dd><dt>Engineer</dt><dd>Eng One</dd><dt>Remark</dt><dd>Gate pass needed, ask at security</dd></dl>
       <div class="crewl">Crew if used <b>2</b></div>
-      <div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip oc"><span class="sq">PH</span>Person H</span></div>
-      <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Different area (Rayong, not AREA1)</span><span class="g"><svg class="ic"><use href="#check"/></svg>3 days at Host Delta</span><span class="w"><svg class="ic"><use href="#alert"/></svg>Starts 1 hour earlier</span></div>
+      <div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip oc"><span class="sq">PH</span>Person H<span class="ocb">OC</span></span></div>
+      <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Different area (Rayong, not AREA1)</span><span class="g"><svg class="ic"><use href="#check"/></svg>3 days at Host Delta</span></div>
       <div class="after">102 then has <b>1</b> (Person K only)</div>
      </div>
     </div>
@@ -235,10 +236,10 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
      <div class="tags"><span class="pill perm">Senior Insp.</span><span class="pill area">AREA1</span></div></div></div>
    <div class="stats"><div><b>6y</b><small>service</small></div><div><b>21</b><small>/30 days</small></div><div><b>4</b><small>this wk</small></div><div><b>Day</b><small>yest.</small></div></div>
    <div class="opts">
-    <div class="op"><div class="src">Keep · carry-over</div><div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div><div class="loc">Amata City · 08:00–17:00 · Eng Two</div>
+    <div class="op"><div class="src">Keep · carry-over</div><div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div><div class="loc">Amata City · Eng Two</div>
      <div class="fit"><span class="g"><svg class="ic"><use href="#check"/></svg>Same area · 38 days here</span></div></div>
-    <div class="op on"><div class="src">Use · Kanya</div><div class="mt"><span class="no">105</span><b>Host Delta</b><span class="tag day">DAY</span></div><div class="loc">Map Ta Phut · 07:00–16:00 · Eng One</div>
-     <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Other area · starts 1 h earlier</span><span class="g"><svg class="ic"><use href="#check"/></svg>3 days here</span></div></div>
+    <div class="op on"><div class="src">Use · Kanya</div><div class="mt"><span class="no">105</span><b>Host Delta</b><span class="tag day">DAY</span></div><div class="loc">Map Ta Phut · Eng One</div>
+     <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Other area</span><span class="g"><svg class="ic"><use href="#check"/></svg>3 days here</span></div></div>
    </div>
    <div class="more">Missions, crews and Kanya's note<svg class="ic"><use href="#chev"/></svg></div>
   </div></div>
@@ -250,12 +251,12 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
   <div class="bd"><span class="scroll" style="top:120px"></span><div class="card" style="margin-top:-150px">
    <div class="opts">
     <div class="op"><div class="src">Keep · 102 Host Beta</div>
-     <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Engineer</dt><dd>Eng Two · 089-312-7740</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl>
+     <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Engineer</dt><dd>Eng Two</dd></dl>
      <div class="crewl">Crew if kept <b>2</b></div><div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip"><span class="sq">PK</span>Person K</span></div>
      <div class="after">105 then has <b>1</b> of 2</div></div>
     <div class="op on"><div class="src">Use · 105 Host Delta</div>
-     <dl class="dl"><dt>Customer</dt><dd>Cust Delta</dd><dt>Engineer</dt><dd>Eng One · 086-905-1182</dd><dt>PPE</dt><dd>Shoes, helmet, glasses, gloves</dd><dt>Remark</dt><dd>Gate pass needed</dd></dl>
-     <div class="crewl">Crew if used <b>2</b></div><div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip oc"><span class="sq">PH</span>Person H</span></div>
+     <dl class="dl"><dt>Customer</dt><dd>Cust Delta</dd><dt>Engineer</dt><dd>Eng One</dd><dt>Remark</dt><dd>Gate pass needed</dd></dl>
+     <div class="crewl">Crew if used <b>2</b></div><div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip oc"><span class="sq">PH</span>Person H<span class="ocb">OC</span></span></div>
      <div class="after">102 then has <b>1</b></div></div>
    </div>
    <div class="note"><svg class="ic"><use href="#msg"/></svg><span>"Delta asked for a senior inspector who knows the line."</span></div>
@@ -278,11 +279,11 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
      <div class="op on"><div class="src">Keep · carry-over<span class="k kbd">1 · ←</span></div>
       <div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div>
       <div class="loc"><svg class="ic"><use href="#pin"/></svg> Amata City, Plant 3 · <span class="pill area">AREA1</span></div>
-      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd><span class="chg">08:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg">Eng Two</span> · 089-312-7740</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl></div>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd><span class="chg">08:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg">Eng Two</span></dd></dl></div>
      <div class="op"><div class="src">Use · Kanya's forecast<span class="k kbd">2 · →</span></div>
       <div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div>
       <div class="loc"><svg class="ic"><use href="#pin"/></svg> Amata City, Plant 3 · <span class="pill area">AREA1</span></div>
-      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd><span class="chg-old">08:00</span><span class="chg">07:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg-old">Eng Two</span><span class="chg">Eng One</span> · 086-905-1182</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl></div>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd><span class="chg-old">08:00</span><span class="chg">07:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg-old">Eng Two</span><span class="chg">Eng One</span></dd></dl></div>
     </div>
     <div class="crewl" style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:12px">People on 102 after card 1 (affected by the time change)<b style="font-family:var(--mono);color:var(--ink)">1</b></div>
     <div class="crew" style="display:flex;gap:4px;margin-top:4px"><span class="chip"><span class="sq">PK</span>Person K</span></div>
@@ -322,16 +323,16 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
     <div style="border:1px solid var(--line);border-radius:11px;padding:10px 12px">
      <div class="mt" style="display:flex;gap:6px;align-items:baseline"><span class="no">103</span><b style="font-size:14px;color:var(--ink)">Host Gamma</b><span class="tag night"><svg class="ic" style="width:10px;height:10px"><use href="#moon"/></svg>NIGHT</span></div>
      <div class="loc" style="font-size:11.5px;color:var(--muted)"><svg class="ic"><use href="#pin"/></svg> Laem Chabang, Port zone B · <span class="pill area">AREA1</span></div>
-     <dl class="dl" style="grid-template-columns:auto 1fr auto 1fr"><dt>Customer</dt><dd>Cust Alpha</dd><dt>Time</dt><dd>20:00–05:00</dd><dt>Engineer</dt><dd>Eng One</dd><dt>PPE</dt><dd>Helmet, reflective vest</dd><dt>Remark</dt><dd style="grid-column:span 3">Running since 6 Oct, 8 nights so far</dd></dl>
+     <dl class="dl" style="grid-template-columns:auto 1fr auto 1fr"><dt>Customer</dt><dd>Cust Alpha</dd><dt>Engineer</dt><dd>Eng One</dd><dt>Remark</dt><dd style="grid-column:span 3">Running since 6 Oct, 8 nights so far</dd></dl>
     </div>
     <div class="opts">
      <div class="op on"><div class="src">Keep 103<span class="k kbd">1 · ←</span></div>
       <div class="crewl">Crew stays <b>2</b></div>
-      <div class="crew"><span class="chip"><span class="sq">PD</span>Person D</span><span class="chip oc"><span class="sq">PG</span>Person G</span></div>
+      <div class="crew"><span class="chip"><span class="sq">PD</span>Person D</span><span class="chip oc"><span class="sq">PG</span>Person G<span class="ocb">OC</span></span></div>
       <div class="after">Kanya gets an alert, because her plan didn't have 103</div></div>
      <div class="op"><div class="src">Remove 103 · Kanya's forecast<span class="k kbd">2 · →</span></div>
       <div class="crewl">Where the crew goes</div>
-      <div class="dl" style="grid-template-columns:auto 1fr"><span class="chip"><span class="sq">PD</span>Person D</span><span style="font-size:11.5px">→ Standby</span><span class="chip oc"><span class="sq">PG</span>Person G</span><span style="font-size:11.5px">→ 106 Host Echo (in Kanya's forecast)</span></div>
+      <div class="dl" style="grid-template-columns:auto 1fr"><span class="chip"><span class="sq">PD</span>Person D</span><span style="font-size:11.5px">→ Standby</span><span class="chip oc"><span class="sq">PG</span>Person G<span class="ocb">OC</span></span><span style="font-size:11.5px">→ 106 Host Echo (in Kanya's forecast)</span></div>
       <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Person D has no mission on Thu</span></div></div>
     </div>
     <div class="swipe"><span>← keep</span><span class="dots"><i class="ok"></i><i class="ok"></i><i class="on"></i></span><span>remove →</span></div>
@@ -344,9 +345,9 @@ h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-
    <div class="q" style="font-size:10.5px">Clash 3 · Kanya's forecast</div>
    <h3>Does 103 Host Gamma run on Thu?</h3>
    <div class="mt" style="display:flex;gap:6px;align-items:baseline"><span class="no">103</span><b style="color:var(--ink)">Host Gamma</b><span class="tag night">NIGHT</span></div>
-   <div class="loc" style="font-size:11.5px;color:var(--muted)">Laem Chabang · 20:00–05:00 · Eng One</div>
+   <div class="loc" style="font-size:11.5px;color:var(--muted)">Laem Chabang · Eng One</div>
    <div class="opts">
-    <div class="op on"><div class="src">Keep 103</div><div class="crew"><span class="chip"><span class="sq">PD</span>Person D</span><span class="chip oc"><span class="sq">PG</span>Person G</span></div><div class="after">Kanya gets an alert</div></div>
+    <div class="op on"><div class="src">Keep 103</div><div class="crew"><span class="chip"><span class="sq">PD</span>Person D</span><span class="chip oc"><span class="sq">PG</span>Person G<span class="ocb">OC</span></span></div><div class="after">Kanya gets an alert</div></div>
     <div class="op"><div class="src">Remove · Kanya</div><div style="font-size:11.5px;margin-top:4px;line-height:1.6">Person D → Standby<br>Person G → 106 Host Echo</div></div>
    </div>
    <div class="more">Mission details<svg class="ic"><use href="#chev"/></svg></div>
