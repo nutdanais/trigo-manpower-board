@@ -227,6 +227,38 @@ code{font-family:var(--mono);font-size:12px;background:#eef1f5;padding:1px 5px;b
 .cap2{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;text-align:center;margin-bottom:6px}
 .approved{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--ok-s);color:var(--ok);border:1px solid var(--ok-l);vertical-align:middle}
 .n-b .night .body{background:#e6e9fa}
+
+.ph .cs{position:relative;height:250px;margin-top:4px}
+.ph .cs .cd{position:absolute;left:0;right:0;background:var(--panel);border-radius:14px;box-shadow:var(--shadow);padding:12px}
+.ph .cs .cd.b2{top:16px;transform:scale(.92);opacity:.55;height:200px}
+.ph .cs .cd.b1{top:8px;transform:scale(.96);opacity:.8;height:200px}
+.ph .cs .cd.top{top:0}
+.ph .opt2{border:1.5px solid var(--border);border-radius:10px;padding:9px;margin-top:7px;display:flex;gap:8px;align-items:center}
+.ph .opt2.on{border-color:var(--navy);background:var(--navy-soft)}
+.ph .opt2 b{display:block;font-size:12px;color:var(--ink)}
+.ph .opt2 small{color:var(--muted);font-size:10.5px}
+.ph .opt2 .mi{margin-left:auto}
+.ph .tilt{transform:rotate(6deg) translateX(30px);transition:none}
+.ph .stamp{position:absolute;top:12px;right:12px;font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--navy);border:2px solid var(--navy);border-radius:6px;padding:1px 6px;transform:rotate(8deg)}
+.ph .dots{display:flex;gap:4px;justify-content:center;margin-top:8px}
+.ph .dots i{width:6px;height:6px;border-radius:50%;background:#cfd5dd}
+.ph .dots i.on{background:var(--navy)}.ph .dots i.ok{background:#7aa33a}
+.ph .reason{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.ph .reason span{font-size:10.5px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);background:var(--panel)}
+.ph .reason span.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.ph .ck{background:var(--panel);border-radius:10px;box-shadow:0 0 0 1px var(--line);overflow:hidden}
+.ph .ck .gh{display:flex;align-items:center;gap:6px;padding:7px 10px;background:#f7f9fb;font-size:10.5px;font-weight:700;color:var(--muted)}
+.ph .ck .gh .n{margin-left:auto;font-weight:600}
+.ph .ck .rw{padding:8px 10px;border-top:1px solid var(--line)}
+.ph .ck .rw .t{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:var(--ink);font-weight:600}
+.ph .ck .rw .t small{color:var(--muted);font-weight:400}
+.ph .ck .rw .sg{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:#eef1f5;border-radius:7px;padding:2px;margin-top:6px}
+.ph .ck .rw .sg span{text-align:center;padding:6px 4px;border-radius:5px;font-size:10.5px;font-weight:600;color:var(--muted)}
+.ph .ck .rw .sg span.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(8,28,56,.14)}
+.ph .ck .rw .sg span.onf{background:var(--navy);color:#fff}
+.ph .ck .rw.done{background:#fbfcfd}
+.ph .ck .rw.done .t::after{content:"✓";color:#7aa33a;font-weight:800}
+.ph .prog2{height:4px;background:#eef1f5}.ph .prog2 i{display:block;height:100%;background:var(--navy)}
 </style>
 </head>
 <body>
@@ -435,6 +467,128 @@ code{font-family:var(--mono);font-size:12px;background:#eef1f5;padding:1px 5px;b
 </div>
 </div>
 
+
+<h3 class="rt" style="margin-top:34px">2A·2 and 2A·3 on a phone</h3>
+<p class="lead">Both flows open full screen on a phone. The data is the same as the desktop mocks: two missions and three people go in without a decision, and three clashes need one. Kanya's forecast moves Person C and grows 102's crew, and the forecast removes 103.</p>
+
+<p class="lead" style="margin-top:14px"><b>2A·2 · Card stack.</b> One clash per card. Tap a side, or swipe the card left (keep carry-over) or right (use the forecast). The dots show where you are, and Back undoes the last card. When you don't use someone's forecast, the next card asks why (that person gets an alert), then Confirm.</p>
+<div class="phones">
+ <div><div class="cap2">1 · First clash</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>Board One · Thu 15 Oct</small></b></div>
+  <div class="prog2"><i style="width:8%"></i></div>
+  <div class="bd">
+   <div class="auto" style="margin:0;font-size:10.5px"><svg class="ic"><use href="#check"/></svg>5 changes go in without a decision</div>
+   <div class="cs"><div class="cd b2"></div><div class="cd b1"></div>
+    <div class="cd top"><div style="font-size:10.5px;color:var(--muted);font-weight:600">Clash 1 of 3 · 102 Host Beta</div><b style="font-size:13.5px;color:var(--ink)">Where does Person C work?</b>
+     <div class="opt2"><div><b>102 Host Beta</b><small>carry-over · stays as today</small></div></div>
+     <div class="opt2"><div><b>105 Host Delta</b><small>Kanya's forecast</small></div><span class="mini fc mi"><i></i>KR</span></div>
+     <div class="swipe"><span>← keep</span><span>use forecast →</span></div></div></div>
+   <div class="dots"><i class="on"></i><i></i><i></i></div>
+  </div>
+  <div class="ft"><button class="btn q" style="opacity:.5">Back</button><span class="sp"></span><button class="btn q">Keep all</button><button class="btn">Use all</button></div>
+ </div></div>
+ <div><div class="cap2">2 · Swiping right</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>Board One · Thu 15 Oct</small></b></div>
+  <div class="prog2"><i style="width:30%"></i></div>
+  <div class="bd">
+   <div class="auto" style="margin:0;font-size:10.5px"><svg class="ic"><use href="#check"/></svg>5 changes go in without a decision</div>
+   <div class="cs"><div class="cd b2"></div>
+    <div class="cd b1" style="top:0;transform:none;opacity:1"><div style="font-size:10.5px;color:var(--muted);font-weight:600">Clash 2 of 3 · 102 Host Beta</div><b style="font-size:13.5px;color:var(--ink)">Crew size for 102?</b></div>
+    <div class="cd top tilt"><span class="stamp">FORECAST</span><div style="font-size:10.5px;color:var(--muted);font-weight:600">Clash 1 of 3</div><b style="font-size:13.5px;color:var(--ink)">Where does Person C work?</b>
+     <div class="opt2"><div><b>102 Host Beta</b><small>carry-over</small></div></div>
+     <div class="opt2 on"><div><b>105 Host Delta</b><small>Kanya's forecast</small></div></div></div></div>
+   <div class="dots"><i class="ok"></i><i class="on"></i><i></i></div>
+  </div>
+  <div class="ft"><button class="btn q">Back</button><span class="sp"></span><button class="btn q">Keep all</button><button class="btn">Use all</button></div>
+ </div></div>
+ <div><div class="cap2">3 · Why not Kanya's?</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>Board One · Thu 15 Oct</small></b></div>
+  <div class="prog2"><i style="width:80%"></i></div>
+  <div class="bd">
+   <div class="cs" style="height:300px"><div class="cd top"><div style="font-size:10.5px;color:var(--muted);font-weight:600">Kept the carry-over for 102 crew</div><b style="font-size:13.5px;color:var(--ink)">Tell Kanya why</b>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">She planned 3 for 102. She gets an alert with your reason.</div>
+    <div class="reason"><span class="on">Customer changed the schedule</span><span>Needed on this site</span><span>Certification / skill</span><span>Leave not approved</span></div>
+    <div class="inp" style="margin-top:8px;height:32px;border:1px solid var(--border);border-radius:7px;padding:0 9px;display:flex;align-items:center;color:#9aa4b1;font-size:11px">Or write your own…</div>
+   </div></div>
+   <div class="dots"><i class="ok"></i><i class="ok"></i><i class="on"></i></div>
+  </div>
+  <div class="ft"><button class="btn q">Back</button><span class="sp"></span><button class="btn p">Next</button></div>
+ </div></div>
+ <div><div class="cap2">4 · Confirm</div><div class="ph">
+  <div class="hd"><b>Confirm merge<small>All 3 clashes decided</small></b></div>
+  <div class="bd">
+   <div class="mini-mc"><b>Changes to the board</b><div style="color:var(--muted);margin-top:4px;line-height:1.6">2 missions added · 3 people placed<br>Person C moves to 105<br>102 crew stays at 2<br>103 is kept</div></div>
+   <div class="mini-mc"><b>Kanya gets an alert</b><div style="color:var(--muted);margin-top:4px">1 part of her forecast not used:<br>"Customer changed the schedule"</div></div>
+  </div>
+  <div class="ft"><button class="btn">Back</button><span class="sp"></span><button class="btn p">Confirm merge</button></div>
+ </div></div>
+</div>
+
+<p class="lead" style="margin-top:22px"><b>2A·3 · Checklist by mission.</b> One scrolling page of the clashes only, grouped under their mission. Each row is a two-way switch with big tap targets. A decided row gets a tick and the bar at the top fills. The reason picker opens under a row only when you keep your own plan over someone's forecast. The footer always shows what's left, and Confirm unlocks when nothing is.</p>
+<div class="phones">
+ <div><div class="cap2">1 · Nothing decided</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>3 clashes · 0 decided</small></b></div>
+  <div class="prog2"><i style="width:0"></i></div>
+  <div class="bd">
+   <div class="auto" style="margin:0;font-size:10.5px"><svg class="ic"><use href="#check"/></svg>5 changes go in without a decision</div>
+   <div class="ck">
+    <div class="gh">102 Host Beta<span class="n">2</span></div>
+    <div class="rw"><div class="t">Person C <small>102 → 105 · Kanya</small></div><div class="sg"><span>Keep 102</span><span>Use 105</span></div></div>
+    <div class="rw"><div class="t">Crew size <small>2 → 3 · Kanya</small></div><div class="sg"><span>Keep 2</span><span>Use 3</span></div></div>
+    <div class="gh">103 Host Gamma<span class="n">1</span></div>
+    <div class="rw"><div class="t">Removed in forecast <small>Kanya</small></div><div class="sg"><span>Keep 103</span><span>Remove</span></div></div>
+   </div>
+  </div>
+  <div class="ft"><span style="color:var(--muted);font-size:11px">3 left</span><span class="sp"></span><button class="btn">Keep all</button><button class="btn p" style="opacity:.45">Confirm</button></div>
+ </div></div>
+ <div><div class="cap2">2 · Deciding, with a reason</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>3 clashes · 2 decided</small></b></div>
+  <div class="prog2"><i style="width:66%"></i></div>
+  <div class="bd">
+   <div class="ck">
+    <div class="gh">102 Host Beta<span class="n">2</span></div>
+    <div class="rw done"><div class="t">Person C <small>Use 105</small></div></div>
+    <div class="rw"><div class="t">Crew size <small>2 → 3 · Kanya</small></div><div class="sg"><span class="onf">Keep 2</span><span>Use 3</span></div>
+     <div style="font-size:10.5px;color:var(--muted);margin-top:7px">Kanya gets an alert. Why?</div>
+     <div class="reason"><span class="on">Customer changed</span><span>Needed on site</span><span>Skill</span><span>Leave</span></div></div>
+    <div class="gh">103 Host Gamma<span class="n">1</span></div>
+    <div class="rw"><div class="t">Removed in forecast <small>Kanya</small></div><div class="sg"><span>Keep 103</span><span>Remove</span></div></div>
+   </div>
+  </div>
+  <div class="ft"><span style="color:var(--muted);font-size:11px">1 left</span><span class="sp"></span><button class="btn">Keep all</button><button class="btn p" style="opacity:.45">Confirm</button></div>
+ </div></div>
+ <div><div class="cap2">3 · All decided</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>3 clashes · all decided</small></b></div>
+  <div class="prog2"><i style="width:100%"></i></div>
+  <div class="bd">
+   <div class="ck">
+    <div class="gh">102 Host Beta<span class="n">✓</span></div>
+    <div class="rw done"><div class="t">Person C <small>Use 105</small></div></div>
+    <div class="rw done"><div class="t">Crew size <small>Keep 2 · reason given</small></div></div>
+    <div class="gh">103 Host Gamma<span class="n">✓</span></div>
+    <div class="rw done"><div class="t">Removed in forecast <small>Keep 103</small></div></div>
+   </div>
+   <div style="font-size:10.5px;color:var(--muted);text-align:center">Tap a row to change it</div>
+  </div>
+  <div class="ft"><span style="color:var(--ok);font-size:11px;font-weight:600">Ready</span><span class="sp"></span><button class="btn p">Confirm</button></div>
+ </div></div>
+ <div><div class="cap2">4 · Confirm</div><div class="ph">
+  <div class="hd"><b>Confirm merge<small>All 3 clashes decided</small></b></div>
+  <div class="bd">
+   <div class="mini-mc"><b>Changes to the board</b><div style="color:var(--muted);margin-top:4px;line-height:1.6">2 missions added · 3 people placed<br>Person C moves to 105<br>102 crew stays at 2<br>103 is kept</div></div>
+   <div class="mini-mc"><b>Kanya gets an alert</b><div style="color:var(--muted);margin-top:4px">2 parts of her forecast not used</div></div>
+  </div>
+  <div class="ft"><button class="btn">Back</button><span class="sp"></span><button class="btn p">Confirm merge</button></div>
+ </div></div>
+</div>
+<div class="shared"><b style="color:var(--ink)">How to choose between them</b>
+ <ul>
+  <li><b>2A·2 card stack</b> suits a day with a handful of clashes. It's the fastest one-handed flow, but you can't see the clashes side by side.</li>
+  <li><b>2A·3 checklist</b> suits a day with many clashes, or a planner who wants an overview first. Everything is on one page and any row can be changed at any time.</li>
+  <li><b>Both</b> could ship, with the checklist on desktop and the card stack on a phone, since they share the same decisions underneath. I'd recommend this if you like both.</li>
+ </ul>
+</div>
+
 <h2 id="emp">4 · Employee card: colour and feel <span class="approved">4A approved</span></h2>
 <p class="lead">The layout stays exactly as it is: the name, a second line, the area pill bottom-right, and OC bottom-left for on-call. Only colour, edges and type weight change. Each option shows two people on a mission and one on-call person in the pool.</p>
 <div class="opts">
@@ -477,7 +631,7 @@ code{font-family:var(--mono);font-size:12px;background:#eef1f5;padding:1px 5px;b
  </article>
 </div>
 
-<h2 id="night">5 · Night shift mission: instead of the black block</h2>
+<h2 id="night">5 · Night shift mission: instead of the black block <span class="approved" style="background:#eef1f5;color:var(--muted);border-color:var(--line)">Keeping as is</span></h2>
 <p class="lead">The card itself doesn't change: the number, host, shift tag, meta line and body. Each option shows a day mission next to the same mission at night, so you can judge how far apart they read.</p>
 <div class="opts">
  <article class="opt">
