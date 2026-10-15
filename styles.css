@@ -4831,8 +4831,8 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-hostrow:hover .cap-row-menu, .cap-row-menu:focus-visible, body.touch-mode .cap-row-menu { opacity: 1; }
 .cap-row-menu:hover { color: var(--text); border-color: var(--border); background: var(--panel); }
 .ctx-item.ctx-danger { color: var(--danger-text); }
-.cap-addrow { border-top: 1px solid var(--bg-soft); }
-.cap-addrow .cap-left { padding: 6px 10px; }
+.cap-add { border-top: 1px solid var(--bg-soft); }
+.cap-add .cap-left { padding: 6px 10px; }
 .cap-add { display: flex; gap: 6px; align-items: center; min-width: 0; }
 .cap-add input, .cap-add select {
   height: var(--ctl-h-sm);
@@ -6286,6 +6286,232 @@ body.exporting #board-capture { background: var(--bg); }
   #users-table.sv-responsive tr.user-row > td { border: 0; }
 
 }
+
+
+/* ===== Signal polish (2026-10-15, design/signal-gaps-review.html) =====
+   The approved items from the Signal review. Every dialog keeps the surface it
+   already has (side panel, centred dialog, full-screen list); only the inside
+   and the small details change. Kept in one block so it is easy to review. */
+
+/* 01 · confirm: the small dialog. No header band or ×; the button names the
+   action, and is red when the action destroys something. */
+#modal-confirm { width: 380px; padding: 20px 20px 16px; }
+#modal-confirm h3 { position: static; margin: 0 0 6px; padding: 0; border: 0; font-size: 16px; letter-spacing: -.2px; }
+#modal-confirm h3 .modal-close { display: none; }
+#modal-confirm #confirm-message { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; white-space: pre-line; }
+#modal-confirm .modal-actions { margin: 18px 0 0; padding: 0; border: 0; background: none; }
+#modal-confirm #btn-confirm-no { border-color: transparent; background: transparent; color: var(--muted); }
+#modal-confirm #btn-confirm-no:hover { background: var(--bg-soft); color: var(--text); }
+.btn.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.btn-danger-solid:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* 03 + 10 · the in-app dropdown (select[data-picker]) */
+.pk-source { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.pk { position: relative; display: block; min-width: 0; }
+label > .pk { margin-top: 5px; }
+.pk-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 36px; padding: 0 10px 0 11px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--text);
+  font: inherit; font-size: 13.5px; font-weight: 400; text-align: left; cursor: pointer;
+  transition: border-color .16s, box-shadow .16s;
+}
+.pk-btn:hover { border-color: #b8c2ce; }
+.pk-btn:focus-visible, .pk-btn[aria-expanded="true"] { outline: none; border-color: var(--primary-text); box-shadow: 0 0 0 3px rgba(0, 58, 102, .12); }
+.pk-btn:disabled { opacity: .6; cursor: default; }
+.pk-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-chev { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.pk-sw { flex: none; width: 12px; height: 12px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); display: block; }
+.pk-sw.hidden { display: none; }
+.pk-pop {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 120; min-width: 200px;
+  background: var(--panel); border-radius: 10px; box-shadow: var(--shadow); padding: 6px;
+  display: flex; flex-direction: column; gap: 4px; max-height: 280px;
+}
+.pk-pop.up { top: auto; bottom: calc(100% + 4px); }
+.pk-q {
+  flex: none; height: 32px; margin: 0 !important; padding: 0 9px !important; border: 1px solid var(--border) !important;
+  border-radius: 6px !important; font-size: 13px !important;
+}
+.pk-list { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; }
+.pk-opt {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 34px; padding: 0 9px; flex: none;
+  border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.pk-opt > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-opt:hover, .pk-opt:focus-visible { background: var(--hover-tint); outline: none; }
+.pk-opt[aria-selected="true"] { font-weight: 600; color: var(--primary-text); }
+.pk-opt:disabled { opacity: .5; cursor: default; }
+.pk-tick { width: 14px; height: 14px; flex: none; }
+.pk-none { margin: 6px 9px; font-size: 12.5px; color: var(--muted); }
+/* in toolbars the picker sizes to its content */
+.cap-field .pk, .oc-levelctl .pk { display: inline-block; width: auto; margin-top: 0; }
+.cap-field .pk-btn, .oc-levelctl .pk-btn { width: auto; min-width: 140px; height: 32px; font-size: 13px; }
+.oc-levelctl .pk-pop, .cap-field .pk-pop { right: auto; }
+.cap-add .pk, .cap-ph .pk { display: inline-block; width: auto; }
+.cap-add .pk-btn, .cap-ph .pk-btn { width: auto; min-width: 84px; height: 30px; }
+
+/* 03 · Host panel: Merge is a section inside the panel, above the footer */
+#modal-host #host-merge { margin: 6px 0 14px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+#modal-host #host-merge.hidden { display: none; }
+#modal-host #host-merge > summary {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; list-style: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+#modal-host #host-merge > summary::-webkit-details-marker { display: none; }
+#modal-host #host-merge > summary .ic { width: 16px; height: 16px; color: var(--muted); }
+#modal-host #host-merge > summary .hm-chev { margin-left: auto; transition: transform .2s; }
+#modal-host #host-merge[open] > summary .hm-chev { transform: rotate(180deg); }
+#modal-host #host-merge > :not(summary) { margin-left: 12px; margin-right: 12px; }
+#modal-host #host-merge .host-merge-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+#modal-host #host-merge .host-merge-row .pk { flex: 1; margin: 0; }
+
+/* 06 · right-click menu: one icon column, sentence case, the chevron at the end */
+#context-menu { padding: 6px; border: 0; border-radius: 10px; min-width: 220px; }
+.ctx-item {
+  display: flex; align-items: center; justify-content: flex-start; gap: 10px;
+  min-height: 34px; padding: 0 9px; border-radius: 6px; font-size: 13px;
+}
+.ctx-item .ic { width: 16px; height: 16px; flex: none; color: var(--muted); }
+.ctx-item.ctx-sub { justify-content: flex-start; }
+.ctx-item.ctx-sub::after { margin-left: auto; padding-left: 12px; color: #9aa4b1; }
+.ctx-title { padding: 6px 9px 4px; font-size: 11.5px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+.ctx-item.ctx-back { text-transform: none; letter-spacing: 0; font-size: 12px; min-height: 30px; }
+.ctx-item.ctx-danger { font-weight: 500; }
+.ctx-item.ctx-danger .ic { color: var(--danger); }
+.ctx-sep { margin: 5px 4px; border-top-color: var(--border); }
+
+/* 07 · Bulk edit: a real drop zone in place of the browser's file input */
+.modal .bulk-drop {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 18px 14px; margin: 6px 0 4px; text-align: center; cursor: pointer;
+  border: 1.5px dashed #b8c2ce; border-radius: var(--r-box); background: var(--bg-soft);
+  transition: border-color .16s, background-color .16s;
+}
+.modal .bulk-drop:hover, .modal .bulk-drop.over { border-color: var(--primary-text); background: var(--hover-tint); }
+.bulk-drop .ic { width: 20px; height: 20px; color: var(--muted); transform: rotate(180deg); margin-bottom: 2px; }
+.bulk-drop b { font-size: 13.5px; color: var(--text); word-break: break-all; }
+.bulk-drop small { font-size: 12px; color: var(--muted); font-weight: 400; }
+.bulk-drop.has-file { border-style: solid; border-color: var(--ok-line); background: var(--ok-surface); }
+.bulk-drop.has-file .ic { color: var(--ok-text); transform: none; }
+.bulk-file-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; margin: 0 !important; }
+.bulk-file-input:focus-visible + .ic { outline: 2px solid var(--primary-text); outline-offset: 4px; border-radius: 4px; }
+
+/* 08 + 14 · empty states */
+.empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 28px 16px; }
+.empty-state .es-ic { width: 44px; height: 44px; padding: 11px; border-radius: 12px; background: var(--bg-soft); color: var(--muted); margin-bottom: 6px; }
+.empty-state b { font-size: 14.5px; color: var(--text); }
+.empty-state p { margin: 0 0 10px; max-width: 320px; font-size: 13px; color: var(--muted); }
+.empty-state .btn { margin-top: 4px; }
+#import-list .empty-state { padding-top: 56px; }
+
+/* 09 · Mission panel on a phone: Shift takes its own row, Start and End share the next */
+@media (max-width: 640px) {
+  #modal-mission .form-row:has(select[name="shift"]) { flex-wrap: wrap; }
+  #modal-mission .form-row:has(select[name="shift"]) > label:first-child { flex: 1 1 100%; }
+  #modal-mission .form-row:has(select[name="shift"]) > label:not(:first-child) { flex: 1 1 0; min-width: 0; }
+}
+
+/* 11 · Host list: one Filters button, the same as Manpower */
+#btn-hostlist-filter-pop .fcount {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px;
+  background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+}
+#btn-hostlist-filter-pop .fcount.hidden { display: none; }
+#hostlist-filter-pop { width: 280px; padding: 12px; }
+#hostlist-filter-pop #hostlist-filters { display: grid; gap: 8px; }
+#hostlist-filter-pop .ms { display: block; }
+#hostlist-filter-pop .ms-btn { width: 100%; justify-content: space-between; }
+@media (max-width: 640px) {
+  #btn-hostlist-filter-pop { display: none; }
+  #hostlist-filter-dd { display: block; width: 100%; }
+  #hostlist-filter-pop { position: static; display: block; width: 100%; padding: 0; box-shadow: none; background: none; }
+  #hostlist-filter-pop.hidden { display: block !important; }
+}
+
+/* 12 · Temporary password: large, and a full-width Copy */
+#modal-temp-password .temp-password { flex-direction: column; align-items: stretch; gap: 10px; padding: 0; border: 0; background: none; }
+#modal-temp-password .temp-password code {
+  display: block; padding: 16px 12px; text-align: center; font-size: 24px; letter-spacing: 2px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--bg-soft);
+}
+#modal-temp-password #btn-copy-temp-password { width: 100%; justify-content: center; min-height: 38px; font-size: 13px; }
+
+/* 13 · Toasts: an icon tile for the kind of message */
+.toast { align-items: flex-start; gap: 10px; border-left-width: 0; border-radius: 10px; box-shadow: var(--shadow); }
+.toast-ic { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; }
+.toast-ic .ic { width: 13px; height: 13px; }
+.toast-info .toast-ic { background: var(--hover-tint); color: var(--primary-text); }
+.toast-warn .toast-ic { background: var(--warn-surface); color: var(--warn-text); }
+.toast-error .toast-ic { background: var(--danger-tint); color: var(--danger); }
+.toast-msg { padding-top: 2px; }
+
+/* 15 · an export with one file type names the file instead of a one-option switch */
+.export-type-single { display: block; }
+.file-chip { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
+.file-chip .fc-ic {
+  flex: none; display: grid; place-items: center; width: 32px; height: 36px; border-radius: 5px;
+  background: #e7f3ea; color: #1f7a3d; font-size: 9px; font-weight: 800; letter-spacing: .3px;
+}
+.file-chip b { display: block; font-size: 13.5px; color: var(--text); }
+.file-chip small { display: block; font-size: 12px; color: var(--muted); }
+
+/* 16 · Employee panel: the person's name in the header, tabs as a segmented control */
+.modal h3 .h3-sub { display: block; margin-top: 1px; font-size: 12.5px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+.modal h3 .h3-sub.hidden { display: none; }
+#modal-employee #employee-tabs {
+  display: flex; gap: 2px; margin: 12px 22px 2px; padding: 2px; border: 0; border-radius: var(--r); background: var(--bg-soft);
+}
+#modal-employee #employee-tabs.hidden { display: none; }
+#modal-employee #employee-tabs .settings-tab {
+  flex: 1; margin: 0; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--muted); font-size: 13px; font-weight: 600; text-align: center;
+}
+#modal-employee #employee-tabs .settings-tab:hover { color: var(--text); }
+#modal-employee #employee-tabs .settings-tab.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(8, 28, 56, .16); }
+
+/* 19 · on a phone the small centred dialogs rise from the bottom as short sheets,
+   with full-width buttons and the main action on top */
+@media (max-width: 640px) {
+  #modal-backdrop:has(> :is(#modal-confirm, #modal-unsaved, #modal-password, #modal-rename-board, #modal-temp-password, #modal-forecast-copy, #modal-perm-review, #modal-holds, #modal-merge-log, #modal-forecast-view):not(.hidden)) {
+    align-items: flex-end; justify-content: stretch;
+  }
+  :is(#modal-confirm, #modal-unsaved, #modal-password, #modal-rename-board, #modal-temp-password, #modal-forecast-copy, #modal-perm-review, #modal-holds, #modal-merge-log, #modal-forecast-view) {
+    width: 100%; max-width: 100%; max-height: 88dvh; border-radius: 16px 16px 0 0;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    animation: sheet-in .3s cubic-bezier(.2, .8, .2, 1);
+  }
+  :is(#modal-confirm, #modal-unsaved, #modal-password, #modal-rename-board, #modal-temp-password, #modal-forecast-copy, #modal-perm-review, #modal-holds, #modal-merge-log, #modal-forecast-view) .modal-actions {
+    flex-direction: column-reverse; align-items: stretch; margin-bottom: calc(-20px - env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(13px + env(safe-area-inset-bottom, 0px));
+  }
+  :is(#modal-confirm, #modal-unsaved, #modal-password, #modal-rename-board, #modal-temp-password, #modal-forecast-copy, #modal-perm-review, #modal-holds, #modal-merge-log, #modal-forecast-view) .modal-actions .btn { width: 100%; min-height: 44px; justify-content: center; margin: 0; }
+  #modal-confirm .modal-actions { margin-bottom: 0; padding-bottom: 0; }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  :is(#modal-confirm, #modal-unsaved, #modal-password, #modal-rename-board, #modal-temp-password, #modal-forecast-copy, #modal-perm-review, #modal-holds, #modal-merge-log, #modal-forecast-view) { animation: none; }
+}
+
+/* 20 · long help text folds to one line, with More / Less */
+.import-note.note-fold:not(.open) { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.note-more {
+  align-self: flex-start; margin: -4px 0 10px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--primary-text);
+}
+.note-more:hover { text-decoration: underline; }
+.note-more:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 3px; }
+
+/* 04A · board cards: white with a hairline, a soft area pill (areaSoftStyle in
+   app.js) and a warm on-call colour instead of grey and black. The layout is
+   untouched. Light theme only; the dark theme keeps its own card tokens. */
+:root:not([data-theme="dark"]) {
+  --emp-bg: #ffffff;
+  --emp-perm-border: #dfe4ea;
+  --emp-oncall-bg: #fffaf2;
+  --emp-oncall-border: #c9a878;
+}
+:root:not([data-theme="dark"]) .emp-card { box-shadow: 0 1px 2px rgba(8, 28, 56, .08); }
+:root:not([data-theme="dark"]) .emp-card .emp-oc { background: #fff1dd; color: #8a4f10; box-shadow: inset 0 0 0 1px #efd2ab; }
+:root:not([data-theme="dark"]) .mini-emp .emp-oc { background: #fff1dd; color: #8a4f10; }
 
 /* ===== Merge forecast: the card stack (design/merge-card-stack.html) =====
    One clash per card; the two sides are big buttons. Keys 1/2 or ←/→, or a

@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-15d">
+<link rel="stylesheet" href="styles.css?v=2026-10-15e">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-15d"></script>
+<script src="version.js?v=2026-10-15e"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -97,6 +97,9 @@
 <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
 <symbol id="i-site" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+<symbol id="i-merge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6a6 6 0 0 0 6 6h6M15 12l3 3-3 3M6 21v-6"/></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3v-6zM3 13h5l1 3h6l1-3h5"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
 <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
 <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></symbol>
@@ -480,7 +483,7 @@
         <div id="cap-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the Capacity tab"></div>
       </div>
       <label class="cap-field" for="cap-range"><span class="cap-tool-label">Range</span>
-      <select id="cap-range" title="How far ahead">
+      <select id="cap-range" title="How far ahead" data-picker>
         <option value="1">Next 1 week</option>
         <option value="2">Next 2 weeks</option>
         <option value="3">Next 3 weeks</option>
@@ -530,12 +533,18 @@
            panel-level row. -->
       <div id="hostlist-toolbar">
         <input id="hostlist-search" type="search" placeholder="Search host, location, inspector…" autocomplete="off">
+        <!-- Five filters behind one "Filters" button, the same as Manpower's -->
+        <div id="hostlist-filter-dd" class="tb-dd">
+          <button type="button" id="btn-hostlist-filter-pop" class="btn" aria-haspopup="true" aria-expanded="false" title="Filter the list"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg> Filters<span id="hostlist-filter-count" class="fcount hidden"></span></button>
+          <div id="hostlist-filter-pop" class="tb-pop hidden" aria-label="Filters">
         <div id="hostlist-filters">
           <div class="ms" data-filter="areaId"><button type="button" class="ms-btn">Service area: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="boardId"><button type="button" class="ms-btn">Board: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="empId"><button type="button" class="ms-btn">Inspector: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="location"><button type="button" class="ms-btn">Location: All</button><div class="ms-pop hidden"></div></div>
           <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
+        </div>
+          </div>
         </div>
       </div>
       <div id="filters">
@@ -843,11 +852,11 @@
   </div>
 
   <div class="modal modal-side hidden" id="modal-employee">
-    <h3><span id="employee-modal-title">New Employee</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <h3><span id="employee-modal-title">New Employee</span><small id="employee-modal-sub" class="h3-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <div id="employee-tabs" class="settings-tabs hidden">
-      <button type="button" class="settings-tab" data-tab="hosts">Host Record</button>
+      <button type="button" class="settings-tab" data-tab="hosts">Host record</button>
       <button type="button" class="settings-tab" data-tab="note">Note</button>
-      <button type="button" class="settings-tab" data-tab="edit">Edit Employee</button>
+      <button type="button" class="settings-tab" data-tab="edit">Details</button>
     </div>
     <!-- All three panes are stacked in the same grid cell (see .employee-pane-stack
          in styles.css) so the box sizes itself to whichever is tallest — pixel-
@@ -906,7 +915,7 @@
           </div>
           <div class="form-group">Placement</div>
           <div class="form-row">
-          <label>Service area <select name="areaId" required></select></label>
+          <label>Service area <select name="areaId" required data-picker></select></label>
           <label>Board <select name="boardId" required></select></label>
           </div>
           <div class="modal-actions">
@@ -926,7 +935,7 @@
       <label>Host name <input name="name" required placeholder="e.g. Fortune"></label>
       <p id="host-name-note" class="import-note hidden">The name is how this record is tied to the host's missions and deployment history. Renaming rewrites it on all of them, so the history follows the host — past mission cards will read the new name too. To combine this host with another one instead, use <b>Merge</b> below.</p>
       <label>Location <input name="location" placeholder="e.g. Amata City Chonburi, Plant 2"></label>
-      <label>Service area <select name="areaId"></select></label>
+      <label>Service area <select name="areaId" data-picker></select></label>
       <label>Google Maps link <input name="mapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
       <p class="import-note">Paste the link from Google Maps (Share → Copy link). Location shows as a pin link on the Host List when a link is saved.</p>
       <label>Note <textarea name="note" rows="2" placeholder="Optional — gate, contact, PPE reminder…"></textarea></label>
@@ -935,6 +944,20 @@
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
         <span class="toggle-text">Archived — keep the history, stop offering it on new missions</span>
       </label>
+      <!-- Merge: the fix for a duplicate or a misspelled host. It rewrites the
+           name on this host's mission and deployment rows, so the wrong spelling
+           disappears everywhere and the two hosts' day counts join up — unlike
+           "Clear record", which only drops the details and leaves the row.
+           Inside the form now, above the pinned footer, so it is never left
+           below Save. -->
+      <details id="host-merge" class="hidden">
+        <summary><svg class="ic" aria-hidden="true"><use href="#i-merge"></use></svg>Merge into another host<svg class="ic hm-chev" aria-hidden="true"><use href="#i-chevron-down"></use></svg></summary>
+        <p id="host-merge-note" class="import-note"></p>
+        <div class="host-merge-row">
+          <select id="host-merge-target" data-picker aria-label="Host to keep"></select>
+          <button type="button" class="btn btn-danger btn-small" id="btn-host-merge">Merge</button>
+        </div>
+      </details>
       <div class="modal-actions">
         <button type="button" class="btn btn-danger hidden" id="btn-delete-host" title="Remove the saved details — the host itself and its history are kept">Clear record</button>
         <span class="toolbar-spacer"></span>
@@ -942,18 +965,6 @@
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
-    <!-- Merge: the fix for a duplicate or a misspelled host. It rewrites the
-         name on this host's mission and deployment rows, so the wrong spelling
-         disappears everywhere and the two hosts' day counts join up — unlike
-         "Clear record", which only drops the details and leaves the row. -->
-    <div id="host-merge" class="hidden">
-      <h4>Merge into another host</h4>
-      <p id="host-merge-note" class="import-note"></p>
-      <div class="host-merge-row">
-        <select id="host-merge-target"></select>
-        <button type="button" class="btn btn-danger btn-small" id="btn-host-merge">Merge</button>
-      </div>
-    </div>
   </div>
 
   <!-- Settings used to be a dialog here. It is now a full page (#settings-view,
@@ -1251,7 +1262,12 @@
     </div>
     <div class="bulk-step">
       <div class="bulk-step-head"><span class="bulk-num">2</span>Upload it back</div>
-      <label class="bulk-drop"><input type="file" id="bulk-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+      <label class="bulk-drop" id="bulk-drop">
+        <input type="file" id="bulk-file" class="bulk-file-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg>
+        <b id="bulk-drop-title">Drop the .xlsx here</b>
+        <small id="bulk-drop-sub">or <u>choose a file</u></small>
+      </label>
       <span class="import-note">Nothing is saved yet — you review every change first.</span>
     </div>
     <div id="bulk-preview" class="hidden"></div>
@@ -1301,7 +1317,7 @@
     <label class="merge-log-filter"><input type="checkbox" id="merge-log-only"> Only what was not used from the forecast</label>
     <div id="merge-log-body"></div>
     <div class="modal-actions">
-      <button type="button" class="btn btn-primary" data-close>Close</button>
+      <button type="button" class="btn" data-close>Close</button>
     </div>
   </div>
 
@@ -1311,7 +1327,7 @@
     <div id="holds-list"></div>
     <div class="modal-actions">
       <button type="button" class="btn" id="btn-holds-ack-all">Acknowledge all</button>
-      <button type="button" class="btn btn-primary" data-close>Close</button>
+      <button type="button" class="btn" data-close>Close</button>
     </div>
   </div>
 
@@ -1336,7 +1352,7 @@
     <p class="import-note">Read-only. A forecast is kept for reference after it has been merged.</p>
     <div id="forecast-view-list"></div>
     <div class="modal-actions">
-      <button type="button" class="btn btn-primary" data-close>Close</button>
+      <button type="button" class="btn" data-close>Close</button>
     </div>
   </div>
 
@@ -1375,13 +1391,13 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="planning.js?v=2026-10-15d"></script>
-<script src="employee-id.js?v=2026-10-15d"></script>
-<script src="cloud.js?v=2026-10-15d"></script>
-<script src="charts.js?v=2026-10-15d"></script>
-<script src="xlsx-export.js?v=2026-10-15d"></script>
-<script src="orgchart-pptx.js?v=2026-10-15d"></script>
-<script src="bulk-edit.js?v=2026-10-15d"></script>
-<script src="app.js?v=2026-10-15d"></script>
+<script src="planning.js?v=2026-10-15e"></script>
+<script src="employee-id.js?v=2026-10-15e"></script>
+<script src="cloud.js?v=2026-10-15e"></script>
+<script src="charts.js?v=2026-10-15e"></script>
+<script src="xlsx-export.js?v=2026-10-15e"></script>
+<script src="orgchart-pptx.js?v=2026-10-15e"></script>
+<script src="bulk-edit.js?v=2026-10-15e"></script>
+<script src="app.js?v=2026-10-15e"></script>
 </body>
 </html>
