@@ -95,25 +95,25 @@ code{font-family:var(--mono);font-size:12px;background:#eef1f5;padding:1px 5px;b
 
 /* ---------- 5: night mission treatments ---------- */
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.n-a.night .mh{background:#1e2c40}
-.n-a.night .no,.n-a.night .host{color:#fff}
-.n-a.night .sep{background:#4a5b72}
-.n-a.night .mh .tag.night{background:#ffd76a;color:#2b2200}
-.n-a.night .meta{background:#1e2c40;color:#b9c6d6;padding-bottom:8px}
-.n-a.night .meta b,.n-a.night .crew{color:#fff}
+.n-a .night .mh{background:#1e2c40}
+.n-a .night .no,.n-a .night .host{color:#fff}
+.n-a .night .sep{background:#4a5b72}
+.n-a .night .mh .tag.night{background:#ffd76a;color:#2b2200}
+.n-a .night .meta{background:#1e2c40;color:#b9c6d6;padding-bottom:8px}
+.n-a .night .meta b,.n-a .night .crew{color:#fff}
 
-.n-b.night{box-shadow:0 0 0 1px #c9cfe8}
-.n-b.night .body{background:#eef0fa}
-.n-b.night .mh .tag.night{background:#3d4a8a}
+.n-b .night{box-shadow:0 0 0 1px #c9cfe8}
+.n-b .night .body{background:#eef0fa}
+.n-b .night .mh .tag.night{background:#3d4a8a}
 
-.n-c.night{box-shadow:inset 4px 0 0 #3d4a8a,0 0 0 1px var(--border)}
-.n-c.night .mh{padding-left:14px}.n-c.night .meta{padding-left:14px}.n-c.night .body{padding-left:14px}
-.n-c.night .meta .time{background:#1c2430;color:#fff;border-radius:4px;padding:0 5px;font-weight:600}
+.n-c .night{box-shadow:inset 4px 0 0 #3d4a8a,0 0 0 1px var(--border)}
+.n-c .night .mh{padding-left:14px}.n-c .night .meta{padding-left:14px}.n-c .night .body{padding-left:14px}
+.n-c .night .meta .time{white-space:nowrap;background:#1c2430;color:#fff;border-radius:4px;padding:0 5px;font-weight:600}
 
-.n-d.night .body{background:#f4f6fb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='70'%3E%3Cpath d='M98 18a14 14 0 1 0 12 22 11 11 0 0 1-12-22z' fill='%23dfe4f2'/%3E%3Ccircle cx='70' cy='14' r='1.4' fill='%23cfd6ea'/%3E%3Ccircle cx='84' cy='50' r='1.1' fill='%23cfd6ea'/%3E%3C/svg%3E") right top no-repeat}
+.n-d .night .body{background:#f4f6fb url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='70'%3E%3Cpath d='M98 18a14 14 0 1 0 12 22 11 11 0 0 1-12-22z' fill='%23dfe4f2'/%3E%3Ccircle cx='70' cy='14' r='1.4' fill='%23cfd6ea'/%3E%3Ccircle cx='84' cy='50' r='1.1' fill='%23cfd6ea'/%3E%3C/svg%3E") right top no-repeat}
 
-.n-e.night .bar{height:6px;background:linear-gradient(90deg,#1c2430 0 70%,var(--eng1) 70%)}
-.n-e.night .mh .tag.night{background:#1c2430}
+.n-e .night .bar{height:6px;background:linear-gradient(90deg,#1c2430 0 70%,var(--eng1) 70%)}
+.n-e .night .mh .tag.night{background:#1c2430}
 
 /* ---------- 2: merge workflow mocks ---------- */
 .wb{background:var(--panel);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;font-size:12px}
@@ -173,6 +173,60 @@ code{font-family:var(--mono);font-size:12px;background:#eef1f5;padding:1px 5px;b
 .today-flow .pain{color:var(--danger)}
 .shared{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);padding:14px 16px;margin-top:16px}
 .shared ul{margin:6px 0 0;padding-left:18px;font-size:13px}
+
+/* ---------- round two: merge ideas ---------- */
+.round{margin-top:26px;padding-top:18px;border-top:1px dashed var(--border)}
+.round h3.rt{font-size:17px;margin:0 0 4px}
+.mini-mc{background:var(--panel);border-radius:8px;box-shadow:0 0 0 1px var(--border);padding:7px 8px;font-size:11px}
+.mini-mc b{color:var(--ink);font-size:11.5px}
+.mini-mc .pp{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.ba{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:center;margin:8px 0}
+.ba .arr{color:var(--muted);font-size:14px}
+.ba .lab{font-size:10px;font-weight:700;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px}
+.cardstack{position:relative;height:200px;margin:4px auto 0;width:100%;max-width:300px}
+.cardstack .cd{position:absolute;left:0;right:0;background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:12px}
+.cardstack .cd.b2{top:14px;transform:scale(.94);opacity:.6}
+.cardstack .cd.b1{top:7px;transform:scale(.97);opacity:.8}
+.cardstack .cd.top{top:0}
+.cardstack .cd b{font-size:13px;color:var(--ink)}
+.cardstack .two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.cardstack .two div{border:1px solid var(--border);border-radius:8px;padding:8px;font-size:11.5px}
+.cardstack .two div.on{border-color:var(--navy);background:var(--navy-soft)}
+.cardstack .two small{display:block;color:var(--muted);font-size:10.5px}
+.swipe{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:8px}
+.chk{background:var(--panel);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;font-size:12px}
+.chk .gh{padding:7px 12px;background:#f7f9fb;font-size:11px;font-weight:700;color:var(--muted);border-top:1px solid var(--line)}
+.chk .gh:first-child{border-top:0}
+.chk .row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line)}
+.chk .row .q{flex:1;min-width:0;padding:0;font-size:12px}
+.chk .row small{color:var(--muted)}
+.chk .row.done{opacity:.6}
+.pop{position:absolute;z-index:2;background:var(--panel);border-radius:10px;box-shadow:var(--shadow);padding:8px;width:170px;font-size:11.5px}
+.pop .ch{padding:6px;margin-bottom:5px}
+.nextbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ink);color:#fff;font-size:11.5px}
+.nextbar b{font-weight:600}
+.nextbar .sp{flex:1}
+.nextbar .btn{height:26px}
+.nextbar .btn.gbtn{background:transparent;border-color:#3b4a60;color:#dfe6ef}
+.phones{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:14px}
+.ph{width:250px;height:470px;border:7px solid #1b2230;border-radius:26px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;position:relative;font-size:11.5px;flex:none}
+.ph .hd{background:var(--panel);padding:9px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.ph .hd b{font-size:13px;color:var(--ink);flex:1}
+.ph .hd small{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
+.ph .bd{flex:1;overflow:hidden;padding:9px;display:flex;flex-direction:column;gap:7px}
+.ph .ft{display:flex;gap:6px;align-items:center;padding:8px 10px;background:var(--panel);border-top:1px solid var(--line)}
+.ph .ft .sp{flex:1}
+.ph .chipbar{display:flex;gap:5px;overflow:hidden}
+.ph .chipbar span{flex:none;height:24px;padding:0 9px;border-radius:999px;border:1px solid var(--border);background:var(--panel);font-size:10.5px;font-weight:600;display:inline-flex;align-items:center}
+.ph .chipbar span.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.ph .chipbar span.w{background:var(--warn-s);border-color:var(--warn-l);color:var(--warn)}
+.ph .scrim{position:absolute;inset:0;background:rgba(15,25,40,.35)}
+.ph .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--panel);border-radius:16px 16px 0 0;padding:6px 12px 12px;box-shadow:0 -8px 30px rgba(0,20,40,.2)}
+.ph .grab{width:34px;height:4px;border-radius:2px;background:#cfd5dd;margin:2px auto 8px}
+.ph .sheet .ch{padding:8px}
+.cap2{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;text-align:center;margin-bottom:6px}
+.approved{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--ok-s);color:var(--ok);border:1px solid var(--ok-l);vertical-align:middle}
+.n-b .night .body{background:#e6e9fa}
 </style>
 </head>
 <body>
@@ -266,7 +320,122 @@ code{font-family:var(--mono);font-size:12px;background:#eef1f5;padding:1px 5px;b
  </ul>
 </div>
 
-<h2 id="emp">4 · Employee card: colour and feel</h2>
+
+<div class="round">
+<h3 class="rt">Round two: more ideas built on 2A and 2B</h3>
+<p class="lead">2A is quick and keyboard-friendly, but you lose sight of the board. 2B shows the result, but it's harder to work through and harder on a phone. These six variants push each idea further, and 2B·3 combines the two.</p>
+<div class="opts">
+
+ <article class="opt">
+  <div class="oh"><span class="k">2A·1</span><h3>Queue with a before / after card</h3></div>
+  <p class="od">Same queue as 2A, but each question shows the mission card as it is now and as it will be, so you see what your choice does to that mission.</p>
+  <div class="stage"><div class="wb">
+   <div class="wh"><div><b>Merge forecast</b><small>1 of 3</small></div><div class="steps"><span class="on">Review</span><span>Confirm</span></div></div>
+   <div class="wbody"><div class="queue"><div class="q on">Person C<span class="s"></span></div><div class="q">102 crew<span class="s"></span></div><div class="q">103 removed?<span class="s ok"></span></div></div>
+    <div class="qd"><b style="font-size:12.5px;color:var(--ink)">Where does Person C work?</b>
+     <div class="ba"><div><div class="lab">Carry-over</div><div class="mini-mc"><b>102 Host Beta</b><div class="pp"><span class="mini">Person C</span></div></div></div><span class="arr">vs</span><div><div class="lab">Kanya's forecast</div><div class="mini-mc"><b>105 Host Delta</b><div class="pp"><span class="mini fc"><i></i>Person C</span></div></div></div></div>
+     <div style="display:flex;gap:6px"><button class="btn" style="flex:1;justify-content:center">Keep 102 <span class="kbd">1</span></button><button class="btn p" style="flex:1;justify-content:center">Use 105 <span class="kbd" style="color:#cfe0f2;border-color:#4a6a8a;background:transparent">2</span></button></div>
+    </div></div>
+  </div></div>
+  <ul class="pc"><li class="p">Context without leaving the queue</li><li class="p">Still keyboard-fast</li><li class="c">Only shows the one mission, not the whole day</li></ul>
+ </article>
+
+ <article class="opt">
+  <div class="oh"><span class="k">2A·2</span><h3>Card stack</h3></div>
+  <p class="od">One clash per card, stacked. Tap a side, or swipe left for carry-over and right for the forecast, and the next card comes up. Best on a phone, and it works with a mouse too.</p>
+  <div class="stage"><div class="cardstack">
+   <div class="cd b2" style="height:150px"></div><div class="cd b1" style="height:150px"></div>
+   <div class="cd top"><div style="font-size:10.5px;color:var(--muted);font-weight:600">1 of 3 · Person C</div><b>Where does Person C work?</b>
+    <div class="two"><div><b>102 Host Beta</b><small>carry-over</small></div><div class="on"><b>105 Host Delta</b><small>Kanya's forecast</small></div></div>
+    <div class="swipe"><span>← keep carry-over</span><span>use forecast →</span></div></div>
+  </div></div>
+  <ul class="pc"><li class="p">The most natural on a phone</li><li class="p">Feels quick and light</li><li class="c">Harder to go back and compare two clashes</li></ul>
+ </article>
+
+ <article class="opt">
+  <div class="oh"><span class="k">2A·3</span><h3>Checklist by mission</h3></div>
+  <p class="od">No left list: one scrolling page of the clashes, grouped under their mission, each with a two-way switch. Rows you've decided fade, and the footer counts what's left.</p>
+  <div class="stage"><div class="chk">
+   <div class="gh">102 Host Beta</div>
+   <div class="row"><div class="q">Person C<br><small>102 → 105 (Kanya)</small></div><span class="seg"><span>Keep</span><span class="on">Forecast</span></span></div>
+   <div class="row"><div class="q">Crew size<br><small>2 → 3</small></div><span class="seg"><span>Keep</span><span>Forecast</span></span></div>
+   <div class="gh">103 Host Gamma</div>
+   <div class="row done"><div class="q">Mission removed in forecast</div><span class="seg"><span class="on">Keep</span><span>Remove</span></span></div>
+   <div class="wf"><span>1 left</span><span class="sp"></span><button class="btn p">Confirm</button></div>
+  </div></div>
+  <ul class="pc"><li class="p">You see every clash at once</li><li class="p">Simple to build and to use</li><li class="c">Long when there are many clashes</li></ul>
+ </article>
+
+ <article class="opt">
+  <div class="oh"><span class="k">2B·1</span><h3>Preview + drawer</h3></div>
+  <p class="od">The 2B from round one: the merged board, amber rings on clashes, and a drawer for the question. Shown again here for comparison.</p>
+  <div class="stage"><div class="wb"><div style="display:grid;grid-template-columns:1fr 130px">
+   <div class="boardp"><div class="bm cf"><span class="flag">Clash</span><b>102 Host Beta</b><div class="pp"><span class="mini ghost">Person C</span></div></div><div class="bm"><b>105 Host Delta</b><div class="pp"><span class="mini fc"><i></i>Person C</span></div></div></div>
+   <div class="drawer"><b style="font-size:12px;color:var(--ink)">Person C</b><div class="ch on" style="padding:6px;margin-top:6px"><span class="rad"></span><div><b>102</b><small>carry-over</small></div></div><div class="ch" style="padding:6px"><span class="rad"></span><div><b>105</b><small>Kanya</small></div></div></div>
+  </div></div></div>
+  <ul class="pc"><li class="p">Shows the outcome</li><li class="c">You have to hunt for amber cards</li></ul>
+ </article>
+
+ <article class="opt">
+  <div class="oh"><span class="k">2B·2</span><h3>Decide on the card</h3></div>
+  <p class="od">No drawer. Tap the amber person chip on the board and a small popover offers the two places, right where the person sits. A "Today ⇄ After merge" switch at the top lets you compare.</p>
+  <div class="stage"><div class="wb" style="position:relative;overflow:visible">
+   <div class="wh"><b>Merge forecast</b><span class="seg" style="margin-left:auto"><span>Today</span><span class="on">After merge</span></span></div>
+   <div class="boardp" style="position:relative;min-height:230px;border-radius:0 0 12px 12px"><div class="bm cf"><span class="flag">Clash</span><b>102 Host Beta</b><div class="pp"><span class="mini" style="box-shadow:0 0 0 2px #d9a35a">Person C</span></div></div><div class="bm"><b>101 Host Alpha</b><div class="pp"><span class="mini">Person A</span></div></div>
+    <div class="pop" style="left:20px;top:78px"><b style="font-size:11.5px;color:var(--ink)">Person C goes to…</b><div class="ch on" style="margin-top:5px"><span class="rad"></span><div><b>102 Host Beta</b><small>carry-over</small></div></div><div class="ch"><span class="rad"></span><div><b>105 Host Delta</b><small>Kanya</small></div></div></div></div>
+  </div></div>
+  <ul class="pc"><li class="p">Decide in place, no extra panel</li><li class="p">Today / After switch makes changes obvious</li><li class="c">Popovers can cover nearby cards</li></ul>
+ </article>
+
+ <article class="opt">
+  <div class="oh"><span class="k">2B·3</span><h3>Preview with a "next clash" bar</h3><span class="pick">My pick</span></div>
+  <p class="od">2B's merged board, plus 2A's guided flow. A dark bar at the bottom says "Clash 1 of 3: Person C", scrolls the board to that card and puts the two choices in the bar. Press 1 / 2 (or tap) and it moves to the next clash. You can still tap any amber card yourself.</p>
+  <div class="stage"><div class="wb">
+   <div class="wh"><div><b>Merge forecast</b><small>Board One · Thu 15 Oct</small></div><span class="seg" style="margin-left:auto"><span>Today</span><span class="on">After</span></span></div>
+   <div class="auto" style="margin:8px 10px 0"><svg class="ic"><use href="#check"/></svg>2 missions and 3 people go in as forecast</div>
+   <div class="boardp"><div class="bm cf" style="box-shadow:0 0 0 2px var(--navy)"><span class="flag">1 of 3</span><b>102 Host Beta</b><div class="pp"><span class="mini">Person C</span></div></div><div class="bm"><b>105 Host Delta</b><div class="pp"><span class="mini fc ghost"><i></i>Person C</span></div></div><div class="bm cf"><span class="flag">2</span><b>102 crew 2 → 3</b></div><div class="bm cf"><span class="flag">3</span><b>103 Host Gamma</b></div></div>
+   <div class="nextbar"><b>Person C</b><span>102 or 105?</span><span class="sp"></span><button class="btn gbtn">Keep 102 · 1</button><button class="btn p" style="background:#fff;color:var(--ink);border-color:#fff">Use 105 · 2</button></div>
+  </div></div>
+  <ul class="pc"><li class="p">You see the result and are guided through it</li><li class="p">Keyboard-fast, like 2A</li><li class="p">Fits a phone (see below)</li><li class="c">The most work of the six to build</li></ul>
+ </article>
+</div>
+
+<h3 class="rt" style="margin-top:28px">How 2B fits on a phone</h3>
+<p class="lead">On a phone the merged board becomes one column of mission cards (the same as the board's phone view), with the clashes first. The "next clash" bar from 2B·3 sits at the bottom. Tapping it, or an amber card, opens a bottom sheet with the two choices as big buttons. After a choice the list scrolls to the next clash. Confirm is a full-screen summary.</p>
+<div class="phones">
+ <div><div class="cap2">1 · Merged board</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>Board One · Thu 15 Oct</small></b></div>
+  <div class="bd">
+   <div class="chipbar"><span class="w">Clashes 3</span><span>All 6</span><span>Changed 4</span></div>
+   <div class="auto" style="margin:0;font-size:10.5px"><svg class="ic"><use href="#check"/></svg>5 changes go in without a decision</div>
+   <div class="bm cf"><span class="flag">1</span><b>102 Host Beta</b><div class="pp"><span class="mini">Person C</span><span class="mini">Person K</span></div></div>
+   <div class="bm cf"><span class="flag">2</span><b>102 crew 2 → 3</b></div>
+   <div class="bm cf"><span class="flag">3</span><b class="ghost">103 Host Gamma</b><div style="font-size:10px;color:var(--muted)">removed in Kanya's forecast</div></div>
+   <div class="bm"><b>105 Host Delta</b><div class="pp"><span class="mini fc"><i></i>Person D</span></div></div>
+  </div>
+  <div class="nextbar"><b>3 clashes</b><span class="sp"></span><button class="btn p" style="background:#fff;color:var(--ink);border-color:#fff">Start</button></div>
+ </div></div>
+ <div><div class="cap2">2 · One clash in a sheet</div><div class="ph">
+  <div class="hd"><b>Merge forecast<small>1 of 3</small></b></div>
+  <div class="bd"><div class="bm cf" style="box-shadow:0 0 0 2px var(--navy)"><span class="flag">1</span><b>102 Host Beta</b><div class="pp"><span class="mini">Person C</span></div></div><div class="bm"><b>105 Host Delta</b></div></div>
+  <div class="scrim"></div>
+  <div class="sheet"><div class="grab"></div><div style="font-size:10.5px;color:var(--muted);font-weight:600">Clash 1 of 3</div><b style="font-size:13.5px;color:var(--ink)">Where does Person C work?</b>
+   <div class="ch on" style="margin-top:8px"><span class="rad"></span><div><b>102 Host Beta</b><small>carry-over · stays as today</small></div></div>
+   <div class="ch"><span class="rad"></span><div><b>105 Host Delta</b><small>Kanya's forecast</small></div></div>
+   <div style="display:flex;gap:6px;margin-top:4px"><button class="btn" style="flex:1;justify-content:center;height:36px">Back</button><button class="btn p" style="flex:2;justify-content:center;height:36px">Next clash</button></div></div>
+ </div></div>
+ <div><div class="cap2">3 · Confirm</div><div class="ph">
+  <div class="hd"><b>Confirm merge<small>All 3 clashes decided</small></b></div>
+  <div class="bd">
+   <div class="mini-mc"><b>Changes to the board</b><div style="color:var(--muted);margin-top:4px;line-height:1.6">2 missions added<br>Person C stays on 102<br>102 crew stays at 2<br>103 is kept</div></div>
+   <div class="mini-mc"><b>Kanya gets an alert</b><div style="color:var(--muted);margin-top:4px">2 parts of her forecast not used</div><div class="pp" style="margin-top:6px"><span class="mini">Customer changed</span><span class="mini">Needed on site</span></div></div>
+  </div>
+  <div class="ft"><button class="btn">Back</button><span class="sp"></span><button class="btn p">Confirm merge</button></div>
+ </div></div>
+</div>
+</div>
+
+<h2 id="emp">4 · Employee card: colour and feel <span class="approved">4A approved</span></h2>
 <p class="lead">The layout stays exactly as it is: the name, a second line, the area pill bottom-right, and OC bottom-left for on-call. Only colour, edges and type weight change. Each option shows two people on a mission and one on-call person in the pool.</p>
 <div class="opts">
  <article class="opt">
