@@ -244,44 +244,46 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       const b = await env.openAs(db, h.USERS.b);
       const pa = a.page, pb = b.page;
       await gotoDate(pa, H);
-      const row = (n) => pa.locator("#merge-body .merge-row", { has: pa.locator(".merge-num b", { hasText: new RegExp("^" + n + "$") }) });
-      const chip = (side, emp) => pa.locator(`#merge-body .merge-cell${side === "forecast" ? ".fc" : ":not(.fc)"} .mini-emp[data-emp="${emp}"]`);
-
       await step("C4: a confirmed day with an unmerged forecast shows the merge banner", async () => {
         await until(async () => (await pa.locator(".plan-banner-forecast").count()) === 1, "forecast banner");
         assert.match(await pa.textContent(".plan-banner-forecast"), /Forecast for this day by eng\.b: 2 missions, 4 people/);
       });
 
-      await step("C4b: Carry over opens the side-by-side review; only collisions wait for a decision", async () => {
+      await step("C4b: Carry over opens the card stack: one card per clash, the rest goes in on its own", async () => {
         await pa.click("#btn-reset-board");
         await until(() => pa.isVisible("#modal-merge"), "merge review opens after the carry");
-        assert.match(await pa.textContent("#merge-title"), /Review & merge forecast/);
-        // 101 · 102 · 103 · 201, then Leave and Standby
-        assert.deepEqual(await pa.$$eval("#merge-body .merge-row:not(.merge-head) .merge-num", (els) => els.map((e) => e.firstChild.textContent)),
-          ["101", "102", "103", "201", "Leave", "Standby"]);
-        // e2 (101, left out of the forecast's 101), e3 (102 -> 101), keep/remove 102 and 103: 4 of 7
-        assert.match(await pa.textContent("#merge-progress"), /3 of 7 differences decided/);
-        assert.equal(await chip("carry", "e3").getAttribute("class").then((c) => /\bconf\b/.test(c)), true, "e3 flagged on the carry-over side");
-        assert.equal(await chip("forecast", "e3").getAttribute("class").then((c) => /\bconf\b/.test(c)), true, "and on the forecast side");
-        assert.match(await chip("forecast", "e6").getAttribute("class"), /\bkept\b/, "off Standby into a new mission: not a collision, pre-decided");
-        assert.match(await pa.textContent("#btn-merge-apply"), /Apply \(4 left\)/);
-        await pa.click("#btn-merge-apply");
-        await until(async () => /still need/.test(await pa.textContent("#toast-stack")), "apply refuses while anything is undecided");
-        assert.ok(await pa.isVisible("#modal-merge"), "still open");
+        assert.match(await pa.textContent("#merge-title"), /Merge forecast/);
+        await until(() => pa.isVisible("#merge-body .mc-card"), "a card");
+        // e2 (101, left out of the forecast's 101), e3 (102 -> 101), keep/remove 102 and 103
+        assert.match(await pa.textContent("#merge-progress"), /Clash 1 of 4/);
+        assert.match(await pa.textContent("#merge-body .mc-auto"), /1 new mission/, "201 goes in without a card");
+        assert.equal(await pa.isVisible("#btn-merge-apply"), false, "no apply while cards are open");
+        assert.equal(await pa.locator("#merge-body .mc-op").count(), 2, "two sides");
+        // choosing moves on; Backspace comes back to the card
+        await pa.click('#merge-body .mc-op[data-side="forecast"]');
+        await until(async () => /Clash 2 of 4/.test(await pa.textContent("#merge-progress")), "next card");
+        await pa.keyboard.press("Backspace");
+        await until(async () => /Clash 1 of 4/.test(await pa.textContent("#merge-progress")), "back");
+        assert.equal(await pa.getAttribute('#merge-body .mc-op[data-side="forecast"]', "aria-pressed"), "true", "the choice is remembered");
         assert.equal(db.t("forecast_merge_decisions").length, 0, "nothing written");
       });
 
-      await step("C4c: decide each collision, give a reason, confirm, and only the chosen side is written", async () => {
-        await chip("carry", "e2").click();                        // keep Person B on 101
-        await chip("carry", "e3").click();                        // keep Person C on 102, not eng.b's 101
-        assert.match(await chip("forecast", "e3").getAttribute("class"), /\bdropped\b/);
-        await row("102").locator(".merge-seg button", { hasText: /^Keep$/ }).click();
-        await row("103").locator(".merge-seg button", { hasText: /^Keep$/ }).click();
-        assert.match(await pa.textContent("#merge-progress"), /7 of 7 differences decided/);
-        // one carry choice over eng.b's forecast: one reason box
-        assert.equal(await pa.locator(".merge-reason").count(), 1);
-        assert.match(await pa.textContent(".merge-reason"), /Person C kept on 102 Day/);
-        await pa.fill(".merge-reason input", "Needed on Beta");
+      await step("C4c: decide each clash, give a reason, confirm, and only the chosen side is written", async () => {
+        // keep the carry-over on every card (1 = keep), with the person card for Person C checked on the way
+        for (let n = 0; n < 4; n++) {
+          await until(() => pa.isVisible("#merge-body .mc-card"), "card " + (n + 1));
+          const q = await pa.textContent("#merge-body .mc-q");
+          if (/Person C/.test(q)) {
+            assert.match(await pa.textContent('#merge-body .mc-op[data-side="carry"]'), /102/);
+            assert.match(await pa.textContent('#merge-body .mc-op[data-side="forecast"]'), /101/);
+          }
+          await pa.keyboard.press("1");
+        }
+        // one carry choice over eng.b's forecast: one reason card
+        await until(() => pa.isVisible("#merge-body .mc-reasons"), "reasons step");
+        assert.equal(await pa.locator("#merge-body .mc-reasons .mc-card").count(), 1);
+        assert.match(await pa.textContent("#merge-body .mc-reasons"), /Person C kept on 102 Day/);
+        await pa.fill("#merge-body .mc-reason-input", "Needed on Beta");
         await pa.click("#btn-merge-apply");
         await until(() => pa.isVisible(".merge-confirm"), "confirm step");
         assert.match(await pa.textContent(".merge-callout"), /eng\.b: 1 part of their forecast not used/);
