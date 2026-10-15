@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Merge Card Stack</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&family=Noto+Sans+Thai:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: a review page. Each clash type gets a desktop frame (the workbench with the card stack) and the same card as phone screens beside it. */
+:root{
+  --bg:#f4f6f8;--panel:#fff;--line:#e3e7ec;--border:#d8dde4;--ink:#0f1b2a;--text:#1f2937;--muted:#6f7c8d;
+  --navy:#003a66;--navy-soft:#eef3fb;--warn:#9a4a07;--warn-s:#fff6ea;--warn-l:#efd2ab;
+  --ok:#4d6810;--ok-s:#f7faef;--ok-l:#cfdcae;--danger:#b42318;--danger-s:#fef3f2;
+  --area1:#7fb8ec;--area2:#a8c855;--fc:#7c6fd0;
+  --r:8px;--r-box:12px;--shadow:0 1px 2px rgba(8,28,56,.08),0 18px 40px -10px rgba(8,40,80,.30);
+  --font:"Geist","Noto Sans Thai",Arial,sans-serif;--mono:"Geist Mono","Noto Sans Thai",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--font)}
+.page{max-width:1240px;margin:0 auto;padding-block:32px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:26px;letter-spacing:-.4px;margin:0 0 6px;color:var(--ink);text-wrap:balance}
+h2{font-size:20px;letter-spacing:-.25px;margin:48px 0 4px;color:var(--ink);text-wrap:balance}
+.lead{color:var(--muted);max-width:820px;margin:0 0 14px;text-wrap:pretty}
+.lead b{color:var(--text)}
+.info{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);padding:14px 18px;margin:14px 0}
+.info table{width:100%;border-collapse:collapse;font-size:13px}
+.info th,.info td{text-align:left;padding:6px 10px;border-top:1px solid var(--line);vertical-align:top}
+.info th{border-top:0;font-size:12px;color:var(--muted)}
+.info td:first-child{font-weight:600;color:var(--ink);white-space:nowrap}
+.wrapt{overflow-x:auto}
+.row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}
+.cap{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:0 0 6px}
+
+/* shared bits */
+.ic{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-2px}
+.btn{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--border);background:var(--panel);font:inherit;font-size:12.5px;font-weight:600;color:var(--text);display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.btn.p{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.q{border-color:transparent;background:transparent;color:var(--muted)}
+.kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--muted);background:var(--panel)}
+.btn.p .kbd{border-color:rgba(255,255,255,.35);color:#dbe7f3;background:transparent}
+.no{font-family:var(--mono);font-weight:600}
+.tag{font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:0 6px;border-radius:4px;line-height:17px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;vertical-align:1px}
+.tag.day{background:#fff;color:var(--muted);border:1px solid var(--border)}
+.tag.night{background:#1c2430;color:#fff}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;padding:0 7px;border-radius:999px;line-height:18px;white-space:nowrap}
+.pill.area{background:#e3eefa;color:#1d5a92;box-shadow:inset 0 0 0 1px #c5dcf3}
+.pill.area2{background:#eef5dd;color:#4d6810;box-shadow:inset 0 0 0 1px #d6e6b4}
+.pill.oc{background:#fff1dd;color:var(--warn);box-shadow:inset 0 0 0 1px var(--warn-l)}
+.pill.perm{background:#eef1f5;color:var(--muted)}
+.pill.fc{background:#f0eefb;color:#5b4fb0}
+.fit{display:flex;flex-direction:column;gap:3px;margin-top:8px}
+.fit span{display:flex;gap:6px;align-items:flex-start;font-size:11.5px;line-height:1.35}
+.fit .g{color:var(--ok)}.fit .w{color:var(--warn)}.fit .n{color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 7px 0 3px;border-radius:6px;background:var(--panel);box-shadow:0 0 0 1px var(--line);font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap}
+.chip .sq{width:16px;height:16px;border-radius:5px;display:grid;place-items:center;font-size:8px;font-weight:700;background:var(--navy-soft);color:var(--navy)}
+.chip.oc{box-shadow:0 0 0 1px var(--warn-l);background:#fffaf2}
+.chip.oc .sq{background:#fff1dd;color:var(--warn)}
+.chip.me{box-shadow:0 0 0 2px var(--navy)}
+.chip.out{opacity:.45;text-decoration:line-through}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:11.5px;margin:6px 0 0}
+.dl dt{color:var(--muted)}
+.dl dd{margin:0;color:var(--ink);min-width:0;overflow-wrap:anywhere}
+.chg{background:#fff3c4;border-radius:3px;padding:0 3px;font-weight:600}
+.chg-old{color:var(--muted);text-decoration:line-through;margin-right:4px}
+
+/* the person header on a card */
+.who{display:flex;gap:10px;align-items:flex-start}
+.av{width:40px;height:40px;border-radius:11px;background:var(--navy-soft);color:var(--navy);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.who b{display:block;font-size:15px;color:var(--ink);line-height:1.25}
+.who .en{font-size:12px;color:var(--muted)}
+.who .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.stats div{background:#f7f9fb;border-radius:7px;padding:6px 8px}
+.stats b{display:block;font-family:var(--mono);font-size:14px;color:var(--ink);line-height:1.2}
+.stats small{font-size:10.5px;color:var(--muted)}
+.hist{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.hist span{font-size:10.5px;padding:1px 7px;border-radius:999px;background:#f2f4f7;color:var(--text)}
+.hist span b{font-family:var(--mono);font-weight:600}
+
+/* option panels */
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.op{border:1.5px solid var(--border);border-radius:11px;padding:10px 11px;background:var(--panel);display:flex;flex-direction:column;min-width:0;position:relative}
+.op.on{border-color:var(--navy);background:linear-gradient(var(--navy-soft),var(--panel) 70%)}
+.op .src{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.op .src .k{margin-left:auto}
+.op .mt{display:flex;align-items:baseline;gap:6px;margin-top:5px;flex-wrap:wrap}
+.op .mt b{font-size:14px;color:var(--ink)}
+.op .loc{font-size:11.5px;color:var(--muted);margin-top:1px}
+.op .crewl{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:var(--muted);margin-top:8px}
+.op .crewl b{font-family:var(--mono);color:var(--ink);font-size:12px}
+.op .crew{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.op .after{margin-top:8px;padding-top:7px;border-top:1px dashed var(--line);font-size:11px;color:var(--muted)}
+.op .after b{color:var(--ink)}
+
+/* desktop workbench */
+.wb{width:100%;max-width:900px;background:var(--panel);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;flex:1 1 640px;min-width:0}
+.wh{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.wh b{font-size:15px;color:var(--ink)}
+.wh small{display:block;font-size:12px;color:var(--muted)}
+.prog{flex:1;max-width:220px;margin-left:auto}
+.prog .bar{height:6px;border-radius:3px;background:#eef1f5;overflow:hidden}
+.prog .bar i{display:block;height:100%;background:var(--navy)}
+.prog small{display:block;text-align:right;margin-top:3px}
+.dots{display:flex;gap:5px}
+.dots i{width:8px;height:8px;border-radius:50%;background:#d6dce3}
+.dots i.ok{background:#7aa33a}.dots i.on{background:var(--navy);box-shadow:0 0 0 3px rgba(0,58,102,.15)}
+.auto{display:flex;gap:8px;align-items:center;margin:10px 16px 0;padding:7px 10px;border-radius:8px;background:var(--ok-s);color:var(--ok);font-size:12px;font-weight:600}
+.auto u{text-decoration:none;margin-left:auto;font-weight:600;color:var(--navy)}
+.stagebg{background:#eef1f5;padding:20px 16px 24px;position:relative}
+.stack{position:relative;max-width:680px;margin:0 auto}
+.ghost1,.ghost2{position:absolute;left:0;right:0;top:0;bottom:0;background:var(--panel);border-radius:16px;box-shadow:0 1px 2px rgba(8,28,56,.08)}
+.ghost1{transform:translateY(10px) scale(.97);opacity:.8}
+.ghost2{transform:translateY(20px) scale(.94);opacity:.55}
+.card{position:relative;background:var(--panel);border-radius:16px;box-shadow:var(--shadow);padding:16px}
+.card .q{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);font-weight:600}
+.card .q .pill{margin-left:auto}
+.card h3{margin:2px 0 10px;font-size:17px;color:var(--ink);letter-spacing:-.2px}
+.note{margin-top:10px;padding:8px 10px;border-radius:8px;background:#f5f3fd;color:#4a3f8f;font-size:11.5px;display:flex;gap:7px}
+.swipe{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted);margin-top:12px}
+.wf{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:#f7f9fb;font-size:12px;color:var(--muted)}
+.wf .sp{flex:1}
+
+/* phone */
+.ph{width:300px;height:640px;border:8px solid #1b2230;border-radius:30px;overflow:hidden;background:#eef1f5;display:flex;flex-direction:column;position:relative;flex:none}
+.ph .hd{background:var(--panel);padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+.ph .hd .t{display:flex;align-items:center;gap:8px}
+.ph .hd b{font-size:14px;color:var(--ink);flex:1}
+.ph .hd small{font-size:11px;color:var(--muted)}
+.ph .hd .bar{height:4px;border-radius:2px;background:#eef1f5;margin-top:8px;overflow:hidden}
+.ph .hd .bar i{display:block;height:100%;background:var(--navy)}
+.ph .bd{flex:1;overflow:hidden;padding:10px;position:relative}
+.ph .card{padding:12px;border-radius:14px}
+.ph .card h3{font-size:15px;margin-bottom:8px}
+.ph .who b{font-size:14px}
+.ph .av{width:34px;height:34px;font-size:11.5px}
+.ph .stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.ph .stats div{padding:5px 6px}.ph .stats b{font-size:12.5px}.ph .stats small{font-size:9.5px}
+.ph .opts{grid-template-columns:1fr;gap:7px}
+.ph .op{padding:8px 10px}
+.ph .op .mt b{font-size:13px}
+.ph .ft{display:flex;gap:6px;align-items:center;padding:8px 10px calc(10px + env(safe-area-inset-bottom,0px));background:var(--panel);border-top:1px solid var(--line)}
+.ph .ft .btn{height:40px;flex:1}
+.ph .more{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:7px 9px;border-radius:8px;background:#f7f9fb;font-size:11.5px;font-weight:600;color:var(--navy)}
+.ph .scroll{position:absolute;right:3px;top:30px;width:3px;height:70px;border-radius:2px;background:#c6ced8}
+.reason{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.reason span{font-size:11.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--panel)}
+.reason span.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.inp{height:34px;border:1px solid var(--border);border-radius:8px;padding:0 10px;display:flex;align-items:center;color:#9aa4b1;font-size:12px;margin-top:8px;background:var(--panel)}
+.sum{background:var(--panel);border-radius:12px;box-shadow:0 0 0 1px var(--line);padding:10px 12px;font-size:12px;margin-bottom:8px}
+.sum b{color:var(--ink)}
+.sum ul{margin:6px 0 0;padding-left:16px;color:var(--text)}
+.sum li{margin:2px 0}
+@media (max-width:700px){.opts{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <symbol id="check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+ <symbol id="alert" viewBox="0 0 24 24"><path d="M12 3l9 16H3L12 3zM12 10v4M12 17h.01"/></symbol>
+ <symbol id="dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></symbol>
+ <symbol id="pin" viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-12a7 7 0 00-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+ <symbol id="moon" viewBox="0 0 24 24"><path d="M20 14A8 8 0 1110 4a6 6 0 0010 10z"/></symbol>
+ <symbol id="msg" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5z"/></symbol>
+ <symbol id="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+ <symbol id="phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></symbol>
+</svg>
+<div class="page">
+<h1>Merge forecast: the card stack, with the full picture</h1>
+<p class="lead">This is option <b>2A·2</b> for desktop and phone, with every mission and employee detail the app already has on each card, so you can decide without leaving the merge. The example is one day: Board One, Thu 15 Oct. Kanya R. made the forecast on Mon 12 Oct, and there are three clashes. Names and numbers are made up.</p>
+
+<div class="info wrapt"><b style="color:var(--ink)">What each card shows, and where it comes from</b>
+<table>
+<thead><tr><th>On the card</th><th>Details</th><th>Source in the app today</th></tr></thead>
+<tbody>
+<tr><td>The person</td><td>Thai and English name, TRIGO ID, position, contract (permanent / on-call), service area, phone, years of service</td><td>Employee record (Manpower list)</td></tr>
+<tr><td>Their recent work</td><td>Days on a mission in the last 30 days, and days already this week</td><td>Assignments, the same as Manpower's 30D utilization</td></tr>
+<tr><td>Host experience</td><td>Days worked at each host in the choice, plus their top hosts</td><td>Host record (deployment history)</td></tr>
+<tr><td>Each mission</td><td>Number, shift, time, host and its location and area, customer, engineer and phone, PPE, remark</td><td>Mission</td></tr>
+<tr><td>Crew under each choice</td><td>Who is on the mission and the count, if you pick this side</td><td>The plan and the forecast</td></tr>
+<tr><td>Fit checks</td><td>Area match, has worked this host, on leave or held elsewhere, shift change from yesterday</td><td>Worked out from the above, never a rule that blocks you</td></tr>
+<tr><td>Who forecast it</td><td>The forecaster, when, and their note if they left one</td><td>Forecast</td></tr>
+</tbody></table></div>
+
+<h2>Clash 1 · A person in two places</h2>
+<p class="lead">The carry-over has Somsak J. on 102, and Kanya's forecast puts them on 105. The card leads with <b>who</b> the person is and what they've been doing, then the two missions side by side. Each side shows the crew it would leave and how well the person fits there.</p>
+<div class="row">
+ <div class="wb">
+  <div class="wh"><div><b>Merge forecast</b><small>Board One · Thu 15 Oct · Kanya's forecast from Mon 12 Oct</small></div>
+   <div class="prog"><div class="bar"><i style="width:8%"></i></div><small>Clash 1 of 3</small></div></div>
+  <div class="auto"><svg class="ic"><use href="#check"/></svg>5 changes go in without a decision: 2 new missions, 3 people from Standby<u>See them</u></div>
+  <div class="stagebg"><div class="stack"><div class="ghost2"></div><div class="ghost1"></div>
+   <div class="card">
+    <div class="q">Clash 1 of 3 · a person in two places<span class="pill fc">Kanya R. · Mon 12 Oct</span></div>
+    <h3>Where does Somsak J. work on Thu?</h3>
+    <div class="who"><span class="av">SJ</span><div style="flex:1;min-width:0"><b>สมศักดิ์ ใจดี <span class="en">Somsak Jaidee · TG-10482</span></b>
+      <div class="tags"><span class="pill perm">Permanent</span><span class="pill perm">Senior Inspector</span><span class="pill area">AREA1</span><span class="pill perm"><svg class="ic"><use href="#phone"/></svg>081-447-2093</span></div></div></div>
+    <div class="stats"><div><b>6 yr</b><small>service</small></div><div><b>21 / 30</b><small>days on a mission</small></div><div><b>4</b><small>days this week</small></div><div><b>Day</b><small>yesterday's shift</small></div></div>
+    <div class="hist">Top hosts:<span>Host Beta <b>38</b>d</span><span>Host Alpha <b>12</b>d</span><span>Host Delta <b>3</b>d</span></div>
+    <div class="opts">
+     <div class="op">
+      <div class="src">Keep · carry-over<span class="k kbd">1 · ←</span></div>
+      <div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div>
+      <div class="loc"><svg class="ic"><use href="#pin"/></svg> Amata City, Plant 3 · <span class="pill area">AREA1</span></div>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd>08:00–17:00</dd><dt>Engineer</dt><dd>Eng Two · 089-312-7740</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl>
+      <div class="crewl">Crew if kept <b>2</b></div>
+      <div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip"><span class="sq">PK</span>Person K</span></div>
+      <div class="fit"><span class="g"><svg class="ic"><use href="#check"/></svg>Same area (AREA1)</span><span class="g"><svg class="ic"><use href="#check"/></svg>38 days at Host Beta</span><span class="n"><svg class="ic"><use href="#dot"/></svg>Same as yesterday</span></div>
+      <div class="after">105 then has <b>1</b> of the 2 Kanya planned</div>
+     </div>
+     <div class="op on">
+      <div class="src">Use · Kanya's forecast<span class="k kbd">2 · →</span></div>
+      <div class="mt"><span class="no">105</span><b>Host Delta</b><span class="tag day">DAY</span></div>
+      <div class="loc"><svg class="ic"><use href="#pin"/></svg> Rayong, Map Ta Phut · <span class="pill area2">Rayong</span></div>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Delta</dd><dt>Time</dt><dd>07:00–16:00</dd><dt>Engineer</dt><dd>Eng One · 086-905-1182</dd><dt>PPE</dt><dd>Safety shoes, helmet, glasses, gloves</dd><dt>Remark</dt><dd>Gate pass needed, ask at security</dd></dl>
+      <div class="crewl">Crew if used <b>2</b></div>
+      <div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip oc"><span class="sq">PH</span>Person H</span></div>
+      <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Different area (Rayong, not AREA1)</span><span class="g"><svg class="ic"><use href="#check"/></svg>3 days at Host Delta</span><span class="w"><svg class="ic"><use href="#alert"/></svg>Starts 1 hour earlier</span></div>
+      <div class="after">102 then has <b>1</b> (Person K only)</div>
+     </div>
+    </div>
+    <div class="note"><svg class="ic"><use href="#msg"/></svg><span><b>Kanya's note:</b> "Delta asked for a senior inspector who knows the line."</span></div>
+    <div class="swipe"><span>← swipe or press 1 to keep</span><span class="dots"><i class="on"></i><i></i><i></i></span><span>press 2 or swipe to use →</span></div>
+   </div></div></div>
+  <div class="wf"><button class="btn q" disabled style="opacity:.5">Back</button><span class="sp"></span><button class="btn">Keep all carry-over</button><button class="btn">Use all forecast</button></div>
+ </div>
+
+ <div><p class="cap">Phone · top of the card</p><div class="ph">
+  <div class="hd"><div class="t"><b>Merge forecast</b><small>1 of 3</small></div><div class="bar"><i style="width:8%"></i></div></div>
+  <div class="bd"><div class="card">
+   <div class="q" style="font-size:10.5px">Clash 1 · Kanya's forecast</div>
+   <h3>Where does Somsak J. work on Thu?</h3>
+   <div class="who"><span class="av">SJ</span><div style="min-width:0"><b>สมศักดิ์ ใจดี</b><span class="en" style="font-size:11px">Somsak Jaidee · TG-10482</span>
+     <div class="tags"><span class="pill perm">Senior Insp.</span><span class="pill area">AREA1</span></div></div></div>
+   <div class="stats"><div><b>6y</b><small>service</small></div><div><b>21</b><small>/30 days</small></div><div><b>4</b><small>this wk</small></div><div><b>Day</b><small>yest.</small></div></div>
+   <div class="opts">
+    <div class="op"><div class="src">Keep · carry-over</div><div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div><div class="loc">Amata City · 08:00–17:00 · Eng Two</div>
+     <div class="fit"><span class="g"><svg class="ic"><use href="#check"/></svg>Same area · 38 days here</span></div></div>
+    <div class="op on"><div class="src">Use · Kanya</div><div class="mt"><span class="no">105</span><b>Host Delta</b><span class="tag day">DAY</span></div><div class="loc">Map Ta Phut · 07:00–16:00 · Eng One</div>
+     <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Other area · starts 1 h earlier</span><span class="g"><svg class="ic"><use href="#check"/></svg>3 days here</span></div></div>
+   </div>
+   <div class="more">Missions, crews and Kanya's note<svg class="ic"><use href="#chev"/></svg></div>
+  </div></div>
+  <div class="ft"><button class="btn">Keep 102</button><button class="btn p">Use 105</button></div>
+ </div></div>
+
+ <div><p class="cap">Phone · "More" open</p><div class="ph">
+  <div class="hd"><div class="t"><b>Merge forecast</b><small>1 of 3</small></div><div class="bar"><i style="width:8%"></i></div></div>
+  <div class="bd"><span class="scroll" style="top:120px"></span><div class="card" style="margin-top:-150px">
+   <div class="opts">
+    <div class="op"><div class="src">Keep · 102 Host Beta</div>
+     <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Engineer</dt><dd>Eng Two · 089-312-7740</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl>
+     <div class="crewl">Crew if kept <b>2</b></div><div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip"><span class="sq">PK</span>Person K</span></div>
+     <div class="after">105 then has <b>1</b> of 2</div></div>
+    <div class="op on"><div class="src">Use · 105 Host Delta</div>
+     <dl class="dl"><dt>Customer</dt><dd>Cust Delta</dd><dt>Engineer</dt><dd>Eng One · 086-905-1182</dd><dt>PPE</dt><dd>Shoes, helmet, glasses, gloves</dd><dt>Remark</dt><dd>Gate pass needed</dd></dl>
+     <div class="crewl">Crew if used <b>2</b></div><div class="crew"><span class="chip me"><span class="sq">SJ</span>Somsak J.</span><span class="chip oc"><span class="sq">PH</span>Person H</span></div>
+     <div class="after">102 then has <b>1</b></div></div>
+   </div>
+   <div class="note"><svg class="ic"><use href="#msg"/></svg><span>"Delta asked for a senior inspector who knows the line."</span></div>
+   <div class="hist" style="font-size:11px;color:var(--muted)">Top hosts:<span>Beta <b>38</b>d</span><span>Alpha <b>12</b>d</span><span>Delta <b>3</b>d</span></div>
+  </div></div>
+  <div class="ft"><button class="btn">Keep 102</button><button class="btn p">Use 105</button></div>
+ </div></div>
+</div>
+
+<h2>Clash 2 · Mission details differ</h2>
+<p class="lead">Kanya's forecast changes 102's start time and engineer. The card shows the whole mission once, with the differing fields marked, and asks one question for the mission. If you'd rather pick field by field, "Choose per detail" splits it. The crew and the people affected are listed, so you can see who a time change touches.</p>
+<div class="row">
+ <div class="wb">
+  <div class="wh"><div><b>Merge forecast</b><small>Board One · Thu 15 Oct</small></div><div class="prog"><div class="bar"><i style="width:40%"></i></div><small>Clash 2 of 3</small></div></div>
+  <div class="stagebg"><div class="stack"><div class="ghost2"></div><div class="ghost1"></div>
+   <div class="card">
+    <div class="q">Clash 2 of 3 · mission details differ<span class="pill fc">Kanya R. · Mon 12 Oct</span></div>
+    <h3>Which details does 102 Host Beta run with?</h3>
+    <div class="opts">
+     <div class="op on"><div class="src">Keep · carry-over<span class="k kbd">1 · ←</span></div>
+      <div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div>
+      <div class="loc"><svg class="ic"><use href="#pin"/></svg> Amata City, Plant 3 · <span class="pill area">AREA1</span></div>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd><span class="chg">08:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg">Eng Two</span> · 089-312-7740</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl></div>
+     <div class="op"><div class="src">Use · Kanya's forecast<span class="k kbd">2 · →</span></div>
+      <div class="mt"><span class="no">102</span><b>Host Beta</b><span class="tag day">DAY</span></div>
+      <div class="loc"><svg class="ic"><use href="#pin"/></svg> Amata City, Plant 3 · <span class="pill area">AREA1</span></div>
+      <dl class="dl"><dt>Customer</dt><dd>Cust Beta</dd><dt>Time</dt><dd><span class="chg-old">08:00</span><span class="chg">07:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg-old">Eng Two</span><span class="chg">Eng One</span> · 086-905-1182</dd><dt>PPE</dt><dd>Safety shoes, helmet</dd></dl></div>
+    </div>
+    <div class="crewl" style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:12px">People on 102 after card 1 (affected by the time change)<b style="font-family:var(--mono);color:var(--ink)">1</b></div>
+    <div class="crew" style="display:flex;gap:4px;margin-top:4px"><span class="chip"><span class="sq">PK</span>Person K</span></div>
+    <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Eng One is also on 105 at 07:00. With the forecast, they run two missions</span><span class="n"><svg class="ic"><use href="#dot"/></svg>Person K worked a night shift yesterday (ends 05:00)</span></div>
+    <div class="swipe"><span>← keep</span><button class="btn q" style="height:24px">Choose per detail</button><span>use →</span></div>
+   </div></div></div>
+  <div class="wf"><button class="btn q">Back</button><span class="sp"></span><button class="btn">Keep all carry-over</button><button class="btn">Use all forecast</button></div>
+ </div>
+ <div><p class="cap">Phone</p><div class="ph">
+  <div class="hd"><div class="t"><b>Merge forecast</b><small>2 of 3</small></div><div class="bar"><i style="width:40%"></i></div></div>
+  <div class="bd"><div class="card">
+   <div class="q" style="font-size:10.5px">Clash 2 · Kanya's forecast</div>
+   <h3>Which details does 102 run with?</h3>
+   <div class="mt" style="display:flex;gap:6px;align-items:baseline"><span class="no">102</span><b style="color:var(--ink)">Host Beta</b><span class="tag day">DAY</span></div>
+   <div class="loc" style="font-size:11.5px;color:var(--muted)">Amata City, Plant 3 · Cust Beta</div>
+   <div class="opts">
+    <div class="op on"><div class="src">Keep · carry-over</div><dl class="dl"><dt>Time</dt><dd><span class="chg">08:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg">Eng Two</span></dd></dl></div>
+    <div class="op"><div class="src">Use · Kanya</div><dl class="dl"><dt>Time</dt><dd><span class="chg">07:00</span>–17:00</dd><dt>Engineer</dt><dd><span class="chg">Eng One</span></dd></dl></div>
+   </div>
+   <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Eng One also runs 105 at 07:00</span></div>
+   <div class="crew" style="display:flex;gap:4px;margin-top:8px"><span class="chip"><span class="sq">PK</span>Person K</span></div>
+   <div class="more">Choose per detail<svg class="ic"><use href="#chev"/></svg></div>
+  </div></div>
+  <div class="ft"><button class="btn">Keep</button><button class="btn p">Use forecast</button></div>
+ </div></div>
+</div>
+
+<h2>Clash 3 · A mission removed in the forecast</h2>
+<p class="lead">103 is on the carry-over, but Kanya's forecast doesn't have it. The card shows the full mission and spells out what happens to its crew on each side: keep it and they stay put, remove it and each person goes to Standby, unless the forecast already places them somewhere else.</p>
+<div class="row">
+ <div class="wb">
+  <div class="wh"><div><b>Merge forecast</b><small>Board One · Thu 15 Oct</small></div><div class="prog"><div class="bar"><i style="width:72%"></i></div><small>Clash 3 of 3</small></div></div>
+  <div class="stagebg"><div class="stack"><div class="ghost1"></div>
+   <div class="card">
+    <div class="q">Clash 3 of 3 · mission removed in the forecast<span class="pill fc">Kanya R. · Mon 12 Oct</span></div>
+    <h3>Does 103 Host Gamma run on Thu?</h3>
+    <div style="border:1px solid var(--line);border-radius:11px;padding:10px 12px">
+     <div class="mt" style="display:flex;gap:6px;align-items:baseline"><span class="no">103</span><b style="font-size:14px;color:var(--ink)">Host Gamma</b><span class="tag night"><svg class="ic" style="width:10px;height:10px"><use href="#moon"/></svg>NIGHT</span></div>
+     <div class="loc" style="font-size:11.5px;color:var(--muted)"><svg class="ic"><use href="#pin"/></svg> Laem Chabang, Port zone B · <span class="pill area">AREA1</span></div>
+     <dl class="dl" style="grid-template-columns:auto 1fr auto 1fr"><dt>Customer</dt><dd>Cust Alpha</dd><dt>Time</dt><dd>20:00–05:00</dd><dt>Engineer</dt><dd>Eng One</dd><dt>PPE</dt><dd>Helmet, reflective vest</dd><dt>Remark</dt><dd style="grid-column:span 3">Running since 6 Oct, 8 nights so far</dd></dl>
+    </div>
+    <div class="opts">
+     <div class="op on"><div class="src">Keep 103<span class="k kbd">1 · ←</span></div>
+      <div class="crewl">Crew stays <b>2</b></div>
+      <div class="crew"><span class="chip"><span class="sq">PD</span>Person D</span><span class="chip oc"><span class="sq">PG</span>Person G</span></div>
+      <div class="after">Kanya gets an alert, because her plan didn't have 103</div></div>
+     <div class="op"><div class="src">Remove 103 · Kanya's forecast<span class="k kbd">2 · →</span></div>
+      <div class="crewl">Where the crew goes</div>
+      <div class="dl" style="grid-template-columns:auto 1fr"><span class="chip"><span class="sq">PD</span>Person D</span><span style="font-size:11.5px">→ Standby</span><span class="chip oc"><span class="sq">PG</span>Person G</span><span style="font-size:11.5px">→ 106 Host Echo (in Kanya's forecast)</span></div>
+      <div class="fit"><span class="w"><svg class="ic"><use href="#alert"/></svg>Person D has no mission on Thu</span></div></div>
+    </div>
+    <div class="swipe"><span>← keep</span><span class="dots"><i class="ok"></i><i class="ok"></i><i class="on"></i></span><span>remove →</span></div>
+   </div></div></div>
+  <div class="wf"><button class="btn q">Back</button><span class="sp"></span><button class="btn">Keep all carry-over</button><button class="btn">Use all forecast</button></div>
+ </div>
+ <div><p class="cap">Phone</p><div class="ph">
+  <div class="hd"><div class="t"><b>Merge forecast</b><small>3 of 3</small></div><div class="bar"><i style="width:72%"></i></div></div>
+  <div class="bd"><div class="card">
+   <div class="q" style="font-size:10.5px">Clash 3 · Kanya's forecast</div>
+   <h3>Does 103 Host Gamma run on Thu?</h3>
+   <div class="mt" style="display:flex;gap:6px;align-items:baseline"><span class="no">103</span><b style="color:var(--ink)">Host Gamma</b><span class="tag night">NIGHT</span></div>
+   <div class="loc" style="font-size:11.5px;color:var(--muted)">Laem Chabang · 20:00–05:00 · Eng One</div>
+   <div class="opts">
+    <div class="op on"><div class="src">Keep 103</div><div class="crew"><span class="chip"><span class="sq">PD</span>Person D</span><span class="chip oc"><span class="sq">PG</span>Person G</span></div><div class="after">Kanya gets an alert</div></div>
+    <div class="op"><div class="src">Remove · Kanya</div><div style="font-size:11.5px;margin-top:4px;line-height:1.6">Person D → Standby<br>Person G → 106 Host Echo</div></div>
+   </div>
+   <div class="more">Mission details<svg class="ic"><use href="#chev"/></svg></div>
+  </div></div>
+  <div class="ft"><button class="btn">Keep</button><button class="btn p">Remove</button></div>
+ </div></div>
+</div>
+
+<h2>After the clashes · reason, then confirm</h2>
+<p class="lead">Each time you keep your own plan over someone's forecast, a short reason card follows, because that person gets an alert. Choices about the same forecaster share one reason card, so Kanya gets one message. Confirm lists exactly what will be written.</p>
+<div class="row">
+ <div><p class="cap">Phone · reason</p><div class="ph">
+  <div class="hd"><div class="t"><b>Merge forecast</b><small>Reason</small></div><div class="bar"><i style="width:90%"></i></div></div>
+  <div class="bd"><div class="card">
+   <div class="q" style="font-size:10.5px">For Kanya R.</div>
+   <h3>Tell Kanya why</h3>
+   <div style="font-size:12px;color:var(--muted)">You kept 2 things from your plan over hers:</div>
+   <div class="sum" style="margin-top:8px;box-shadow:none;background:#f7f9fb"><ul style="margin:0"><li>102 runs 08:00 with Eng Two</li><li>103 Host Gamma stays</li></ul></div>
+   <div class="reason"><span class="on">Customer changed the schedule</span><span>Needed on this site</span><span>Certification / skill</span><span>Leave not approved</span></div>
+   <div class="inp">Add a note (optional)</div>
+  </div></div>
+  <div class="ft"><button class="btn">Back</button><button class="btn p">Next</button></div>
+ </div></div>
+ <div><p class="cap">Phone · confirm</p><div class="ph">
+  <div class="hd"><div class="t"><b>Confirm merge</b><small>All decided</small></div><div class="bar"><i style="width:100%"></i></div></div>
+  <div class="bd">
+   <div class="sum"><b>Changes to Thu 15 Oct</b><ul><li>2 missions added: 105, 106</li><li>3 people from Standby placed</li><li>Somsak J. moves 102 → 105</li><li>102 keeps 08:00 and Eng Two</li><li>103 Host Gamma stays</li></ul></div>
+   <div class="sum"><b>Kanya R. gets one alert</b><div style="color:var(--muted);margin-top:4px">2 parts of her forecast not used · "Customer changed the schedule"</div></div>
+   <div class="sum"><b>Crew after the merge</b><div style="color:var(--muted);margin-top:4px">101 · 2 &nbsp; 102 · 1 &nbsp; 103 · 2 &nbsp; 105 · 2 &nbsp; 106 · 3</div></div>
+  </div>
+  <div class="ft"><button class="btn">Back</button><button class="btn p">Confirm merge</button></div>
+ </div></div>
+ <div style="flex:1 1 300px;min-width:0"><p class="cap">Notes for building it</p>
+  <div class="info" style="margin-top:0"><ul style="margin:0;padding-left:18px;font-size:13px">
+   <li>The same card works on desktop and phone. On a phone the mission details, crews and note fold under "More", so the choice and the key facts fit on one screen.</li>
+   <li>On desktop: <b>1 / 2</b> or <b>← / →</b> to choose, <b>Backspace</b> to go back. On a phone: swipe, or the two footer buttons.</li>
+   <li>Fit checks are hints only (green = good, amber = worth a look). They never block a choice.</li>
+   <li>"Keep all" and "Use all" still decide everything at once, then go straight to the reason and confirm cards.</li>
+   <li>Nothing new is stored. Every detail on the card is already in the app; the card just brings it together.</li>
+  </ul></div>
+ </div>
+</div>
+</div>
+</body>
+</html>
