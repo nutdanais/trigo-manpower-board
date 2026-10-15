@@ -27,7 +27,7 @@
   var lang = "en";
   try { if (localStorage.getItem(KEY) === "th") lang = "th"; } catch (e) { /* private mode: English */ }
 
-  var DOW = { Sun: "อา.", Mon: "จ.", Tue: "อ.", Wed: "พ.", Thu: "พฤ.", Fri: "ศ.", Sat: "ส." };
+  var DOW = { Sun: "อาทิตย์", Mon: "จันทร์", Tue: "อังคาร", Wed: "พุธ", Thu: "พฤหัสบดี", Fri: "ศุกร์", Sat: "เสาร์" };
   var MON = { Jan: "ม.ค.", Feb: "ก.พ.", Mar: "มี.ค.", Apr: "เม.ย.", May: "พ.ค.", Jun: "มิ.ย.", Jul: "ก.ค.", Aug: "ส.ค.", Sep: "ก.ย.", Oct: "ต.ค.", Nov: "พ.ย.", Dec: "ธ.ค." };
   var MONTH_FULL = { January: "มกราคม", February: "กุมภาพันธ์", March: "มีนาคม", April: "เมษายน", May: "พฤษภาคม", June: "มิถุนายน", July: "กรกฎาคม", August: "สิงหาคม", September: "กันยายน", October: "ตุลาคม", November: "พฤศจิกายน", December: "ธันวาคม" };
 
@@ -108,7 +108,7 @@
      with no crew"): the count + noun becomes Thai, and the English left between
      the numbers and Thai is looked up as its own piece. */
   var UNITS = {
-    board: "บอร์ด", mission: "ภารกิจ", host: "โฮสต์", engineer: "วิศวกร", inspector: "ผู้ตรวจสอบ", employee: "พนักงาน",
+    board: "บอร์ด", mission: "มิชชั่น", host: "โฮสต์", engineer: "วิศวกร", inspector: "ผู้ตรวจสอบ", employee: "พนักงาน",
     person: "คน", people: "คน", staff: "คน", crew: "คน", day: "วัน", week: "สัปดาห์", month: "เดือน", year: "ปี", row: "แถว",
     slide: "สไลด์", file: "ไฟล์", number: "ตัวเลข", hold: "รายการจอง", shift: "กะ", area: "พื้นที่", name: "ชื่อ",
     change: "รายการเปลี่ยนแปลง", decision: "การตัดสินใจ", user: "ผู้ใช้", request: "คำขอ", site: "ไซต์", cell: "ช่อง", page: "หน้า",
