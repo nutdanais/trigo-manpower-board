@@ -431,13 +431,13 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
 
       await step("B1: enter demand for two hosts; the gap chip turns red and updates live, including for a second user", async () => {
         await pa.fill("#cap-add input", "Host Alpha");
-        await pa.click("#cap-add button");
+        await pa.click("#cap-add button[type=submit]");
         await cell(pa, H).fill("12");
         await cell(pa, H).press("Enter");
         await until(() => db.t("capacity_demand").some((r) => r.plan_date === H && r.headcount === 12), "saved");
         await pa.fill("#cap-add input", "Host Beta");
         await pa.selectOption("#cap-add select", "night");
-        await pa.click("#cap-add button");
+        await pa.click("#cap-add button[type=submit]");
         const beta = pa.locator(`input[data-cap-key^="b1\u0001${H}\u0001Host Beta\u0001night"]`);
         await beta.fill("3");
         await beta.press("Tab");
@@ -458,7 +458,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
 
       await step("B1c: a host that is not on the Host list is refused", async () => {
         await pa.fill("#cap-add input", "Nowhere Site");
-        await pa.click("#cap-add button");
+        await pa.click("#cap-add button[type=submit]");
         await until(async () => /not in the Host list/.test(await pa.textContent("#toast-stack")), "refusal toast");
         assert.equal(await pa.locator('input[data-cap-key*="Nowhere Site"]').count(), 0, "no row added");
       });
@@ -654,7 +654,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 0, "row gone from the grid");
         // a row that was only added (no numbers yet) goes without a question
         await pa.fill("#cap-add input", "Host Gamma");
-        await pa.click("#cap-add button");
+        await pa.click("#cap-add button[type=submit]");
         await until(async () => (await pa.locator('.cap-hostname:text-is("Host Gamma")').count()) === 1, "re-added");
         await pa.click('.cap-row-menu[aria-label="Row actions for Host Gamma day"]');
         await pa.click("#context-menu >> text=Remove this row…");
