@@ -5241,6 +5241,20 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 .tb-who { padding: 8px 11px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
 .tb-who b { display: block; font-size: 13.5px; font-weight: 650; }
 .tb-who small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+/* Thai leave names already say "leave", so the English tail is dropped */
+html[lang="th"] .lv-long { display: none; }
+
+/* Language switch in the account menus (buildLangRow in app.js) */
+.tb-lang { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 11px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.tb-lang-label { display: inline-flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 550; color: var(--text); }
+.tb-seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--hover-tint); border-radius: 9px; }
+.tb-seg-btn {
+  border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 4px 10px; border-radius: 7px; cursor: pointer; min-height: 26px;
+}
+.tb-seg-btn:hover { color: var(--primary-text); }
+.tb-seg-btn.active { background: var(--panel); color: var(--primary-text); box-shadow: 0 0 0 1px rgba(0, 38, 70, .10); cursor: default; }
+.tb-seg-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .avatar-btn {
   width: 32px; height: 32px; margin-left: 4px; border: 0; border-radius: 9px; padding: 0; cursor: pointer;
   background: var(--brand-green); color: #1d2c05; font: 700 12px var(--font-ui); display: grid; place-items: center;
