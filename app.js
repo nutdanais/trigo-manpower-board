@@ -1808,6 +1808,7 @@ function renderBottomNav() {
   who.className = "tb-who";
   who.innerHTML = `<b>${escapeHtml($("#user-menu-name").textContent)}</b><small>${escapeHtml($("#user-menu-role").textContent)}</small>`;
   menu.appendChild(who);
+  menu.appendChild(buildLangRow(closeMoreMenu));
   for (const m of more) {
     const b = document.createElement("button");
     b.type = "button";
@@ -1875,6 +1876,30 @@ function renderUserMenu() {
   $("#avatar-initials").textContent = initials;
   $("#user-menu-name").textContent = name;
   $("#user-menu-role").textContent = me.legacy ? (me.email || "") : [roleLabel(me.roleKey), me.email].filter(Boolean).join(" · ");
+  $("#user-menu-lang").replaceChildren(buildLangRow());
+}
+
+/* Language switch (English / Thai), in both account menus: the avatar's on a
+   computer, "Me" on a phone. The words are written out in their own language
+   and left alone by the translator (data-no-i18n), so it reads the same either
+   way round. i18n.js does the switching; this only draws the control. */
+document.addEventListener("langchange", () => { renderUserMenu(); renderBottomNav(); });
+function buildLangRow(onPick) {
+  const row = document.createElement("div");
+  row.className = "tb-lang";
+  const now = window.I18N ? I18N.lang() : "en";
+  row.innerHTML = `<span class="tb-lang-label">${icon("globe")}Language</span>` +
+    `<span class="tb-seg" role="group" aria-label="Language" data-no-i18n>` +
+    [["en", "English"], ["th", "ไทย"]].map(([code, label]) =>
+      `<button type="button" class="tb-seg-btn${code === now ? " active" : ""}" data-lang="${code}" aria-pressed="${code === now}" lang="${code}">${label}</button>`).join("") +
+    `</span>`;
+  row.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-lang]");
+    if (!b || !window.I18N) return;
+    I18N.setLang(b.dataset.lang);
+    if (onPick) onPick();
+  });
+  return row;
 }
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
