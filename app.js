@@ -161,6 +161,23 @@ function tintOf(color, alpha) {
    AYT 152, NPT 150, Wellgrow 171, AMATA 188, BENZ 232 and the #9ca3af
    new-area default 157 all stay black; reds #e05a5a → 100 and #f87171 →
    126 go white. */
+/* Signal 4A: the area pill on a board card is a pale tint of the area's colour
+   with a darker shade of it as text, instead of the full colour. Plain rgb(),
+   not color-mix(): the card sits inside the export capture, and html2canvas
+   cannot parse color-mix(). An unparseable colour falls back to the old pill. */
+function areaSoftStyle(color) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color || "").trim());
+  if (!m) return `background:${escapeHtml(color)};color:${inkOn(color)}`;
+  const hex = m[1].length === 3 ? m[1].split("").map(c => c + c).join("") : m[1];
+  const n = parseInt(hex, 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const bg = c.map(v => Math.round(v * 0.22 + 255 * 0.78));   // 22% of the colour on white
+  const ink = c.map(v => Math.round(v * 0.45));                 // the colour, darkened
+  // a very light colour still needs readable text: never lighter than #44
+  const luma = (ink[0] * 299 + ink[1] * 587 + ink[2] * 114) / 1000;
+  const k = luma > 90 ? 90 / luma : 1;
+  return `background:rgb(${bg.join(",")});color:rgb(${ink.map(v => Math.round(v * k)).join(",")});box-shadow:inset 0 0 0 1px rgb(${c.map(v => Math.round(v * 0.45 + 255 * 0.55)).join(",")})`;
+}
 function inkOn(bg) {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(bg).trim());
   if (!m) return "var(--card-ink)";
@@ -291,6 +308,8 @@ function toast(message, type = "info", opts = {}) {
   const el = document.createElement("div");
   el.className = "toast toast-" + type;
   el.setAttribute("role", type === "error" ? "alert" : "status");
+  // an icon tile says which kind of message this is before it is read
+  el.insertAdjacentHTML("afterbegin", `<span class="toast-ic">${icon(type === "error" ? "close" : type === "warn" ? "alert" : "info")}</span>`);
   const msg = document.createElement("span");
   msg.className = "toast-msg";
   msg.textContent = message;
@@ -1330,7 +1349,7 @@ function renderOrgChart() {
           ${orgFilterDropdown("statuses", "Standby / Leave", org.filterOpts.statuses)}
         </div>
         <label class="oc-levelctl">Show to
-          <select id="oc-level" class="oc-select">${levelOpts}</select>
+          <select id="oc-level" class="oc-select" data-picker>${levelOpts}</select>
         </label>
       </div>
       <div class="oc-legend">
@@ -1904,7 +1923,7 @@ function buildLangRow(onPick) {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2040,7 +2059,7 @@ function empCard(emp) {
     (alsoEn ? ` <span class="emp-name-en">${escapeHtml(alsoEn)}</span>` : "") +
     `<span class="emp-meta">` +
       role +
-      (area ? `<span class="emp-area" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
+      (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
@@ -4415,6 +4434,14 @@ async function bulkWriteFile(kind, all, name) {
   bulkSaveBlob(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), name + ".xlsx");
 }
 
+/* the drop zone names the file once one is chosen */
+function bulkDropLabel() {
+  const f = $("#bulk-file").files && $("#bulk-file").files[0];
+  $("#bulk-drop").classList.toggle("has-file", !!f);
+  $("#bulk-drop-title").textContent = f ? f.name : "Drop the .xlsx here";
+  $("#bulk-drop-sub").innerHTML = f ? "Choose a different file" : "or <u>choose a file</u>";
+}
+
 function openBulkModal(kind) {
   const area = kind === "employees" ? "emplist" : "hostlist";
   if (!can(area, "edit")) { toast("Your role can view this list but not change it.", "info"); return; }
@@ -4427,6 +4454,7 @@ function openBulkModal(kind) {
   const n = bulkTemplateRows(kind, false).length;
   $("#bulk-dl-note").textContent = `${n} ${emp ? (n === 1 ? "employee" : "employees") : (n === 1 ? "host" : "hosts")} — the rows the list is showing now. Clear the search and filters first to include everyone. The Excel file has dropdowns, real dates and keeps Thai text intact.`;
   $("#bulk-file").value = "";
+  bulkDropLabel();
   $("#bulk-preview").classList.add("hidden");
   $("#bulk-preview").innerHTML = "";
   $("#btn-bulk-apply").disabled = true;
@@ -5033,6 +5061,11 @@ function renderHostlistFilterOptions() {
       pop.appendChild(row);
     }
   }
+  // how many filters are on, shown on the "Filters" button (as Manpower does)
+  const on = Object.values(state.hostlist.filters).filter(v => v && v.length).length;
+  $("#hostlist-filter-count").textContent = on;
+  $("#hostlist-filter-count").classList.toggle("hidden", !on);
+  $("#btn-hostlist-filter-pop").classList.toggle("ms-active", on > 0);
 }
 
 function hostlistFilteredSorted() {
@@ -5305,7 +5338,7 @@ function openHostModal(name, opts = {}) {
   form.mapUrl.value = rec ? rec.mapUrl : "";
   form.note.value = rec ? rec.note : "";
   form.areaId.innerHTML = `<option value="">— none —</option>`
-    + D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+    + D().areas.map(a => `<option value="${a.id}" data-color="${escapeHtml(a.color || "")}">${escapeHtml(a.name)}</option>`).join("");
   form.areaId.value = rec ? (rec.areaId || "") : "";
   form.archived.checked = !!(rec && rec.archived);
   $("#btn-delete-host").classList.toggle("hidden", !rec);
@@ -5614,7 +5647,35 @@ function openModal(id) {
   for (const m of $$(".modal")) m.classList.add("hidden");
   $(id).classList.remove("hidden");
   syncSegmented($(id));
+  pickerClose();
+  // long help text in a record panel folds to one line, after the content is
+  // filled in (several notes are set right after openModal returns)
+  if ($(id).classList.contains("modal-side")) requestAnimationFrame(() => foldNotes($(id)));
   if (state.settingsOpen) focusModal($(id));
+}
+
+/* Help text in the side panels: one line, with "More" to read the rest in
+   place. A note that already fits gets no button. Notes whose text is set
+   later are measured again on the next open. */
+function foldNotes(root) {
+  for (const p of root.querySelectorAll("p.import-note")) {
+    if (p.closest(".modal-actions") || p.classList.contains("settings-error") || p.id === "user-modal-note") continue;
+    // a short status line (the ✓ under Host, a count) is never folded
+    if (p.textContent.trim().length < 90) continue;
+    let more = p.nextElementSibling && p.nextElementSibling.classList.contains("note-more") ? p.nextElementSibling : null;
+    p.classList.add("note-fold");
+    p.classList.remove("open");
+    const long = p.offsetParent !== null && p.scrollHeight > p.clientHeight + 2;
+    if (!long) { if (more) more.remove(); p.classList.remove("note-fold"); continue; }
+    if (!more) {
+      more = document.createElement("button");
+      more.type = "button";
+      more.className = "note-more";
+      more.onclick = () => { const open = p.classList.toggle("open"); more.textContent = open ? "Less" : "More"; };
+      p.after(more);
+    }
+    more.textContent = "More";
+  }
 }
 
 /* ---------- segmented controls ----------
@@ -5627,6 +5688,155 @@ function syncSegmented(root = document) {
     for (const btn of sel._seg.children) btn.setAttribute("aria-pressed", String(btn.dataset.v === sel.value));
   }
 }
+/* ----- in-app dropdown standing in for a native <select> -----
+   On a phone a native select opens the system's own list (a dark sheet on
+   Android) that matches nothing else in the app. Any <select data-picker> gets
+   a button in its place and a light popover list in the Signal menu style: a
+   search box once there are more than six options, a colour square when an
+   option carries data-color, a tick on the current one. The select stays in
+   the DOM as the source of truth — forms still read and submit it, and code
+   that sets .value or rebuilds its options is followed (see pickerWatch). */
+let _pickerOpen = null;
+function pickerLabel(sel) {
+  const o = sel.options[sel.selectedIndex];
+  return o ? { text: o.textContent, color: o.dataset.color || "" } : { text: "", color: "" };
+}
+function pickerSync(sel) {
+  const pk = sel._pk;
+  if (!pk) return;
+  const { text, color } = pickerLabel(sel);
+  pk.text.textContent = text;
+  pk.sw.style.background = color;
+  pk.sw.classList.toggle("hidden", !color);
+  pk.btn.disabled = sel.disabled;
+}
+function pickerClose() {
+  if (!_pickerOpen) return;
+  const { pop, btn } = _pickerOpen;
+  pop.remove();
+  btn.setAttribute("aria-expanded", "false");
+  _pickerOpen = null;
+}
+function pickerOpen(sel) {
+  pickerClose();
+  const pk = sel._pk;
+  const pop = document.createElement("div");
+  pop.className = "pk-pop";
+  pop.setAttribute("role", "listbox");
+  pop.setAttribute("aria-label", pk.btn.getAttribute("aria-label") || "");
+  const opts = [...sel.options];
+  let q = null;
+  if (opts.length > 6) {
+    q = document.createElement("input");
+    q.type = "search";
+    q.className = "pk-q";
+    q.placeholder = "Search…";
+    q.setAttribute("aria-label", "Search");
+    pop.appendChild(q);
+  }
+  const list = document.createElement("div");
+  list.className = "pk-list";
+  pop.appendChild(list);
+  const draw = () => {
+    const term = q ? q.value.trim().toLowerCase() : "";
+    list.innerHTML = "";
+    let n = 0;
+    for (const o of opts) {
+      if (term && !o.textContent.toLowerCase().includes(term)) continue;
+      n++;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pk-opt";
+      b.setAttribute("role", "option");
+      const on = o.value === sel.value;
+      b.setAttribute("aria-selected", String(on));
+      b.disabled = o.disabled;
+      if (o.dataset.color) { const i = document.createElement("i"); i.className = "pk-sw"; i.style.background = o.dataset.color; b.appendChild(i); }
+      const t = document.createElement("span"); t.textContent = o.textContent; b.appendChild(t);
+      if (on) b.insertAdjacentHTML("beforeend", icon("check", "pk-tick"));
+      b.onclick = () => {
+        pickerClose();
+        if (sel.value !== o.value) { sel.value = o.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        pk.btn.focus();
+      };
+      list.appendChild(b);
+    }
+    if (!n) list.innerHTML = `<p class="pk-none">No matches</p>`;
+  };
+  draw();
+  if (q) q.oninput = draw;
+  pop.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") { ev.stopPropagation(); pickerClose(); pk.btn.focus(); }
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      ev.preventDefault();
+      const items = [...list.querySelectorAll(".pk-opt:not(:disabled)")];
+      const i = items.indexOf(document.activeElement);
+      const next = items[ev.key === "ArrowDown" ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1)];
+      if (next) next.focus();
+    }
+  });
+  pk.wrap.appendChild(pop);
+  // open upwards when there is no room below (a picker low in a panel)
+  const r = pk.btn.getBoundingClientRect();
+  pop.classList.toggle("up", window.innerHeight - r.bottom < 260 && r.top > 260);
+  pk.btn.setAttribute("aria-expanded", "true");
+  _pickerOpen = { pop, btn: pk.btn };
+  (q || list.querySelector('[aria-selected="true"]') || list.querySelector(".pk-opt") || pop).focus();
+}
+function pickerWatch(sel) {
+  // follow code that sets .value / .selectedIndex directly (no change event)
+  for (const prop of ["value", "selectedIndex"]) {
+    const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, prop);
+    Object.defineProperty(sel, prop, {
+      configurable: true,
+      get() { return d.get.call(this); },
+      set(v) { d.set.call(this, v); pickerSync(this); },
+    });
+  }
+  new MutationObserver(() => pickerSync(sel)).observe(sel, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
+  sel.addEventListener("change", () => pickerSync(sel));
+}
+function initPicker(sel) {
+  if (sel._pk) return;
+  const wrap = document.createElement("span");
+  wrap.className = "pk";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pk-btn";
+  btn.setAttribute("aria-haspopup", "listbox");
+  btn.setAttribute("aria-expanded", "false");
+  const lab = sel.closest("label");
+  const name = sel.getAttribute("aria-label") || (lab && lab.childNodes[0] && lab.childNodes[0].textContent.trim()) || sel.title || "";
+  if (name) btn.setAttribute("aria-label", name);
+  if (sel.title) btn.title = sel.title;
+  const sw = document.createElement("i"); sw.className = "pk-sw hidden";
+  const text = document.createElement("span"); text.className = "pk-text";
+  btn.append(sw, text);
+  btn.insertAdjacentHTML("beforeend", icon("chevron-down", "pk-chev"));
+  btn.onclick = (ev) => { ev.stopPropagation(); if (_pickerOpen && _pickerOpen.btn === btn) pickerClose(); else pickerOpen(sel); };
+  sel.classList.add("pk-source");
+  sel.tabIndex = -1;
+  sel.setAttribute("aria-hidden", "true");
+  sel.after(wrap);
+  wrap.append(sel, btn);   // inside the wrapper, so the hidden select can't stick out of a narrow row
+  sel._pk = { wrap, btn, sw, text };
+  pickerWatch(sel);
+  pickerSync(sel);
+}
+function initPickers(root = document) {
+  for (const sel of root.querySelectorAll("select[data-picker]")) initPicker(sel);
+}
+document.addEventListener("click", (ev) => { if (_pickerOpen && !_pickerOpen.pop.contains(ev.target)) pickerClose(); });
+// selects built later (the org chart toolbar, the capacity add-host row, the
+// Settings tables) are picked up as they are added
+new MutationObserver((muts) => {
+  for (const m of muts) for (const n of m.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    if (n.matches && n.matches("select[data-picker]")) initPicker(n);
+    else if (n.querySelector && n.querySelector("select[data-picker]")) initPickers(n);
+  }
+}).observe(document.documentElement, { childList: true, subtree: true });
+
 function initSegmented() {
   for (const sel of $$("select[data-seg]")) {
     if (sel._seg) continue;
@@ -5701,10 +5911,45 @@ function trapModalTab(ev) {
   else if (!ev.shiftKey && (!inside || document.activeElement === lastEl)) { ev.preventDefault(); firstEl.focus(); }
 }
 
+/* Signal's small dialog names the action on its button, and a destructive one
+   is red. Callers pass a title; the label and the danger flag come from it here,
+   so the 30-odd callers didn't each need a new argument. A caller's own
+   yesLabel still wins. "Cannot …" titles are notices: one OK, no Cancel. */
+const CONFIRM_ACTIONS = [
+  [/^Cannot /, "OK", false, true],
+  [/^Unlock board/, "Unlock"],
+  [/^Edit (today's board|a past date)/, "Edit anyway"],
+  [/^Deactivate employees?/, "Deactivate", true],
+  [/^Merge hosts/, "Merge hosts", true],
+  [/^Rename this host/, "Rename"],
+  [/^Clear host record/, "Clear record", true],
+  [/^Take /, "Take them"],
+  [/^Create this host/, "Create host"],
+  [/^Delete (forecast )?mission/, "Delete mission", true],
+  [/^Hide mission/, "Hide mission"],
+  [/^Delete note/, "Delete note", true],
+  [/^Remove this engineer/, "Remove engineer", true],
+  [/^Delete this account/, "Delete account", true],
+  [/^Delete /, "Delete", true],
+  [/^Reset board/, "Reset board", true],
+  [/^Start from the confirmed plan/, "Start over", true],
+  [/^Reset all numbers/, "Reset to 0", true],
+  [/^Copy this week/, "Copy"],
+  [/^Remove /, "Remove", true],
+  [/^Turn down/, "Turn down", true],
+  [/^Issue a new password/, "Issue password"],
+  [/^Mark as holiday/, "Mark as holiday"],
+  [/^Make it a working day/, "Make it a working day"],
+];
 function showConfirm(title, message, onYes, onCancel, yesLabel) {
+  const act = CONFIRM_ACTIONS.find(([re]) => re.test(title)) || [null, "OK", false, false];
   $("#confirm-title").textContent = title;
   $("#confirm-message").textContent = message;
-  $("#btn-confirm-yes").textContent = yesLabel || "Yes";
+  const yes = $("#btn-confirm-yes");
+  yes.textContent = yesLabel || act[1];
+  yes.classList.toggle("btn-danger-solid", !!act[2]);
+  yes.classList.toggle("btn-primary", !act[2]);
+  $("#btn-confirm-no").classList.toggle("hidden", !!act[3]);
   _confirmCancel = onCancel || null;
   openModal("#modal-confirm");
   $("#btn-confirm-yes").onclick = () => { _confirmCancel = null; closeModal(); onYes(); };
@@ -5974,9 +6219,18 @@ function openEmployeeModal(empId, focusField) {
   state.editingEmployeeId = empId || null;
   const form = $("#form-employee");
   form.reset();
-  $("#employee-modal-title").textContent = empId ? "Edit Employee" : "New Employee";
+  // an existing person: their name leads the panel, with board · contract · area under it
+  const who0 = empId ? D().employees.find(e => e.id === empId) : null;
+  $("#employee-modal-title").textContent = who0 ? (who0.name || "Edit employee") : "New employee";
+  const sub = $("#employee-modal-sub");
+  if (who0) {
+    const b = D().boards.find(x => x.id === who0.boardId);
+    const ar = D().areas.find(x => x.id === who0.areaId);
+    sub.textContent = [b && b.name, who0.contract === "oncall" ? "On-call" : "Permanent", ar && ar.name].filter(Boolean).join(" · ");
+  }
+  sub.classList.toggle("hidden", !who0);
   $("#btn-deactivate-employee").classList.toggle("hidden", !empId);
-  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join("");
+  form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}" data-color="${escapeHtml(a.color || "")}">${escapeHtml(a.name)}</option>`).join("");
   form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
   if (empId) {
     const e = D().employees.find(x => x.id === empId);
@@ -6295,19 +6549,28 @@ function renderSettingsFooter() {
   status.textContent = text;
   status.className = cls;
   const saving = sv.phase === "saving";
-  save.classList.toggle("hidden", !dirty);
+  // On a phone Save stays where it is (disabled while there is nothing to save),
+  // like the record dialogs' footer; Users saves from each person's dialog.
+  const keepSave = svIsPhone() && tab !== "users";
+  save.classList.toggle("hidden", !dirty && !keepSave);
+  if (!dirty && keepSave && sv.phase !== "saved") status.textContent = "No unsaved changes";
+  save.disabled = saving || !dirty;
   discard.classList.toggle("hidden", !dirty);
-  save.disabled = saving;
   discard.disabled = saving;
-  save.textContent = tab === "roles" ? "Review changes" : sv.phase === "error" ? "Retry" : "Save changes";
+  save.textContent = tab === "roles" ? (svIsPhone() ? "Review" : "Review changes") : sv.phase === "error" ? "Retry" : svIsPhone() ? "Save" : "Save changes";
 }
 
 function renderSettingsHead() {
   const tab = state.settingsTab;
   const meta = SETTINGS_SECTIONS[tab];
-  $("#sv-crumb").textContent = meta.group;
-  $("#sv-title").textContent = meta.label;
-  $("#sv-hint").textContent = meta.hint;
+  const home = svAtHome();
+  $("#sv-crumb").textContent = home ? "" : meta.group;
+  $("#sv-title").textContent = home ? "Settings" : meta.label;
+  $("#sv-hint").textContent = home ? "" : meta.hint;
+  const back = $("#btn-settings-back-icon");
+  const backLabel = svIsPhone() && !home ? "Back to Settings" : "Back to board";
+  back.setAttribute("aria-label", backLabel);
+  back.title = backLabel;
   $("#btn-add-engineer").classList.toggle("hidden", !(tab === "engineers" && can("settings", "edit")));
   $("#btn-add-area").classList.toggle("hidden", !(tab === "areas" && can("settings", "edit")));
   $("#btn-add-board-settings").classList.toggle("hidden", !(tab === "boards" && can("settings", "edit")));
@@ -6347,21 +6610,6 @@ function applySettingsTab() {
   for (const pane of $$("#settings-view .settings-pane")) {
     pane.classList.toggle("hidden", pane.dataset.pane !== state.settingsTab);
   }
-  // the phone's stand-in for the rail
-  const sel = $("#sv-select");
-  let html = "", group = null;
-  for (const btn of buttons) {
-    if (btn.classList.contains("hidden")) continue;
-    if (btn.dataset.group !== group) {
-      if (group !== null) html += "</optgroup>";
-      group = btn.dataset.group;
-      html += `<optgroup label="${escapeHtml(SETTINGS_GROUPS[group] || group)}">`;
-    }
-    html += `<option value="${escapeHtml(btn.dataset.tab)}">${escapeHtml(SETTINGS_SECTIONS[btn.dataset.tab].label)}</option>`;
-  }
-  sel.innerHTML = html + (group !== null ? "</optgroup>" : "");
-  sel.value = state.settingsTab;
-
   renderSettingsHead();
   if (state.settingsTab === "account") renderAccountPane();
   if (state.settingsTab === "users") renderUsersPane();
@@ -6383,6 +6631,7 @@ function renderSettings() {
   $("#engineers-count").textContent = n("engineer", "engineers", engineerPaneRows().length);
   $("#areas-count").textContent = n("service area", "service areas", D().areas.length);
   $("#boards-count").textContent = n("board", "boards", D().boards.length);
+  renderSvHome();
 }
 
 /* After a data refresh (Realtime, a role change, coming back to the tab). The
@@ -6415,6 +6664,7 @@ function openSettingsView(tab) {
   let remembered = null;
   try { remembered = localStorage.getItem(SETTINGS_TAB_KEY); } catch (e) { /* private mode */ }
   state.settingsTab = tab || (SETTINGS_SECTIONS[remembered] ? remembered : "account");
+  state.svHome = !tab;
   document.body.classList.add("settings-open");
   $("#settings-view").classList.remove("hidden");
   renderSettings();
@@ -6443,9 +6693,96 @@ function closeSettingsView() {
   });
 }
 
+/* ----- phone: the section list -----
+   At 720px and below there is no rail. Settings opens on a grouped list of the
+   sections (state.svHome) and a section then has the whole screen; its back
+   chevron returns to the list, and the list's × returns to the board. */
+const SV_PHONE = window.matchMedia("(max-width: 720px)");
+function svIsPhone() { return SV_PHONE.matches; }
+function svAtHome() { return !!(state.settingsOpen && state.svHome && svIsPhone()); }
+
+function svHomeMeta(tab) {
+  const n = (one, many, c) => `${c} ${c === 1 ? one : many}`;
+  if (tab === "account") return { sub: "Name, mobile number, password" };
+  if (tab === "engineers") return { count: engineerPaneRows().length, sub: n("person", "people", engineerPaneRows().length) };
+  if (tab === "areas") return { count: D().areas.length, sub: n("area", "areas", D().areas.length) };
+  if (tab === "boards") return { count: D().boards.length, sub: n("board", "boards", D().boards.length) };
+  if (tab === "users") {
+    const all = D().users || [];
+    const waiting = all.filter(u => u.status === "pending").length;
+    return { sub: D().users ? n("person", "people", all.length) : "Accounts and access requests", waiting };
+  }
+  if (tab === "roles") return { sub: "What each role can see and change" };
+  return {};
+}
+
+function renderSvHome() {
+  const home = $("#sv-home");
+  if (!home) return;
+  const at = svAtHome();
+  $("#settings-view").classList.toggle("sv-at-home", at);
+  if (!at) { home.innerHTML = ""; return; }
+  let html = "", group = null;
+  for (const btn of $$("#settings-tabs .settings-tab")) {
+    if (btn.classList.contains("hidden")) continue;
+    const tab = btn.dataset.tab;
+    if (btn.dataset.group !== group) {
+      if (group !== null) html += "</div>";
+      group = btn.dataset.group;
+      html += `<div class="svh-label">${escapeHtml(SETTINGS_GROUPS[group] || group)}</div><div class="svh-group">`;
+    }
+    const m = svHomeMeta(tab);
+    const use = btn.querySelector("use");
+    const ic = use ? use.getAttribute("href") : "#i-gear";
+    const dirty = sdDirty(tab) ? `<span class="svh-dirty">Unsaved</span>` : "";
+    const waiting = m.waiting ? `<span class="svh-waiting">${m.waiting} waiting</span>` : "";
+    html += `<button type="button" class="svh-row" data-tab="${escapeHtml(tab)}">
+      <span class="svh-ic"><svg class="ic" aria-hidden="true"><use href="${escapeHtml(ic)}"></use></svg></span>
+      <span class="svh-text"><b>${escapeHtml(SETTINGS_SECTIONS[tab].label)}</b>${m.sub ? `<small>${escapeHtml(m.sub)}</small>` : ""}</span>
+      ${dirty}${waiting}<svg class="ic svh-chev" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>`;
+  }
+  if (group !== null) html += "</div>";
+  html += `<p class="app-version svh-version">Version <span data-app-version>${escapeHtml(($("#settings-version [data-app-version]") || {}).textContent || "")}</span></p>`;
+  home.innerHTML = html;
+  for (const row of home.querySelectorAll(".svh-row")) row.onclick = () => svOpenSection(row.dataset.tab);
+  // Users is loaded on first entry; the list asks for it so the waiting count is there
+  if (can("users") && D().users === null && !state._svUsersLoading) {
+    state._svUsersLoading = true;
+    safely(async () => { try { await cloud.loadUsers(); } finally { state._svUsersLoading = false; } if (svAtHome()) renderSvHome(); });
+  }
+}
+
+function svOpenSection(tab) {
+  if (tab === state.settingsTab) {
+    state.svHome = false;
+    renderSettings();
+    $("#sv-scroll").scrollTop = 0;
+    $("#sv-title").focus({ preventScroll: true });
+    return;
+  }
+  goSettingsTab(tab);
+}
+
+/* the header's back control: a section goes back to the list (asking first if
+   it has unsaved edits, as moving to another section does); the list, or any
+   wider screen, goes back to the board */
+function svBack() {
+  if (svIsPhone() && !svAtHome()) {
+    settingsGuard(() => {
+      state.svHome = true;
+      state.settingsSave = { phase: "clean" };
+      renderSettings();
+      $("#sv-title").focus({ preventScroll: true });
+    });
+    return;
+  }
+  closeSettingsView();
+}
+
 function goSettingsTab(tab, onCancel) {
   if (tab === state.settingsTab) return;
   settingsGuard(() => {
+    state.svHome = false;
     state.settingsTab = tab;
     state.settingsSave = { phase: "clean" };
     try { localStorage.setItem(SETTINGS_TAB_KEY, tab); } catch (e) { /* private mode */ }
@@ -6796,7 +7133,7 @@ function renderEngineerRows() {
     const phoneCell = document.createElement("td");
     phoneCell.className = "st-phone";
     phoneCell.dataset.label = "Phone";
-    phoneCell.textContent = r.phone || "—";
+    phoneCell.textContent = r.phone || "";   // empty shows "—" (or "No phone yet" on a phone), see styles.css
     phoneCell.title = r.kind === "account"
       ? "Set by this person under Settings → My account."
       : "From the engineer record. Link it to an account and the number comes from there.";
@@ -6835,6 +7172,7 @@ function renderEngineerRows() {
       acctCell.appendChild(unlink);
     } else {
       const link = document.createElement("select");
+      link.dataset.picker = "";
       link.setAttribute("aria-label", `Account for ${r.name}`);
       link.innerHTML = `<option value="">— no account —</option>` +
         linkable.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.displayName || d.fullName || "?")}</option>`).join("");
@@ -6891,6 +7229,10 @@ function openAddEngineerModal() {
     .map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.displayName || d.fullName || "?")} — ${escapeHtml(roleLabel(d.roleKey))}</option>`)
     .join("");
   const none = !free.length;
+  form.profileId.value = "";
+  $("#ae-q").value = "";
+  renderAddEngineerList(free);
+  $("#ae-q").oninput = () => renderAddEngineerList(free);
   form.profileId.disabled = none;
   $("#form-add-engineer button[type=submit]").disabled = none;
   note.textContent = none
@@ -6899,6 +7241,39 @@ function openAddEngineerModal() {
         : "Adding engineers by account needs the one-time database update (migration-2026-09-06-display-names.sql).")
     : "They get a colour of their own and can be picked in the Engineer box on a mission. Their name and phone number come from their account.";
   openModal("#modal-add-engineer");
+}
+
+function renderAddEngineerList(free) {
+  const form = $("#form-add-engineer");
+  const sel = form.profileId;
+  sel.closest("label").classList.add("role-pick-src");
+  const q = $("#ae-q").value.trim().toLowerCase();
+  const list = $("#ae-list");
+  const shown = free.filter(d => !q || [d.displayName, d.fullName, d.email].some(x => (x || "").toLowerCase().includes(q)));
+  $(".ae-pick").classList.toggle("hidden", !free.length);
+  list.innerHTML = shown.length ? "" : `<p class="import-note ae-empty">No one matches “${escapeHtml($("#ae-q").value)}”.</p>`;
+  for (const d of shown) {
+    const name = d.displayName || d.fullName || "?";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ae-row";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(sel.value === d.id));
+    b.innerHTML = `<span class="ae-avatar" aria-hidden="true">${escapeHtml(nameInitials(name))}</span>
+      <span class="ae-who"><b>${escapeHtml(name)}</b><small>${escapeHtml(d.email || "")}</small></span>
+      <span class="role-pill role-${escapeHtml(d.roleKey || "none")}">${escapeHtml(roleLabel(d.roleKey))}</span>`;
+    b.onclick = () => {
+      sel.value = d.id;
+      for (const x of list.querySelectorAll(".ae-row")) x.setAttribute("aria-checked", String(x === b));
+      $("#form-add-engineer button[type=submit]").disabled = false;
+    };
+    list.appendChild(b);
+  }
+  $("#form-add-engineer button[type=submit]").disabled = !sel.value;
+}
+function nameInitials(name) {
+  const parts = String(name).replace(/[._-]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  return ((parts[0] || "?")[0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
 function addEngineerFromModal(ev) {
@@ -7545,7 +7920,19 @@ function exportTypeSaved(tab, types) {
   return types[0];
 }
 /* the File type radios at the top of an export dialog */
+const EXPORT_FILE_NAMES = { manpower: "Manpower list", hostlist: "Host list" };
 function renderExportTypes(el, tab, types, onChange) {
+  // One file type is nothing to choose between: say what the file is instead
+  // of drawing a one-option switch. The checked radio stays (hidden) so
+  // pickedExportType() reads the same either way.
+  if (types.length === 1) {
+    const t = types[0];
+    el.classList.add("export-type-single");
+    el.innerHTML = `<input type="radio" name="${tab}-export-type" value="${t}" checked hidden>` +
+      `<div class="file-chip"><span class="fc-ic">${escapeHtml(t.toUpperCase())}</span><span><b>${escapeHtml(EXPORT_FILE_NAMES[tab] || "Export")}.${escapeHtml(t)}</b><small>${escapeHtml(EXPORT_TYPES[t])} workbook</small></span></div>`;
+    return;
+  }
+  el.classList.remove("export-type-single");
   const selected = exportTypeSaved(tab, types);
   el.innerHTML = "<b>File type</b>" + types.map(t =>
     `<label><input type="radio" name="${tab}-export-type" value="${t}"${t === selected ? " checked" : ""}> ${EXPORT_TYPES[t]}</label>`).join("");
@@ -8074,6 +8461,12 @@ function missionArea(number) {
   return m ? m[0].toUpperCase() : "Other";
 }
 
+/* A composed empty state for a list that has nothing in it: an icon tile,
+   what is (not) here, and the next step where there is one. */
+function emptyStateHtml(title, text, iconName = "inbox") {
+  return `<div class="empty-state">${icon(iconName, "es-ic")}<b>${escapeHtml(title)}</b>${text ? `<p>${escapeHtml(text)}</p>` : ""}</div>`;
+}
+
 function importMsg(text) {
   importUi = { items: [], picked: new Set(), q: "", f: "all" };
   $("#import-tools").classList.add("hidden");
@@ -8231,7 +8624,13 @@ function openImportModal() {
       const srcDate = await cloud.findLatestWeekdayMissionDate(boardId, state.date);
       if (!srcDate) {
         importCandidates = [];
-        importMsg("No missions found on recent weekdays to copy from.");
+        importMsg("");
+        $("#import-list").innerHTML = emptyStateHtml("Nothing to copy yet",
+          "No missions on this board in the last few working days. Start the day with a new mission instead.");
+        const go = mkEl("button", "btn btn-primary", "New mission");
+        go.type = "button";
+        go.onclick = () => { closeModal(); openMissionModal(null); };
+        $("#import-list .empty-state").appendChild(go);
         return;
       }
       importCandidates = (await cloud.getMissionsForDate(boardId, srcDate)).filter(m => !m.hidden);
@@ -8738,7 +9137,7 @@ function renderHoldEventsModal() {
       ? "Forecasts not used when a day was confirmed, and people moved out of a forecast they were held in. Each flag stays until it is acknowledged."
       : "Someone moved these people out of a forecast they were held in. The flag stays on the mission until it is acknowledged.";
   if (!events.length) {
-    list.innerHTML = '<p class="import-note">All acknowledged — nothing left here.</p>';
+    list.innerHTML = emptyStateHtml("Nothing to acknowledge", "Every alert here has been acknowledged.", "check");
     return;
   }
   if (merges.length) list.appendChild(mergeAlertsEl(merges, mayAck));
@@ -10082,7 +10481,8 @@ function renderMergeLog() {
   const nu = rows.filter(decisionNotUsed).length;
   $("#merge-log-sub").textContent = rows.length
     ? `${rows.length} ${rows.length === 1 ? "decision" : "decisions"}; ${nu} ${nu === 1 ? "part" : "parts"} of the forecast not used. Highlighted rows alerted the engineer who forecast them.`
-    : "No decisions were recorded for this merge.";
+    : "";
+  if (!rows.length) body.innerHTML = emptyStateHtml("No decisions recorded", "This merge had no differences to decide.");
   for (const [, list] of merges) {
     const r0 = list[0];
     body.appendChild(mkEl("p", "merge-log-when", `Merged by ${who(r0.merged_by)} · ${fmtStamp(r0.merged_at)}`));
@@ -10182,7 +10582,8 @@ function openForecastViewer() {
     }
     list.appendChild(g);
   }
-  if (!list.children.length) list.innerHTML = '<p class="import-note">This forecast is empty.</p>';
+  if (!list.children.length) list.innerHTML = emptyStateHtml(`No forecast for ${fmtDow(state.date)} ${shortDateLabel(state.date)}`,
+    "Nobody has planned this day ahead yet. A forecast stays here for reference after it is merged.");
   openModal("#modal-forecast-view");
 }
 
@@ -10907,6 +11308,7 @@ function capacityAddRowForm(boardId) {
   inp.setAttribute("list", "cap-host-list");
   inp.setAttribute("aria-label", "Host");
   const sh = document.createElement("select");
+  sh.dataset.picker = "";
   sh.setAttribute("aria-label", "Shift");
   sh.innerHTML = '<option value="day">Day</option><option value="night">Night</option>';
   const btn = document.createElement("button");
@@ -11655,6 +12057,8 @@ function renderUserRows() {
     $("#btn-users-pending").textContent = state.users.pendingOnly ? "Show everyone" : "Review requests";
   }
 
+  renderUsersChips(all);
+
   $("#users-count").textContent = rows.length === all.length
     ? `${all.length} ${all.length === 1 ? "person" : "people"}`
     : `${rows.length} of ${all.length}`;
@@ -11674,8 +12078,11 @@ function renderUserRows() {
     const st = USER_STATUS[u.status] || { label: u.status };
     const isMe = D().me && u.id === D().me.id;
     tr.className = "user-row status-" + u.status + (isMe ? " user-row-me" : "");
+    // on a phone the whole card opens the person (the pencil is hidden there);
+    // a tap on Approve / Reject stays theirs
+    if (mayEdit) tr.onclick = (ev) => { if (svIsPhone() && !ev.target.closest("button")) openUserModal(u.id); };
     tr.innerHTML = `
-      <td data-label="Name">${escapeHtml(u.fullName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
+      <td data-label="Name">${escapeHtml(u.fullName || u.displayName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName && u.fullName ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
       <td data-label="Email">${escapeHtml(u.email || "")}</td>
       <td data-label="Role"><span class="role-pill role-${escapeHtml(u.roleKey || "none")}">${escapeHtml(roleLabel(u.roleKey))}</span></td>
       <td data-label="Status"><span class="status-pill status-${escapeHtml(u.status)}" title="${escapeHtml(st.hint || "")}">${escapeHtml(st.label)}</span></td>
@@ -11712,6 +12119,36 @@ function renderUserRows() {
   }
 }
 
+/* Phone: one row of chips in place of the Role / Status dropdowns — All,
+   Waiting, then each role, each with its count. A chip sets the same filters
+   the dropdowns do, so the two never disagree. */
+function renderUsersChips(all) {
+  const box = $("#users-chips");
+  if (!box) return;
+  const f = state.users.filters;
+  const chips = [{ id: "all", label: "All", count: all.length, on: !f.roleKey.length && !f.status.length && !state.users.pendingOnly }];
+  const waiting = all.filter(u => u.status === "pending").length;
+  if (waiting) chips.push({ id: "status:pending", label: "Waiting", count: waiting, warn: true,
+    on: (f.status.length === 1 && f.status[0] === "pending" && !f.roleKey.length) || state.users.pendingOnly });
+  for (const r of D().roles) {
+    const c = all.filter(u => u.roleKey === r.key).length;
+    chips.push({ id: "role:" + r.key, label: r.label, count: c, on: f.roleKey.length === 1 && f.roleKey[0] === r.key && !f.status.length });
+  }
+  const off = all.filter(u => u.status === "disabled").length;
+  if (off) chips.push({ id: "status:disabled", label: "Disabled", count: off, on: f.status.length === 1 && f.status[0] === "disabled" && !f.roleKey.length });
+  box.innerHTML = chips.map(c => `<button type="button" class="sv-chip${c.warn ? " warn" : ""}" data-chip="${escapeHtml(c.id)}" aria-pressed="${c.on}">${escapeHtml(c.label)} <span class="n">${c.count}</span></button>`).join("");
+  for (const b of box.querySelectorAll(".sv-chip")) {
+    b.onclick = () => {
+      const [kind, val] = b.dataset.chip.split(":");
+      state.users.pendingOnly = false;
+      state.users.filters.roleKey = kind === "role" ? [val] : [];
+      state.users.filters.status = kind === "status" ? [val] : [];
+      renderUsersFilterOptions();
+      renderUserRows();
+    };
+  }
+}
+
 function approveUser(u) {
   const fallback = D().roles.some(r => r.key === "viewer") ? "viewer" : (D().roles[0] || {}).key;
   const roleKey = u.roleKey || fallback;
@@ -11734,9 +12171,49 @@ function rejectUser(u) {
     }));
 }
 
+const ROLE_BLURB = {
+  admin: "Everything, including users and permissions",
+  manager: "All boards, Manpower and Host",
+  engineer: "Runs missions and edits the board",
+  viewer: "Can look, cannot change anything",
+};
 function fillRoleSelect(sel, value) {
   sel.innerHTML = D().roles.map(r => `<option value="${escapeHtml(r.key)}">${escapeHtml(r.label)}</option>`).join("");
   if (value) sel.value = value;
+  renderRolePick(sel);
+}
+/* The role as a short list of options with a line each, drawn beside the
+   (hidden) select it drives — the select is still what the form submits. */
+function renderRolePick(sel) {
+  const box = sel.form && sel.form.querySelector('.role-pick[data-for="roleKey"]');
+  if (!box) return;
+  sel.closest("label").classList.add("role-pick-src");
+  if (!box.previousElementSibling || !box.previousElementSibling.classList.contains("field-label")) {
+    const h = document.createElement("div");
+    h.className = "field-label";
+    h.textContent = "Role";
+    box.before(h);
+  }
+  box.innerHTML = "";
+  for (const r of D().roles) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "role-opt";
+    b.setAttribute("role", "radio");
+    b.dataset.v = r.key;
+    const blurb = ROLE_BLURB[r.key] || "";
+    b.innerHTML = `<span class="role-dot" aria-hidden="true"></span><span><b>${escapeHtml(r.label)}</b>${blurb ? `<small>${escapeHtml(blurb)}</small>` : ""}</span>`;
+    b.onclick = () => { sel.value = r.key; sel.dispatchEvent(new Event("change", { bubbles: true })); sync(); };
+    box.appendChild(b);
+  }
+  const sync = () => {
+    for (const b of box.children) {
+      b.setAttribute("aria-checked", String(b.dataset.v === sel.value));
+      b.disabled = sel.disabled;
+    }
+  };
+  sel._rolePickSync = sync;
+  sync();
 }
 
 /* The modal opens over the Settings modal — openModal hides every other .modal,
@@ -11757,6 +12234,9 @@ function openUserModal(id) {
   const locked = userLockReason(u);
   form.roleKey.disabled = !!locked;
   form.status.disabled = !!locked;
+  if (form.roleKey._rolePickSync) form.roleKey._rolePickSync();
+  syncSegmented(form);
+  for (const b of form.status._seg ? form.status._seg.children : []) b.disabled = !!locked;
   $("#btn-delete-user").classList.toggle("hidden", !!locked);
   // Not the same condition as `locked`: reissuing the only admin's password
   // locks nobody out, so that case is allowed. Your own is not — you change it
@@ -11957,6 +12437,7 @@ function renderRolesMatrix() {
           td.classList.toggle("rm-changed", !!sdMap("roles")[key]);
         };
         td.appendChild(sel);
+        td.appendChild(segForSelect(sel));
         tr.appendChild(td);
       }
       body.appendChild(tr);
@@ -11966,7 +12447,37 @@ function renderRolesMatrix() {
   const pick = $("#rm-role-select");
   pick.innerHTML = roles.map(r => `<option value="${escapeHtml(r.key)}">${escapeHtml(r.label)}${r.protected ? " (always full access)" : ""}</option>`).join("");
   pick.value = state.rolesColumn || "";
+  const chips = $("#rm-role-chips");
+  chips.innerHTML = roles.map(r => `<button type="button" class="sv-chip" data-role-chip="${escapeHtml(r.key)}" aria-pressed="${r.key === state.rolesColumn}">${escapeHtml(r.label)}</button>`).join("");
+  for (const b of chips.querySelectorAll(".sv-chip")) {
+    b.onclick = () => { state.rolesColumn = b.dataset.roleChip; pick.value = state.rolesColumn; showRolesColumn(); };
+  }
   showRolesColumn();
+}
+
+/* A row of buttons standing in for a small <select>, kept in step with it: a
+   press sets the select and fires its change event, so whatever already
+   listens to the select keeps working. The select stays for wide screens,
+   where CSS shows it instead (#roles-matrix). */
+function segForSelect(sel) {
+  const row = document.createElement("div");
+  row.className = "seg-pick rm-seg";
+  row.setAttribute("role", "group");
+  row.setAttribute("aria-label", sel.getAttribute("aria-label") || "");
+  const sync = () => { for (const b of row.children) b.setAttribute("aria-pressed", String(b.dataset.v === sel.value)); };
+  for (const o of sel.options) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.v = o.value;
+    b.textContent = o.value === "none" ? "Off" : o.textContent;
+    b.disabled = sel.disabled;
+    if (sel.title) b.title = sel.title;
+    b.onclick = () => { if (sel.value === o.value) return; sel.value = o.value; sel.dispatchEvent(new Event("change")); sync(); };
+    row.appendChild(b);
+  }
+  sel.addEventListener("change", sync);
+  sync();
+  return row;
 }
 
 /* the one-role-at-a-time view: CSS only shows the marked column below 960px */
@@ -11974,6 +12485,7 @@ function showRolesColumn() {
   for (const el of $$("#roles-matrix [data-role]")) {
     el.toggleAttribute("data-visible", el.dataset.role === state.rolesColumn);
   }
+  for (const b of $$("#rm-role-chips .sv-chip")) b.setAttribute("aria-pressed", String(b.dataset.roleChip === state.rolesColumn));
 }
 
 function wireUserManagement() {
@@ -12215,6 +12727,7 @@ function wireApp() {
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
   initSegmented();
+  initPickers();
   $("#form-employee").onsubmit = saveEmployee;
   $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = deleteMission;
@@ -12230,10 +12743,10 @@ function wireApp() {
   for (const btn of $$("#settings-tabs .settings-tab")) {
     btn.onclick = () => goSettingsTab(btn.dataset.tab);
   }
-  // the phone's section picker snaps back if the unsaved-changes guard is declined
-  $("#sv-select").onchange = (ev) => goSettingsTab(ev.target.value, () => { ev.target.value = state.settingsTab; });
   $("#btn-settings-back").onclick = closeSettingsView;
-  $("#btn-settings-back-icon").onclick = closeSettingsView;
+  $("#btn-settings-back-icon").onclick = svBack;
+  // turning a tablet or resizing across 720px: the rail and the list swap
+  SV_PHONE.addEventListener("change", () => { if (state.settingsOpen) renderSettings(); });
   $("#btn-sv-save").onclick = () => saveSettingsSection();
   $("#btn-sv-discard").onclick = discardSettingsDraft;
   $("#rm-role-select").onchange = (ev) => { state.rolesColumn = ev.target.value; showRolesColumn(); };
@@ -12427,7 +12940,18 @@ function wireApp() {
   $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
   $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
   $("#btn-bulk-dl-xlsx").onclick = () => safely(bulkDownload);
-  $("#bulk-file").onchange = (e) => safely(() => onBulkFile(e));
+  $("#bulk-file").onchange = (e) => { bulkDropLabel(); safely(() => onBulkFile(e)); };
+  const drop = $("#bulk-drop");
+  drop.addEventListener("dragover", (ev) => { ev.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (ev) => {
+    ev.preventDefault();
+    drop.classList.remove("over");
+    const f = ev.dataTransfer && ev.dataTransfer.files;
+    if (!f || !f.length) return;
+    $("#bulk-file").files = f;
+    $("#bulk-file").dispatchEvent(new Event("change"));
+  });
   $("#btn-bulk-apply").onclick = () => safely(applyBulk);
   $("#btn-emplist-xlsx-go").onclick = exportEmplistXlsx;
   $("#emplist-name-view").addEventListener("change", (e) => {

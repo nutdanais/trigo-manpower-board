@@ -366,38 +366,66 @@ async function step(name, fn) {
       await closeDialog();
     });
 
-    await step("on a phone the rail is a section picker, lists are cards, and nothing leaves the screen", async () => {
+    await step("on a phone Settings opens on a section list, a section has the screen, and nothing leaves it", async () => {
       await p.setViewportSize({ width: 390, height: 844 });
+      // reopen so it starts the way a phone does: on the list
+      await p.evaluate(() => { closeSettingsView(); openSettingsView(); });
+      await p.waitForSelector("#settings-view.sv-at-home #sv-home .svh-row");
       assert.equal(await p.locator("#settings-rail").isVisible(), false);
-      assert.equal(await p.locator("#sv-select").isVisible(), true);
-      for (const t of ["account", "engineers", "areas", "boards", "users", "roles"]) {
-        await p.selectOption("#sv-select", t);
-        await p.waitForFunction((x) => state.settingsTab === x, t);
+      assert.equal(await p.locator("#sv-scroll").isVisible(), false, "the list replaces the pane");
+      assert.equal(await p.locator("#sticky-header").isVisible(), false, "Settings takes the whole phone screen");
+      const rows = await p.$$eval("#sv-home .svh-row", (r) => r.map((x) => x.dataset.tab));
+      assert.deepEqual(rows, ["account", "engineers", "areas", "boards", "users", "roles"]);
+      const open = async (t) => {
+        if (!(await p.locator("#settings-view.sv-at-home").count())) { await p.click("#btn-settings-back-icon"); await p.waitForSelector("#settings-view.sv-at-home"); }
+        await p.click(`#sv-home .svh-row[data-tab=${t}]`);
+        await p.waitForFunction((x) => state.settingsTab === x && !state.svHome, t);
+      };
+      for (const t of rows) {
+        await open(t);
         const m = await p.evaluate(() => ({
           page: document.documentElement.scrollWidth - innerWidth,
           pane: document.querySelector("#sv-scroll").scrollWidth - document.querySelector("#sv-scroll").clientWidth,
+          foot: innerHeight - document.querySelector("#sv-foot").getBoundingClientRect().bottom,
         }));
         assert.ok(m.page <= 0 && m.pane <= 1, `${t}: overflows by ${JSON.stringify(m)}`);
+        assert.ok(Math.abs(m.foot) <= 1, `${t}: the footer sits ${m.foot}px above the bottom edge`);
       }
-      // a list is cards: no header row, each cell labelled
-      await p.selectOption("#sv-select", "users");
+      // Boards: the week is one row of seven
+      await open("boards");
+      const tops = await p.$$eval("#settings-boards tr:first-child .weekday-chip", (c) => [...new Set(c.map((x) => Math.round(x.getBoundingClientRect().top)))]);
+      assert.equal(tops.length, 1, "all seven days on one line");
+      // Users: chips filter, rows have no header
+      await open("users");
       assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector("#users-table thead")).display), "none");
-      // permissions: one role at a time
-      await p.selectOption("#sv-select", "roles");
+      await p.click('#users-chips [data-chip="role:admin"]');
+      assert.ok((await p.$$eval("#users-body tr.user-row", (r) => r.length)) >= 1);
+      assert.ok(await p.$$eval("#users-body tr.user-row", (r) => r.every((x) => x.querySelector(".role-admin"))));
+      await p.click('#users-chips [data-chip="all"]');
+      // permissions: one role at a time, chosen by chip, levels as buttons
+      await open("roles");
       const shown = await p.evaluate(() => [...document.querySelectorAll("#roles-matrix .rm-head th[data-role]")].filter((e) => e.getClientRects().length).length);
       assert.equal(shown, 1);
-      await p.selectOption("#rm-role-select", "engineer");
+      await p.click('#rm-role-chips [data-role-chip="engineer"]');
       assert.equal(await p.evaluate(() => [...document.querySelectorAll("#roles-matrix .rm-head th[data-role]")].filter((e) => e.getClientRects().length).map((e) => e.dataset.role).join()), "engineer");
-      // 44px touch targets, and the section picker snaps back if the guard is declined
-      await p.selectOption("#sv-select", "account");
+      assert.equal(await p.locator("#roles-matrix td[data-role=engineer] .rm-level").first().isVisible(), false);
+      await p.locator("#roles-matrix td[data-role=engineer] .rm-seg").first().locator("button").first().click();
+      await p.waitForFunction(() => sdCount("roles") === 1);
+      await p.click("#btn-sv-discard");
+      // Save stays in the footer, disabled until there is something to save; the
+      // back chevron asks first when there is
+      await open("account");
+      assert.equal(await p.locator("#btn-sv-save").isDisabled(), true);
       await p.fill("#acct-phone", "092-222-2222");
       const save = await p.locator("#btn-sv-save").boundingBox();
-      assert.ok(save.height >= 44, "save is " + save.height + "px tall");
-      await p.selectOption("#sv-select", "boards");
+      assert.ok(save.height >= 40, "save is " + save.height + "px tall");
+      await p.click("#btn-settings-back-icon");
       await p.waitForSelector("#modal-unsaved:not(.hidden)");
       await closeDialog();
-      assert.equal(await p.inputValue("#sv-select"), "account");
+      assert.equal(await p.evaluate(() => state.svHome), false, "declining keeps the section open");
       await p.click("#btn-sv-discard");
+      await p.click("#btn-settings-back-icon");
+      await p.waitForSelector("#settings-view.sv-at-home");
       await p.click("#btn-settings-back-icon");
       await p.waitForSelector("#settings-view", { state: "hidden" });
       await p.setViewportSize({ width: 1400, height: 900 });
