@@ -6008,6 +6008,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 .fv-row:first-child, .hm-group-head + .fv-row { border-top: 0; }
 .fv-row.fv-zone { grid-template-columns: 150px minmax(0, 1fr); }
 .fv-people { min-width: 0; overflow-wrap: anywhere; }
+.fv-row > * { grid-area: auto; grid-column: auto; grid-row: auto; }
 .fv-none { color: var(--warn-text); }
 @media (max-width: 640px) {
   .fv-row, .fv-row.fv-zone { grid-template-columns: 1fr; row-gap: 3px; }
@@ -6187,27 +6188,40 @@ body.exporting #board-capture { background: var(--bg); }
   .merge-bulk .btn { flex: 1; }
 }
 
-/* Merge forecast and Hide/Unhide missions open as side drawers on a desktop,
-   like the record dialogs (.modal-side). Phones keep their full-screen layout. */
+/* Board dialogs open as side drawers on a desktop, like the record dialogs
+   (.modal-side): Merge forecast, Hide/Unhide missions, Add Mission, Review
+   changes, Merge decisions, Holds taken and Forecast. Each keeps a header and
+   footer pinned while its body scrolls. Phones keep their own layout. */
 @media (min-width: 761px) {
   #modal-backdrop:has(#modal-merge:not(.hidden)),
-  #modal-backdrop:has(#modal-hide-missions:not(.hidden)) {
+  #modal-backdrop:has(#modal-hide-missions:not(.hidden)),
+  #modal-backdrop:has(#modal-import:not(.hidden)),
+  #modal-backdrop:has(#modal-plandiff:not(.hidden)),
+  #modal-backdrop:has(#modal-merge-log:not(.hidden)),
+  #modal-backdrop:has(#modal-holds:not(.hidden)),
+  #modal-backdrop:has(#modal-forecast-view:not(.hidden)) {
     justify-content: flex-end; align-items: stretch; background: rgba(10, 24, 44, .30);
   }
-  #modal-merge, #modal-hide-missions {
+  #modal-merge, #modal-hide-missions, #modal-import, #modal-plandiff, #modal-merge-log, #modal-holds, #modal-forecast-view {
     width: min(760px, 100vw); max-width: 100vw; height: 100%; max-height: none; margin: 0;
+    display: flex; flex-direction: column; overflow: hidden;
     border-radius: 12px 0 0 12px; box-shadow: 0 1px 2px rgba(8, 28, 56, .08), 0 18px 40px -10px rgba(8, 40, 80, .32);
     animation: side-in .3s cubic-bezier(.2, .8, .2, 1);
   }
-  #modal-merge > h3, #modal-hide-missions > h3 {
-    margin: -20px -20px 14px; padding: 18px 56px 14px 22px;
+  #modal-merge-log, #modal-holds.wide { width: min(900px, 100vw); }
+  #modal-merge > *, #modal-hide-missions > *, #modal-import > *, #modal-plandiff > *, #modal-merge-log > *, #modal-holds > *, #modal-forecast-view > * { flex: none; }
+  #merge-body, #hide-missions-list, #import-list, #plandiff-body, #merge-log-body, #holds-list, #forecast-view-list {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  }
+  #modal-merge > h3, #modal-hide-missions > h3, #modal-import > h3, #modal-plandiff > h3, #modal-merge-log > h3, #modal-holds > h3, #modal-forecast-view > h3 {
+    position: relative; top: auto; margin: -20px -20px 14px; padding: 18px 56px 14px 22px;
     font-size: 17px; font-weight: 650; letter-spacing: -.2px; border-bottom: 1px solid var(--border);
   }
-  #modal-merge > h3 .modal-close, #modal-hide-missions > h3 .modal-close { right: 14px; width: 32px; height: 32px; border-radius: 8px; }
-  #modal-merge > .modal-actions, #modal-hide-missions > .modal-actions {
-    margin: 0 -20px -20px; padding: 12px 22px; border-top: 1px solid var(--border); background: var(--panel);
+  #modal-merge > h3 .modal-close, #modal-hide-missions > h3 .modal-close, #modal-import > h3 .modal-close, #modal-plandiff > h3 .modal-close, #modal-merge-log > h3 .modal-close, #modal-holds > h3 .modal-close, #modal-forecast-view > h3 .modal-close { right: 14px; width: 32px; height: 32px; border-radius: 8px; }
+  #modal-merge > .modal-actions, #modal-hide-missions > .modal-actions, #modal-import > .modal-actions, #modal-plandiff > .modal-actions, #modal-merge-log > .modal-actions, #modal-holds > .modal-actions, #modal-forecast-view > .modal-actions {
+    position: static; margin: auto -20px -20px; padding: 12px 22px; border-top: 1px solid var(--border); background: var(--panel);
   }
 }
 @media (min-width: 761px) and (prefers-reduced-motion: reduce) {
-  #modal-merge, #modal-hide-missions { animation: none; }
+  #modal-merge, #modal-hide-missions, #modal-import, #modal-plandiff, #modal-merge-log, #modal-holds, #modal-forecast-view { animation: none; }
 }
