@@ -6186,3 +6186,28 @@ body.exporting #board-capture { background: var(--bg); }
   .merge-bulk { flex: 1; flex-wrap: nowrap; }
   .merge-bulk .btn { flex: 1; }
 }
+
+/* Merge forecast and Hide/Unhide missions open as side drawers on a desktop,
+   like the record dialogs (.modal-side). Phones keep their full-screen layout. */
+@media (min-width: 761px) {
+  #modal-backdrop:has(#modal-merge:not(.hidden)),
+  #modal-backdrop:has(#modal-hide-missions:not(.hidden)) {
+    justify-content: flex-end; align-items: stretch; background: rgba(10, 24, 44, .30);
+  }
+  #modal-merge, #modal-hide-missions {
+    width: min(760px, 100vw); max-width: 100vw; height: 100%; max-height: none; margin: 0;
+    border-radius: 12px 0 0 12px; box-shadow: 0 1px 2px rgba(8, 28, 56, .08), 0 18px 40px -10px rgba(8, 40, 80, .32);
+    animation: side-in .3s cubic-bezier(.2, .8, .2, 1);
+  }
+  #modal-merge > h3, #modal-hide-missions > h3 {
+    margin: -20px -20px 14px; padding: 18px 56px 14px 22px;
+    font-size: 17px; font-weight: 650; letter-spacing: -.2px; border-bottom: 1px solid var(--border);
+  }
+  #modal-merge > h3 .modal-close, #modal-hide-missions > h3 .modal-close { right: 14px; width: 32px; height: 32px; border-radius: 8px; }
+  #modal-merge > .modal-actions, #modal-hide-missions > .modal-actions {
+    margin: 0 -20px -20px; padding: 12px 22px; border-top: 1px solid var(--border); background: var(--panel);
+  }
+}
+@media (min-width: 761px) and (prefers-reduced-motion: reduce) {
+  #modal-merge, #modal-hide-missions { animation: none; }
+}
