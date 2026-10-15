@@ -144,7 +144,7 @@ async function step(name, fn) {
       });
       assert.ok(Math.abs(scrolled.pool - scrolled.bar) <= 1, "scrolled: the panel stops at the banner " + JSON.stringify(scrolled));
       assert.ok(r.bannerRight >= r.vw - 1, "the banner spans the full width");
-      assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
+      assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["ไทย", "English"]);
     });
 
     await step("a record dialog is a side panel: right-aligned, full height, footer pinned", async () => {

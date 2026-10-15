@@ -62,7 +62,8 @@ async function step(name, fn) {
         assert.equal((await b.textContent()).trim(), "+ Add");
         await b.click();
         await p.waitForSelector("#modal-employee:not(.hidden)");
-        assert.equal(await p.evaluate(() => document.activeElement.name), f);
+        // a field drawn by an in-app picker (start date, position) focuses its button
+        assert.equal(await p.evaluate(() => { const a = document.activeElement; return a.name || (a.closest(".pk") && a.closest(".pk").querySelector("select, input").name); }), f);
         await p.evaluate(() => closeModal());
       }
     });

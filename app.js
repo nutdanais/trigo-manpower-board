@@ -991,10 +991,10 @@ function render() {
   $("#holiday-toggle").classList.toggle("hidden", !showHoliday);
   if (showHoliday) $("#holiday-check").checked = isNonWorkingDate(state.date);
   // amber marks a holiday board: the date box, an amber Add Mission, a wash
-  // behind the board and the banner (design/holiday-selector-options.html 3, 5, 6)
+  // behind the board and the banner (design/holiday-selector-options.html 3, 5, 6).
+  // Any other day it is a plain button: red is kept for actions that remove something.
   const holidayBoard = board && isNonWorkingDate(state.date);   // a forecast day can be a holiday too
   document.body.classList.toggle("holiday-day", holidayBoard);
-  $("#btn-import-mission").classList.toggle("btn-danger", !holidayBoard);
   $("#btn-import-mission").classList.toggle("btn-holiday", holidayBoard);
   renderHolidayBanner(holidayBoard);
   $("#filters").classList.toggle("hidden", !board);
@@ -1154,7 +1154,7 @@ function buildOrgTree() {
       const area = areaById.get(areaId);
       const node = {
         type: "area", _id: engNode._id + "/a:" + key,
-        name: area ? area.name : "No service area", color: area ? area.color : "#c3ccd6", children: [],
+        name: area ? area.name : "No service area", color: area ? area.color : "#c3ccd6", none: !area, children: [],
       };
       engNode._areas.set(key, node); engNode.children.push(node);
       return node;
@@ -1212,11 +1212,27 @@ const orgLevelLabel = (t) => ({ board: "Board", engineer: "Engineer", area: "Ser
    the tiers that sit below it, left to right. */
 function orgCountText(n) {
   const crew = orgCrewCount(n);
-  if (n.type === "root") return `${orgCountType(n, "board")} boards · ${orgDistinctEngineers(n)} engineers · ${orgDistinctAreas(n)} areas · ${orgMissionCount(n)} missions · ${crew} crew`;
-  if (n.type === "board") return `${orgCountType(n, "engineer")} eng · ${orgDistinctAreas(n)} areas · ${orgMissionCount(n)} miss · ${crew} crew`;
-  if (n.type === "engineer") return `${orgCountType(n, "area")} areas · ${orgMissionCount(n)} miss · ${crew} crew`;
+  const pl = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  if (n.type === "root") return `${pl(orgCountType(n, "board"), "board", "boards")} · ${pl(orgDistinctEngineers(n), "engineer", "engineers")} · ${pl(orgDistinctAreas(n), "area", "areas")} · ${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
+  if (n.type === "board") return `${orgCountType(n, "engineer")} eng · ${pl(orgDistinctAreas(n), "area", "areas")} · ${orgMissionCount(n)} miss · ${crew} crew`;
+  if (n.type === "engineer") return `${pl(orgCountType(n, "area"), "area", "areas")} · ${orgMissionCount(n)} miss · ${crew} crew`;
   if (n.type === "area") return `${orgMissionCount(n)} miss · ${crew} crew`;
   return `${crew} crew`;
+}
+/* The square tile in front of each Org chart row. People and engineers show
+   initials on their colour; a board, the whole team and the Standby / Leave
+   group show an icon, white on navy or grey on grey; a row with no service
+   area shows a dash rather than "No". */
+function orgTag(n) {
+  const tile = (bg, inner, cls = "") => `<span class="oc-tag${cls}" style="--oc-c:${bg}">${inner}</span>`;
+  if (n.type === "root") return tile("var(--primary)", icon("orgchart"), " oc-tag-ic");
+  if (n.type === "board") return tile("var(--primary)", icon("board"), " oc-tag-ic");
+  if (n.type === "bucket") return tile("var(--bg-soft)", icon("users"), " oc-tag-ic oc-tag-soft");
+  if (n.type === "employee") return tile(n.areaColor, orgInitials(n.name));
+  if (n.type === "engineer") return tile(n.color, orgInitials(n.name));
+  if (n.type === "area") return tile(n.color, n.none ? "–" : escapeHtml(n.name).slice(0, 3));
+  if (n.type === "mission") return tile(n.color, "M");
+  return tile("#c3ccd6", "•");
 }
 function orgInitials(s) { return String(s).replace(/[^A-Za-z ]/g, "").split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase() || "•"; }
 const ZONE_STATUS = { annual: "Annual leave", sick: "Sick leave", business: "Business leave", unpaid: "Unpaid leave", exchange: "Exchange day" };
@@ -1459,12 +1475,7 @@ function orgOutlineNode(n) {
   row.className = "oc-ol-row l-" + n.type;
   const caret = orgIsLeaf(n) ? '<span class="oc-caret leaf"></span>'
     : `<span class="oc-caret">${icon("chevron-right")}</span>`;
-  let tagEl;
-  if (n.type === "employee") tagEl = `<span class="oc-tag" style="--oc-c:${n.areaColor}">${orgInitials(n.name)}</span>`;
-  else if (n.type === "board" || n.type === "engineer") tagEl = `<span class="oc-tag" style="--oc-c:${n.color}">${orgInitials(n.name)}</span>`;
-  else if (n.type === "area") tagEl = `<span class="oc-tag" style="--oc-c:${n.color}">${escapeHtml(n.name).slice(0, 3)}</span>`;
-  else if (n.type === "mission") tagEl = `<span class="oc-tag" style="--oc-c:${n.color}">M</span>`;
-  else tagEl = `<span class="oc-tag" style="--oc-c:#c3ccd6">◑</span>`;
+  const tagEl = orgTag(n);
   const sub = n.sub ? `<span class="oc-sub">${escapeHtml(n.sub)}</span>` : "";
   let right;
   if (n.type === "employee") right = `<span class="oc-meta">${orgEmpChips(n)}<span class="oc-phone">${escapeHtml(n.phone)}</span></span>`;
@@ -1516,10 +1527,7 @@ function orgChartBox(n) {
   const el = document.createElement("div");
   el.className = "oc-box is-" + n.type;
   el.style.setProperty("--oc-c", n.color || n.areaColor || "var(--primary)");
-  let head = "";
-  if (n.type === "board" || n.type === "engineer") head = `<span class="oc-tag" style="--oc-c:${n.color}">${orgInitials(n.name)}</span>`;
-  else if (n.type === "area") head = `<span class="oc-tag" style="--oc-c:${n.color}">${escapeHtml(n.name).slice(0, 3)}</span>`;
-  else if (n.type === "employee") head = `<span class="oc-tag" style="--oc-c:${n.areaColor}">${orgInitials(n.name)}</span>`;
+  const head = n.type === "board" || n.type === "engineer" || n.type === "area" || n.type === "employee" ? orgTag(n) : "";
   let meta;
   if (n.type === "employee") {
     meta = `<div class="oc-meta">${orgEmpChips(n)}</div><div class="oc-meta oc-phone">${escapeHtml(n.phone)}</div>`;
@@ -1652,7 +1660,7 @@ function renderBoardEmptyState() {
     : "Carry over the last working day's missions and crew to start from there, or just add missions manually.";
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = "btn btn-carry";
+  btn.className = "btn btn-primary btn-carry";
   setIconLabel(btn, "reset", fc ? "Start from confirmed (all missions)" : "Carry over last working day's plan");
   btn.onclick = () => guardEdit(() => resetBoard());
   if (fc && !can("forecast", "edit")) btn.classList.add("hidden");
@@ -1909,7 +1917,7 @@ function buildLangRow(onPick) {
   const now = window.I18N ? I18N.lang() : "en";
   row.innerHTML = `<span class="tb-lang-label">${icon("globe")}Language</span>` +
     `<span class="tb-seg" role="group" aria-label="Language" data-no-i18n>` +
-    [["en", "English"], ["th", "ไทย"]].map(([code, label]) =>
+    [["th", "ไทย"], ["en", "English"]].map(([code, label]) =>
       `<button type="button" class="tb-seg-btn${code === now ? " active" : ""}" data-lang="${code}" aria-pressed="${code === now}" lang="${code}">${label}</button>`).join("") +
     `</span>`;
   row.addEventListener("click", (ev) => {
@@ -2266,7 +2274,7 @@ function renderCtxMenu(view) {
   const addBack = (text) => {
     const it = document.createElement("div");
     it.className = "ctx-item ctx-back";
-    it.textContent = text;
+    setIconLabel(it, "chevron-left", text);
     it.onclick = (ev) => { ev.stopPropagation(); renderCtxMenu("root"); };
     menu.appendChild(it);
   };
@@ -2297,7 +2305,7 @@ function renderCtxMenu(view) {
   const who = many ? `${ids.length} employees` : emp.name;
 
   if (view === "boards") {
-    addBack("‹ Move to board");
+    addBack("Move to board");
     for (const b of targetBoards) {
       addItem(b.name, () => guardEdit(() => safely(async () => {
         await cloud.moveEmployeesToBoard(ids, b.id, state.date);
@@ -2306,12 +2314,12 @@ function renderCtxMenu(view) {
       })));
     }
   } else if (view === "missions") {
-    addBack("‹ Assign to mission");
+    addBack("Assign to mission");
     for (const m of missions) {
       addItem(m.number, () => guardEdit(() => assignEmployeesTo(ids, { missionId: m.id })));
     }
   } else if (view === "leave") {
-    addBack("‹ Leave");
+    addBack("Leave");
     for (const z of leaveZones) {
       addItem(ZONE_LABELS[z], () => guardEdit(() => assignEmployeesTo(ids, { zone: z })));
     }
@@ -2319,18 +2327,18 @@ function renderCtxMenu(view) {
     addTitle(many ? `${ids.length} employees selected` : emp.name);
     if (!many) addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
     if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
-    if (missions.length) addSub("⊕ Assign to mission", "missions");
+    if (missions.length) addSub("Assign to mission", "missions", "plus");
     if (leaveZones.length) addSub("Leave", "leave", "leave");
     if (placeable && (many || current)) {
-      addItem(many ? "↩ Return to standby / pool" : `↩ Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`,
-        () => guardEdit(() => assignEmployeesTo(ids, null)));
+      addItem(many ? "Return to standby / pool" : `Return to ${emp.contract === "oncall" ? "Available On-call" : "Standby"}`,
+        () => guardEdit(() => assignEmployeesTo(ids, null)), null, "return");
     }
     addSep();
     addItem(many ? `Deactivate ${ids.length} employees` : "Deactivate employee", () => {
       showConfirm("Deactivate employee" + (many ? "s" : "") + "?",
         `Deactivate ${who}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
         () => safely(async () => { await cloud.setEmployeesActive(ids, false); clearSelection(); await refreshAndRender(); }));
-    }, "ctx-danger");
+    }, "ctx-danger", "ban");
   }
 
   menu.classList.remove("hidden");
@@ -3125,10 +3133,11 @@ function buildPhoneMoreMenu() {
       row.innerHTML = icon("users") + `<span class="tb-grow">Names</span>`;
       const seg = document.createElement("span");
       seg.className = "tb-seg";
+      seg.dataset.noI18n = "";
       for (const o of nv.options) {
         const b = document.createElement("button");
         b.type = "button";
-        b.textContent = o.value === "th" ? "ไทย" : o.value === "en" ? "EN" : o.textContent;
+        b.textContent = o.value === "th" ? "ไทย" : o.value === "en" ? "English" : o.textContent;
         b.setAttribute("aria-pressed", String(nv.value === o.value));
         b.onclick = (ev) => {
           ev.stopPropagation();
@@ -3158,10 +3167,11 @@ function buildPhoneMoreMenu() {
     row.innerHTML = icon("users") + `<span class="tb-grow">Names</span>`;
     const seg = document.createElement("span");
     seg.className = "tb-seg";
+    seg.dataset.noI18n = "";
     for (const o of names.options) {
       const b = document.createElement("button");
       b.type = "button";
-      b.textContent = o.value === "th" ? "ไทย" : o.value === "en" ? "EN" : o.textContent;
+      b.textContent = o.value === "th" ? "ไทย" : o.value === "en" ? "English" : o.textContent;
       b.setAttribute("aria-pressed", String(names.value === o.value));
       b.onclick = (ev) => {
         ev.stopPropagation();
@@ -5775,13 +5785,30 @@ function pickerOpen(sel) {
       if (next) next.focus();
     }
   });
-  pk.wrap.appendChild(pop);
-  // open upwards when there is no room below (a picker low in a panel)
-  const r = pk.btn.getBoundingClientRect();
-  pop.classList.toggle("up", window.innerHeight - r.bottom < 260 && r.top > 260);
-  pk.btn.setAttribute("aria-expanded", "true");
-  _pickerOpen = { pop, btn: pk.btn };
+  // On the page itself, fixed under its button: inside a scrolling table (the
+  // Roles grid, Engineers) or a panel an absolute popover would be clipped.
+  pickerFloat(pk.btn, pop);
   (q || list.querySelector('[aria-selected="true"]') || list.querySelector(".pk-opt") || pop).focus();
+}
+/* Put a popover on the page, fixed under (or above) the control that opened it.
+   On the page itself: inside a scrolling table (the Roles grid, Engineers) or a
+   panel an absolute popover would be clipped. `need` is the height it wants
+   below the control before it opens upwards instead. */
+function pickerFloat(btn, pop, need = 260, minW = 200) {
+  document.body.appendChild(pop);
+  const place = () => {
+    const r = btn.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight || !r.width) { pickerClose(); return; }
+    const w = Math.max(r.width, minW);
+    pop.style.width = w + "px";
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+    const up = window.innerHeight - r.bottom < need && r.top > need;
+    pop.style.top = up ? "auto" : (r.bottom + 4) + "px";
+    pop.style.bottom = up ? (window.innerHeight - r.top + 4) + "px" : "auto";
+  };
+  place();
+  btn.setAttribute("aria-expanded", "true");
+  _pickerOpen = { pop, btn, place };
 }
 function pickerWatch(sel) {
   // follow code that sets .value / .selectedIndex directly (no change event)
@@ -5825,15 +5852,280 @@ function initPicker(sel) {
 }
 function initPickers(root = document) {
   for (const sel of root.querySelectorAll("select[data-picker]")) initPicker(sel);
+  for (const inp of root.querySelectorAll('input[type="date"], input[type="time"]')) initField(inp);
 }
+
+/* ----- in-app date, time and colour fields -----
+   The same reasoning as the dropdowns: <input type="date|time|color"> opens the
+   browser's own picker (a dark sheet or clock on Android, a grey dialog for a
+   colour) and draws mm/dd/yyyy in the field. Every date and time input gets a
+   button in its place with a light popover — a calendar, a list of times — and
+   every colour input opens a palette. The input stays as the source of truth:
+   forms read it, code that sets .value is followed, and choosing fires the same
+   input and change events the native control did. */
+const FIELD_COLOURS = ["#7fb8ec", "#a8d98a", "#f6a06b", "#f2c94c", "#c39bd3", "#f19cb0", "#76d7c4", "#b0bec5",
+  "#3b82f6", "#22a06b", "#e8590c", "#d4a017", "#8e44ad", "#d6336c", "#0d9488", "#64748b"];
+function fieldSet(input, v) {
+  input.value = v;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+function initField(input) {
+  if (input._dp) return;
+  const isDate = input.type === "date";
+  const wrap = document.createElement("span");
+  wrap.className = "pk pk-field";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pk-btn";
+  btn.setAttribute("aria-haspopup", "dialog");
+  btn.setAttribute("aria-expanded", "false");
+  const lab = input.closest("label");
+  const name = input.getAttribute("aria-label") || (lab && lab.childNodes[0] && lab.childNodes[0].textContent.trim()) || input.title || "";
+  if (name) btn.setAttribute("aria-label", name);
+  if (input.title) btn.title = input.title;
+  const text = document.createElement("span"); text.className = "pk-text";
+  btn.insertAdjacentHTML("beforeend", icon(isDate ? "calendar" : "clock", "pk-ic"));
+  btn.appendChild(text);
+  input.classList.add("pk-source");
+  input.tabIndex = -1;
+  input.setAttribute("aria-hidden", "true");
+  input.after(wrap);
+  wrap.append(input, btn);
+  const sync = () => {
+    const v = input.value;
+    text.textContent = v ? (isDate ? fmtDate(v) : v) : (isDate ? "Pick a date" : "Pick a time");
+    text.classList.toggle("pk-placeholder", !v);
+    btn.disabled = input.disabled;
+  };
+  const d = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  Object.defineProperty(input, "value", { configurable: true, get() { return d.get.call(this); }, set(v) { d.set.call(this, v); sync(); } });
+  input.addEventListener("change", sync);
+  if (input.form) input.form.addEventListener("reset", () => setTimeout(sync));
+  new MutationObserver(sync).observe(input, { attributes: true, attributeFilter: ["disabled"] });
+  btn.onclick = (ev) => {
+    ev.stopPropagation();
+    if (_pickerOpen && _pickerOpen.btn === btn) { pickerClose(); return; }
+    pickerClose();
+    if (isDate) openDateField(input); else openTimeField(input);
+  };
+  input._dp = { wrap, btn, sync };
+  sync();
+}
+function fieldPopKeys(pop, btn) {
+  pop.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { ev.stopPropagation(); pickerClose(); btn.focus(); } });
+}
+/* a calendar for one date field: days, or (from the title) years, then months,
+   so a start date years back is three taps, not dozens of "‹" */
+function openDateField(input) {
+  const btn = input._dp.btn;
+  const min = input.min || "", max = input.max || "";
+  const today = todayStr();
+  let view = "days", ym = (input.value || (max && today > max ? max : today)).slice(0, 7), yearBase = 0;
+  const pop = document.createElement("div");
+  pop.className = "pk-pop dpf-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", btn.getAttribute("aria-label") || "Pick a date");
+  const inRange = (iso) => (!min || iso >= min.slice(0, iso.length)) && (!max || iso <= max.slice(0, iso.length));
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const pick = (iso) => { pickerClose(); fieldSet(input, iso); btn.focus(); };
+  const draw = () => {
+    const [y, m] = ym.split("-").map(Number);
+    const head = (title, prev, next) => {
+      const h = document.createElement("div");
+      h.className = "dpf-head";
+      h.innerHTML = `<button type="button" class="dpf-nav" aria-label="Previous">${icon("chevron-left")}</button>` +
+        `<button type="button" class="dpf-title">${title}</button>` +
+        `<button type="button" class="dpf-nav" aria-label="Next">${icon("chevron-right")}</button>`;
+      const [p, t, n] = h.children;
+      p.onclick = (ev) => { ev.stopPropagation(); prev(); draw(); };
+      n.onclick = (ev) => { ev.stopPropagation(); next(); draw(); };
+      t.onclick = (ev) => { ev.stopPropagation(); view = view === "days" ? "years" : view === "years" ? "days" : "years"; yearBase = y - (y % 12); draw(); };
+      return h;
+    };
+    pop.innerHTML = "";
+    const grid = document.createElement("div");
+    if (view === "days") {
+      const first = new Date(y, m - 1, 1);
+      pop.appendChild(head(first.toLocaleString("en-GB", { month: "long", year: "numeric" }),
+        () => { const d = new Date(y, m - 2, 1); ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); },
+        () => { const d = new Date(y, m, 1); ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }));
+      grid.className = "dpf-grid";
+      grid.innerHTML = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d, i) => `<span class="dpf-dow${i === 0 || i === 6 ? " we" : ""}">${d}</span>`).join("") +
+        "<span></span>".repeat(first.getDay());
+      const days = new Date(y, m, 0).getDate();
+      for (let d = 1; d <= days; d++) {
+        const iso = `${ym}-${String(d).padStart(2, "0")}`;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dpf-day" + (iso === input.value ? " on" : "") + (iso === today ? " today" : "") + ([0, 6].includes(new Date(y, m - 1, d).getDay()) ? " we" : "");
+        b.textContent = d;
+        b.disabled = !inRange(iso);
+        b.onclick = () => pick(iso);
+        grid.appendChild(b);
+      }
+    } else if (view === "years") {
+      pop.appendChild(head(`${yearBase} – ${yearBase + 11}`, () => { yearBase -= 12; }, () => { yearBase += 12; }));
+      grid.className = "dpf-grid dpf-grid-3";
+      for (let k = 0; k < 12; k++) {
+        const yy = yearBase + k;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dpf-cell" + (yy === y ? " on" : "");
+        b.textContent = yy;
+        b.disabled = !inRange(String(yy));
+        b.onclick = (ev) => { ev.stopPropagation(); ym = yy + ym.slice(4); view = "months"; draw(); };
+        grid.appendChild(b);
+      }
+    } else {
+      pop.appendChild(head(String(y), () => { ym = (y - 1) + ym.slice(4); }, () => { ym = (y + 1) + ym.slice(4); }));
+      grid.className = "dpf-grid dpf-grid-3";
+      MONTHS.forEach((mo, k) => {
+        const key = `${y}-${String(k + 1).padStart(2, "0")}`;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dpf-cell" + (k + 1 === m ? " on" : "");
+        b.textContent = mo;
+        b.disabled = !inRange(key);
+        b.onclick = (ev) => { ev.stopPropagation(); ym = key; view = "days"; draw(); };
+        grid.appendChild(b);
+      });
+    }
+    pop.appendChild(grid);
+    const foot = document.createElement("div");
+    foot.className = "dpf-foot";
+    if (inRange(today)) {
+      const t = mkEl("button", "btn btn-small btn-quiet", "Today");
+      t.type = "button";
+      t.onclick = () => pick(today);
+      foot.appendChild(t);
+    }
+    if (!input.required && input.value && !input.classList.contains("ov-history-date")) {
+      const c = mkEl("button", "btn btn-small btn-quiet", "Clear");
+      c.type = "button";
+      c.onclick = () => pick("");
+      foot.appendChild(c);
+    }
+    if (foot.children.length) pop.appendChild(foot);
+  };
+  draw();
+  fieldPopKeys(pop, btn);
+  pickerFloat(btn, pop, 340, 272);
+  (pop.querySelector(".dpf-day.on") || pop.querySelector(".dpf-day.today:not(:disabled)") || pop.querySelector(".dpf-day:not(:disabled)") || pop).focus();
+}
+/* times every half hour, with a box to type any other (07:45) */
+function openTimeField(input) {
+  const btn = input._dp.btn;
+  const pop = document.createElement("div");
+  pop.className = "pk-pop tf-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", btn.getAttribute("aria-label") || "Pick a time");
+  const typed = document.createElement("input");
+  typed.type = "text";
+  typed.className = "pk-q";
+  typed.inputMode = "numeric";
+  typed.placeholder = "Type a time, e.g. 07:45";
+  typed.setAttribute("aria-label", "Type a time");
+  pop.appendChild(typed);
+  const list = document.createElement("div");
+  list.className = "pk-list";
+  pop.appendChild(list);
+  const pick = (v) => { pickerClose(); fieldSet(input, v); btn.focus(); };
+  for (let k = 0; k < 48; k++) {
+    const v = String(Math.floor(k / 2)).padStart(2, "0") + (k % 2 ? ":30" : ":00");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "pk-opt";
+    b.setAttribute("aria-selected", String(v === input.value));
+    b.innerHTML = `<span>${v}</span>` + (v === input.value ? icon("check", "pk-tick") : "");
+    b.onclick = () => pick(v);
+    list.appendChild(b);
+  }
+  typed.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    const m = /^([01]?\d|2[0-3])[:.]?([0-5]\d)$/.exec(typed.value.trim());
+    if (m) pick(m[1].padStart(2, "0") + ":" + m[2]);
+    else typed.setAttribute("aria-invalid", "true");
+  });
+  fieldPopKeys(pop, btn);
+  pickerFloat(btn, pop, 280);
+  // start the list at the current time (or 08:00), not at midnight
+  const near = [...list.children].find(b => b.textContent >= (input.value || "08:00")) || list.firstChild;
+  list.scrollTop = Math.max(0, near.offsetTop - list.offsetTop - 40);
+  typed.focus();
+}
+/* colour inputs keep their swatch (.sw-pick); a click opens this palette instead
+   of the browser's dialog */
+function openColourField(input) {
+  const anchor = input.closest(".sw-pick") || input;
+  const pop = document.createElement("div");
+  pop.className = "pk-pop cf-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", input.getAttribute("aria-label") || "Pick a colour");
+  const cur = String(input.value || "").toLowerCase();
+  const pick = (v) => { pickerClose(); fieldSet(input, v); input.focus(); };
+  const grid = document.createElement("div");
+  grid.className = "cf-grid";
+  for (const c of FIELD_COLOURS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "cf-sw" + (c === cur ? " on" : "");
+    b.style.background = c;
+    b.title = swHex(c);
+    b.setAttribute("aria-label", swHex(c));
+    if (c === cur) b.innerHTML = icon("check");
+    b.onclick = () => pick(c);
+    grid.appendChild(b);
+  }
+  pop.appendChild(grid);
+  const row = document.createElement("label");
+  row.className = "cf-hex";
+  row.innerHTML = `<span>Hex</span><i style="background:${escapeHtml(cur)}"></i><input type="text" maxlength="7" spellcheck="false" aria-label="Hex colour" value="${escapeHtml(swHex(cur))}">`;
+  const hex = row.querySelector("input"), prev = row.querySelector("i");
+  const parse = () => { const m = /^#?([0-9a-f]{6})$/i.exec(hex.value.trim()); return m ? "#" + m[1].toLowerCase() : null; };
+  hex.oninput = () => { const v = parse(); hex.toggleAttribute("aria-invalid", !v); if (v) prev.style.background = v; };
+  hex.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); const v = parse(); if (v) pick(v); } };
+  pop.appendChild(row);
+  const ok = mkEl("button", "btn btn-small btn-primary", "Use this colour");
+  ok.type = "button";
+  ok.onclick = () => { const v = parse(); if (v) pick(v); else hex.focus(); };
+  pop.appendChild(ok);
+  fieldPopKeys(pop, input);
+  pickerFloat(anchor, pop, 220, 232);
+  (grid.querySelector(".on") || grid.firstChild).focus();
+}
+document.addEventListener("click", (ev) => {
+  const c = ev.target.closest && ev.target.closest('input[type="color"]');
+  if (!c) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (c.disabled) return;
+  if (_pickerOpen && _pickerOpen.btn === (c.closest(".sw-pick") || c)) { pickerClose(); return; }
+  pickerClose();
+  openColourField(c);
+}, true);
+document.addEventListener("keydown", (ev) => {
+  if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches('input[type="color"]')) {
+    ev.preventDefault();
+    pickerClose();
+    openColourField(ev.target);
+  }
+}, true);
 document.addEventListener("click", (ev) => { if (_pickerOpen && !_pickerOpen.pop.contains(ev.target)) pickerClose(); });
+// the popover is fixed, so it follows its button when anything scrolls or the
+// window resizes (a phone keyboard opening for the search box), and closes once
+// the button has gone off screen
+window.addEventListener("scroll", (ev) => { if (_pickerOpen && !(ev.target instanceof Node && _pickerOpen.pop.contains(ev.target))) _pickerOpen.place(); }, true);
+window.addEventListener("resize", () => { if (_pickerOpen) _pickerOpen.place(); });
 // selects built later (the org chart toolbar, the capacity add-host row, the
 // Settings tables) are picked up as they are added
 new MutationObserver((muts) => {
   for (const m of muts) for (const n of m.addedNodes) {
     if (n.nodeType !== 1) continue;
     if (n.matches && n.matches("select[data-picker]")) initPicker(n);
-    else if (n.querySelector && n.querySelector("select[data-picker]")) initPickers(n);
+    else if (n.matches && n.matches('input[type="date"], input[type="time"]')) initField(n);
+    else if (n.querySelector && n.querySelector('select[data-picker], input[type="date"], input[type="time"]')) initPickers(n);
   }
 }).observe(document.documentElement, { childList: true, subtree: true });
 
@@ -5850,6 +6142,7 @@ function initSegmented() {
       btn.type = "button";
       btn.dataset.v = o.value;
       btn.textContent = o.textContent;
+      if (sel.hasAttribute("data-no-i18n")) btn.dataset.noI18n = "";   // ไทย | English stay as written in either language
       btn.onclick = (ev) => {
         ev.preventDefault();
         sel.value = o.value;
@@ -5869,6 +6162,7 @@ function initSegmented() {
 let _confirmCancel = null;   // fired if a confirm is dismissed any way other than "Yes"
 
 function closeModal() {
+  pickerClose();   // its popover lives on the page, not in the dialog
   const backdrop = $("#modal-backdrop");
   backdrop.classList.add("hidden");
   for (const m of $$(".modal")) m.classList.add("hidden");
@@ -6257,7 +6551,8 @@ function openEmployeeModal(empId, focusField) {
   applyEmployeeTab();
   if (empId) { loadEmployeeHostRecord(empId); loadEmployeeNotes(empId); }
   openModal("#modal-employee");
-  if (focusField && form[focusField]) requestAnimationFrame(() => form[focusField].focus());
+  // a field drawn by an in-app picker focuses its button, not the hidden source
+  if (focusField && form[focusField]) requestAnimationFrame(() => { const f = form[focusField]; ((f._pk && f._pk.btn) || (f._dp && f._dp.btn) || f).focus(); });
 }
 
 function saveEmployee(ev) {
@@ -6348,6 +6643,7 @@ function applyEmployeeTab() {
    long history. */
 async function loadEmployeeHostRecord(empId) {
   const box = $("#employee-hosts-list");
+  $("#employee-hosts-intro").classList.remove("hidden");
   box.innerHTML = '<p class="import-note">Loading…</p>';
   let rows;
   try {
@@ -6359,7 +6655,11 @@ async function loadEmployeeHostRecord(empId) {
   // bail if the modal moved on to a different employee (or closed) while this was in flight
   if (state.editingEmployeeId !== empId) return;
   if (!rows.length) {
-    box.innerHTML = '<p class="import-note">No host history yet.</p>';
+    // the empty-state block, not a lone grey line; the intro has nothing to introduce
+    const emp = D().employees.find(e => e.id === empId);
+    $("#employee-hosts-intro").classList.add("hidden");
+    box.innerHTML = emptyStateHtml("No deployments yet",
+      `Hosts appear here once ${emp ? emp.name : "this person"} has worked a mission.`, "site");
     return;
   }
   const byHost = new Map();   // host name -> { days, lastDate, lastNumber, lastCustomer }
@@ -8474,11 +8774,28 @@ function importMsg(text) {
   updateImportSummary();
 }
 
+/* Nothing to pick: the empty-state block instead of a lone grey line, with a
+   way forward (a new mission), and no disabled "Add selected" left behind —
+   the footer is just Close. startImportModal puts the footer back. */
+function importEmpty(title, sub) {
+  importMsg("");
+  $("#import-list").innerHTML = emptyStateHtml(title, sub);
+  const go = mkEl("button", "btn btn-primary", "New mission");
+  go.type = "button";
+  go.onclick = () => { closeModal(); openMissionModal(null); };
+  $("#import-list .empty-state").appendChild(go);
+  $("#import-crew").classList.add("hidden");
+  $("#btn-import-confirm").classList.add("hidden");
+  $("#btn-import-cancel").textContent = "Close";
+}
+
 function startImportModal(mode) {
   importMode = mode;
   importUi = { items: [], picked: new Set(), q: "", f: "all" };
   $("#import-q").value = "";
   $("#import-crew").classList.toggle("hidden", mode !== "forecast");
+  $("#btn-import-confirm").classList.remove("hidden");
+  $("#btn-import-cancel").textContent = "Cancel";
   $("#import-source-note").textContent = "";
   importMsg("Loading…");
   openModal("#modal-import");
@@ -8624,18 +8941,14 @@ function openImportModal() {
       const srcDate = await cloud.findLatestWeekdayMissionDate(boardId, state.date);
       if (!srcDate) {
         importCandidates = [];
-        importMsg("");
-        $("#import-list").innerHTML = emptyStateHtml("Nothing to copy yet",
+        importEmpty("Nothing to copy yet",
           "No missions on this board in the last few working days. Start the day with a new mission instead.");
-        const go = mkEl("button", "btn btn-primary", "New mission");
-        go.type = "button";
-        go.onclick = () => { closeModal(); openMissionModal(null); };
-        $("#import-list .empty-state").appendChild(go);
         return;
       }
       importCandidates = (await cloud.getMissionsForDate(boardId, srcDate)).filter(m => !m.hidden);
       if (!importCandidates.length) {
-        importMsg('Every mission from that date is hidden. Unhide from "Hide/Unhide" first if you want to bring one forward.');
+        importEmpty("Nothing to copy",
+          'Every mission from that date is hidden. Unhide one from "Hide/Unhide" first to bring it forward, or start with a new mission.');
         return;
       }
       // the crew is not copied on a holiday, so the count column stays empty
@@ -8659,14 +8972,16 @@ function openForecastAddModal() {
     try {
       const src = await cloud.findLatestWeekdayMissionDate(boardId, date);
       if (!src) {
-        importMsg('There is no confirmed working day with missions to pick from yet. Use "New Mission" to create one.');
+        importEmpty("Nothing to pick from yet",
+          "No confirmed working day has missions yet. Start this forecast with a new mission instead.");
         return;
       }
       const preview = await cloud.buildCarryPreview(boardId, src);
       const missions = preview.missions.filter(m => !m.hidden)
         .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }) || (a.shift === "night") - (b.shift === "night"));
       if (!missions.length) {
-        importMsg("Every mission on the latest confirmed day is hidden, so there is nothing to pick.");
+        importEmpty("Nothing to pick",
+          "Every mission on the latest confirmed day is hidden. Start this forecast with a new mission instead.");
         return;
       }
       importForecastSrc = src;
@@ -11209,6 +11524,7 @@ function renderCapacityPhone(boardId, board, m, rows, cellVal, mayEdit) {
   if (r) {
     const pick = document.createElement("select");
     pick.className = "cap-ph-host";
+    pick.dataset.picker = "";
     pick.setAttribute("aria-label", "Host");
     rows.forEach((x, k) => {
       const o = document.createElement("option");
@@ -12419,6 +12735,7 @@ function renderRolesMatrix() {
         const key = role.key + "|" + item.key;
         const sel = document.createElement("select");
         sel.className = "rm-level";
+        sel.dataset.picker = "";
         sel.setAttribute("aria-label", `${item.label} for ${role.label}`);
         // A section that nothing can "edit" only offers off/on — a third state
         // that means nothing would just be a way to get it wrong.
