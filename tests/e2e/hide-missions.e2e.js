@@ -186,10 +186,14 @@ async function step(name, fn) {
       await m.close();
     });
 
-    await step("on a desktop the dialog is wide", async () => {
+    await step("on a desktop the dialog is a side drawer", async () => {
       await p.click("#btn-hide-missions");
+      await p.waitForTimeout(400);
       const box = await dlg.boundingBox();
-      assert.equal(Math.round(box.width), 920);
+      const vp = p.viewportSize();
+      assert.equal(Math.round(box.width), 760);
+      assert.equal(Math.round(box.x + box.width), vp.width);
+      assert.equal(Math.round(box.height), vp.height);
     });
 
     await step("no page errors", async () => { assert.deepEqual(a.errors, []); });

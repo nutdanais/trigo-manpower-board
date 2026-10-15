@@ -9041,7 +9041,6 @@ function applyPlanDiffFromModal() {
    planner: Apply stays locked until every difference has a side.
    ====================================================================== */
 const MERGE_REASONS = ["Customer changed the schedule", "Needed on this site", "Certification / skill", "Leave not approved"];
-const MERGE_FC_COLORS = 4;   // --fc-1 .. --fc-4 in styles.css
 
 function openMergeReview() {
   guardEdit(() => safely(async () => {
@@ -9057,19 +9056,17 @@ function openMergeReview() {
     state.merge = {
       boardId, date, model, forecasters,
       carriedFrom: (sig && sig.stamp && sig.stamp.carried_from) || null,
-      reasons: {}, filter: "all", step: "review", applying: false,
+      reasons: {}, step: "review", applying: false, idx: 0, perDetail: new Set(),
     };
+    state.merge.deck = mergeBuildDeck(model);
     renderMerge();
+    mergeLoadPeople(state.merge);   // once: host history and 30-day utilization fill in when they arrive
     openModal("#modal-merge");
   }));
 }
 
 /* ---------- small shared pieces (also used by the forecast alerts) ---------- */
 const initialsOf = (email) => who(email).split(/[._-]/).filter(Boolean).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
-function mergeFcColor(email) {
-  const i = state.merge ? state.merge.forecasters.indexOf(String(email || "").toLowerCase()) : -1;
-  return i < 0 ? "var(--muted)" : `var(--fc-${(i % MERGE_FC_COLORS) + 1})`;
-}
 function mergeFieldLabel(field) {
   if (field === "hidden") return "Visibility";
   const f = PlanDiff.MISSION_FIELDS.find(x => x.key === field);
@@ -9135,163 +9132,502 @@ function mergeRowKeys() {
     return String(ma.number).localeCompare(String(mb.number), undefined, { numeric: true }) || String(ma.shift).localeCompare(String(mb.shift));
   });
 }
-/* the collision items a row's buttons (and the forecaster filter) act on */
-function mergeRowItems(key) {
-  const m = state.merge.model;
-  return m.items.filter(it => it.type === "person"
-    ? ((it.from.kind === "mission" && it.from.key === key) || (it.to.kind === "mission" && it.to.key === key))
-    : it.key === key);
-}
-function mergeMatchesFilter(it) {
-  const f = state.merge.filter;
-  if (f === "all") return true;
-  return f === "none" ? !it.forecaster : !!it.forecaster && it.forecaster.toLowerCase() === f;
-}
-/* bulk choices touch collisions only: a person coming off Standby and a new
-   mission were never collisions, so "keep carry-over for all" doesn't undo them */
-const mergeBulkable = (it) => !(it.type === "person" && it.free) && it.type !== "add";
-
-function mergeChip(empId, side) {
-  const sm = state.merge, m = sm.model;
-  const it = m.byId.get("person:" + empId);
-  const p = m.people.get(empId);
-  const zoneNote = (pl) => (pl.kind === "zone" ? ZONE_LABELS[pl.zone] : null);
-  if (!it) {
-    // the same on both sides, or following its carry-over mission
-    const gone = side === "carry" && p.from.kind === "mission" && PlanDiff.carryPlace(m, p.from).kind === "standby";
-    return miniEmp(empId, {
-      cls: gone ? "dropped" : "same", note: gone ? "→ Standby" : zoneNote(side === "carry" ? p.from : p.to),
-      title: gone ? "Goes to Standby: this mission is being removed" : "The same on both sides",
-    });
+/* ---------- the card stack (design/merge-card-stack.html, option 2A·2) ----------
+   Only the clashes are cards: a person in two places, a mission whose details
+   differ (all of that mission's fields on one card), a mission the forecast
+   dropped. What goes in without a decision (new missions, people off Standby)
+   is counted above the stack. Each card carries what the app knows about the
+   person and the missions, so the choice can be made on the card. One reason
+   card per forecaster follows, then the confirm step. */
+function mergeBuildDeck(m) {
+  const deck = [];
+  const byMission = new Map();
+  for (const it of m.items) {
+    if (PlanDiff.decisionOf(m, it.id)) continue;            // pre-decided: not a clash
+    if (it.type === "field") {
+      if (!byMission.has(it.key)) { const c = { kind: "fields", key: it.key, ids: [] }; byMission.set(it.key, c); deck.push(c); }
+      byMission.get(it.key).ids.push(it.id);
+    } else if (it.type === "person") deck.push({ kind: "person", ids: [it.id], empId: it.empId });
+    else if (it.type === "remove") deck.push({ kind: "remove", key: it.key, ids: [it.id] });
+    else deck.push({ kind: "other", ids: [it.id] });
   }
-  const d = PlanDiff.decisionOf(m, it.id);
-  const locked = PlanDiff.mergeLocked(m, it);
-  const here = side === "carry" ? PlanDiff.carryPlace(m, it.from) : it.to;
-  const other = side === "carry" ? it.to : PlanDiff.carryPlace(m, it.from);
-  const name = empName(empId);
-  const chip = miniEmp(empId, {
-    button: !locked && !sm.applying,
-    cls: (!d ? "conf" : d === side ? "kept" : "dropped") + (locked ? " locked" : ""),
-    dot: side === "forecast" && it.forecaster ? mergeFcColor(it.forecaster) : null,
-    note: (side === "carry" ? "→ " : "← ") + mergePlaceLabel(other),
-    title: locked ? `${name} stays on the carry-over: ${mergePlaceLabel(it.to)} is not being added`
-      : side === "carry" ? `Keep ${name} on ${mergePlaceLabel(here)} (carry-over)`
-      : `Use ${it.forecaster ? who(it.forecaster) + "'s" : "the"} forecast: ${name} on ${mergePlaceLabel(here)}`,
+  const num = (c) => {
+    const it = m.byId.get(c.ids[0]);
+    const key = c.key || (it.from && it.from.kind === "mission" ? it.from.key : it.to && it.to.kind === "mission" ? it.to.key : "");
+    return key ? String(key.split("|")[0]) : "zzz";
+  };
+  deck.sort((a, b) => num(a).localeCompare(num(b), undefined, { numeric: true }));
+  return deck;
+}
+const mergeCardDecision = (c) => {
+  const ds = c.ids.map(id => PlanDiff.decisionOf(state.merge.model, id));
+  return ds.every(d => d && d === ds[0]) ? ds[0] : ds.some(Boolean) ? "mixed" : null;
+};
+/* people's host history and 30-day utilization, loaded once per review */
+function mergeLoadPeople(sm) {
+  const ids = sm.deck.filter(c => c.kind === "person").map(c => c.empId);
+  sm.hist = sm.hist || {};
+  for (const id of ids) {
+    if (sm.hist[id]) continue;
+    sm.hist[id] = "loading";
+    cloud.getEmployeeHostHistory(id)
+      .then(rows => { sm.hist[id] = rows || []; })
+      .catch(() => { sm.hist[id] = []; })
+      .then(() => { if (state.merge === sm) renderMerge(); });
+  }
+  if (ids.length && !sm.utilAsked) {
+    sm.utilAsked = true;
+    ensureEmplistUtilLoaded().then(() => { if (state.merge === sm) renderMerge(); }).catch(() => {});
+  }
+}
+function mergeHostDays(empId, host) {
+  const rows = (state.merge.hist || {})[empId];
+  if (!Array.isArray(rows) || !host) return null;
+  const k = host.trim().toLowerCase();
+  return new Set(rows.filter(r => (r.host || "").trim().toLowerCase() === k).map(r => r.date)).size;
+}
+function mergeTopHosts(empId) {
+  const rows = (state.merge.hist || {})[empId];
+  if (!Array.isArray(rows)) return null;
+  const days = new Map();
+  for (const r of rows) { const h = r.host || "?"; if (!days.has(h)) days.set(h, new Set()); days.get(h).add(r.date); }
+  return [...days].map(([h, d]) => [h, d.size]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+}
+function mergeWeekDays(empId) {
+  const rows = (state.merge.hist || {})[empId];
+  if (!Array.isArray(rows)) return null;
+  const d = new Date(state.merge.date + "T00:00:00");
+  const monday = addDays(state.merge.date, -((d.getDay() + 6) % 7));
+  return new Set(rows.filter(r => r.date >= monday && r.date < state.merge.date).map(r => r.date)).size;
+}
+function mergePill(text, cls) { return mkEl("span", "mc-pill" + (cls ? " " + cls : ""), text); }
+function mergeAreaPill(area) {
+  const p = mkEl("span", "mc-pill area", area.name);
+  p.setAttribute("style", areaSoftStyleSafe(area.color));
+  return p;
+}
+function areaSoftStyleSafe(color) { return typeof areaSoftStyle === "function" ? areaSoftStyle(color) : `background:${escapeHtml(color)};color:${inkOn(color)}`; }
+/* a crew chip: name, and the amber OC badge only for on-call */
+function mergeCrewChip(empId, me) {
+  const emp = D().employees.find(e => e.id === empId);
+  const c = mkEl("span", "mc-chip" + (emp && emp.contract === "oncall" ? " oc" : "") + (me ? " me" : ""));
+  c.appendChild(mkEl("span", null, emp ? emp.name : "(unknown)"));
+  if (emp && emp.contract === "oncall") c.appendChild(mkEl("span", "mc-oc", "OC"));
+  return c;
+}
+function mergeDl(rows) {
+  const dl = mkEl("dl", "mc-dl");
+  for (const [k, v, changed, old] of rows) {
+    if (v == null || v === "") continue;
+    dl.appendChild(mkEl("dt", null, k));
+    const dd = mkEl("dd");
+    if (old) dd.appendChild(mkEl("span", "mc-old", old));
+    dd.appendChild(mkEl("span", changed ? "mc-chg" : null, v));
+    dl.appendChild(dd);
+  }
+  return dl;
+}
+function mergeMissionHead(mis) {
+  const h = mkEl("div", "mc-mhead");
+  h.appendChild(mkEl("span", "mc-no", mis.number));
+  h.appendChild(mkEl("b", null, mis.host || "—"));
+  h.appendChild(mkEl("span", "merge-shift" + (mis.shift === "night" ? " night" : ""), shiftWord(mis.shift).toUpperCase()));
+  return h;
+}
+function mergeMissionLoc(mis) {
+  const rec = hostRecordOf(mis.host);
+  const area = hostAreaOf(mis.host);
+  const loc = mkEl("div", "mc-loc");
+  if (rec && rec.location) loc.appendChild(mkEl("span", null, rec.location));
+  if (area) loc.appendChild(mergeAreaPill(area));
+  return loc.childNodes.length ? loc : null;
+}
+/* a mission's details: customer, engineer and remark always; time, PPE and host
+   only when they are what differs (changed). `old` holds the other side's value,
+   drawn struck through before the new one. */
+function mergeMissionDetails(mis, changed, old) {
+  changed = changed || new Set();
+  old = old || {};
+  const eng = (id) => { const e = D().engineers.find(x => x.id === id); return e ? e.name : (id ? "?" : ""); };
+  const rows = [["Customer", mis.customer, changed.has("customer"), old.customer]];
+  if (changed.has("startTime") || changed.has("endTime")) {
+    const was = ("startTime" in old || "endTime" in old) ? `${old.startTime ?? mis.startTime ?? "?"}–${old.endTime ?? mis.endTime ?? "?"}` : undefined;
+    rows.push(["Time", `${mis.startTime || "?"}–${mis.endTime || "?"}`, true, was]);
+  }
+  if (changed.has("host")) rows.push(["Host", mis.host, true, old.host]);
+  rows.push(["Engineer", eng(mis.engineerId), changed.has("engineerId"), "engineerId" in old ? eng(old.engineerId) : undefined]);
+  if (changed.has("ppe")) rows.push(["PPE", mis.ppe || "(none)", true, old.ppe]);
+  rows.push(["Remark", mis.remark, changed.has("remark"), old.remark]);
+  return mergeDl(rows.map(([k, v, c, o]) => [k, v, c, o != null && o !== v ? (o || "(blank)") : null]));
+}
+function mergePlaceCrew(m, key, withEmp, withoutEmp) {
+  const ids = [...m.people.keys()].filter(id => {
+    if (id === withEmp) return true;
+    if (id === withoutEmp) return false;
+    const r = PlanDiff.resultPlace(m, id);
+    return r.kind === "mission" && r.key === key;
   });
-  chip.setAttribute("aria-pressed", String(d === side));
-  if (!locked) {
-    chip.onclick = () => { if (PlanDiff.decide(m, it.id, side)) renderMerge(); };
-    const pair = (on) => { for (const c of document.querySelectorAll(`#merge-body .mini-emp[data-emp="${CSS.escape(empId)}"]`)) c.classList.toggle("pair", on); };
-    chip.addEventListener("mouseenter", () => pair(true));
-    chip.addEventListener("mouseleave", () => pair(false));
-    chip.addEventListener("focus", () => pair(true));
-    chip.addEventListener("blur", () => pair(false));
+  return ids;
+}
+function mergeFit(list) {
+  const box = mkEl("div", "mc-fit");
+  for (const [kind, text] of list) {
+    const s = mkEl("span", kind);
+    s.innerHTML = icon(kind === "w" ? "alert" : "check");
+    s.appendChild(document.createTextNode(text));
+    box.appendChild(s);
   }
-  return chip;
+  return box;
 }
-/* a two-way choice for one item: [carry-over text | forecast text] */
-function mergeSeg(itemId, carryText, forecastText, label) {
-  const m = state.merge.model;
-  const d = PlanDiff.decisionOf(m, itemId);
-  const seg = mkEl("div", "merge-seg" + (d ? "" : " undecided"));
-  seg.setAttribute("role", "radiogroup");
-  seg.setAttribute("aria-label", label);
-  for (const [side, text, tip] of [["carry", carryText, "Carry-over"], ["forecast", forecastText, "Forecast"]]) {
-    const b = mkEl("button", null, text);
-    b.type = "button";
-    b.setAttribute("role", "radio");
-    b.setAttribute("aria-checked", String(d === side));
-    b.title = tip;
-    b.disabled = state.merge.applying;
-    b.onclick = () => { if (PlanDiff.decide(m, itemId, side)) renderMerge(); };
-    seg.appendChild(b);
-  }
-  return seg;
+function mergeOption(side, label, keyHint, on, build) {
+  const b = mkEl("button", "mc-op" + (on ? " on" : ""));
+  b.type = "button";
+  b.dataset.side = side;
+  b.setAttribute("aria-pressed", String(!!on));
+  const src = mkEl("div", "mc-src");
+  src.appendChild(mkEl("span", null, label));
+  src.appendChild(mkEl("span", "mc-kbd", keyHint));
+  b.appendChild(src);
+  build(b);
+  b.onclick = () => mergeChoose(side);
+  return b;
 }
-function mergeCell(side, chips, emptyText) {
-  const cell = mkEl("div", "merge-cell" + (side === "forecast" ? " fc" : ""));
-  cell.appendChild(mkEl("span", "merge-cell-label", side === "carry" ? "Carry-over" : "Forecast"));
-  if (chips.length) for (const c of chips) cell.appendChild(c);
-  else cell.appendChild(mkEl("span", "merge-empty", emptyText));
-  return cell;
-}
-function mergeMissionRow(key) {
+function mergePersonCard(card) {
   const sm = state.merge, m = sm.model;
-  const bm = m.baseByKey.get(key), fm = m.proposedByKey.get(key);
-  const mis = fm || bm;
-  const eng = D().engineers.find(e => e.id === mis.engineerId);
-  const onBoard = PlanDiff.missionOnBoard(m, key);
-  const people = [...m.people.entries()];
-  const carryIds = people.filter(([, p]) => p.from.kind === "mission" && p.from.key === key).map(([id]) => id);
-  const fcIds = people.filter(([, p]) => p.to.kind === "mission" && p.to.key === key).map(([id]) => id);
-  const after = onBoard ? people.filter(([id]) => { const r = PlanDiff.resultPlace(m, id); return r.kind === "mission" && r.key === key; }).length : 0;
-  const items = mergeRowItems(key);
-
-  const row = mkEl("div", "merge-row" + (onBoard ? "" : " gone") + (items.some(mergeMatchesFilter) || sm.filter === "all" ? "" : " dim"));
-  const info = mkEl("div", "merge-info");
-  if (eng) info.style.borderLeftColor = eng.color;
-  const head = mkEl("div", "merge-num");
-  head.appendChild(mkEl("b", null, mis.number));
-  head.appendChild(mkEl("span", "merge-shift" + (mis.shift === "night" ? " night" : ""), shiftWord(mis.shift).toUpperCase()));
-  info.appendChild(head);
-  info.appendChild(mkEl("div", "merge-host", `${mis.host} → ${mis.customer}`));
-  for (const it of items.filter(i => i.type === "field")) {
-    const f = mkEl("div", "merge-field");
-    f.appendChild(mkEl("span", "merge-field-label", `${it.label}:`));
-    const val = (v) => (it.field === "hidden" ? v : diffFieldValue(it.field, v));
-    f.appendChild(mergeSeg(it.id, val(it.carry), val(it.forecast), `${it.label} on ${mis.number}`));
-    info.appendChild(f);
-  }
-  const add = items.find(i => i.type === "add");
-  if (add) {
-    const f = mkEl("div", "merge-field");
-    f.appendChild(mkEl("span", "merge-field-label", `New in ${add.forecaster ? who(add.forecaster) + "'s" : "the"} forecast:`));
-    f.appendChild(mergeSeg(add.id, "Don't add", "Add", `Add mission ${mis.number}`));
-    info.appendChild(f);
-  }
-  const rem = items.find(i => i.type === "remove");
-  if (rem) {
-    const f = mkEl("div", "merge-field");
-    f.appendChild(mkEl("span", "merge-field-label", "Not in the forecast:"));
-    f.appendChild(mergeSeg(rem.id, "Keep", "Remove", `Keep mission ${mis.number}`));
-    info.appendChild(f);
-  }
-  info.appendChild(mkEl("div", "merge-after", onBoard ? `After merge: ${after} ${after === 1 ? "person" : "people"}` : (add ? "Not added" : "Removed")));
-  const bulk = items.filter(i => i.type !== "add" && i.type !== "remove" && !(i.type === "person" && i.free) && !PlanDiff.mergeLocked(m, i));
-  if (bulk.length && !sm.applying) {
-    const acts = mkEl("div", "merge-row-acts");
-    for (const [side, text] of [["carry", "Keep carry-over"], ["forecast", "Use forecast"]]) {
-      const b = mkEl("button", "btn btn-small", text);
-      b.type = "button";
-      b.title = side === "carry" ? "Keep this mission as the carry-over has it: its crew and details" : "Make this mission match the forecast: its crew and details";
-      b.onclick = () => { for (const it of bulk) PlanDiff.decide(m, it.id, side); renderMerge(); };
-      acts.appendChild(b);
+  const it = m.byId.get(card.ids[0]);
+  const emp = D().employees.find(e => e.id === it.empId) || { name: empName(it.empId) };
+  const d = mergeCardDecision(card);
+  const el = mkEl("div", "mc-card");
+  el.appendChild(mkEl("div", "mc-q", `Where does ${emp.name} work on ${fmtShort(sm.date)}?`));
+  // who
+  const whoEl = mkEl("div", "mc-who");
+  const av = mkEl("span", "mc-av", initialsFromName(emp.nameEn || emp.name));
+  whoEl.appendChild(av);
+  const wt = mkEl("div", "mc-who-t");
+  const nm = mkEl("div", "mc-name");
+  nm.appendChild(mkEl("b", null, emp.name));
+  const sub = [emp.nameEn && emp.nameEn !== emp.name ? emp.nameEn : "", emp.trigoId || ""].filter(Boolean).join(" · ");
+  if (sub) nm.appendChild(mkEl("span", "mc-sub", sub));
+  wt.appendChild(nm);
+  const tags = mkEl("div", "mc-tags");
+  if (emp.contract === "oncall") tags.appendChild(mkEl("span", "mc-oc big", "OC"));
+  if (emp.position && POSITIONS[emp.position]) tags.appendChild(mergePill(POSITIONS[emp.position].label));
+  const ea = D().areas.find(a => a.id === emp.areaId);
+  if (ea) tags.appendChild(mergeAreaPill(ea));
+  if (emp.phone) tags.appendChild(mergePill(emp.phone));
+  wt.appendChild(tags);
+  whoEl.appendChild(wt);
+  el.appendChild(whoEl);
+  // numbers
+  const stats = mkEl("div", "mc-stats");
+  const stat = (v, l) => { const s = mkEl("div"); s.appendChild(mkEl("b", null, v)); s.appendChild(mkEl("small", null, l)); stats.appendChild(s); };
+  const svc = emp.startDate && window.ManpowerXlsx ? ManpowerXlsx.serviceParts(emp.startDate, todayStr()) : null;
+  stat(svc ? `${svc.years}y ${svc.months}m` : "—", "service");
+  const util = state.emplist.util ? state.emplist.util[it.empId] : undefined;
+  stat(util == null ? "—" : util + "%", "30-day utilization");
+  const wk = mergeWeekDays(it.empId);
+  stat(wk == null ? "…" : String(wk), "days this week");
+  el.appendChild(stats);
+  const top = mergeTopHosts(it.empId);
+  const hist = mkEl("div", "mc-hist");
+  hist.appendChild(mkEl("span", "mc-hist-l", "Top hosts"));
+  if (top === null) hist.appendChild(mkEl("span", null, "…"));
+  else if (!top.length) hist.appendChild(mkEl("span", null, "No host history yet"));
+  else for (const [h, n] of top) hist.appendChild(mkEl("span", "mc-hchip", `${h} · ${n}d`));
+  el.appendChild(hist);
+  // the two places
+  const carryAt = PlanDiff.carryPlace(m, it.from);
+  const fcName = it.forecaster ? who(it.forecaster) : "the";
+  const opts = mkEl("div", "mc-opts");
+  const placeSide = (side, place, other) => (b) => {
+    if (place.kind === "mission") {
+      const mis = mergeMissionOf(place.key);
+      b.appendChild(mergeMissionHead(mis));
+      const loc = mergeMissionLoc(mis); if (loc) b.appendChild(loc);
+      const more = mkEl("div", "mc-more");
+      more.appendChild(mergeMissionDetails(mis));
+      const crew = mergePlaceCrew(m, place.key, it.empId, null);
+      const cl = mkEl("div", "mc-crewl");
+      cl.appendChild(mkEl("span", null, side === "carry" ? "Crew if kept" : "Crew if used"));
+      cl.appendChild(mkEl("b", null, String(crew.length)));
+      more.appendChild(cl);
+      const cr = mkEl("div", "mc-crew");
+      for (const id of crew) cr.appendChild(mergeCrewChip(id, id === it.empId));
+      more.appendChild(cr);
+      b.appendChild(more);
+      const fit = [];
+      const area = hostAreaOf(mis.host);
+      if (area && emp.areaId) fit.push(area.id === emp.areaId ? ["g", `Same area (${area.name})`] : ["w", `Different area (${area.name})`]);
+      const days = mergeHostDays(it.empId, mis.host);
+      if (days != null) fit.push(days ? ["g", `${days} day${days === 1 ? "" : "s"} at ${mis.host}`] : ["w", `Never worked at ${mis.host}`]);
+      const otherMis = other.kind === "mission" ? mergeMissionOf(other.key) : null;
+      if (otherMis && otherMis.shift !== mis.shift) fit.push(["w", `${shiftWord(mis.shift)} shift`]);
+      if (fit.length) b.appendChild(mergeFit(fit));
+      if (other.kind === "mission") {
+        const left = mergePlaceCrew(m, other.key, null, it.empId).length;
+        const om = mergeMissionOf(other.key);
+        b.appendChild(mkEl("div", "mc-after", `${om.number} then has ${left}`));
+      }
+    } else {
+      b.appendChild(mkEl("div", "mc-mhead", "")).appendChild(mkEl("b", null, mergePlaceLabel(place)));
+      b.appendChild(mkEl("div", "mc-loc", place.kind === "zone" ? "Leave, not on a mission" : "Not on a mission"));
     }
-    info.appendChild(acts);
-  }
-  row.appendChild(info);
-  row.appendChild(mergeCell("carry", carryIds.map(id => mergeChip(id, "carry")), bm ? "Nobody" : "Not on the carry-over"));
-  row.appendChild(mergeCell("forecast", fcIds.map(id => mergeChip(id, "forecast")), fm ? "Nobody" : "Not in the forecast"));
-  return row;
+  };
+  opts.appendChild(mergeOption("carry", "Keep · carry-over", "1 · ←", d === "carry", placeSide("carry", carryAt, it.to)));
+  opts.appendChild(mergeOption("forecast", `Use · ${it.forecaster ? fcName + "'s forecast" : "the forecast"}`, "2 · →", d === "forecast", placeSide("forecast", it.to, carryAt)));
+  el.appendChild(opts);
+  // on a phone the mission details and crews fold under this
+  const more = mkEl("button", "mc-more-btn", "Mission details and crews");
+  more.type = "button";
+  more.setAttribute("aria-expanded", "false");
+  more.onclick = () => { const o = el.classList.toggle("open"); more.setAttribute("aria-expanded", String(o)); };
+  el.appendChild(more);
+  return el;
 }
-/* Leave, and Standby for the people who move on or off it */
-function mergeLaneRow(kind) {
+function mergeFieldsCard(card) {
   const sm = state.merge, m = sm.model;
-  const people = [...m.people.entries()];
-  const test = kind === "leave" ? (p) => p.kind === "zone" : (p) => p.kind === "standby";
-  const moving = (id) => m.byId.has("person:" + id);
-  const carryIds = people.filter(([id, p]) => test(p.from) && (kind === "leave" || moving(id))).map(([id]) => id);
-  const fcIds = people.filter(([id, p]) => test(p.to) && (kind === "leave" || moving(id))).map(([id]) => id);
-  if (!carryIds.length && !fcIds.length) return null;
-  const items = [...carryIds, ...fcIds].map(id => m.byId.get("person:" + id)).filter(Boolean);
-  const row = mkEl("div", "merge-row lane" + (items.some(mergeMatchesFilter) || sm.filter === "all" ? "" : " dim"));
-  const info = mkEl("div", "merge-info");
-  info.appendChild(mkEl("div", "merge-num", kind === "leave" ? "Leave" : "Standby"));
-  info.appendChild(mkEl("div", "merge-host", kind === "leave" ? "Annual, sick, business…" : "Only the people who move on or off it"));
-  row.appendChild(info);
-  row.appendChild(mergeCell("carry", carryIds.map(id => mergeChip(id, "carry")), "Nobody"));
-  row.appendChild(mergeCell("forecast", fcIds.map(id => mergeChip(id, "forecast")), "Nobody"));
-  return row;
+  const items = card.ids.map(id => m.byId.get(id));
+  const bm = m.baseByKey.get(card.key), fm = m.proposedByKey.get(card.key);
+  const el = mkEl("div", "mc-card");
+  el.appendChild(mkEl("div", "mc-q", `Which details does ${bm.number} ${bm.host} run with?`));
+  const per = sm.perDetail && sm.perDetail.has(card.key);
+  const d = mergeCardDecision(card);
+  const fcName = items[0].forecaster ? who(items[0].forecaster) + "'s forecast" : "the forecast";
+  if (!per) {
+    const opts = mkEl("div", "mc-opts");
+    const side = (s, mis) => (b) => {
+      b.appendChild(mergeMissionHead(mis));
+      const loc = mergeMissionLoc(mis); if (loc) b.appendChild(loc);
+      const changed = new Set(items.map(i => i.field));
+      const old = {};
+      if (s === "forecast") for (const it of items) if (it.field !== "hidden") old[it.field] = it.carry;
+      b.appendChild(mergeMissionDetails(mis, changed, old));
+      if (items.some(i => i.field === "hidden")) b.appendChild(mkEl("div", "mc-after", s === "carry" ? "Stays hidden" : "Shown on the board"));
+    };
+    opts.appendChild(mergeOption("carry", "Keep · carry-over", "1 · ←", d === "carry", side("carry", bm)));
+    opts.appendChild(mergeOption("forecast", "Use · " + fcName, "2 · →", d === "forecast", side("forecast", fm)));
+    el.appendChild(opts);
+  } else {
+    const list = mkEl("div", "mc-perdetail");
+    for (const it of items) {
+      const row = mkEl("div", "mc-pd-row");
+      row.appendChild(mkEl("span", "mc-pd-l", it.label));
+      const seg = mkEl("div", "seg-pick");
+      const val = (v) => (it.field === "hidden" ? v : diffFieldValue(it.field, v));
+      for (const [s, text] of [["carry", val(it.carry)], ["forecast", val(it.forecast)]]) {
+        const b = mkEl("button", null, text || "(blank)");
+        b.type = "button";
+        b.setAttribute("aria-pressed", String(PlanDiff.decisionOf(m, it.id) === s));
+        b.onclick = () => { PlanDiff.decide(m, it.id, s); renderMerge(); };
+        seg.appendChild(b);
+      }
+      row.appendChild(seg);
+      list.appendChild(row);
+    }
+    el.appendChild(list);
+  }
+  // who the change touches
+  const crew = mergePlaceCrew(m, card.key, null, null);
+  const cl = mkEl("div", "mc-crewl");
+  cl.appendChild(mkEl("span", null, `People on ${bm.number}`));
+  cl.appendChild(mkEl("b", null, String(crew.length)));
+  el.appendChild(cl);
+  const cr = mkEl("div", "mc-crew");
+  for (const id of crew) cr.appendChild(mergeCrewChip(id));
+  el.appendChild(cr);
+  // an engineer who would run two missions in the same shift
+  const engIt = items.find(i => i.field === "engineerId");
+  if (engIt && engIt.forecast) {
+    const clash = [...m.proposedByKey.values(), ...m.baseByKey.values()].find(x => x !== fm && x !== bm && x.engineerId === engIt.forecast && x.shift === fm.shift && PlanDiff.missionOnBoard(m, PlanDiff.missionKey(x)));
+    if (clash) el.appendChild(mergeFit([["w", `${diffFieldValue("engineerId", engIt.forecast)} also runs ${clash.number}. With the forecast they run two missions`]]));
+  }
+  const tog = mkEl("button", "mc-link", per ? "Choose for the whole mission" : "Choose per detail");
+  tog.type = "button";
+  tog.onclick = () => { sm.perDetail = sm.perDetail || new Set(); if (per) sm.perDetail.delete(card.key); else sm.perDetail.add(card.key); renderMerge(); };
+  el.appendChild(tog);
+  return el;
+}
+function mergeRemoveCard(card) {
+  const sm = state.merge, m = sm.model;
+  const bm = m.baseByKey.get(card.key);
+  const d = mergeCardDecision(card);
+  const el = mkEl("div", "mc-card");
+  el.appendChild(mkEl("div", "mc-q", `Does ${bm.number} ${bm.host} run on ${fmtShort(sm.date)}?`));
+  const box = mkEl("div", "mc-mbox");
+  box.appendChild(mergeMissionHead(bm));
+  const loc = mergeMissionLoc(bm); if (loc) box.appendChild(loc);
+  box.appendChild(mergeMissionDetails(bm));
+  el.appendChild(box);
+  const crew = [...m.people.entries()].filter(([, p]) => p.from.kind === "mission" && p.from.key === card.key).map(([id]) => id);
+  const opts = mkEl("div", "mc-opts");
+  opts.appendChild(mergeOption("carry", `Keep ${bm.number}`, "1 · ←", d === "carry", (b) => {
+    const cl = mkEl("div", "mc-crewl"); cl.appendChild(mkEl("span", null, "Crew stays")); cl.appendChild(mkEl("b", null, String(crew.length))); b.appendChild(cl);
+    const cr = mkEl("div", "mc-crew"); for (const id of crew) cr.appendChild(mergeCrewChip(id)); b.appendChild(cr);
+  }));
+  opts.appendChild(mergeOption("forecast", `Remove ${bm.number} · as the forecast`, "2 · →", d === "forecast", (b) => {
+    b.appendChild(mkEl("div", "mc-crewl", "Where the crew goes"));
+    const list = mkEl("div", "mc-goes");
+    for (const id of crew) {
+      const p = m.people.get(id);
+      const to = p.to.kind === "mission" && p.to.key !== card.key ? mergePlaceLabel(p.to) : "Standby";
+      const r = mkEl("div");
+      r.appendChild(mergeCrewChip(id));
+      r.appendChild(mkEl("span", null, "→ " + to));
+      list.appendChild(r);
+    }
+    if (!crew.length) list.appendChild(mkEl("span", "mc-sub", "Nobody is on it"));
+    b.appendChild(list);
+  }));
+  el.appendChild(opts);
+  return el;
+}
+function initialsFromName(n) {
+  const parts = String(n || "?").replace(/[._-]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  return ((parts[0] || "?")[0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+/* decide the current card and move on */
+function mergeChoose(side) {
+  const sm = state.merge;
+  if (!sm || sm.applying || sm.step !== "review") return;
+  const card = sm.deck[sm.idx];
+  if (!card) return;
+  for (const id of card.ids) PlanDiff.decide(sm.model, id, side);
+  mergeAdvance();
+}
+function mergeAdvance() {
+  const sm = state.merge;
+  const next = sm.deck.findIndex((c, i) => i > sm.idx && !mergeCardDecision(c));
+  if (next >= 0) sm.idx = next;
+  else {
+    const open = sm.deck.findIndex(c => !mergeCardDecision(c) || mergeCardDecision(c) === "mixed" && c.ids.some(id => !PlanDiff.decisionOf(sm.model, id)));
+    if (open >= 0) sm.idx = open;
+    else sm.step = mergeAlertGroups().length ? "reasons" : "confirm";
+  }
+  renderMerge();
+}
+function mergeBack() {
+  const sm = state.merge;
+  if (!sm || sm.applying) return;
+  if (sm.step === "confirm") sm.step = mergeAlertGroups().length ? "reasons" : "review";
+  else if (sm.step === "reasons") sm.step = "review";
+  else if (sm.idx > 0) sm.idx--;
+  if (sm.step === "review" && sm.idx >= sm.deck.length) sm.idx = Math.max(0, sm.deck.length - 1);
+  renderMerge();
+}
+function mergeDecideAll(side) {
+  const sm = state.merge;
+  if (!sm || sm.applying) return;
+  for (const c of sm.deck) for (const id of c.ids) PlanDiff.decide(sm.model, id, side);
+  sm.step = mergeAlertGroups().length ? "reasons" : "confirm";
+  renderMerge();
+}
+/* one reason per forecaster, shared by every carry choice made over their forecast */
+function mergeAlertGroups() {
+  const by = new Map();
+  for (const it of mergeAlertItems()) {
+    const k = it.forecaster.toLowerCase();
+    if (!by.has(k)) by.set(k, { forecaster: it.forecaster, items: [] });
+    by.get(k).items.push(it);
+  }
+  return [...by.values()];
+}
+function mergeReasonsStep() {
+  const sm = state.merge;
+  const wrap = mkEl("div", "mc-reasons");
+  for (const g of mergeAlertGroups()) {
+    const card = mkEl("div", "mc-card");
+    card.appendChild(mkEl("div", "mc-kicker", `For ${who(g.forecaster)}`));
+    card.appendChild(mkEl("div", "mc-q", `Tell ${who(g.forecaster)} why`));
+    card.appendChild(mkEl("p", "mc-sub", `You kept ${g.items.length === 1 ? "one thing" : g.items.length + " things"} from your plan over their forecast. They get one alert with your reason; it is optional.`));
+    const ul = mkEl("ul", "mc-kept");
+    for (const it of g.items) ul.appendChild(mkEl("li", null, mergeItemText(it)));
+    card.appendChild(ul);
+    const cur = sm.reasons[g.items[0].id] || "";
+    const set = (v) => { for (const it of g.items) sm.reasons[it.id] = v; };
+    const qs = mkEl("div", "mc-reason-chips");
+    const inp = document.createElement("input");
+    for (const q of MERGE_REASONS) {
+      const b = mkEl("button", "mc-rchip", q);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(cur === q));
+      b.onclick = () => { set(q); inp.value = q; for (const x of qs.children) x.setAttribute("aria-pressed", String(x === b)); };
+      qs.appendChild(b);
+    }
+    card.appendChild(qs);
+    inp.type = "text";
+    inp.className = "mc-reason-input";
+    inp.id = "merge-reason-" + g.forecaster.replace(/[^a-z0-9]/gi, "-");
+    inp.maxLength = 200;
+    inp.placeholder = "Or write your own (optional)";
+    inp.value = cur;
+    inp.setAttribute("aria-label", `Reason for ${who(g.forecaster)}`);
+    inp.oninput = () => { set(inp.value); for (const x of qs.children) x.setAttribute("aria-pressed", String(x.textContent === inp.value)); };
+    card.appendChild(inp);
+    wrap.appendChild(card);
+  }
+  return wrap;
+}
+function mergeAutoLine() {
+  const m = state.merge.model;
+  const adds = m.items.filter(i => i.type === "add" && PlanDiff.decisionOf(m, i.id) === "forecast").length;
+  const free = m.items.filter(i => i.type === "person" && i.free).length;
+  if (!adds && !free) return null;
+  const bits = [];
+  if (adds) bits.push(`${adds} new mission${adds === 1 ? "" : "s"}`);
+  if (free) bits.push(`${free} ${free === 1 ? "person" : "people"} from Standby`);
+  const el = mkEl("div", "mc-auto");
+  el.innerHTML = icon("check");
+  el.appendChild(document.createTextNode(`Go in without a decision: ${bits.join(", ")}`));
+  return el;
+}
+function renderMergeStack() {
+  const sm = state.merge;
+  const card = sm.deck[sm.idx];
+  const stage = mkEl("div", "mc-stage");
+  const auto = mergeAutoLine();
+  if (auto) stage.appendChild(auto);
+  const stack = mkEl("div", "mc-stack");
+  const rest = sm.deck.length - sm.idx - 1;
+  if (rest > 1) stack.appendChild(mkEl("div", "mc-ghost g2"));
+  if (rest > 0) stack.appendChild(mkEl("div", "mc-ghost g1"));
+  const el = card.kind === "person" ? mergePersonCard(card) : card.kind === "fields" ? mergeFieldsCard(card) : card.kind === "remove" ? mergeRemoveCard(card) : mkEl("div", "mc-card", "Unknown difference");
+  const it0 = sm.model.byId.get(card.ids[0]);
+  const kick = mkEl("div", "mc-kicker");
+  kick.appendChild(mkEl("span", null, `Clash ${sm.idx + 1} of ${sm.deck.length} · ${card.kind === "person" ? "a person in two places" : card.kind === "fields" ? "mission details differ" : "a mission the forecast drops"}`));
+  if (it0 && it0.forecaster) kick.appendChild(mkEl("span", "mc-fc", who(it0.forecaster)));
+  el.prepend(kick);
+  const foot = mkEl("div", "mc-swipe");
+  foot.appendChild(mkEl("span", null, "← keep"));
+  const dots = mkEl("span", "mc-dots");
+  sm.deck.forEach((c, i) => dots.appendChild(mkEl("i", i === sm.idx ? "on" : mergeCardDecision(c) ? "ok" : "")));
+  foot.appendChild(dots);
+  foot.appendChild(mkEl("span", null, "use →"));
+  el.appendChild(foot);
+  mergeSwipe(el);
+  stack.appendChild(el);
+  stage.appendChild(stack);
+  return stage;
+}
+/* drag a card sideways: left keeps the carry-over, right uses the forecast */
+function mergeSwipe(el) {
+  let x0 = null, id = null, dx = 0;
+  el.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button, input, a")) return;
+    x0 = e.clientX; id = e.pointerId; dx = 0; el.setPointerCapture(id); el.classList.add("dragging");
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (x0 === null || e.pointerId !== id) return;
+    dx = e.clientX - x0;
+    el.style.transform = `translateX(${dx}px) rotate(${dx / 40}deg)`;
+    el.dataset.lean = dx > 40 ? "forecast" : dx < -40 ? "carry" : "";
+  });
+  const end = () => {
+    if (x0 === null) return;
+    x0 = null; el.classList.remove("dragging"); el.style.transform = ""; delete el.dataset.lean;
+    if (Math.abs(dx) > 90) mergeChoose(dx > 0 ? "forecast" : "carry");
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
 }
 /* the forecasters a carry-over choice will alert: never the planner, never 'migrated' */
 function mergeAlertItems() {
@@ -9306,136 +9642,75 @@ function mergeItemText(it) {
   if (it.type === "add") return `${mis.number} ${shiftWord(mis.shift)} not added`;
   return `${mis.number} kept`;
 }
-function mergeReasonsEl() {
-  const sm = state.merge;
-  const list = mergeAlertItems();
-  if (!list.length) return null;
-  const box = mkEl("section", "merge-reasons");
-  box.appendChild(mkEl("h4", null, "Reasons for the forecasters (optional)"));
-  box.appendChild(mkEl("p", "import-note", "Each engineer below gets an alert that part of their forecast was not used. A reason is shown with it and kept in the merge log."));
-  for (const it of list) {
-    const row = mkEl("div", "merge-reason");
-    const t = mkEl("div", "merge-reason-text");
-    t.appendChild(mkEl("b", null, mergeItemText(it)));
-    t.appendChild(mkEl("small", null, `instead of ${who(it.forecaster)}'s forecast`));
-    row.appendChild(t);
-    const right = mkEl("div", "merge-reason-input");
-    const qs = mkEl("div", "merge-quick");
-    for (const q of MERGE_REASONS) {
-      const b = mkEl("button", "merge-qchip", q);
-      b.type = "button";
-      b.disabled = sm.applying;
-      b.onclick = () => { sm.reasons[it.id] = q; const inp = row.querySelector("input"); if (inp) inp.value = q; };
-      qs.appendChild(b);
-    }
-    right.appendChild(qs);
-    const inp = document.createElement("input");
-    inp.type = "text";
-    inp.id = "merge-reason-" + it.id.replace(/[^a-z0-9]/gi, "-");
-    inp.maxLength = 200;
-    inp.placeholder = "Optional reason";
-    inp.value = sm.reasons[it.id] || "";
-    inp.disabled = sm.applying;
-    inp.setAttribute("aria-label", `Reason: ${mergeItemText(it)}`);
-    inp.oninput = () => { sm.reasons[it.id] = inp.value; };
-    right.appendChild(inp);
-    row.appendChild(right);
-    box.appendChild(row);
-  }
-  return box;
-}
-function renderMergeTools() {
-  const sm = state.merge;
-  const box = $("#merge-tools");
-  box.innerHTML = "";
-  box.classList.toggle("hidden", sm.step !== "review" || !sm.model.items.length);
-  if (sm.step !== "review") return;
-  const legend = mkEl("div", "merge-legend");
-  for (const [cls, text] of [["same", "Same on both sides"], ["conf", "Needs a decision"], ["kept", "Kept"], ["dropped", "Not used"]]) {
-    const chip = mkEl("span", "mini-emp legend " + cls);
-    chip.appendChild(mkEl("span", "mini-name", text));
-    legend.appendChild(chip);
-  }
-  box.appendChild(legend);
-  const bar = mkEl("div", "merge-filter");
-  const counts = { all: 0, none: 0 };
-  for (const it of sm.model.items) {
-    if (!mergeBulkable(it)) continue;
-    counts.all++;
-    const k = it.forecaster ? it.forecaster.toLowerCase() : "none";
-    counts[k] = (counts[k] || 0) + 1;
-  }
-  const chips = [["all", "All"], ...sm.forecasters.map(f => [f, who(f)]), ...(counts.none ? [["none", "No forecaster"]] : [])];
-  for (const [k, text] of chips) {
-    const b = mkEl("button", "merge-fchip");
-    b.type = "button";
-    b.setAttribute("aria-pressed", String(sm.filter === k));
-    if (k !== "all" && k !== "none") { const d = mkEl("i", "mini-dot"); d.style.background = mergeFcColor(k); b.appendChild(d); }
-    b.appendChild(document.createTextNode(`${text} · ${counts[k] || 0}`));
-    b.onclick = () => { sm.filter = k; renderMerge(); };
-    bar.appendChild(b);
-  }
-  const whose = sm.filter === "all" ? "" : sm.filter === "none" ? " (no forecaster)" : ` (${who(sm.filter)}'s)`;
-  for (const [side, text] of [["carry", `Keep carry-over for all${whose}`], ["forecast", `Take forecast for all${whose}`]]) {
-    const b = mkEl("button", "btn btn-small", text);
-    b.type = "button";
-    b.disabled = sm.applying;
-    b.onclick = () => { for (const it of sm.model.items) if (mergeBulkable(it) && mergeMatchesFilter(it)) PlanDiff.decide(sm.model, it.id, side); renderMerge(); };
-    bar.appendChild(b);
-  }
-  box.appendChild(bar);
-}
 function renderMerge() {
   const sm = state.merge;
   if (!sm) return;
   const m = sm.model;
-  $("#merge-title").textContent = `Review & merge forecast — ${fmtShort(sm.date)}`;
+  $("#merge-title").textContent = `Merge forecast — ${fmtShort(sm.date)}`;
   const src = sm.carriedFrom ? `carried over from ${fmtShort(sm.carriedFrom)}` : "the confirmed plan";
-  $("#merge-sub").textContent = sm.step === "confirm"
-    ? "Check what the merge will do, then confirm."
-    : `Left: ${src}. Right: the forecast (dashed). Click a flagged person on the side you want to keep; hover to see where they are on the other side. Only the chosen side is written, and people placed on missions go into the Host Record.`;
-  renderMergeTools();
+  $("#merge-sub").textContent = sm.step === "confirm" ? "Check what the merge will do, then confirm."
+    : sm.step === "reasons" ? "Optional: tell each forecaster why part of their forecast was not used."
+    : `Keep ${src}, or use the forecast, one clash at a time.${matchMedia("(max-width: 760px)").matches ? " Swipe left to keep, right to use the forecast." : " Press 1 or ← to keep, 2 or → to use the forecast."}`;
+  $("#merge-tools").classList.add("hidden");
   const body = $("#merge-body");
   body.innerHTML = "";
-  if (sm.step === "confirm") body.appendChild(mergeConfirmEl());
-  else if (!m.items.length) {
-    body.appendChild(mkEl("p", "import-note", "No differences — the confirmed plan already matches the forecast."));
-  } else {
-    const grid = mkEl("div", "merge-grid");
-    const head = mkEl("div", "merge-row merge-head");
-    for (const t of ["Mission", "Carry-over (solid)", "Forecast (dashed)"]) head.appendChild(mkEl("div", null, t));
-    grid.appendChild(head);
-    for (const key of mergeRowKeys()) grid.appendChild(mergeMissionRow(key));
-    for (const k of ["leave", "standby"]) { const r = mergeLaneRow(k); if (r) grid.appendChild(r); }
-    body.appendChild(grid);
-    const reasons = mergeReasonsEl();
-    if (reasons) body.appendChild(reasons);
-  }
+  body.classList.toggle("mc-mode", sm.step === "review" && sm.deck.length > 0);
+  if (!m.items.length) body.appendChild(emptyStateHtmlEl("No differences", "The confirmed plan already matches the forecast."));
+  else if (sm.step === "confirm") body.appendChild(mergeConfirmEl());
+  else if (sm.step === "reasons") body.appendChild(mergeReasonsStep());
+  else if (sm.deck.length) body.appendChild(renderMergeStack());
+  else body.appendChild(mergeConfirmEl());
   renderMergeFooter();
+}
+function emptyStateHtmlEl(title, text) {
+  const d = document.createElement("div");
+  d.innerHTML = typeof emptyStateHtml === "function" ? emptyStateHtml(title, text) : `<p class="import-note">${escapeHtml(title)}. ${escapeHtml(text)}</p>`;
+  return d.firstElementChild;
 }
 function renderMergeFooter() {
   const sm = state.merge, m = sm.model;
-  const total = m.items.length, left = PlanDiff.pending(m).length, done = total - left;
+  const total = sm.deck.length, done = sm.deck.filter(c => mergeCardDecision(c) && mergeCardDecision(c) !== "mixed").length;
   const prog = $("#merge-progress");
   prog.innerHTML = "";
-  if (total) {
-    prog.appendChild(mkEl("span", "merge-prog-text", sm.step === "confirm" ? "Every difference has a side" : `${done} of ${total} differences decided`));
-    const bar = mkEl("span", "merge-prog-bar");
-    const fill = mkEl("i");
-    fill.style.width = `${Math.round((done / total) * 100)}%`;
-    bar.appendChild(fill);
-    prog.appendChild(bar);
+  if (m.items.length) {
+    const text = sm.step === "confirm" ? "Every clash has a side" : sm.step === "reasons" ? "Reasons" : total ? `Clash ${Math.min(sm.idx + 1, total)} of ${total}` : "";
+    prog.appendChild(mkEl("span", "merge-prog-text", text));
+    if (total) {
+      const bar = mkEl("span", "merge-prog-bar");
+      const fill = mkEl("i");
+      fill.style.width = `${Math.round((done / total) * 100)}%`;
+      bar.appendChild(fill);
+      prog.appendChild(bar);
+    }
   }
+  const review = sm.step === "review" && total > 0;
+  let bulk = $("#merge-bulk");
+  if (!bulk) {
+    bulk = mkEl("span", "merge-bulk");
+    bulk.id = "merge-bulk";
+    for (const [side, text] of [["carry", "Keep all carry-over"], ["forecast", "Use all forecast"]]) {
+      const b = mkEl("button", "btn", text);
+      b.type = "button";
+      b.dataset.side = side;
+      b.onclick = () => mergeDecideAll(side);
+      bulk.appendChild(b);
+    }
+    $("#btn-merge-apply").before(bulk);
+  }
+  bulk.classList.toggle("hidden", !review);
+  for (const b of bulk.children) b.disabled = sm.applying;
+  const back = $("#btn-merge-back");
+  back.textContent = "Back";
+  back.classList.toggle("hidden", !(sm.step !== "review" && total) && !(review && sm.idx > 0));
   const apply = $("#btn-merge-apply");
-  $("#btn-merge-back").classList.toggle("hidden", sm.step !== "confirm");
+  apply.classList.toggle("hidden", review);
   apply.disabled = sm.applying;
-  // still clickable while anything is undecided: the click points at what is left
-  apply.classList.toggle("merge-pending", left > 0);
+  apply.classList.remove("merge-pending");
   apply.textContent = sm.applying ? "Merging…"
-    : !total ? "Mark forecast as merged"
-    : sm.step === "confirm" ? "Confirm merge"
-    : left ? `Apply (${left} left)` : "Review & apply";
-  apply.title = !total ? "Changes nothing on the board; hides the forecast banner for everyone" : "";
+    : !m.items.length ? "Mark forecast as merged"
+    : sm.step === "reasons" ? "Next"
+    : "Confirm merge";
+  apply.title = !m.items.length ? "Changes nothing on the board; hides the forecast banner for everyone" : "";
 }
 function mergeConfirmEl() {
   const sm = state.merge, m = sm.model;
@@ -9478,21 +9753,28 @@ function mergeConfirmEl() {
 function onMergeApply() {
   const sm = state.merge;
   if (!sm || sm.applying) return;
+  if (sm.step === "reasons") { sm.step = "confirm"; renderMerge(); return; }
   const left = PlanDiff.pending(sm.model);
   if (left.length) {
-    const first = document.querySelector("#merge-body .mini-emp.conf, #merge-body .merge-seg.undecided");
-    if (first) {
-      first.scrollIntoView({ block: "center", behavior: "smooth" });
-      first.classList.remove("merge-flash");
-      void first.offsetWidth;
-      first.classList.add("merge-flash");
-    }
-    toast(`${left.length} ${left.length === 1 ? "difference still needs" : "differences still need"} a side before the merge.`, "warn");
+    // something is still undecided: go to its card
+    sm.step = "review";
+    const i = sm.deck.findIndex(c => c.ids.some(id => !PlanDiff.decisionOf(sm.model, id)));
+    if (i >= 0) sm.idx = i;
+    renderMerge();
+    toast(`${left.length} ${left.length === 1 ? "clash still needs" : "clashes still need"} a side before the merge.`, "warn");
     return;
   }
-  if (sm.step === "review" && sm.model.items.length) { sm.step = "confirm"; renderMerge(); return; }
   applyMerge();
 }
+/* 1 / 2 and the arrow keys choose, Backspace goes back, while the stack is up */
+document.addEventListener("keydown", (e) => {
+  const sm = state.merge;
+  if (!sm || sm.step !== "review" || $("#modal-merge").classList.contains("hidden")) return;
+  if (e.target.closest && e.target.closest("input, textarea, select")) return;
+  if (e.key === "1" || e.key === "ArrowLeft") { e.preventDefault(); mergeChoose("carry"); }
+  else if (e.key === "2" || e.key === "ArrowRight") { e.preventDefault(); mergeChoose("forecast"); }
+  else if (e.key === "Backspace") { e.preventDefault(); mergeBack(); }
+});
 function applyMerge() {
   const sm = state.merge;
   sm.applying = true;
@@ -12041,7 +12323,7 @@ function wireApp() {
   $("#btn-plandiff-none").onclick = () => setAllPlanDiff(false);
   $("#btn-plandiff-apply").onclick = applyPlanDiffFromModal;
   $("#btn-merge-apply").onclick = onMergeApply;
-  $("#btn-merge-back").onclick = () => { if (state.merge && !state.merge.applying) { state.merge.step = "review"; renderMerge(); } };
+  $("#btn-merge-back").onclick = mergeBack;
   $("#merge-log-only").onchange = renderMergeLog;
   $("#cap-range").onchange = (ev) => { state.capacity.weeks = Number(ev.target.value); state.capacity.cacheKey = null; refreshAndRender(); };
   $("#btn-cap-copy-week").onclick = copyCapacityWeek;
