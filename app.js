@@ -161,6 +161,23 @@ function tintOf(color, alpha) {
    AYT 152, NPT 150, Wellgrow 171, AMATA 188, BENZ 232 and the #9ca3af
    new-area default 157 all stay black; reds #e05a5a → 100 and #f87171 →
    126 go white. */
+/* Signal 4A: the area pill on a board card is a pale tint of the area's colour
+   with a darker shade of it as text, instead of the full colour. Plain rgb(),
+   not color-mix(): the card sits inside the export capture, and html2canvas
+   cannot parse color-mix(). An unparseable colour falls back to the old pill. */
+function areaSoftStyle(color) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color || "").trim());
+  if (!m) return `background:${escapeHtml(color)};color:${inkOn(color)}`;
+  const hex = m[1].length === 3 ? m[1].split("").map(c => c + c).join("") : m[1];
+  const n = parseInt(hex, 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const bg = c.map(v => Math.round(v * 0.22 + 255 * 0.78));   // 22% of the colour on white
+  const ink = c.map(v => Math.round(v * 0.45));                 // the colour, darkened
+  // a very light colour still needs readable text: never lighter than #44
+  const luma = (ink[0] * 299 + ink[1] * 587 + ink[2] * 114) / 1000;
+  const k = luma > 90 ? 90 / luma : 1;
+  return `background:rgb(${bg.join(",")});color:rgb(${ink.map(v => Math.round(v * k)).join(",")});box-shadow:inset 0 0 0 1px rgb(${c.map(v => Math.round(v * 0.45 + 255 * 0.55)).join(",")})`;
+}
 function inkOn(bg) {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(bg).trim());
   if (!m) return "var(--card-ink)";
@@ -2017,7 +2034,7 @@ function empCard(emp) {
     (alsoEn ? ` <span class="emp-name-en">${escapeHtml(alsoEn)}</span>` : "") +
     `<span class="emp-meta">` +
       role +
-      (area ? `<span class="emp-area" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : "") +
+      (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
