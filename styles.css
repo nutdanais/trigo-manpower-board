@@ -948,14 +948,7 @@ body.board-view #toolbar-row2 #area-bar { order: 5; flex: 0 0 100%; gap: 3px 14p
 body.exporting #board-empty { display: none; }   /* never bake the prompt into an exported JPG */
 #board-empty .empty-title { font-size: 15px; color: var(--text); }
 #board-empty .empty-sub { font-size: 13px; color: var(--muted); max-width: 460px; }
-#board-empty .btn-carry {
-  margin-top: 6px;
-  background: var(--brand-green);
-  border-color: var(--brand-green);
-  color: #1a1a1a;
-  font-weight: 700;
-}
-#board-empty .btn-carry:hover { filter: brightness(0.96); }
+#board-empty .btn-carry { margin-top: 6px; }   /* navy, the one action colour (was brand green) */
 #board-empty .btn-carry-alt { font-weight: 600; }
 
 /* JS masonry container: layoutMasonry() (app.js) absolutely-positions each
@@ -3229,6 +3222,18 @@ body.exporting .zone-label { background: var(--bg-soft); }
 }
 /* clear the floating touch action bar (bottom:8px, full-width) when it's on screen */
 body.touch-mode.has-selection #toast-stack { bottom: 76px; }
+/* Phone: the bottom of the screen belongs to the bottom bar, the people drawer
+   and every sheet's buttons, so toasts drop in from the top instead, full width,
+   and never cover Save or Cancel. */
+@media (max-width: 640px) {
+  #toast-stack, body.touch-mode.has-selection #toast-stack {
+    top: calc(8px + env(safe-area-inset-top, 0px)); bottom: auto; left: 12px; right: 12px;
+    max-width: none; flex-direction: column;
+  }
+  #toast-stack .toast { width: 100%; animation-name: toast-in-top; }
+  #toast-stack .toast.toast-out { animation-name: toast-out; }
+}
+@keyframes toast-in-top { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 .toast {
   pointer-events: auto;
   display: flex;
@@ -4030,6 +4035,10 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
 .oc-lvl { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
   color: var(--muted); opacity: .85; }
 .oc-sub { font-weight: 500; color: var(--muted); font-size: 12px; }
+.oc-ol-row .oc-sub { margin-left: 6px; }   /* "101  Host Alpha", not "101Host Alpha" */
+.oc-tag.oc-tag-ic { color: #fff; }
+.oc-tag.oc-tag-ic .ic { width: 14px; height: 14px; }
+.oc-tag.oc-tag-soft { color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
 .oc-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 
 /* ---- Outline view ---- */
@@ -6337,11 +6346,11 @@ label > .pk { margin-top: 5px; }
 .pk-sw { flex: none; width: 12px; height: 12px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); display: block; }
 .pk-sw.hidden { display: none; }
 .pk-pop {
-  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 120; min-width: 200px;
+  position: fixed; z-index: 450; min-width: 200px;   /* placed by pickerOpen, above dialogs (300) */
   background: var(--panel); border-radius: 10px; box-shadow: var(--shadow); padding: 6px;
   display: flex; flex-direction: column; gap: 4px; max-height: 280px;
 }
-.pk-pop.up { top: auto; bottom: calc(100% + 4px); }
+
 .pk-q {
   flex: none; height: 32px; margin: 0 !important; padding: 0 9px !important; border: 1px solid var(--border) !important;
   border-radius: 6px !important; font-size: 13px !important;
@@ -6360,7 +6369,6 @@ label > .pk { margin-top: 5px; }
 /* in toolbars the picker sizes to its content */
 .cap-field .pk, .oc-levelctl .pk { display: inline-block; width: auto; margin-top: 0; }
 .cap-field .pk-btn, .oc-levelctl .pk-btn { width: auto; min-width: 140px; height: 32px; font-size: 13px; }
-.oc-levelctl .pk-pop, .cap-field .pk-pop { right: auto; }
 .cap-add .pk, .cap-ph .pk { display: inline-block; width: auto; }
 .cap-add .pk-btn, .cap-ph .pk-btn { width: auto; min-width: 84px; height: 30px; }
 
@@ -6386,7 +6394,8 @@ label > .pk { margin-top: 5px; }
   min-height: 34px; padding: 0 9px; border-radius: 6px; font-size: 13px;
 }
 .ctx-item .ic { width: 16px; height: 16px; flex: none; color: var(--muted); }
-.ctx-item.ctx-sub { justify-content: flex-start; }
+.ctx-item.ctx-sub { justify-content: flex-start; gap: 10px; }   /* same gap as a plain row, so every label starts on one line */
+.ctx-item.ctx-back .ic { width: 14px; height: 14px; }
 .ctx-item.ctx-sub::after { margin-left: auto; padding-left: 12px; color: #9aa4b1; }
 .ctx-title { padding: 6px 9px 4px; font-size: 11.5px; font-weight: 700; text-transform: none; letter-spacing: 0; }
 .ctx-item.ctx-back { text-transform: none; letter-spacing: 0; font-size: 12px; min-height: 30px; }
@@ -6682,3 +6691,69 @@ label > .pk { margin-top: 5px; }
 @media (min-width: 761px) and (prefers-reduced-motion: reduce) {
   #modal-merge, #modal-hide-missions, #modal-import, #modal-plandiff, #modal-merge-log, #modal-holds, #modal-forecast-view { animation: none; }
 }
+
+/* ===== In-app dropdowns in the last places that still had native ones =====
+   Employee Position and Board, Manpower's bulk bar, Sort by, the Roles grid and
+   the phone Capacity host picker (styles for the .pk wrapper initPicker adds). */
+#emplist-bulkbar .pk { display: inline-block; width: auto; }
+#emplist-bulkbar .pk-btn { width: auto; min-width: 150px; height: 30px; font-size: 12.5px; }
+#filter-pop .filter-sort .pk { margin-top: 0; }
+#roles-matrix .pk { display: inline-block; width: auto; vertical-align: middle; }
+#roles-matrix .pk-btn { width: auto; min-width: 84px; height: 28px; padding: 0 6px 0 9px; font-size: 12px; }
+#roles-matrix td.rm-changed .pk-btn { font-weight: 700; }
+@media (max-width: 960px) { #roles-matrix td[data-role] .pk { display: none; } }
+.cap-ph-hostbar .pk { flex: 1 1 auto; min-width: 0; }
+.cap-ph-hostbar .pk-btn { height: 40px; font-size: 14px; font-weight: 600; }
+
+/* ===== In-app date, time and colour fields (initField / openColourField) ===== */
+.pk-btn .pk-ic { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.pk-text.pk-placeholder { color: var(--muted); }
+.ov-history-dates { min-width: 0; max-width: 100%; }
+.ov-history-dates .pk { flex: 0 1 140px; min-width: 0; }   /* shrink on a narrow phone rather than widen the page */
+.ov-history-dates .pk-btn { height: 28px; font-size: 12.5px; gap: 6px; padding: 0 8px; }
+.pk-pop.dpf-pop { max-height: none; padding: 10px; gap: 6px; }
+.dpf-head { display: flex; align-items: center; gap: 4px; }
+.dpf-title { flex: 1; height: 32px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--text); cursor: pointer; }
+.dpf-title:hover, .dpf-nav:hover { background: var(--hover-tint); }
+.dpf-nav { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.dpf-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dpf-grid.dpf-grid-3 { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.dpf-dow { font-size: 11px; font-weight: 600; color: var(--muted); text-align: center; padding: 4px 0; }
+.dpf-day, .dpf-cell {
+  height: 34px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px;
+  color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.dpf-cell { height: 40px; }
+.dpf-day.we, .dpf-dow.we { color: var(--muted); }     /* weekends: muted, never a red fill */
+.dpf-day:hover:not(:disabled), .dpf-cell:hover:not(:disabled) { background: var(--hover-tint); }
+.dpf-day.today { box-shadow: inset 0 0 0 1.5px var(--primary); }
+.dpf-day.on, .dpf-cell.on { background: var(--primary); color: #fff; font-weight: 600; }
+.dpf-day:disabled, .dpf-cell:disabled { color: #c3cad3; cursor: default; }
+.dpf-foot { display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 6px; }
+.pk-pop.tf-pop .pk-list { max-height: 220px; overflow-y: auto; }
+.pk-q[aria-invalid="true"] { border-color: var(--danger); }
+.pk-pop.cf-pop { max-height: none; padding: 10px; gap: 10px; }
+.cf-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.cf-sw {
+  aspect-ratio: 1; border: 0; border-radius: 7px; cursor: pointer; display: grid; place-items: center;
+  color: #fff; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+}
+.cf-sw:hover { transform: scale(1.08); }
+.cf-sw.on { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--primary); }
+.cf-sw .ic { width: 14px; height: 14px; filter: drop-shadow(0 0 1px rgba(0, 0, 0, .5)); }
+.cf-hex { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 0; }
+.cf-hex i { width: 22px; height: 22px; border-radius: 6px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
+.cf-hex input { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--r); font: inherit; font-size: 13px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.cf-hex input[aria-invalid] { border-color: var(--danger); }
+
+/* ===== Capacity: one Range control, and an Add-host row with room ===== */
+.cap-field { gap: 8px; padding-left: 0; border: 0; background: none; }   /* no box around the dropdown's own box */
+.cap-tool-label { font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.cap-add { flex-wrap: wrap; }
+.cap-add input { flex: 1 1 100%; }
+.cap-add .pk { flex: 1 1 auto; }
+.cap-add .pk-btn { width: 100%; }
+.cap-add .btn { flex: none; }
+.cap-ph-add .cap-add { flex-wrap: nowrap; }
+.cap-ph-add .cap-add input { flex: 1 1 auto; }
+.cap-ph-add .cap-add .pk { flex: none; }

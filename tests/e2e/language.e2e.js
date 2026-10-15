@@ -26,10 +26,10 @@ const text = (p, sel) => p.$eval(sel, (e) => e.textContent.trim());
     const p = a.page;
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
 
-    await step("English is the default and the avatar menu offers English / ไทย", async () => {
+    await step("English is the default and the avatar menu offers ไทย / English", async () => {
       assert.equal(await p.evaluate(() => document.documentElement.lang), "en");
       await p.click("#btn-avatar");
-      assert.deepEqual(await p.$$eval("#user-menu .tb-seg-btn", (els) => els.map((e) => e.textContent)), ["English", "ไทย"]);
+      assert.deepEqual(await p.$$eval("#user-menu .tb-seg-btn", (els) => els.map((e) => e.textContent)), ["ไทย", "English"]);
       assert.equal(await text(p, "#user-menu .tb-seg-btn.active"), "English");
       assert.equal(await text(p, "#btn-signout"), "Sign out");
     });

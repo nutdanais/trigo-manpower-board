@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-15f">
+<link rel="stylesheet" href="styles.css?v=2026-10-15g">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-15f"></script>
+<script src="version.js?v=2026-10-15g"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -74,6 +74,7 @@
 <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
 <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
 <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
 <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
 <symbol id="i-unlock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
 <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
@@ -427,7 +428,7 @@
         <div id="rm-role-chips" class="sv-chips" role="group" aria-label="Role to review"></div>
         <div class="rm-role-pick">
           <label for="rm-role-select">Role to review</label>
-          <select id="rm-role-select"></select>
+          <select id="rm-role-select" data-picker></select>
         </div>
         <div class="table-wrap">
           <table id="roles-matrix"><tbody id="roles-matrix-body"></tbody></table>
@@ -471,7 +472,7 @@
       <button type="button" id="btn-ov-board" class="btn" aria-haspopup="menu" aria-expanded="false" title="Board shown on the dashboard"><span class="ovb-cap">Board</span><span class="ovb-label">All boards</span><span class="ovb-count"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
       <div id="ov-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the dashboard"></div>
     </div>
-    <button id="btn-import-mission" class="btn btn-danger hidden"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add Mission</button>
+    <button id="btn-import-mission" class="btn hidden"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add Mission</button>
     <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
     <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
     <button id="btn-add-host" class="btn btn-primary hidden" title="Record a host that isn't on any mission yet"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Host</button>
@@ -510,8 +511,8 @@
            this row; render() shows/hides the whole group with one class. -->
       <div id="emplist-toolbar">
         <input id="emplist-search" type="search" placeholder="Search name (Thai or English), TRIGO ID or mobile…" autocomplete="off">
-        <select id="emplist-name-view" data-seg aria-label="Names shown" title="Which name the list shows. The app shows the Thai name by default.">
-          <option value="th">Thai</option>
+        <select id="emplist-name-view" data-seg data-no-i18n aria-label="Names shown" title="Which name the list shows. The app shows the Thai name by default.">
+          <option value="th">ไทย</option>
           <option value="en">English</option>
         </select>
         <!-- Six filters behind one "Filters" button (with how many are on), like the board's
@@ -573,7 +574,7 @@
               <div class="ms-pop hidden"></div>
             </div>
             <label class="filter-sort"><span>Sort by</span>
-            <select id="sort-by" title="Sort missions">
+            <select id="sort-by" title="Sort missions" data-picker>
               <option value="number">Mission No.</option>
               <option value="engineer">Engineer</option>
               <option value="host">Host</option>
@@ -611,8 +612,8 @@
       <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
       <span id="hostlist-count" class="hidden"></span>
       <button type="button" class="btn hidden" id="btn-hostlist-bulk" title="Edit many hosts in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
-      <select id="card-names" class="hidden" data-seg aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
-        <option value="th">Thai</option>
+      <select id="card-names" class="hidden" data-seg data-no-i18n aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
+        <option value="th">ไทย</option>
         <option value="en">English</option>
       </select>
       <span id="readonly-badge" class="hidden"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg><span>Read-only (past date)</span></span>
@@ -677,12 +678,12 @@
   <section id="emplist-panel" class="hidden">
     <div id="emplist-bulkbar" class="hidden">
       <span id="emplist-bulk-count"></span>
-      <select id="emplist-bulk-contract">
+      <select id="emplist-bulk-contract" data-picker aria-label="Set contract">
         <option value="">Set contract…</option>
         <option value="permanent">Permanent</option>
         <option value="oncall">On-call</option>
       </select>
-      <select id="emplist-bulk-position">
+      <select id="emplist-bulk-position" data-picker aria-label="Set position">
         <option value="">Set position…</option>
         <option value="inspector">Inspector</option>
         <option value="senior_inspector">Senior Inspector</option>
@@ -691,10 +692,10 @@
         <option value="assistant_site_engineer">Assistant Site Engineer</option>
         <option value="__none__">— none —</option>
       </select>
-      <select id="emplist-bulk-area">
+      <select id="emplist-bulk-area" data-picker aria-label="Set service area">
         <option value="">Set service area…</option>
       </select>
-      <select id="emplist-bulk-board">
+      <select id="emplist-bulk-board" data-picker aria-label="Move to board">
         <option value="">Move to board…</option>
       </select>
       <button type="button" class="btn btn-danger btn-small" id="emplist-bulk-deactivate"><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg> Deactivate</button>
@@ -866,7 +867,7 @@
          of jumping to fit whichever one happens to be showing. -->
     <div class="employee-pane-stack">
       <div class="settings-pane hidden" data-pane="hosts">
-        <p class="import-note">Every host this employee has been deployed to, most recent first.</p>
+        <p class="import-note" id="employee-hosts-intro">Every host this employee has been deployed to, most recent first.</p>
         <div id="employee-hosts-list"></div>
         <div class="modal-actions">
           <button type="button" class="btn" data-close>Close</button>
@@ -901,7 +902,7 @@
             </select>
           </label>
           <label>Position
-            <select name="position">
+            <select name="position" data-picker>
               <option value="">— none —</option>
               <option value="inspector">Inspector</option>
               <option value="senior_inspector">Senior Inspector</option>
@@ -918,7 +919,7 @@
           <div class="form-group">Placement</div>
           <div class="form-row">
           <label>Service area <select name="areaId" required data-picker></select></label>
-          <label>Board <select name="boardId" required></select></label>
+          <label>Board <select name="boardId" required data-picker></select></label>
           </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee"><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg> Deactivate</button>
@@ -1142,7 +1143,7 @@
       <span>Bring each mission's crew too<small>People already placed somewhere on this forecast day stay where they are. Everyone brought in is held by you.</small></span></label>
     <div class="modal-actions">
       <span id="import-summary" aria-live="polite"></span>
-      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn" id="btn-import-cancel" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-import-confirm">Add selected</button>
     </div>
   </div>
@@ -1177,8 +1178,8 @@
     <div id="xlsx-part">
     <div class="xlsx-lang" id="xlsx-lang" role="radiogroup" aria-label="File language">
       <b>File language</b>
-      <label><input type="radio" name="xlsx-lang" value="en"> English</label>
-      <label><input type="radio" name="xlsx-lang" value="th"> ไทย (Thai)</label>
+      <label data-no-i18n><input type="radio" name="xlsx-lang" value="th"> ไทย</label>
+      <label data-no-i18n><input type="radio" name="xlsx-lang" value="en"> English</label>
     </div>
     <div id="xlsx-tools">
       <button type="button" class="btn btn-small" id="btn-xlsx-all">Tick all</button>
@@ -1241,8 +1242,8 @@
     <p class="import-note" id="emplist-xlsx-summary"></p>
     <div class="xlsx-lang" id="emplist-xlsx-lang" role="radiogroup" aria-label="File language">
       <b>File language</b>
-      <label><input type="radio" name="emplist-xlsx-lang" value="en"> English</label>
-      <label><input type="radio" name="emplist-xlsx-lang" value="th"> ไทย (Thai)</label>
+      <label data-no-i18n><input type="radio" name="emplist-xlsx-lang" value="th"> ไทย</label>
+      <label data-no-i18n><input type="radio" name="emplist-xlsx-lang" value="en"> English</label>
     </div>
     <p class="import-note">One sheet with the same columns as the table (plus Years of Service, counted up to today), in the order shown. Only the table header — no banner. The language choice is remembered on this device.</p>
     </div>
@@ -1393,15 +1394,15 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-10-15f"></script>
-<script src="i18n-th.js?v=2026-10-15f"></script>
-<script src="planning.js?v=2026-10-15f"></script>
-<script src="employee-id.js?v=2026-10-15f"></script>
-<script src="cloud.js?v=2026-10-15f"></script>
-<script src="charts.js?v=2026-10-15f"></script>
-<script src="xlsx-export.js?v=2026-10-15f"></script>
-<script src="orgchart-pptx.js?v=2026-10-15f"></script>
-<script src="bulk-edit.js?v=2026-10-15f"></script>
-<script src="app.js?v=2026-10-15f"></script>
+<script src="i18n.js?v=2026-10-15g"></script>
+<script src="i18n-th.js?v=2026-10-15g"></script>
+<script src="planning.js?v=2026-10-15g"></script>
+<script src="employee-id.js?v=2026-10-15g"></script>
+<script src="cloud.js?v=2026-10-15g"></script>
+<script src="charts.js?v=2026-10-15g"></script>
+<script src="xlsx-export.js?v=2026-10-15g"></script>
+<script src="orgchart-pptx.js?v=2026-10-15g"></script>
+<script src="bulk-edit.js?v=2026-10-15g"></script>
+<script src="app.js?v=2026-10-15g"></script>
 </body>
 </html>

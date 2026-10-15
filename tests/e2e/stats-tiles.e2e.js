@@ -169,7 +169,7 @@ async function step(name, fn) {
     await step("the Names control is a compact Thai | English toggle", async () => {
       const w = await p.evaluate(() => document.querySelector("#card-names + .seg-pick").getBoundingClientRect().width);
       assert.ok(w > 0 && w < 190, "compact, was " + w);
-      assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["Thai", "English"]);
+      assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["ไทย", "English"]);
     });
 
     await step("Overview shows the day across every board in row 2 (layout A), no board tiles or areas", async () => {
