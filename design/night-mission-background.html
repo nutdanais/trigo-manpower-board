@@ -61,30 +61,20 @@ h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
 .emp-oc { background: var(--charcoal); color: #fff; padding: 0 4px; }
 .emp-area { margin-left: auto; }
 
-/* ===== the options: only .mission-body changes ===== */
-.o-current .night .mission-body { background: #1c2430; }
-.o-current .night .m-remark { color: #b8bfc8; }
-.o-indigo .night .mission-body { background: #31357d; }
-.o-indigo .night .m-remark { color: #c9cbf0; }
-.o-navy .night .mission-body { background: #003a66; }
-.o-navy .night .m-remark { color: #b9cde0; }
-.o-dusk .night .mission-body { background: #56618a; }
-.o-dusk .night .m-remark { color: #e3e7f2; }
-.o-lav .night .mission-body { background: #d3d6f3; }
-.o-lav .night .m-remark { color: #31357d; }
-.o-stripe .night .mission-body { background: repeating-linear-gradient(135deg, #e1e3f7 0 7px, #c9cdef 7px 14px); }
-.o-stripe .night .m-remark { color: #31357d; }
-.o-gradient .night .mission-body { background: linear-gradient(180deg, #31357d 0%, #6a6fbf 100%); }
-.o-gradient .night .m-remark { color: #eef0ff; }
-
+.opt .night .mission-body { background: var(--nbg); }
+.opt .night .m-remark { color: var(--nink); }
+.grp { font-size: 18px; margin-top: 14px; }
+#opts { display: grid; gap: 16px; }
+.css { font-size: 11px; color: var(--muted); background: var(--bg); padding: 6px 8px; border-radius: 6px; word-break: break-word; }
 @media (max-width: 900px) { .opt { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 700px) { .board { grid-template-columns: minmax(0, 1fr); } }
 </style>
 
 <div class="wrap">
   <header>
-    <h1>Night mission card: body background options</h1>
-    <p class="lede">Only the area behind the employee cards changes. The header band, the engineer colour on the top edge and the NIGHT chip stay as they are. Each option shows a day card next to a night card so you can judge how fast night stands out. Use the buttons to see it the way the export does: small like a JPG on a phone, or grey like a black-and-white printout of the PDF.</p>
+    <h1>Night mission card: stripe and fade options</h1>
+    <p class="lede">Round 2, building on C (stripes) and F (fade). Only the area behind the employee cards changes. The header band, the engineer colour on the top edge and the NIGHT chip stay as they are. Each option shows a day card next to a night card so you can judge how fast night stands out. Use the buttons to see it the way the export does: small like a JPG on a phone, or grey like a black-and-white printout of the PDF.</p>
+    <p class="lede">Every option was tested in the app's own export engine (html2canvas 1.4.1). It drops CSS repeating stripes completely, so the stripes here are built as small repeating tiles instead. That version comes out the same in the JPG as on screen.</p>
   </header>
 
   <div class="tools" role="group" aria-label="Preview">
@@ -98,27 +88,33 @@ h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
 
 <script>
 const OPTS = [
-  { k:"indigo", name:"A. Indigo night", rec:true, hex:["#31357d"],
-    why:"The deep indigo already used for night in the Excel export and the Capacity export. Clearly a colour (not black), still very dark, so the light employee cards pop out strongly.",
-    spot:"Very strong", ink:"High", print:"Dark grey, still clearly different from day" },
-  { k:"lav", name:"B. Lavender mat", rec:true, hex:["#d3d6f3"],
-    why:"A light version of the same indigo, close to the Excel night cell fill. Saves a lot of ink on PDF and looks calm. Night stands out by colour, less by darkness.",
-    spot:"Medium", ink:"Low", print:"Light grey, weaker in black-and-white" },
-  { k:"stripe", name:"C. Lavender stripes", hex:["#e1e3f7","#c9cdef"],
-    why:"Lavender with soft diagonal stripes. The pattern still shows on a black-and-white printer, where a flat light colour can disappear.",
-    spot:"Strong, also in black-and-white", ink:"Low", print:"Stripes stay visible" },
-  { k:"dusk", name:"D. Dusk slate", hex:["#56618a"],
-    why:"A mid-tone blue grey. Lighter than black so the page feels less heavy, but still clearly darker than day.",
-    spot:"Strong", ink:"Medium", print:"Mid grey" },
-  { k:"navy", name:"E. TRIGO navy", hex:["#003a66"],
-    why:"The brand navy from the top bar. On-brand, but it is the same colour as buttons and selected states, so night could be read as 'selected'.",
-    spot:"Very strong", ink:"High", print:"Dark grey" },
-  { k:"gradient", name:"F. Night sky fade", hex:["#31357d","#6a6fbf"],
-    why:"Indigo fading lighter towards the bottom, like a night sky. The most expressive one; a tall card shows more of the fade than a short one.",
-    spot:"Strong", ink:"Medium-high", print:"Dark to mid grey" },
-  { k:"current", name:"Today: Night navy", cur:true, hex:["#1c2430"],
-    why:"What the board uses now. Reads as black, and it takes the most ink when the PDF is printed.",
-    spot:"Very strong", ink:"Highest", print:"Near black" },
+  { group:"Stripes (from C)" },
+  { k:"c1", name:"C1. Lavender stripes", note:"From round 1", bg:"linear-gradient(135deg, #c9cdef 25%, #e1e3f7 25% 50%, #c9cdef 50% 75%, #e1e3f7 75%) 0 0 / 20px 20px", ink:"#31357d",
+    why:"The one you liked. Soft diagonal bands, light on ink, and the pattern still shows when printed in grey." },
+  { k:"c2", name:"C2. Fine pinstripe", bg:"linear-gradient(135deg, #b9bdec 0 8%, #e4e5f7 8% 50%, #b9bdec 50% 58%, #e4e5f7 58%) 0 0 / 12px 12px", ink:"#31357d",
+    why:"Thin lines on a pale ground. Calmer behind the names than C1, but still a clear texture at JPG size." },
+  { k:"c3", name:"C3. Bold indigo bands", bg:"linear-gradient(135deg, #a9aee6 25%, #d3d6f3 25% 50%, #a9aee6 50% 75%, #d3d6f3 75%) 0 0 / 26px 26px", ink:"#31357d",
+    why:"Wider, stronger bands. The most visible light option, at the cost of a busier look behind the cards." },
+  { k:"c4", name:"C4. Ruled lines", bg:"linear-gradient(180deg, #e4e5f7 0 9px, #c3c7ee 9px 11px) 0 0 / 100% 11px", ink:"#31357d",
+    why:"Horizontal lines like lined paper, which reads as a list. Calmer than diagonals and very print-safe." },
+  { k:"c5", name:"C5. Dark indigo stripes", bg:"linear-gradient(135deg, #3b4091 25%, #31357d 25% 50%, #3b4091 50% 75%, #31357d 75%) 0 0 / 20px 20px", ink:"#d6d8f5",
+    why:"Stripes on the deep indigo from option A. As strong as a dark card, with a texture so it never looks like plain black." },
+  { group:"Fades (from F)" },
+  { k:"f1", name:"F1. Night sky fade", note:"From round 1", bg:"linear-gradient(180deg, #31357d 0%, #6a6fbf 100%)", ink:"#eef0ff",
+    why:"The one you liked. Deep indigo at the top fading lighter towards the bottom." },
+  { k:"f2", name:"F2. Dusk to lavender", bg:"linear-gradient(180deg, #31357d 0%, #8c90d4 55%, #d3d6f3 100%)", ink:"#31357d",
+    why:"Dark under the header, ending pale. Night is obvious at the top edge, and a long crew list ends on a light, low-ink colour." },
+  { k:"f3", name:"F3. Pale moonlight fade", bg:"linear-gradient(180deg, #b9bdec 0%, #e8e9f8 100%)", ink:"#31357d",
+    why:"A light fade from soft lavender down to almost white. The lowest-ink fade, best if the PDF gets printed a lot." },
+  { k:"f4", name:"F4. Diagonal night fade", bg:"linear-gradient(135deg, #2b2f72 0%, #5a5fb0 60%, #8a8ed2 100%)", ink:"#ffffff",
+    why:"The fade runs corner to corner, so a short card with one row of people shows the whole fade too." },
+  { k:"f5", name:"F5. Midnight to violet", bg:"linear-gradient(180deg, #252a66 0%, #4e3f8f 100%)", ink:"#e6e0fa",
+    why:"Indigo deepening into violet, closer to a real night sky. It uses the purple-leaning end of the night colours." },
+  { group:"Stripes and fade together" },
+  { k:"m1", name:"M1. Striped night sky", bg:"linear-gradient(135deg, rgba(255,255,255,.10) 25%, rgba(255,255,255,0) 25% 50%, rgba(255,255,255,.10) 50% 75%, rgba(255,255,255,0) 75%) 0 0 / 20px 20px, linear-gradient(180deg, #31357d 0%, #6a6fbf 100%)", ink:"#eef0ff",
+    why:"F1's fade with faint light stripes on top. Strong colour plus a texture that survives black-and-white printing." },
+  { k:"m2", name:"M2. Pinstriped moonlight", bg:"linear-gradient(135deg, rgba(49,53,125,.16) 0 8%, rgba(49,53,125,0) 8% 50%, rgba(49,53,125,.16) 50% 58%, rgba(49,53,125,0) 58%) 0 0 / 12px 12px, linear-gradient(180deg, #b9bdec 0%, #e8e9f8 100%)", ink:"#31357d",
+    why:"F3's light fade with C2's fine lines. Low ink, soft, and still marked as night on a grey printout." },
 ];
 const DAY = [["สมชาย","ใจดี","TECH","BKK"],["Anan","Prasert","LEAD","BKK"],["วิไล","ศรีสุข",null,"RYG"]];
 const NIGHT = [["Kittipong","Saelim","TECH","CBI"],["ณัฐพล","บุญมา","TECH","CBI"],["Thanawat","Rattana",null,"RYG"],["ปิยะ","แก้วมณี","LEAD","CBI"]];
@@ -130,14 +126,13 @@ const card = (night) => `<div class="mission-card${night?" night":""}" style="bo
   </div>
   <div class="mission-body"><div class="mission-emps">${(night?NIGHT:DAY).map(emp).join("")}</div><div class="m-remark">${night?"Bring own torch, gate 3 after 22:00":"Safety shoes required"}</div></div>
 </div>`;
-document.getElementById("opts").innerHTML = OPTS.map(o => `
-<section class="opt o-${o.k}${o.rec?" rec":""}" style="margin-bottom:18px">
+document.getElementById("opts").innerHTML = OPTS.map(o => o.group ? `<h2 class="grp">${o.group}</h2>` : `
+<section class="opt" id="${o.k}" style="--nbg:${o.bg};--nink:${o.ink}">
   <div class="stage"><div class="board">${card(false)}${card(true)}</div></div>
   <div class="notes">
-    <h2>${o.name}${o.rec?'<span class="badge">Recommended</span>':""}${o.cur?'<span class="badge cur">Current</span>':""}</h2>
-    <div class="sw">${o.hex.map(h=>`<i style="background:${h}"></i>${h}`).join(" ")}</div>
+    <h2>${o.name}${o.note?`<span class="badge cur">${o.note}</span>`:""}</h2>
     <p>${o.why}</p>
-    <dl><dt>Stands out</dt><dd>${o.spot}</dd><dt>Ink on PDF</dt><dd>${o.ink}</dd><dt>B&amp;W print</dt><dd>${o.print}</dd></dl>
+    <code class="css">${o.bg}</code>
   </div>
 </section>`).join("");
 for (const [id, cls] of [["t-small","small"],["t-gray","gray"]]) {
