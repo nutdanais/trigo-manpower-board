@@ -57,7 +57,7 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.ok(await p.$eval("#board-dd-label", (e) => e.scrollWidth <= e.clientWidth), "the name fits whole");
     });
 
-    await step("line 1 never wraps: a long name shortens with …, the date stays beside it (360pt, with HOLIDAY too)", async () => {
+    await step("line 1 never wraps: a long name shortens with …, the date stays beside it (360pt, on a holiday too); one status pill", async () => {
       await p.setViewportSize({ width: 360, height: 800 });
       const board = await p.evaluate(() => D().boards.find((b) => b.id === D().activeBoardId).name);
       const line = () => p.evaluate(() => {
@@ -65,20 +65,22 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
         const l = document.querySelector("#board-dd-label");
         return { same: Math.abs(mid("#btn-board-dd") - mid("#btn-date")) < 6, cut: l.scrollWidth > l.clientWidth };
       });
-      const setup = (name, hol) => p.evaluate(([n, hol]) => {
+      let weekend = SRC; while (!h.isWeekend(weekend)) weekend = h.addDays(weekend, 1);
+      const setup = (name, date) => p.evaluate(([n, d]) => {
         D().boards.find((b) => b.id === D().activeBoardId).name = n;
-        renderBoardPill();
-        document.querySelector("#m-hol-pill").classList.toggle("hidden", !hol);
-      }, [name, hol]);
-      for (const hol of [false, true]) {
-        await setup("Non-Rayong", hol);
-        assert.deepEqual(await line(), { same: true, cut: false }, "Non-Rayong fits whole, holiday=" + hol);
-        await setup("Eastern Seaboard North", hol);
-        assert.deepEqual(await line(), { same: true, cut: true }, "a long name shortens, holiday=" + hol);
+        state.date = d;
+        return refreshAndRender();
+      }, [name, date]);
+      for (const date of [SRC, weekend]) {
+        await setup("Non-Rayong", date);
+        assert.deepEqual(await line(), { same: true, cut: false }, "Non-Rayong fits whole on " + date);
+        await setup("Eastern Seaboard North", date);
+        assert.deepEqual(await line(), { same: true, cut: true }, "a long name shortens on " + date);
       }
-      assert.equal(await visible(p, "#mode-pill"), false, "HOLIDAY stands in for CONFIRMED on a phone");
-      await setup(board, false);
-      await p.evaluate(() => renderModePill());
+      // the one pill carries the holiday itself (there is no second HOLIDAY pill)
+      assert.equal(await p.locator("#topbar .mode-pill:not(.hidden)").count(), 1, "one status pill");
+      assert.match(await p.textContent("#mode-pill"), /Holiday/);
+      await setup(board, SRC);
       await p.setViewportSize({ width: 390, height: 844 });
     });
 

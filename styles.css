@@ -417,6 +417,10 @@ button, input, select, textarea, optgroup {
   font-weight: 600;
 }
 .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+/* a disabled filled button keeps its fill on hover: the generic disabled rule
+   above paints it white, and its white label then vanishes (a phone's sticky
+   hover after a tap did the same) */
+.btn-primary:disabled:hover, .btn-primary.btn-inert:hover { background: var(--primary); border-color: var(--primary); }
 
 /* Destructive and attention-getting actions are outlined, not filled. A row of
    solid red blocks shouted louder than the actions deserved — the same reason
@@ -5227,6 +5231,18 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
   content: ""; position: absolute; left: 13px; right: 13px; bottom: -10px; height: 2px; border-radius: 2px; background: var(--brand-green);
 }
 #board-tabs .board-tab .ic { margin-right: 6px; opacity: .85; }
+#board-tabs button.board-tab { font-family: inherit; line-height: 1; }
+#board-tabs .board-tab:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+/* a narrow top bar (fitTopbar in app.js): first tighter, then icon-only tabs */
+#topbar.tb-tight .topbar-right #mode-pill { font-size: 10.5px; padding: 0 8px; letter-spacing: 0; gap: 4px; }
+#topbar.tb-tight .btn-date .d-yr { display: none; }
+#topbar.tb-tight .topbar-right { gap: 6px; }
+#topbar.tb-snug #board-tabs .board-tab { padding: 0 8px; font-size: 13px; }
+#topbar.tb-snug #board-tabs .board-tab.active::after { left: 8px; right: 8px; }
+#topbar.tb-snug .topbar-left { gap: 4px; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 10px; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
 
 /* banner menus (board pill, account) */
 .tb-dd { position: relative; flex: none; }
@@ -5604,7 +5620,10 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
 /* where the plan stands: nothing yet (grey), a holiday (violet, like the phone's
    HOLIDAY pill), missions added but not carried over or merged (amber, dashed),
    carried over but its source changed since (a small amber dot) */
-#mode-pill.mode-empty { color: var(--muted); border: 1px solid var(--border); background: transparent; }
+/* Not planned: a solid slate chip with an open ring, so it reads as a state and
+   never as a disabled button (it was grey text on a grey outline) */
+#mode-pill.mode-empty { color: #23405f; border: 1px solid #b9c7d8; background: #e6edf5; }
+#mode-pill.mode-empty .mp-main::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; margin-right: 5px; vertical-align: 0; box-sizing: border-box; }
 #mode-pill.mode-holiday { color: #5b4bb8; border: 1px solid #cfc8f2; background: #f1effc; }
 #mode-pill.mode-draft { color: #8a4f10; border: 1px dashed #d9a95b; background: #fdf7ec; }
 #mode-pill.mode-stale::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); margin-right: 5px; flex: none; }
@@ -5656,7 +5675,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
    - New Mission becomes a floating button above the bar.
    - The available-people panel is a drawer that peeks above the bar.
    - Record dialogs (.modal-side) open full screen with Save pinned. */
-#bottom-nav, #fp-drawer-handle, #m-count, #m-row2, #m-details, #m-hol-pill, #m-more-menu { display: none; }
+#bottom-nav, #fp-drawer-handle, #m-count, #m-row2, #m-details, #m-more-menu { display: none; }
 #more-menu.hidden { display: none; }
 
 @media (max-width: 640px) {
@@ -5685,12 +5704,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   #btn-board-dd #board-dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   #btn-board-dd .ic:last-child { width: 15px; height: 15px; opacity: .6; }
   body:not(.board-view) #board-dd { display: none; }
-  #mode-pill, #m-hol-pill { order: 2; flex: none; margin-left: 0; font-size: 9.5px; letter-spacing: .2px; padding: 1px 6px; }
-  /* one pill only: on a holiday, HOLIDAY stands in for CONFIRMED / FORECAST, or the
-     name would be left with almost no room */
-  #topbar:has(#m-hol-pill:not(.hidden)) #mode-pill { display: none; }
-  #m-hol-pill { display: inline-flex; color: #2b1700; background: var(--warn); border: 1px solid var(--warn); }
-  #m-hol-pill.hidden { display: none; }
+  #mode-pill { order: 2; flex: none; margin-left: 0; font-size: 9.5px; letter-spacing: .2px; padding: 1px 6px; }
   #btn-hold-alerts { order: 4; }
   #topbar .topbar-right { order: 3; flex: 0 0 auto; margin-left: auto; gap: 0; }
   body:not(.board-view) #topbar .topbar-right { margin-left: 0; }
@@ -5810,7 +5824,6 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   /* scrolled down: one line — name, date, the count, Filter, ⋯ */
   body.board-view.hdr-compact #topbar { padding-top: 4px; padding-bottom: 4px; }
   body.board-view.hdr-compact #mode-pill,
-  body.board-view.hdr-compact #m-hol-pill,
   body.board-view.hdr-compact #btn-date-prev,
   body.board-view.hdr-compact #btn-date-next,
   body.board-view.hdr-compact #m-summary,
@@ -5832,13 +5845,12 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
      instead of shifting the rest. */
   #topbar {
     display: grid; align-items: center; column-gap: 5px; row-gap: 8px;
-    grid-template-columns: minmax(0, max-content) max-content max-content minmax(0, 1fr) max-content;
+    grid-template-columns: minmax(0, max-content) max-content minmax(0, 1fr) max-content;
   }
   #board-dd { grid-area: 1 / 1; min-width: 0; }
   #btn-board-dd { width: 100%; }
   #mode-pill { grid-area: 1 / 2; }
-  #m-hol-pill { grid-area: 1 / 3; }
-  #topbar .topbar-right { grid-area: 1 / 5; justify-self: end; }
+  #topbar .topbar-right { grid-area: 1 / 4; justify-self: end; }
   body:not(.board-view) #topbar .topbar-right { grid-column: 1 / -1; justify-self: start; }
   #btn-hold-alerts { grid-area: 4 / 1 / 5 / -1; justify-self: start; }
   body.board-view #m-row2 { grid-area: 2 / 1 / 3 / -1; }
@@ -5943,7 +5955,27 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   #float-pool { transition: none; }
   .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); }
 }
-@media (max-width: 640px) { #mode-pill .mp-extra { display: none; } #mode-pill .ic { width: 10px; height: 10px; } }
+/* The one status pill (renderModePill). Its extras follow the main word on one line;
+   a phone stacks them as a second, smaller line so the pill stays narrow enough for
+   the board name and the date beside it, and every status is still in it. */
+#mode-pill .mp-body { display: inline-flex; align-items: center; white-space: nowrap; }
+#mode-pill .mp-head { display: inline-flex; align-items: center; gap: 6px; }
+#mode-pill .mp-extras { display: inline; }
+#mode-pill .mp-extra { font-weight: 600; }
+#mode-pill .mp-dot { margin: 0 .35em; }
+@media (max-width: 640px) {
+  #mode-pill .ic { width: 10px; height: 10px; }
+  #topbar #mode-pill { height: auto; min-height: 22px; padding: 2px 6px; gap: 3px; border-radius: 8px; line-height: 1.15; }
+  #mode-pill .mp-body { display: inline-flex; flex-direction: column; align-items: flex-start; }
+  #mode-pill .mp-extras { display: block; font-size: 8px; letter-spacing: 0; opacity: .9; }
+  #mode-pill .mp-extras .mp-extra:first-child .mp-dot { display: none; }
+  /* the lock icon at the front already says Read-only, so the phone lets it stand in
+     for the word when another status needs the second line */
+  #mode-pill .mp-head:has(.mp-main) + .mp-extras .mp-ro:not(:first-child) { display: none; }
+  #mode-pill .mp-head:has(.mp-main) + .mp-extras .mp-ro:first-child:not(:only-child) { display: none; }
+  #mode-pill .mp-head:has(.mp-main) + .mp-extras .mp-ro:first-child + .mp-extra .mp-dot { display: none; }
+  #mode-pill .mp-head { gap: 3px; }
+}
 
 /* ===== Phone parity: Overview, Manpower, Host (2026-10-13, design/mobile-parity.html) =====
    The board's phone header on every tab: the tab's name and the date on line 1, the
@@ -5958,7 +5990,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
     display: block; grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-size: 18px; font-weight: 700; letter-spacing: -.3px; color: var(--text); line-height: 40px; padding: 0 2px;
   }
-  body:not(.board-view) #topbar .topbar-right { grid-area: 1 / 5; justify-self: end; }
+  body:not(.board-view) #topbar .topbar-right { grid-area: 1 / 4; justify-self: end; }
 
   /* line 2: summary card, Filter (lists only), ⋯ */
   body:is(.ov-view, .el-view, .hl-view) #m-row2 { grid-area: 2 / 1 / 3 / -1; display: flex; gap: 6px; align-items: stretch; min-width: 0; }

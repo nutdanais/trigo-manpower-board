@@ -17,10 +17,16 @@ function todayStr() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* The app's one long date: "16 Oct 2026" (with fmtDow in front: "Fri 16 Oct 2026").
+   Grids, chart axes and chips use the short form, fmtDayMon: "16 Oct". */
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtDate(iso) {
   const [y, m, d] = iso.split("-").map(Number);
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${String(d).padStart(2,"0")}-${months[m-1]}-${y}`;
+  return `${d} ${MONTHS_SHORT[m-1]} ${y}`;
+}
+function fmtDayMon(iso) {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${d} ${MONTHS_SHORT[m-1]}`;
 }
 function fmtDow(iso) {
   return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(iso + "T00:00:00").getDay()];
@@ -1073,7 +1079,31 @@ function render() {
   updateSelectionUI();
   updateUndoButton();
   applySearchHighlight();
+  fitTopbar();
 }
+
+/* The top bar never hides a module tab. #board-tabs scrolls rather than run under
+   the status pill, which used to leave Capacity (1280px) or Manpower, Host and
+   Capacity (1100px) out of sight with nothing to say so. When the tabs don't fit,
+   first the pill and the date get tighter (tb-tight: smaller pill, no year), then
+   the tabs (tb-snug: less padding), and only then does every tab but the current
+   one show its icon alone (tb-icons; the name is in its tooltip). Measured, not guessed from the width, so Thai, a long status and a
+   larger browser font all fit. A phone has the bottom bar instead. */
+function fitTopbar() {
+  const bar = $("#topbar"), tabs = $("#board-tabs");
+  if (!bar || !tabs) return;
+  bar.classList.remove("tb-tight", "tb-snug", "tb-icons");
+  if (!tabs.offsetParent) return;
+  const over = () => tabs.scrollWidth > tabs.clientWidth + 1;
+  for (const step of ["tb-tight", "tb-snug", "tb-icons"]) { if (!over()) break; bar.classList.add(step); }
+}
+let _fitTopbarQueued = false;
+window.addEventListener("resize", () => {
+  if (_fitTopbarQueued) return;
+  _fitTopbarQueued = true;
+  requestAnimationFrame(() => { _fitTopbarQueued = false; fitTopbar(); });
+});
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitTopbar());
 
 /* ======================================================================
    Org Chart tab — today's operational structure as a collapsible tree.
@@ -1679,6 +1709,19 @@ function renderBoardEmptyState() {
   }
 }
 
+/* One module tab in the top bar. A real button (it was a div), so Tab reaches it
+   and a screen reader announces it; aria-current marks where you are. The label is
+   its own span so a narrow top bar can show the icon alone (fitTopbar), and the
+   title carries the name for that case. */
+function moduleTab(cls, active, iconName, label) {
+  const t = document.createElement("button");
+  t.type = "button";
+  t.className = "board-tab " + cls + (active ? " active" : "");
+  if (active) t.setAttribute("aria-current", "page");
+  t.title = label;
+  setIconLabel(t, iconName, label, "tab-label");
+  return t;
+}
 function renderTabs() {
   const el = $("#board-tabs");
   // On a phone the strip scrolls sideways; rebuilding it would snap it back to
@@ -1686,18 +1729,14 @@ function renderTabs() {
   const keepScroll = el.scrollLeft;
   el.innerHTML = "";
   if (can("overview")) {
-  const ov = document.createElement("div");
-  ov.className = "board-tab tab-overview" + (isOverview() ? " active" : "");
-  setIconLabel(ov, "chart", "Overview");
+  const ov = moduleTab("tab-overview", isOverview(), "chart", "Overview");
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
   }
   // Board: an ordinary module tab. It opens the board last shown (the toolbar's
   // board picker then switches between boards, like Overview's).
   if (can("board") && D().boards.length) {
-  const bt = document.createElement("div");
-  bt.className = "board-tab tab-boardmod" + (!isNonBoardView() ? " active" : "");
-  setIconLabel(bt, "appmark", "Board");   // the app mark (favicon's four squares), outlined
+  const bt = moduleTab("tab-boardmod", !isNonBoardView(), "appmark", "Board");   // the app mark (favicon's four squares), outlined
   bt.onclick = () => {
     if (!isNonBoardView()) return;
     clearSelection();
@@ -1709,30 +1748,22 @@ function renderTabs() {
   el.prepend(bt);
   }
   if (can("orgchart")) {
-  const oc = document.createElement("div");
-  oc.className = "board-tab tab-orgchart" + (isOrgChart() ? " active" : "");
-  setIconLabel(oc, "orgchart", "Org Chart");
+  const oc = moduleTab("tab-orgchart", isOrgChart(), "orgchart", "Org Chart");
   oc.onclick = () => { clearSelection(); D().activeBoardId = ORGCHART_ID; refreshAndRender(); };
   el.appendChild(oc);
   }
   if (can("emplist")) {
-  const eml = document.createElement("div");
-  eml.className = "board-tab tab-emplist" + (isEmployeeList() ? " active" : "");
-  eml.innerHTML = icon("users") + 'Manpower';
+  const eml = moduleTab("tab-emplist", isEmployeeList(), "users", "Manpower");
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
   }
   if (can("hostlist")) {
-  const hl = document.createElement("div");
-  hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
-  hl.innerHTML = icon("site") + 'Host';
+  const hl = moduleTab("tab-hostlist", isHostList(), "site", "Host");
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
   }
   if (can("capacity") && feat().capacity) {
-  const cp = document.createElement("div");
-  cp.className = "board-tab tab-capacity" + (isCapacity() ? " active" : "");
-  cp.innerHTML = icon("list") + 'Capacity';
+  const cp = moduleTab("tab-capacity", isCapacity(), "list", "Capacity");
   cp.onclick = () => {
     clearSelection();
     // open on the board the user was just looking at
@@ -1982,9 +2013,10 @@ function wireTopbarMenus() {
 function renderDateButton() {
   const dow = fmtDow(state.date);
   const full = fmtDate(state.date);
-  const [d, mon, yr] = full.split("-");
+  // "16 Oct" and " 2026" apart, so a narrow top bar (#topbar.tb-tight) can drop the year
+  const yr = full.slice(full.lastIndexOf(" ") + 1), dm = full.slice(0, full.lastIndexOf(" "));
   const btn = $("#btn-date");
-  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt"><span class="d-dow">${dow}</span> <span class="d-dm">${d}-${mon}</span><span class="d-yr">-${yr}</span></span>`;
+  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt"><span class="d-dow">${dow}</span> <span class="d-dm">${dm}</span><span class="d-yr"> ${yr}</span></span>`;
   btn.title = `${dow} ${full} — click to pick a date`;
 }
 
@@ -8192,18 +8224,18 @@ function placeBoardRow1Tools(board) {
    (like Overview's) and the pill sits beside the date picker; on a phone both stay
    on header line 1 next to the date, as the phone layout has them. */
 function placeBoardPicker() {
-  const dd = $("#board-dd"), pill = $("#mode-pill"), hol = $("#m-hol-pill");
+  const dd = $("#board-dd"), pill = $("#mode-pill");
   if (ROW1_TOOLS_MQ.matches) {
     const row1 = $("#toolbar-row1");
     if (dd.parentNode !== row1) row1.prepend(dd);
     // pill, then Lock, then the date: anchored on Lock so the pill never lands
     // between Lock and the date arrows
     const lock = $("#btn-lock");
-    if (pill.nextElementSibling !== hol || hol.nextElementSibling !== lock) { lock.before(pill); lock.before(hol); }
+    if (pill.nextElementSibling !== lock) lock.before(pill);
   } else {
     const right = document.querySelector("#topbar .topbar-right");
     if (dd.parentNode !== right.parentNode) right.before(dd);
-    if (pill.previousElementSibling !== dd) { dd.after(pill); pill.after(hol); }
+    if (pill.previousElementSibling !== dd) dd.after(pill);
   }
 }
 ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.body.classList.contains("board-view")); });
@@ -9264,8 +9296,7 @@ function startForecast() {
 
 /* "Tue 22 Sep" — the short form the banners use */
 function fmtShort(iso) {
-  const [, m, d] = iso.split("-").map(Number);
-  return `${fmtDow(iso)} ${d} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1]}`;
+  return `${fmtDow(iso)} ${fmtDayMon(iso)}`;
 }
 /* a timestamp as HH:MM, with the date in front when it isn't today */
 function fmtStamp(ts) {
@@ -9309,21 +9340,23 @@ function planIsEmpty(plan) {
   return !plan.missions.length && !Object.values(plan.zones || {}).some(z => z && z.length);
 }
 function renderModePill() {
-  const pill = $("#mode-pill"), hol = $("#m-hol-pill");
+  // The top bar's one status pill. Everything that describes the day goes in it
+  // (Draft, Not reviewed, Read-only, Locked, Holiday…): there is no second pill,
+  // on a phone either. Narrow screens shrink it (CSS), they never split it.
+  const pill = $("#mode-pill");
   const onBoard = !isNonBoardView() && !!D().activeBoardId && can("board");
-  const nonWorking = !isNonBoardView() && isNonWorkingDate(state.date);
-  const hide = () => { pill.className = "mode-pill hidden"; hol && hol.classList.toggle("hidden", !nonWorking); };
+  const hide = () => { pill.className = "mode-pill hidden"; pill.innerHTML = ""; };
   if (!onBoard) return hide();
   const boardId = D().activeBoardId;
   const planning = !!feat().forecast;
   const fc = planning && isForecastView();
   const lock = lockInfo(boardId, state.date);
   const ro = !fc && isReadOnly();
-  if (!planning && !ro) return hide();
-  // the pill names the holiday itself, so the phone's separate HOLIDAY pill steps aside
-  if (hol) hol.classList.add("hidden");
-  const plan = getPlan();
   const holidayDay = isNonWorkingDate(state.date, boardId);
+  // without forward planning the pill only has something to say on a read-only
+  // day or a holiday
+  if (!planning && !ro && !holidayDay) return hide();
+  const plan = getPlan();
   const sig = signalsForScreen();
   const stamp = sig ? sig.stamp : null;
   const st = PlanStatus.of({
@@ -9332,22 +9365,28 @@ function renderModePill() {
     stamped: feat().stamps && sig ? !!(stamp && (stamp.carried_from || stamp.forecast_merged_at)) : null,
     stale: !!currentStale(), date: state.date, today: todayStr(),
   });
-  const look = planning ? MODE_PILL[st.state] : { label: "", cls: "confirmed" };
+  const look = planning ? MODE_PILL[st.state] : (holidayDay ? MODE_PILL.holiday : { label: "", cls: "confirmed" });
   // a past day is a record of what happened: no Draft / Out of date there
   const record = st.past && planning && ["planned", "draft", "stale"].includes(st.state);
   const main = record ? "Record" : look.label;
-  const extra = record ? "Read-only"
-    : st.state === "locked" ? "Locked"
-    : st.state === "draft" ? "Not reviewed"
-    : st.state === "stale" ? "Out of date"
-    : ro ? "Read-only"
-    : st.state === "planned" && holidayDay ? "Holiday" : "";
+  const parts = [];   // [text, kind]: the kind lets a phone shorten one (styles.css)
+  if (record) parts.push(["Read-only", "ro"]);
+  else {
+    if (st.state === "locked") parts.push(["Locked", "locked"]);
+    else if (st.state === "draft") parts.push(["Not reviewed", "review"]);
+    else if (st.state === "stale") parts.push(["Out of date", "stale"]);
+    if (st.state !== "locked" && ro) parts.push(["Read-only", "ro"]);
+    if (holidayDay && main !== "Holiday") parts.push(["Holiday", "holiday"]);
+  }
   pill.className = "mode-pill mode-" + (record ? "confirmed" : look.cls) + (ro || st.state === "locked" ? " mode-ro" : "");
   pill.dataset.state = st.state + (st.past ? " past" : st.today ? " today" : "");
-  // the second part (· Read-only / · Locked …) drops on a phone, where the lock icon carries it
-  pill.innerHTML = (ro || lock ? icon("lock") : "") + (main ? `<span>${escapeHtml(main)}</span>` : "") +
-    (extra ? `<span class="mp-extra">${main ? "· " : ""}${escapeHtml(extra)}</span>` : "") +
-    (extra && ro && st.state !== "locked" && extra !== "Read-only" ? `<span class="mp-extra">· Read-only</span>` : "");
+  // each extra carries its own "·" (spaced by CSS) so it reads the same however it wraps;
+  // a phone stacks the extras under the main word (styles.css, .mp-extras)
+  pill.innerHTML = `<span class="mp-body"><span class="mp-head">${ro || lock ? icon("lock") : ""}` +
+    (main ? `<span class="mp-main">${escapeHtml(main)}</span>` : "") + `</span>` +
+    (parts.length ? `<span class="mp-extras">${parts.map(([x, kind], i) =>
+      `<span class="mp-extra mp-${kind}">${main || i ? `<span class="mp-dot">·</span>` : ""}${escapeHtml(x)}</span>`).join("")}</span>` : "") +
+    `</span>`;
   const end = planning ? horizonEndFor(boardId) : null;
   const authors = fc ? (plan.authors || []) : [];
   const n = plan.missions.length;

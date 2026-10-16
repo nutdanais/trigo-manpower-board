@@ -117,7 +117,10 @@ async function step(name, fn) {
       assert.equal(await p.evaluate(() => window.__beforeReload === undefined), true, "page must have reloaded");
     });
 
-    assert.deepEqual(a.errors, [], "no console errors: " + a.errors.join(" | "));
+    // the 500 served on purpose above is logged by the browser itself ("Failed to load
+    // resource"); that is the test's doing, not the app's
+    const errors = a.errors.filter((e) => !/Failed to load resource: .* 500/.test(e));
+    assert.deepEqual(errors, [], "no console errors: " + errors.join(" | "));
     console.log("all checks passed");
   } finally {
     await env.close();

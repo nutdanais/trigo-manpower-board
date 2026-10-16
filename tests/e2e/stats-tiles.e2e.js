@@ -191,6 +191,26 @@ async function step(name, fn) {
       assert.ok(!/standby/i.test(r.chips), "no Standby status chip: " + r.chips);
     });
 
+    for (const width of [1024, 1100, 1280, 1366]) {
+      await step("every module tab is in full view in the top bar at " + width + "px (no tab scrolled out of sight)", async () => {
+        await p.setViewportSize({ width, height: 900 });
+        await p.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
+        const r = await p.evaluate(() => {
+          const strip = document.querySelector("#board-tabs").getBoundingClientRect();
+          const pill = document.querySelector("#mode-pill").getBoundingClientRect();
+          return {
+            hidden: [...document.querySelectorAll("#board-tabs .board-tab")]
+              .filter((t) => { const b = t.getBoundingClientRect(); return b.left < strip.left - 1 || b.right > strip.right + 1; })
+              .map((t) => t.title),
+            underPill: pill.width > 0 && strip.right > pill.left + 1,
+          };
+        });
+        assert.deepEqual(r.hidden, [], "tabs out of sight");
+        assert.equal(r.underPill, false, "the tab strip runs under the status pill");
+      });
+    }
+    await p.setViewportSize({ width: 1400, height: 900 });
+
     assert.deepEqual(a.errors, [], "no page errors");
     console.log("all stats-tiles checks passed");
   } catch (e) {

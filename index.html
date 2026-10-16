@@ -208,12 +208,10 @@
   <nav id="board-tabs" aria-label="Modules"></nav>
   <div class="topbar-right">
     <span id="save-status" class="hidden"></span>
-    <!-- the date's state, beside the date it describes: CONFIRMED, CONFIRMED · READ-ONLY
-         (past date) or · LOCKED, or FORECAST (renderModePill in app.js) -->
+    <!-- the date's one status pill, beside the date it describes: Draft · Not reviewed ·
+         Read-only, Final · Locked, Holiday, Forecast… (renderModePill in app.js). On a
+         phone it is the only pill too, holiday included. -->
     <span id="mode-pill" class="mode-pill hidden"></span>
-    <!-- Phone only (styles.css, Phone header): HOLIDAY beside the status pill, since the
-         Holiday switch itself lives in the date picker there -->
-    <span id="m-hol-pill" class="mode-pill mode-holiday hidden">HOLIDAY</span>
     <!-- Lock sits left of the date, so showing/hiding it never shifts the date
          arrows (the row is right-aligned) -->
     <button id="btn-lock" class="btn btn-top hidden" title="Lock this board so it's view-only for everyone"><svg class="ic" aria-hidden="true"><use href="#i-unlock"></use></svg><span class="btn-label">Lock</span></button>
