@@ -1,0 +1,673 @@
+<title>Release Readiness Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600&family=Noto+Sans+Thai:wght@400;600;700&display=swap">
+<style>
+/* Layout: one reading column; each finding is a card with "Today" (screenshot) beside "Proposed" (a live Signal mockup). Light only, like the app. */
+:root{
+  --bg:#f4f6f8;--panel:#fff;--line:#e3e7ec;--border:#d8dde4;--ink:#0f1b2a;--text:#1f2937;--muted:#6f7c8d;--soft:#eef1f5;
+  --navy:#003a66;--navy-dark:#002a4a;--navy-soft:#eef3fb;--green:#a8c855;
+  --p0:#b42318;--p0-s:#fef3f2;--p0-l:#f3c3bd;
+  --p1:#9a4a07;--p1-s:#fff6ea;--p1-l:#efd2ab;
+  --p2:#4d5b6c;--p2-s:#eef1f5;--p2-l:#d8dde4;
+  --ok:#4d6810;--ok-s:#f7faef;--ok-l:#cfdcae;
+  --night:#1c2533;
+  --r:8px;--r-box:12px;--shadow:0 1px 2px rgba(8,28,56,.08),0 14px 32px -12px rgba(8,40,80,.28);
+  --font:"Geist","Noto Sans Thai",system-ui,Arial,sans-serif;--mono:"Geist Mono","Noto Sans Thai",ui-monospace,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/1.55 var(--font);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.page{max-width:1180px;margin:0 auto;padding-block:28px 72px}
+h1{font-size:28px;letter-spacing:-.5px;margin:0 0 6px;color:var(--ink);text-wrap:balance}
+h2{font-size:19px;letter-spacing:-.2px;margin:40px 0 6px;color:var(--ink);text-wrap:balance}
+h3{margin:0;font-size:16px;color:var(--ink);text-wrap:balance}
+p{margin:0}
+.lead{color:var(--muted);max-width:760px;text-wrap:pretty}
+code,.mono{font-family:var(--mono);font-size:12px}
+code{background:var(--soft);padding:1px 5px;border-radius:5px;color:var(--ink)}
+a{color:var(--navy)}
+:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+/* topline */
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:var(--muted);font-size:12.5px}
+.brand b{background:var(--navy);color:#fff;font-size:11px;letter-spacing:.6px;padding:3px 8px;border-radius:6px}
+.health{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:18px 0 6px}
+.hc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);padding:12px 14px}
+.hc .l{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.hc .v{font-size:24px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px}
+.hc .v small{font-size:13px;font-weight:500;color:var(--muted)}
+.hc .s{font-size:12px;color:var(--muted)}
+.hc.bad .v{color:var(--p0)} .hc.good .v{color:var(--ok)}
+/* legend + toc */
+.legend{display:flex;gap:14px 22px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:10px 0 0}
+.legend span{display:inline-flex;gap:8px;align-items:center}
+.pri{display:inline-flex;align-items:center;flex:none;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;line-height:20px;border:1px solid;white-space:nowrap}
+.pri.p0{background:var(--p0-s);color:var(--p0);border-color:var(--p0-l)}
+.pri.p1{background:var(--p1-s);color:var(--p1);border-color:var(--p1-l)}
+.pri.p2{background:var(--p2-s);color:var(--p2);border-color:var(--p2-l)}
+.tag{display:inline-flex;align-items:center;padding:0 7px;border-radius:6px;font-size:11px;font-weight:600;line-height:20px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.toc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);margin:14px 0 6px;overflow:hidden}
+.toc-g{padding:10px 16px 12px;border-top:1px solid var(--line)}
+.toc-g:first-child{border-top:0}
+.toc-g h4{margin:0 0 6px;font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center}
+.toc ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:2px 20px}
+.toc li a{display:flex;gap:10px;align-items:baseline;text-decoration:none;color:var(--text);font-size:13.5px;padding:3px 0}
+.toc li a:hover{color:var(--navy)}
+.toc .n{font-family:var(--mono);color:var(--muted);font-size:12px;width:22px;flex:none;text-align:right}
+.toc .e{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted)}
+/* item */
+.item{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-box);margin:16px 0;overflow:hidden;scroll-margin-top:16px}
+.ih{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+.ih .n{font-family:var(--mono);color:var(--muted);font-size:13px;font-weight:600}
+.ih h3{flex:1 1 300px;min-width:0}
+.ih .meta{display:flex;gap:6px;flex-wrap:wrap}
+.why{padding:12px 18px 0;color:var(--text);font-size:13.5px;max-width:880px;text-wrap:pretty}
+.why .where{display:block;color:var(--muted);font-size:12.5px;margin-top:4px}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:14px 18px 6px;align-items:start}
+@media (max-width:860px){.cmp{grid-template-columns:minmax(0,1fr)}}
+.cap{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;gap:6px;align-items:center}
+.cap.now::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--p0)}
+.cap.new::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--ok)}
+.shot{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+.shot.n360{max-width:360px;width:100%}
+.shots{display:flex;flex-direction:column;gap:8px}
+.after{background:#e9edf2;border-radius:10px;padding:16px;display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:12px;min-width:0;overflow-x:auto}
+.after.col{display:grid;grid-template-columns:minmax(0,1fr);justify-items:stretch}
+.after.col > *{min-width:0;max-width:100%}
+.zm{zoom:.8}
+.fix{padding:6px 18px 16px}
+.fix ul{margin:6px 0 0;padding-left:20px;font-size:13px}
+.fix li{margin:3px 0}
+.fix .cap{margin-top:6px}
+.note{font-size:12px;color:var(--muted);margin-top:6px}
+/* text compare table */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);background:#f7f9fb;font-weight:700}
+tr:last-child td{border-bottom:0}
+td.bad{color:var(--p0)} td.good{color:var(--ok)}
+pre.code{margin:0;font-family:var(--mono);font-size:12px;line-height:1.6;background:#0f1b2a;color:#e6edf5;border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:pre}
+pre.code .c{color:#8fa3b8} pre.code .a{color:#c8e08c} pre.code .d{color:#f3a59c}
+/* ---- Signal kit for the mockups ---- */
+.btn{height:34px;padding:0 13px;border-radius:var(--r);border:1px solid var(--border);background:var(--panel);font:inherit;font-size:13px;font-weight:600;color:var(--text);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;cursor:default}
+.btn.p{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.p.hov{background:var(--navy-dark);border-color:var(--navy-dark)}
+.btn.p.dis{opacity:.45}
+.btn.blank{background:#fff;border-color:var(--navy);color:#fff;opacity:.45}
+.btn.d{background:#d92d20;border-color:#d92d20;color:#fff}
+.btn.q{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.sm{height:28px;padding:0 9px;font-size:12px}
+.ic{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bar{background:var(--navy);border-radius:10px;display:flex;align-items:center;gap:4px;padding:8px 10px;width:100%;min-width:640px;max-width:780px}
+.bar .logo{color:#fff;font-weight:700;letter-spacing:2px;font-size:13px;margin-right:8px}
+.bar .tab{height:30px;padding:0 10px;border-radius:7px;color:rgba(255,255,255,.82);display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
+.bar .tab.on{background:#fff;color:var(--navy)}
+.bar .sp{flex:1}
+.bar .pill{height:26px;padding:0 9px;border-radius:999px;background:var(--p1-s);color:var(--p1);border:1px solid var(--p1-l);font-size:11.5px;font-weight:700;display:inline-flex;gap:5px;align-items:center}
+.bar .dt{height:30px;border:1px solid rgba(255,255,255,.4);border-radius:8px;color:#fff;font-size:12px;display:inline-flex;align-items:center;padding:0 10px;gap:6px}
+.bar .av{width:28px;height:28px;border-radius:7px;background:var(--green);color:var(--navy);font-size:11px;font-weight:700;display:grid;place-items:center}
+.wlabel{font-family:var(--mono);font-size:11px;color:var(--muted);align-self:flex-start}
+.tb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border-radius:10px;padding:8px;box-shadow:var(--shadow);max-width:100%}
+.tb .grow{flex:1}
+.pop{background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);padding:12px;width:290px;display:flex;flex-direction:column;gap:10px;font-size:12.5px}
+.pop .h{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.seg{display:flex;background:var(--soft);border-radius:var(--r);padding:2px;gap:2px}
+.seg span{flex:1;text-align:center;padding:5px 8px;border-radius:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.seg span.on{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(8,28,56,.12)}
+.row2{display:flex;gap:8px;align-items:center;justify-content:space-between}
+/* mission card */
+.mc{background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);width:340px;max-width:100%;overflow:hidden;border-top:3px solid var(--c,#a8d98a)}
+.mc .hd{padding:9px 12px 8px;display:flex;flex-direction:column;gap:2px}
+.mc .t{display:flex;align-items:baseline;gap:8px;min-width:0}
+.mc .t b{font-family:var(--mono);font-size:14px;color:var(--ink)}
+.mc .t span{font-weight:600;font-size:14px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.mc .t i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.4px;padding:1px 6px;border-radius:5px;background:var(--soft);color:var(--muted)}
+.mc .t i.nt{background:var(--night);color:#fff}
+.mc .m{font-size:11.5px;color:var(--muted);display:flex;gap:6px;min-width:0;align-items:center}
+.mc .m .cu{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mc .m .nw{white-space:nowrap;flex:none}
+.mc .m .eng{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-weight:600;white-space:nowrap;flex:none}
+.mc .m .eng::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--c,#a8d98a)}
+.mc .bd{padding:8px 12px 12px;display:flex;gap:6px;flex-wrap:wrap}
+.mc.night .bd{background:#f2f4f8}
+.pc{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 9px 0 4px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink)}
+.pc .sq{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:9.5px;font-weight:700;background:var(--navy-soft);color:var(--navy)}
+.pc .ar{font-size:10px;font-weight:600;color:var(--muted)}
+.pc.oc{border-style:dashed}.pc.oc .sq{background:var(--p1-s);color:var(--p1)}
+/* phone frame */
+.ph{width:300px;max-width:100%;background:var(--bg);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;font-size:12px;border:1px solid var(--line)}
+.ph .top{background:var(--panel);padding:10px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+.ph .top b{font-size:15px;color:var(--ink);flex:1}
+.ph .sq{width:32px;height:32px;border:1px solid var(--border);border-radius:9px;display:grid;place-items:center;color:var(--ink);background:var(--panel)}
+.ph .sum{flex:1;height:32px;border-radius:9px;background:var(--soft);display:flex;align-items:center;padding:0 10px;gap:6px;font-weight:600;color:var(--ink)}
+.ph .body{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.chipr{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:28px;padding:0 10px;border-radius:999px;border:1px solid var(--border);background:var(--panel);display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--text)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.sheet{background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -10px 30px -12px rgba(8,40,80,.35);padding:8px 14px 12px;display:flex;flex-direction:column;gap:10px}
+.sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--border);align-self:center}
+.sheet .sh{display:flex;align-items:center;gap:8px}
+.sheet .sh b{flex:1;font-size:15px;color:var(--ink)}
+.fld{display:flex;justify-content:space-between;align-items:center;height:40px;border:1px solid var(--border);border-radius:var(--r);padding:0 11px;font-size:12.5px;background:var(--panel)}
+.fld small{color:var(--muted);font-weight:500}
+.fld .v{font-weight:600;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+.lab{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.tg{width:34px;height:20px;border-radius:999px;background:var(--navy);position:relative;flex:none}
+.tg::after{content:"";position:absolute;right:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff}
+.tg.g{background:#9cc14a}
+.tgrow{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--ink)}
+.dlg{width:340px;max-width:100%;background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);padding:16px}
+.dlg h4{margin:0 0 4px;font-size:15px;color:var(--ink)}
+.dlg p{color:var(--muted);font-size:12.5px;margin:0 0 12px}
+.acts{display:flex;gap:8px;justify-content:flex-end}
+.side{width:340px;max-width:100%;background:var(--panel);border-radius:var(--r-box);box-shadow:var(--shadow);overflow:hidden}
+.side .hd{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.side .hd b{display:block;font-size:15px;color:var(--ink)}
+.side .hd small{color:var(--muted);font-size:12px}
+.side .hd .x{margin-left:auto;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--muted)}
+.side .bd{padding:14px;display:flex;flex-direction:column;gap:10px}
+.inp{height:34px;border:1px solid var(--border);border-radius:var(--r);padding:0 10px;display:flex;align-items:center;font-size:12.5px;background:var(--panel)}
+.hint{font-size:12px;display:flex;gap:6px;align-items:flex-start;color:var(--muted)}
+.hint.warn{color:var(--p1)}
+.hint .ic{margin-top:2px}
+.f label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--ink)}
+.pillx{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid}
+.pillx.np{background:var(--soft);color:var(--ink);border-color:var(--border)}
+.pillx.np::before{content:"";width:7px;height:7px;border-radius:50%;background:#9aa4b1}
+.pillx.dr{background:var(--p1-s);color:var(--p1);border-color:var(--p1-l)}
+.band{width:100%;max-width:640px;display:flex;align-items:baseline;gap:10px;border-bottom:1px solid var(--border);padding:4px 2px 8px}
+.band b{font-size:15px;color:var(--ink)}
+.band span{font-size:12.5px;color:var(--muted)}
+.mini-table{width:100%;max-width:560px;background:var(--panel);border-radius:10px;box-shadow:var(--shadow);overflow:hidden;font-size:12px}
+.mini-table td{padding:8px 10px}
+.mini-table .dash{color:#b6bec9}
+.mini-table tr.hv{background:var(--navy-soft)}
+.add{font-size:11px;font-weight:600;color:var(--navy);border:1px dashed var(--border);border-radius:6px;padding:1px 6px;background:var(--panel)}
+.done{background:var(--panel);border:1px solid var(--ok-l);border-radius:var(--r-box);padding:12px 16px;margin-top:12px}
+.done ul{margin:6px 0 0;padding-left:18px;columns:2 300px;column-gap:28px;font-size:13px}
+.done li{margin:3px 0;break-inside:avoid}
+.fade{position:relative}
+.fade::after{content:"";position:absolute;right:0;top:0;bottom:0;width:36px;background:linear-gradient(90deg,rgba(255,255,255,0),#fff)}
+footer{margin-top:40px;color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M6 20V10M12 20V4M18 20v-6"/></symbol>
+  <symbol id="i-org" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c2 .6 3.2 2.5 3.5 5.5"/></symbol>
+  <symbol id="i-site" viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M10 21v-5h4v5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-hide" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a15 15 0 0 1-2.6 3.2M6.6 6.6C4.2 8.2 3 12 3 12s4 6 9 6a9 9 0 0 0 4.4-1.1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+</svg>
+
+<div class="page">
+  <div class="brand"><b>TRIGO</b> Manpower Board · pre-release review · version 2026-10-15g · 16 Oct 2026</div>
+  <h1>Release readiness review</h1>
+  <p class="lead">I opened every tab, panel, dialog, menu and sheet in the real app (the test harness with sample data, including long Thai names and a long host name) at 1400px, 1100px and 390px, in English and Thai, and also checked 1024–1536px laptop widths. That is 124 screens, plus every automated test. Below are the 30 things I'd change, ranked by priority. Each one shows today's screen next to the proposed fix.</p>
+
+  <div class="health" aria-label="Health check">
+    <div class="hc good"><div class="l">Unit tests</div><div class="v">125<small> / 125</small></div><div class="s">13 files, all passing</div></div>
+    <div class="hc bad"><div class="l">Browser tests</div><div class="v">20<small> / 23 suites</small></div><div class="s">3 fail, all stale tests (item 4)</div></div>
+    <div class="hc good"><div class="l">Console errors</div><div class="v">0</div><div class="s">across the 124 screens</div></div>
+    <div class="hc good"><div class="l">Native dropdowns left</div><div class="v">0</div><div class="s">every select uses the in-app picker</div></div>
+    <div class="hc bad"><div class="l">Untranslated in Thai</div><div class="v">40+</div><div class="s">strings, some half-translated (item 3)</div></div>
+  </div>
+
+  <div class="legend">
+    <span><i class="pri p0">P0</i> Fix before release: broken, hidden or embarrassing</span>
+    <span><i class="pri p1">P1</i> Should be in this pack: inconsistent with the new design</span>
+    <span><i class="pri p2">P2</i> Polish: fine to follow in the next pack</span>
+    <span><i class="tag">S / M / L</i> rough effort</span>
+  </div>
+
+  <nav class="toc" aria-label="All findings">
+    <div class="toc-g"><h4><i class="pri p0">P0</i> Fix before release</h4><ol>
+      <li><a href="#i1"><span class="n">1</span>Module tabs hidden at laptop widths<span class="e">M</span></a></li>
+      <li><a href="#i2"><span class="n">2</span>Disabled buttons turn blank on hover / tap<span class="e">S</span></a></li>
+      <li><a href="#i3"><span class="n">3</span>Thai mode is half-translated<span class="e">M</span></a></li>
+      <li><a href="#i4"><span class="n">4</span>Release gate is red: 3 stale browser tests<span class="e">S</span></a></li>
+    </ol></div>
+    <div class="toc-g"><h4><i class="pri p1">P1</i> Should be in this pack</h4><ol>
+      <li><a href="#i5"><span class="n">5</span>Board toolbar wraps; Names toggle looks like a language switch<span class="e">S</span></a></li>
+      <li><a href="#i6"><span class="n">6</span>Mission card text breaks with long names<span class="e">S</span></a></li>
+      <li><a href="#i7"><span class="n">7</span>Org Chart on phone ignores the phone header<span class="e">M</span></a></li>
+      <li><a href="#i8"><span class="n">8</span>Switches are navy on desktop, green on phone<span class="e">S</span></a></li>
+      <li><a href="#i9"><span class="n">9</span>Phone Filter sheet has no title, Clear or Done<span class="e">S</span></a></li>
+      <li><a href="#i10"><span class="n">10</span>Module tabs can't be reached by keyboard<span class="e">S</span></a></li>
+      <li><a href="#i11"><span class="n">11</span>Utilization shows 58.33% next to 58%<span class="e">S</span></a></li>
+      <li><a href="#i12"><span class="n">12</span>"Add Mission" next to "New Mission" on a forecast<span class="e">S</span></a></li>
+      <li><a href="#i13"><span class="n">13</span>People tiles and the black night block (Signal 04/05)<span class="e">L</span></a></li>
+    </ol></div>
+    <div class="toc-g"><h4><i class="pri p2">P2</i> Polish</h4><ol>
+      <li><a href="#i14"><span class="n">14</span>Export: a full-height drawer for one choice<span class="e">S</span></a></li>
+      <li><a href="#i15"><span class="n">15</span>Help text cut to one line in roomy panels<span class="e">S</span></a></li>
+      <li><a href="#i16"><span class="n">16</span>Warnings shown with a green tick<span class="e">S</span></a></li>
+      <li><a href="#i17"><span class="n">17</span>Two styles of close button<span class="e">S</span></a></li>
+      <li><a href="#i18"><span class="n">18</span>Host panel: no gap under the header; doubled titles<span class="e">S</span></a></li>
+      <li><a href="#i19"><span class="n">19</span>Status pill: "Not planned" looks disabled, "Draft" too long<span class="e">S</span></a></li>
+      <li><a href="#i20"><span class="n">20</span>Dates written four ways<span class="e">M</span></a></li>
+      <li><a href="#i21"><span class="n">21</span>Org Chart counts say "5 miss"<span class="e">S</span></a></li>
+      <li><a href="#i22"><span class="n">22</span>Overview's heavy navy section bands<span class="e">S</span></a></li>
+      <li><a href="#i23"><span class="n">23</span>Manpower table: 60+ "+ Add" chips<span class="e">S</span></a></li>
+      <li><a href="#i24"><span class="n">24</span>Capacity phone: unpadded empty text<span class="e">S</span></a></li>
+      <li><a href="#i25"><span class="n">25</span>Phone leave tabs cut off with no hint<span class="e">S</span></a></li>
+      <li><a href="#i26"><span class="n">26</span>Thai: กลางวัน vs กะกลางคืน<span class="e">S</span></a></li>
+      <li><a href="#i27"><span class="n">27</span>Users: the same name shown twice<span class="e">S</span></a></li>
+      <li><a href="#i28"><span class="n">28</span>Night time shown as 20:00–05:00 on card, 08:00–17:00 in data<span class="e">S</span></a></li>
+      <li><a href="#i29"><span class="n">29</span>Dead dark-theme CSS still shipped<span class="e">S</span></a></li>
+      <li><a href="#i30"><span class="n">30</span>Add a Thai check to the language test<span class="e">S</span></a></li>
+    </ol></div>
+  </nav>
+
+  <div class="done">
+    <div class="cap new" style="margin:0">Already fixed since the last review (checked, no action)</div>
+    <ul>
+      <li>Confirm dialogs name the action and destructive ones are red ("Delete mission").</li>
+      <li>No native dropdowns remain: Org chart "Show to", Capacity range, host merge and sort all use the in-app picker.</li>
+      <li>Host panel: "Merge into another host" now sits inside the form, above the footer.</li>
+      <li>Bulk edit: two numbered steps and a real drop zone.</li>
+      <li>Empty board and empty forecast: composed empty states with the next step.</li>
+      <li>Phone: confirm dialogs and "Edit today's board?" open as bottom sheets.</li>
+      <li>Employee right-click menu: one icon column, sentence case, destructive item last.</li>
+      <li>Mission panel on phone: Shift on its own row, Start and End side by side.</li>
+      <li>Settings on phone opens on a section list.</li>
+      <li>No console errors anywhere in the tour.</li>
+    </ul>
+  </div>
+
+  <!-- ============================ P0 ============================ -->
+  <h2>P0 · Fix before release</h2>
+
+  <article class="item" id="i1">
+    <div class="ih"><span class="n">01</span><h3>Module tabs are hidden at common laptop widths</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">Top bar · desktop</i><i class="tag">M</i></div></div>
+    <p class="why">At any window narrower than about 1,340px the tab strip is cut off behind the status pill, with no arrow or fade to show there is more. At <b>1280px</b> (a very common laptop) <b>Capacity</b> is hidden. At <b>1100px</b> Manpower, Host and Capacity are all gone, and "Ma…" peeks out under the pill. People will think those modules were removed in this release.
+      <span class="where">Measured: tabs clip at 1024, 1100, 1180 and 1280px in English and Thai; fine from 1366px. <code>#board-tabs</code> has overflow hidden and the status pill (<code>#mode-pill</code>) holds three phrases.</span></p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><div class="shots"><img class="shot" src="tabs-1280.jpg" alt="Top bar at 1280px: the Capacity tab is cut off behind the Draft, Not reviewed, Read-only pill"><img class="shot" src="tabs-1100.jpg" alt="Top bar at 1100px: Manpower, Host and Capacity tabs are hidden"></div></div>
+      <div><p class="cap new">Proposed (1280px, then 1100px)</p>
+        <div class="after col">
+          <div class="bar"><span class="logo">TRIGO</span>
+            <span class="tab on"><svg class="ic"><use href="#i-board"/></svg>Board</span><span class="tab"><svg class="ic"><use href="#i-chart"/></svg>Overview</span><span class="tab"><svg class="ic"><use href="#i-org"/></svg>Org Chart</span><span class="tab"><svg class="ic"><use href="#i-users"/></svg>Manpower</span><span class="tab"><svg class="ic"><use href="#i-site"/></svg>Host</span><span class="tab"><svg class="ic"><use href="#i-list"/></svg>Capacity</span>
+            <span class="sp"></span><span class="pill"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>Draft</span><span class="dt"><svg class="ic"><use href="#i-cal"/></svg>Fri 16-Oct</span><span class="av">AZ</span></div>
+          <div class="bar" style="max-width:640px"><span class="logo">TRIGO</span>
+            <span class="tab on"><svg class="ic"><use href="#i-board"/></svg>Board</span><span class="tab" title="Overview"><svg class="ic"><use href="#i-chart"/></svg></span><span class="tab" title="Org Chart"><svg class="ic"><use href="#i-org"/></svg></span><span class="tab" title="Manpower"><svg class="ic"><use href="#i-users"/></svg></span><span class="tab" title="Host"><svg class="ic"><use href="#i-site"/></svg></span><span class="tab" title="Capacity"><svg class="ic"><use href="#i-list"/></svg></span>
+            <span class="sp"></span><span class="pill"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>Draft</span><span class="dt"><svg class="ic"><use href="#i-cal"/></svg>Fri 16-Oct</span><span class="av">AZ</span></div>
+        </div></div>
+    </div>
+    <div class="fix"><p class="cap">Change</p><ul>
+      <li>Below 1440px the pill shows only its main word (Draft, Locked, Forecast…) with the lock icon, as the phone already does. "Not reviewed · Read-only" moves into its tooltip.</li>
+      <li>Below 1180px the tabs go icon-only with a tooltip, keeping the label on the active tab. The tabs never clip.</li>
+      <li>Below 1280px the date drops its year ("Fri 16-Oct").</li>
+      <li>Add a check to <code>stats-tiles.e2e.js</code> that every tab is fully visible at 1024, 1100, 1280 and 1366px.</li>
+    </ul></div>
+  </article>
+
+  <article class="item" id="i2">
+    <div class="ih"><span class="n">02</span><h3>Disabled main buttons turn into blank white boxes on hover or tap</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">Buttons · everywhere</i><i class="tag">S</i></div></div>
+    <p class="why">When a navy button is disabled and the mouse is over it (or it was just tapped on a phone, where the hover state sticks), its background turns white but its label stays white, so the button looks empty. This hits about a dozen buttons: Bulk edit <b>Apply changes</b>, Export <b>Export</b>, Add Mission <b>Add selected</b>, Hide/Unhide <b>Save</b>, Settings <b>Save</b>, Review &amp; merge <b>Apply</b>, Review changes <b>Apply</b>, Copy forecast, and <b>Sign in</b> while it is signing in.
+      <span class="where">Cause: <code>styles.css:410</code> <code>.btn:disabled:hover { background: var(--panel) }</code> applies to <code>.btn-primary</code> too.</span></p>
+    <div class="cmp">
+      <div><p class="cap now">Today (pointer over the disabled Apply button)</p><img class="shot" src="bulk-hover.jpg" alt="Bulk edit footer: the disabled Apply changes button is an empty white outline"></div>
+      <div><p class="cap new">Proposed</p><div class="after col">
+        <div class="row2"><span class="wlabel">disabled, hovered</span><span style="display:flex;gap:8px"><span class="btn">Cancel</span><span class="btn p dis">Apply changes</span></span></div>
+        <div class="row2"><span class="wlabel">enabled, hovered</span><span style="display:flex;gap:8px"><span class="btn">Cancel</span><span class="btn p hov">Apply changes</span></span></div>
+        <pre class="code"><span class="c">/* styles.css, after line 410 */</span>
+.btn-primary:disabled:hover { background: <span class="a">var(--primary)</span>; border-color: <span class="a">var(--primary)</span>; }
+.btn-danger:disabled:hover  { background: <span class="a">var(--danger)</span>;  border-color: <span class="a">var(--danger)</span>; }</pre>
+      </div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i3">
+    <div class="ih"><span class="n">03</span><h3>Thai mode is half-translated, sometimes inside one sentence</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">ไทย · all tabs</i><i class="tag">M</i></div></div>
+    <p class="why">The Thai switch is new in this release, so Thai users will open it straight away. Most labels are translated, but phrase-by-phrase translation leaves sentences that mix the two languages. These read worse than either language alone ("ว่าง 3 on-call staff are เป็นกำลังสำรอง…", "on 4 โฮสต์, run by 2 วิศวกร"). Placeholders, tooltips, two panel tabs, the Export and Bulk edit text and the Settings home subtitles are still English. A scan of the visible text in Thai found 40+ strings.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today (ไทย)</p><div class="shots"><img class="shot" src="th-attention.jpg" alt="Overview attention card in Thai with English fragments mixed in"><img class="shot" src="th-kpi.jpg" alt="Overview KPI cards in Thai with English fragments"><img class="shot n360" src="th-settings.jpg" alt="Phone Settings home in Thai with English subtitles and a 1 waiting chip"></div></div>
+      <div><p class="cap new">Proposed: translate whole sentences (draft Thai, please have a native speaker check it)</p>
+        <div class="tw"><table>
+          <thead><tr><th>Where</th><th>Today</th><th>Proposed</th></tr></thead>
+          <tbody>
+            <tr><td>Overview attention</td><td class="bad">ว่าง 3 on-call staff are เป็นกำลังสำรอง…</td><td class="good">ออนคอลว่าง 3 คน เป็นกำลังสำรองยามงานเร่งด่วน ไม่ต้องดำเนินการใดๆ</td></tr>
+            <tr><td>Overview attention</td><td class="bad">2 boards · click a name to open that person's board</td><td class="good">2 บอร์ด · คลิกชื่อเพื่อเปิดบอร์ดของคนนั้น</td></tr>
+            <tr><td>Overview KPI</td><td class="bad">on 4 โฮสต์, run by 2 วิศวกร</td><td class="good">ที่ 4 โฮสต์ ดูแลโดยวิศวกร 2 คน</td></tr>
+            <tr><td>Overview KPI / History</td><td class="bad">3 of 4 · today 58% · 1 of 12</td><td class="good">3 จาก 4 · วันนี้ 58% · 1 จาก 12</td></tr>
+            <tr><td>Overview By board</td><td class="bad">ลูกศร Click a row to show only that board here; the เปิดตัวบอร์ดเอง</td><td class="good">คลิกแถวเพื่อดูเฉพาะบอร์ดนั้น · ลูกศรเปิดบอร์ดนั้น</td></tr>
+            <tr><td>Overview bands, By engineer</td><td class="bad">all boards · across all boards · YTD</td><td class="good">ทุกบอร์ด · จากทุกบอร์ด · ต้นปีถึงวันนี้</td></tr>
+            <tr><td>Employee panel tabs</td><td class="bad">Host record · Details</td><td class="good">ประวัติโฮสต์ · รายละเอียด</td></tr>
+            <tr><td>Mission panel hints</td><td class="bad">— no service area set yet · — no account yet</td><td class="good">ยังไม่ได้กำหนดพื้นที่บริการ · ยังไม่มีบัญชีผู้ใช้</td></tr>
+            <tr><td>People panel, lists</td><td class="bad">Search employee… · Search name (Thai or English)… · Search host… · Search name or email…</td><td class="good">ค้นหาพนักงาน… · ค้นหาชื่อ (ไทยหรืออังกฤษ)… · ค้นหาโฮสต์… · ค้นหาชื่อหรืออีเมล…</td></tr>
+            <tr><td>Export panel</td><td class="bad">Export · Saves a high-resolution image…</td><td class="good">ส่งออก · บันทึกเป็นรูปภาพความละเอียดสูง…</td></tr>
+            <tr><td>Bulk edit</td><td class="bad">Change many employees at once… · Drop the .xlsx here · choose a file · 10 employees</td><td class="good">แก้ไขพนักงานหลายคนพร้อมกันด้วยสเปรดชีต… · วางไฟล์ .xlsx ที่นี่ · เลือกไฟล์ · พนักงาน 10 คน</td></tr>
+            <tr><td>Settings home</td><td class="bad">ชื่อ, mobile number, password · What each role can see and change · 1 waiting</td><td class="good">ชื่อ เบอร์มือถือ รหัสผ่าน · สิ่งที่แต่ละบทบาทดูและแก้ไขได้ · รออนุมัติ 1</td></tr>
+            <tr><td>Roles</td><td class="bad">always full access · you</td><td class="good">สิทธิ์เต็มเสมอ · คุณ</td></tr>
+            <tr><td>Tooltips, placeholders</td><td class="bad">Which name the employee cards show… · e.g. Safety shoes, helmet, glasses · Optional notes · + Add host…</td><td class="good">การ์ดแสดงชื่อแบบใด… · เช่น รองเท้านิรภัย หมวก แว่นตา · หมายเหตุ (ไม่บังคับ) · + เพิ่มโฮสต์…</td></tr>
+          </tbody></table></div>
+        <p class="note">Rule for <code>i18n-th.js</code>: translate a sentence whole, with its numbers as placeholders (<code>"{n} on-call staff are free…"</code>). Translating fragments is what creates the mixed lines.</p>
+      </div>
+    </div>
+  </article>
+
+  <article class="item" id="i4">
+    <div class="ih"><span class="n">04</span><h3>The release gate is red: 3 browser test suites fail, and all three are stale tests</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">Tests</i><i class="tag">S</i></div></div>
+    <p class="why">I checked each failure by hand, and the app behaves correctly in all three. Each test still expects an older layout. Ship with a green suite, so that the next real failure isn't lost among known ones.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><div class="tw"><table>
+        <thead><tr><th>Suite</th><th>Fails at</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><code>app-version</code></td><td>final "no console errors"</td><td>The test itself serves a 500 to check the app stays silent; Chrome logs that 500, and the test counts its own log.</td></tr>
+          <tr><td><code>forward-planning</code></td><td>Part B, line 767</td><td>Clicks <code>#board-tabs .tab-capacity</code> at 390px. On a phone that tab is hidden; Capacity lives under <b>Me</b>.</td></tr>
+          <tr><td><code>list-alerts-org</code></td><td>"+ Add start date"</td><td>Focus correctly lands on the new in-app date button, but the test looks for the field name inside <code>.pk</code>, where the date picker doesn't keep it.</td></tr>
+        </tbody></table></div></div>
+      <div><p class="cap new">Proposed</p><div class="tw"><table>
+        <thead><tr><th>Suite</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td><code>app-version</code></td><td>Filter <code>Failed to load resource … 500</code> out of <code>a.errors</code> for the step that serves it, or check the errors before that step.</td></tr>
+          <tr><td><code>forward-planning</code></td><td>Open Capacity the phone way: <code>#btn-bn-more</code>, then the "Capacity" item.</td></tr>
+          <tr><td><code>list-alerts-org</code></td><td>Read the name from the focused button's field (<code>aria-label</code>, or the input the date picker is bound to).</td></tr>
+        </tbody></table></div>
+        <p class="note">Then run all 23 suites once more before tagging the release.</p></div>
+    </div>
+  </article>
+
+  <!-- ============================ P1 ============================ -->
+  <h2>P1 · Should be in this pack</h2>
+
+  <article class="item" id="i5">
+    <div class="ih"><span class="n">05</span><h3>Board toolbar wraps to two rows, and the Names toggle looks like a language switch</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board toolbar</i><i class="tag">S</i></div></div>
+    <p class="why">The new <b>ไทย | English</b> card-names toggle sits in the toolbar with no label. It reads as the app language (which has the same two words in the avatar menu), so people will flip it expecting the screen to turn Thai. It also pushes Undo, Reset Board and Export onto a second row below 1280px. The phone ⋯ menu already labels it "Names". Do the same on desktop.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today (1100px)</p><img class="shot" src="toolbar-1100.jpg" alt="Board toolbar at 1100px wrapping to two rows with an unlabeled ไทย English toggle"></div>
+      <div><p class="cap new">Proposed: Names moves into Filter &amp; sort; the toolbar stays on one row</p><div class="after col">
+        <div class="tb zm" style="flex-wrap:nowrap"><span class="btn sm">Board One ▾</span><span class="btn sm p"><svg class="ic"><use href="#i-plus"/></svg>New Mission</span><span class="btn sm"><svg class="ic"><use href="#i-plus"/></svg>New Employee</span><span class="btn sm"><svg class="ic"><use href="#i-search"/></svg>Filter &amp; sort</span><span class="btn sm q" title="Hide/Unhide"><svg class="ic"><use href="#i-hide"/></svg></span><span class="grow"></span><span class="btn sm q"><svg class="ic"><use href="#i-undo"/></svg></span><span class="btn sm q"><svg class="ic"><use href="#i-reset"/></svg>Reset</span><span class="btn sm"><svg class="ic"><use href="#i-dl"/></svg>Export</span></div>
+        <div class="pop" style="justify-self:center"><div class="h">Filter &amp; sort</div><div class="fld"><small>Engineer</small><span class="v">All</span></div><div class="fld"><small>Sort by</small><span class="v">Mission No.</span></div><div class="h">Names on cards</div><div class="seg"><span class="on">ไทย</span><span>English</span><span>Both</span></div></div>
+      </div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i6">
+    <div class="ih"><span class="n">06</span><h3>Mission card text breaks with long customer names</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board · mission card</i><i class="tag">S</i></div></div>
+    <p class="why">With a long customer name at laptop width, the meta line wraps inside each part. The time splits as "08:00-" / "17:00" and the engineer as "Eng" / "Two", so the card header doubles in height. Customer names like this are normal for TRIGO's clients.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today (1100px)</p><img class="shot n360" src="card-104.jpg" alt="Mission 104 card: the time and engineer name wrap onto two lines"></div>
+      <div><p class="cap new">Proposed: time and engineer never wrap; the customer name shortens with …</p><div class="after">
+        <div class="mc" style="--c:#f6a06b"><div class="hd"><div class="t"><b>104</b><span>Thai Summit Autoparts Industry (Rayong Plant 2) Co., Ltd.</span><i>DAY</i></div><div class="m"><span class="cu">Very Long Customer Name Automotive Group</span><span class="nw">· 08:00–17:00 ·</span><span class="eng">Eng Two</span></div></div>
+          <div class="bd"><span class="pc"><span class="sq">วศ</span>วิทยา<span class="ar">AREA1</span></span><span class="pc oc"><span class="sq">สช</span>สมชาย<span class="ar">OC</span></span></div></div>
+      </div></div>
+    </div>
+    <div class="fix"><p class="cap">Change</p><ul><li><code>white-space: nowrap</code> on the time and engineer spans; <code>min-width: 0; text-overflow: ellipsis</code> on the customer; the full text stays in the tooltip and the panel.</li></ul></div>
+  </article>
+
+  <article class="item" id="i7">
+    <div class="ih"><span class="n">07</span><h3>Org Chart on a phone doesn't use the phone header the other tabs share</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Org Chart · phone</i><i class="tag">M</i></div></div>
+    <p class="why">Overview, Manpower and Host open with the same header: a summary card, Filter and ⋯. Org Chart instead stacks the Board picker, a lone "More" button, a stats line, a lone Export button, the view switch, three filter buttons, a floating "FILTER" label and "Show to". The chart starts below the middle of the screen.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today (390px)</p><img class="shot n360" src="org-phone.jpg" alt="Org Chart on phone with many stacked controls before the chart"></div>
+      <div><p class="cap new">Proposed</p><div class="after">
+        <div class="ph"><div class="top"><b>Org Chart</b><span class="btn sm"><svg class="ic"><use href="#i-left"/></svg></span><span class="btn sm">16-Oct</span></div>
+          <div class="body">
+            <div style="display:flex;gap:6px"><span class="sum">All boards · 7 crew deployed</span><span class="sq"><svg class="ic"><use href="#i-filter"/></svg></span><span class="sq"><svg class="ic"><use href="#i-more"/></svg></span></div>
+            <div class="seg"><span class="on">Outline</span><span>Org chart</span></div>
+            <div style="background:var(--panel);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px">
+              <b style="color:var(--ink)">TRIGO Manpower</b><span style="color:var(--muted);font-size:11px">2 boards · 2 engineers · 5 missions · 16 crew</span>
+              <span style="padding-left:12px;font-weight:600;color:var(--ink)">▾ Board One</span><span style="padding-left:26px">▾ Eng One · 2 missions</span><span style="padding-left:40px;color:var(--muted)">101 Host Alpha · Day · 2 crew</span>
+            </div>
+            <p class="note" style="margin:0">Filter holds Board, Engineer, Service area, Standby / Leave and Show to; ⋯ holds Export.</p>
+          </div></div>
+      </div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i8">
+    <div class="ih"><span class="n">08</span><h3>On/off switches are navy on desktop but green on a phone</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Manpower · Host · phone</i><i class="tag">S</i></div></div>
+    <p class="why">The Manpower Status switch and the host Active switch are navy on desktop and lime green on a phone. Signal keeps navy as the only action colour. Green is the brand accent, and in the app it also signals "good" (Active, Approved).</p>
+    <div class="cmp">
+      <div><p class="cap now">Today: desktop (left), phone (right)</p><div class="shots"><img class="shot" src="toggle-desk.jpg" alt="Desktop Manpower list status switches in navy"><img class="shot n360" src="toggle-phone.jpg" alt="Phone employee card with a green Active switch"></div></div>
+      <div><p class="cap new">Proposed: navy everywhere</p><div class="after col">
+        <div class="tgrow"><span class="tg"></span>Active <span class="wlabel" style="margin-left:auto">desktop + phone</span></div>
+        <div class="tgrow"><span class="tg" style="background:#c7ced8"></span><span style="color:var(--muted)">Inactive</span></div>
+      </div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i9">
+    <div class="ih"><span class="n">09</span><h3>Phone Filter sheet has no title, Clear or Done</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board · phone</i><i class="tag">S</i></div></div>
+    <p class="why">Tapping Filter drops a panel from the top with four boxes that look like empty text fields (Engineer, Host, Customer, Shift). It has no heading, no way to clear everything and no obvious way to close it. The phone's other sheets (confirm, Edit today's board) open from the bottom with a title and buttons.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot n360" src="filter-phone.jpg" alt="Phone filter panel with four plain boxes and Sort by"></div>
+      <div><p class="cap new">Proposed: a bottom sheet like the others</p><div class="after">
+        <div class="ph" style="background:#c9d0d9"><div style="height:120px"></div>
+          <div class="sheet"><div class="grab"></div><div class="sh"><b>Filter &amp; sort</b><span class="btn sm q">Clear all</span></div>
+            <div class="fld"><small>Engineer</small><span class="v">Eng One <svg class="ic"><use href="#i-right"/></svg></span></div>
+            <div class="fld"><small>Host</small><span class="v">All <svg class="ic"><use href="#i-right"/></svg></span></div>
+            <div class="fld"><small>Customer</small><span class="v">All <svg class="ic"><use href="#i-right"/></svg></span></div>
+            <div class="fld"><small>Shift</small><span class="v">All <svg class="ic"><use href="#i-right"/></svg></span></div>
+            <div class="fld"><small>Sort by</small><span class="v">Mission No. <svg class="ic"><use href="#i-right"/></svg></span></div>
+            <span class="btn p" style="justify-content:center;height:40px">Show 3 missions</span></div></div>
+      </div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i10">
+    <div class="ih"><span class="n">10</span><h3>The module tabs can't be reached with the keyboard</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Accessibility</i><i class="tag">S</i></div></div>
+    <p class="why">Pressing Tab from the top goes Lock → date → avatar → toolbar and skips Board, Overview, Org Chart, Manpower, Host and Capacity. They are plain <code>&lt;div&gt;</code>s with a click handler, so keyboard and screen-reader users can't switch modules. Employee cards on the board are <code>&lt;div&gt;</code>s too.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><pre class="code"><span class="c">// app.js renderTabs()</span>
+const ov = document.createElement(<span class="d">"div"</span>);
+ov.className = "board-tab tab-overview";
+ov.onclick = () =&gt; { … };</pre></div>
+      <div><p class="cap new">Proposed</p><pre class="code"><span class="c">// one helper for all six tabs</span>
+const ov = document.createElement(<span class="a">"button"</span>);
+ov.type = "button";
+ov.className = "board-tab tab-overview";
+ov.setAttribute(<span class="a">"aria-current"</span>, isOverview() ? "page" : "false");
+ov.onclick = () =&gt; { … };</pre>
+        <p class="note">Reset the button styles in <code>.board-tab</code> (border, background and font: inherit). Give the focus ring white on the navy bar.</p></div>
+    </div>
+  </article>
+
+  <article class="item" id="i11">
+    <div class="ih"><span class="n">11</span><h3>Utilization shows 58.33% in one place and 58% in another</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Overview</i><i class="tag">S</i></div></div>
+    <p class="why">The Overview's top line and the phone summary card print two decimals (58.33%). The KPI card, the By board table and the board header print whole numbers (58%, 70%). Two decimals suggest a precision the data doesn't have.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><div class="shots"><img class="shot" src="ov-strip.jpg" alt="Overview top line showing Utilization 58.33%"><img class="shot n360" src="ov-phone-sum.jpg" alt="Phone Overview summary showing 58.33% assigned and utilized"></div></div>
+      <div><p class="cap new">Proposed</p><div class="after col"><div class="tb" style="font-size:12.5px;gap:14px"><span>Boards: <b>2</b></span><span>Utilization: <b>58%</b></span><span>Assigned: <b>7</b></span><span>Standby: <b>5</b></span></div><p class="note" style="margin:0">One <code>fmtPct()</code> helper (whole numbers) used by every utilization label.</p></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i12">
+    <div class="ih"><span class="n">12</span><h3>A forecast day shows "Add Mission" next to "New Mission"</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board · forecast</i><i class="tag">S</i></div></div>
+    <p class="why">On a future date the toolbar has <b>Add Mission</b> (copy missions from the confirmed plan) right beside <b>New Mission</b> (create one). The labels mean almost the same thing, and the empty state repeats "Add Mission…".</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="forecast-bar.jpg" alt="Forecast toolbar with both Add Mission and New Mission buttons"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="tb"><span class="btn sm">Board One ▾</span><span class="btn sm p"><svg class="ic"><use href="#i-plus"/></svg>New Mission</span><span class="btn sm"><svg class="ic"><use href="#i-copy"/></svg>Copy from confirmed…</span><span class="btn sm"><svg class="ic"><use href="#i-plus"/></svg>New Employee</span></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i13">
+    <div class="ih"><span class="n">13</span><h3>People tiles and the black night block still use the old look (Signal review 04 and 05)</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board</i><i class="tag">L</i></div></div>
+    <p class="why">This is the biggest remaining gap with the new design. The cards are still grey tiles with "Person" bold over a tiny second line, headers carry a pastel wash, and a night mission gets a near-black body that reads as an error. The earlier review suggested shipping it on its own because it touches drag and drop, print and the JPG export. <b>My recommendation: leave it out of this pack</b> unless you have time to test the exports, and make it the headline of the next one.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="board-cards.jpg" alt="Board mission cards with grey people tiles and black night blocks"></div>
+      <div><p class="cap new">Proposed (as in the Signal review)</p><div class="after">
+        <div class="mc"><div class="hd"><div class="t"><b>101</b><span>Host Alpha</span><i>DAY</i></div><div class="m"><span class="cu">Cust Alpha</span><span class="nw">· 08:00–17:00 ·</span><span class="eng">Eng One</span></div></div><div class="bd"><span class="pc"><span class="sq">PA</span>Person A<span class="ar">AREA1</span></span><span class="pc"><span class="sq">PB</span>Person B<span class="ar">AREA1</span></span></div></div>
+        <div class="mc night" style="--c:#7d8ea8"><div class="hd"><div class="t"><b>103</b><span>Host Gamma</span><i class="nt">NIGHT</i></div><div class="m"><span class="cu">Cust Alpha</span><span class="nw">· 20:00–05:00 ·</span><span class="eng">Eng One</span></div></div><div class="bd"><span class="pc"><span class="sq">PD</span>Person D<span class="ar">AREA1</span></span><span class="pc oc"><span class="sq">PG</span>Person G<span class="ar">On-call</span></span></div></div>
+      </div></div>
+    </div>
+  </article>
+
+  <!-- ============================ P2 ============================ -->
+  <h2>P2 · Polish</h2>
+
+  <article class="item" id="i14">
+    <div class="ih"><span class="n">14</span><h3>Export opens a full-height drawer for one choice</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Board · Export</i><i class="tag">S</i></div></div>
+    <p class="why">Signal uses a side panel for one record and a small dialog for one decision. Export is one decision (JPG, PDF or Excel), yet it fills a full-height panel that is 80% empty, and still cuts its one-line description short with "More".</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="export.jpg" alt="Export side panel mostly empty, with truncated description"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="dlg"><h4>Export Board One</h4><p>Fri 16 Oct 2026</p><div class="seg" style="margin-bottom:10px"><span class="on">JPG image</span><span>PDF</span><span>Excel</span></div><p>A high-resolution picture of the board, for chat groups. Use PDF to print, or Excel to edit.</p><div class="acts"><span class="btn q">Cancel</span><span class="btn p"><svg class="ic"><use href="#i-dl"/></svg>Export JPG</span></div></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i15">
+    <div class="ih"><span class="n">15</span><h3>Help text is cut to one line even when the panel has room</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Panels</i><i class="tag">S</i></div></div>
+    <p class="why">Host panel, Bulk edit and Export clamp every hint to one line and add "More". Most hints are under two lines, so people click More just to read half a sentence.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot n360" src="host-panel.jpg" alt="Host panel with two hints cut to one line plus More"></div>
+      <div><p class="cap new">Proposed: clamp at 3 lines, and show More only when the text is actually cut</p><div class="after"><div class="side"><div class="bd"><div class="f"><label>Host name</label><div class="inp">Host Alpha</div></div><p class="hint">The name ties this record to the host's missions and deployment history. Renaming it here renames it everywhere.</p><div class="f"><label>Google Maps link</label><div class="inp" style="color:#9aa4b1">https://maps.app.goo.gl/…</div></div><p class="hint">Paste the link from Google Maps (Share → Copy link). The location shows as a pin on the mission card.</p></div></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i16">
+    <div class="ih"><span class="n">16</span><h3>Warnings in the mission panel use a green-style tick</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Mission panel</i><i class="tag">S</i></div></div>
+    <p class="why">"✓ … — no service area set yet" and "✓ Eng Two — no account yet" combine a tick (all good) with a gap to fix, in bold navy.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot n360" src="mission-hint.jpg" alt="Mission panel hints with a tick saying no service area set yet and no account yet"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="side"><div class="bd"><div class="f"><label>Host (company)</label><div class="inp">Thai Summit Autoparts Industry (Rayong P…</div></div><p class="hint warn"><svg class="ic"><use href="#i-info"/></svg>No service area set for this host yet. <a href="#i16">Set it</a></p><div class="f"><label>Engineer</label><div class="inp">Eng Two</div></div><p class="hint"><svg class="ic"><use href="#i-info"/></svg>Eng Two has no sign-in account yet.</p></div></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i17">
+    <div class="ih"><span class="n">17</span><h3>Two styles of close button</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Panels</i><i class="tag">S</i></div></div>
+    <p class="why">The Mission, Export and Employee panels use a plain ×. Host, Bulk edit and the Thai Mission panel use a grey filled square, which makes the same panel look different by language.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><div style="display:flex;gap:10px;flex-wrap:wrap"><img class="shot" src="close-a.jpg" alt="Plain close button" style="width:100px"><img class="shot" src="close-b.jpg" alt="Filled grey close button" style="width:100px"></div></div>
+      <div><p class="cap new">Proposed: one quiet icon button, grey fill on hover only</p><div class="after"><span class="btn q" style="width:34px;padding:0;justify-content:center"><svg class="ic"><use href="#i-x"/></svg></span><span class="btn" style="width:34px;padding:0;justify-content:center;background:var(--soft);border-color:transparent"><svg class="ic"><use href="#i-x"/></svg></span><span class="wlabel">rest · hover</span></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i18">
+    <div class="ih"><span class="n">18</span><h3>Host panel: fields start flush under the header, and titles repeat themselves</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Host · Export panels</i><i class="tag">S</i></div></div>
+    <p class="why">In the Host panel "Host name" sits right on the header's divider (about 6px, against 24px in the Mission panel). Titles read "Host — Host Alpha" and "Export — Board One". Signal's inspector puts the record name in the title and the type underneath.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot n360" src="host-panel.jpg" alt="Host panel header with field label touching the divider"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="side"><div class="hd"><div><b>Host Alpha</b><small>Host · 3 missions · 12 deployment days</small></div><span class="x"><svg class="ic"><use href="#i-x"/></svg></span></div><div class="bd" style="padding-top:20px"><div class="f"><label>Host name</label><div class="inp">Host Alpha</div></div></div></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i19">
+    <div class="ih"><span class="n">19</span><h3>Status pill: "Not planned" looks disabled, "Draft" carries three phrases</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Top bar</i><i class="tag">S</i></div></div>
+    <p class="why">"Not planned" is grey text in a grey outline, so it looks like a disabled button. "Draft · Not reviewed · Read-only" is the longest thing in the top bar and is part of why the tabs get pushed out (item 1).</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><div class="shots"><img class="shot" src="empty-pill.jpg" alt="Not planned pill in grey outline" style="max-width:270px"><img class="shot" src="pill-draft.jpg" alt="Draft, Not reviewed, Read-only pill" style="max-width:240px"></div></div>
+      <div><p class="cap new">Proposed</p><div class="after"><span class="pillx np">Not planned</span><span class="pillx dr"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>Draft</span><span class="wlabel">details in the tooltip</span></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i20">
+    <div class="ih"><span class="n">20</span><h3>Dates are written four ways, sometimes on the same screen</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Everywhere</i><i class="tag">M</i></div></div>
+    <p class="why">The forecast banner says "Fri 6 Nov", and the empty state right below it says "Fri 06-Nov-2026". Capacity uses "16/10", and the Overview chart "01/10". Pick one long and one short form.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><div class="shots"><img class="shot" src="dates-banner.jpg" alt="Forecast banner reading Fri 6 Nov"><img class="shot" src="dates-empty.jpg" alt="Empty state reading Fri 06-Nov-2026"></div></div>
+      <div><p class="cap new">Proposed</p><div class="tw"><table><thead><tr><th>Use</th><th>Format</th><th>Example</th></tr></thead><tbody>
+        <tr><td>Header, banners, panels, empty states</td><td>Ddd d Mmm yyyy</td><td>Fri 6 Nov 2026</td></tr>
+        <tr><td>Grids, chart axes, chips</td><td>d Mmm</td><td>6 Nov</td></tr>
+        <tr><td>Exports (Excel)</td><td>real dates</td><td>unchanged</td></tr></tbody></table></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i21">
+    <div class="ih"><span class="n">21</span><h3>Org Chart counts say "5 miss · 14 crew" and "2 eng"</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Org Chart</i><i class="tag">S</i></div></div>
+    <p class="why">"miss" reads as a word, not an abbreviation. The row has room for the full words, and the top line already spells them out.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="org-meta.jpg" alt="Org Chart outline counts with miss and eng abbreviations" style="max-width:300px"></div>
+      <div><p class="cap new">Proposed</p><div class="after col" style="font-size:12px;color:var(--muted);text-align:right"><span>2 engineers · 1 area · 5 missions · 14 crew</span><span>1 area · 2 missions · 3 crew</span></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i22">
+    <div class="ih"><span class="n">22</span><h3>Overview's navy "In detail" and "Period" bands are the heaviest thing on the page</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Overview</i><i class="tag">S</i></div></div>
+    <p class="why">Two full-width navy bars carrying a small label pull the eye away from the numbers. Signal builds structure from space and type. Still open from the earlier review (item 17).</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="ov-band.jpg" alt="Overview with a full-width navy In detail band"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="band"><b>In detail</b><span>Fri 16 Oct 2026 · all boards</span></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i23">
+    <div class="ih"><span class="n">23</span><h3>Manpower table: 60+ "+ Add" chips drown the data</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Manpower</i><i class="tag">S</i></div></div>
+    <p class="why">Every blank TRIGO ID, Position, Mobile and Start date shows a "+ Add" chip, so on a real list the chips outnumber the names. The amber pills above the table ("10 missing TRIGO ID") already flag the gaps.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="manpower-adds.jpg" alt="Manpower table where most cells are + Add chips"></div>
+      <div><p class="cap new">Proposed: a quiet dash, and "+ Add" on the row you point at (phone cards keep it)</p><div class="after"><table class="mini-table"><tbody>
+        <tr><td>Person A</td><td class="dash">—</td><td>Permanent</td><td class="dash">—</td><td class="dash">—</td></tr>
+        <tr class="hv"><td>Person B</td><td><span class="add">+ Add</span></td><td>Permanent</td><td><span class="add">+ Add</span></td><td><span class="add">+ Add</span></td></tr>
+        <tr><td>วิทยา ศรีสุวรรณวงศ์</td><td>T1001</td><td>Permanent</td><td class="dash">—</td><td class="dash">—</td></tr></tbody></table></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i24">
+    <div class="ih"><span class="n">24</span><h3>Capacity on a phone: "No demand yet" sits on the card edge</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Capacity · phone</i><i class="tag">S</i></div></div>
+    <p class="why">The empty line has no inner padding, so it touches the card's left edge while the controls below are indented.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot n360" src="cap-phone.jpg" alt="Capacity phone card with unpadded No demand yet text"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="side" style="width:300px"><div class="bd"><b style="color:var(--ink)">Board One · demand by host</b><p class="hint" style="font-style:italic">No demand yet. Add a host below.</p><div style="display:flex;gap:6px"><div class="inp" style="flex:1;color:var(--navy);font-weight:600">+ Add host…</div><span class="btn sm">Day ▾</span><span class="btn sm">Add</span></div></div></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i25">
+    <div class="ih"><span class="n">25</span><h3>Phone leave tabs are cut off with no hint that they scroll</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Board · phone</i><i class="tag">S</i></div></div>
+    <p class="why">"Unpaid" is cut at the screen edge and "Exchange" is out of sight. A fade on the right edge tells people the row scrolls.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot n360" src="leave-phone.jpg" alt="Phone leave tabs with Unpaid cut at the edge"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="fade chipr" style="flex-wrap:nowrap;overflow:hidden;width:280px;background:#fff;padding:6px;border-radius:10px"><span class="chip on">Annual 1</span><span class="chip">Sick 0</span><span class="chip">Business 0</span><span class="chip">Unpaid 0</span></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i26">
+    <div class="ih"><span class="n">26</span><h3>Thai shift names don't match: กลางวัน and กะกลางคืน</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">ไทย</i><i class="tag">S</i></div></div>
+    <p class="why">Day became "กลางวัน" in the last update, but Night is still "กะกลางคืน". The longer word also crowds the Shift switch and the card tag.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot n360" src="th-mission.jpg" alt="Thai mission panel Shift switch reading กลางวัน and กะกลางคืน"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="seg" style="width:220px"><span class="on">กลางวัน</span><span>กลางคืน</span></div></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i27">
+    <div class="ih"><span class="n">27</span><h3>Users list shows the same name twice</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Settings · Users</i><i class="tag">S</i></div></div>
+    <p class="why">When the display name equals the short name, the row shows "admin.z" and then an "admin.z" tag. Show the tag only when the two differ.</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="users-dup.jpg" alt="Users table with duplicated name tags" style="max-width:460px"></div>
+      <div><p class="cap new">Proposed</p><div class="after col" style="font-size:13px;max-width:340px"><span><b>admin.z</b> <span class="tag">you</span></span><span><b>Somchai J.</b> <span class="tag">somchai.j</span></span></div></div>
+    </div>
+  </article>
+
+  <article class="item" id="i28">
+    <div class="ih"><span class="n">28</span><h3>A night mission can show day hours</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Board · mission</i><i class="tag">S</i></div></div>
+    <p class="why">Missions 103 and 105 are Night, but their cards say 08:00–17:00 because no times were entered and the default is the day shift. Switching Shift to Night should also switch empty or default times to the night default, or the card should say "Night · time not set".</p>
+    <div class="cmp">
+      <div><p class="cap now">Today</p><img class="shot" src="board-cards.jpg" alt="Night missions 103 and 105 showing 08:00-17:00"></div>
+      <div><p class="cap new">Proposed</p><div class="after"><div class="mc night" style="--c:#7d8ea8"><div class="hd"><div class="t"><b>105</b><span>Host Alpha</span><i class="nt">NIGHT</i></div><div class="m"><span class="cu">Cust Beta</span><span class="nw">· 20:00–05:00 ·</span><span class="eng">Eng Two</span></div></div></div></div><p class="note">Please confirm the night default hours your team uses.</p></div>
+    </div>
+  </article>
+
+  <article class="item" id="i29">
+    <div class="ih"><span class="n">29</span><h3>Dark-theme CSS is still shipped though the app is light-only</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Code</i><i class="tag">S</i></div></div>
+    <p class="why">The theme toggle was removed and a stored dark theme is cleared, but <code>styles.css</code> still carries about 30 <code>[data-theme="dark"]</code> rules and a second token block. Users never see it; removing it makes the CSS smaller and stops future edits from maintaining two palettes.</p>
+    <div class="fix"><p class="cap">Change</p><ul><li>Delete the <code>:root[data-theme="dark"]</code> blocks and the dark-only rules; keep the comments that explain the export colours.</li></ul></div>
+  </article>
+
+  <article class="item" id="i30">
+    <div class="ih"><span class="n">30</span><h3>Add a Thai check to the language test so item 3 can't come back</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Tests</i><i class="tag">S</i></div></div>
+    <p class="why">After switching to ไทย, walk each tab and the main panels and fail on visible text, placeholders or tooltips that are still English. The check should ignore names, IDs, AREA codes and file types (Excel, PDF, JPG). The scan I used for this review is about 30 lines and can go into <code>tests/e2e/language.e2e.js</code>.</p>
+  </article>
+
+  <footer>Screens taken from the test harness with sample data (fake names, example.com). Effort: S under half a day, M one to two days, L a few days including export checks. Source: <code>design/release-review/</code>.</footer>
+</div>
