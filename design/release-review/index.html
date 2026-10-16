@@ -190,6 +190,16 @@ pre.code .c{color:#8fa3b8} pre.code .a{color:#c8e08c} pre.code .d{color:#f3a59c}
 .done li{margin:3px 0;break-inside:avoid}
 .fade{position:relative}
 .fade::after{content:"";position:absolute;right:0;top:0;bottom:0;width:36px;background:linear-gradient(90deg,rgba(255,255,255,0),#fff)}
+.st{display:inline-flex;align-items:center;gap:5px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;line-height:20px;border:1px solid;white-space:nowrap}
+.st.fixed{background:var(--ok-s);color:var(--ok);border-color:var(--ok-l)}
+.st.skip{background:var(--soft);color:var(--muted);border-color:var(--line)}
+.shipped{margin:4px 18px 16px;padding:12px 14px;border:1px solid var(--ok-l);background:var(--ok-s);border-radius:10px}
+.shipped .cap{color:var(--ok);margin-bottom:8px}
+.shipped .cap::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--ok)}
+.shipped .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.shipped .row img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+.shipped .row img.n{max-width:340px;width:100%}
+.shipped p{font-size:12.5px;color:var(--text);margin:8px 0 0}
 footer{margin-top:40px;color:var(--muted);font-size:12px}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
 </style>
@@ -222,6 +232,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
 <div class="page">
   <div class="brand"><b>TRIGO</b> Manpower Board · pre-release review · version 2026-10-15g · 16 Oct 2026</div>
   <h1>Release readiness review</h1>
+  <p class="lead"><b>Update 16 Oct:</b> every item is now fixed on this branch except 12 and 13 (kept for a later pack) and 17 (no change needed). Each item ends with a green <b>Shipped</b> box showing the result. All 13 unit-test files and all 23 browser suites pass.</p>
   <p class="lead">I opened every tab, panel, dialog, menu and sheet in the real app (the test harness with sample data, including long Thai names and a long host name) at 1400px, 1100px and 390px, in English and Thai, and also checked 1024–1536px laptop widths. That is 124 screens, plus every automated test. Below are the 30 things I'd change, ranked by priority. Each one shows today's screen next to the proposed fix.</p>
 
   <div class="health" aria-label="Health check">
@@ -298,7 +309,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
   <h2>P0 · Fix before release</h2>
 
   <article class="item" id="i1">
-    <div class="ih"><span class="n">01</span><h3>Module tabs are hidden at common laptop widths</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">Top bar · desktop</i><i class="tag">M</i></div></div>
+    <div class="ih"><span class="n">01</span><h3>Module tabs are hidden at common laptop widths</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p0">P0</i><i class="tag">Top bar · desktop</i><i class="tag">M</i></div></div>
     <p class="why">At any window narrower than about 1,340px the tab strip is cut off behind the status pill, with no arrow or fade to show there is more. At <b>1280px</b> (a very common laptop) <b>Capacity</b> is hidden. At <b>1100px</b> Manpower, Host and Capacity are all gone, and "Ma…" peeks out under the pill. People will think those modules were removed in this release.
       <span class="where">Measured: tabs clip at 1024, 1100, 1180 and 1280px in English and Thai; fine from 1366px. <code>#board-tabs</code> has overflow hidden and the status pill (<code>#mode-pill</code>) holds three phrases.</span></p>
     <div class="cmp">
@@ -319,10 +330,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
       <li>Below 1280px the date drops its year ("Fri 16-Oct").</li>
       <li>Add a check to <code>stats-tiles.e2e.js</code> that every tab is fully visible at 1024, 1100, 1280 and 1366px.</li>
     </ul></div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/tabs-1280.jpg" alt="After: item 1"><img class="" src="after/tabs-1100.jpg" alt="After: item 1"></div><p>Tabs never hide: the top bar tightens the pill, drops the date's year, then shows inactive tabs as icons. The one status pill holds every status. Tested at 1024 / 1100 / 1280 / 1366px.</p></div>
   </article>
 
   <article class="item" id="i2">
-    <div class="ih"><span class="n">02</span><h3>Disabled main buttons turn into blank white boxes on hover or tap</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">Buttons · everywhere</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">02</span><h3>Disabled main buttons turn into blank white boxes on hover or tap</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p0">P0</i><i class="tag">Buttons · everywhere</i><i class="tag">S</i></div></div>
     <p class="why">When a navy button is disabled and the mouse is over it (or it was just tapped on a phone, where the hover state sticks), its background turns white but its label stays white, so the button looks empty. This hits about a dozen buttons: Bulk edit <b>Apply changes</b>, Export <b>Export</b>, Add Mission <b>Add selected</b>, Hide/Unhide <b>Save</b>, Settings <b>Save</b>, Review &amp; merge <b>Apply</b>, Review changes <b>Apply</b>, Copy forecast, and <b>Sign in</b> while it is signing in.
       <span class="where">Cause: <code>styles.css:410</code> <code>.btn:disabled:hover { background: var(--panel) }</code> applies to <code>.btn-primary</code> too.</span></p>
     <div class="cmp">
@@ -335,10 +347,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
 .btn-danger:disabled:hover  { background: <span class="a">var(--danger)</span>;  border-color: <span class="a">var(--danger)</span>; }</pre>
       </div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/bulk-hover.jpg" alt="After: item 2"></div><p>A disabled main button keeps its fill on hover and after a tap.</p></div>
   </article>
 
   <article class="item" id="i3">
-    <div class="ih"><span class="n">03</span><h3>Thai mode is half-translated, sometimes inside one sentence</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">ไทย · all tabs</i><i class="tag">M</i></div></div>
+    <div class="ih"><span class="n">03</span><h3>Thai mode is half-translated, sometimes inside one sentence</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p0">P0</i><i class="tag">ไทย · all tabs</i><i class="tag">M</i></div></div>
     <p class="why">The Thai switch is new in this release, so Thai users will open it straight away. Most labels are translated, but phrase-by-phrase translation leaves sentences that mix the two languages. These read worse than either language alone ("ว่าง 3 on-call staff are เป็นกำลังสำรอง…", "on 4 โฮสต์, run by 2 วิศวกร"). Placeholders, tooltips, two panel tabs, the Export and Bulk edit text and the Settings home subtitles are still English. A scan of the visible text in Thai found 40+ strings.</p>
     <div class="cmp">
       <div><p class="cap now">Today (ไทย)</p><div class="shots"><img class="shot" src="th-attention.jpg" alt="Overview attention card in Thai with English fragments mixed in"><img class="shot" src="th-kpi.jpg" alt="Overview KPI cards in Thai with English fragments"><img class="shot n360" src="th-settings.jpg" alt="Phone Settings home in Thai with English subtitles and a 1 waiting chip"></div></div>
@@ -364,10 +377,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
         <p class="note">Rule for <code>i18n-th.js</code>: translate a sentence whole, with its numbers as placeholders (<code>"{n} on-call staff are free…"</code>). Translating fragments is what creates the mixed lines.</p>
       </div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/th-attention.jpg" alt="After: item 3"><img class="n" src="after/ph-th-settings.jpg" alt="After: item 3"></div><p>Whole sentences in Thai; placeholders and tooltips on inputs are translated too; the language test now fails on English left in Thai mode.</p></div>
   </article>
 
   <article class="item" id="i4">
-    <div class="ih"><span class="n">04</span><h3>The release gate is red: 3 browser test suites fail, and all three are stale tests</h3><div class="meta"><i class="pri p0">P0</i><i class="tag">Tests</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">04</span><h3>The release gate is red: 3 browser test suites fail, and all three are stale tests</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p0">P0</i><i class="tag">Tests</i><i class="tag">S</i></div></div>
     <p class="why">I checked each failure by hand, and the app behaves correctly in all three. Each test still expects an older layout. Ship with a green suite, so that the next real failure isn't lost among known ones.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><div class="tw"><table>
@@ -386,13 +400,14 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
         </tbody></table></div>
         <p class="note">Then run all 23 suites once more before tagging the release.</p></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><p>All 23 browser suites pass (the Capacity phone test also passes on Fridays now).</p></div>
   </article>
 
   <!-- ============================ P1 ============================ -->
   <h2>P1 · Should be in this pack</h2>
 
   <article class="item" id="i5">
-    <div class="ih"><span class="n">05</span><h3>Board toolbar wraps to two rows, and the Names toggle looks like a language switch</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board toolbar</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">05</span><h3>Board toolbar wraps to two rows, and the Names toggle looks like a language switch</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Board toolbar</i><i class="tag">S</i></div></div>
     <p class="why">The new <b>ไทย | English</b> card-names toggle sits in the toolbar with no label. It reads as the app language (which has the same two words in the avatar menu), so people will flip it expecting the screen to turn Thai. It also pushes Undo, Reset Board and Export onto a second row below 1280px. The phone ⋯ menu already labels it "Names". Do the same on desktop.</p>
     <div class="cmp">
       <div><p class="cap now">Today (1100px)</p><img class="shot" src="toolbar-1100.jpg" alt="Board toolbar at 1100px wrapping to two rows with an unlabeled ไทย English toggle"></div>
@@ -401,10 +416,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
         <div class="pop" style="justify-self:center"><div class="h">Filter &amp; sort</div><div class="fld"><small>Engineer</small><span class="v">All</span></div><div class="fld"><small>Sort by</small><span class="v">Mission No.</span></div><div class="h">Names on cards</div><div class="seg"><span class="on">ไทย</span><span>English</span><span>Both</span></div></div>
       </div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/toolbar-1100.jpg" alt="After: item 5"><img class="" src="after/filter-pop.jpg" alt="After: item 5"></div><p>Names on cards lives in Filter & sort, labelled; row 1 stays on one line.</p></div>
   </article>
 
   <article class="item" id="i6">
-    <div class="ih"><span class="n">06</span><h3>Mission card text breaks with long customer names</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board · mission card</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">06</span><h3>Mission card text breaks with long customer names</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Board · mission card</i><i class="tag">S</i></div></div>
     <p class="why">With a long customer name at laptop width, the meta line wraps inside each part. The time splits as "08:00-" / "17:00" and the engineer as "Eng" / "Two", so the card header doubles in height. Customer names like this are normal for TRIGO's clients.</p>
     <div class="cmp">
       <div><p class="cap now">Today (1100px)</p><img class="shot n360" src="card-104.jpg" alt="Mission 104 card: the time and engineer name wrap onto two lines"></div>
@@ -414,10 +430,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
       </div></div>
     </div>
     <div class="fix"><p class="cap">Change</p><ul><li><code>white-space: nowrap</code> on the time and engineer spans; <code>min-width: 0; text-overflow: ellipsis</code> on the customer; the full text stays in the tooltip and the panel.</li></ul></div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/card-104.jpg" alt="After: item 6"></div><p>Customer shortens with …; time and engineer never break.</p></div>
   </article>
 
   <article class="item" id="i7">
-    <div class="ih"><span class="n">07</span><h3>Org Chart on a phone doesn't use the phone header the other tabs share</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Org Chart · phone</i><i class="tag">M</i></div></div>
+    <div class="ih"><span class="n">07</span><h3>Org Chart on a phone doesn't use the phone header the other tabs share</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Org Chart · phone</i><i class="tag">M</i></div></div>
     <p class="why">Overview, Manpower and Host open with the same header: a summary card, Filter and ⋯. Org Chart instead stacks the Board picker, a lone "More" button, a stats line, a lone Export button, the view switch, three filter buttons, a floating "FILTER" label and "Show to". The chart starts below the middle of the screen.</p>
     <div class="cmp">
       <div><p class="cap now">Today (390px)</p><img class="shot n360" src="org-phone.jpg" alt="Org Chart on phone with many stacked controls before the chart"></div>
@@ -434,10 +451,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
           </div></div>
       </div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/ph-org.jpg" alt="After: item 7"></div><p>Summary card, Filter and ⋯ like the other tabs; filters open in the Filter sheet.</p></div>
   </article>
 
   <article class="item" id="i8">
-    <div class="ih"><span class="n">08</span><h3>On/off switches are navy on desktop but green on a phone</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Manpower · Host · phone</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">08</span><h3>On/off switches are navy on desktop but green on a phone</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Manpower · Host · phone</i><i class="tag">S</i></div></div>
     <p class="why">The Manpower Status switch and the host Active switch are navy on desktop and lime green on a phone. Signal keeps navy as the only action colour. Green is the brand accent, and in the app it also signals "good" (Active, Approved).</p>
     <div class="cmp">
       <div><p class="cap now">Today: desktop (left), phone (right)</p><div class="shots"><img class="shot" src="toggle-desk.jpg" alt="Desktop Manpower list status switches in navy"><img class="shot n360" src="toggle-phone.jpg" alt="Phone employee card with a green Active switch"></div></div>
@@ -446,10 +464,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
         <div class="tgrow"><span class="tg" style="background:#c7ced8"></span><span style="color:var(--muted)">Inactive</span></div>
       </div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/ph-manpower.jpg" alt="After: item 8"></div><p>Navy on phones too.</p></div>
   </article>
 
   <article class="item" id="i9">
-    <div class="ih"><span class="n">09</span><h3>Phone Filter sheet has no title, Clear or Done</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board · phone</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">09</span><h3>Phone Filter sheet has no title, Clear or Done</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Board · phone</i><i class="tag">S</i></div></div>
     <p class="why">Tapping Filter drops a panel from the top with four boxes that look like empty text fields (Engineer, Host, Customer, Shift). It has no heading, no way to clear everything and no obvious way to close it. The phone's other sheets (confirm, Edit today's board) open from the bottom with a title and buttons.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot n360" src="filter-phone.jpg" alt="Phone filter panel with four plain boxes and Sort by"></div>
@@ -464,10 +483,11 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
             <span class="btn p" style="justify-content:center;height:40px">Show 3 missions</span></div></div>
       </div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/ph-filter.jpg" alt="After: item 9"></div><p>From the bottom, over a scrim, with a title, Clear all and Done (board, Manpower, Host, Org Chart).</p></div>
   </article>
 
   <article class="item" id="i10">
-    <div class="ih"><span class="n">10</span><h3>The module tabs can't be reached with the keyboard</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Accessibility</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">10</span><h3>The module tabs can't be reached with the keyboard</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Accessibility</i><i class="tag">S</i></div></div>
     <p class="why">Pressing Tab from the top goes Lock → date → avatar → toolbar and skips Board, Overview, Org Chart, Manpower, Host and Capacity. They are plain <code>&lt;div&gt;</code>s with a click handler, so keyboard and screen-reader users can't switch modules. Employee cards on the board are <code>&lt;div&gt;</code>s too.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><pre class="code"><span class="c">// app.js renderTabs()</span>
@@ -482,19 +502,21 @@ ov.setAttribute(<span class="a">"aria-current"</span>, isOverview() ? "page" : "
 ov.onclick = () =&gt; { … };</pre>
         <p class="note">Reset the button styles in <code>.board-tab</code> (border, background and font: inherit). Give the focus ring white on the navy bar.</p></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><p>Module tabs are buttons with aria-current; Tab reaches them.</p></div>
   </article>
 
   <article class="item" id="i11">
-    <div class="ih"><span class="n">11</span><h3>Utilization shows 58.33% in one place and 58% in another</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Overview</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">11</span><h3>Utilization shows 58.33% in one place and 58% in another</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Overview</i><i class="tag">S</i></div></div>
     <p class="why">The Overview's top line and the phone summary card print two decimals (58.33%). The KPI card, the By board table and the board header print whole numbers (58%, 70%). Two decimals suggest a precision the data doesn't have.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><div class="shots"><img class="shot" src="ov-strip.jpg" alt="Overview top line showing Utilization 58.33%"><img class="shot n360" src="ov-phone-sum.jpg" alt="Phone Overview summary showing 58.33% assigned and utilized"></div></div>
       <div><p class="cap new">Proposed</p><div class="after col"><div class="tb" style="font-size:12.5px;gap:14px"><span>Boards: <b>2</b></span><span>Utilization: <b>58%</b></span><span>Assigned: <b>7</b></span><span>Standby: <b>5</b></span></div><p class="note" style="margin:0">One <code>fmtPct()</code> helper (whole numbers) used by every utilization label.</p></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/ov-strip.jpg" alt="After: item 11"><img class="" src="after/ph-ov-sum.jpg" alt="After: item 11"></div><p>Whole percentages everywhere.</p></div>
   </article>
 
   <article class="item" id="i12">
-    <div class="ih"><span class="n">12</span><h3>A forecast day shows "Add Mission" next to "New Mission"</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board · forecast</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">12</span><h3>A forecast day shows "Add Mission" next to "New Mission"</h3><div class="meta"><i class="st skip">Not in this pack</i><i class="pri p1">P1</i><i class="tag">Board · forecast</i><i class="tag">S</i></div></div>
     <p class="why">On a future date the toolbar has <b>Add Mission</b> (copy missions from the confirmed plan) right beside <b>New Mission</b> (create one). The labels mean almost the same thing, and the empty state repeats "Add Mission…".</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="forecast-bar.jpg" alt="Forecast toolbar with both Add Mission and New Mission buttons"></div>
@@ -503,7 +525,7 @@ ov.onclick = () =&gt; { … };</pre>
   </article>
 
   <article class="item" id="i13">
-    <div class="ih"><span class="n">13</span><h3>People tiles and the black night block still use the old look (Signal review 04 and 05)</h3><div class="meta"><i class="pri p1">P1</i><i class="tag">Board</i><i class="tag">L</i></div></div>
+    <div class="ih"><span class="n">13</span><h3>People tiles and the black night block still use the old look (Signal review 04 and 05)</h3><div class="meta"><i class="st skip">Not in this pack</i><i class="pri p1">P1</i><i class="tag">Board</i><i class="tag">L</i></div></div>
     <p class="why">This is the biggest remaining gap with the new design. The cards are still grey tiles with "Person" bold over a tiny second line, headers carry a pastel wash, and a night mission gets a near-black body that reads as an error. The earlier review suggested shipping it on its own because it touches drag and drop, print and the JPG export. <b>My recommendation: leave it out of this pack</b> unless you have time to test the exports, and make it the headline of the next one.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="board-cards.jpg" alt="Board mission cards with grey people tiles and black night blocks"></div>
@@ -518,61 +540,67 @@ ov.onclick = () =&gt; { … };</pre>
   <h2>P2 · Polish</h2>
 
   <article class="item" id="i14">
-    <div class="ih"><span class="n">14</span><h3>Export opens a full-height drawer for one choice</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Board · Export</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">14</span><h3>Export opens a full-height drawer for one choice</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Board · Export</i><i class="tag">S</i></div></div>
     <p class="why">Signal uses a side panel for one record and a small dialog for one decision. Export is one decision (JPG, PDF or Excel), yet it fills a full-height panel that is 80% empty, and still cuts its one-line description short with "More".</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="export.jpg" alt="Export side panel mostly empty, with truncated description"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="dlg"><h4>Export Board One</h4><p>Fri 16 Oct 2026</p><div class="seg" style="margin-bottom:10px"><span class="on">JPG image</span><span>PDF</span><span>Excel</span></div><p>A high-resolution picture of the board, for chat groups. Use PDF to print, or Excel to edit.</p><div class="acts"><span class="btn q">Cancel</span><span class="btn p"><svg class="ic"><use href="#i-dl"/></svg>Export JPG</span></div></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/export.jpg" alt="After: item 14"></div><p>A centred dialog sized to its content (a phone keeps its sheet).</p></div>
   </article>
 
   <article class="item" id="i15">
-    <div class="ih"><span class="n">15</span><h3>Help text is cut to one line even when the panel has room</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Panels</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">15</span><h3>Help text is cut to one line even when the panel has room</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Panels</i><i class="tag">S</i></div></div>
     <p class="why">Host panel, Bulk edit and Export clamp every hint to one line and add "More". Most hints are under two lines, so people click More just to read half a sentence.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot n360" src="host-panel.jpg" alt="Host panel with two hints cut to one line plus More"></div>
       <div><p class="cap new">Proposed: clamp at 3 lines, and show More only when the text is actually cut</p><div class="after"><div class="side"><div class="bd"><div class="f"><label>Host name</label><div class="inp">Host Alpha</div></div><p class="hint">The name ties this record to the host's missions and deployment history. Renaming it here renames it everywhere.</p><div class="f"><label>Google Maps link</label><div class="inp" style="color:#9aa4b1">https://maps.app.goo.gl/…</div></div><p class="hint">Paste the link from Google Maps (Share → Copy link). The location shows as a pin on the mission card.</p></div></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/host-panel.jpg" alt="After: item 15"></div><p>Help text folds at 3 lines; More only when it is cut.</p></div>
   </article>
 
   <article class="item" id="i16">
-    <div class="ih"><span class="n">16</span><h3>Warnings in the mission panel use a green-style tick</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Mission panel</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">16</span><h3>Warnings in the mission panel use a green-style tick</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Mission panel</i><i class="tag">S</i></div></div>
     <p class="why">"✓ … — no service area set yet" and "✓ Eng Two — no account yet" combine a tick (all good) with a gap to fix, in bold navy.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot n360" src="mission-hint.jpg" alt="Mission panel hints with a tick saying no service area set yet and no account yet"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="side"><div class="bd"><div class="f"><label>Host (company)</label><div class="inp">Thai Summit Autoparts Industry (Rayong P…</div></div><p class="hint warn"><svg class="ic"><use href="#i-info"/></svg>No service area set for this host yet. <a href="#i16">Set it</a></p><div class="f"><label>Engineer</label><div class="inp">Eng Two</div></div><p class="hint"><svg class="ic"><use href="#i-info"/></svg>Eng Two has no sign-in account yet.</p></div></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/mission-hint.jpg" alt="After: item 16"></div><p>Gaps get an info mark (amber / grey), never a tick.</p></div>
   </article>
 
   <article class="item" id="i17">
-    <div class="ih"><span class="n">17</span><h3>Two styles of close button</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Panels</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">17</span><h3>Two styles of close button</h3><div class="meta"><i class="st skip">No change needed</i><i class="pri p2">P2</i><i class="tag">Panels</i><i class="tag">S</i></div></div>
     <p class="why">The Mission, Export and Employee panels use a plain ×. Host, Bulk edit and the Thai Mission panel use a grey filled square, which makes the same panel look different by language.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><div style="display:flex;gap:10px;flex-wrap:wrap"><img class="shot" src="close-a.jpg" alt="Plain close button" style="width:100px"><img class="shot" src="close-b.jpg" alt="Filled grey close button" style="width:100px"></div></div>
       <div><p class="cap new">Proposed: one quiet icon button, grey fill on hover only</p><div class="after"><span class="btn q" style="width:34px;padding:0;justify-content:center"><svg class="ic"><use href="#i-x"/></svg></span><span class="btn" style="width:34px;padding:0;justify-content:center;background:var(--soft);border-color:transparent"><svg class="ic"><use href="#i-x"/></svg></span><span class="wlabel">rest · hover</span></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><p>Both panels already used the same close button: the filled one in my screenshots was the hover state (the mouse was resting there).</p></div>
   </article>
 
   <article class="item" id="i18">
-    <div class="ih"><span class="n">18</span><h3>Host panel: fields start flush under the header, and titles repeat themselves</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Host · Export panels</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">18</span><h3>Host panel: fields start flush under the header, and titles repeat themselves</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Host · Export panels</i><i class="tag">S</i></div></div>
     <p class="why">In the Host panel "Host name" sits right on the header's divider (about 6px, against 24px in the Mission panel). Titles read "Host — Host Alpha" and "Export — Board One". Signal's inspector puts the record name in the title and the type underneath.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot n360" src="host-panel.jpg" alt="Host panel header with field label touching the divider"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="side"><div class="hd"><div><b>Host Alpha</b><small>Host · 3 missions · 12 deployment days</small></div><span class="x"><svg class="ic"><use href="#i-x"/></svg></span></div><div class="bd" style="padding-top:20px"><div class="f"><label>Host name</label><div class="inp">Host Alpha</div></div></div></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/host-panel.jpg" alt="After: item 18"></div><p>Title is the host's name with "Host" underneath; fields sit clear of the header.</p></div>
   </article>
 
   <article class="item" id="i19">
-    <div class="ih"><span class="n">19</span><h3>Status pill: "Not planned" looks disabled, "Draft" carries three phrases</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Top bar</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">19</span><h3>Status pill: "Not planned" looks disabled, "Draft" carries three phrases</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Top bar</i><i class="tag">S</i></div></div>
     <p class="why">"Not planned" is grey text in a grey outline, so it looks like a disabled button. "Draft · Not reviewed · Read-only" is the longest thing in the top bar and is part of why the tabs get pushed out (item 1).</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><div class="shots"><img class="shot" src="empty-pill.jpg" alt="Not planned pill in grey outline" style="max-width:270px"><img class="shot" src="pill-draft.jpg" alt="Draft, Not reviewed, Read-only pill" style="max-width:240px"></div></div>
       <div><p class="cap new">Proposed</p><div class="after"><span class="pillx np">Not planned</span><span class="pillx dr"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock"/></svg>Draft</span><span class="wlabel">details in the tooltip</span></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/pill-empty.jpg" alt="After: item 19"><img class="" src="after/pill-draft.jpg" alt="After: item 19"><img class="" src="after/ph-board.jpg" alt="After: item 19"></div><p>Not planned is a solid slate chip. One pill everywhere; on a phone the extras stack and the lock stands for Read-only.</p></div>
   </article>
 
   <article class="item" id="i20">
-    <div class="ih"><span class="n">20</span><h3>Dates are written four ways, sometimes on the same screen</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Everywhere</i><i class="tag">M</i></div></div>
+    <div class="ih"><span class="n">20</span><h3>Dates are written four ways, sometimes on the same screen</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Everywhere</i><i class="tag">M</i></div></div>
     <p class="why">The forecast banner says "Fri 6 Nov", and the empty state right below it says "Fri 06-Nov-2026". Capacity uses "16/10", and the Overview chart "01/10". Pick one long and one short form.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><div class="shots"><img class="shot" src="dates-banner.jpg" alt="Forecast banner reading Fri 6 Nov"><img class="shot" src="dates-empty.jpg" alt="Empty state reading Fri 06-Nov-2026"></div></div>
@@ -581,28 +609,31 @@ ov.onclick = () =&gt; { … };</pre>
         <tr><td>Grids, chart axes, chips</td><td>d Mmm</td><td>6 Nov</td></tr>
         <tr><td>Exports (Excel)</td><td>real dates</td><td>unchanged</td></tr></tbody></table></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/dates.jpg" alt="After: item 20"></div><p>"Fri 16 Oct 2026" long, "16 Oct" short — banner, empty state, Capacity and chart axes.</p></div>
   </article>
 
   <article class="item" id="i21">
-    <div class="ih"><span class="n">21</span><h3>Org Chart counts say "5 miss · 14 crew" and "2 eng"</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Org Chart</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">21</span><h3>Org Chart counts say "5 miss · 14 crew" and "2 eng"</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Org Chart</i><i class="tag">S</i></div></div>
     <p class="why">"miss" reads as a word, not an abbreviation. The row has room for the full words, and the top line already spells them out.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="org-meta.jpg" alt="Org Chart outline counts with miss and eng abbreviations" style="max-width:300px"></div>
       <div><p class="cap new">Proposed</p><div class="after col" style="font-size:12px;color:var(--muted);text-align:right"><span>2 engineers · 1 area · 5 missions · 14 crew</span><span>1 area · 2 missions · 3 crew</span></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/org-meta.jpg" alt="After: item 21"></div><p>Counts in full words.</p></div>
   </article>
 
   <article class="item" id="i22">
-    <div class="ih"><span class="n">22</span><h3>Overview's navy "In detail" and "Period" bands are the heaviest thing on the page</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Overview</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">22</span><h3>Overview's navy "In detail" and "Period" bands are the heaviest thing on the page</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Overview</i><i class="tag">S</i></div></div>
     <p class="why">Two full-width navy bars carrying a small label pull the eye away from the numbers. Signal builds structure from space and type. Still open from the earlier review (item 17).</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="ov-band.jpg" alt="Overview with a full-width navy In detail band"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="band"><b>In detail</b><span>Fri 16 Oct 2026 · all boards</span></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/ov-band.jpg" alt="After: item 22"></div><p>Navy title, green mark and a navy rule instead of a navy bar.</p></div>
   </article>
 
   <article class="item" id="i23">
-    <div class="ih"><span class="n">23</span><h3>Manpower table: 60+ "+ Add" chips drown the data</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Manpower</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">23</span><h3>Manpower table: 60+ "+ Add" chips drown the data</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Manpower</i><i class="tag">S</i></div></div>
     <p class="why">Every blank TRIGO ID, Position, Mobile and Start date shows a "+ Add" chip, so on a real list the chips outnumber the names. The amber pills above the table ("10 missing TRIGO ID") already flag the gaps.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="manpower-adds.jpg" alt="Manpower table where most cells are + Add chips"></div>
@@ -611,62 +642,70 @@ ov.onclick = () =&gt; { … };</pre>
         <tr class="hv"><td>Person B</td><td><span class="add">+ Add</span></td><td>Permanent</td><td><span class="add">+ Add</span></td><td><span class="add">+ Add</span></td></tr>
         <tr><td>วิทยา ศรีสุวรรณวงศ์</td><td>T1001</td><td>Permanent</td><td class="dash">—</td><td class="dash">—</td></tr></tbody></table></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/manpower.jpg" alt="After: item 23"></div><p>A quiet dash; + Add appears on the row you point at.</p></div>
   </article>
 
   <article class="item" id="i24">
-    <div class="ih"><span class="n">24</span><h3>Capacity on a phone: "No demand yet" sits on the card edge</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Capacity · phone</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">24</span><h3>Capacity on a phone: "No demand yet" sits on the card edge</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Capacity · phone</i><i class="tag">S</i></div></div>
     <p class="why">The empty line has no inner padding, so it touches the card's left edge while the controls below are indented.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot n360" src="cap-phone.jpg" alt="Capacity phone card with unpadded No demand yet text"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="side" style="width:300px"><div class="bd"><b style="color:var(--ink)">Board One · demand by host</b><p class="hint" style="font-style:italic">No demand yet. Add a host below.</p><div style="display:flex;gap:6px"><div class="inp" style="flex:1;color:var(--navy);font-weight:600">+ Add host…</div><span class="btn sm">Day ▾</span><span class="btn sm">Add</span></div></div></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/ph-capacity.jpg" alt="After: item 24"></div><p>Padded like the card.</p></div>
   </article>
 
   <article class="item" id="i25">
-    <div class="ih"><span class="n">25</span><h3>Phone leave tabs are cut off with no hint that they scroll</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Board · phone</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">25</span><h3>Phone leave tabs are cut off with no hint that they scroll</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Board · phone</i><i class="tag">S</i></div></div>
     <p class="why">"Unpaid" is cut at the screen edge and "Exchange" is out of sight. A fade on the right edge tells people the row scrolls.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot n360" src="leave-phone.jpg" alt="Phone leave tabs with Unpaid cut at the edge"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="fade chipr" style="flex-wrap:nowrap;overflow:hidden;width:280px;background:#fff;padding:6px;border-radius:10px"><span class="chip on">Annual 1</span><span class="chip">Sick 0</span><span class="chip">Business 0</span><span class="chip">Unpaid 0</span></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/ph-board.jpg" alt="After: item 25"></div><p>Labels never wrap inside a tab; the row fades at the right while more tabs are hidden.</p></div>
   </article>
 
   <article class="item" id="i26">
-    <div class="ih"><span class="n">26</span><h3>Thai shift names don't match: กลางวัน and กะกลางคืน</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">ไทย</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">26</span><h3>Thai shift names don't match: กลางวัน and กะกลางคืน</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">ไทย</i><i class="tag">S</i></div></div>
     <p class="why">Day became "กลางวัน" in the last update, but Night is still "กะกลางคืน". The longer word also crowds the Shift switch and the card tag.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot n360" src="th-mission.jpg" alt="Thai mission panel Shift switch reading กลางวัน and กะกลางคืน"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="seg" style="width:220px"><span class="on">กลางวัน</span><span>กลางคืน</span></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="n" src="after/th-mission.jpg" alt="After: item 26"></div><p>กะกลางวัน / กะกลางคืน everywhere; the Shift switch has room for them.</p></div>
   </article>
 
   <article class="item" id="i27">
-    <div class="ih"><span class="n">27</span><h3>Users list shows the same name twice</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Settings · Users</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">27</span><h3>Users list shows the same name twice</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Settings · Users</i><i class="tag">S</i></div></div>
     <p class="why">When the display name equals the short name, the row shows "admin.z" and then an "admin.z" tag. Show the tag only when the two differ.</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="users-dup.jpg" alt="Users table with duplicated name tags" style="max-width:460px"></div>
       <div><p class="cap new">Proposed</p><div class="after col" style="font-size:13px;max-width:340px"><span><b>admin.z</b> <span class="tag">you</span></span><span><b>Somchai J.</b> <span class="tag">somchai.j</span></span></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/users.jpg" alt="After: item 27"></div><p>The short-name tag shows only when it differs from the name.</p></div>
   </article>
 
   <article class="item" id="i28">
-    <div class="ih"><span class="n">28</span><h3>A night mission can show day hours</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Board · mission</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">28</span><h3>A night mission can show day hours</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Board · mission</i><i class="tag">S</i></div></div>
     <p class="why">Missions 103 and 105 are Night, but their cards say 08:00–17:00 because no times were entered and the default is the day shift. Switching Shift to Night should also switch empty or default times to the night default, or the card should say "Night · time not set".</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="board-cards.jpg" alt="Night missions 103 and 105 showing 08:00-17:00"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="mc night" style="--c:#7d8ea8"><div class="hd"><div class="t"><b>105</b><span>Host Alpha</span><i class="nt">NIGHT</i></div><div class="m"><span class="cu">Cust Beta</span><span class="nw">· 20:00–05:00 ·</span><span class="eng">Eng Two</span></div></div></div></div><p class="note">Please confirm the night default hours your team uses.</p></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img class="" src="after/card-105.jpg" alt="After: item 28"></div><p>A Night mission still on the 08:00–17:00 default reads "Night · time not set".</p></div>
   </article>
 
   <article class="item" id="i29">
-    <div class="ih"><span class="n">29</span><h3>Dark-theme CSS is still shipped though the app is light-only</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Code</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">29</span><h3>Dark-theme CSS is still shipped though the app is light-only</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Code</i><i class="tag">S</i></div></div>
     <p class="why">The theme toggle was removed and a stored dark theme is cleared, but <code>styles.css</code> still carries about 30 <code>[data-theme="dark"]</code> rules and a second token block. Users never see it; removing it makes the CSS smaller and stops future edits from maintaining two palettes.</p>
     <div class="fix"><p class="cap">Change</p><ul><li>Delete the <code>:root[data-theme="dark"]</code> blocks and the dark-only rules; keep the comments that explain the export colours.</li></ul></div>
+      <div class="shipped"><p class="cap">Shipped</p><p>About 20 dark-theme rules removed.</p></div>
   </article>
 
   <article class="item" id="i30">
-    <div class="ih"><span class="n">30</span><h3>Add a Thai check to the language test so item 3 can't come back</h3><div class="meta"><i class="pri p2">P2</i><i class="tag">Tests</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">30</span><h3>Add a Thai check to the language test so item 3 can't come back</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p2">P2</i><i class="tag">Tests</i><i class="tag">S</i></div></div>
     <p class="why">After switching to ไทย, walk each tab and the main panels and fail on visible text, placeholders or tooltips that are still English. The check should ignore names, IDs, AREA codes and file types (Excel, PDF, JPG). The scan I used for this review is about 30 lines and can go into <code>tests/e2e/language.e2e.js</code>.</p>
+      <div class="shipped"><p class="cap">Shipped</p><p>language.e2e.js walks every tab and panel in Thai and fails on English text, placeholders or tooltips.</p></div>
   </article>
 
   <footer>Screens taken from the test harness with sample data (fake names, example.com). Effort: S under half a day, M one to two days, L a few days including export checks. Source: <code>design/release-review/</code>.</footer>

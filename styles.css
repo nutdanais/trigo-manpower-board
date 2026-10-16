@@ -5582,7 +5582,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 .ov-group-head {
   margin: 22px 0 0; padding: 0 2px 9px; border-radius: 0; align-items: center;
   background: none; color: var(--primary-text); box-shadow: none;
-  border-bottom: 2px solid color-mix(in srgb, var(--primary) 26%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
 }
 .ov-group-head h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.2px; text-transform: none; color: var(--primary-text); }
 .ov-group-head .ov-group-sub { color: var(--muted); font-size: 13px; font-weight: 500; }
@@ -6831,3 +6831,8 @@ label > .pk { margin-top: 5px; }
     mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
   }
 }
+
+/* 26 · Shift's two words are longer in Thai (กะกลางวัน | กะกลางคืน): its column takes
+   more of the When row, and a switch label never wraps or touches its edge */
+@media (min-width: 641px) { #modal-mission .form-row:has(select[name="shift"]) > label:first-child { flex: 1.5 1 0; } }   /* a phone gives Shift a row of its own */
+.seg-pick button { white-space: nowrap; padding: 0 8px; }
