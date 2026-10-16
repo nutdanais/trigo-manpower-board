@@ -5224,6 +5224,11 @@ html[lang="th"] .lv-long { display: none; }
   body.board-view #float-pool, body.board-view #fp-resizer { top: var(--fp-top, var(--bar-h, 56px)); }
 }
 body.settings-open #board-tabs, body.settings-open #board-dd { display: none !important; }
+/* Settings keeps body.board-view, but the people panel the rule above makes room for is
+   hidden there, so the bar must not run out past the screen (it hid the status pill). */
+body.settings-open #sticky-header #topbar,
+body.settings-open #sticky-header #green-rule,
+body.settings-open #sticky-header #update-banner { margin-right: 0; }
 
 /* The board toolbar is the same white bar as every other tab (the deeper-navy
    row 2 is gone): only row 1 of the banner is navy, everywhere. */
@@ -6725,6 +6730,31 @@ label > .pk { margin-top: 5px; }
 .cf-hex i { width: 22px; height: 22px; border-radius: 6px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
 .cf-hex input { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--r); font: inherit; font-size: 13px; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .cf-hex input[aria-invalid] { border-color: var(--danger); }
+.cf-sep { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.cf-sep::before, .cf-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.cf-sv {
+  position: relative; height: 150px; border-radius: 8px; cursor: crosshair; touch-action: none; flex: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+  background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);
+}
+.cf-hue {
+  position: relative; height: 14px; border-radius: 7px; cursor: pointer; touch-action: none; flex: none;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+}
+.cf-knob {
+  position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; pointer-events: none;
+  border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), 0 1px 4px rgba(0, 0, 0, .35);
+}
+.cf-hue .cf-knob { top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; }
+.cf-sv:focus-visible, .cf-hue:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+.cf-hex i { width: 30px; height: 30px; }
+.cf-eye {
+  flex: none; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border);
+  border-radius: var(--r); background: var(--panel); color: var(--muted); cursor: pointer;
+}
+.cf-eye:hover { background: var(--hover-tint); color: var(--text); }
+.cf-recent { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.cf-recent .cf-sw { width: 22px; height: 22px; aspect-ratio: auto; border-radius: 6px; }
 
 /* ===== Capacity: one Range control, and an Add-host row with room ===== */
 .cap-field { gap: 8px; padding-left: 0; border: 0; background: none; }   /* no box around the dropdown's own box */

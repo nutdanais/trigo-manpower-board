@@ -6196,37 +6196,135 @@ function openColourField(input) {
   pop.className = "pk-pop cf-pop";
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-label", input.getAttribute("aria-label") || "Pick a colour");
-  const cur = String(input.value || "").toLowerCase();
-  const pick = (v) => { pickerClose(); fieldSet(input, v); input.focus(); };
-  const grid = document.createElement("div");
-  grid.className = "cf-grid";
-  for (const c of FIELD_COLOURS) {
+  const cur = /^#[0-9a-f]{6}$/i.test(input.value || "") ? input.value.toLowerCase() : "#9ca3af";
+  const RECENT_KEY = "mpm-recent-colours";
+  const recentGet = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } };
+  const pick = (v) => {
+    pickerClose();
+    if (!FIELD_COLOURS.includes(v)) {
+      try { localStorage.setItem(RECENT_KEY, JSON.stringify([v, ...recentGet().filter(x => x !== v)].slice(0, 6))); } catch { /* storage unavailable: no recent row */ }
+    }
+    fieldSet(input, v);
+    input.focus();
+  };
+  const swatch = (c, on) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "cf-sw" + (c === cur ? " on" : "");
+    b.className = "cf-sw" + (on ? " on" : "");
     b.style.background = c;
     b.title = swHex(c);
     b.setAttribute("aria-label", swHex(c));
-    if (c === cur) b.innerHTML = icon("check");
+    if (on) b.innerHTML = icon("check");
+    return b;
+  };
+  const grid = document.createElement("div");
+  grid.className = "cf-grid";
+  for (const c of FIELD_COLOURS) {
+    const b = swatch(c, c === cur);
     b.onclick = () => pick(c);
     grid.appendChild(b);
   }
   pop.appendChild(grid);
+
+  // Custom: a saturation / brightness square, a hue bar and the hex box. Nothing is
+  // applied until "Use this colour" (or Enter in the hex box), like the presets' own tap.
+  const sep = mkEl("div", "cf-sep", "Custom");
+  pop.appendChild(sep);
+  let [hue, sat, val] = hexToHsv(cur);
+  const sv = mkEl("div", "cf-sv");
+  sv.tabIndex = 0;
+  sv.setAttribute("role", "slider");
+  sv.setAttribute("aria-label", "Shade");
+  const svKnob = mkEl("div", "cf-knob");
+  sv.appendChild(svKnob);
+  const hueBar = mkEl("div", "cf-hue");
+  hueBar.tabIndex = 0;
+  hueBar.setAttribute("role", "slider");
+  hueBar.setAttribute("aria-label", "Hue");
+  hueBar.setAttribute("aria-valuemin", "0");
+  hueBar.setAttribute("aria-valuemax", "359");
+  const hueKnob = mkEl("div", "cf-knob");
+  hueBar.appendChild(hueKnob);
+  pop.append(sv, hueBar);
+
   const row = document.createElement("label");
   row.className = "cf-hex";
-  row.innerHTML = `<span>Hex</span><i style="background:${escapeHtml(cur)}"></i><input type="text" maxlength="7" spellcheck="false" aria-label="Hex colour" value="${escapeHtml(swHex(cur))}">`;
+  row.innerHTML = `<span>Hex</span><i></i><input type="text" maxlength="7" spellcheck="false" aria-label="Hex colour">`;
   const hex = row.querySelector("input"), prev = row.querySelector("i");
   const parse = () => { const m = /^#?([0-9a-f]{6})$/i.exec(hex.value.trim()); return m ? "#" + m[1].toLowerCase() : null; };
-  hex.oninput = () => { const v = parse(); hex.toggleAttribute("aria-invalid", !v); if (v) prev.style.background = v; };
-  hex.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); const v = parse(); if (v) pick(v); } };
+  let eye = null;
+  if (window.EyeDropper) {
+    eye = mkEl("button", "cf-eye");
+    eye.type = "button";
+    eye.title = "Pick a colour from the screen";
+    eye.setAttribute("aria-label", "Pick a colour from the screen");
+    eye.innerHTML = icon("eyedropper");
+    eye.onclick = async () => {
+      try { const r = await new EyeDropper().open(); [hue, sat, val] = hexToHsv(r.sRGBHex.toLowerCase()); paint(); } catch { /* cancelled */ }
+    };
+    row.appendChild(eye);
+  }
   pop.appendChild(row);
+
+  const paint = (fromHex) => {
+    const c = hsvToHex(hue, sat, val);
+    sv.style.backgroundColor = `hsl(${hue}, 100%, 50%)`;
+    svKnob.style.left = sat * 100 + "%"; svKnob.style.top = (1 - val) * 100 + "%"; svKnob.style.background = c;
+    hueKnob.style.left = hue / 360 * 100 + "%"; hueKnob.style.background = `hsl(${hue}, 100%, 50%)`;
+    hueBar.setAttribute("aria-valuenow", String(Math.round(hue)));
+    sv.setAttribute("aria-valuetext", c.slice(1).toUpperCase());
+    prev.style.background = c;
+    if (!fromHex) { hex.value = swHex(c); hex.removeAttribute("aria-invalid"); }
+  };
+  const drag = (el, fn) => {
+    const move = (ev) => { const r = el.getBoundingClientRect(); fn(Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height))); paint(); };
+    el.addEventListener("pointerdown", (ev) => { ev.preventDefault(); el.setPointerCapture(ev.pointerId); el.focus(); move(ev); el.onpointermove = move; el.onpointerup = el.onpointercancel = () => { el.onpointermove = null; }; });
+  };
+  drag(sv, (x, y) => { sat = x; val = 1 - y; });
+  drag(hueBar, (x) => { hue = x * 359.99; });
+  sv.addEventListener("keydown", (ev) => {
+    const st = ev.shiftKey ? .1 : .02, d = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, st], ArrowDown: [0, -st] }[ev.key];
+    if (!d) return;
+    ev.preventDefault(); sat = Math.min(1, Math.max(0, sat + d[0])); val = Math.min(1, Math.max(0, val + d[1])); paint();
+  });
+  hueBar.addEventListener("keydown", (ev) => {
+    if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+    ev.preventDefault(); hue = Math.min(359.99, Math.max(0, hue + (ev.key === "ArrowRight" ? 1 : -1) * (ev.shiftKey ? 20 : 4))); paint();
+  });
+  hex.oninput = () => { const v = parse(); hex.toggleAttribute("aria-invalid", !v); if (v) { [hue, sat, val] = hexToHsv(v); paint(true); } };
+  hex.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); const v = parse(); if (v) pick(v); } };
+  paint();
+
+  const recent = recentGet().filter(c => /^#[0-9a-f]{6}$/.test(c) && !FIELD_COLOURS.includes(c));
+  if (recent.length) {
+    const rr = mkEl("div", "cf-recent");
+    rr.appendChild(mkEl("span", "", "Recent"));
+    for (const c of recent) {
+      const b = swatch(c, false);
+      b.onclick = () => { [hue, sat, val] = hexToHsv(c); paint(); };
+      rr.appendChild(b);
+    }
+    pop.appendChild(rr);
+  }
   const ok = mkEl("button", "btn btn-small btn-primary", "Use this colour");
   ok.type = "button";
   ok.onclick = () => { const v = parse(); if (v) pick(v); else hex.focus(); };
   pop.appendChild(ok);
   fieldPopKeys(pop, input);
-  pickerFloat(anchor, pop, 220, 232);
+  pickerFloat(anchor, pop, 400, 272);
   (grid.querySelector(".on") || grid.firstChild).focus();
+}
+/* HSV <-> #rrggbb for the custom colour square (hue 0-360, saturation and value 0-1) */
+function hsvToHex(h, s, v) {
+  const f = (n) => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return "#" + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, "0")).join("");
+}
+function hexToHsv(c) {
+  const r = parseInt(c.slice(1, 3), 16) / 255, g = parseInt(c.slice(3, 5), 16) / 255, b = parseInt(c.slice(5, 7), 16) / 255;
+  const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b);
+  let h = 0;
+  if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+  return [h, mx ? d / mx : 0, mx];
 }
 document.addEventListener("click", (ev) => {
   const c = ev.target.closest && ev.target.closest('input[type="color"]');
