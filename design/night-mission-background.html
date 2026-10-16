@@ -1,0 +1,142 @@
+<title>Night Mission Backgrounds</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: colour switcher on top, the four chosen patterns side by side in that colour, then a colour x pattern matrix for comparing everything at once. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --brand-green: #a8c855; --night: #1c2430;
+  --emp-bg: #e6e9ec; --emp-perm-border: #b4bcc4; --emp-oncall-border: #6b737c; --emp-oncall-bg: #dfe3e7;
+  --emp-ink: #1a1a1a; --emp-sub: #545c66; --charcoal: #59595b;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
+h2 { font-size: 18px; }
+.lede { color: var(--muted); max-width: 72ch; line-height: 1.55; margin-top: 6px; }
+.tools { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: grid; gap: 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.row > span { font-size: 12px; color: var(--muted); width: 74px; }
+.tg { font: inherit; font-size: 12.5px; font-weight: 600; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.tg i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,.15); }
+.tg[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tg:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.pal-note { font-size: 13px; color: var(--text); line-height: 1.5; }
+.pal-note b { font-weight: 700; }
+
+.feature { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+.cell { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.cell h3 { font-size: 13.5px; }
+.cell p { font-size: 12px; color: var(--muted); }
+.stage { overflow: hidden; border-radius: 8px; }
+.stage.gray .mission-card { filter: grayscale(1); }
+.stage.small .mission-card { zoom: .6; }
+
+.matrix-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.matrix { display: grid; grid-template-columns: 110px repeat(4, 250px); gap: 10px; width: max-content; background: var(--panel); }
+.matrix .hd { font-size: 12px; font-weight: 700; color: var(--muted); align-self: end; }
+.matrix .lab { font-size: 13px; font-weight: 700; align-self: center; }
+.matrix .lab small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.matrix .mission-body { min-height: 0; }
+.matrix .emp-card { width: 104px; }
+
+/* app's own mission card + employee card, copied from styles.css */
+.mission-card { border: 1px solid var(--border); border-top: 5px solid #8b5cf6; border-radius: 8px; background: var(--panel); overflow: hidden; }
+.mission-header { padding: 7px 9px; font-size: 11.5px; border-bottom: 1px solid var(--border); background: rgba(139,92,246,.15); }
+.m-line1 { display: flex; align-items: baseline; gap: 7px; }
+.m-host { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-decoration: underline; text-underline-offset: 2px; }
+.m-shift { margin-left: auto; flex: none; font-weight: 700; font-size: 9px; line-height: 1.7; letter-spacing: .3px; padding: 0 4px; border-radius: 3px; background: var(--night); color: #fff; border: 1px solid var(--night); }
+.m-line2 { display: flex; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--muted); }
+.m-line2 b { color: var(--text); font-weight: 600; }
+.mission-body { display: flex; flex-direction: column; padding: 8px; min-height: 120px; background: var(--nbg); }
+.mission-emps { display: flex; flex-wrap: wrap; gap: 6px; }
+.m-remark { margin-top: auto; padding-top: 6px; font-style: italic; color: var(--nink); font-size: 12px; }
+.emp-card { width: 116px; height: 70px; border-radius: 6px; padding: 5px 6px 6px; box-shadow: 0 1px 2px rgba(0,0,0,.14); background: var(--emp-bg); border: 1px solid var(--emp-perm-border); display: flex; flex-direction: column; color: var(--emp-ink); }
+.emp-card.oncall { border: 1px dashed var(--emp-oncall-border); background: var(--emp-oncall-bg); }
+.emp-name { font-size: 12.5px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-surname { font-size: 11px; font-weight: 500; line-height: 1.3; color: var(--emp-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-meta { margin-top: auto; display: flex; gap: 3px; }
+.emp-pos, .emp-oc, .emp-area { font-size: 9.5px; font-weight: 700; line-height: 1.6; padding: 0 5px; border-radius: 999px; }
+.emp-pos { color: var(--primary); background: rgba(0,73,131,.09); }
+.emp-oc { background: var(--charcoal); color: #fff; padding: 0 4px; }
+.emp-area { margin-left: auto; color: #1a1a1a; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Night mission card: colours for C1, F1, F5 and M1</h1>
+    <p class="lede">Round 3. The four patterns you picked stay the same. Only the colour changes. Choose a colour below to see all four in it, or scroll to the grid to compare every colour at once. Every colour here was checked in the app's export engine, so the JPG matches the screen.</p>
+  </header>
+
+  <div class="tools">
+    <div class="row" role="group" aria-label="Colour" id="pal-btns"><span>Colour</span></div>
+    <div class="row" role="group" aria-label="Preview"><span>Preview as</span>
+      <button class="tg" id="t-small" aria-pressed="false">Small (JPG on phone)</button>
+      <button class="tg" id="t-gray" aria-pressed="false">Black-and-white print</button>
+    </div>
+    <p class="pal-note" id="pal-note"></p>
+  </div>
+
+  <section class="feature" id="feature"></section>
+
+  <h2>All colours at a glance</h2>
+  <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
+</div>
+
+<script>
+/* each colour: a/b = C1 stripe pair, d/l = F1 fade dark to light, f5 = F5 two-hue fade, inkL/inkD = remark text on the light (C1) and dark (fades) bodies */
+const PALS = [
+  { k:"indigo", name:"Indigo", a:"#e1e3f7", b:"#c9cdef", d:"#31357d", l:"#6a6fbf", f5:["#252a66","#4e3f8f"], inkL:"#31357d", inkD:"#eef0ff",
+    note:"<b>Indigo</b> is what you saw before. It matches the night colour in the Excel and Capacity exports." },
+  { k:"blue", name:"Midnight blue", a:"#dde9f6", b:"#c3d6ee", d:"#123e6e", l:"#4f86c6", f5:["#0f2c52","#2f5f9e"], inkL:"#123e6e", inkD:"#eaf2fb",
+    note:"<b>Midnight blue</b> sits close to the TRIGO navy, so it feels on-brand. It is lighter and bluer than the navy on buttons, so it won't read as 'selected'." },
+  { k:"teal", name:"Deep teal", a:"#dcefef", b:"#bfe0e2", d:"#0d4a55", l:"#3f8f99", f5:["#0b3540","#1f6b6e"], inkL:"#0d4a55", inkD:"#e6f6f7",
+    note:"<b>Deep teal</b> is clearly different from both the navy and the purple engineer colours, so night never gets mixed up with either." },
+  { k:"slate", name:"Slate", a:"#e3e7ec", b:"#cbd2db", d:"#2f3a4a", l:"#6b7a90", f5:["#232c3a","#4b5a73"], inkL:"#2f3a4a", inkD:"#eef1f5",
+    note:"<b>Slate</b> is closest to today's dark card, but softer and with a pattern. The quietest choice, and it looks about the same in black-and-white." },
+  { k:"plum", name:"Plum", a:"#ebe4f6", b:"#d6c9ee", d:"#3e2a6b", l:"#7a5ea8", f5:["#2c1f52","#6b3f8f"], inkL:"#3e2a6b", inkD:"#f2ecfb",
+    note:"<b>Plum</b> is the warmest night. Some engineers' header colours are purple too, so a purple header on a plum body can blend together." },
+  { k:"forest", name:"Night forest", a:"#e0efe7", b:"#c4e0d1", d:"#1f4a3a", l:"#4e8a6f", f5:["#163a30","#2f6a5e"], inkL:"#1f4a3a", inkD:"#e8f5ee",
+    note:"<b>Night forest</b> is a dark green. Very distinct, but green usually means 'available' or 'OK', and TRIGO green is the brand accent, so it may send the wrong signal." },
+];
+const tile = (a, b, s) => `linear-gradient(135deg, ${b} 25%, ${a} 25% 50%, ${b} 50% 75%, ${a} 75%) 0 0 / ${s}px ${s}px`;
+const PATS = [
+  { k:"C1", name:"C1. Stripes", desc:"Light diagonal bands. Lowest ink.", bg:p => tile(p.a, p.b, 20), ink:p => p.inkL },
+  { k:"F1", name:"F1. Fade", desc:"Deep at the top, lighter at the bottom.", bg:p => `linear-gradient(180deg, ${p.d} 0%, ${p.l} 100%)`, ink:p => p.inkD },
+  { k:"F5", name:"F5. Two-tone fade", desc:"Deep colour turning into a second hue.", bg:p => `linear-gradient(180deg, ${p.f5[0]} 0%, ${p.f5[1]} 100%)`, ink:p => p.inkD },
+  { k:"M1", name:"M1. Striped fade", desc:"F1 with faint light stripes on top.", bg:p => `${tile("rgba(255,255,255,0)", "rgba(255,255,255,.10)", 20)}, linear-gradient(180deg, ${p.d} 0%, ${p.l} 100%)`, ink:p => p.inkD },
+];
+const AREA = { CBI:"#f2c48d", RYG:"#b9dd9a" };
+const NIGHT = [["Kittipong","Saelim","TECH","CBI"],["ณัฐพล","บุญมา","TECH","CBI"],["Thanawat","Rattana",null,"RYG"],["ปิยะ","แก้วมณี","LEAD","CBI"]];
+const emp = ([n,s,p,a]) => `<div class="emp-card${p?"":" oncall"}"><div class="emp-name">${n}</div><div class="emp-surname">${s}</div><div class="emp-meta">${p?`<span class="emp-pos">${p}</span>`:`<span class="emp-oc">OC</span>`}<span class="emp-area" style="background:${AREA[a]}">${a}</span></div></div>`;
+const card = (p, t, n = 4) => `<div class="mission-card" style="--nbg:${t.bg(p)};--nink:${t.ink(p)}">
+  <div class="mission-header"><div class="m-line1"><span class="m-host">Toyota Gateway</span><span class="m-shift">NIGHT</span></div>
+  <div class="m-line2"><span>Toyota</span><span>·</span><span>20:00-05:00</span><span>·</span><b>Arthit W.</b></div></div>
+  <div class="mission-body"><div class="mission-emps">${NIGHT.slice(0, n).map(emp).join("")}</div><div class="m-remark">Bring own torch, gate 3 after 22:00</div></div>
+</div>`;
+
+let cur = 0;
+const btns = document.getElementById("pal-btns");
+btns.insertAdjacentHTML("beforeend", PALS.map((p, i) => `<button class="tg" data-i="${i}" aria-pressed="${i===0}"><i style="background:${p.d}"></i>${p.name}</button>`).join(""));
+const views = { small:false, gray:false };
+function applyViews() { document.querySelectorAll(".stage").forEach(s => { s.classList.toggle("small", views.small); s.classList.toggle("gray", views.gray); }); }
+function renderFeature() {
+  const p = PALS[cur];
+  document.getElementById("feature").innerHTML = PATS.map(t => `<div class="cell"><h3>${t.name}</h3><p>${t.desc}</p><div class="stage">${card(p, t)}</div></div>`).join("");
+  document.getElementById("pal-note").innerHTML = p.note;
+  btns.querySelectorAll("[data-i]").forEach(b => b.setAttribute("aria-pressed", b.dataset.i == cur));
+  applyViews();
+}
+btns.addEventListener("click", e => { const b = e.target.closest("[data-i]"); if (b) { cur = +b.dataset.i; renderFeature(); } });
+document.getElementById("matrix").innerHTML = `<div></div>${PATS.map(t => `<div class="hd">${t.name}</div>`).join("")}` +
+  PALS.map(p => `<div class="lab">${p.name}<small>${p.d}</small></div>${PATS.map(t => `<div class="stage">${card(p, t, 2)}</div>`).join("")}`).join("");
+for (const [id, k] of [["t-small","small"],["t-gray","gray"]]) {
+  const b = document.getElementById(id);
+  b.addEventListener("click", () => { views[k] = !views[k]; b.setAttribute("aria-pressed", views[k]); applyViews(); });
+}
+renderFeature();
+</script>
