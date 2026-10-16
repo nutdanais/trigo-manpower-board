@@ -820,7 +820,8 @@ body.board-view #toolbar-row2 #area-bar { order: 5; flex: 0 0 100%; gap: 3px 14p
 /* The base checked colour is the Holiday toggle's amber, which reads as a
    warning — wrong for "this employee is active". Green is already this app's
    active/selected signal (the current board tab), so the roster toggle uses it. */
-.toggle-active input:checked + .toggle-track { background: var(--brand-green); }
+/* navy, like every other on state (it was lime green on a phone and navy on a computer) */
+.toggle-active input:checked + .toggle-track { background: var(--primary); }
 .toggle-active .toggle-text { font-weight: 600; font-size: 12px; }
 #readonly-badge {
   background: var(--warn-surface);
@@ -1065,8 +1066,16 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   line-height: 1.35;
   color: var(--muted);
 }
-.mission-header .m-sep { opacity: .45; }
+.mission-header .m-sep { opacity: .45; flex: none; }
 .mission-header .m-line2 .m-eng { font-weight: 600; color: var(--text); }
+/* a long customer name shortens with "…" (the full name is in its tooltip and the
+   panel); the hours and the engineer never break in two */
+.mission-header .m-line2 { min-width: 0; }
+.mission-header .m-line2 .m-cust { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-header .m-line2 .m-time, .mission-header .m-line2 .m-eng, .mission-header .m-line2 a { flex: none; white-space: nowrap; }
+.mission-header .m-line2 .m-time-unset { font-style: italic; color: #9a4a07; }
+/* a picture or print of the board has no tooltip to fall back on: full name there */
+body.exporting .mission-header .m-line2 .m-cust { white-space: normal; overflow: visible; }
 /* headcount chip: same fixed translucent-white treatment as the shift chip */
 .mission-header .m-count {
   margin-left: auto;
@@ -5421,6 +5430,8 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 #filter-pop .ms-btn { width: 100%; justify-content: space-between; }
 #filter-pop .filter-sort { display: grid; gap: 4px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--muted); }
 #filter-pop .filter-sort select { width: 100%; }
+#filter-pop #filter-names .seg-pick { display: flex; width: 100%; }
+#filter-pop #filter-names .seg-pick button { flex: 1; }
 /* phone: the popover is just the open list inside the More dropdown */
 @media (max-width: 640px) {
   #btn-filter-pop { display: none; }
@@ -6799,3 +6810,77 @@ label > .pk { margin-top: 5px; }
 .cap-ph-add .cap-add { flex-wrap: nowrap; }
 .cap-ph-add .cap-add input { flex: 1 1 auto; }
 .cap-ph-add .cap-add .pk { flex: none; }
+
+/* ===== Release review 2026-10-16 (design/release-review/) ===== */
+
+/* Filter & sort on a computer: each filter shows its value at the right ("All",
+   "2 selected") with a chevron; row 1 elsewhere keeps the short form */
+#filter-pop .ms-btn .ms-colon { display: none; }
+#filter-pop .ms-btn .ms-all { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+#filter-pop .ms-btn .ms-val { margin-left: auto; }
+#filter-pop .ms-btn::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); opacity: .55; flex: none; }
+
+/* the Org Chart's filters are ordinary toolbar items on a computer */
+.oc-filterbox { display: contents; }
+/* Names on cards is moved in on a computer only (placeBoardRow1Tools) */
+#filter-pop #filter-names:not(:has(select)) { display: none; }
+.m-sheet-head, .m-sheet-foot { display: none; }
+
+@media (max-width: 640px) {
+  /* Org Chart gets the phone header every other tab has: summary card, Filter, ⋯ */
+  body.oc-view #m-row2 { grid-area: 2 / 1 / 3 / -1; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+  body.oc-view #m-details:not(.hidden) {
+    grid-area: 3 / 1 / 4 / -1; display: flex; flex-direction: column; gap: 8px;
+    padding: 8px 10px 9px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
+  }
+  body.oc-view #toolbar-row2,
+  body.oc-view #btn-toolbar-more,
+  body.oc-view #toolbar-more { display: none; }
+  body.oc-view #toolbar-row1 > :not(#ov-board-dd) { display: none !important; }
+  body.oc-view #toolbar-row1:not(:has(#ov-board-dd:not(.hidden))) { display: none; }
+  body.oc-view #ov-board-dd { flex: 1 1 auto; }
+  body.oc-view #btn-ov-board { width: 100%; justify-content: space-between; }
+  body.oc-view .oc-toolbar { flex-wrap: nowrap; }
+  body.oc-view .oc-views { flex: 1; display: flex; }
+  body.oc-view .oc-views .oc-view-btn { flex: 1; justify-content: center; }
+  body.oc-view .oc-legend .oc-hint { display: none; }
+  .oc-filterbox { display: none; }
+
+  /* The Filter sheet (board, Manpower, Host, Org Chart): from the bottom, over a
+     scrim, with a title, Clear all and Done — like the app's other phone sheets */
+  body.m-filter-open #app-root::after {
+    content: ""; position: fixed; inset: 0; z-index: 79; background: rgba(15, 27, 42, .38);
+  }
+  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar,
+  body.oc-view.m-filter-open .oc-filterbox {
+    display: flex; flex-direction: column; gap: 0; position: fixed; left: 0; right: 0; top: auto; bottom: 0; z-index: 90;
+    max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--panel); border: 0; border-radius: 16px 16px 0 0;
+    box-shadow: 0 -14px 34px -10px rgba(0, 38, 70, .4);
+  }
+  body.m-filter-open .m-sheet-head { display: none; }
+  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar > .m-sheet-head,
+  body.oc-view.m-filter-open .oc-filterbox > .m-sheet-head {
+    display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 2;
+    padding: 16px 12px 8px 16px; background: var(--panel);
+  }
+  body.m-filter-open .m-sheet-grab { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--border); }
+  body.m-filter-open .m-sheet-title { flex: 1; font-size: 16px; color: var(--text); }
+  body.m-filter-open .m-sheet-clear { height: 34px; color: var(--primary-text); }
+  body.m-filter-open .m-sheet-foot { display: none; }
+  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar > .m-sheet-foot,
+  body.oc-view.m-filter-open .oc-filterbox > .m-sheet-foot {
+    display: flex; position: sticky; bottom: 0; z-index: 2; margin-top: auto;
+    padding: 10px 12px 12px; background: var(--panel); border-top: 1px solid var(--border);
+  }
+  body.m-filter-open .m-sheet-done { flex: 1; height: 44px; font-size: 15px; }
+  body.m-filter-open #toolbar-row1 { padding: 4px 16px 12px !important; }
+  body.oc-view.m-filter-open .oc-filterbox > :not(.m-sheet-head):not(.m-sheet-foot) { margin: 0 16px 10px; }
+  body.oc-view.m-filter-open .oc-filters { display: grid; gap: 8px; }
+  body.oc-view.m-filter-open .oc-ms-btn { width: 100%; justify-content: space-between; min-height: 40px; }
+  body.oc-view.m-filter-open .oc-levelctl { display: grid; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  body.oc-view.m-filter-open .oc-flabel { display: none; }
+  /* each filter reads like a settings row: its name, then the value and a chevron */
+  body.m-filter-open #filter-pop .ms-btn { min-height: 44px; font-size: 14px; }
+}

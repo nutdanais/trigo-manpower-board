@@ -213,11 +213,14 @@ async function sheetOf(path) {
     await step("board cards: Thai by default, English on request, remembered, hidden outside a board", async () => {
       await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
       const card = (thai) => p.locator(`.emp-card[data-emp-id="e1"]`).first();
-      assert.equal(await p.locator("#card-names").isVisible(), true);
+      // on a computer the Names toggle lives in Filter & sort
+      assert.equal(await p.locator("#filter-pop #filter-names #card-names").count(), 1);
       assert.equal(await p.inputValue("#card-names"), "th");
       assert.match(await card().textContent(), /สมชาย\s*ใจดี/);
       assert.ok(!/Somchai/.test(await card().textContent()));
+      await p.click("#btn-filter-pop");
       await p.click("#card-names + .seg-pick [data-v=en]");
+      await p.keyboard.press("Escape");
       assert.match(await card().textContent(), /Somchai\s*Jaidee/);
       assert.ok(!/สมชาย/.test(await card().textContent()));
       assert.match(await p.locator('.emp-card[data-emp-id="e2"]').first().textContent(), /มาลี/, "no English name: the Thai one, not a blank card");
@@ -230,7 +233,9 @@ async function sheetOf(path) {
       await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       assert.equal(await p.locator("#card-names").isVisible(), false, "not offered on the Manpower List");
       await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
+      await p.click("#btn-filter-pop");
       await p.click("#card-names + .seg-pick [data-v=th]");
+      await p.keyboard.press("Escape");
     });
 
     console.log("all English name checks passed");

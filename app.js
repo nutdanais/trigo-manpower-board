@@ -1044,6 +1044,7 @@ function render() {
   document.body.classList.toggle("ov-view", ov);
   document.body.classList.toggle("el-view", eml);
   document.body.classList.toggle("hl-view", hl);
+  document.body.classList.toggle("oc-view", org);
   // phone header line 1 off a board: the tab's name where a board shows its own
   $("#m-title").textContent = ov ? "Overview" : org ? "Org Chart" : eml ? "Manpower" : hl ? "Host" : cap ? "Capacity" : "";
   placeBoardRow1Tools(board);
@@ -1388,6 +1389,8 @@ function renderOrgChart() {
           <button type="button" class="btn oc-view-btn" data-v="chart">${icon("orgchart")}<span>Org chart</span></button>
         </div>
         <div class="oc-spacer"></div>
+        <!-- display:contents on a computer; on a phone this is the Filter sheet -->
+        <div class="oc-filterbox">
         <span class="oc-flabel">Filter</span>
         <div class="oc-filters">
           ${orgFilterDropdown("engineers", "Engineer", org.filterOpts.engineers)}
@@ -1397,6 +1400,7 @@ function renderOrgChart() {
         <label class="oc-levelctl">Show to
           <select id="oc-level" class="oc-select" data-picker>${levelOpts}</select>
         </label>
+        </div>
       </div>
       <div class="oc-legend">
         <span class="oc-k"><span class="oc-sw" style="background:var(--chart-permanent)"></span>Permanent</span>
@@ -1476,6 +1480,7 @@ function orgApplyFilters() {
   org.tree = t;
   orgUpdateFilterLabels($("#orgchart-panel"));
   orgRerender();
+  renderStats();   // the phone's Filter button carries the count
 }
 /* redraw both views after a collapse/expand or filter change, keeping pan + view */
 function orgRerender() {
@@ -2602,6 +2607,17 @@ function missionSortValue(m) {
    high enough that the header still reads as that engineer's block. */
 const MISSION_TINT = 0.15;
 
+/* A mission's hours on its card. Times are stored NOT NULL with the day shift's
+   08:00–17:00 as the default, so a Night mission still on exactly those hours was
+   never given its own: say so instead of showing day hours on a night card. */
+function nightTimeNotSet(m) {
+  return m.shift === "night" && m.startTime === "08:00" && m.endTime === "17:00";
+}
+function missionTimeHtml(m) {
+  return nightTimeNotSet(m)
+    ? `<span class="m-time m-time-unset" title="Open the mission to set the night shift's hours">Night · time not set</span>`
+    : `<span class="m-time">${m.startTime}–${m.endTime}</span>`;
+}
 function renderMissions() {
   const plan = getPlan();
   const grid = $("#missions-grid");
@@ -2669,9 +2685,9 @@ function renderMissions() {
         </span>
       </div>
       <div class="m-line2">
-        <span class="m-cust">${escapeHtml(m.customer)}</span>
+        <span class="m-cust" title="${escapeHtml(m.customer)}">${escapeHtml(m.customer)}</span>
         <span class="m-sep">|</span>
-        <span>${m.startTime}-${m.endTime}</span>
+        ${missionTimeHtml(m)}
         <span class="m-sep">|</span>
         <span class="m-eng">${eng ? escapeHtml(eng.name) : "?"}</span>
         ${eng && eng.phone ? telLink(eng.phone) : ""}
@@ -2863,6 +2879,15 @@ function renderStats() {
     bar.appendChild(statChip("Missions", missions));
     bar.appendChild(statChip("Crew deployed", crew));
     statusGroup(bar, [emptyMissions ? statusChip("amber", null, plural(emptyMissions, "mission", "missions") + " with no crew") : null]);
+    // a phone: the same summary card + Filter + ⋯ header as Overview, Manpower and Host
+    renderPhoneViewCard({
+      head: `<b>${crew}</b><span class="ms-w"> crew deployed</span>`,
+      label: `${crew} crew deployed on ${missions} missions, ${engs.size} engineers, ${scope.length} boards`,
+      keys: [],
+      bar: [["asg", crew]],
+      tiles: [["perm", scope.length, "Boards"], ["oncall", engs.size, "Engineers"], ["asg", missions, "Missions"], ["asg", crew, "Crew"]],
+      filterCount: Object.values(org.filters).filter(f => f.size).length,
+    });
     return;
   }
   if (isEmployeeList()) {
@@ -3054,7 +3079,7 @@ function renderPhoneSummary(s, areaHtml) {
   const parts = [["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]];
   const split = `<span class="ms-bar" aria-hidden="true">${parts.filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</span>`;
   const k = (kind, n, label, alert) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}</span>`;
-  // Utilization = Assigned ÷ (Assigned + Standby), to two decimals: people on leave,
+  // Utilization = Assigned ÷ (Assigned + Standby), a whole percentage: people on leave,
   // on a holiday or on-call and not called in are left out, so 0 Standby reads 100%.
   const util = utilizationPct2(s.assigned, s.standby);
   card.innerHTML = `<span class="ms-row"><span class="ms-t"><b>${s.assigned}</b> <span class="ms-u">(${util}%)</span><span class="ms-w"> ${word}</span></span>` +
@@ -3157,7 +3182,7 @@ function buildPhoneMoreMenu() {
   const sep = () => { if (menu.lastChild && menu.lastChild.tagName !== "HR") menu.appendChild(document.createElement("hr")); };
   const click = (sel) => () => $(sel).click();
   // Overview, Manpower and Host: their own row-2 actions (the create button stays in view)
-  if (isOverview() || isEmployeeList() || isHostList()) {
+  if (isOverview() || isOrgChart() || isEmployeeList() || isHostList()) {
     const nv = $("#emplist-name-view");
     if (isEmployeeList() && nv) {
       const row = document.createElement("div");
@@ -3238,8 +3263,56 @@ function togglePhoneFilter(ev) {
   if (ev) ev.stopPropagation();
   const open = !document.body.classList.contains("m-filter-open");
   closePhoneMenus();
+  if (open) phoneSheetChrome();
   document.body.classList.toggle("m-filter-open", open);
   $("#m-filter").setAttribute("aria-expanded", String(open));
+}
+/* The phone's Filter sheet (a board, Manpower, Host, Org Chart) opens from the
+   bottom like the app's other sheets, with a title, Clear all and Done. The sheet
+   is the tab's own filter controls; this adds the head and foot to it once (they
+   are hidden on a computer, styles.css .m-sheet-head). */
+function phoneSheetChrome() {
+  const box = isOrgChart() ? $("#orgchart-panel .oc-filterbox") : $("#toolbar");
+  if (!box) return;
+  let head = box.querySelector(":scope > .m-sheet-head");
+  if (!head) {
+    head = document.createElement("div");
+    head.className = "m-sheet-head";
+    head.innerHTML = `<span class="m-sheet-grab" aria-hidden="true"></span><b class="m-sheet-title"></b>` +
+      `<button type="button" class="btn btn-quiet m-sheet-clear">Clear all</button>`;
+    box.prepend(head);
+    const foot = document.createElement("div");
+    foot.className = "m-sheet-foot";
+    foot.innerHTML = `<button type="button" class="btn btn-primary m-sheet-done">Done</button>`;
+    box.append(foot);
+    foot.querySelector(".m-sheet-done").onclick = (e) => { e.stopPropagation(); closePhoneMenus(); };
+  } else if (box.lastElementChild !== box.querySelector(":scope > .m-sheet-foot")) {
+    box.append(box.querySelector(":scope > .m-sheet-foot"));
+  }
+  head.querySelector(".m-sheet-title").textContent = isOrgChart() || isEmployeeList() || isHostList() ? "Filter" : "Filter & sort";
+  head.querySelector(".m-sheet-clear").onclick = (e) => { e.stopPropagation(); clearViewFilters(); };
+}
+/* Clear all, in the phone Filter sheet: every filter (and the search) of the tab on screen */
+function clearViewFilters() {
+  if (isOrgChart()) {
+    for (const f of Object.values(org.filters)) f.clear();
+    renderOrgChart();
+    renderStats();
+    return;
+  }
+  const empty = (o) => { for (const k of Object.keys(o)) o[k] = []; };
+  if (isEmployeeList()) {
+    empty(state.emplist.filters); state.emplist.search = ""; state.emplist.issue = null;
+    const q = $("#emplist-search"); if (q) q.value = "";
+    renderEmplistFilterOptions(); renderEmployeeRows(); renderStats();
+  } else if (isHostList()) {
+    empty(state.hostlist.filters); state.hostlist.search = "";
+    const q = $("#hostlist-search"); if (q) q.value = "";
+    renderHostlistFilterOptions(); renderHostRows(); renderStats();
+  } else {
+    empty(state.filters);
+    renderFilterOptions(); renderMissions();
+  }
 }
 function closePhoneMenus() {
   closeMoreMenu();
@@ -3271,9 +3344,12 @@ function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); 
 /* The same utilization to two decimals, for the board's own stats: assigned ÷
    (assigned + standby), which is the denominator above once leave, holiday and
    free on-call are taken out. Trailing zeros dropped: 97.85, 98.5, 100. */
+/* Assigned ÷ (Assigned + Standby) as a whole percentage. It printed two decimals
+   (58.33%) beside places that printed 58%; one precision everywhere, and a whole
+   number is all the data supports. */
 function utilizationPct2(assigned, standby) {
   const denom = assigned + standby;
-  return denom > 0 ? Math.round(assigned / denom * 10000) / 100 : 0;
+  return denom > 0 ? Math.round(assigned / denom * 100) : 0;
 }
 function utilizationPct(assigned, headcount, leave, onHoliday = 0, oncallFree = 0) {
   const denom = headcount - leave - onHoliday - oncallFree;
@@ -4177,9 +4253,11 @@ function msButtonLabel(key) {
    span so "All" can go quiet and a real selection can take the active tint */
 function setMsLabel(btn, key) {
   const sel = state.filters[key];
+  // textContent stays "Engineer: All" / "Engineer: 2 selected"; inside Filter & sort
+  // the value shows at the right ("All", "2 selected"), on row 1 only the name or count
   btn.innerHTML = sel.length
-    ? `${FILTER_LABELS[key]}: <span class="ms-val">${sel.length}<span class="ms-all"> selected</span></span>`
-    : `${FILTER_LABELS[key]}<span class="ms-val ms-all">: All</span>`;
+    ? `<span class="ms-name">${FILTER_LABELS[key]}</span><span class="ms-colon">: </span><span class="ms-val">${sel.length}<span class="ms-all"> selected</span></span>`
+    : `<span class="ms-name">${FILTER_LABELS[key]}</span><span class="ms-val ms-all"><span class="ms-colon">: </span>All</span>`;
   btn.classList.toggle("ms-active", sel.length > 0);
 }
 
@@ -8197,7 +8275,8 @@ function setXlsxTicks(on) {
 }
 
 /* Layout A (computer widths): row 1 ends with the tab's tools and Export at the
-   right edge. On a board that is Names → Undo → Reset → Export; on the lists,
+   right edge. On a board that is Undo → Reset → Export (Names on the cards is in
+   Filter & sort, #filter-names); on the lists,
    Bulk edit → Export. Phones (where row 1 folds into the More dropdown) keep
    them in #toolbar-right. */
 const ROW1_TOOLS_MQ = window.matchMedia("(min-width: 641px)");
@@ -8209,7 +8288,8 @@ function placeBoardRow1Tools(board) {
   const wide = ROW1_TOOLS_MQ.matches;
   // layout A: row 1 ends with the tab's tools and Export, on every tab
   if (board && wide) {
-    if (names.parentNode !== end) { end.prepend(names); if (seg) names.after(seg); }
+    const home = $("#filter-names");
+    if (names.parentNode !== home) { home.append(names); if (seg) names.after(seg); }
   } else if (names.parentNode !== right) {
     right.insertBefore(names, $("#readonly-badge"));
     if (seg) names.after(seg);
@@ -13266,7 +13346,7 @@ function wireApp() {
   $("#m-filter").onclick = togglePhoneFilter;
   document.addEventListener("click", (ev) => {
     if (!ev.target.closest("#m-more-menu, #m-more")) { $("#m-more-menu").classList.add("hidden"); $("#m-more").setAttribute("aria-expanded", "false"); }
-    if (document.body.classList.contains("m-filter-open") && !ev.target.closest("#toolbar, #m-filter, .ms-pop")) {
+    if (document.body.classList.contains("m-filter-open") && !ev.target.closest("#toolbar, #m-filter, .ms-pop, .oc-filterbox, .pk-pop, .dp-pop")) {
       document.body.classList.remove("m-filter-open");
       $("#m-filter").setAttribute("aria-expanded", "false");
     }
