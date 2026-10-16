@@ -5623,6 +5623,16 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
 .ov-mgrid > :first-child { text-align: right; font-variant-numeric: tabular-nums; }
 .ov-mtags { display: inline-flex; gap: 4px; }
 th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; justify-self: end; margin-right: 100px; }
+/* a phone: the Missions column drops to a narrower pill track (D 12 + N 10 still
+   fit) and the pills lose their spare padding, so the whole table sits inside the
+   card with no sideways scroll. The header's offset follows the track: 72px + 6px gap. */
+@media (max-width: 640px) {
+  .ov-mgrid { grid-template-columns: 2.2ch 72px; column-gap: 6px; }
+  .ov-mtags { gap: 3px; }
+  .ov-mtags .ov-shift-tag { padding: 0 4px; margin-left: 0; }
+  th.ov-mcell .ov-mgrid > :first-child { margin-right: 78px; }
+  .ov-table-label small { overflow-wrap: anywhere; }
+}
 
 /* Shifts: the night card on a soft night-blue wash */
 .ov-daynight-tile.ov-dn-night { background: #eef2f8; border-color: #d4dceb; }

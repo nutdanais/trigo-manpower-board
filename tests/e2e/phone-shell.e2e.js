@@ -240,6 +240,24 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       await tapNav(p, "Board");
     });
 
+    await step("Overview's By engineer table fits its card at 390px and 320px, with no sideways scroll", async () => {
+      await p.evaluate(() => document.querySelector("#board-tabs .tab-overview").onclick());
+      await p.waitForTimeout(400);
+      for (const w of [390, 320]) {
+        await p.setViewportSize({ width: w, height: 844 });
+        await p.waitForTimeout(200);
+        const m = await p.evaluate(() => {
+          const t = [...document.querySelectorAll("#overview-panel .ov-table")].find((x) => x.querySelector("th.ov-mcell"));
+          const wrap = t && t.parentElement;
+          return wrap && { sw: wrap.scrollWidth, cw: wrap.clientWidth };
+        });
+        assert.ok(m, "By engineer table is on the Overview");
+        assert.ok(m.sw <= m.cw, "By engineer scrolls sideways at " + w + "px: " + m.sw + " > " + m.cw);
+      }
+      await p.setViewportSize({ width: 390, height: 844 });
+      await tapNav(p, "Board");
+    });
+
     await step("Me holds the account, Org Chart, Lock, Settings and Sign out; Settings hides the bar", async () => {
       await tapNav(p, "Me");
       assert.equal(await visible(p, "#more-menu"), true);
