@@ -36,7 +36,7 @@ const THAI_MONTHS = ["มกราคม","กุมภาพันธ์","ม�
 function fmtDateThai(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   const dow = THAI_DOW[new Date(iso + "T00:00:00").getDay()];
-  return `${dow} ${String(d).padStart(2,"0")}-${THAI_MONTHS[m-1]}-${y + 543}`;
+  return `${dow} ${d} ${THAI_MONTHS[m-1]} ${y + 543}`;   // same shape as fmtDate: "ศุกร์ 16 ตุลาคม 2569"
 }
 function addDays(iso, n) {
   const d = new Date(iso + "T00:00:00");
@@ -1245,9 +1245,10 @@ function orgCountText(n) {
   const crew = orgCrewCount(n);
   const pl = (k, one, many) => `${k} ${k === 1 ? one : many}`;
   if (n.type === "root") return `${pl(orgCountType(n, "board"), "board", "boards")} · ${pl(orgDistinctEngineers(n), "engineer", "engineers")} · ${pl(orgDistinctAreas(n), "area", "areas")} · ${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
-  if (n.type === "board") return `${orgCountType(n, "engineer")} eng · ${pl(orgDistinctAreas(n), "area", "areas")} · ${orgMissionCount(n)} miss · ${crew} crew`;
-  if (n.type === "engineer") return `${pl(orgCountType(n, "area"), "area", "areas")} · ${orgMissionCount(n)} miss · ${crew} crew`;
-  if (n.type === "area") return `${orgMissionCount(n)} miss · ${crew} crew`;
+  // words in full: "5 miss" read as a word, not an abbreviation
+  if (n.type === "board") return `${pl(orgCountType(n, "engineer"), "engineer", "engineers")} · ${pl(orgDistinctAreas(n), "area", "areas")} · ${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
+  if (n.type === "engineer") return `${pl(orgCountType(n, "area"), "area", "areas")} · ${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
+  if (n.type === "area") return `${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
   return `${crew} crew`;
 }
 /* The square tile in front of each Org chart row. People and engineers show
@@ -2445,6 +2446,19 @@ function renderLeaveTabs() {
     state.leaveTab = best;
   }
   setLeaveTab(state.leaveTab);
+  updateLeaveTabsFade();
+}
+/* On a phone the leave tabs are one swipeable row: a fade at the right edge says
+   there are more, and goes once the last tab is in view (styles.css, .lv-more) */
+function updateLeaveTabsFade() {
+  const strip = $("#leave-tabs");
+  if (!strip) return;
+  strip.classList.toggle("lv-more", strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+  if (!strip._fadeWired) {
+    strip._fadeWired = true;
+    strip.addEventListener("scroll", updateLeaveTabsFade, { passive: true });
+    window.addEventListener("resize", updateLeaveTabsFade);
+  }
 }
 function wireLeaveTabs() {
   const strip = $("#leave-tabs");
@@ -3326,7 +3340,9 @@ function closePhoneMenus() {
 }
 
 /* ---------- overview tab ---------- */
-function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); }
+/* the short date for grids, chart axes and chips: "16 Oct" (it was "16/10", beside
+   "Fri 16-Oct-2026" and "Fri 6 Nov" elsewhere — one long and one short form now) */
+function shortDateLabel(iso) { return fmtDayMon(iso); }
 
 /* assigned ÷ (headcount − leave − onHoliday − free on-call) — "how much of the
    people actually available today is deployed". onHoliday and oncallFree default
@@ -12534,7 +12550,7 @@ function renderUserRows() {
     // a tap on Approve / Reject stays theirs
     if (mayEdit) tr.onclick = (ev) => { if (svIsPhone() && !ev.target.closest("button")) openUserModal(u.id); };
     tr.innerHTML = `
-      <td data-label="Name">${escapeHtml(u.fullName || u.displayName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName && u.fullName ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
+      <td data-label="Name">${escapeHtml(u.fullName || u.displayName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName && u.fullName && u.displayName.trim().toLowerCase() !== u.fullName.trim().toLowerCase() ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
       <td data-label="Email">${escapeHtml(u.email || "")}</td>
       <td data-label="Role"><span class="role-pill role-${escapeHtml(u.roleKey || "none")}">${escapeHtml(roleLabel(u.roleKey))}</span></td>
       <td data-label="Status"><span class="status-pill status-${escapeHtml(u.status)}" title="${escapeHtml(st.hint || "")}">${escapeHtml(st.label)}</span></td>

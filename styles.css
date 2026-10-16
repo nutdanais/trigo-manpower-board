@@ -133,63 +133,6 @@
   --topbar-line: var(--primary-dark);
 }
 
-:root[data-theme="dark"] {
-  --bg: #14171a;
-  --panel: #1c2024;
-  --border: #2c3236;
-  --text: #e8ebed;
-  --muted: #9aa1a8;
-  --primary-text: #6fb1e0;
-  --danger-line: #7f2222;
-  --danger-tint: rgba(185,28,28,.16);
-  --danger-text: #fca5a5;
-  --warn-text: #e0b070;
-  --warn-tint: rgba(245,158,11,.16);
-  /* dark steps of the status set: a low-chroma ground with a lifted ink,
-     rather than the light values dimmed — dimming them turns amber to mud */
-  --ok-surface: #1b2416;
-  --ok-line: #46592a;
-  --ok-text: #a8c855;
-  --warn-surface: #2a2313;
-  --warn-line: #6a5426;
-  --bg-soft: #232a33;
-  --hover-tint: #232c38;
-  --stat-asg: #3987e5; --stat-leave: #c98500; --stat-standby: #d0334f;
-  --track-off: #3a424b;
-  /* employee card surface, a step lighter than --panel/--bg-soft so cards
-     read as distinct from the board underneath them (was previously fixed
-     to the light-mode value — see the light block's comment on why that's
-     safe to change now) */
-  --emp-bg: #2a3038;
-  --emp-perm-border: #4a525c;
-  --emp-oncall-border: #7a838d;
-  --emp-oncall-bg: #242a31;   /* one step below --emp-bg */
-  --emp-ink: #e8ebed;
-  --emp-sub: #aab2bb;
-  --emp-pos-bg: rgba(111,177,224,.14);
-  --pool-tint: #12303f;
-  --leave-tint: #232a33;
-
-  /* dark-surface steps of the same chart hues (see the light block for why
-     these — unlike engineer/area colors — do redefine per theme) */
-  --chart-assigned: #3987e5;
-  --chart-leave: #c98500;
-  --chart-standby: #d0334f;
-  --chart-holiday: #199e70;  /* reuses chart-cat-3 — unused elsewhere in this group */
-  --chart-permanent: #3987e5;
-  --chart-oncall: #d95926;
-  --chart-cat-1: #3987e5;
-  --chart-cat-2: #d95926;
-  --chart-cat-3: #199e70;
-  --chart-cat-4: #c98500;
-  --chart-cat-5: #d55181;
-  --chart-cat-6: #008300;
-  --chart-cat-7: #9085e9;
-  --chart-cat-8: #e66767;
-
-  --shadow: 0 14px 36px rgba(0, 0, 0, .52);
-
-}
 
 body {
   font-family: var(--font-ui);
@@ -203,13 +146,6 @@ body {
     radial-gradient(1100px 720px at 6% -12%, rgba(0, 73, 131, 0.12), transparent 60%),
     radial-gradient(1000px 820px at 110% 118%, rgba(168, 200, 85, 0.16), transparent 55%),
     linear-gradient(158deg, #eef3f8 0%, #e8edf3 46%, #edf2e9 100%);
-  background-attachment: fixed;
-}
-:root[data-theme="dark"] body {
-  background:
-    radial-gradient(1100px 720px at 6% -12%, rgba(22, 92, 152, 0.22), transparent 60%),
-    radial-gradient(1000px 820px at 110% 118%, rgba(96, 128, 44, 0.16), transparent 55%),
-    linear-gradient(158deg, #0f1317 0%, #12161b 50%, #101410 100%);
   background-attachment: fixed;
 }
 
@@ -1147,7 +1083,6 @@ body.exporting .mission-header .m-line2 .m-cust { white-space: normal; overflow:
    DAY card away from the ground, rather than lightening night. */
 .mission-card.night .mission-body { background: #1c2430; }
 .mission-card.night .m-remark { color: #b8bfc8; }
-:root[data-theme="dark"] .mission-card:not(.night) .mission-body { background: #3a424b; }
 .mission-emps {
   display: flex;
   flex-wrap: wrap;
@@ -2360,11 +2295,6 @@ body.fp-pools-empty { --fp-w: 264px; }
   line-height: 1.5;
   margin-bottom: 10px;
 }
-:root[data-theme="dark"] .modal-warn {
-  background: rgba(217,119,6,.12);
-  border-color: #8a6127;
-  color: #f0c674;
-}
 
 .temp-password code {
   flex: 1 1 auto;
@@ -2717,7 +2647,6 @@ body.fp-pools-empty { --fp-w: 264px; }
   min-height: 26px;
 }
 .ov-history-date:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-[data-theme="dark"] .ov-history-date::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.7); }
 /* The Overview is exportable too (see the isOverview() branch in exportBoard),
    and #board-capture takes the whole panel with it. A native date input and a
    <select> are the two controls html2canvas reproduces least predictably, and
@@ -3020,8 +2949,6 @@ body.touch-mode .hl-edit { opacity: 1; }
 }
 #hostlist-dupbar .dupbar-icon { color: var(--warn-text); font-weight: 700; }
 #hostlist-dup-text { flex: 1; min-width: 200px; }
-:root[data-theme="dark"] #hostlist-dupbar { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
-:root[data-theme="dark"] #hostlist-dupbar .dupbar-icon { color: #f0b45c; }
 
 /* small tags beside a host name: archived state, and the duplicate hint */
 .hl-tag {
@@ -3037,7 +2964,6 @@ body.touch-mode .hl-edit { opacity: 1; }
 }
 .hl-tag-arch { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
 .hl-tag-dup { background: var(--warn-tint); color: var(--warn-text); border: 1px solid var(--warn-line); }
-:root[data-theme="dark"] .hl-tag-dup { color: #f0b45c; border-color: #7a5a1f; }
 /* an archived host is still readable, just visibly off the active roster —
    same treatment (and same reasoning) as an inactive employee's row */
 #hostlist-table tbody tr.row-archived td { opacity: .55; }
@@ -3084,7 +3010,6 @@ body.touch-mode .hl-edit { opacity: 1; }
 /* a known record with something missing (no service area): amber info, never a tick */
 .host-note-gap { color: var(--warn-text); font-weight: 500; }
 .host-note-info { color: var(--muted); font-weight: 500; }
-:root[data-theme="dark"] .host-note-new { color: #f0b45c; }
 
 .hl-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: center; }
 .hl-count {
@@ -3430,12 +3355,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   border-color: var(--danger-line);
   color: var(--danger-text);
 }
-:root[data-theme="dark"] .st-del:hover,
-:root[data-theme="dark"] .st-del:focus-visible {
-  background: rgba(185,28,28,.18);
-  border-color: #7f2222;
-  color: var(--danger-text);
-}
 /* the weekday chips sit on one line beside the board name */
 .settings-table .settings-board-days { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 0; }
 .settings-table .settings-board-name { margin: 0; font-size: 13px; }
@@ -3488,8 +3407,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 }
 #users-pending .dupbar-icon { color: var(--warn-text); font-weight: 700; }
 #users-pending-text { flex: 1; min-width: 180px; }
-:root[data-theme="dark"] #users-pending { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
-:root[data-theme="dark"] #users-pending .dupbar-icon { color: #f0b45c; }
 
 #users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 #users-table th, #users-table td {
@@ -3506,9 +3423,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 #users-table tr.status-disabled { opacity: .6; }
 /* the one row state worth marking: a request still waiting on somebody */
 #users-table tr.status-pending { background: rgba(237,161,0,.08); }
-:root[data-theme="dark"] #users-table tr.status-pending { background: rgba(237,161,0,.10); }
 #users-table tr.user-row-me { background: rgba(0,0,0,.03); }
-:root[data-theme="dark"] #users-table tr.user-row-me { background: rgba(255,255,255,.04); }
 .user-you {
   font-size: 10.5px;
   font-weight: 700;
@@ -3555,8 +3470,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .status-pill.status-pending  { background: var(--warn-surface); color: var(--warn-text); }
 .status-pill.status-disabled { background: #f1f5f9; color: #64748b; }
 /* the pills carry their own ink, so dark mode only softens the plate */
-:root[data-theme="dark"] .role-pill,
-:root[data-theme="dark"] .status-pill { border-color: rgba(255,255,255,.16); filter: brightness(.92); }
 
 /* ----- My account ----- */
 .account-identity { margin-bottom: 14px; }
@@ -3600,7 +3513,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   background: rgba(0,0,0,.03);
   padding-top: 10px;
 }
-:root[data-theme="dark"] #roles-matrix .rm-group td { background: rgba(255,255,255,.04); }
 #roles-matrix .rm-area { font-weight: 600; }
 #roles-matrix .rm-area small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 #roles-matrix td:not(.rm-area) { text-align: center; }
@@ -3645,7 +3557,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   font-size: 12.5px;
   margin-bottom: 10px;
 }
-:root[data-theme="dark"] .login-note { background: rgba(16,185,129,.12); border-color: #2f6f57; color: #86efac; }
 .invite-domain { font-weight: 700; white-space: nowrap; }
 
 /* the recovery screen reuses the sign-in card wholesale */
@@ -4430,7 +4341,6 @@ body.forecast-mode .zone { border-style: dashed; }
    forecast, as on the board. --fc-* tell the forecasters apart; they are a
    designed set with dark steps, like the chart colours. */
 :root { --fc-1: #2a78d6; --fc-2: #c2410c; --fc-3: #0f8a5f; --fc-4: #8b5cf6; --merge-sel: rgba(0,73,131,.08); }
-:root[data-theme="dark"] { --fc-1: #5b9ff0; --fc-2: #f08a4b; --fc-3: #3fbf8f; --fc-4: #a98bf8; --merge-sel: rgba(111,177,224,.14); }
 #modal-merge { width: 1080px; display: flex; flex-direction: column; overflow: hidden; }
 #modal-merge > h3 { position: relative; top: 0; flex: none; }
 #merge-sub { flex: none; max-width: 90ch; }
@@ -4617,12 +4527,6 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   --cap-stripe: rgba(0, 73, 131, .05);
   --cap-sel: rgba(0, 73, 131, .12);
 }
-:root[data-theme="dark"] {
-  --cap-over: #ef5b52;
-  --cap-spare: #6f8a3a;
-  --cap-stripe: rgba(111, 177, 224, .07);
-  --cap-sel: rgba(111, 177, 224, .2);
-}
 #capacity-toolbar { display: contents; }
 #btn-cap-board { gap: 8px; min-width: 210px; }
 #btn-cap-board .ovb-cap { color: var(--muted); font-weight: 550; }
@@ -4806,7 +4710,6 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-area { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 16px; flex: none; }
 .cap-shift { flex: none; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); }
 .cap-shift.night { background: var(--night); border-color: var(--night); color: #fff; }
-:root[data-theme="dark"] .cap-shift.night { background: #0b0f14; border-color: var(--muted); }
 .cap-empty { color: var(--muted); font-style: italic; font-size: 13px; }
 .cap-cell { font-size: 14px; font-weight: 600; }
 .cap-cell input {
@@ -4885,6 +4788,8 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-ph-weeklabel small { color: var(--muted); margin-left: 4px; }
 .cap-ph-hostbar .cap-row-menu { margin-left: 0; width: 40px; height: 40px; opacity: 1; }
 .cap-ph-days { display: flex; flex-direction: column; }
+/* the empty line sits in from the card edge like the controls below it */
+.cap-ph-days > .cap-empty { margin: 0; padding: 10px 16px 2px; }
 .cap-ph-day { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--bg-soft); }
 .cap-ph-when { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .cap-ph-when small { font-size: 11.5px; color: var(--muted); }
@@ -5670,16 +5575,18 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 /* Shifts: the night card on a soft night-blue wash */
 .ov-daynight-tile.ov-dn-night { background: #eef2f8; border-color: #d4dceb; }
 
-/* Overview group headers ("In detail", "Period"): a real section header — a navy bar
-   with a white title, so it no longer melts into the page background */
+/* Overview group headers ("In detail", "Period"): a section header built from type
+   and one rule, not a navy bar (the heaviest thing on the page, release review 22).
+   Still unmistakable: a larger navy title, the green accent mark and a full-width
+   navy-tinted rule under it, so the section break doesn't melt into the page. */
 .ov-group-head {
-  margin: 14px 0 -2px; padding: 9px 14px; border-radius: 10px;
-  background: var(--primary); color: #fff; align-items: center;
-  box-shadow: 0 1px 2px rgba(0, 38, 70, .18);
+  margin: 22px 0 0; padding: 0 2px 9px; border-radius: 0; align-items: center;
+  background: none; color: var(--primary-text); box-shadow: none;
+  border-bottom: 2px solid color-mix(in srgb, var(--primary) 26%, transparent);
 }
-.ov-group-head h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: .2px; text-transform: none; color: #fff; }
-.ov-group-head .ov-group-sub { color: rgba(255, 255, 255, .78); font-size: 12.5px; }
-.ov-group-head::before { content: ""; width: 4px; align-self: stretch; border-radius: 2px; background: var(--brand-green); margin-right: 2px; }
+.ov-group-head h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.2px; text-transform: none; color: var(--primary-text); }
+.ov-group-head .ov-group-sub { color: var(--muted); font-size: 13px; font-weight: 500; }
+.ov-group-head::before { content: ""; width: 4px; height: 20px; align-self: center; border-radius: 2px; background: var(--brand-green); margin-right: 2px; }
 /* ===== Phone shell (2026-10-13, mobile direction C + pool drawer) =====
    See design/mobile-directions.html. Below 640px only; desktop is untouched.
    - Top bar: a light surface with the date and the avatar on one line, then the
@@ -6901,3 +6808,26 @@ label > .pk { margin-top: 5px; }
   .modal.modal-side.modal-export:not(#modal-bulk) .modal-body { overflow-y: auto; min-height: 0; }
 }
 @keyframes export-in { from { transform: translateY(10px); opacity: 0; } }
+
+/* 23 · Manpower and Host tables on a computer: an empty field reads as a quiet dash,
+   and its "+ Add" shows on the row you point at (or tab into). Sixty-odd chips drowned
+   the names; the amber pills above the table still count what is missing. The text
+   stays "+ Add" for screen readers. Phone cards keep the chip (no hover there). */
+@media (min-width: 641px) and (hover: hover) {
+  :is(#emplist-body, #hostlist-body) tr:not(:hover):not(:focus-within) .hl-add-loc {
+    font-size: 0; border-color: transparent; background: none; padding: 0; min-width: 0;
+  }
+  :is(#emplist-body, #hostlist-body) tr:not(:hover):not(:focus-within) .hl-add-loc::before {
+    content: "—"; font-size: 13px; color: #b6bec9;
+  }
+}
+
+/* 25 · phone leave tabs: a label never breaks inside its tab, and while more tabs
+   are out of sight the row fades out at the right edge (updateLeaveTabsFade) */
+.lv-tab { white-space: nowrap; }
+@media (max-width: 640px) {
+  body.board-view:not(.exporting) #leave-tabs.lv-more {
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+  }
+}

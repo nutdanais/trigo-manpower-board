@@ -85,7 +85,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       const banner = [];
       ws.eachRow((r, n) => { if (n <= 3) r.eachCell((c) => banner.push(String(c.value))); });
       assert.ok(banner.includes("Manpower Board") && banner.includes("OPERATIONS PLANNING") && banner.includes("Board One"));
-      assert.ok(banner.some((t) => /^\w{3} \d\d-\w{3}-\d{4}/.test(t)), "date in banner");
+      assert.ok(banner.some((t) => /^\w{3} \d{1,2} \w{3} \d{4}/.test(t)), "date in banner");
       assert.ok(banner.includes("4") && banner.includes("TOTAL EMPLOYEES"));
       const names = [];
       for (let r = 7; r <= 10; r++) names.push(ws.getCell(r, 1).value);
@@ -124,7 +124,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       assert.deepEqual(col(oncall, 3, 7, 8), ["On-call", "On-call"]);
       for (const ws of [leave, standby, oncall]) {
         const t = []; ws.eachRow((r, n) => { if (n <= 3) r.eachCell((c) => t.push(String(c.value))); });
-        assert.ok(t.includes("Manpower Board") && t.includes("Board One") && t.some((x) => /^\w{3} \d\d-\w{3}-\d{4}/.test(x)), ws.name + " banner");
+        assert.ok(t.includes("Manpower Board") && t.includes("Board One") && t.some((x) => /^\w{3} \d{1,2} \w{3} \d{4}/.test(x)), ws.name + " banner");
         assert.equal(ws.getImages().length, 1, ws.name + " logo");
       }
     });
