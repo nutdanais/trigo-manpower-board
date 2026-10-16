@@ -53,13 +53,27 @@
   }
 
   /* the Thai for one string, or null when there is none */
+  /* A pattern's {a} stands for a number, a name or a date. When it would instead
+     swallow an English clause that has no Thai of its own ("Nothing is planned for
+     this day yet" through "{a} for {b}"), the pattern is the wrong one: skip it, so
+     the sentence-by-sentence pass below gets the string, not a half-Thai line. */
+  var CLAUSE = /\b(the|is|are|was|were|to|and|or|this|that|yet|has|have|not|be|it|its|will|can|if|so|but|only|when|then)\b/i;
   function lookup(en) {
     if (en in dict) return dict[en];
     for (var i = 0; i < patterns.length; i++) {
       var p = patterns[i], m = p.re.exec(en);
       if (!m) continue;
-      var vals = {};
-      p.keys.forEach(function (k, j) { vals[k] = tr(m[j + 1]); });
+      var vals = {}, clause = false;
+      p.keys.forEach(function (k, j) {
+        // {b} in "{a} mission{b}" is the plural "s" and the Thai leaves it out; it
+        // must never swallow (and so drop) the rest of a sentence
+        if (p.th.indexOf("{" + k + "}") < 0 && m[j + 1].length > 3) clause = true;
+        vals[k] = tr(m[j + 1]);
+        // judged on the result: a clause only partly translated is still English
+        var left = vals[k].replace(/[^A-Za-z\s]+/g, " ");
+        if (CLAUSE.test(left) && /[A-Za-z]{2,}(\s+[A-Za-z]{2,}){2}/.test(left)) clause = true;
+      });
+      if (clause) continue;
       return p.th.replace(/\{(\w+)\}/g, function (all, k) { return k in vals ? vals[k] : all; });
     }
     return null;
@@ -76,11 +90,18 @@
     if (!/[A-Za-z]/.test(core)) return p;
     var th = lookup(core);
     if (th === null) {
-      var m = /^(.*?)([.:!]+)$/.exec(core);          // "Saved." when the dictionary has "Saved"
+      var m = /^(.*?)([.:!;]+)$/.exec(core);         // "Saved." when the dictionary has "Saved"
       if (m) { th = lookup(m[1]); if (th !== null) th += m[2]; }
     }
     if (th === null) return null;
     return p.slice(0, p.indexOf(core)) + th + p.slice(p.indexOf(core) + core.length);
+  }
+  /* a piece with a date in it: the date in Thai, then the dictionary once more */
+  function datePiece(p) {
+    var core = p.trim(), d = dates(core);
+    if (d === core) return null;
+    var th = lookup(d);
+    return p.slice(0, p.indexOf(core)) + (th === null ? d : th) + p.slice(p.indexOf(core) + core.length);
   }
   /* split on `sep` (separators sit at odd positions); each part is tried whole,
      then handed to `inner`. Returns null when nothing in it had a translation. */
@@ -90,6 +111,7 @@
       if (i % 2 || !/[A-Za-z]/.test(p)) return p;
       var t = piece(p);
       if (t === null && inner) t = inner(p, unknown);
+      if (t === null) t = datePiece(p);   // last: a piece that only has a date to translate
       if (t === null) { if (/[A-Za-z]{3}/.test(p)) unknown.push(p.trim()); return p; }
       hit = true;
       return t;
@@ -144,7 +166,16 @@
       var th = core ? lookup(core) : null;
       if (th === null && core) {
         var d = dates(core);
-        if (d !== core) th = d;
+        if (d !== core) {
+          // The words around a date need translating too (it used to stop at the date:
+          // "Today's plan (16 ต.ค. 2026) is already being executed…"). Sentences are
+          // split on the English first — "ต.ค." has a full stop that would cut one in
+          // two — and each piece translates its own date (piece, below).
+          var rest = pieces(body);
+          if (rest === null) rest = lookup(d);
+          if (rest === null) rest = stitch(d);
+          th = rest === null ? d : rest;
+        }
         else if ((th = pieces(body)) === null && (th = stitch(body)) === null) missing.add(core);
       }
       hit = th === null ? s : lead + th + trail;
@@ -177,7 +208,9 @@
     else if (rec) texts.delete(node);
   }
   function doAttrs(el) {
-    if (skipEl(el)) return;
+    // an <input>'s typed text is never ours, but its placeholder and tooltip are:
+    // only data (people's names) is left alone here, not the INPUT / TEXTAREA tags
+    if (!el || (el.closest && el.closest(DATA))) return;
     var recs = attrs.get(el);
     for (var i = 0; i < ATTRS.length; i++) {
       var a = ATTRS[i], v = el.getAttribute(a);

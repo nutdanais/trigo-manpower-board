@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-15g">
+<link rel="stylesheet" href="styles.css?v=2026-10-16a">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-15g"></script>
+<script src="version.js?v=2026-10-16a"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -99,6 +99,7 @@
 <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
 <symbol id="i-site" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
 <symbol id="i-merge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6a6 6 0 0 0 6 6h6M15 12l3 3-3 3M6 21v-6"/></symbol>
 <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3v-6zM3 13h5l1 3h6l1-3h5"/></symbol>
 <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
@@ -208,12 +209,10 @@
   <nav id="board-tabs" aria-label="Modules"></nav>
   <div class="topbar-right">
     <span id="save-status" class="hidden"></span>
-    <!-- the date's state, beside the date it describes: CONFIRMED, CONFIRMED · READ-ONLY
-         (past date) or · LOCKED, or FORECAST (renderModePill in app.js) -->
+    <!-- the date's one status pill, beside the date it describes: Draft · Not reviewed ·
+         Read-only, Final · Locked, Holiday, Forecast… (renderModePill in app.js). On a
+         phone it is the only pill too, holiday included. -->
     <span id="mode-pill" class="mode-pill hidden"></span>
-    <!-- Phone only (styles.css, Phone header): HOLIDAY beside the status pill, since the
-         Holiday switch itself lives in the date picker there -->
-    <span id="m-hol-pill" class="mode-pill mode-holiday hidden">HOLIDAY</span>
     <!-- Lock sits left of the date, so showing/hiding it never shifts the date
          arrows (the row is right-aligned) -->
     <button id="btn-lock" class="btn btn-top hidden" title="Lock this board so it's view-only for everyone"><svg class="ic" aria-hidden="true"><use href="#i-unlock"></use></svg><span class="btn-label">Lock</span></button>
@@ -369,7 +368,7 @@
       </div>
 
       <div class="settings-pane" data-pane="boards">
-        <p class="settings-hint">Ticked days are that board's non-working days (its weekend). This drives the holiday toggle, the weekend "Add Mission" import, the date picker's highlighting and both Overview trend charts.</p>
+        <p class="settings-hint">Ticked days are that board's non-working days (its weekend). This drives the holiday toggle, the weekend "Copy from weekday", the date picker's highlighting and both Overview trend charts.</p>
         <div class="settings-list">
           <table class="settings-table sv-responsive">
             <thead><tr><th class="st-board">Board</th><th>Non-working days</th><th class="st-act"><span class="sr-only">Actions</span></th></tr></thead>
@@ -472,7 +471,9 @@
       <button type="button" id="btn-ov-board" class="btn" aria-haspopup="menu" aria-expanded="false" title="Board shown on the dashboard"><span class="ovb-cap">Board</span><span class="ovb-label">All boards</span><span class="ovb-count"></span><svg class="ic" aria-hidden="true"><use href="#i-chevron-down"></use></svg></button>
       <div id="ov-board-menu" class="tb-pop hidden" role="menu" aria-label="Board shown on the dashboard"></div>
     </div>
-    <button id="btn-import-mission" class="btn hidden"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Add Mission</button>
+    <!-- Copy from confirmed… (a forecast day) / Copy from weekday… (a holiday): sits
+         left of New Mission, which stays the one filled button (release review 12) -->
+    <button id="btn-import-mission" class="btn hidden"><svg class="ic" aria-hidden="true"><use href="#i-copy"></use></svg> <span id="import-mission-label">Copy from weekday…</span></button>
     <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
     <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
     <button id="btn-add-host" class="btn btn-primary hidden" title="Record a host that isn't on any mission yet"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Host</button>
@@ -582,6 +583,11 @@
               <option value="shift">Shift</option>
             </select>
             </label>
+            <!-- Names on the cards (Thai / English): on a computer it lives here, not
+                 in row 1, where an unlabelled ไทย | English read as the app language
+                 switch. placeBoardRow1Tools moves #card-names in; a phone offers it
+                 in the ⋯ menu instead. -->
+            <div id="filter-names" class="filter-sort"><span>Names on cards</span></div>
           </div>
         </div>
         <!-- Narrows the board like a filter does, so it sits with them: reads
@@ -933,7 +939,7 @@
   </div>
 
   <div class="modal modal-side hidden" id="modal-host">
-    <h3><span id="host-modal-title">Host</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <h3><span id="host-modal-title">Host</span><small id="host-modal-sub" class="h3-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-host">
       <label>Host name <input name="name" required placeholder="e.g. Fortune"></label>
       <p id="host-name-note" class="import-note hidden">The name is how this record is tied to the host's missions and deployment history. Renaming rewrites it on all of them, so the history follows the host — past mission cards will read the new name too. To combine this host with another one instead, use <b>Merge</b> below.</p>
@@ -1121,7 +1127,7 @@
       <label>Board name <input name="name" required placeholder="e.g. Rayong"></label>
       <div class="field-label">Weekend (non-working) days</div>
       <div id="board-weekend-days" class="weekday-picker"></div>
-      <p class="import-note">Ticked days are the board's weekend — they start empty and use "Add Mission". You can still override a single date later with "Mark as Holiday" / "Unmark Holiday".</p>
+      <p class="import-note">Ticked days are the board's weekend — they start empty and use "Copy from weekday". You can still override a single date later with "Mark as Holiday" / "Unmark Holiday".</p>
       <div class="modal-actions">
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Create board</button>
@@ -1133,7 +1139,7 @@
        the area prefix of the mission number, a tag on what Add will do, and a
        running total next to the button (see renderImportList). -->
   <div class="modal hidden" id="modal-import" role="dialog" aria-labelledby="import-title">
-    <h3><span id="import-title">Add Mission</span><small id="import-source-note"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <h3><span id="import-title">Copy from weekday</span><small id="import-source-note"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <div id="import-tools" class="hidden">
       <label class="hm-search"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg><input type="search" id="import-q" placeholder="Search mission, host, customer or engineer" aria-label="Search missions" autocomplete="off"></label>
       <div class="hm-filters" id="import-filters" role="group" aria-label="Show"></div>
@@ -1394,15 +1400,15 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-10-15g"></script>
-<script src="i18n-th.js?v=2026-10-15g"></script>
-<script src="planning.js?v=2026-10-15g"></script>
-<script src="employee-id.js?v=2026-10-15g"></script>
-<script src="cloud.js?v=2026-10-15g"></script>
-<script src="charts.js?v=2026-10-15g"></script>
-<script src="xlsx-export.js?v=2026-10-15g"></script>
-<script src="orgchart-pptx.js?v=2026-10-15g"></script>
-<script src="bulk-edit.js?v=2026-10-15g"></script>
-<script src="app.js?v=2026-10-15g"></script>
+<script src="i18n.js?v=2026-10-16a"></script>
+<script src="i18n-th.js?v=2026-10-16a"></script>
+<script src="planning.js?v=2026-10-16a"></script>
+<script src="employee-id.js?v=2026-10-16a"></script>
+<script src="cloud.js?v=2026-10-16a"></script>
+<script src="charts.js?v=2026-10-16a"></script>
+<script src="xlsx-export.js?v=2026-10-16a"></script>
+<script src="orgchart-pptx.js?v=2026-10-16a"></script>
+<script src="bulk-edit.js?v=2026-10-16a"></script>
+<script src="app.js?v=2026-10-16a"></script>
 </body>
 </html>

@@ -120,15 +120,15 @@ async function step(name, fn) {
       await p.evaluate(() => { state.filters.engineer = []; renderFilterOptions(); });
     });
 
-    await step("row 1 ends Names → Undo → Reset Board → Export, Export at the right edge", async () => {
+    await step("row 1 ends Undo → Reset Board → Export, Export at the right edge; Names is in Filter & sort", async () => {
       const row = await p.locator("#toolbar-row1").boundingBox();
-      const names = await p.locator("#card-names + .seg-pick").boundingBox();
       const undo = await p.locator("#btn-undo").boundingBox();
       const reset = await p.locator("#btn-reset-board").boundingBox();
       const exp = await p.locator("#btn-export").boundingBox();
       assert.ok(row.x + row.width - (exp.x + exp.width) <= 24, "Export at the right edge");
-      assert.ok(names.x < undo.x && undo.x < reset.x && reset.x < exp.x, "Names, Undo, Reset Board, Export");
-      for (const b of [names, undo, reset, exp]) assert.ok(Math.abs((b.y + b.height / 2) - (undo.y + undo.height / 2)) <= 4, "all on one line");
+      assert.ok(undo.x < reset.x && reset.x < exp.x, "Undo, Reset Board, Export");
+      for (const b of [undo, reset, exp]) assert.ok(Math.abs((b.y + b.height / 2) - (undo.y + undo.height / 2)) <= 4, "all on one line");
+      assert.equal(await p.locator("#filter-pop #filter-names #card-names").count(), 1, "Names lives in Filter & sort");
     });
 
     await step("row 1 stays on ONE line at laptop width on an editable future day (Holiday toggle showing)", async () => {
@@ -166,10 +166,13 @@ async function step(name, fn) {
     }
     await p.setViewportSize({ width: 1400, height: 900 });
 
-    await step("the Names control is a compact Thai | English toggle", async () => {
+    await step("the Names control is a labelled Thai | English toggle inside Filter & sort", async () => {
+      await p.click("#btn-filter-pop");
+      assert.match(await p.textContent("#filter-names"), /Names on cards/);
       const w = await p.evaluate(() => document.querySelector("#card-names + .seg-pick").getBoundingClientRect().width);
-      assert.ok(w > 0 && w < 190, "compact, was " + w);
+      assert.ok(w > 0, "shown, was " + w);
       assert.deepEqual(await p.$$eval("#card-names + .seg-pick button", (b) => b.map((x) => x.textContent)), ["ไทย", "English"]);
+      await p.keyboard.press("Escape");
     });
 
     await step("Overview shows the day across every board in row 2 (layout A), no board tiles or areas", async () => {
@@ -185,11 +188,31 @@ async function step(name, fn) {
         const s = boardStats(D().activeBoardId);
         return { s, pct: document.querySelector("#stats-bar .st-pct").textContent, chips: document.querySelector("#board-status").textContent };
       });
-      // two decimals, trailing zeros dropped (97.85, 98.5, 100)
-      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 10000) / 100 : 0;
+      // a whole percentage, the same as everywhere else (98, 100)
+      const want = r.s.assigned + r.s.standby > 0 ? Math.round(r.s.assigned / (r.s.assigned + r.s.standby) * 100) : 0;
       assert.equal(r.pct, want + "% utilized");
       assert.ok(!/standby/i.test(r.chips), "no Standby status chip: " + r.chips);
     });
+
+    for (const width of [1024, 1100, 1280, 1366]) {
+      await step("every module tab is in full view in the top bar at " + width + "px (no tab scrolled out of sight)", async () => {
+        await p.setViewportSize({ width, height: 900 });
+        await p.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
+        const r = await p.evaluate(() => {
+          const strip = document.querySelector("#board-tabs").getBoundingClientRect();
+          const pill = document.querySelector("#mode-pill").getBoundingClientRect();
+          return {
+            hidden: [...document.querySelectorAll("#board-tabs .board-tab")]
+              .filter((t) => { const b = t.getBoundingClientRect(); return b.left < strip.left - 1 || b.right > strip.right + 1; })
+              .map((t) => t.title),
+            underPill: pill.width > 0 && strip.right > pill.left + 1,
+          };
+        });
+        assert.deepEqual(r.hidden, [], "tabs out of sight");
+        assert.equal(r.underPill, false, "the tab strip runs under the status pill");
+      });
+    }
+    await p.setViewportSize({ width: 1400, height: 900 });
 
     assert.deepEqual(a.errors, [], "no page errors");
     console.log("all stats-tiles checks passed");

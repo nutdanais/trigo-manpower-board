@@ -17,10 +17,16 @@ function todayStr() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+/* The app's one long date: "16 Oct 2026" (with fmtDow in front: "Fri 16 Oct 2026").
+   Grids, chart axes and chips use the short form, fmtDayMon: "16 Oct". */
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtDate(iso) {
   const [y, m, d] = iso.split("-").map(Number);
-  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  return `${String(d).padStart(2,"0")}-${months[m-1]}-${y}`;
+  return `${d} ${MONTHS_SHORT[m-1]} ${y}`;
+}
+function fmtDayMon(iso) {
+  const [, m, d] = iso.split("-").map(Number);
+  return `${d} ${MONTHS_SHORT[m-1]}`;
 }
 function fmtDow(iso) {
   return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(iso + "T00:00:00").getDay()];
@@ -30,7 +36,7 @@ const THAI_MONTHS = ["มกราคม","กุมภาพันธ์","ม�
 function fmtDateThai(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   const dow = THAI_DOW[new Date(iso + "T00:00:00").getDay()];
-  return `${dow} ${String(d).padStart(2,"0")}-${THAI_MONTHS[m-1]}-${y + 543}`;
+  return `${dow} ${d} ${THAI_MONTHS[m-1]} ${y + 543}`;   // same shape as fmtDate: "ศุกร์ 16 ตุลาคม 2569"
 }
 function addDays(iso, n) {
   const d = new Date(iso + "T00:00:00");
@@ -982,6 +988,8 @@ function render() {
   // "Add Mission": on a holiday/weekend (import mission definitions), and on
   // every forecast day (pick missions from the latest confirmed day)
   $("#btn-import-mission").classList.toggle("hidden", fc ? !planEdit : (!boardEdit || !isNonWorkingDate(state.date)));
+  // "Copy from …", not "Add Mission": beside New Mission the two read as the same thing
+  $("#import-mission-label").textContent = fc ? "Copy from confirmed…" : "Copy from weekday…";
   $("#btn-import-mission").title = fc
     ? "Pick missions from the latest confirmed day to add to this forecast"
     : "Copy missions from the latest weekday onto this holiday";
@@ -1038,6 +1046,7 @@ function render() {
   document.body.classList.toggle("ov-view", ov);
   document.body.classList.toggle("el-view", eml);
   document.body.classList.toggle("hl-view", hl);
+  document.body.classList.toggle("oc-view", org);
   // phone header line 1 off a board: the tab's name where a board shows its own
   $("#m-title").textContent = ov ? "Overview" : org ? "Org Chart" : eml ? "Manpower" : hl ? "Host" : cap ? "Capacity" : "";
   placeBoardRow1Tools(board);
@@ -1073,7 +1082,31 @@ function render() {
   updateSelectionUI();
   updateUndoButton();
   applySearchHighlight();
+  fitTopbar();
 }
+
+/* The top bar never hides a module tab. #board-tabs scrolls rather than run under
+   the status pill, which used to leave Capacity (1280px) or Manpower, Host and
+   Capacity (1100px) out of sight with nothing to say so. When the tabs don't fit,
+   first the pill and the date get tighter (tb-tight: smaller pill, no year), then
+   the tabs (tb-snug: less padding), and only then does every tab but the current
+   one show its icon alone (tb-icons; the name is in its tooltip). Measured, not guessed from the width, so Thai, a long status and a
+   larger browser font all fit. A phone has the bottom bar instead. */
+function fitTopbar() {
+  const bar = $("#topbar"), tabs = $("#board-tabs");
+  if (!bar || !tabs) return;
+  bar.classList.remove("tb-tight", "tb-snug", "tb-icons");
+  if (!tabs.offsetParent) return;
+  const over = () => tabs.scrollWidth > tabs.clientWidth + 1;
+  for (const step of ["tb-tight", "tb-snug", "tb-icons"]) { if (!over()) break; bar.classList.add(step); }
+}
+let _fitTopbarQueued = false;
+window.addEventListener("resize", () => {
+  if (_fitTopbarQueued) return;
+  _fitTopbarQueued = true;
+  requestAnimationFrame(() => { _fitTopbarQueued = false; fitTopbar(); });
+});
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitTopbar());
 
 /* ======================================================================
    Org Chart tab — today's operational structure as a collapsible tree.
@@ -1214,9 +1247,10 @@ function orgCountText(n) {
   const crew = orgCrewCount(n);
   const pl = (k, one, many) => `${k} ${k === 1 ? one : many}`;
   if (n.type === "root") return `${pl(orgCountType(n, "board"), "board", "boards")} · ${pl(orgDistinctEngineers(n), "engineer", "engineers")} · ${pl(orgDistinctAreas(n), "area", "areas")} · ${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
-  if (n.type === "board") return `${orgCountType(n, "engineer")} eng · ${pl(orgDistinctAreas(n), "area", "areas")} · ${orgMissionCount(n)} miss · ${crew} crew`;
-  if (n.type === "engineer") return `${pl(orgCountType(n, "area"), "area", "areas")} · ${orgMissionCount(n)} miss · ${crew} crew`;
-  if (n.type === "area") return `${orgMissionCount(n)} miss · ${crew} crew`;
+  // words in full: "5 miss" read as a word, not an abbreviation
+  if (n.type === "board") return `${pl(orgCountType(n, "engineer"), "engineer", "engineers")} · ${pl(orgDistinctAreas(n), "area", "areas")} · ${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
+  if (n.type === "engineer") return `${pl(orgCountType(n, "area"), "area", "areas")} · ${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
+  if (n.type === "area") return `${pl(orgMissionCount(n), "mission", "missions")} · ${crew} crew`;
   return `${crew} crew`;
 }
 /* The square tile in front of each Org chart row. People and engineers show
@@ -1358,6 +1392,8 @@ function renderOrgChart() {
           <button type="button" class="btn oc-view-btn" data-v="chart">${icon("orgchart")}<span>Org chart</span></button>
         </div>
         <div class="oc-spacer"></div>
+        <!-- display:contents on a computer; on a phone this is the Filter sheet -->
+        <div class="oc-filterbox">
         <span class="oc-flabel">Filter</span>
         <div class="oc-filters">
           ${orgFilterDropdown("engineers", "Engineer", org.filterOpts.engineers)}
@@ -1367,6 +1403,7 @@ function renderOrgChart() {
         <label class="oc-levelctl">Show to
           <select id="oc-level" class="oc-select" data-picker>${levelOpts}</select>
         </label>
+        </div>
       </div>
       <div class="oc-legend">
         <span class="oc-k"><span class="oc-sw" style="background:var(--chart-permanent)"></span>Permanent</span>
@@ -1446,6 +1483,7 @@ function orgApplyFilters() {
   org.tree = t;
   orgUpdateFilterLabels($("#orgchart-panel"));
   orgRerender();
+  renderStats();   // the phone's Filter button carries the count
 }
 /* redraw both views after a collapse/expand or filter change, keeping pan + view */
 function orgRerender() {
@@ -1672,13 +1710,26 @@ function renderBoardEmptyState() {
     const pick = document.createElement("button");
     pick.type = "button";
     pick.className = "btn btn-carry-alt";
-    setIconLabel(pick, "plus", "Add Mission…");
+    setIconLabel(pick, "copy", "Copy from confirmed…");
     pick.title = "Pick only the missions you will work on from the latest confirmed day";
     pick.onclick = () => openImportModal();
     box.appendChild(pick);
   }
 }
 
+/* One module tab in the top bar. A real button (it was a div), so Tab reaches it
+   and a screen reader announces it; aria-current marks where you are. The label is
+   its own span so a narrow top bar can show the icon alone (fitTopbar), and the
+   title carries the name for that case. */
+function moduleTab(cls, active, iconName, label) {
+  const t = document.createElement("button");
+  t.type = "button";
+  t.className = "board-tab " + cls + (active ? " active" : "");
+  if (active) t.setAttribute("aria-current", "page");
+  t.title = label;
+  setIconLabel(t, iconName, label, "tab-label");
+  return t;
+}
 function renderTabs() {
   const el = $("#board-tabs");
   // On a phone the strip scrolls sideways; rebuilding it would snap it back to
@@ -1686,18 +1737,14 @@ function renderTabs() {
   const keepScroll = el.scrollLeft;
   el.innerHTML = "";
   if (can("overview")) {
-  const ov = document.createElement("div");
-  ov.className = "board-tab tab-overview" + (isOverview() ? " active" : "");
-  setIconLabel(ov, "chart", "Overview");
+  const ov = moduleTab("tab-overview", isOverview(), "chart", "Overview");
   ov.onclick = () => { clearSelection(); D().activeBoardId = OVERVIEW_ID; refreshAndRender(); };
   el.appendChild(ov);
   }
   // Board: an ordinary module tab. It opens the board last shown (the toolbar's
   // board picker then switches between boards, like Overview's).
   if (can("board") && D().boards.length) {
-  const bt = document.createElement("div");
-  bt.className = "board-tab tab-boardmod" + (!isNonBoardView() ? " active" : "");
-  setIconLabel(bt, "appmark", "Board");   // the app mark (favicon's four squares), outlined
+  const bt = moduleTab("tab-boardmod", !isNonBoardView(), "appmark", "Board");   // the app mark (favicon's four squares), outlined
   bt.onclick = () => {
     if (!isNonBoardView()) return;
     clearSelection();
@@ -1709,30 +1756,22 @@ function renderTabs() {
   el.prepend(bt);
   }
   if (can("orgchart")) {
-  const oc = document.createElement("div");
-  oc.className = "board-tab tab-orgchart" + (isOrgChart() ? " active" : "");
-  setIconLabel(oc, "orgchart", "Org Chart");
+  const oc = moduleTab("tab-orgchart", isOrgChart(), "orgchart", "Org Chart");
   oc.onclick = () => { clearSelection(); D().activeBoardId = ORGCHART_ID; refreshAndRender(); };
   el.appendChild(oc);
   }
   if (can("emplist")) {
-  const eml = document.createElement("div");
-  eml.className = "board-tab tab-emplist" + (isEmployeeList() ? " active" : "");
-  eml.innerHTML = icon("users") + 'Manpower';
+  const eml = moduleTab("tab-emplist", isEmployeeList(), "users", "Manpower");
   eml.onclick = () => { clearSelection(); D().activeBoardId = EMPLIST_ID; refreshAndRender(); };
   el.appendChild(eml);
   }
   if (can("hostlist")) {
-  const hl = document.createElement("div");
-  hl.className = "board-tab tab-hostlist" + (isHostList() ? " active" : "");
-  hl.innerHTML = icon("site") + 'Host';
+  const hl = moduleTab("tab-hostlist", isHostList(), "site", "Host");
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
   }
   if (can("capacity") && feat().capacity) {
-  const cp = document.createElement("div");
-  cp.className = "board-tab tab-capacity" + (isCapacity() ? " active" : "");
-  cp.innerHTML = icon("list") + 'Capacity';
+  const cp = moduleTab("tab-capacity", isCapacity(), "list", "Capacity");
   cp.onclick = () => {
     clearSelection();
     // open on the board the user was just looking at
@@ -1982,9 +2021,10 @@ function wireTopbarMenus() {
 function renderDateButton() {
   const dow = fmtDow(state.date);
   const full = fmtDate(state.date);
-  const [d, mon, yr] = full.split("-");
+  // "16 Oct" and " 2026" apart, so a narrow top bar (#topbar.tb-tight) can drop the year
+  const yr = full.slice(full.lastIndexOf(" ") + 1), dm = full.slice(0, full.lastIndexOf(" "));
   const btn = $("#btn-date");
-  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt"><span class="d-dow">${dow}</span> <span class="d-dm">${d}-${mon}</span><span class="d-yr">-${yr}</span></span>`;
+  btn.innerHTML = `<span class="d-ico">${icon("calendar")}</span><span class="d-txt"><span class="d-dow">${dow}</span> <span class="d-dm">${dm}</span><span class="d-yr"> ${yr}</span></span>`;
   btn.title = `${dow} ${full} — click to pick a date`;
 }
 
@@ -2408,6 +2448,19 @@ function renderLeaveTabs() {
     state.leaveTab = best;
   }
   setLeaveTab(state.leaveTab);
+  updateLeaveTabsFade();
+}
+/* On a phone the leave tabs are one swipeable row: a fade at the right edge says
+   there are more, and goes once the last tab is in view (styles.css, .lv-more) */
+function updateLeaveTabsFade() {
+  const strip = $("#leave-tabs");
+  if (!strip) return;
+  strip.classList.toggle("lv-more", strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+  if (!strip._fadeWired) {
+    strip._fadeWired = true;
+    strip.addEventListener("scroll", updateLeaveTabsFade, { passive: true });
+    window.addEventListener("resize", updateLeaveTabsFade);
+  }
 }
 function wireLeaveTabs() {
   const strip = $("#leave-tabs");
@@ -2570,6 +2623,17 @@ function missionSortValue(m) {
    high enough that the header still reads as that engineer's block. */
 const MISSION_TINT = 0.15;
 
+/* A mission's hours on its card. Times are stored NOT NULL with the day shift's
+   08:00–17:00 as the default, so a Night mission still on exactly those hours was
+   never given its own: say so instead of showing day hours on a night card. */
+function nightTimeNotSet(m) {
+  return m.shift === "night" && m.startTime === "08:00" && m.endTime === "17:00";
+}
+function missionTimeHtml(m) {
+  return nightTimeNotSet(m)
+    ? `<span class="m-time m-time-unset" title="Open the mission to set the night shift's hours">Night · time not set</span>`
+    : `<span class="m-time">${m.startTime}–${m.endTime}</span>`;
+}
 function renderMissions() {
   const plan = getPlan();
   const grid = $("#missions-grid");
@@ -2637,9 +2701,9 @@ function renderMissions() {
         </span>
       </div>
       <div class="m-line2">
-        <span class="m-cust">${escapeHtml(m.customer)}</span>
+        <span class="m-cust" title="${escapeHtml(m.customer)}">${escapeHtml(m.customer)}</span>
         <span class="m-sep">|</span>
-        <span>${m.startTime}-${m.endTime}</span>
+        ${missionTimeHtml(m)}
         <span class="m-sep">|</span>
         <span class="m-eng">${eng ? escapeHtml(eng.name) : "?"}</span>
         ${eng && eng.phone ? telLink(eng.phone) : ""}
@@ -2831,6 +2895,15 @@ function renderStats() {
     bar.appendChild(statChip("Missions", missions));
     bar.appendChild(statChip("Crew deployed", crew));
     statusGroup(bar, [emptyMissions ? statusChip("amber", null, plural(emptyMissions, "mission", "missions") + " with no crew") : null]);
+    // a phone: the same summary card + Filter + ⋯ header as Overview, Manpower and Host
+    renderPhoneViewCard({
+      head: `<b>${crew}</b><span class="ms-w"> crew deployed</span>`,
+      label: `${crew} crew deployed on ${missions} missions, ${engs.size} engineers, ${scope.length} boards`,
+      keys: [],
+      bar: [["asg", crew]],
+      tiles: [["perm", scope.length, "Boards"], ["oncall", engs.size, "Engineers"], ["asg", missions, "Missions"], ["asg", crew, "Crew"]],
+      filterCount: Object.values(org.filters).filter(f => f.size).length,
+    });
     return;
   }
   if (isEmployeeList()) {
@@ -3022,7 +3095,7 @@ function renderPhoneSummary(s, areaHtml) {
   const parts = [["asg", s.assigned], ["leave", s.leave], ["standby", s.standby], ["hol", s.isHoliday ? s.onHoliday : 0], ["free", s.oncallAvailable]];
   const split = `<span class="ms-bar" aria-hidden="true">${parts.filter(([, n]) => n > 0).map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</span>`;
   const k = (kind, n, label, alert) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}</span>`;
-  // Utilization = Assigned ÷ (Assigned + Standby), to two decimals: people on leave,
+  // Utilization = Assigned ÷ (Assigned + Standby), a whole percentage: people on leave,
   // on a holiday or on-call and not called in are left out, so 0 Standby reads 100%.
   const util = utilizationPct2(s.assigned, s.standby);
   card.innerHTML = `<span class="ms-row"><span class="ms-t"><b>${s.assigned}</b> <span class="ms-u">(${util}%)</span><span class="ms-w"> ${word}</span></span>` +
@@ -3125,7 +3198,7 @@ function buildPhoneMoreMenu() {
   const sep = () => { if (menu.lastChild && menu.lastChild.tagName !== "HR") menu.appendChild(document.createElement("hr")); };
   const click = (sel) => () => $(sel).click();
   // Overview, Manpower and Host: their own row-2 actions (the create button stays in view)
-  if (isOverview() || isEmployeeList() || isHostList()) {
+  if (isOverview() || isOrgChart() || isEmployeeList() || isHostList()) {
     const nv = $("#emplist-name-view");
     if (isEmployeeList() && nv) {
       const row = document.createElement("div");
@@ -3157,7 +3230,7 @@ function buildPhoneMoreMenu() {
     return;
   }
   if (shown("#btn-new-mission")) item("New mission", "plus", click("#btn-new-mission"), "tb-item-pri");
-  if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Add mission", "plus", click("#btn-import-mission"), "tb-item-pri");
+  if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Copy from…", "copy", click("#btn-import-mission"), "tb-item-pri");
   if (shown("#btn-new-employee")) item("New employee", "plus", click("#btn-new-employee"), "tb-item-pri");
   sep();
   const names = $("#card-names");
@@ -3206,8 +3279,56 @@ function togglePhoneFilter(ev) {
   if (ev) ev.stopPropagation();
   const open = !document.body.classList.contains("m-filter-open");
   closePhoneMenus();
+  if (open) phoneSheetChrome();
   document.body.classList.toggle("m-filter-open", open);
   $("#m-filter").setAttribute("aria-expanded", String(open));
+}
+/* The phone's Filter sheet (a board, Manpower, Host, Org Chart) opens from the
+   bottom like the app's other sheets, with a title, Clear all and Done. The sheet
+   is the tab's own filter controls; this adds the head and foot to it once (they
+   are hidden on a computer, styles.css .m-sheet-head). */
+function phoneSheetChrome() {
+  const box = isOrgChart() ? $("#orgchart-panel .oc-filterbox") : $("#toolbar");
+  if (!box) return;
+  let head = box.querySelector(":scope > .m-sheet-head");
+  if (!head) {
+    head = document.createElement("div");
+    head.className = "m-sheet-head";
+    head.innerHTML = `<span class="m-sheet-grab" aria-hidden="true"></span><b class="m-sheet-title"></b>` +
+      `<button type="button" class="btn btn-quiet m-sheet-clear">Clear all</button>`;
+    box.prepend(head);
+    const foot = document.createElement("div");
+    foot.className = "m-sheet-foot";
+    foot.innerHTML = `<button type="button" class="btn btn-primary m-sheet-done">Done</button>`;
+    box.append(foot);
+    foot.querySelector(".m-sheet-done").onclick = (e) => { e.stopPropagation(); closePhoneMenus(); };
+  } else if (box.lastElementChild !== box.querySelector(":scope > .m-sheet-foot")) {
+    box.append(box.querySelector(":scope > .m-sheet-foot"));
+  }
+  head.querySelector(".m-sheet-title").textContent = isOrgChart() || isEmployeeList() || isHostList() ? "Filter" : "Filter & sort";
+  head.querySelector(".m-sheet-clear").onclick = (e) => { e.stopPropagation(); clearViewFilters(); };
+}
+/* Clear all, in the phone Filter sheet: every filter (and the search) of the tab on screen */
+function clearViewFilters() {
+  if (isOrgChart()) {
+    for (const f of Object.values(org.filters)) f.clear();
+    renderOrgChart();
+    renderStats();
+    return;
+  }
+  const empty = (o) => { for (const k of Object.keys(o)) o[k] = []; };
+  if (isEmployeeList()) {
+    empty(state.emplist.filters); state.emplist.search = ""; state.emplist.issue = null;
+    const q = $("#emplist-search"); if (q) q.value = "";
+    renderEmplistFilterOptions(); renderEmployeeRows(); renderStats();
+  } else if (isHostList()) {
+    empty(state.hostlist.filters); state.hostlist.search = "";
+    const q = $("#hostlist-search"); if (q) q.value = "";
+    renderHostlistFilterOptions(); renderHostRows(); renderStats();
+  } else {
+    empty(state.filters);
+    renderFilterOptions(); renderMissions();
+  }
 }
 function closePhoneMenus() {
   closeMoreMenu();
@@ -3221,7 +3342,9 @@ function closePhoneMenus() {
 }
 
 /* ---------- overview tab ---------- */
-function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); }
+/* the short date for grids, chart axes and chips: "16 Oct" (it was "16/10", beside
+   "Fri 16-Oct-2026" and "Fri 6 Nov" elsewhere — one long and one short form now) */
+function shortDateLabel(iso) { return fmtDayMon(iso); }
 
 /* assigned ÷ (headcount − leave − onHoliday − free on-call) — "how much of the
    people actually available today is deployed". onHoliday and oncallFree default
@@ -3239,9 +3362,12 @@ function shortDateLabel(iso) { return iso.slice(8, 10) + "/" + iso.slice(5, 7); 
 /* The same utilization to two decimals, for the board's own stats: assigned ÷
    (assigned + standby), which is the denominator above once leave, holiday and
    free on-call are taken out. Trailing zeros dropped: 97.85, 98.5, 100. */
+/* Assigned ÷ (Assigned + Standby) as a whole percentage. It printed two decimals
+   (58.33%) beside places that printed 58%; one precision everywhere, and a whole
+   number is all the data supports. */
 function utilizationPct2(assigned, standby) {
   const denom = assigned + standby;
-  return denom > 0 ? Math.round(assigned / denom * 10000) / 100 : 0;
+  return denom > 0 ? Math.round(assigned / denom * 100) : 0;
 }
 function utilizationPct(assigned, headcount, leave, onHoliday = 0, oncallFree = 0) {
   const denom = headcount - leave - onHoliday - oncallFree;
@@ -4145,9 +4271,11 @@ function msButtonLabel(key) {
    span so "All" can go quiet and a real selection can take the active tint */
 function setMsLabel(btn, key) {
   const sel = state.filters[key];
+  // textContent stays "Engineer: All" / "Engineer: 2 selected"; inside Filter & sort
+  // the value shows at the right ("All", "2 selected"), on row 1 only the name or count
   btn.innerHTML = sel.length
-    ? `${FILTER_LABELS[key]}: <span class="ms-val">${sel.length}<span class="ms-all"> selected</span></span>`
-    : `${FILTER_LABELS[key]}<span class="ms-val ms-all">: All</span>`;
+    ? `<span class="ms-name">${FILTER_LABELS[key]}</span><span class="ms-colon">: </span><span class="ms-val">${sel.length}<span class="ms-all"> selected</span></span>`
+    : `<span class="ms-name">${FILTER_LABELS[key]}</span><span class="ms-val ms-all"><span class="ms-colon">: </span>All</span>`;
   btn.classList.toggle("ms-active", sel.length > 0);
 }
 
@@ -5341,7 +5469,12 @@ function openHostModal(name, opts = {}) {
   state.hostlist.returnToMission = !!opts.returnToMission;
   const form = $("#form-host");
   form.reset();
-  $("#host-modal-title").textContent = name ? `Host — ${name}` : "New Host";
+  // the record's name is the title and what it is goes underneath, as on the
+  // Employee panel (it read "Host — Host Alpha")
+  $("#host-modal-title").textContent = name || "New Host";
+  const hostArea = rec && rec.areaId ? (D().areas.find(a => a.id === rec.areaId) || {}).name : "";
+  $("#host-modal-sub").textContent = rec ? ["Host", hostArea, rec.archived ? "archived" : ""].filter(Boolean).join(" · ") : "";
+  $("#host-modal-sub").classList.toggle("hidden", !rec);
   form.name.value = name || opts.prefillName || "";
   $("#host-name-note").classList.toggle("hidden", !name);
   form.location.value = rec ? rec.location : "";
@@ -6283,9 +6416,15 @@ function updateMissionHostNote() {
   const rec = hostRecordOf(typed);
   if (rec) {
     const area = rec.areaId ? D().areas.find(a => a.id === rec.areaId) : null;
-    note.className = "import-note host-note-ok";
-    setIconLabel(note, "check", `${rec.name}${area ? " — " + area.name : " — no service area set yet"}`
-      + (rec.archived ? " · archived host" : ""));
+    // a tick only when there is nothing to fix; a gap gets the info mark in amber
+    if (area) {
+      note.className = "import-note host-note-ok";
+      setIconLabel(note, "check", `${rec.name} — ${area.name}` + (rec.archived ? " · archived host" : ""));
+    } else {
+      note.className = "import-note host-note-gap";
+      setIconLabel(note, "info", "No service area set for this host yet. Add it in the Host list."
+        + (rec.archived ? " This host is archived." : ""));
+    }
   } else {
     note.className = "import-note host-note-new";
     setIconLabel(note, "alert", `"${typed}" is not in the Host list yet — saving will offer to create it.`);
@@ -6371,6 +6510,12 @@ function updateMissionEngineerNote() {
   if (!match) {
     note.className = "import-note host-note-new";
     setIconLabel(note, "alert", `"${typed}" isn't on the engineer list — pick a name from the suggestions.`);
+    return;
+  }
+  if (!match.profileId) {
+    // a record with no sign-in behind it: a fact to know, not a tick
+    note.className = "import-note host-note-info";
+    setIconLabel(note, "info", `${match.name} has no sign-in account yet.`);
     return;
   }
   note.className = "import-note host-note-ok";
@@ -8165,7 +8310,8 @@ function setXlsxTicks(on) {
 }
 
 /* Layout A (computer widths): row 1 ends with the tab's tools and Export at the
-   right edge. On a board that is Names → Undo → Reset → Export; on the lists,
+   right edge. On a board that is Undo → Reset → Export (Names on the cards is in
+   Filter & sort, #filter-names); on the lists,
    Bulk edit → Export. Phones (where row 1 folds into the More dropdown) keep
    them in #toolbar-right. */
 const ROW1_TOOLS_MQ = window.matchMedia("(min-width: 641px)");
@@ -8177,7 +8323,8 @@ function placeBoardRow1Tools(board) {
   const wide = ROW1_TOOLS_MQ.matches;
   // layout A: row 1 ends with the tab's tools and Export, on every tab
   if (board && wide) {
-    if (names.parentNode !== end) { end.prepend(names); if (seg) names.after(seg); }
+    const home = $("#filter-names");
+    if (names.parentNode !== home) { home.append(names); if (seg) names.after(seg); }
   } else if (names.parentNode !== right) {
     right.insertBefore(names, $("#readonly-badge"));
     if (seg) names.after(seg);
@@ -8192,18 +8339,18 @@ function placeBoardRow1Tools(board) {
    (like Overview's) and the pill sits beside the date picker; on a phone both stay
    on header line 1 next to the date, as the phone layout has them. */
 function placeBoardPicker() {
-  const dd = $("#board-dd"), pill = $("#mode-pill"), hol = $("#m-hol-pill");
+  const dd = $("#board-dd"), pill = $("#mode-pill");
   if (ROW1_TOOLS_MQ.matches) {
     const row1 = $("#toolbar-row1");
     if (dd.parentNode !== row1) row1.prepend(dd);
     // pill, then Lock, then the date: anchored on Lock so the pill never lands
     // between Lock and the date arrows
     const lock = $("#btn-lock");
-    if (pill.nextElementSibling !== hol || hol.nextElementSibling !== lock) { lock.before(pill); lock.before(hol); }
+    if (pill.nextElementSibling !== lock) lock.before(pill);
   } else {
     const right = document.querySelector("#topbar .topbar-right");
     if (dd.parentNode !== right.parentNode) right.before(dd);
-    if (pill.previousElementSibling !== dd) { dd.after(pill); pill.after(hol); }
+    if (pill.previousElementSibling !== dd) dd.after(pill);
   }
 }
 ROW1_TOOLS_MQ.addEventListener("change", () => { placeBoardRow1Tools(document.body.classList.contains("board-view")); });
@@ -8261,7 +8408,7 @@ let xlsxEmpty = false;      // nobody on the board: Excel has nothing to write
 function openBoardExportModal() {
   if (isForecastView()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
   const board = isOverview() || isOrgChart() ? null : D().boards.find(b => b.id === D().activeBoardId);
-  $("#board-export-title").textContent = "Export — " + (isOrgChart() ? "Org Chart" : board ? board.name : "Overview");
+  $("#board-export-title").textContent = "Export " + (isOrgChart() ? "Org Chart" : board ? board.name : "Overview");
   const types = board ? ["jpg", "pdf", "xlsx"] : isOrgChart() ? ["jpg", "pdf", "pptx"] : ["jpg", "pdf"];
   if (board) prepareXlsxPart(board);
   renderExportTypes($("#board-export-type"), board ? "board" : isOrgChart() ? "orgchart" : "overview", types, updateBoardExportModal);
@@ -8643,7 +8790,7 @@ function renderHolidayBanner(on) {
   const board = D().boards.find(b => b.id === D().activeBoardId);
   const canAdd = !$("#btn-import-mission").classList.contains("hidden");
   el.innerHTML = `${icon("calendar")}<span><b>Holiday on ${escapeHtml(board ? board.name : "this board")}.</b> ` +
-    (canAdd ? "The board starts empty. Use <b>Add Mission</b> to bring in only the missions that run today."
+    (canAdd ? "The board starts empty. Use <b>Copy from weekday</b> to bring in only the missions that run today."
             : "Only the missions brought in for today are on the board.") +
     " Other boards are not affected.</span>";
 }
@@ -8792,6 +8939,7 @@ function importEmpty(title, sub) {
 function startImportModal(mode) {
   importMode = mode;
   importUi = { items: [], picked: new Set(), q: "", f: "all" };
+  $("#import-title").textContent = mode === "forecast" ? "Copy from confirmed" : "Copy from weekday";
   $("#import-q").value = "";
   $("#import-crew").classList.toggle("hidden", mode !== "forecast");
   $("#btn-import-confirm").classList.remove("hidden");
@@ -9264,8 +9412,7 @@ function startForecast() {
 
 /* "Tue 22 Sep" — the short form the banners use */
 function fmtShort(iso) {
-  const [, m, d] = iso.split("-").map(Number);
-  return `${fmtDow(iso)} ${d} ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1]}`;
+  return `${fmtDow(iso)} ${fmtDayMon(iso)}`;
 }
 /* a timestamp as HH:MM, with the date in front when it isn't today */
 function fmtStamp(ts) {
@@ -9309,21 +9456,23 @@ function planIsEmpty(plan) {
   return !plan.missions.length && !Object.values(plan.zones || {}).some(z => z && z.length);
 }
 function renderModePill() {
-  const pill = $("#mode-pill"), hol = $("#m-hol-pill");
+  // The top bar's one status pill. Everything that describes the day goes in it
+  // (Draft, Not reviewed, Read-only, Locked, Holiday…): there is no second pill,
+  // on a phone either. Narrow screens shrink it (CSS), they never split it.
+  const pill = $("#mode-pill");
   const onBoard = !isNonBoardView() && !!D().activeBoardId && can("board");
-  const nonWorking = !isNonBoardView() && isNonWorkingDate(state.date);
-  const hide = () => { pill.className = "mode-pill hidden"; hol && hol.classList.toggle("hidden", !nonWorking); };
+  const hide = () => { pill.className = "mode-pill hidden"; pill.innerHTML = ""; };
   if (!onBoard) return hide();
   const boardId = D().activeBoardId;
   const planning = !!feat().forecast;
   const fc = planning && isForecastView();
   const lock = lockInfo(boardId, state.date);
   const ro = !fc && isReadOnly();
-  if (!planning && !ro) return hide();
-  // the pill names the holiday itself, so the phone's separate HOLIDAY pill steps aside
-  if (hol) hol.classList.add("hidden");
-  const plan = getPlan();
   const holidayDay = isNonWorkingDate(state.date, boardId);
+  // without forward planning the pill only has something to say on a read-only
+  // day or a holiday
+  if (!planning && !ro && !holidayDay) return hide();
+  const plan = getPlan();
   const sig = signalsForScreen();
   const stamp = sig ? sig.stamp : null;
   const st = PlanStatus.of({
@@ -9332,22 +9481,28 @@ function renderModePill() {
     stamped: feat().stamps && sig ? !!(stamp && (stamp.carried_from || stamp.forecast_merged_at)) : null,
     stale: !!currentStale(), date: state.date, today: todayStr(),
   });
-  const look = planning ? MODE_PILL[st.state] : { label: "", cls: "confirmed" };
+  const look = planning ? MODE_PILL[st.state] : (holidayDay ? MODE_PILL.holiday : { label: "", cls: "confirmed" });
   // a past day is a record of what happened: no Draft / Out of date there
   const record = st.past && planning && ["planned", "draft", "stale"].includes(st.state);
   const main = record ? "Record" : look.label;
-  const extra = record ? "Read-only"
-    : st.state === "locked" ? "Locked"
-    : st.state === "draft" ? "Not reviewed"
-    : st.state === "stale" ? "Out of date"
-    : ro ? "Read-only"
-    : st.state === "planned" && holidayDay ? "Holiday" : "";
+  const parts = [];   // [text, kind]: the kind lets a phone shorten one (styles.css)
+  if (record) parts.push(["Read-only", "ro"]);
+  else {
+    if (st.state === "locked") parts.push(["Locked", "locked"]);
+    else if (st.state === "draft") parts.push(["Not reviewed", "review"]);
+    else if (st.state === "stale") parts.push(["Out of date", "stale"]);
+    if (st.state !== "locked" && ro) parts.push(["Read-only", "ro"]);
+    if (holidayDay && main !== "Holiday") parts.push(["Holiday", "holiday"]);
+  }
   pill.className = "mode-pill mode-" + (record ? "confirmed" : look.cls) + (ro || st.state === "locked" ? " mode-ro" : "");
   pill.dataset.state = st.state + (st.past ? " past" : st.today ? " today" : "");
-  // the second part (· Read-only / · Locked …) drops on a phone, where the lock icon carries it
-  pill.innerHTML = (ro || lock ? icon("lock") : "") + (main ? `<span>${escapeHtml(main)}</span>` : "") +
-    (extra ? `<span class="mp-extra">${main ? "· " : ""}${escapeHtml(extra)}</span>` : "") +
-    (extra && ro && st.state !== "locked" && extra !== "Read-only" ? `<span class="mp-extra">· Read-only</span>` : "");
+  // each extra carries its own "·" (spaced by CSS) so it reads the same however it wraps;
+  // a phone stacks the extras under the main word (styles.css, .mp-extras)
+  pill.innerHTML = `<span class="mp-body"><span class="mp-head">${ro || lock ? icon("lock") : ""}` +
+    (main ? `<span class="mp-main">${escapeHtml(main)}</span>` : "") + `</span>` +
+    (parts.length ? `<span class="mp-extras">${parts.map(([x, kind], i) =>
+      `<span class="mp-extra mp-${kind}">${main || i ? `<span class="mp-dot">·</span>` : ""}${escapeHtml(x)}</span>`).join("")}</span>` : "") +
+    `</span>`;
   const end = planning ? horizonEndFor(boardId) : null;
   const authors = fc ? (plan.authors || []) : [];
   const n = plan.missions.length;
@@ -12398,7 +12553,7 @@ function renderUserRows() {
     // a tap on Approve / Reject stays theirs
     if (mayEdit) tr.onclick = (ev) => { if (svIsPhone() && !ev.target.closest("button")) openUserModal(u.id); };
     tr.innerHTML = `
-      <td data-label="Name">${escapeHtml(u.fullName || u.displayName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName && u.fullName ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
+      <td data-label="Name">${escapeHtml(u.fullName || u.displayName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName && u.fullName && u.displayName.trim().toLowerCase() !== u.fullName.trim().toLowerCase() ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
       <td data-label="Email">${escapeHtml(u.email || "")}</td>
       <td data-label="Role"><span class="role-pill role-${escapeHtml(u.roleKey || "none")}">${escapeHtml(roleLabel(u.roleKey))}</span></td>
       <td data-label="Status"><span class="status-pill status-${escapeHtml(u.status)}" title="${escapeHtml(st.hint || "")}">${escapeHtml(st.label)}</span></td>
@@ -13227,7 +13382,7 @@ function wireApp() {
   $("#m-filter").onclick = togglePhoneFilter;
   document.addEventListener("click", (ev) => {
     if (!ev.target.closest("#m-more-menu, #m-more")) { $("#m-more-menu").classList.add("hidden"); $("#m-more").setAttribute("aria-expanded", "false"); }
-    if (document.body.classList.contains("m-filter-open") && !ev.target.closest("#toolbar, #m-filter, .ms-pop")) {
+    if (document.body.classList.contains("m-filter-open") && !ev.target.closest("#toolbar, #m-filter, .ms-pop, .oc-filterbox, .pk-pop, .dp-pop")) {
       document.body.classList.remove("m-filter-open");
       $("#m-filter").setAttribute("aria-expanded", "false");
     }

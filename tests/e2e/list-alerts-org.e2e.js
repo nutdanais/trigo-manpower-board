@@ -62,6 +62,8 @@ async function step(name, fn) {
         assert.equal((await b.textContent()).trim(), "+ Add");
         await b.click();
         await p.waitForSelector("#modal-employee:not(.hidden)");
+        // focus moves on the next frame (openEmployeeModal), so wait for it to leave the page
+        await p.waitForFunction(() => document.activeElement && document.activeElement !== document.body);
         // a field drawn by an in-app picker (start date, position) focuses its button
         assert.equal(await p.evaluate(() => { const a = document.activeElement; return a.name || (a.closest(".pk") && a.closest(".pk").querySelector("select, input").name); }), f);
         await p.evaluate(() => closeModal());

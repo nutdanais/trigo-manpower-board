@@ -360,9 +360,12 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await until(async () => !(await p.isVisible("#modal-import")), "picker closes");
       };
 
-      await step("C8: a forecast day offers Add Mission; it adds only the picked missions, with their crew held by the engineer", async () => {
-        assert.ok(await pa.isVisible("#btn-import-mission"), "Add Mission in the toolbar");
-        assert.ok(await pa.isVisible("#board-empty >> text=Add Mission…"), "and on the empty-forecast prompt");
+      await step("C8: a forecast day offers Copy from confirmed… (left of New Mission); it adds only the picked missions, with their crew held by the engineer", async () => {
+        assert.ok(await pa.isVisible("#btn-import-mission"), "Copy from confirmed… in the toolbar");
+        assert.equal((await pa.textContent("#btn-import-mission")).trim(), "Copy from confirmed…");
+        const copy = await pa.locator("#btn-import-mission").boundingBox(), add = await pa.locator("#btn-new-mission").boundingBox();
+        assert.ok(copy.x + copy.width <= add.x, "left of + New Mission");
+        assert.ok(await pa.isVisible("#board-empty >> text=Copy from confirmed…"), "and on the empty-forecast prompt");
         await pick(pa, ["102"], true);
         await until(() => !!fm("102"), "102 added to the forecast");
         assert.equal(db.t("forecast_missions").filter((m) => m.plan_date === F).length, 1, "only the picked mission");
@@ -764,13 +767,24 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
       const a = await env.openAs(db, h.USERS.a, phone);
       const v = await env.openAs(db, h.USERS.v, phone);
       const pa = a.page;
-      for (const p of [pa, v.page]) { await p.click("#board-tabs .tab-capacity"); await p.waitForSelector(".cap-phone"); }
+      // on a phone the header tabs give way to the bottom bar; Capacity is under Me
+      for (const p of [pa, v.page]) {
+        await p.click("#btn-bn-more");
+        await p.locator("#more-menu .tb-item", { hasText: "Capacity" }).first().click();
+        await p.waitForSelector(".cap-phone");
+      }
       const stepIn = (date) => pa.locator(`.cap-stepper input[data-cap-key^="b1\u0001${date}\u0001"]`);
+      // the phone shows one week at a time, opening on this week; on a Friday the
+      // next working day (H) is in the week after, so page forward until it shows
+      const showWeekOf = async (date) => {
+        for (let i = 0; i < 4 && !(await stepIn(date).count()); i++) await pa.click('[data-cap-step="cap-ph-weekbar1"]');
+      };
 
       await step("B14: a phone shows one host at a time with a stepper per day, not the grid", async () => {
         assert.equal(await pa.locator(".cap-grid2").count(), 0, "no grid");
         assert.match(await pa.inputValue(".cap-ph-host"), /^0$/);
         assert.match(await pa.textContent(".cap-ph-host option:checked"), /Host Alpha · Day/);
+        await showWeekOf(H);
         assert.equal(await stepIn(H).inputValue(), "5");
         assert.equal(await pa.isVisible("#btn-cap-seed"), false, "toolbar actions fold into ⋯");
         assert.ok(await pa.isVisible("#btn-cap-more"));
@@ -793,8 +807,11 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await pa.click(".cap-ph-next");
         await until(async () => /Host Beta · Night/.test(await pa.textContent(".cap-ph-host option:checked")), "next host");
         assert.equal(await stepIn(H).inputValue(), "2");
+        // which week is "next" depends on the weekday the test runs (see showWeekOf)
+        const weekNo = async () => Number((await pa.textContent(".cap-ph-weeklabel")).match(/(\d+) of \d+/)[1]);
+        const before = await weekNo();
         await pa.click('.cap-ph-weekbar [aria-label="Next week"]');
-        await until(async () => /2 of 2/.test(await pa.textContent(".cap-ph-weeklabel")), "week 2");
+        await until(async () => (await weekNo()) === before + 1, "the next week");
         await pa.click("#btn-cap-more");
         assert.ok(await pa.isVisible("#context-menu >> text=Start from confirmed plan"), "Start from confirmed plan in ⋯");
         await pa.keyboard.press("Escape");

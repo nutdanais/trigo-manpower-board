@@ -57,7 +57,7 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       assert.ok(await p.$eval("#board-dd-label", (e) => e.scrollWidth <= e.clientWidth), "the name fits whole");
     });
 
-    await step("line 1 never wraps: a long name shortens with …, the date stays beside it (360pt, with HOLIDAY too)", async () => {
+    await step("line 1 never wraps: a long name shortens with …, the date stays beside it (360pt, on a holiday too); one status pill", async () => {
       await p.setViewportSize({ width: 360, height: 800 });
       const board = await p.evaluate(() => D().boards.find((b) => b.id === D().activeBoardId).name);
       const line = () => p.evaluate(() => {
@@ -65,20 +65,22 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
         const l = document.querySelector("#board-dd-label");
         return { same: Math.abs(mid("#btn-board-dd") - mid("#btn-date")) < 6, cut: l.scrollWidth > l.clientWidth };
       });
-      const setup = (name, hol) => p.evaluate(([n, hol]) => {
+      let weekend = SRC; while (!h.isWeekend(weekend)) weekend = h.addDays(weekend, 1);
+      const setup = (name, date) => p.evaluate(([n, d]) => {
         D().boards.find((b) => b.id === D().activeBoardId).name = n;
-        renderBoardPill();
-        document.querySelector("#m-hol-pill").classList.toggle("hidden", !hol);
-      }, [name, hol]);
-      for (const hol of [false, true]) {
-        await setup("Non-Rayong", hol);
-        assert.deepEqual(await line(), { same: true, cut: false }, "Non-Rayong fits whole, holiday=" + hol);
-        await setup("Eastern Seaboard North", hol);
-        assert.deepEqual(await line(), { same: true, cut: true }, "a long name shortens, holiday=" + hol);
+        state.date = d;
+        return refreshAndRender();
+      }, [name, date]);
+      for (const date of [SRC, weekend]) {
+        await setup("Non-Rayong", date);
+        assert.deepEqual(await line(), { same: true, cut: false }, "Non-Rayong fits whole on " + date);
+        await setup("Eastern Seaboard North", date);
+        assert.deepEqual(await line(), { same: true, cut: true }, "a long name shortens on " + date);
       }
-      assert.equal(await visible(p, "#mode-pill"), false, "HOLIDAY stands in for CONFIRMED on a phone");
-      await setup(board, false);
-      await p.evaluate(() => renderModePill());
+      // the one pill carries the holiday itself (there is no second HOLIDAY pill)
+      assert.equal(await p.locator("#topbar .mode-pill:not(.hidden)").count(), 1, "one status pill");
+      assert.match(await p.textContent("#mode-pill"), /Holiday/);
+      await setup(board, SRC);
       await p.setViewportSize({ width: 390, height: 844 });
     });
 
@@ -87,9 +89,9 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       for (const sel of ["#m-summary", "#m-filter", "#m-more"]) assert.equal(await visible(p, sel), true, sel);
       const card = await rect(p, "#m-summary"), more = await rect(p, "#m-more");
       assert.ok(Math.abs(card.top - more.top) < 2, "one line");
-      // closed: assigned with utilization beside it, Assigned ÷ (Assigned + Standby) to two decimals
+      // closed: assigned with utilization beside it, Assigned ÷ (Assigned + Standby) as a whole percentage
       const c = await p.evaluate(() => ({ s: boardStats(D().activeBoardId), t: document.querySelector("#m-summary .ms-t").textContent }));
-      const want = c.s.assigned + c.s.standby > 0 ? Math.round(c.s.assigned / (c.s.assigned + c.s.standby) * 10000) / 100 : 0;
+      const want = c.s.assigned + c.s.standby > 0 ? Math.round(c.s.assigned / (c.s.assigned + c.s.standby) * 100) : 0;
       assert.equal(c.t, `${c.s.assigned} (${want}%) assigned`);
       assert.ok((await rect(p, "#sticky-header")).height < 130, "two compact lines, got " + (await rect(p, "#sticky-header")).height);
       await shot(p, "1-board");
@@ -226,6 +228,32 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       await p.click("#emplist-body tr:first-child .m-fold");
       assert.equal(await visible(p, tid), true, "TRIGO ID shown after More details");
       await tapNav(p, "Board");
+    });
+
+    await step("Org Chart has the same header (summary card, Filter, ⋯ with Export); Filter is a bottom sheet with Clear all and Done", async () => {
+      await p.evaluate(() => { D().activeBoardId = ORGCHART_ID; return refreshAndRender(); });
+      await p.waitForTimeout(300);
+      assert.equal((await p.textContent("#m-title")).trim(), "Org Chart");
+      for (const sel of ["#m-summary", "#m-filter", "#m-more"]) assert.equal(await visible(p, sel), true, sel + " on Org Chart");
+      assert.equal(await visible(p, ".oc-filterbox"), false, "the filters wait behind Filter");
+      await p.click("#m-more");
+      assert.ok((await menuItems(p, "#m-more-menu")).some((x) => /Export/.test(x)), "Export in ⋯");
+      await p.click("#m-more");
+      await p.click("#m-filter");
+      const sheet = await rect(p, ".oc-filterbox");
+      assert.ok(Math.abs(sheet.bottom - 844) < 2, "the sheet sits on the bottom edge");
+      assert.equal((await p.textContent(".oc-filterbox .m-sheet-title")).trim(), "Filter");
+      await p.click(".oc-filterbox .m-sheet-done");
+      assert.equal(await p.evaluate(() => document.body.classList.contains("m-filter-open")), false, "Done closes it");
+      // the board's sheet: same head and foot, from the bottom
+      await tapNav(p, "Board");
+      await p.click("#m-filter");
+      assert.equal((await p.textContent("#toolbar .m-sheet-title")).trim(), "Filter & sort");
+      assert.ok(Math.abs((await rect(p, "#toolbar")).bottom - 844) < 2, "board sheet on the bottom edge");
+      await p.evaluate(() => { state.filters.engineer = ["eng-1"]; renderFilterOptions(); renderMissions(); });
+      await p.click("#toolbar .m-sheet-clear");
+      assert.deepEqual(await p.evaluate(() => state.filters.engineer), [], "Clear all empties the filters");
+      await p.click("#toolbar .m-sheet-done");
     });
 
     await step("no tab is wider than a narrow phone (320px, or a larger text size)", async () => {

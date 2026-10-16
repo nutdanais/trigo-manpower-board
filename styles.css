@@ -133,63 +133,6 @@
   --topbar-line: var(--primary-dark);
 }
 
-:root[data-theme="dark"] {
-  --bg: #14171a;
-  --panel: #1c2024;
-  --border: #2c3236;
-  --text: #e8ebed;
-  --muted: #9aa1a8;
-  --primary-text: #6fb1e0;
-  --danger-line: #7f2222;
-  --danger-tint: rgba(185,28,28,.16);
-  --danger-text: #fca5a5;
-  --warn-text: #e0b070;
-  --warn-tint: rgba(245,158,11,.16);
-  /* dark steps of the status set: a low-chroma ground with a lifted ink,
-     rather than the light values dimmed — dimming them turns amber to mud */
-  --ok-surface: #1b2416;
-  --ok-line: #46592a;
-  --ok-text: #a8c855;
-  --warn-surface: #2a2313;
-  --warn-line: #6a5426;
-  --bg-soft: #232a33;
-  --hover-tint: #232c38;
-  --stat-asg: #3987e5; --stat-leave: #c98500; --stat-standby: #d0334f;
-  --track-off: #3a424b;
-  /* employee card surface, a step lighter than --panel/--bg-soft so cards
-     read as distinct from the board underneath them (was previously fixed
-     to the light-mode value — see the light block's comment on why that's
-     safe to change now) */
-  --emp-bg: #2a3038;
-  --emp-perm-border: #4a525c;
-  --emp-oncall-border: #7a838d;
-  --emp-oncall-bg: #242a31;   /* one step below --emp-bg */
-  --emp-ink: #e8ebed;
-  --emp-sub: #aab2bb;
-  --emp-pos-bg: rgba(111,177,224,.14);
-  --pool-tint: #12303f;
-  --leave-tint: #232a33;
-
-  /* dark-surface steps of the same chart hues (see the light block for why
-     these — unlike engineer/area colors — do redefine per theme) */
-  --chart-assigned: #3987e5;
-  --chart-leave: #c98500;
-  --chart-standby: #d0334f;
-  --chart-holiday: #199e70;  /* reuses chart-cat-3 — unused elsewhere in this group */
-  --chart-permanent: #3987e5;
-  --chart-oncall: #d95926;
-  --chart-cat-1: #3987e5;
-  --chart-cat-2: #d95926;
-  --chart-cat-3: #199e70;
-  --chart-cat-4: #c98500;
-  --chart-cat-5: #d55181;
-  --chart-cat-6: #008300;
-  --chart-cat-7: #9085e9;
-  --chart-cat-8: #e66767;
-
-  --shadow: 0 14px 36px rgba(0, 0, 0, .52);
-
-}
 
 body {
   font-family: var(--font-ui);
@@ -203,13 +146,6 @@ body {
     radial-gradient(1100px 720px at 6% -12%, rgba(0, 73, 131, 0.12), transparent 60%),
     radial-gradient(1000px 820px at 110% 118%, rgba(168, 200, 85, 0.16), transparent 55%),
     linear-gradient(158deg, #eef3f8 0%, #e8edf3 46%, #edf2e9 100%);
-  background-attachment: fixed;
-}
-:root[data-theme="dark"] body {
-  background:
-    radial-gradient(1100px 720px at 6% -12%, rgba(22, 92, 152, 0.22), transparent 60%),
-    radial-gradient(1000px 820px at 110% 118%, rgba(96, 128, 44, 0.16), transparent 55%),
-    linear-gradient(158deg, #0f1317 0%, #12161b 50%, #101410 100%);
   background-attachment: fixed;
 }
 
@@ -417,6 +353,10 @@ button, input, select, textarea, optgroup {
   font-weight: 600;
 }
 .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+/* a disabled filled button keeps its fill on hover: the generic disabled rule
+   above paints it white, and its white label then vanishes (a phone's sticky
+   hover after a tap did the same) */
+.btn-primary:disabled:hover, .btn-primary.btn-inert:hover { background: var(--primary); border-color: var(--primary); }
 
 /* Destructive and attention-getting actions are outlined, not filled. A row of
    solid red blocks shouted louder than the actions deserved — the same reason
@@ -816,7 +756,8 @@ body.board-view #toolbar-row2 #area-bar { order: 5; flex: 0 0 100%; gap: 3px 14p
 /* The base checked colour is the Holiday toggle's amber, which reads as a
    warning — wrong for "this employee is active". Green is already this app's
    active/selected signal (the current board tab), so the roster toggle uses it. */
-.toggle-active input:checked + .toggle-track { background: var(--brand-green); }
+/* navy, like every other on state (it was lime green on a phone and navy on a computer) */
+.toggle-active input:checked + .toggle-track { background: var(--primary); }
 .toggle-active .toggle-text { font-weight: 600; font-size: 12px; }
 #readonly-badge {
   background: var(--warn-surface);
@@ -1061,8 +1002,16 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
   line-height: 1.35;
   color: var(--muted);
 }
-.mission-header .m-sep { opacity: .45; }
+.mission-header .m-sep { opacity: .45; flex: none; }
 .mission-header .m-line2 .m-eng { font-weight: 600; color: var(--text); }
+/* a long customer name shortens with "…" (the full name is in its tooltip and the
+   panel); the hours and the engineer never break in two */
+.mission-header .m-line2 { min-width: 0; }
+.mission-header .m-line2 .m-cust { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-header .m-line2 .m-time, .mission-header .m-line2 .m-eng, .mission-header .m-line2 a { flex: none; white-space: nowrap; }
+.mission-header .m-line2 .m-time-unset { font-style: italic; color: #9a4a07; }
+/* a picture or print of the board has no tooltip to fall back on: full name there */
+body.exporting .mission-header .m-line2 .m-cust { white-space: normal; overflow: visible; }
 /* headcount chip: same fixed translucent-white treatment as the shift chip */
 .mission-header .m-count {
   margin-left: auto;
@@ -1134,7 +1083,6 @@ body.exporting #board-empty { display: none; }   /* never bake the prompt into a
    DAY card away from the ground, rather than lightening night. */
 .mission-card.night .mission-body { background: #1c2430; }
 .mission-card.night .m-remark { color: #b8bfc8; }
-:root[data-theme="dark"] .mission-card:not(.night) .mission-body { background: #3a424b; }
 .mission-emps {
   display: flex;
   flex-wrap: wrap;
@@ -2347,11 +2295,6 @@ body.fp-pools-empty { --fp-w: 264px; }
   line-height: 1.5;
   margin-bottom: 10px;
 }
-:root[data-theme="dark"] .modal-warn {
-  background: rgba(217,119,6,.12);
-  border-color: #8a6127;
-  color: #f0c674;
-}
 
 .temp-password code {
   flex: 1 1 auto;
@@ -2704,7 +2647,6 @@ body.fp-pools-empty { --fp-w: 264px; }
   min-height: 26px;
 }
 .ov-history-date:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-[data-theme="dark"] .ov-history-date::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.7); }
 /* The Overview is exportable too (see the isOverview() branch in exportBoard),
    and #board-capture takes the whole panel with it. A native date input and a
    <select> are the two controls html2canvas reproduces least predictably, and
@@ -3007,8 +2949,6 @@ body.touch-mode .hl-edit { opacity: 1; }
 }
 #hostlist-dupbar .dupbar-icon { color: var(--warn-text); font-weight: 700; }
 #hostlist-dup-text { flex: 1; min-width: 200px; }
-:root[data-theme="dark"] #hostlist-dupbar { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
-:root[data-theme="dark"] #hostlist-dupbar .dupbar-icon { color: #f0b45c; }
 
 /* small tags beside a host name: archived state, and the duplicate hint */
 .hl-tag {
@@ -3024,7 +2964,6 @@ body.touch-mode .hl-edit { opacity: 1; }
 }
 .hl-tag-arch { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
 .hl-tag-dup { background: var(--warn-tint); color: var(--warn-text); border: 1px solid var(--warn-line); }
-:root[data-theme="dark"] .hl-tag-dup { color: #f0b45c; border-color: #7a5a1f; }
 /* an archived host is still readable, just visibly off the active roster —
    same treatment (and same reasoning) as an inactive employee's row */
 #hostlist-table tbody tr.row-archived td { opacity: .55; }
@@ -3068,7 +3007,9 @@ body.touch-mode .hl-edit { opacity: 1; }
 /* live verdict under the New Mission host box (see updateMissionHostNote) */
 .host-note-ok { color: var(--primary-text); font-weight: 600; }
 .host-note-new { color: var(--warn-text); font-weight: 600; }
-:root[data-theme="dark"] .host-note-new { color: #f0b45c; }
+/* a known record with something missing (no service area): amber info, never a tick */
+.host-note-gap { color: var(--warn-text); font-weight: 500; }
+.host-note-info { color: var(--muted); font-weight: 500; }
 
 .hl-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: center; }
 .hl-count {
@@ -3414,12 +3355,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   border-color: var(--danger-line);
   color: var(--danger-text);
 }
-:root[data-theme="dark"] .st-del:hover,
-:root[data-theme="dark"] .st-del:focus-visible {
-  background: rgba(185,28,28,.18);
-  border-color: #7f2222;
-  color: var(--danger-text);
-}
 /* the weekday chips sit on one line beside the board name */
 .settings-table .settings-board-days { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 0; }
 .settings-table .settings-board-name { margin: 0; font-size: 13px; }
@@ -3472,8 +3407,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 }
 #users-pending .dupbar-icon { color: var(--warn-text); font-weight: 700; }
 #users-pending-text { flex: 1; min-width: 180px; }
-:root[data-theme="dark"] #users-pending { border-color: #7a5a1f; background: rgba(237,161,0,.12); }
-:root[data-theme="dark"] #users-pending .dupbar-icon { color: #f0b45c; }
 
 #users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 #users-table th, #users-table td {
@@ -3490,9 +3423,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 #users-table tr.status-disabled { opacity: .6; }
 /* the one row state worth marking: a request still waiting on somebody */
 #users-table tr.status-pending { background: rgba(237,161,0,.08); }
-:root[data-theme="dark"] #users-table tr.status-pending { background: rgba(237,161,0,.10); }
 #users-table tr.user-row-me { background: rgba(0,0,0,.03); }
-:root[data-theme="dark"] #users-table tr.user-row-me { background: rgba(255,255,255,.04); }
 .user-you {
   font-size: 10.5px;
   font-weight: 700;
@@ -3539,8 +3470,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .status-pill.status-pending  { background: var(--warn-surface); color: var(--warn-text); }
 .status-pill.status-disabled { background: #f1f5f9; color: #64748b; }
 /* the pills carry their own ink, so dark mode only softens the plate */
-:root[data-theme="dark"] .role-pill,
-:root[data-theme="dark"] .status-pill { border-color: rgba(255,255,255,.16); filter: brightness(.92); }
 
 /* ----- My account ----- */
 .account-identity { margin-bottom: 14px; }
@@ -3584,7 +3513,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   background: rgba(0,0,0,.03);
   padding-top: 10px;
 }
-:root[data-theme="dark"] #roles-matrix .rm-group td { background: rgba(255,255,255,.04); }
 #roles-matrix .rm-area { font-weight: 600; }
 #roles-matrix .rm-area small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 #roles-matrix td:not(.rm-area) { text-align: center; }
@@ -3629,7 +3557,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   font-size: 12.5px;
   margin-bottom: 10px;
 }
-:root[data-theme="dark"] .login-note { background: rgba(16,185,129,.12); border-color: #2f6f57; color: #86efac; }
 .invite-domain { font-weight: 700; white-space: nowrap; }
 
 /* the recovery screen reuses the sign-in card wholesale */
@@ -4414,7 +4341,6 @@ body.forecast-mode .zone { border-style: dashed; }
    forecast, as on the board. --fc-* tell the forecasters apart; they are a
    designed set with dark steps, like the chart colours. */
 :root { --fc-1: #2a78d6; --fc-2: #c2410c; --fc-3: #0f8a5f; --fc-4: #8b5cf6; --merge-sel: rgba(0,73,131,.08); }
-:root[data-theme="dark"] { --fc-1: #5b9ff0; --fc-2: #f08a4b; --fc-3: #3fbf8f; --fc-4: #a98bf8; --merge-sel: rgba(111,177,224,.14); }
 #modal-merge { width: 1080px; display: flex; flex-direction: column; overflow: hidden; }
 #modal-merge > h3 { position: relative; top: 0; flex: none; }
 #merge-sub { flex: none; max-width: 90ch; }
@@ -4601,12 +4527,6 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
   --cap-stripe: rgba(0, 73, 131, .05);
   --cap-sel: rgba(0, 73, 131, .12);
 }
-:root[data-theme="dark"] {
-  --cap-over: #ef5b52;
-  --cap-spare: #6f8a3a;
-  --cap-stripe: rgba(111, 177, 224, .07);
-  --cap-sel: rgba(111, 177, 224, .2);
-}
 #capacity-toolbar { display: contents; }
 #btn-cap-board { gap: 8px; min-width: 210px; }
 #btn-cap-board .ovb-cap { color: var(--muted); font-weight: 550; }
@@ -4790,7 +4710,6 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-area { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 16px; flex: none; }
 .cap-shift { flex: none; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 16px; color: var(--muted); }
 .cap-shift.night { background: var(--night); border-color: var(--night); color: #fff; }
-:root[data-theme="dark"] .cap-shift.night { background: #0b0f14; border-color: var(--muted); }
 .cap-empty { color: var(--muted); font-style: italic; font-size: 13px; }
 .cap-cell { font-size: 14px; font-weight: 600; }
 .cap-cell input {
@@ -4869,6 +4788,8 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-ph-weeklabel small { color: var(--muted); margin-left: 4px; }
 .cap-ph-hostbar .cap-row-menu { margin-left: 0; width: 40px; height: 40px; opacity: 1; }
 .cap-ph-days { display: flex; flex-direction: column; }
+/* the empty line sits in from the card edge like the controls below it */
+.cap-ph-days > .cap-empty { margin: 0; padding: 10px 16px 2px; }
 .cap-ph-day { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--bg-soft); }
 .cap-ph-when { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .cap-ph-when small { font-size: 11.5px; color: var(--muted); }
@@ -5227,6 +5148,18 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
   content: ""; position: absolute; left: 13px; right: 13px; bottom: -10px; height: 2px; border-radius: 2px; background: var(--brand-green);
 }
 #board-tabs .board-tab .ic { margin-right: 6px; opacity: .85; }
+#board-tabs button.board-tab { font-family: inherit; line-height: 1; }
+#board-tabs .board-tab:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+/* a narrow top bar (fitTopbar in app.js): first tighter, then icon-only tabs */
+#topbar.tb-tight .topbar-right #mode-pill { font-size: 10.5px; padding: 0 8px; letter-spacing: 0; gap: 4px; }
+#topbar.tb-tight .btn-date .d-yr { display: none; }
+#topbar.tb-tight .topbar-right { gap: 6px; }
+#topbar.tb-snug #board-tabs .board-tab { padding: 0 8px; font-size: 13px; }
+#topbar.tb-snug #board-tabs .board-tab.active::after { left: 8px; right: 8px; }
+#topbar.tb-snug .topbar-left { gap: 4px; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 10px; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
 
 /* banner menus (board pill, account) */
 .tb-dd { position: relative; flex: none; }
@@ -5405,6 +5338,8 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 #filter-pop .ms-btn { width: 100%; justify-content: space-between; }
 #filter-pop .filter-sort { display: grid; gap: 4px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--muted); }
 #filter-pop .filter-sort select { width: 100%; }
+#filter-pop #filter-names .seg-pick { display: flex; width: 100%; }
+#filter-pop #filter-names .seg-pick button { flex: 1; }
 /* phone: the popover is just the open list inside the More dropdown */
 @media (max-width: 640px) {
   #btn-filter-pop { display: none; }
@@ -5604,7 +5539,10 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
 /* where the plan stands: nothing yet (grey), a holiday (violet, like the phone's
    HOLIDAY pill), missions added but not carried over or merged (amber, dashed),
    carried over but its source changed since (a small amber dot) */
-#mode-pill.mode-empty { color: var(--muted); border: 1px solid var(--border); background: transparent; }
+/* Not planned: a solid slate chip with an open ring, so it reads as a state and
+   never as a disabled button (it was grey text on a grey outline) */
+#mode-pill.mode-empty { color: #23405f; border: 1px solid #b9c7d8; background: #e6edf5; }
+#mode-pill.mode-empty .mp-main::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; margin-right: 5px; vertical-align: 0; box-sizing: border-box; }
 #mode-pill.mode-holiday { color: #5b4bb8; border: 1px solid #cfc8f2; background: #f1effc; }
 #mode-pill.mode-draft { color: #8a4f10; border: 1px dashed #d9a95b; background: #fdf7ec; }
 #mode-pill.mode-stale::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); margin-right: 5px; flex: none; }
@@ -5637,16 +5575,18 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 /* Shifts: the night card on a soft night-blue wash */
 .ov-daynight-tile.ov-dn-night { background: #eef2f8; border-color: #d4dceb; }
 
-/* Overview group headers ("In detail", "Period"): a real section header — a navy bar
-   with a white title, so it no longer melts into the page background */
+/* Overview group headers ("In detail", "Period"): a section header built from type
+   and one rule, not a navy bar (the heaviest thing on the page, release review 22).
+   Still unmistakable: a larger navy title, the green accent mark and a full-width
+   navy-tinted rule under it, so the section break doesn't melt into the page. */
 .ov-group-head {
-  margin: 14px 0 -2px; padding: 9px 14px; border-radius: 10px;
-  background: var(--primary); color: #fff; align-items: center;
-  box-shadow: 0 1px 2px rgba(0, 38, 70, .18);
+  margin: 22px 0 0; padding: 0 2px 9px; border-radius: 0; align-items: center;
+  background: none; color: var(--primary-text); box-shadow: none;
+  border-bottom: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
 }
-.ov-group-head h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: .2px; text-transform: none; color: #fff; }
-.ov-group-head .ov-group-sub { color: rgba(255, 255, 255, .78); font-size: 12.5px; }
-.ov-group-head::before { content: ""; width: 4px; align-self: stretch; border-radius: 2px; background: var(--brand-green); margin-right: 2px; }
+.ov-group-head h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -.2px; text-transform: none; color: var(--primary-text); }
+.ov-group-head .ov-group-sub { color: var(--muted); font-size: 13px; font-weight: 500; }
+.ov-group-head::before { content: ""; width: 4px; height: 20px; align-self: center; border-radius: 2px; background: var(--brand-green); margin-right: 2px; }
 /* ===== Phone shell (2026-10-13, mobile direction C + pool drawer) =====
    See design/mobile-directions.html. Below 640px only; desktop is untouched.
    - Top bar: a light surface with the date and the avatar on one line, then the
@@ -5656,7 +5596,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
    - New Mission becomes a floating button above the bar.
    - The available-people panel is a drawer that peeks above the bar.
    - Record dialogs (.modal-side) open full screen with Save pinned. */
-#bottom-nav, #fp-drawer-handle, #m-count, #m-row2, #m-details, #m-hol-pill, #m-more-menu { display: none; }
+#bottom-nav, #fp-drawer-handle, #m-count, #m-row2, #m-details, #m-more-menu { display: none; }
 #more-menu.hidden { display: none; }
 
 @media (max-width: 640px) {
@@ -5685,12 +5625,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   #btn-board-dd #board-dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   #btn-board-dd .ic:last-child { width: 15px; height: 15px; opacity: .6; }
   body:not(.board-view) #board-dd { display: none; }
-  #mode-pill, #m-hol-pill { order: 2; flex: none; margin-left: 0; font-size: 9.5px; letter-spacing: .2px; padding: 1px 6px; }
-  /* one pill only: on a holiday, HOLIDAY stands in for CONFIRMED / FORECAST, or the
-     name would be left with almost no room */
-  #topbar:has(#m-hol-pill:not(.hidden)) #mode-pill { display: none; }
-  #m-hol-pill { display: inline-flex; color: #2b1700; background: var(--warn); border: 1px solid var(--warn); }
-  #m-hol-pill.hidden { display: none; }
+  #mode-pill { order: 2; flex: none; margin-left: 0; font-size: 9.5px; letter-spacing: .2px; padding: 1px 6px; }
   #btn-hold-alerts { order: 4; }
   #topbar .topbar-right { order: 3; flex: 0 0 auto; margin-left: auto; gap: 0; }
   body:not(.board-view) #topbar .topbar-right { margin-left: 0; }
@@ -5810,7 +5745,6 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   /* scrolled down: one line — name, date, the count, Filter, ⋯ */
   body.board-view.hdr-compact #topbar { padding-top: 4px; padding-bottom: 4px; }
   body.board-view.hdr-compact #mode-pill,
-  body.board-view.hdr-compact #m-hol-pill,
   body.board-view.hdr-compact #btn-date-prev,
   body.board-view.hdr-compact #btn-date-next,
   body.board-view.hdr-compact #m-summary,
@@ -5832,13 +5766,12 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
      instead of shifting the rest. */
   #topbar {
     display: grid; align-items: center; column-gap: 5px; row-gap: 8px;
-    grid-template-columns: minmax(0, max-content) max-content max-content minmax(0, 1fr) max-content;
+    grid-template-columns: minmax(0, max-content) max-content minmax(0, 1fr) max-content;
   }
   #board-dd { grid-area: 1 / 1; min-width: 0; }
   #btn-board-dd { width: 100%; }
   #mode-pill { grid-area: 1 / 2; }
-  #m-hol-pill { grid-area: 1 / 3; }
-  #topbar .topbar-right { grid-area: 1 / 5; justify-self: end; }
+  #topbar .topbar-right { grid-area: 1 / 4; justify-self: end; }
   body:not(.board-view) #topbar .topbar-right { grid-column: 1 / -1; justify-self: start; }
   #btn-hold-alerts { grid-area: 4 / 1 / 5 / -1; justify-self: start; }
   body.board-view #m-row2 { grid-area: 2 / 1 / 3 / -1; }
@@ -5943,7 +5876,27 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   #float-pool { transition: none; }
   .mission-card.flash-outline { animation: none; outline: 3px solid var(--warn); }
 }
-@media (max-width: 640px) { #mode-pill .mp-extra { display: none; } #mode-pill .ic { width: 10px; height: 10px; } }
+/* The one status pill (renderModePill). Its extras follow the main word on one line;
+   a phone stacks them as a second, smaller line so the pill stays narrow enough for
+   the board name and the date beside it, and every status is still in it. */
+#mode-pill .mp-body { display: inline-flex; align-items: center; white-space: nowrap; }
+#mode-pill .mp-head { display: inline-flex; align-items: center; gap: 6px; }
+#mode-pill .mp-extras { display: inline; }
+#mode-pill .mp-extra { font-weight: 600; }
+#mode-pill .mp-dot { margin: 0 .35em; }
+@media (max-width: 640px) {
+  #mode-pill .ic { width: 10px; height: 10px; }
+  #topbar #mode-pill { height: auto; min-height: 22px; padding: 2px 6px; gap: 3px; border-radius: 8px; line-height: 1.15; }
+  #mode-pill .mp-body { display: inline-flex; flex-direction: column; align-items: flex-start; }
+  #mode-pill .mp-extras { display: block; font-size: 8px; letter-spacing: 0; opacity: .9; }
+  #mode-pill .mp-extras .mp-extra:first-child .mp-dot { display: none; }
+  /* the lock icon at the front already says Read-only, so the phone lets it stand in
+     for the word when another status needs the second line */
+  #mode-pill .mp-head:has(.mp-main) + .mp-extras .mp-ro:not(:first-child) { display: none; }
+  #mode-pill .mp-head:has(.mp-main) + .mp-extras .mp-ro:first-child:not(:only-child) { display: none; }
+  #mode-pill .mp-head:has(.mp-main) + .mp-extras .mp-ro:first-child + .mp-extra .mp-dot { display: none; }
+  #mode-pill .mp-head { gap: 3px; }
+}
 
 /* ===== Phone parity: Overview, Manpower, Host (2026-10-13, design/mobile-parity.html) =====
    The board's phone header on every tab: the tab's name and the date on line 1, the
@@ -5958,7 +5911,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
     display: block; grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-size: 18px; font-weight: 700; letter-spacing: -.3px; color: var(--text); line-height: 40px; padding: 0 2px;
   }
-  body:not(.board-view) #topbar .topbar-right { grid-area: 1 / 5; justify-self: end; }
+  body:not(.board-view) #topbar .topbar-right { grid-area: 1 / 4; justify-self: end; }
 
   /* line 2: summary card, Filter (lists only), ⋯ */
   body:is(.ov-view, .el-view, .hl-view) #m-row2 { grid-area: 2 / 1 / 3 / -1; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
@@ -6525,7 +6478,7 @@ label > .pk { margin-top: 5px; }
 }
 
 /* 20 · long help text folds to one line, with More / Less */
-.import-note.note-fold:not(.open) { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.import-note.note-fold:not(.open) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .note-more {
   align-self: flex-start; margin: -4px 0 10px; padding: 0; border: 0; background: none; cursor: pointer;
   font: inherit; font-size: 12px; font-weight: 600; color: var(--primary-text);
@@ -6767,3 +6720,119 @@ label > .pk { margin-top: 5px; }
 .cap-ph-add .cap-add { flex-wrap: nowrap; }
 .cap-ph-add .cap-add input { flex: 1 1 auto; }
 .cap-ph-add .cap-add .pk { flex: none; }
+
+/* ===== Release review 2026-10-16 (design/release-review/) ===== */
+
+/* Filter & sort on a computer: each filter shows its value at the right ("All",
+   "2 selected") with a chevron; row 1 elsewhere keeps the short form */
+#filter-pop .ms-btn .ms-colon { display: none; }
+#filter-pop .ms-btn .ms-all { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+#filter-pop .ms-btn .ms-val { margin-left: auto; }
+#filter-pop .ms-btn::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); opacity: .55; flex: none; }
+
+/* the Org Chart's filters are ordinary toolbar items on a computer */
+.oc-filterbox { display: contents; }
+/* Names on cards is moved in on a computer only (placeBoardRow1Tools) */
+#filter-pop #filter-names:not(:has(select)) { display: none; }
+.m-sheet-head, .m-sheet-foot { display: none; }
+
+@media (max-width: 640px) {
+  /* Org Chart gets the phone header every other tab has: summary card, Filter, ⋯ */
+  body.oc-view #m-row2 { grid-area: 2 / 1 / 3 / -1; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+  body.oc-view #m-details:not(.hidden) {
+    grid-area: 3 / 1 / 4 / -1; display: flex; flex-direction: column; gap: 8px;
+    padding: 8px 10px 9px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
+  }
+  body.oc-view #toolbar-row2,
+  body.oc-view #btn-toolbar-more,
+  body.oc-view #toolbar-more { display: none; }
+  body.oc-view #toolbar-row1 > :not(#ov-board-dd) { display: none !important; }
+  body.oc-view #toolbar-row1:not(:has(#ov-board-dd:not(.hidden))) { display: none; }
+  body.oc-view #ov-board-dd { flex: 1 1 auto; }
+  body.oc-view #btn-ov-board { width: 100%; justify-content: space-between; }
+  body.oc-view .oc-toolbar { flex-wrap: nowrap; }
+  body.oc-view .oc-views { flex: 1; display: flex; }
+  body.oc-view .oc-views .oc-view-btn { flex: 1; justify-content: center; }
+  body.oc-view .oc-legend .oc-hint { display: none; }
+  .oc-filterbox { display: none; }
+
+  /* The Filter sheet (board, Manpower, Host, Org Chart): from the bottom, over a
+     scrim, with a title, Clear all and Done — like the app's other phone sheets */
+  body.m-filter-open #app-root::after {
+    content: ""; position: fixed; inset: 0; z-index: 79; background: rgba(15, 27, 42, .38);
+  }
+  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar,
+  body.oc-view.m-filter-open .oc-filterbox {
+    display: flex; flex-direction: column; gap: 0; position: fixed; left: 0; right: 0; top: auto; bottom: 0; z-index: 90;
+    max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--panel); border: 0; border-radius: 16px 16px 0 0;
+    box-shadow: 0 -14px 34px -10px rgba(0, 38, 70, .4);
+  }
+  body.m-filter-open .m-sheet-head { display: none; }
+  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar > .m-sheet-head,
+  body.oc-view.m-filter-open .oc-filterbox > .m-sheet-head {
+    display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 2;
+    padding: 16px 12px 8px 16px; background: var(--panel);
+  }
+  body.m-filter-open .m-sheet-grab { position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--border); }
+  body.m-filter-open .m-sheet-title { flex: 1; font-size: 16px; color: var(--text); }
+  body.m-filter-open .m-sheet-clear { height: 34px; color: var(--primary-text); }
+  body.m-filter-open .m-sheet-foot { display: none; }
+  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar > .m-sheet-foot,
+  body.oc-view.m-filter-open .oc-filterbox > .m-sheet-foot {
+    display: flex; position: sticky; bottom: 0; z-index: 2; margin-top: auto;
+    padding: 10px 12px 12px; background: var(--panel); border-top: 1px solid var(--border);
+  }
+  body.m-filter-open .m-sheet-done { flex: 1; height: 44px; font-size: 15px; }
+  body.m-filter-open #toolbar-row1 { padding: 4px 16px 12px !important; }
+  body.oc-view.m-filter-open .oc-filterbox > :not(.m-sheet-head):not(.m-sheet-foot) { margin: 0 16px 10px; }
+  body.oc-view.m-filter-open .oc-filters { display: grid; gap: 8px; }
+  body.oc-view.m-filter-open .oc-ms-btn { width: 100%; justify-content: space-between; min-height: 40px; }
+  body.oc-view.m-filter-open .oc-levelctl { display: grid; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  body.oc-view.m-filter-open .oc-flabel { display: none; }
+  /* each filter reads like a settings row: its name, then the value and a chevron */
+  body.m-filter-open #filter-pop .ms-btn { min-height: 44px; font-size: 14px; }
+}
+
+/* 14 · Export is one decision (the file type, and for Excel the columns): a dialog
+   sized to its content in the middle of the screen, not a full-height side panel
+   that was mostly empty for a JPG. Bulk edit (also .modal-export) stays a panel.
+   A phone keeps its bottom sheet. */
+@media (min-width: 641px) {
+  #modal-backdrop:has(.modal-export:not(#modal-bulk):not(.hidden)) { justify-content: center; align-items: center; }
+  .modal.modal-side.modal-export:not(#modal-bulk) {
+    width: min(540px, 94vw); height: auto; max-height: 86vh; border-radius: var(--r-box);
+    animation: export-in .2s cubic-bezier(.2, .8, .2, 1);
+  }
+  .modal.modal-side.modal-export:not(#modal-bulk) .modal-body { overflow-y: auto; min-height: 0; }
+}
+@keyframes export-in { from { transform: translateY(10px); opacity: 0; } }
+
+/* 23 · Manpower and Host tables on a computer: an empty field reads as a quiet dash,
+   and its "+ Add" shows on the row you point at (or tab into). Sixty-odd chips drowned
+   the names; the amber pills above the table still count what is missing. The text
+   stays "+ Add" for screen readers. Phone cards keep the chip (no hover there). */
+@media (min-width: 641px) and (hover: hover) {
+  :is(#emplist-body, #hostlist-body) tr:not(:hover):not(:focus-within) .hl-add-loc {
+    font-size: 0; border-color: transparent; background: none; padding: 0; min-width: 0;
+  }
+  :is(#emplist-body, #hostlist-body) tr:not(:hover):not(:focus-within) .hl-add-loc::before {
+    content: "—"; font-size: 13px; color: #b6bec9;
+  }
+}
+
+/* 25 · phone leave tabs: a label never breaks inside its tab, and while more tabs
+   are out of sight the row fades out at the right edge (updateLeaveTabsFade) */
+.lv-tab { white-space: nowrap; }
+@media (max-width: 640px) {
+  body.board-view:not(.exporting) #leave-tabs.lv-more {
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+  }
+}
+
+/* 26 · Shift's two words are longer in Thai (กะกลางวัน | กะกลางคืน): its column takes
+   more of the When row, and a switch label never wraps or touches its edge */
+@media (min-width: 641px) { #modal-mission .form-row:has(select[name="shift"]) > label:first-child { flex: 1.5 1 0; } }   /* a phone gives Shift a row of its own */
+.seg-pick button { white-space: nowrap; padding: 0 8px; }

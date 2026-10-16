@@ -124,3 +124,11 @@ Chosen from round two and built in the app: leave as tabs (B), the navy control 
 board picker as a pill in the banner, the quiet table (A), Sign out in the avatar menu, Holiday
 and Reset board kept on the toolbar. Not built from it: one "New" menu (New mission and New
 employee stay as two buttons) and the Ctrl+K palette.
+
+## Release readiness review (2026-10-16)
+
+`release-review/index.html` is the pre-release review of the update pack: 30
+findings ranked P0 (fix before release) to P2 (polish), each with today's
+screenshot beside a live mockup of the proposed change. Screenshots come from
+the test harness's sample data at 1400 / 1100 / 390px in English and Thai.
+Like the rest of this folder it is not loaded by the app.
