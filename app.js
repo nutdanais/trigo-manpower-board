@@ -988,6 +988,8 @@ function render() {
   // "Add Mission": on a holiday/weekend (import mission definitions), and on
   // every forecast day (pick missions from the latest confirmed day)
   $("#btn-import-mission").classList.toggle("hidden", fc ? !planEdit : (!boardEdit || !isNonWorkingDate(state.date)));
+  // "Copy from …", not "Add Mission": beside New Mission the two read as the same thing
+  $("#import-mission-label").textContent = fc ? "Copy from confirmed…" : "Copy from weekday…";
   $("#btn-import-mission").title = fc
     ? "Pick missions from the latest confirmed day to add to this forecast"
     : "Copy missions from the latest weekday onto this holiday";
@@ -1708,7 +1710,7 @@ function renderBoardEmptyState() {
     const pick = document.createElement("button");
     pick.type = "button";
     pick.className = "btn btn-carry-alt";
-    setIconLabel(pick, "plus", "Add Mission…");
+    setIconLabel(pick, "copy", "Copy from confirmed…");
     pick.title = "Pick only the missions you will work on from the latest confirmed day";
     pick.onclick = () => openImportModal();
     box.appendChild(pick);
@@ -3228,7 +3230,7 @@ function buildPhoneMoreMenu() {
     return;
   }
   if (shown("#btn-new-mission")) item("New mission", "plus", click("#btn-new-mission"), "tb-item-pri");
-  if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Add mission", "plus", click("#btn-import-mission"), "tb-item-pri");
+  if (shown("#btn-import-mission")) item($("#btn-import-mission").textContent.trim() || "Copy from…", "copy", click("#btn-import-mission"), "tb-item-pri");
   if (shown("#btn-new-employee")) item("New employee", "plus", click("#btn-new-employee"), "tb-item-pri");
   sep();
   const names = $("#card-names");
@@ -8788,7 +8790,7 @@ function renderHolidayBanner(on) {
   const board = D().boards.find(b => b.id === D().activeBoardId);
   const canAdd = !$("#btn-import-mission").classList.contains("hidden");
   el.innerHTML = `${icon("calendar")}<span><b>Holiday on ${escapeHtml(board ? board.name : "this board")}.</b> ` +
-    (canAdd ? "The board starts empty. Use <b>Add Mission</b> to bring in only the missions that run today."
+    (canAdd ? "The board starts empty. Use <b>Copy from weekday</b> to bring in only the missions that run today."
             : "Only the missions brought in for today are on the board.") +
     " Other boards are not affected.</span>";
 }
@@ -8937,6 +8939,7 @@ function importEmpty(title, sub) {
 function startImportModal(mode) {
   importMode = mode;
   importUi = { items: [], picked: new Set(), q: "", f: "all" };
+  $("#import-title").textContent = mode === "forecast" ? "Copy from confirmed" : "Copy from weekday";
   $("#import-q").value = "";
   $("#import-crew").classList.toggle("hidden", mode !== "forecast");
   $("#btn-import-confirm").classList.remove("hidden");

@@ -232,7 +232,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12px}
 <div class="page">
   <div class="brand"><b>TRIGO</b> Manpower Board · pre-release review · version 2026-10-15g · 16 Oct 2026</div>
   <h1>Release readiness review</h1>
-  <p class="lead"><b>Update 16 Oct:</b> every item is now fixed on this branch except 12 and 13 (kept for a later pack) and 17 (no change needed). Each item ends with a green <b>Shipped</b> box showing the result. All 13 unit-test files and all 23 browser suites pass.</p>
+  <p class="lead"><b>Update 16 Oct:</b> every item is now fixed on this branch except 13 (kept for a later pack) and 17 (no change needed). Each item ends with a green <b>Shipped</b> box showing the result. All 13 unit-test files and all 23 browser suites pass.</p>
   <p class="lead">I opened every tab, panel, dialog, menu and sheet in the real app (the test harness with sample data, including long Thai names and a long host name) at 1400px, 1100px and 390px, in English and Thai, and also checked 1024–1536px laptop widths. That is 124 screens, plus every automated test. Below are the 30 things I'd change, ranked by priority. Each one shows today's screen next to the proposed fix.</p>
 
   <div class="health" aria-label="Health check">
@@ -516,12 +516,13 @@ ov.onclick = () =&gt; { … };</pre>
   </article>
 
   <article class="item" id="i12">
-    <div class="ih"><span class="n">12</span><h3>A forecast day shows "Add Mission" next to "New Mission"</h3><div class="meta"><i class="st skip">Not in this pack</i><i class="pri p1">P1</i><i class="tag">Board · forecast</i><i class="tag">S</i></div></div>
+    <div class="ih"><span class="n">12</span><h3>A forecast day shows "Add Mission" next to "New Mission"</h3><div class="meta"><i class="st fixed">✓ Fixed</i><i class="pri p1">P1</i><i class="tag">Board · forecast</i><i class="tag">S</i></div></div>
     <p class="why">On a future date the toolbar has <b>Add Mission</b> (copy missions from the confirmed plan) right beside <b>New Mission</b> (create one). The labels mean almost the same thing, and the empty state repeats "Add Mission…".</p>
     <div class="cmp">
       <div><p class="cap now">Today</p><img class="shot" src="forecast-bar.jpg" alt="Forecast toolbar with both Add Mission and New Mission buttons"></div>
       <div><p class="cap new">Proposed</p><div class="after"><div class="tb"><span class="btn sm">Board One ▾</span><span class="btn sm p"><svg class="ic"><use href="#i-plus"/></svg>New Mission</span><span class="btn sm"><svg class="ic"><use href="#i-copy"/></svg>Copy from confirmed…</span><span class="btn sm"><svg class="ic"><use href="#i-plus"/></svg>New Employee</span></div></div></div>
     </div>
+      <div class="shipped"><p class="cap">Shipped</p><div class="row"><img src="after/copy-from.jpg" alt="After: Copy from confirmed… and Copy from weekday… left of New Mission"></div><p>"Copy from confirmed…" on a forecast day and "Copy from weekday…" on a holiday, with a copy icon, left of + New Mission (New Mission stays the one filled button). The empty-forecast prompt, the picker's title, the phone ⋯ menu and Thai follow.</p></div>
   </article>
 
   <article class="item" id="i13">

@@ -360,9 +360,12 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await until(async () => !(await p.isVisible("#modal-import")), "picker closes");
       };
 
-      await step("C8: a forecast day offers Add Mission; it adds only the picked missions, with their crew held by the engineer", async () => {
-        assert.ok(await pa.isVisible("#btn-import-mission"), "Add Mission in the toolbar");
-        assert.ok(await pa.isVisible("#board-empty >> text=Add Mission…"), "and on the empty-forecast prompt");
+      await step("C8: a forecast day offers Copy from confirmed… (left of New Mission); it adds only the picked missions, with their crew held by the engineer", async () => {
+        assert.ok(await pa.isVisible("#btn-import-mission"), "Copy from confirmed… in the toolbar");
+        assert.equal((await pa.textContent("#btn-import-mission")).trim(), "Copy from confirmed…");
+        const copy = await pa.locator("#btn-import-mission").boundingBox(), add = await pa.locator("#btn-new-mission").boundingBox();
+        assert.ok(copy.x + copy.width <= add.x, "left of + New Mission");
+        assert.ok(await pa.isVisible("#board-empty >> text=Copy from confirmed…"), "and on the empty-forecast prompt");
         await pick(pa, ["102"], true);
         await until(() => !!fm("102"), "102 added to the forecast");
         assert.equal(db.t("forecast_missions").filter((m) => m.plan_date === F).length, 1, "only the picked mission");
