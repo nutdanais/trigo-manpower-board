@@ -3081,6 +3081,9 @@ body.touch-mode .hl-edit { opacity: 1; }
 /* live verdict under the New Mission host box (see updateMissionHostNote) */
 .host-note-ok { color: var(--primary-text); font-weight: 600; }
 .host-note-new { color: var(--warn-text); font-weight: 600; }
+/* a known record with something missing (no service area): amber info, never a tick */
+.host-note-gap { color: var(--warn-text); font-weight: 500; }
+.host-note-info { color: var(--muted); font-weight: 500; }
 :root[data-theme="dark"] .host-note-new { color: #f0b45c; }
 
 .hl-chips { display: flex; flex-wrap: wrap; gap: 4px 5px; align-items: center; }
@@ -6568,7 +6571,7 @@ label > .pk { margin-top: 5px; }
 }
 
 /* 20 · long help text folds to one line, with More / Less */
-.import-note.note-fold:not(.open) { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.import-note.note-fold:not(.open) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .note-more {
   align-self: flex-start; margin: -4px 0 10px; padding: 0; border: 0; background: none; cursor: pointer;
   font: inherit; font-size: 12px; font-weight: 600; color: var(--primary-text);
@@ -6884,3 +6887,17 @@ label > .pk { margin-top: 5px; }
   /* each filter reads like a settings row: its name, then the value and a chevron */
   body.m-filter-open #filter-pop .ms-btn { min-height: 44px; font-size: 14px; }
 }
+
+/* 14 · Export is one decision (the file type, and for Excel the columns): a dialog
+   sized to its content in the middle of the screen, not a full-height side panel
+   that was mostly empty for a JPG. Bulk edit (also .modal-export) stays a panel.
+   A phone keeps its bottom sheet. */
+@media (min-width: 641px) {
+  #modal-backdrop:has(.modal-export:not(#modal-bulk):not(.hidden)) { justify-content: center; align-items: center; }
+  .modal.modal-side.modal-export:not(#modal-bulk) {
+    width: min(540px, 94vw); height: auto; max-height: 86vh; border-radius: var(--r-box);
+    animation: export-in .2s cubic-bezier(.2, .8, .2, 1);
+  }
+  .modal.modal-side.modal-export:not(#modal-bulk) .modal-body { overflow-y: auto; min-height: 0; }
+}
+@keyframes export-in { from { transform: translateY(10px); opacity: 0; } }

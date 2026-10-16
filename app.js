@@ -5451,7 +5451,12 @@ function openHostModal(name, opts = {}) {
   state.hostlist.returnToMission = !!opts.returnToMission;
   const form = $("#form-host");
   form.reset();
-  $("#host-modal-title").textContent = name ? `Host — ${name}` : "New Host";
+  // the record's name is the title and what it is goes underneath, as on the
+  // Employee panel (it read "Host — Host Alpha")
+  $("#host-modal-title").textContent = name || "New Host";
+  const hostArea = rec && rec.areaId ? (D().areas.find(a => a.id === rec.areaId) || {}).name : "";
+  $("#host-modal-sub").textContent = rec ? ["Host", hostArea, rec.archived ? "archived" : ""].filter(Boolean).join(" · ") : "";
+  $("#host-modal-sub").classList.toggle("hidden", !rec);
   form.name.value = name || opts.prefillName || "";
   $("#host-name-note").classList.toggle("hidden", !name);
   form.location.value = rec ? rec.location : "";
@@ -6393,9 +6398,15 @@ function updateMissionHostNote() {
   const rec = hostRecordOf(typed);
   if (rec) {
     const area = rec.areaId ? D().areas.find(a => a.id === rec.areaId) : null;
-    note.className = "import-note host-note-ok";
-    setIconLabel(note, "check", `${rec.name}${area ? " — " + area.name : " — no service area set yet"}`
-      + (rec.archived ? " · archived host" : ""));
+    // a tick only when there is nothing to fix; a gap gets the info mark in amber
+    if (area) {
+      note.className = "import-note host-note-ok";
+      setIconLabel(note, "check", `${rec.name} — ${area.name}` + (rec.archived ? " · archived host" : ""));
+    } else {
+      note.className = "import-note host-note-gap";
+      setIconLabel(note, "info", "No service area set for this host yet. Add it in the Host list."
+        + (rec.archived ? " This host is archived." : ""));
+    }
   } else {
     note.className = "import-note host-note-new";
     setIconLabel(note, "alert", `"${typed}" is not in the Host list yet — saving will offer to create it.`);
@@ -6481,6 +6492,12 @@ function updateMissionEngineerNote() {
   if (!match) {
     note.className = "import-note host-note-new";
     setIconLabel(note, "alert", `"${typed}" isn't on the engineer list — pick a name from the suggestions.`);
+    return;
+  }
+  if (!match.profileId) {
+    // a record with no sign-in behind it: a fact to know, not a tick
+    note.className = "import-note host-note-info";
+    setIconLabel(note, "info", `${match.name} has no sign-in account yet.`);
     return;
   }
   note.className = "import-note host-note-ok";
@@ -8373,7 +8390,7 @@ let xlsxEmpty = false;      // nobody on the board: Excel has nothing to write
 function openBoardExportModal() {
   if (isForecastView()) { toast("Forecasts are tentative and are never exported.", "info"); return; }
   const board = isOverview() || isOrgChart() ? null : D().boards.find(b => b.id === D().activeBoardId);
-  $("#board-export-title").textContent = "Export — " + (isOrgChart() ? "Org Chart" : board ? board.name : "Overview");
+  $("#board-export-title").textContent = "Export " + (isOrgChart() ? "Org Chart" : board ? board.name : "Overview");
   const types = board ? ["jpg", "pdf", "xlsx"] : isOrgChart() ? ["jpg", "pdf", "pptx"] : ["jpg", "pdf"];
   if (board) prepareXlsxPart(board);
   renderExportTypes($("#board-export-type"), board ? "board" : isOrgChart() ? "orgchart" : "overview", types, updateBoardExportModal);
