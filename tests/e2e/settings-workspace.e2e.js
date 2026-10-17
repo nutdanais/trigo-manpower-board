@@ -7,7 +7,8 @@
    a failed save keeping its draft and retrying, service areas / boards / engineers
    / roles end to end (the permission review included), the sections each role may
    open, focus handling in the dialogs over the page, the password form, and the
-   phone layout. Exits non-zero on the first failed check. */
+   phone layout. Engineers, areas and boards are rows that open in place; Roles is
+   one role at a time with Off / View / Edit buttons. Exits non-zero on the first failed check. */
 "use strict";
 
 const assert = require("node:assert/strict");
@@ -52,9 +53,15 @@ async function step(name, fn) {
     const status = () => p.locator("#sv-status").innerText();
     const openSettings = async () => { await p.click("#btn-avatar"); await p.click("#btn-settings"); await p.waitForSelector("#settings-view:not(.hidden)"); };
     const tab = async (t) => { await p.click(`#settings-tabs [data-tab=${t}]`); await p.waitForFunction((x) => state.settingsTab === x, t); };
+    // a list row reads as the thing itself and opens in place to edit it
+    const openRow = async (list, n) => {
+      const row = p.locator(`#settings-${list} .sv-row`).nth(n);
+      if (!(await row.evaluate((e) => e.classList.contains("open")))) await row.locator(".sv-row-toggle").click();
+      return row;
+    };
     const closeDialog = async () => { await p.keyboard.press("Escape"); await p.waitForSelector("#modal-backdrop", { state: "hidden" }); };
 
-    await step("one navy: the top bar, the export header, the sidebar selection and the main buttons share it", async () => {
+    await step("one navy: the top bar, the export header and the main buttons share it; the rail marks where you are with it", async () => {
       const navy = await p.evaluate(() => {
         const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundColor;
         const probe = document.createElement("button"); probe.className = "btn btn-primary"; document.body.appendChild(probe);
@@ -64,7 +71,10 @@ async function step(name, fn) {
       assert.equal(navy.token, "#003a66");
       assert.deepEqual([navy.top, navy.capture, navy.button], ["rgb(0, 58, 102)", "rgb(0, 58, 102)", "rgb(0, 58, 102)"]);
       await openSettings();
-      assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector("#settings-tabs .settings-tab.active")).backgroundColor), "rgb(0, 58, 102)");
+      // where you are is a tint with navy text, so navy stays the colour of what you press
+      const active = await p.evaluate(() => { const c = getComputedStyle(document.querySelector("#settings-tabs .settings-tab.active")); return { bg: c.backgroundColor, ink: c.color }; });
+      assert.equal(active.ink, "rgb(0, 58, 102)");
+      assert.notEqual(active.bg, "rgb(0, 58, 102)", "the selected section is not a navy block");
       await p.click("#btn-settings-back");
     });
 
@@ -107,8 +117,9 @@ async function step(name, fn) {
       await openSettings();
       await tab("account");
       assert.equal(await p.inputValue("#acct-display-name"), "Admin.Z");
-      assert.match(await status(), /Changes apply when you save/);
+      assert.equal(await p.locator("#sv-foot").isVisible(), false, "no action bar while there is nothing to save");
       await p.fill("#acct-display-name", "Zed.A");
+      assert.equal(await p.locator("#sv-foot").isVisible(), true);
       assert.match(await status(), /Unsaved changes \(1\)/);
       assert.equal(await p.locator("#btn-sv-save").isVisible(), true);
       assert.equal(profile(ADMIN.email).display_name, "Admin.Z", "nothing is written before Save");
@@ -124,6 +135,9 @@ async function step(name, fn) {
       assert.equal(profile(ADMIN.email).full_name, "Admin Z", "the full name goes back unchanged");
       assert.equal(await p.inputValue("#acct-display-name"), "Zed.A");
       assert.equal(await p.locator("#btn-sv-save").isVisible(), false);
+      // the confirmation is the one thing the bar says once saved, and then it goes
+      assert.match(await status(), /All changes saved/);
+      await p.waitForSelector("#sv-foot", { state: "hidden", timeout: 8000 });
     });
 
     await step("leaving with unsaved changes asks: keep editing, discard, or save and continue", async () => {
@@ -165,6 +179,41 @@ async function step(name, fn) {
       await p.click("#btn-sv-discard");
     });
 
+    await step("the rail counts each list and flags the access requests waiting on somebody", async () => {
+      for (const [i, [name, mail]] of [["Waiting One", "waiting.one"], ["Waiting Two", "waiting.two"]].entries()) {
+        db.t("profiles").push({ id: "00000000-0000-0000-0000-00000000010" + i, email: mail + "@example.com", full_name: name, display_name: "Wait." + (i + 1), role_key: "engineer", status: "pending", requested_at: new Date().toISOString() });
+      }
+      await p.evaluate(() => cloud.loadUsers().then(() => renderSettings()));
+      const n = (t) => p.locator(`#settings-tabs [data-tab=${t}] .st-n`).innerText();
+      assert.equal(await n("users"), "2");
+      assert.equal(await p.locator('#settings-tabs [data-tab=users] .st-n').evaluate((e) => e.classList.contains("st-badge")), true, "waiting people are a badge, not a count");
+      assert.equal(await n("areas"), String(await p.evaluate(() => D().areas.length)));
+      assert.equal(await n("boards"), String(await p.evaluate(() => D().boards.length)));
+      assert.equal(await n("engineers"), String(await p.evaluate(() => engineerPaneRows().length)));
+    });
+
+    await step("Users: people waiting for access are a queue with its own buttons, not rows in the list", async () => {
+      await tab("users");
+      assert.match(await p.locator("#users-pending").innerText(), /Waiting for access · 2/);
+      assert.equal(await p.locator("#users-body tr.status-pending").count(), 0, "not in the list");
+      assert.deepEqual(await p.locator("#users-table thead th").allInnerTexts(), ["Person", "Role", "Status", "Last seen", "Actions"]);
+      assert.equal(await p.locator('#users-chips [data-chip="status:pending"]').innerText().then((t) => t.replace(/\s+/g, " ")), "Waiting 2");
+      await p.locator("#users-pending .sv-queue-row", { hasText: "Waiting One" }).getByRole("button", { name: /Approve/ }).click();
+      await p.waitForFunction(() => /Waiting for access · 1/.test(document.querySelector("#users-pending").textContent));
+      assert.equal(profile("waiting.one@example.com").status, "active");
+      assert.equal(await p.locator("#users-body tr", { hasText: "Waiting One" }).count(), 1, "approved: now in the list");
+      assert.equal(await p.locator('#settings-tabs [data-tab=users] .st-n').innerText(), "1", "the badge follows");
+      // the Waiting chip is how the same people are listed with a row each
+      await p.click('#users-chips [data-chip="status:pending"]');
+      assert.equal(await p.locator("#users-pending").isVisible(), false, "listed once, not twice");
+      assert.equal(await p.locator("#users-body tr.status-pending").count(), 1);
+      await p.click('#users-chips [data-chip="all"]');
+      await p.locator("#users-pending .sv-queue-row", { hasText: "Waiting Two" }).getByRole("button", { name: /Reject/ }).click();
+      await p.click("#btn-confirm-yes");
+      await p.waitForFunction(() => document.querySelector("#users-pending").classList.contains("hidden"));
+      assert.equal(profile("waiting.two@example.com").status, "disabled");
+    });
+
     await step("Service areas: a named add form, edits staged and saved together, validation that keeps the draft", async () => {
       await tab("areas");
       await p.click("#btn-add-area");
@@ -184,9 +233,11 @@ async function step(name, fn) {
       assert.ok(row, "created with its own name");
       assert.equal(row.color, "#ff0000", "and its own colour, in the same write");
       assert.equal(db.t("service_areas").some((r) => r.name === "New Area"), false, "no placeholder row");
-      assert.equal(await p.locator("#settings-areas tr").count(), 2);
+      assert.equal(await p.locator("#settings-areas .sv-row").count(), 2);
+      assert.equal(await p.locator("#settings-areas .sv-row input[type=text]:visible").count(), 0, "fields are not on show until a row is opened");
 
-      const rayong = p.locator("#settings-areas tr", { has: p.locator('input[type=text]') }).nth(1);
+      const rayong = await openRow("areas", 1);
+      assert.equal(await p.locator("#settings-areas .sv-row.open").count(), 1);
       await rayong.locator('input[type=text]').fill("Rayong East");
       await rayong.locator('input[type=color]').fill("#00aa00");
       assert.match(await status(), /Unsaved changes \(2\)/);
@@ -212,7 +263,7 @@ async function step(name, fn) {
         window.__orig = cloud.saveAreaField;
         cloud.saveAreaField = async () => { window.__calls++; throw new Error("network down"); };
       });
-      const row = p.locator("#settings-areas tr").nth(1);
+      const row = await openRow("areas", 1);
       await row.locator('input[type=text]').fill("Rayong West");
       await p.click("#btn-sv-save");
       await p.waitForFunction(() => /network down/.test(document.querySelector("#sv-status").textContent));
@@ -228,33 +279,42 @@ async function step(name, fn) {
     });
 
     await step("a live refresh redraws around a draft instead of over it", async () => {
-      const row = p.locator("#settings-areas tr").nth(1);
+      const row = await openRow("areas", 1);
       await row.locator('input[type=text]').fill("Typing…");
       await p.evaluate(() => refreshAndRender());
       await p.waitForTimeout(150);
-      assert.equal(await p.locator("#settings-areas tr").nth(1).locator('input[type=text]').inputValue(), "Typing…");
+      assert.equal(await p.locator("#settings-areas .sv-row").nth(1).locator('input[type=text]').inputValue(), "Typing…", "the open row stays open around the draft");
       assert.match(await status(), /Unsaved changes/);
       await p.click("#btn-sv-discard");
-      assert.equal(await p.locator("#settings-areas tr").nth(1).locator('input[type=text]').inputValue(), "Rayong West");
+      assert.equal(await p.locator("#settings-areas .sv-row").nth(1).locator('input[type=text]').inputValue(), "Rayong West");
     });
 
     await step("deleting an area: refused while it has employees, otherwise confirmed", async () => {
-      await p.locator("#settings-areas tr").nth(0).locator(".st-del").click();
+      const first = await openRow("areas", 0);
+      assert.match(await first.locator(".sv-why").innerText(), /Move them first/, "an area in use says so before you try");
+      await first.locator(".sv-del").click();
       assert.match(await p.locator("#confirm-title").innerText(), /Cannot delete/);
       await closeDialog();
-      await p.locator("#settings-areas tr").nth(1).locator(".st-del").click();
+      const second = await openRow("areas", 1);
+      assert.equal(await second.locator(".sv-why").count(), 0, "an empty area has nothing to explain");
+      await second.locator(".sv-del").click();
       assert.match(await p.locator("#confirm-title").innerText(), /Delete Rayong West/);
       await p.click("#btn-confirm-yes");
-      await p.waitForFunction(() => document.querySelectorAll("#settings-areas tr").length === 1);
+      await p.waitForFunction(() => document.querySelectorAll("#settings-areas .sv-row").length === 1);
       assert.equal(db.t("service_areas").some((r) => r.name === "Rayong West"), false);
     });
 
     await step("Boards: names and non-working days are staged; duplicates are refused; deletion keeps its guards", async () => {
       await tab("boards");
-      const first = p.locator("#settings-boards tr").nth(0);
-      await first.locator("label.weekday-chip", { hasText: "Mon" }).click();
+      const first = p.locator("#settings-boards .sv-row").nth(0);
+      // the strip shows the days the board WORKS: Sun and Sat (its weekend) are off
+      assert.deepEqual(await first.locator(".sv-day.on").allInnerTexts(), ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+      assert.match(await first.locator(".sv-row-main small").innerText(), /Mon–Fri · 5 working days/);
+      await first.locator(".sv-day", { hasText: "Mon" }).click();   // Monday stops being a working day
       assert.match(await status(), /Unsaved changes \(1\)/);
+      assert.match(await first.locator(".sv-row-main small").innerText(), /4 working days/);
       assert.deepEqual(db.t("boards").find((b) => b.id === "b1").weekend_days, [0, 6], "not written yet");
+      await openRow("boards", 0);
       await first.locator('input[type=text]').fill("Board Two");
       await p.click("#btn-sv-save");
       await p.waitForFunction(() => /already a board called Board Two/.test(document.querySelector("#sv-status").textContent));
@@ -265,7 +325,7 @@ async function step(name, fn) {
       const b1 = db.t("boards").find((b) => b.id === "b1");
       assert.equal(b1.name, "Board 1");
       assert.deepEqual(b1.weekend_days.slice().sort(), [0, 1, 6]);
-      await p.locator("#settings-boards tr").nth(0).locator(".st-del").click();
+      await p.locator("#settings-boards .sv-row").nth(0).locator(".sv-del").click();
       assert.match(await p.locator("#confirm-message").innerText(), /still has \d+ employee/);
       await closeDialog();
     });
@@ -276,21 +336,22 @@ async function step(name, fn) {
       await tab("areas");
       assert.equal(await p.locator("#btn-add-board-settings").isVisible(), false, "and only there");
       await tab("boards");
-      const before = await p.locator("#settings-boards tr").count();
+      const before = await p.locator("#settings-boards .sv-row").count();
       await p.click("#btn-add-board-settings");
       await p.waitForSelector("#modal-board:not(.hidden)");
       await p.fill("#form-board [name=name]", "Board Three");
       await p.click("#form-board button[type=submit]");
-      await p.waitForFunction((n) => document.querySelectorAll("#settings-boards tr").length === n + 1, before);
+      await p.waitForFunction((n) => document.querySelectorAll("#settings-boards .sv-row").length === n + 1, before);
       assert.equal(db.t("boards").some((b) => b.name === "Board Three"), true, "saved");
       assert.equal(await p.locator("#settings-view").isVisible(), true, "still on the Settings page");
     });
 
     await step("Engineers: a colour is staged and saved from the page", async () => {
       await tab("engineers");
-      const row = p.locator("#settings-engineers tr").nth(0);
-      const name = await row.locator('input[type=text]').inputValue();
+      const row = await openRow("engineers", 0);
+      const name = (await row.locator(".sv-row-main b").innerText()).trim();
       await row.locator('input[type=color]').fill("#112233");
+      assert.equal(await row.locator(".sv-sq").evaluate((e) => getComputedStyle(e).backgroundColor), "rgb(17, 34, 51)", "the row's tile follows the colour");
       assert.match(await status(), /Unsaved changes \(1\)/);
       await p.click("#btn-sv-save");
       await p.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
@@ -299,10 +360,30 @@ async function step(name, fn) {
 
     await step("Roles & permissions: changes are staged, reviewed before / after, then applied", async () => {
       await tab("roles");
-      assert.equal(await p.locator("#roles-matrix .rm-level:disabled").count() > 10, true, "Admin's column is read-only");
-      const sel = p.locator('select[aria-label="Settings for Manager"]');
-      assert.equal(await sel.inputValue(), "edit");
-      await sel.selectOption("view");
+      // every role side by side: roles across, areas down, a cell is the level
+      assert.deepEqual(await p.locator("#roles-matrix thead .rm-role-h b").allInnerTexts(), ["Admin", "Manager", "Engineer", "Viewer"]);
+      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row").count(), 19, "every permission area is a row");
+      assert.equal(await p.locator("#roles-matrix select").count(), 0, "no grid of dropdowns");
+      assert.equal(await p.locator("#roles-matrix td[data-role=admin] button").count(), 0, "Admin's column is shown but locked");
+      assert.match(await p.locator("#roles-matrix td[data-role=admin]").first().innerText(), /Edit/);
+      const cell = (area, role) => p.locator(`#roles-matrix button[aria-label^="${area} for ${role}:"]`);
+      assert.equal(await cell("Settings", "Manager").innerText(), "Edit");
+      assert.equal(await cell("Settings", "Viewer").innerText(), "Off", "a row reads across the roles");
+      // "Differences only" drops the rows where every role is the same
+      const rowsAll = await p.locator("#roles-matrix tbody tr.rm-row").count();
+      await p.click("#rm-diff");
+      const rowsDiff = await p.locator("#roles-matrix tbody tr.rm-row").count();
+      assert.ok(rowsDiff > 0 && rowsDiff < rowsAll, `${rowsDiff} of ${rowsAll}`);
+      assert.equal(await p.locator("#rm-diff-n").innerText(), String(rowsDiff));
+      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row", { hasText: "Org Chart" }).count(), 0, "an area every role sees the same is hidden");
+      await p.click("#rm-diff");
+      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row").count(), rowsAll);
+      // a press steps the cell: Edit -> Off -> View -> Edit
+      await cell("Settings", "Manager").click();
+      assert.equal(await cell("Settings", "Manager").innerText(), "Off");
+      await cell("Settings", "Manager").click();
+      assert.equal(await cell("Settings", "Manager").innerText(), "View");
+      assert.equal(await cell("Settings", "Manager").evaluate((e) => e.parentElement.classList.contains("rm-changed")), true, "a staged cell is marked");
       assert.match(await status(), /1 permission change ready to review/);
       assert.equal(await p.locator("#btn-sv-save").innerText(), "Review changes");
       assert.equal(perm("manager", "settings"), "edit", "nothing is written before Apply");
@@ -313,8 +394,11 @@ async function step(name, fn) {
       assert.match(await p.locator("#perm-review-body .hm-group-title").innerText(), /^Manager$/);
       assert.match(rows[0].replace(/\s+/g, " "), /Settings Edit View/);
       await p.click("#btn-perm-cancel");
-      assert.equal(await sel.inputValue(), "view", "Keep editing keeps the staged change");
+      assert.equal(await cell("Settings", "Manager").innerText(), "View", "Keep editing keeps the staged change");
       assert.equal(perm("manager", "settings"), "edit");
+      // a staged change survives the filter redrawing the grid
+      await p.click("#rm-diff"); await p.click("#rm-diff");
+      assert.equal(await cell("Settings", "Manager").innerText(), "View");
       // someone else changes the same cell while this is open: the review says so
       db.t("role_permissions").find((r) => r.role_key === "manager" && r.area === "settings").level = "none";
       await p.evaluate(() => cloud._loadIdentity());
@@ -326,6 +410,12 @@ async function step(name, fn) {
       await p.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
       assert.equal(perm("manager", "settings"), "view");
       assert.equal(await p.locator("#btn-sv-save").isVisible(), false);
+      // putting a value back un-stages it
+      await cell("Host", "Manager").click();   // Edit -> Off
+      assert.match(await status(), /1 permission change/);
+      await cell("Host", "Manager").click();   // Off -> View
+      await cell("Host", "Manager").click();   // View -> Edit
+      assert.equal(await p.evaluate(() => sdCount("roles")), 0);
     });
 
     await step("dialogs over the page: focus goes in, Tab stays in, Esc closes and focus goes back", async () => {
@@ -393,7 +483,7 @@ async function step(name, fn) {
       }
       // Boards: the week is one row of seven
       await open("boards");
-      const tops = await p.$$eval("#settings-boards tr:first-child .weekday-chip", (c) => [...new Set(c.map((x) => Math.round(x.getBoundingClientRect().top)))]);
+      const tops = await p.$$eval("#settings-boards .sv-row:first-child .sv-day", (c) => [...new Set(c.map((x) => Math.round(x.getBoundingClientRect().top)))]);
       assert.equal(tops.length, 1, "all seven days on one line");
       // Users: chips filter, rows have no header
       await open("users");
@@ -404,12 +494,12 @@ async function step(name, fn) {
       await p.click('#users-chips [data-chip="all"]');
       // permissions: one role at a time, chosen by chip, levels as buttons
       await open("roles");
-      const shown = await p.evaluate(() => [...document.querySelectorAll("#roles-matrix .rm-head th[data-role]")].filter((e) => e.getClientRects().length).length);
-      assert.equal(shown, 1);
-      await p.click('#rm-role-chips [data-role-chip="engineer"]');
-      assert.equal(await p.evaluate(() => [...document.querySelectorAll("#roles-matrix .rm-head th[data-role]")].filter((e) => e.getClientRects().length).map((e) => e.dataset.role).join()), "engineer");
-      assert.equal(await p.locator("#roles-matrix td[data-role=engineer] .rm-level").first().isVisible(), false);
-      await p.locator("#roles-matrix td[data-role=engineer] .rm-seg").first().locator("button").first().click();
+      const heads = await p.$$eval("#roles-matrix thead .rm-role-h", (c) => c.map((x) => Math.round(x.getBoundingClientRect().top)));
+      assert.equal(heads.length, 4);
+      assert.equal(new Set(heads).size, 1, "all four roles sit side by side on a phone too");
+      const btn = p.locator("#roles-matrix tbody tr.rm-row").first().locator("button").first();
+      assert.ok((await btn.boundingBox()).height >= 36, "a cell is a touch target");
+      await btn.click();
       await p.waitForFunction(() => sdCount("roles") === 1);
       await p.click("#btn-sv-discard");
       // Save stays in the footer, disabled until there is something to save; the
@@ -444,7 +534,9 @@ async function step(name, fn) {
       await m.page.waitForSelector("#users-table");
       assert.equal(await m.page.locator("#btn-add-user").isVisible(), false);
       assert.equal(await m.page.locator("#users-body .user-actions .btn").count(), 0, "no edit / approve buttons");
-      assert.match(await m.page.locator("#sv-status").innerText(), /View only/);
+      assert.equal(await m.page.locator("#users-viewonly").isVisible(), true, "the page says it is view only");
+      assert.match(await m.page.locator("#users-viewonly").innerText(), /View only/);
+      assert.equal(await m.page.locator("#sv-foot").isVisible(), false);
       assert.deepEqual(m.errors, []);
       await m.close();
     });

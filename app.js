@@ -421,7 +421,8 @@ const state = {
   settingsStale: false,       // a live update arrived while a field had focus: redraw once it leaves
   settingsSave: { phase: "clean" },   // clean | dirty | saving | saved | error, per the open section
   settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, roles: {} },   // staged edits, by section
-  rolesColumn: null,          // Roles & permissions: the one role shown below 960px
+  rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
+  svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
@@ -437,8 +438,8 @@ const state = {
   users: {                    // Settings > Users: search/filter/sort over the people list
     search: "",
     filters: { roleKey: [], status: [] },
-    pendingOnly: false,       // "Review requests" — show only accounts waiting for approval
-    sortKey: "email",
+    pendingOnly: false,       // the "Waiting" chip — show only accounts waiting for approval
+    sortKey: "name",
     sortDir: 1,
     editingId: null,          // profile id the User modal is editing
   },
@@ -2185,7 +2186,7 @@ function clearSelection() {
 }
 
 function closeFilterPops() {
-  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop, #users-filters .ms-pop")) p.classList.add("hidden");
+  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop")) p.classList.add("hidden");
 }
 
 /* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
@@ -6994,7 +6995,7 @@ const SETTINGS_SECTIONS = {
   account:   { label: "My account",          group: "Personal",       hint: "Your profile and sign-in details." },
   engineers: { label: "Engineers",           group: "Board setup",    hint: "Who can run a mission, and the colour of their mission cards." },
   areas:     { label: "Service areas",       group: "Board setup",    hint: "Labels used across people, missions and hosts." },
-  boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and non-working days." },
+  boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and working days." },
   users:     { label: "Users",               group: "Administration", hint: "Accounts, access requests and status." },
   roles:     { label: "Roles & permissions", group: "Administration", hint: "Review what each role can see and change." },
 };
@@ -7075,6 +7076,7 @@ function renderSettingsFooter() {
   const sv = state.settingsSave;
   const n = sdCount(tab);
   const dirty = n > 0;
+  const foot = $("#sv-foot");
   const status = $("#sv-status");
   const save = $("#btn-sv-save");
   const discard = $("#btn-sv-discard");
@@ -7083,8 +7085,8 @@ function renderSettingsFooter() {
   else if (sv.phase === "error") { text = sv.message; cls = "error"; }
   else if (dirty) {
     text = tab === "roles"
-      ? `● ${n} permission ${n === 1 ? "change" : "changes"} ready to review`
-      : `● Unsaved changes (${n})`;
+      ? `${n} permission ${n === 1 ? "change" : "changes"} ready to review`
+      : `Unsaved changes (${n})`;
     cls = "dirty";
   }
   else if (sv.phase === "saved") { text = "✓ " + sv.message; cls = "saved"; }
@@ -7092,15 +7094,25 @@ function renderSettingsFooter() {
   status.textContent = text;
   status.className = cls;
   const saving = sv.phase === "saving";
-  // On a phone Save stays where it is (disabled while there is nothing to save),
-  // like the record dialogs' footer; Users saves from each person's dialog.
+  // On a phone the bar stays where it is (Save disabled while there is nothing
+  // to save), like the record dialogs' footer; Users saves from each person's
+  // dialog. On a wider screen it floats over the page and is only there while
+  // there is something to say: unsaved changes, a save under way, a failure,
+  // or the confirmation, which goes by itself after a moment.
   const keepSave = svIsPhone() && tab !== "users";
+  foot.classList.toggle("sv-foot-idle", !svIsPhone() && !dirty && sv.phase === "clean");
   save.classList.toggle("hidden", !dirty && !keepSave);
   if (!dirty && keepSave && sv.phase !== "saved") status.textContent = "No unsaved changes";
   save.disabled = saving || !dirty;
   discard.classList.toggle("hidden", !dirty);
   discard.disabled = saving;
   save.textContent = tab === "roles" ? (svIsPhone() ? "Review" : "Review changes") : sv.phase === "error" ? "Retry" : svIsPhone() ? "Save" : "Save changes";
+  clearTimeout(renderSettingsFooter._t);
+  if (sv.phase === "saved" && !svIsPhone()) {
+    renderSettingsFooter._t = setTimeout(() => {
+      if (state.settingsOpen && state.settingsSave === sv) { state.settingsSave = { phase: "clean" }; renderSettingsFooter(); }
+    }, 3500);
+  }
 }
 
 function renderSettingsHead() {
@@ -7156,8 +7168,36 @@ function applySettingsTab() {
   renderSettingsHead();
   if (state.settingsTab === "account") renderAccountPane();
   if (state.settingsTab === "users") renderUsersPane();
-  if (state.settingsTab === "roles") renderRolesMatrix();
+  if (state.settingsTab === "roles") renderRolesPane();
+  renderRailMeta();
   renderSettingsFooter();
+}
+
+/* The rail says how much is in each list, and flags the one thing waiting on
+   somebody: access requests on Users. The people list loads on demand, so the
+   badge asks for it once. */
+function ensureUsersLoaded() {
+  if (!can("users") || D().users !== null || state._svUsersLoading) return;
+  state._svUsersLoading = true;
+  safely(async () => {
+    try { await cloud.loadUsers(); } finally { state._svUsersLoading = false; }
+    if (state.settingsOpen) { renderRailMeta(); if (svAtHome()) renderSvHome(); if (state.settingsTab === "roles") renderRolesPane(); }
+  });
+}
+function renderRailMeta() {
+  const put = (tab, text, badge) => {
+    const el = $(`#settings-tabs [data-tab="${tab}"] .st-n`);
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("st-badge", !!badge);
+    if (badge) el.setAttribute("aria-label", `${text} waiting for access`); else el.removeAttribute("aria-label");
+  };
+  put("engineers", String(engineerPaneRows().length));
+  put("areas", String(D().areas.length));
+  put("boards", String(D().boards.length));
+  const waiting = (D().users || []).filter(u => u.status === "pending").length;
+  put("users", waiting ? String(waiting) : "", true);
+  ensureUsersLoaded();
 }
 
 /* Everything on the page, drawn from the data plus the drafts. */
@@ -7289,10 +7329,7 @@ function renderSvHome() {
   home.innerHTML = html;
   for (const row of home.querySelectorAll(".svh-row")) row.onclick = () => svOpenSection(row.dataset.tab);
   // Users is loaded on first entry; the list asks for it so the waiting count is there
-  if (can("users") && D().users === null && !state._svUsersLoading) {
-    state._svUsersLoading = true;
-    safely(async () => { try { await cloud.loadUsers(); } finally { state._svUsersLoading = false; } if (svAtHome()) renderSvHome(); });
-  }
+  ensureUsersLoaded();
 }
 
 function svOpenSection(tab) {
@@ -7606,12 +7643,136 @@ function engineerPaneRows() {
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/* ---------- Settings rows ----------
+   Engineers, Service areas and Boards share one row. The head reads as the
+   thing itself — a colour tile, its name, one line about it — and opens in place
+   to edit it; the fields are only in view while the row is open, so the list
+   does not look like a form. One row per list is open at a time, remembered in
+   state.svOpen so a redraw (a live update, a save) keeps it open. The draft
+   machinery (sdSet / sdMarkRow) is exactly what the table rows used. */
+function svRow(section, key, { lead = "", title, sub = "", meta = null, editor = null }) {
+  const row = document.createElement("div");
+  row.className = "sv-row";
+  row.dataset.key = key;
+  const head = document.createElement("div");
+  head.className = "sv-row-head";
+  const main = `${lead}<span class="sv-row-main"><b>${escapeHtml(title)}</b><small>${sub}</small></span>`;
+  let toggle = null;
+  if (editor) {
+    toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "sv-row-toggle";
+    toggle.innerHTML = main;
+    toggle.setAttribute("aria-label", `Edit ${title}`);
+    head.appendChild(toggle);
+  } else {
+    const plain = document.createElement("div");
+    plain.className = "sv-row-toggle sv-row-plain";
+    plain.innerHTML = main;
+    head.appendChild(plain);
+  }
+  if (meta) head.appendChild(meta);
+  if (editor) {
+    const chev = document.createElement("span");
+    chev.className = "sv-row-chev";
+    chev.innerHTML = icon("chevron-down");
+    head.appendChild(chev);
+  }
+  row.appendChild(head);
+  if (editor) {
+    editor.classList.add("sv-row-edit");
+    row.appendChild(editor);
+    const setOpen = (on) => {
+      for (const o of row.parentElement ? row.parentElement.querySelectorAll(".sv-row.open") : []) {
+        if (o !== row) { o.classList.remove("open"); const t = o.querySelector(".sv-row-toggle"); if (t) t.setAttribute("aria-expanded", "false"); }
+      }
+      row.classList.toggle("open", on);
+      toggle.setAttribute("aria-expanded", String(on));
+      state.svOpen[section] = on ? key : null;
+    };
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.onclick = () => setOpen(!row.classList.contains("open"));
+    // the rest of the head is a click target too, except what is a control in its own right
+    head.onclick = (ev) => { if (!ev.target.closest("button, input, label, select, a")) toggle.click(); };
+    const done = editor.querySelector(".sv-done");
+    if (done) done.onclick = () => { setOpen(false); toggle.focus(); };
+    if (state.svOpen[section] === key) { row.classList.add("open"); toggle.setAttribute("aria-expanded", "true"); }
+  }
+  return row;
+}
+function svField(label, control, hint) {
+  const f = document.createElement("div");
+  f.className = "sv-field";
+  const l = document.createElement("span");
+  l.className = "sv-field-label";
+  l.textContent = label;
+  f.appendChild(l);
+  f.appendChild(control);
+  if (hint) { const h = document.createElement("p"); h.className = "import-note"; h.textContent = hint; f.appendChild(h); }
+  return f;
+}
+function svEditorFoot(deleteBtn) {
+  const foot = document.createElement("div");
+  foot.className = "sv-edit-foot";
+  if (deleteBtn) foot.appendChild(deleteBtn);
+  const sp = document.createElement("span");
+  sp.className = "grow";
+  foot.appendChild(sp);
+  const done = document.createElement("button");
+  done.type = "button";
+  done.className = "btn btn-small sv-done";
+  done.textContent = "Done";
+  foot.appendChild(done);
+  return foot;
+}
+function svDeleteBtn(label, title) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "btn btn-small sv-del";
+  b.title = title;
+  b.innerHTML = `${icon("close")}<span>${escapeHtml(label)}</span>`;
+  return b;
+}
+function svSwatch(color) {
+  return `<span class="sv-sq" style="background:${escapeHtml(color)}"></span>`;
+}
+/* the colour control: the swatch is the control, as before — a click opens the
+   app's colour picker (openColourField) */
+function svColourPick(color, label, onchange) {
+  const pick = document.createElement("label");
+  pick.className = "sw-pick";
+  const input = document.createElement("input");
+  input.type = "color";
+  input.value = color;
+  input.title = "Colour";
+  input.setAttribute("aria-label", label);
+  const hex = document.createElement("b");
+  hex.textContent = swHex(color);
+  input.oninput = () => { hex.textContent = swHex(input.value); onchange(input.value); };
+  pick.append(input, hex);
+  return pick;
+}
+/* "Mon–Fri", "Mon–Sat", "Every day" … from a board's non-working weekdays, as
+   markup: each piece is its own text node so the Thai pass can translate it */
+function workWeekHtml(off) {
+  const on = [1, 2, 3, 4, 5, 6, 0].filter(d => !off.includes(d));
+  const n = on.length;
+  const monFri = [1, 2, 3, 4, 5], monSat = [1, 2, 3, 4, 5, 6];
+  let label;
+  if (!n) label = "No working days";
+  else if (n === 7) label = "Every day";
+  else if (n === 5 && monFri.every(d => on.includes(d))) label = "Mon–Fri";
+  else if (n === 6 && monSat.every(d => on.includes(d))) label = "Mon–Sat";
+  else label = on.map(d => `<span>${DOW_LABELS[d]}</span>`).join(", ");
+  return `<span>${label}</span> · <span>${7 - off.length} working ${7 - off.length === 1 ? "day" : "days"}</span>`;
+}
+
 function renderEngineerRows() {
-  const engBox = $("#settings-engineers");
-  engBox.innerHTML = "";
+  const box = $("#settings-engineers");
+  box.innerHTML = "";
   const rows = engineerPaneRows();
   if (!rows.length) {
-    engBox.innerHTML = `<tr><td colspan="5" class="import-note">Nobody has the Engineer role yet. Give somebody that role under <b>Users</b>, or add a manager or admin here.</td></tr>`;
+    box.innerHTML = `<p class="import-note sv-empty">Nobody has the Engineer role yet. Give somebody that role under <b>Users</b>, or add a manager or admin here.</p>`;
     return;
   }
   // accounts that could be linked to a record that has none: everyone in the
@@ -7621,88 +7782,48 @@ function renderEngineerRows() {
 
   for (const r of rows) {
     const rec = r.engineer;
-    const row = document.createElement("tr");
-    row.className = "st-row";
+    const ed = document.createElement("div");
+    let row;
 
-    const swatch = document.createElement("td");
-    swatch.className = "st-swatch";
-    swatch.dataset.label = "Colour";
-    // The swatch IS the control. A bare <input type="color"> is drawn by the
-    // browser as a colour chip inside its OWN bordered box, using a fixed grey
-    // that ignores the theme — a box, inside a box, inside a table cell. The
-    // .sw-pick wrapper strips that chrome (see styles.css) and prints the hex
-    // beside it, so the value is never carried by colour alone.
-    const pick = document.createElement("label");
-    pick.className = "sw-pick";
-    const color = document.createElement("input");
-    color.type = "color";
-    color.value = sdVal("engineers", "color|" + r.key, r.color);
-    color.title = "Mission card colour";
-    color.setAttribute("aria-label", `Colour for ${r.name}`);
-    const hex = document.createElement("b");
-    hex.textContent = swHex(color.value);
-    color.oninput = () => {
-      hex.textContent = swHex(color.value);
-      sdSet("engineers", "color|" + r.key, color.value, `${r.name} colour`, baseOf(r.key, "color"));
+    // colour: the swatch is the control; the head's tile follows it
+    const colour = svColourPick(sdVal("engineers", "color|" + r.key, r.color), `Colour for ${r.name}`, (v) => {
+      sdSet("engineers", "color|" + r.key, v, `${r.name} colour`, baseOf(r.key, "color"));
+      row.querySelector(".sv-sq").style.background = v;
       sdMarkRow(row, "engineers", r.key);
-    };
-    pick.appendChild(color);
-    pick.appendChild(hex);
-    swatch.appendChild(pick);
+    });
 
-    const nameCell = document.createElement("td");
-    nameCell.className = "st-primary";
-    nameCell.dataset.label = "Name";
+    // name: editable only on a record with no account — otherwise it is the account's
+    let nameCtl;
     if (r.kind === "record") {
-      // no account behind it: the record's own name is still the only name
-      // there is, so it stays editable until somebody links it
-      const name = document.createElement("input");
-      name.type = "text";
-      name.value = sdVal("engineers", "name|" + r.key, r.name);
-      name.placeholder = "Name";
-      name.maxLength = 80;
-      name.setAttribute("aria-label", "Engineer name");
-      name.oninput = () => {
-        sdSet("engineers", "name|" + r.key, name.value, `${r.name} name`, baseOf(r.key, "name"));
+      nameCtl = document.createElement("input");
+      nameCtl.type = "text";
+      nameCtl.maxLength = 80;
+      nameCtl.placeholder = "Name";
+      nameCtl.setAttribute("aria-label", "Engineer name");
+      nameCtl.value = sdVal("engineers", "name|" + r.key, r.name);
+      nameCtl.oninput = () => {
+        sdSet("engineers", "name|" + r.key, nameCtl.value, `${r.name} name`, baseOf(r.key, "name"));
         sdMarkRow(row, "engineers", r.key);
       };
-      nameCell.appendChild(name);
     } else {
-      nameCell.classList.add("st-name");
-      nameCell.textContent = r.name;
-      if (r.profile && r.profile.fullName) nameCell.title = r.profile.fullName;
+      nameCtl = document.createElement("div");
+      nameCtl.className = "sv-static";
+      nameCtl.textContent = r.name;
+      if (r.profile && r.profile.fullName) nameCtl.title = r.profile.fullName;
     }
 
-    const phoneCell = document.createElement("td");
-    phoneCell.className = "st-phone";
-    phoneCell.dataset.label = "Phone";
-    phoneCell.textContent = r.phone || "";   // empty shows "—" (or "No phone yet" on a phone), see styles.css
-    phoneCell.title = r.kind === "account"
-      ? "Set by this person under Settings → My account."
-      : "From the engineer record. Link it to an account and the number comes from there.";
-
-    const acctCell = document.createElement("td");
-    acctCell.className = "st-account";
-    acctCell.dataset.label = "Account";
+    // account
+    const acct = document.createElement("div");
+    acct.className = "sv-static";
+    let acctHint = "";
     if (r.kind === "account") {
-      acctCell.innerHTML = `<span class="role-pill role-${escapeHtml(r.profile.roleKey || "none")}">${escapeHtml(roleLabel(r.profile.roleKey))}</span>`;
-      // two kinds of mission owner, kept apart in words as well as by whether
-      // they can be removed: on the list because of their role, or added by hand
-      const via = document.createElement("span");
-      via.className = "st-hint";
-      via.textContent = r.profile.roleKey === "engineer" ? " from role" : " added manually";
-      acctCell.appendChild(via);
-      if (!rec) {
-        const hint = document.createElement("span");
-        hint.className = "st-hint";
-        hint.textContent = " no colour yet";
-        acctCell.appendChild(hint);
-      }
+      acct.innerHTML = `<span class="role-pill role-${escapeHtml(r.profile.roleKey || "none")}">${escapeHtml(roleLabel(r.profile.roleKey))}</span> <span class="st-hint">${r.profile.roleKey === "engineer" ? "from role" : "added manually"}</span>`;
+      acctHint = "Name and phone number come from the account.";
     } else if (r.kind === "stranded") {
       // the account behind this record is not an active engineer any more —
       // demoted, or disabled. Unlinking is the way back to an ordinary record
       // that can be renamed and pointed at somebody else.
-      acctCell.innerHTML = `<span class="st-hint">account is no longer an engineer</span> `;
+      acct.innerHTML = `<span class="st-hint">account is no longer an engineer</span> `;
       const unlink = document.createElement("button");
       unlink.type = "button";
       unlink.className = "btn btn-small";
@@ -7712,8 +7833,9 @@ function renderEngineerRows() {
         await cloud.saveEngineerField(rec.id, "profile_id", null);
         renderSettings();
       });
-      acctCell.appendChild(unlink);
+      acct.appendChild(unlink);
     } else {
+      acct.className = "";
       const link = document.createElement("select");
       link.dataset.picker = "";
       link.setAttribute("aria-label", `Account for ${r.name}`);
@@ -7728,22 +7850,25 @@ function renderEngineerRows() {
         });
         sdMarkRow(row, "engineers", r.key);
       };
-      acctCell.appendChild(link);
+      acct.appendChild(link);
+      acctHint = "Link an account and the name and phone number come from it.";
     }
 
-    const actCell = document.createElement("td");
-    actCell.className = "st-act";
+    const fields = document.createElement("div");
+    fields.className = "sv-fields";
+    fields.append(
+      svField("Name", nameCtl, r.kind === "record" ? "Shown on every mission card they run." : ""),
+      svField("Colour", colour, "Marks each mission card this person is responsible for."),
+      svField("Account", acct, acctHint));
+    ed.appendChild(fields);
+
     // An Engineer-by-role is on this list because of their role: taking them
     // off it is a role change under Users, not a delete here. Everything else
     // — an added manager or admin, an unlinked record — can go.
     const removable = r.kind !== "account" || (rec && r.profile.roleKey !== "engineer");
+    let del = null;
     if (removable) {
-      const del = document.createElement("button");
-      del.type = "button";
-      del.className = "st-del";
-      del.title = `Remove ${r.name}`;
-      del.setAttribute("aria-label", `Remove ${r.name}`);
-      del.innerHTML = icon("close");
+      del = svDeleteBtn("Delete engineer…", `Remove ${r.name}`);
       del.onclick = () => showConfirm("Remove this engineer?",
         `${r.name} will no longer be offered on a mission, and their colour is forgotten. ` +
         `Missions that already name them keep their record of who ran them, but lose the engineer on the card.`,
@@ -7752,12 +7877,26 @@ function renderEngineerRows() {
           for (const k of Object.keys(sdMap("engineers"))) if (k.split("|")[1] === r.key) delete sdMap("engineers")[k];
           renderSettings();
         }));
-      actCell.appendChild(del);
     }
+    ed.appendChild(svEditorFoot(del));
 
-    row.append(swatch, nameCell, phoneCell, acctCell, actCell);
+    // what the row says about the person: the phone, or the gap where it should be
+    const phone = r.phone
+      ? escapeHtml(r.phone)
+      : `<span class="sv-need">${icon("alert")} ${r.kind === "account" ? "No phone number yet" : "No phone number"}</span>`;
+    const meta = document.createElement("div");
+    meta.className = "sv-row-meta";
+    if (r.kind === "account") {
+      meta.innerHTML = `<span class="role-pill role-${escapeHtml(r.profile.roleKey || "none")}">${escapeHtml(roleLabel(r.profile.roleKey))}</span>` +
+        (rec ? "" : `<span class="st-hint">no colour yet</span>`);
+    } else if (r.kind === "stranded") {
+      meta.innerHTML = `<span class="sv-need">${icon("alert")} Account no longer an engineer</span>`;
+    } else {
+      meta.innerHTML = `<span class="st-hint">No account</span>`;
+    }
+    row = svRow("engineers", r.key, { lead: svSwatch(colour.querySelector("input").value), title: r.name, sub: phone, meta, editor: ed });
     sdMarkRow(row, "engineers", r.key);
-    engBox.appendChild(row);
+    box.appendChild(row);
   }
 }
 
@@ -7832,43 +7971,53 @@ function addEngineerFromModal(ev) {
 
 /* ---------- Settings -> Service areas ---------- */
 function renderAreaRows() {
-  const areaBox = $("#settings-areas");
-  areaBox.innerHTML = "";
+  const box = $("#settings-areas");
+  box.innerHTML = "";
   if (!D().areas.length) {
-    areaBox.innerHTML = `<tr><td colspan="3" class="import-note">No service areas yet. Use <b>Add area</b> to create the first one.</td></tr>`;
+    box.innerHTML = `<p class="import-note sv-empty">No service areas yet. Use <b>Add area</b> to create the first one.</p>`;
     return;
   }
   const baseOf = (id, prop) => () => { const a = D().areas.find(x => x.id === id); return a ? a[prop] : undefined; };
   for (const a of D().areas) {
-    const row = document.createElement("tr");
-    row.className = "st-row";
-    row.innerHTML = `
-      <td class="st-swatch" data-label="Colour"><label class="sw-pick"><input type="color" title="Area colour" aria-label="Colour for ${escapeHtml(a.name)}"><b></b></label></td>
-      <td class="st-primary" data-label="Name"><input type="text" maxlength="60" placeholder="Area name" aria-label="Area name"></td>
-      <td class="st-act"><button type="button" class="st-del" title="Delete ${escapeHtml(a.name)}" aria-label="Delete ${escapeHtml(a.name)}">${icon("close")}</button></td>`;
-    const color = row.querySelector('input[type="color"]');
-    const hex = row.querySelector("b");
-    const name = row.querySelector('input[type="text"]');
-    const del = row.querySelector(".st-del");
-    color.value = sdVal("areas", "color|" + a.id, a.color);
-    hex.textContent = swHex(color.value);
+    const people = D().employees.filter(e => e.areaId === a.id).length;
+    const hosts = (D().hosts || []).filter(h => h.areaId === a.id).length;
+    let row;
+    const pill = document.createElement("span");
+    pill.className = "area-pill";
+    const paintPill = (name, color) => { pill.textContent = name.trim() || "Area"; pill.style.background = color; pill.style.color = inkOn(color); };
+    const name = document.createElement("input");
+    name.type = "text";
+    name.maxLength = 60;
+    name.placeholder = "Area name";
+    name.setAttribute("aria-label", "Area name");
     name.value = sdVal("areas", "name|" + a.id, a.name);
-    color.oninput = () => {
-      hex.textContent = swHex(color.value);
-      sdSet("areas", "color|" + a.id, color.value, `${a.name} colour`, baseOf(a.id, "color"));
+    const colour = svColourPick(sdVal("areas", "color|" + a.id, a.color), `Colour for ${a.name}`, (v) => {
+      sdSet("areas", "color|" + a.id, v, `${a.name} colour`, baseOf(a.id, "color"));
+      row.querySelector(".sv-sq").style.background = v;
+      paintPill(name.value, v);
       sdMarkRow(row, "areas", a.id);
-    };
+    });
+    const colourVal = () => colour.querySelector("input").value;
+    paintPill(name.value, colourVal());
     name.oninput = () => {
       sdSet("areas", "name|" + a.id, name.value, `${a.name} name`, baseOf(a.id, "name"));
+      paintPill(name.value, colourVal());
       sdMarkRow(row, "areas", a.id);
     };
+
+    const ed = document.createElement("div");
+    const fields = document.createElement("div");
+    fields.className = "sv-fields sv-fields-2";
+    fields.append(
+      svField("Name", name),
+      svField("Colour", colour, "The pill shown on employee cards, mission cards and both lists."));
+    ed.appendChild(fields);
+    const del = svDeleteBtn("Delete area…", `Delete ${a.name}`);
     del.onclick = () => {
-      const people = D().employees.filter(e => e.areaId === a.id).length;
       if (people) {
         showConfirm("Cannot delete", `${a.name} still has ${people} employee${people === 1 ? "" : "s"}. Reassign them first.`, () => {});
         return;
       }
-      const hosts = (D().hosts || []).filter(h => h.areaId === a.id).length;
       showConfirm(`Delete ${a.name}?`,
         `This removes the service area.` + (hosts ? ` ${hosts} host${hosts === 1 ? "" : "s"} using it will have no area set.` : "") +
         ` It has no employees, so nobody loses their area. This cannot be undone.`,
@@ -7878,8 +8027,27 @@ function renderAreaRows() {
           renderSettings();
         }));
     };
+    const foot = svEditorFoot(del);
+    if (people) {
+      const why = document.createElement("small");
+      why.className = "sv-why";
+      why.textContent = `${people} ${people === 1 ? "person uses" : "people use"} this area. Move them first.`;
+      foot.insertBefore(why, foot.querySelector(".grow"));
+    }
+    ed.appendChild(foot);
+
+    const meta = document.createElement("div");
+    meta.className = "sv-row-meta";
+    meta.appendChild(pill);
+    const use = people ? `<span class="st-hint">${icon("lock")} In use</span>` : `<span class="st-hint">Not in use</span>`;
+    meta.insertAdjacentHTML("beforeend", use);
+    row = svRow("areas", a.id, {
+      lead: svSwatch(colourVal()), title: a.name,
+      sub: `<span>${people} ${people === 1 ? "person" : "people"}</span> · <span>${hosts} ${hosts === 1 ? "host" : "hosts"}</span>`,
+      meta, editor: ed,
+    });
     sdMarkRow(row, "areas", a.id);
-    areaBox.appendChild(row);
+    box.appendChild(row);
   }
 }
 
@@ -7919,83 +8087,71 @@ function addAreaFromModal(ev) {
    weekend import, the date-picker's weekend highlighting and the Overview trend
    charts for that board. */
 function renderBoardRows() {
-  const boardsBox = $("#settings-boards");
-  boardsBox.innerHTML = "";
+  const box = $("#settings-boards");
+  box.innerHTML = "";
   const boardOf = (id) => D().boards.find(x => x.id === id);
+  const mayRename = can("boarddelete", "edit");
   for (const b of D().boards) {
-    const row = document.createElement("tr");
-    row.className = "st-row";
-    const nameCell = document.createElement("td");
-    nameCell.className = "st-board st-primary";
-    nameCell.dataset.label = "Board";
-    // Renaming shares the "Rename & delete boards" permission (Admin only by
-    // default; a trigger enforces it). A blank or duplicate name is refused when
-    // you save, and says so, rather than being put back silently.
-    let nameEl;
-    if (can("boarddelete", "edit")) {
-      nameEl = document.createElement("input");
-      nameEl.type = "text";
-      nameEl.className = "settings-board-name";
-      nameEl.value = sdVal("boards", "name|" + b.id, b.name);
-      nameEl.placeholder = "Board name";
-      nameEl.maxLength = 60;
-      nameEl.setAttribute("aria-label", "Board name");
-      nameEl.oninput = () => {
-        sdSet("boards", "name|" + b.id, nameEl.value, `${b.name} name`, () => { const x = boardOf(b.id); return x ? x.name : undefined; });
-        sdMarkRow(row, "boards", b.id);
-      };
-    } else {
-      nameEl = document.createElement("div");
-      nameEl.className = "settings-board-name";
-      nameEl.textContent = b.name;
-    }
-    const daysCell = document.createElement("td");
-    daysCell.className = "st-days";
-    daysCell.dataset.label = "Non-working days";
+    let row;
+    const off0 = () => sdVal("boards", "weekend|" + b.id, b.weekendDays.slice().sort((x, y) => x - y));
+    const summary = workWeekHtml;
+
+    // The week as the days the board WORKS (on = a working day). It is stored
+    // as the non-working days, so the draft still holds those.
     const picker = document.createElement("div");
-    picker.className = "weekday-picker settings-board-days";
+    picker.className = "sv-week";
     picker.setAttribute("role", "group");
-    picker.setAttribute("aria-label", `Non-working days for ${b.name}`);
-    const shown = sdVal("boards", "weekend|" + b.id, b.weekendDays.slice().sort((x, y) => x - y));
+    picker.setAttribute("aria-label", `Working days for ${b.name}`);
+    const off = off0();
     for (let i = 0; i < DOW_LABELS.length; i++) {
       const lab = document.createElement("label");
-      lab.className = "weekday-chip";
-      lab.innerHTML = `<input type="checkbox" value="${i}" ${shown.includes(i) ? "checked" : ""}> ${DOW_LABELS[i]}`;
-      // The checkbox stays in the DOM for keyboard and screen readers; the cell
-      // it sits in is what you actually see (see .weekday-picker in styles.css).
-      // The .on class rather than :has(:checked) so the selected day still reads
-      // correctly on the older browsers some of the factory PCs run.
-      lab.classList.toggle("on", shown.includes(i));
+      lab.className = "sv-day";
+      const works = !off.includes(i);
+      lab.innerHTML = `<input type="checkbox" value="${i}" ${works ? "checked" : ""}><span>${DOW_LABELS[i]}</span>`;
+      // .on rather than :has(:checked), for the older browsers on some factory PCs
+      lab.classList.toggle("on", works);
       lab.querySelector("input").onchange = (ev) => {
         lab.classList.toggle("on", ev.target.checked);
-        const days = Array.from(picker.querySelectorAll("input:checked")).map(c => Number(c.value)).sort((x, y) => x - y);
+        const days = Array.from(picker.querySelectorAll("input:not(:checked)")).map(c => Number(c.value)).sort((x, y) => x - y);
         sdSet("boards", "weekend|" + b.id, days, `${b.name} non-working days`,
           () => { const x = boardOf(b.id); return x ? x.weekendDays.slice().sort((p, q) => p - q) : undefined; });
+        row.querySelector(".sv-row-main small").innerHTML = summary(days);
         sdMarkRow(row, "boards", b.id);
       };
       picker.appendChild(lab);
     }
-    nameCell.appendChild(nameEl);
-    daysCell.appendChild(picker);
-    row.appendChild(nameCell);
-    row.appendChild(daysCell);
-    // Delete is its own permission (Roles & permissions → "Rename & delete boards",
-    // Admin only by default) because it takes every mission on the board with it.
-    const actCell = document.createElement("td");
-    actCell.className = "st-act";
-    if (can("boarddelete", "edit")) {
-      const del = document.createElement("button");
-      del.type = "button";
-      del.className = "st-del";
-      del.title = `Delete ${b.name}`;
-      del.setAttribute("aria-label", `Delete ${b.name}`);
-      del.innerHTML = icon("close");
+    const meta = document.createElement("div");
+    meta.className = "sv-row-meta sv-row-week";
+    meta.appendChild(picker);
+
+    // Rename and delete share the "Rename & delete boards" permission (Admin only
+    // by default; a trigger enforces it). A blank or duplicate name is refused
+    // when you save, and says so, rather than being put back silently.
+    let ed = null;
+    if (mayRename) {
+      ed = document.createElement("div");
+      const name = document.createElement("input");
+      name.type = "text";
+      name.maxLength = 60;
+      name.placeholder = "Board name";
+      name.setAttribute("aria-label", "Board name");
+      name.value = sdVal("boards", "name|" + b.id, b.name);
+      name.oninput = () => {
+        sdSet("boards", "name|" + b.id, name.value, `${b.name} name`, () => { const x = boardOf(b.id); return x ? x.name : undefined; });
+        sdMarkRow(row, "boards", b.id);
+      };
+      const fields = document.createElement("div");
+      fields.className = "sv-fields sv-fields-1";
+      fields.appendChild(svField("Name", name));
+      ed.appendChild(fields);
+      // Delete is its own permission because it takes every mission on the board with it.
+      const del = svDeleteBtn("Delete board…", `Delete ${b.name}`);
       del.onclick = () => confirmDeleteBoard(b);
-      actCell.appendChild(del);
+      ed.appendChild(svEditorFoot(del));
     }
-    row.appendChild(actCell);
+    row = svRow("boards", b.id, { lead: "", title: sdVal("boards", "name|" + b.id, b.name), sub: summary(off), meta, editor: ed });
     sdMarkRow(row, "boards", b.id);
-    boardsBox.appendChild(row);
+    box.appendChild(row);
   }
 }
 
@@ -12446,15 +12602,15 @@ function renderAccountPane() {
   const box = $("#account-identity");
   if (!me) { box.textContent = ""; return; }
   const status = USER_STATUS[me.status];
-  box.innerHTML =
-    `<div class="account-email">${escapeHtml(me.email || "")}</div>` +
-    (me.legacy
-      ? `<p class="import-note">Roles aren't set up on this database yet — everyone has full access until <code>migration-2026-09-04b-user-management.sql</code> is run.</p>`
-      : `<div class="account-meta">` +
+  const who = me.fullName || me.displayName || me.email || "";
+  box.innerHTML = me.legacy
+    ? `<p class="import-note">Roles aren't set up on this database yet — everyone has full access until <code>migration-2026-09-04b-user-management.sql</code> is run.</p>`
+    : `<div class="sv-id"><span class="sv-avatar" aria-hidden="true">${escapeHtml(nameInitials(who))}</span>` +
+        `<div class="sv-id-main"><b>${escapeHtml(who)}</b><small class="account-email">${escapeHtml(me.email || "")}</small></div>` +
+        `<div class="account-meta">` +
           `<span class="role-pill role-${escapeHtml(me.roleKey || "none")}">${escapeHtml(roleLabel(me.roleKey))}</span>` +
           `<span class="status-pill status-${escapeHtml(me.status)}">${escapeHtml(status ? status.label : me.status)}</span>` +
-        `</div>` +
-        `<p class="import-note">Your role decides which tabs you see and what you can change. Only an admin can alter it.</p>`);
+        `</div></div>`;
   const form = $("#form-account-name");
   // what the user has typed wins over what is saved, so a refresh from another
   // tab or device cannot overwrite a half-finished edit
@@ -12557,80 +12713,89 @@ function usersFilteredSorted() {
   });
 }
 
-function usersMsLabel(key) {
-  const picked = state.users.filters[key];
-  const noun = key === "roleKey" ? "Role" : "Status";
-  if (!picked.length) return `${noun}: All`;
-  if (picked.length === 1) return `${noun}: ${key === "roleKey" ? roleLabel(picked[0]) : (USER_STATUS[picked[0]] || {}).label || picked[0]}`;
-  return `${noun}: ${picked.length}`;
-}
-
-function renderUsersFilterOptions() {
-  for (const ms of $$("#users-filters .ms")) {
-    const key = ms.dataset.filter;
-    ms.querySelector(".ms-btn").textContent = usersMsLabel(key);
-    const pop = ms.querySelector(".ms-pop");
-    pop.innerHTML = "";
-    const clear = document.createElement("div");
-    clear.className = "ms-clear";
-    clear.textContent = "Clear";
-    clear.onclick = () => { state.users.filters[key] = []; renderUsersFilterOptions(); renderUserRows(); };
-    pop.appendChild(clear);
-    const opts = key === "roleKey"
-      ? D().roles.map(r => ({ value: r.key, label: r.label }))
-      : Object.keys(USER_STATUS).map(k => ({ value: k, label: USER_STATUS[k].label }));
-    for (const o of opts) {
-      const row = document.createElement("label");
-      row.className = "ms-opt";
-      const checked = state.users.filters[key].includes(o.value) ? "checked" : "";
-      row.innerHTML = `<input type="checkbox" value="${escapeHtml(o.value)}" ${checked}><span>${escapeHtml(o.label)}</span>`;
-      row.querySelector("input").onchange = (e) => {
-        const set = new Set(state.users.filters[key]);
-        e.target.checked ? set.add(o.value) : set.delete(o.value);
-        state.users.filters[key] = [...set];
-        ms.querySelector(".ms-btn").textContent = usersMsLabel(key);   // keep the dropdown open
-        renderUserRows();
-      };
-      pop.appendChild(row);
-    }
-  }
-}
-
 /* Loads the people list on first entry to the pane, then redraws. Everything
    after that comes over Realtime (see cloud._subscribeRealtime). */
 function renderUsersPane() {
   if (!can("users")) return;
   $("#users-search").value = state.users.search;
   if (D().users === null) {
-    safely(async () => { await cloud.loadUsers(); renderUsersFilterOptions(); renderUserRows(); });
+    safely(async () => { await cloud.loadUsers(); renderUserRows(); });
     return;
   }
-  renderUsersFilterOptions();
   renderUserRows();
+}
+
+/* "Today", "Yesterday", "6 days ago" — and a date once it is a while back */
+function seenLabel(iso) {
+  if (!iso) return "—";
+  const day = iso.slice(0, 10);
+  const n = Math.round((new Date(todayStr() + "T00:00:00") - new Date(day + "T00:00:00")) / 86400000);
+  if (n <= 0) return "Today";
+  if (n === 1) return "Yesterday";
+  if (n < 30) return `${n} days ago`;
+  return fmtDate(day);
+}
+function userNameHtml(u, isMe) {
+  const full = u.fullName || u.displayName || "—";
+  const showShort = u.displayName && u.fullName && u.displayName.trim().toLowerCase() !== u.fullName.trim().toLowerCase();
+  return `${escapeHtml(full)}${isMe ? ' <span class="user-you">you</span>' : ""}${showShort ? ` <span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}`;
 }
 
 function renderUserRows() {
   const body = $("#users-body");
   if (!body) return;
-  const rows = usersFilteredSorted();
   const all = D().users || [];
   const mayEdit = can("users", "edit");
+  const f = state.users.filters;
+  // Waiting people have a queue of their own above the list. They are in the
+  // list too only when the Waiting chip (or the status filter) asks for them.
+  const showPending = state.users.pendingOnly || f.status.includes("pending");
+  const matches = usersFilteredSorted();
+  const rows = matches.filter(u => showPending || u.status !== "pending");
+  const settled = all.filter(u => u.status !== "pending");
+  const base = showPending ? all : settled;
+  $("#users-viewonly").classList.toggle("hidden", mayEdit);
 
-  const pending = all.filter(u => u.status === "pending");
-  const bar = $("#users-pending");
-  bar.classList.toggle("hidden", !pending.length);
+  const pending = showPending ? [] : matches.filter(u => u.status === "pending");
+  const queue = $("#users-pending");
+  queue.classList.toggle("hidden", !pending.length);
   if (pending.length) {
-    $("#users-pending-text").textContent = pending.length === 1
-      ? "1 person is waiting for access."
-      : `${pending.length} people are waiting for access.`;
-    $("#btn-users-pending").textContent = state.users.pendingOnly ? "Show everyone" : "Review requests";
+    $("#users-pending-text").textContent = `Waiting for access · ${pending.length}`;
+    const list = $("#users-pending-list");
+    list.innerHTML = "";
+    for (const u of pending) {
+      const item = document.createElement("div");
+      item.className = "sv-queue-row";
+      const asked = u.requestedAt ? `<span>asked ${escapeHtml(seenLabel(u.requestedAt).toLowerCase())}</span> · ` : "";
+      item.innerHTML = `<span class="sv-avatar sv-avatar-warn" aria-hidden="true">${escapeHtml(nameInitials(u.fullName || u.displayName || u.email))}</span>
+        <div class="sv-queue-who"><b>${userNameHtml(u, false)}</b><small><span data-no-i18n>${escapeHtml(u.email || "")}</span> · ${asked}<span>joins as ${escapeHtml(roleLabel(u.roleKey))}</span></small></div>
+        <div class="sv-queue-act"></div>`;
+      if (mayEdit) {
+        const act = item.querySelector(".sv-queue-act");
+        const ok = document.createElement("button");
+        ok.type = "button";
+        ok.className = "btn btn-small btn-primary";
+        ok.innerHTML = `${icon("check")} <span>Approve</span>`;
+        ok.setAttribute("aria-label", `Approve ${u.fullName || u.displayName || u.email}`);
+        ok.onclick = () => approveUser(u);
+        const no = document.createElement("button");
+        no.type = "button";
+        no.className = "btn btn-small";
+        no.textContent = "Reject";
+        no.setAttribute("aria-label", `Reject ${u.fullName || u.displayName || u.email}`);
+        no.onclick = () => rejectUser(u);
+        act.append(ok, no);
+        item.onclick = (ev) => { if (svIsPhone() && !ev.target.closest("button")) openUserModal(u.id); };
+      }
+      list.appendChild(item);
+    }
   }
 
   renderUsersChips(all);
 
-  $("#users-count").textContent = rows.length === all.length
-    ? `${all.length} ${all.length === 1 ? "person" : "people"}`
-    : `${rows.length} of ${all.length}`;
+  $("#users-count").textContent = rows.length === base.length
+    ? `${base.length} ${base.length === 1 ? "person" : "people"}`
+    : `${rows.length} of ${base.length}`;
 
   for (const th of $$("#users-table th[data-sort]")) {
     th.classList.toggle("sorted", th.dataset.sort === state.users.sortKey);
@@ -12639,7 +12804,7 @@ function renderUserRows() {
 
   body.innerHTML = "";
   if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="7" class="import-note">${all.length ? "No one matches those filters." : "No accounts yet."}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="import-note">${base.length ? "No one matches those filters." : all.length ? "No one has been approved yet." : "No accounts yet."}</td></tr>`;
     return;
   }
   for (const u of rows) {
@@ -12650,19 +12815,17 @@ function renderUserRows() {
     // on a phone the whole card opens the person (the pencil is hidden there);
     // a tap on Approve / Reject stays theirs
     if (mayEdit) tr.onclick = (ev) => { if (svIsPhone() && !ev.target.closest("button")) openUserModal(u.id); };
+    const who = u.fullName || u.displayName || u.email || "?";
     tr.innerHTML = `
-      <td data-label="Name">${escapeHtml(u.fullName || u.displayName || "—")}${isMe ? ' <span class="user-you">you</span>' : ""}${u.displayName && u.fullName && u.displayName.trim().toLowerCase() !== u.fullName.trim().toLowerCase() ? `<span class="user-display-name" title="The short name the board shows">${escapeHtml(u.displayName)}</span>` : ""}</td>
-      <td data-label="Email">${escapeHtml(u.email || "")}</td>
+      <td data-label="Person"><div class="sv-person"><span class="sv-avatar" aria-hidden="true">${escapeHtml(nameInitials(who))}</span><div class="sv-person-main"><b>${userNameHtml(u, isMe)}</b><small>${escapeHtml(u.email || "")}</small></div></div></td>
       <td data-label="Role"><span class="role-pill role-${escapeHtml(u.roleKey || "none")}">${escapeHtml(roleLabel(u.roleKey))}</span></td>
       <td data-label="Status"><span class="status-pill status-${escapeHtml(u.status)}" title="${escapeHtml(st.hint || "")}">${escapeHtml(st.label)}</span></td>
-      <td data-label="Last seen">${u.lastSeenAt ? escapeHtml(fmtDate(u.lastSeenAt.slice(0, 10))) : "—"}</td>
-      <td data-label="Requested">${u.requestedAt ? escapeHtml(fmtDate(u.requestedAt.slice(0, 10))) : "—"}</td>
+      <td data-label="Last seen">${escapeHtml(seenLabel(u.lastSeenAt))}</td>
       <td data-label="" class="user-actions"></td>`;
     const actions = tr.querySelector(".user-actions");
     if (mayEdit) {
       if (u.status === "pending") {
-        // The two things an admin actually wants to do to a request, without
-        // opening anything: approve at the default role, or turn it down.
+        // only reached through the Waiting chip: the same two buttons as the queue
         const ok = document.createElement("button");
         ok.type = "button";
         ok.className = "btn btn-small btn-primary";
@@ -12681,6 +12844,7 @@ function renderUserRows() {
       edit.className = "btn btn-small";
       edit.innerHTML = icon("edit");
       edit.title = "Edit this person";
+      edit.setAttribute("aria-label", `Edit ${who}`);
       edit.onclick = () => openUserModal(u.id);
       actions.appendChild(edit);
     }
@@ -12688,23 +12852,25 @@ function renderUserRows() {
   }
 }
 
-/* Phone: one row of chips in place of the Role / Status dropdowns — All,
-   Waiting, then each role, each with its count. A chip sets the same filters
-   the dropdowns do, so the two never disagree. */
+/* One row of chips instead of Role / Status dropdowns — All, then each role,
+   Disabled, and Waiting when somebody is — each with its count. A chip sets the
+   filters; the counts are of the people in the list (those waiting are counted
+   on their own chip, and listed in the queue above). */
 function renderUsersChips(all) {
   const box = $("#users-chips");
   if (!box) return;
   const f = state.users.filters;
-  const chips = [{ id: "all", label: "All", count: all.length, on: !f.roleKey.length && !f.status.length && !state.users.pendingOnly }];
-  const waiting = all.filter(u => u.status === "pending").length;
-  if (waiting) chips.push({ id: "status:pending", label: "Waiting", count: waiting, warn: true,
-    on: (f.status.length === 1 && f.status[0] === "pending" && !f.roleKey.length) || state.users.pendingOnly });
+  const settled = all.filter(u => u.status !== "pending");
+  const chips = [{ id: "all", label: "All", count: settled.length, on: !f.roleKey.length && !f.status.length && !state.users.pendingOnly }];
   for (const r of D().roles) {
-    const c = all.filter(u => u.roleKey === r.key).length;
+    const c = settled.filter(u => u.roleKey === r.key).length;
     chips.push({ id: "role:" + r.key, label: r.label, count: c, on: f.roleKey.length === 1 && f.roleKey[0] === r.key && !f.status.length });
   }
   const off = all.filter(u => u.status === "disabled").length;
   if (off) chips.push({ id: "status:disabled", label: "Disabled", count: off, on: f.status.length === 1 && f.status[0] === "disabled" && !f.roleKey.length });
+  const waiting = all.filter(u => u.status === "pending").length;
+  if (waiting) chips.push({ id: "status:pending", label: "Waiting", count: waiting, warn: true,
+    on: (f.status.length === 1 && f.status[0] === "pending" && !f.roleKey.length) || state.users.pendingOnly });
   box.innerHTML = chips.map(c => `<button type="button" class="sv-chip${c.warn ? " warn" : ""}" data-chip="${escapeHtml(c.id)}" aria-pressed="${c.on}">${escapeHtml(c.label)} <span class="n">${c.count}</span></button>`).join("");
   for (const b of box.querySelectorAll(".sv-chip")) {
     b.onclick = () => {
@@ -12712,7 +12878,6 @@ function renderUsersChips(all) {
       state.users.pendingOnly = false;
       state.users.filters.roleKey = kind === "role" ? [val] : [];
       state.users.filters.status = kind === "status" ? [val] : [];
-      renderUsersFilterOptions();
       renderUserRows();
     };
   }
@@ -12955,112 +13120,125 @@ function permShown(roleKey, item, viewOnly) {
   return levels.includes(cur) ? cur : (item.allowOnly ? "none" : "view");
 }
 
-function renderRolesMatrix() {
-  const body = $("#roles-matrix-body");
-  if (!body || !can("users", "edit")) return;
-  const roles = D().roles;
-  body.innerHTML = "";
-  if (!roles.some(r => r.key === state.rolesColumn)) {
-    state.rolesColumn = (roles.find(r => !r.protected) || roles[0] || {}).key || null;
-  }
-
-  const head = document.createElement("tr");
-  head.className = "rm-head";
-  head.innerHTML = "<th>Area</th>" + roles.map(r =>
-    `<th data-role="${escapeHtml(r.key)}">${escapeHtml(r.label)}${r.protected ? '<br><small>always full access</small>' : ""}</th>`).join("");
-  body.appendChild(head);
-
+/* Roles & permissions: every role side by side. Areas run down the page, roles
+   across, and a cell is the level — Edit, View or Off — so what one position can
+   do reads against the others, and "Differences only" drops the rows where every
+   role is the same. A press steps a cell Off → View → Edit (an area that can only
+   be viewed, or only allowed, has two steps). It is staged exactly as the old
+   dropdown was (sdSet "roles") and nothing is written until the review dialog is
+   applied. Admin's column is shown but locked: database triggers hold that line,
+   and the page says so rather than offering controls that cannot work. */
+function rolePermCounts(role) {
+  let edit = 0, view = 0, off = 0;
   for (const group of PERM_AREAS) {
-    const gr = document.createElement("tr");
-    gr.className = "rm-group";
-    gr.innerHTML = `<td colspan="${roles.length + 1}">${escapeHtml(group.group)}</td>`;
-    body.appendChild(gr);
-
     for (const item of group.items) {
-      const viewOnly = group.viewOnly || item.viewOnly;
-      const tr = document.createElement("tr");
-      const hint = item.hint ? `<small>${escapeHtml(item.hint)}</small>` : "";
-      tr.innerHTML = `<td class="rm-area">${escapeHtml(item.label)}${hint}</td>`;
-      for (const role of roles) {
-        const td = document.createElement("td");
-        td.dataset.role = role.key;
-        td.dataset.label = role.label;
-        const key = role.key + "|" + item.key;
-        const sel = document.createElement("select");
-        sel.className = "rm-level";
-        sel.dataset.picker = "";
-        sel.setAttribute("aria-label", `${item.label} for ${role.label}`);
-        // A section that nothing can "edit" only offers off/on — a third state
-        // that means nothing would just be a way to get it wrong.
-        // A one-off action (deleting a board) is simply allowed or not.
-        const levels = item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
-        sel.innerHTML = levels.map(l =>
-          `<option value="${l}">${l === "none" ? "—" : l === "view" ? "View" : item.allowOnly ? "Allowed" : "Edit"}</option>`).join("");
-        const saved = permShown(role.key, item, viewOnly);
-        sel.value = sdVal("roles", key, saved);
-        sel.disabled = !!role.protected;
-        if (role.protected) sel.title = "Admin always keeps full access.";
-        td.classList.toggle("rm-changed", !!sdMap("roles")[key]);
-        sel.onchange = () => {
-          sdSet("roles", key, sel.value, `${role.label}: ${item.label}`, () => permShown(role.key, item, viewOnly),
-            { roleKey: role.key, areaKey: item.key, roleLabel: role.label, areaLabel: item.label, allowOnly: !!item.allowOnly });
-          td.classList.toggle("rm-changed", !!sdMap("roles")[key]);
-        };
-        td.appendChild(sel);
-        td.appendChild(segForSelect(sel));
-        tr.appendChild(td);
-      }
-      body.appendChild(tr);
+      const v = sdVal("roles", role.key + "|" + item.key, permShown(role.key, item, group.viewOnly || item.viewOnly));
+      if (v === "edit") edit++; else if (v === "view") view++; else off++;
     }
   }
-
-  const pick = $("#rm-role-select");
-  pick.innerHTML = roles.map(r => `<option value="${escapeHtml(r.key)}">${escapeHtml(r.label)}${r.protected ? " (always full access)" : ""}</option>`).join("");
-  pick.value = state.rolesColumn || "";
-  const chips = $("#rm-role-chips");
-  chips.innerHTML = roles.map(r => `<button type="button" class="sv-chip" data-role-chip="${escapeHtml(r.key)}" aria-pressed="${r.key === state.rolesColumn}">${escapeHtml(r.label)}</button>`).join("");
-  for (const b of chips.querySelectorAll(".sv-chip")) {
-    b.onclick = () => { state.rolesColumn = b.dataset.roleChip; pick.value = state.rolesColumn; showRolesColumn(); };
-  }
-  showRolesColumn();
+  return { edit, view, off };
 }
 
-/* A row of buttons standing in for a small <select>, kept in step with it: a
-   press sets the select and fires its change event, so whatever already
-   listens to the select keeps working. The select stays for wide screens,
-   where CSS shows it instead (#roles-matrix). */
-function segForSelect(sel) {
-  const row = document.createElement("div");
-  row.className = "seg-pick rm-seg";
-  row.setAttribute("role", "group");
-  row.setAttribute("aria-label", sel.getAttribute("aria-label") || "");
-  const sync = () => { for (const b of row.children) b.setAttribute("aria-pressed", String(b.dataset.v === sel.value)); };
-  for (const o of sel.options) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.v = o.value;
-    b.textContent = o.value === "none" ? "Off" : o.textContent;
-    b.disabled = sel.disabled;
-    if (sel.title) b.title = sel.title;
-    b.onclick = () => { if (sel.value === o.value) return; sel.value = o.value; sel.dispatchEvent(new Event("change")); sync(); };
-    row.appendChild(b);
-  }
-  sel.addEventListener("change", sync);
-  sync();
-  return row;
+function permLevels(item, viewOnly) {
+  return item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
+}
+function permWord(level, item) {
+  return level === "none" ? "Off" : level === "view" ? "View" : item.allowOnly ? "Allowed" : "Edit";
 }
 
-/* the one-role-at-a-time view: CSS only shows the marked column below 960px */
-function showRolesColumn() {
-  for (const el of $$("#roles-matrix [data-role]")) {
-    el.toggleAttribute("data-visible", el.dataset.role === state.rolesColumn);
+function renderRolesPane() {
+  const table = $("#roles-matrix");
+  if (!table || !can("users", "edit")) return;
+  const roles = D().roles;
+  if (!roles.length) { table.innerHTML = ""; return; }
+  ensureUsersLoaded();
+  const people = (key) => (D().users || []).filter(u => u.roleKey === key && u.status === "active").length;
+  const shown = (role, item, viewOnly) => sdVal("roles", role.key + "|" + item.key, permShown(role.key, item, viewOnly));
+  const differs = (item, viewOnly) => new Set(roles.map(r => shown(r, item, viewOnly))).size > 1;
+
+  const diffOnly = !!state.rolesDiffOnly;
+  const btn = $("#rm-diff");
+  btn.setAttribute("aria-pressed", String(diffOnly));
+  let nDiff = 0;
+  for (const g of PERM_AREAS) for (const it of g.items) if (differs(it, g.viewOnly || it.viewOnly)) nDiff++;
+  $("#rm-diff-n").textContent = String(nDiff);
+
+  // the header: a role's name, how many people have it, and what it adds up to
+  const head = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.innerHTML = `<th scope="col" class="rm-area-h">Area</th>` + roles.map(r => {
+    const c = rolePermCounts(r);
+    return `<th scope="col" class="rm-role-h" data-role="${escapeHtml(r.key)}"><b>${escapeHtml(r.label)}${r.protected ? icon("lock") : ""}</b>` +
+      `<small>${D().users ? `<span>${people(r.key)} ${people(r.key) === 1 ? "person" : "people"}</span><br>` : ""}<span>${c.edit} edit</span> · <span>${c.view} view</span></small></th>`;
+  }).join("");
+  head.appendChild(hr);
+
+  const body = document.createElement("tbody");
+  for (const group of PERM_AREAS) {
+    const rows = [];
+    for (const item of group.items) {
+      const viewOnly = group.viewOnly || item.viewOnly;
+      if (diffOnly && !differs(item, viewOnly)) continue;
+      const tr = document.createElement("tr");
+      tr.className = "rm-row";
+      tr.innerHTML = `<th scope="row" class="rm-area"><b>${escapeHtml(item.label)}</b>${item.hint ? `<small>${escapeHtml(item.hint)}</small>` : ""}</th>`;
+      for (const role of roles) {
+        const key = role.key + "|" + item.key;
+        const td = document.createElement("td");
+        td.dataset.role = role.key;
+        const saved = permShown(role.key, item, viewOnly);
+        const levels = permLevels(item, viewOnly);
+        const paint = (b) => {
+          const cur = sdVal("roles", key, saved);
+          b.className = "rm-cell rm-" + cur;
+          b.textContent = permWord(cur, item);
+          b.setAttribute("aria-label", `${item.label} for ${role.label}: ${permWord(cur, item)}`);
+          td.classList.toggle("rm-changed", !!sdMap("roles")[key]);
+        };
+        if (role.protected) {
+          const span = document.createElement("span");
+          span.title = "Admin always keeps full access.";
+          paint(span);
+          span.classList.add("rm-locked-cell");
+          td.appendChild(span);
+        } else {
+          const b = document.createElement("button");
+          b.type = "button";
+          paint(b);
+          b.title = "Press to change";
+          b.onclick = () => {
+            const cur = sdVal("roles", key, saved);
+            const next = levels[(levels.indexOf(cur) + 1) % levels.length];
+            sdSet("roles", key, next, `${role.label}: ${item.label}`, () => permShown(role.key, item, viewOnly),
+              { roleKey: role.key, areaKey: item.key, roleLabel: role.label, areaLabel: item.label, allowOnly: !!item.allowOnly });
+            paint(b);
+            // the totals under each role's name move with the change
+            const c = rolePermCounts(role);
+            const small = table.querySelector(`.rm-role-h[data-role="${CSS.escape(role.key)}"] small`);
+            if (small) small.innerHTML = (D().users ? `<span>${people(role.key)} ${people(role.key) === 1 ? "person" : "people"}</span><br>` : "") + `<span>${c.edit} edit</span> · <span>${c.view} view</span>`;
+          };
+          td.appendChild(b);
+        }
+        tr.appendChild(td);
+      }
+      rows.push(tr);
+    }
+    if (!rows.length) continue;
+    const gr = document.createElement("tr");
+    gr.className = "rm-group";
+    gr.innerHTML = `<th colspan="${roles.length + 1}" scope="colgroup">${escapeHtml(group.group)}</th>`;
+    body.appendChild(gr);
+    for (const r of rows) body.appendChild(r);
   }
-  for (const b of $$("#rm-role-chips .sv-chip")) b.setAttribute("aria-pressed", String(b.dataset.roleChip === state.rolesColumn));
+  if (!body.children.length) {
+    body.innerHTML = `<tr><td colspan="${roles.length + 1}" class="import-note sv-empty">Every role has the same access to everything here.</td></tr>`;
+  }
+  table.replaceChildren(head, body);
 }
 
 function wireUserManagement() {
   $("#users-search").addEventListener("input", (e) => { state.users.search = e.target.value; renderUserRows(); });
-  $("#btn-users-pending").onclick = () => { state.users.pendingOnly = !state.users.pendingOnly; renderUserRows(); };
+  $("#rm-diff").onclick = () => { state.rolesDiffOnly = !state.rolesDiffOnly; renderRolesPane(); };
   $("#btn-users-xlsx").onclick = () => safely(exportUsersXlsx);
   $("#btn-add-user").onclick = openAddUserModal;
   $("#form-add-user").onsubmit = addUser;
@@ -13070,15 +13248,6 @@ function wireUserManagement() {
   // Back to the Users list rather than the board: the admin has just changed
   // something there and the new row is what they want to see.
   $("#btn-temp-password-done").onclick = reopenSettings;
-  for (const ms of $$("#users-filters .ms")) {
-    ms.querySelector(".ms-btn").onclick = (ev) => {
-      ev.stopPropagation();
-      const pop = ms.querySelector(".ms-pop");
-      const wasOpen = !pop.classList.contains("hidden");
-      closeFilterPops();
-      if (!wasOpen) pop.classList.remove("hidden");
-    };
-  }
   for (const th of $$("#users-table th[data-sort]")) {
     th.onclick = () => {
       const key = th.dataset.sort;
@@ -13319,7 +13488,6 @@ function wireApp() {
   SV_PHONE.addEventListener("change", () => { if (state.settingsOpen) renderSettings(); });
   $("#btn-sv-save").onclick = () => saveSettingsSection();
   $("#btn-sv-discard").onclick = discardSettingsDraft;
-  $("#rm-role-select").onchange = (ev) => { state.rolesColumn = ev.target.value; showRolesColumn(); };
   // a live update that arrived while a field had focus is drawn once focus has
   // left (after a beat, so a click on a button in the page is not swallowed by
   // the page being redrawn between its press and its release)

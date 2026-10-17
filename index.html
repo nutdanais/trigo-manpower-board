@@ -262,8 +262,9 @@
      it — the view, board and date are untouched, so "Back to board" is just
      this section hiding again (see openSettingsView in app.js). The ids and
      classes inside are the ones app.js reads (#settings-tabs, .settings-tab,
-     data-tab, data-area, data-pane). One scroll region (#sv-scroll) sits
-     between a fixed heading and a fixed action bar. -->
+     data-tab, data-area, data-pane). One scroll region (#sv-scroll) sits under
+     a one-line heading; the action bar (#sv-foot) floats over it and is only
+     there while there is something to save. -->
 <section id="settings-view" class="hidden" aria-labelledby="sv-title">
   <aside id="settings-rail">
     <button type="button" class="btn btn-small btn-quiet sv-back" id="btn-settings-back">
@@ -274,11 +275,11 @@
       <div class="settings-group" data-group="account">Personal</div>
       <button type="button" class="settings-tab" data-tab="account" data-area="account" data-group="account"><svg class="ic" aria-hidden="true"><use href="#i-person"></use></svg><span>My account</span></button>
       <div class="settings-group" data-group="board">Board setup</div>
-      <button type="button" class="settings-tab" data-tab="engineers" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"></use></svg><span>Engineers</span></button>
-      <button type="button" class="settings-tab" data-tab="areas" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-area"></use></svg><span>Service areas</span></button>
-      <button type="button" class="settings-tab" data-tab="boards" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-board"></use></svg><span>Boards</span></button>
+      <button type="button" class="settings-tab" data-tab="engineers" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"></use></svg><span>Engineers</span><span class="st-n"></span></button>
+      <button type="button" class="settings-tab" data-tab="areas" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-area"></use></svg><span>Service areas</span><span class="st-n"></span></button>
+      <button type="button" class="settings-tab" data-tab="boards" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-board"></use></svg><span>Boards</span><span class="st-n"></span></button>
       <div class="settings-group" data-group="admin">Administration</div>
-      <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg><span>Users</span></button>
+      <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg><span>Users</span><span class="st-n"></span></button>
       <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg><span>Roles &amp; permissions</span></button>
     </nav>
     <!-- Where a bug report quotes the version from. Pinned to the bottom of
@@ -311,103 +312,92 @@
       <!-- My account: the one pane every role can open, which is why user
            management lives in Settings rather than as a tab of its own. -->
       <div class="settings-pane" data-pane="account">
-        <div class="sv-cards">
+        <div class="sv-wrap">
           <section class="sv-card">
-            <h2>Profile</h2>
             <div id="account-identity" class="account-identity"></div>
             <form id="form-account-name" class="account-form" autocomplete="off">
-              <label for="acct-display-name">Display name</label>
-              <input id="acct-display-name" name="displayName" type="text" maxlength="40" autocomplete="off">
-              <p class="import-note">The short name the board shows you by, taken from your email address — <b>first name . last initial</b>. Leave it empty to keep it that way, or type your own if it clashes with somebody.</p>
-              <label for="acct-phone">Mobile number</label>
-              <input id="acct-phone" name="phone" type="tel" maxlength="40" placeholder="e.g. 081-234-5678" autocomplete="tel">
-              <p class="import-note">Shown as a tap-to-call link on every mission card you are the engineer for, and on the printed board. Yours to keep up to date — nobody edits it for you in Settings.</p>
+              <div class="sv-two">
+                <div>
+                  <label for="acct-display-name">Display name</label>
+                  <input id="acct-display-name" name="displayName" type="text" maxlength="40" autocomplete="off">
+                  <p class="import-note">Shown on the board. Left empty, it is <b>first name . last initial</b> from your email address.</p>
+                </div>
+                <div>
+                  <label for="acct-phone">Mobile number</label>
+                  <input id="acct-phone" name="phone" type="tel" maxlength="40" placeholder="e.g. 081-234-5678" autocomplete="tel">
+                  <p class="import-note">A tap-to-call link on your mission cards and the printed board. Yours to keep up to date.</p>
+                </div>
+              </div>
               <button type="submit" class="sr-only" tabindex="-1">Save</button>
             </form>
           </section>
-          <section class="sv-card">
-            <div class="sv-card-head">
+          <section class="sv-card sv-line">
+            <div class="grow">
               <h2>Password</h2>
-              <button type="button" class="btn btn-small" id="btn-change-password">Change password…</button>
+              <p class="import-note">At least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
             </div>
-            <p class="import-note">Use at least 8 characters. You stay signed in on this device; other devices keep their session until it expires.</p>
-            <details class="sv-details">
-              <summary>Who can edit my account?</summary>
-              <p class="import-note">You own your display name and phone number. An administrator controls your role and account status.</p>
-            </details>
+            <button type="button" class="btn btn-small" id="btn-change-password">Change password…</button>
           </section>
+          <p class="import-note">You own your display name and phone number. An administrator controls your role and account status.</p>
         </div>
       </div>
 
-      <!-- The list panes are tables rather than loose rows: the same language
-           the Users and Roles panes use, a heading for each field, and below
-           960px each row becomes a labelled card (data-label on every cell). -->
+      <!-- The list panes are rows rather than tables: a row reads as the
+           person, area or board, and opens in place to edit it. The fields only
+           appear once a row is open, so nothing on the page looks like a form
+           until you reach for it. -->
       <div class="settings-pane" data-pane="engineers">
-        <p class="settings-hint">Everyone with the <b>Engineer</b> role is here automatically. Use <b>Add engineer</b> for a manager or admin who runs missions of their own. The colour marks every mission card that person is responsible for; the name and phone number come from their account, and each person keeps their own number up to date under <b>My account</b>.</p>
-        <div class="settings-list">
-          <table class="settings-table sv-responsive">
-            <thead><tr>
-              <th class="st-swatch">Colour</th><th>Name</th><th>Phone</th><th>Account</th><th class="st-act"><span class="sr-only">Actions</span></th>
-            </tr></thead>
-            <tbody id="settings-engineers"></tbody>
-          </table>
+        <div class="sv-wrap">
+          <p class="settings-hint">Everyone with the <b>Engineer</b> role is added automatically.</p>
+          <details class="sv-details sv-how">
+            <summary>How engineers work</summary>
+            <p class="import-note">Use <b>Add engineer</b> for a manager or admin who runs missions of their own. The colour marks every mission card that person is responsible for. The name and phone number come from their account, and each person keeps their own number up to date under <b>My account</b>.</p>
+          </details>
+          <div id="settings-engineers" class="sv-list"></div>
+          <p class="settings-count" id="engineers-count"></p>
         </div>
-        <p class="settings-count" id="engineers-count"></p>
       </div>
 
       <div class="settings-pane" data-pane="areas">
-        <p class="settings-hint">The colour is the pill shown on employee cards, mission cards and both lists. An area that still has employees cannot be deleted — move them first.</p>
-        <div class="settings-list">
-          <table class="settings-table sv-responsive">
-            <thead><tr>
-              <th class="st-swatch">Colour</th><th>Name</th><th class="st-act"><span class="sr-only">Actions</span></th>
-            </tr></thead>
-            <tbody id="settings-areas"></tbody>
-          </table>
+        <div class="sv-wrap">
+          <p class="settings-hint">The colour is the pill shown on employee cards, mission cards and both lists. An area that still has employees cannot be deleted — move them first.</p>
+          <div id="settings-areas" class="sv-list"></div>
+          <p class="settings-count" id="areas-count"></p>
         </div>
-        <p class="settings-count" id="areas-count"></p>
       </div>
 
       <div class="settings-pane" data-pane="boards">
-        <p class="settings-hint">Ticked days are that board's non-working days (its weekend). This drives the holiday toggle, the weekend "Copy from weekday", the date picker's highlighting and both Overview trend charts.</p>
-        <div class="settings-list">
-          <table class="settings-table sv-responsive">
-            <thead><tr><th class="st-board">Board</th><th>Non-working days</th><th class="st-act"><span class="sr-only">Actions</span></th></tr></thead>
-            <tbody id="settings-boards"></tbody>
-          </table>
+        <div class="sv-wrap">
+          <p class="settings-hint">Highlighted days are the days the board works. The greyed days are its weekend: they drive the holiday toggle, the weekend “Copy from weekday”, the date picker's highlighting and both Overview trend charts.</p>
+          <div id="settings-boards" class="sv-list"></div>
+          <p class="settings-count" id="boards-count"></p>
         </div>
-        <p class="settings-count" id="boards-count"></p>
       </div>
 
       <!-- Users: the same table shape as the Host list, so it inherits that
-           tab's toolbar / filter / sort styling rather than inventing any. -->
+           tab's toolbar / search / sort styling rather than inventing any. -->
       <div class="settings-pane" data-pane="users">
-        <div id="users-pending" class="hidden">
-          <span class="dupbar-icon" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-alert"></use></svg></span>
-          <span id="users-pending-text"></span>
-          <button type="button" class="btn btn-small" id="btn-users-pending">Review requests</button>
-        </div>
+        <p id="users-viewonly" class="sv-banner hidden">View only — you can see accounts but not change them.</p>
+        <!-- People waiting for access: a queue with its own buttons, not a filter -->
+        <section id="users-pending" class="sv-queue hidden" aria-label="Waiting for access">
+          <h2><svg class="ic" aria-hidden="true"><use href="#i-alert"></use></svg><span id="users-pending-text"></span></h2>
+          <div id="users-pending-list"></div>
+        </section>
         <div id="users-chips" class="sv-chips" role="group" aria-label="Show"></div>
         <div id="users-toolbar">
           <input id="users-search" type="search" placeholder="Search name or email…" aria-label="Search users" autocomplete="off">
-          <div id="users-filters">
-            <div class="ms" data-filter="roleKey"><button type="button" class="ms-btn">Role: All</button><div class="ms-pop hidden"></div></div>
-            <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
-          </div>
           <div class="toolbar-spacer"></div>
           <span id="users-count"></span>
           <button type="button" class="btn btn-small" id="btn-users-xlsx" aria-label="Export to Excel" title="Export the rows below as an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg><span class="btn-label"> Excel</span></button>
         </div>
         <div class="table-wrap">
-          <table id="users-table" class="sv-responsive">
+          <table id="users-table">
             <thead>
               <tr>
-                <th data-sort="name">Name</th>
-                <th data-sort="email">Email</th>
+                <th data-sort="name">Person</th>
                 <th data-sort="role" title="What this person may see and change. The rules behind each role are under Roles &amp; permissions.">Role</th>
                 <th data-sort="status" title="Pending = waiting for approval. Disabled keeps the record and all of their attribution, and only stops them signing in.">Status</th>
                 <th data-sort="lastSeen" title="When this person last opened the app.">Last seen</th>
-                <th data-sort="requested" title="When they asked for access, or were invited.">Requested</th>
                 <th><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -416,23 +406,29 @@
         </div>
       </div>
 
-      <!-- Roles & permissions: the matrix itself. Admin's column is rendered
-           read-only, and database triggers back that up. Changes are staged
-           here and only written after the review dialog. -->
+      <!-- Roles & permissions: every role side by side, so what one position can
+           do reads against the others. A cell is the level (Edit / View / Off) and
+           a press steps it. Admin's column is shown but locked, and database
+           triggers back that up. Changes are staged here and only written after
+           the review dialog. -->
       <div class="settings-pane" data-pane="roles">
         <div class="sv-banner sv-banner-warn">
           <svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg>
-          <div><b>Changes affect everyone with that role</b>, including anyone with the app open right now. You review them before they apply. Admin always keeps full access, so nobody can lock themselves out of this screen.</div>
+          <div><b>Changes affect everyone with that role</b>, including anyone with the app open right now. You review them before they apply.</div>
         </div>
-        <p class="import-note"><b>Edit</b> also grants view. <b>—</b> removes access. Hiding an Overview section keeps it off the page and skips its query; it is not a data barrier — those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
-        <div id="rm-role-chips" class="sv-chips" role="group" aria-label="Role to review"></div>
-        <div class="rm-role-pick">
-          <label for="rm-role-select">Role to review</label>
-          <select id="rm-role-select" data-picker></select>
+        <div class="rm-tools">
+          <button type="button" class="sv-chip" id="rm-diff" aria-pressed="false">Differences only <span class="n" id="rm-diff-n"></span></button>
+          <span class="rm-legend" aria-hidden="true"><span class="rm-cell rm-edit">Edit</span><span class="rm-cell rm-view">View</span><span class="rm-cell rm-none">Off</span></span>
+          <span class="grow"></span>
+          <span class="rm-hint">Press a cell to change it.</span>
         </div>
-        <div class="table-wrap">
-          <table id="roles-matrix"><tbody id="roles-matrix-body"></tbody></table>
+        <div class="table-wrap rm-wrap">
+          <table id="roles-matrix"></table>
         </div>
+        <details class="sv-details rm-note">
+          <summary>How hiding Overview sections works</summary>
+          <p class="import-note"><b>Edit</b> also grants view. <b>Off</b> removes access. Hiding an Overview section keeps it off the page and skips its query; it is not a data barrier — those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
+        </details>
       </div>
     </div>
 
