@@ -6995,7 +6995,7 @@ const SETTINGS_SECTIONS = {
   account:   { label: "My account",          group: "Personal",       hint: "Your profile and sign-in details." },
   engineers: { label: "Engineers",           group: "Board setup",    hint: "Who can run a mission, and the colour of their mission cards." },
   areas:     { label: "Service areas",       group: "Board setup",    hint: "Labels used across people, missions and hosts." },
-  boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and non-working days." },
+  boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and working days." },
   users:     { label: "Users",               group: "Administration", hint: "Accounts, access requests and status." },
   roles:     { label: "Roles & permissions", group: "Administration", hint: "Review what each role can see and change." },
 };
@@ -7752,15 +7752,19 @@ function svColourPick(color, label, onchange) {
   pick.append(input, hex);
   return pick;
 }
-/* "Mon–Fri", "Mon–Sat", "Every day" … from a board's non-working weekdays */
-function workWeekLabel(off) {
+/* "Mon–Fri", "Mon–Sat", "Every day" … from a board's non-working weekdays, as
+   markup: each piece is its own text node so the Thai pass can translate it */
+function workWeekHtml(off) {
   const on = [1, 2, 3, 4, 5, 6, 0].filter(d => !off.includes(d));
-  if (!on.length) return "No working days";
-  if (on.length === 7) return "Every day";
+  const n = on.length;
   const monFri = [1, 2, 3, 4, 5], monSat = [1, 2, 3, 4, 5, 6];
-  if (on.length === 5 && monFri.every(d => on.includes(d))) return "Mon–Fri";
-  if (on.length === 6 && monSat.every(d => on.includes(d))) return "Mon–Sat";
-  return on.map(d => DOW_LABELS[d]).join(", ");
+  let label;
+  if (!n) label = "No working days";
+  else if (n === 7) label = "Every day";
+  else if (n === 5 && monFri.every(d => on.includes(d))) label = "Mon–Fri";
+  else if (n === 6 && monSat.every(d => on.includes(d))) label = "Mon–Sat";
+  else label = on.map(d => `<span>${DOW_LABELS[d]}</span>`).join(", ");
+  return `<span>${label}</span> · <span>${7 - off.length} working ${7 - off.length === 1 ? "day" : "days"}</span>`;
 }
 
 function renderEngineerRows() {
@@ -8039,7 +8043,7 @@ function renderAreaRows() {
     meta.insertAdjacentHTML("beforeend", use);
     row = svRow("areas", a.id, {
       lead: svSwatch(colourVal()), title: a.name,
-      sub: `${people} ${people === 1 ? "person" : "people"} · ${hosts} ${hosts === 1 ? "host" : "hosts"}`,
+      sub: `<span>${people} ${people === 1 ? "person" : "people"}</span> · <span>${hosts} ${hosts === 1 ? "host" : "hosts"}</span>`,
       meta, editor: ed,
     });
     sdMarkRow(row, "areas", a.id);
@@ -8090,7 +8094,7 @@ function renderBoardRows() {
   for (const b of D().boards) {
     let row;
     const off0 = () => sdVal("boards", "weekend|" + b.id, b.weekendDays.slice().sort((x, y) => x - y));
-    const summary = (off) => `${workWeekLabel(off)} · ${7 - off.length} working ${7 - off.length === 1 ? "day" : "days"}`;
+    const summary = workWeekHtml;
 
     // The week as the days the board WORKS (on = a working day). It is stored
     // as the non-working days, so the draft still holds those.
@@ -8111,7 +8115,7 @@ function renderBoardRows() {
         const days = Array.from(picker.querySelectorAll("input:not(:checked)")).map(c => Number(c.value)).sort((x, y) => x - y);
         sdSet("boards", "weekend|" + b.id, days, `${b.name} non-working days`,
           () => { const x = boardOf(b.id); return x ? x.weekendDays.slice().sort((p, q) => p - q) : undefined; });
-        row.querySelector(".sv-row-main small").textContent = summary(days);
+        row.querySelector(".sv-row-main small").innerHTML = summary(days);
         sdMarkRow(row, "boards", b.id);
       };
       picker.appendChild(lab);
@@ -12762,9 +12766,9 @@ function renderUserRows() {
     for (const u of pending) {
       const item = document.createElement("div");
       item.className = "sv-queue-row";
-      const asked = u.requestedAt ? `asked ${seenLabel(u.requestedAt).toLowerCase()}` : "";
+      const asked = u.requestedAt ? `<span>asked ${escapeHtml(seenLabel(u.requestedAt).toLowerCase())}</span> · ` : "";
       item.innerHTML = `<span class="sv-avatar sv-avatar-warn" aria-hidden="true">${escapeHtml(nameInitials(u.fullName || u.displayName || u.email))}</span>
-        <div class="sv-queue-who"><b>${userNameHtml(u, false)}</b><small>${escapeHtml(u.email || "")}${asked ? " · " + escapeHtml(asked) : ""} · joins as ${escapeHtml(roleLabel(u.roleKey))}</small></div>
+        <div class="sv-queue-who"><b>${userNameHtml(u, false)}</b><small><span data-no-i18n>${escapeHtml(u.email || "")}</span> · ${asked}<span>joins as ${escapeHtml(roleLabel(u.roleKey))}</span></small></div>
         <div class="sv-queue-act"></div>`;
       if (mayEdit) {
         const act = item.querySelector(".sv-queue-act");
@@ -13144,6 +13148,8 @@ function renderRolesPane() {
   ensureUsersLoaded();
   const members = (key) => (D().users || []).filter(u => u.roleKey === key && u.status === "active");
   const people = (n) => `${n} ${n === 1 ? "person" : "people"}`;
+  const roleCountsHtml = (r, c) => (D().users ? `<span>${people(members(r.key).length)}</span> · ` : "") +
+    `<span>${c.edit} edit</span> · <span>${c.view} view</span>${c.off ? ` · <span>${c.off} off</span>` : ""}`;
 
   // the role list
   list.innerHTML = "";
@@ -13155,7 +13161,7 @@ function renderRolesPane() {
     b.dataset.roleChip = r.key;
     b.setAttribute("aria-pressed", String(r.key === state.rolesColumn));
     b.innerHTML = `<b>${escapeHtml(r.label)}${r.protected ? icon("lock") : ""}</b>` +
-      `<small>${D().users ? people(members(r.key).length) + " · " : ""}${c.edit} edit · ${c.view} view${c.off ? " · " + c.off + " off" : ""}</small>`;
+      `<small>${roleCountsHtml(r, c)}</small>`;
     b.onclick = () => { state.rolesColumn = r.key; renderRolesPane(); };
     list.appendChild(b);
   }
@@ -13211,7 +13217,7 @@ function renderRolesPane() {
           // the counts under the role's name move with the change
           const c = rolePermCounts(role);
           const small = list.querySelector(`[data-role-chip="${CSS.escape(role.key)}"] small`);
-          if (small) small.textContent = `${D().users ? people(members(role.key).length) + " · " : ""}${c.edit} edit · ${c.view} view${c.off ? " · " + c.off + " off" : ""}`;
+          if (small) small.innerHTML = roleCountsHtml(role, c);
         };
         seg.appendChild(btn);
       }
