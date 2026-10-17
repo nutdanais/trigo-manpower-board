@@ -1,0 +1,62 @@
+name: Build updated user manuals
+
+on:
+  push:
+    branches: [claude/update-user-manuals-2026-10-13x]
+    paths: [docs/user-manual-src/**, .github/workflows/user-manual.yml]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths: [docs/user-manual-src/**, .github/workflows/user-manual.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-user-manuals-2026-10-13x
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/claude/update-user-manuals-2026-10-13x' || (github.head_ref == 'claude/update-user-manuals-2026-10-13x' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/update-user-manuals-2026-10-13x
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install rendering dependencies
+        run: |
+          npm install --no-save playwright@1.56.1 qrcode@1.5.4
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-core
+          python -m pip install pymupdf==1.26.4 zxing-cpp==2.3.0 pillow==11.3.0
+      - name: Capture real current app and render both languages
+        run: node docs/user-manual-src/build.cjs
+      - name: Verify PDF pages, languages, links, QR codes and layout
+        run: python docs/user-manual-src/verify.py
+      - name: Publish validated files to the documentation branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/user-manual
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs: publish validated English and Thai manuals for 2026-10-13x"
+          git pull --rebase origin claude/update-user-manuals-2026-10-13x
+          git push origin HEAD:claude/update-user-manuals-2026-10-13x
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trigo-manuals-release-2026-10-13x
+          path: docs/user-manual/
+          if-no-files-found: ignore
+          retention-days: 30
