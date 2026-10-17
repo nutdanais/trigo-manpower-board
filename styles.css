@@ -3721,39 +3721,41 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
 .sv-person-main b { display: block; font-size: 14px; }
 .sv-person-main small { display: block; font-size: 12px; }
 
-/* ----- Roles & permissions: a role, then its permissions ----- */
-.rm-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 22px; align-items: start; }
-.rm-roles { display: flex; flex-direction: column; background: var(--panel); border-radius: var(--r-box); box-shadow: var(--sv-lift); overflow: hidden; position: sticky; top: 0; }
-.rm-role {
-  position: relative; display: block; width: 100%; padding: 11px 16px; text-align: left;
-  border: 0; border-top: 1px solid var(--sv-line); background: none; font: inherit; color: inherit; cursor: pointer;
-  transition: background-color .16s;
+/* ----- Roles & permissions: every role side by side ----- */
+.rm-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.rm-tools .grow { flex: 1; }
+.rm-hint { font-size: 12.5px; color: var(--muted); }
+.rm-legend { display: inline-flex; gap: 6px; }
+.rm-legend .rm-cell { min-width: 0; height: 24px; padding: 0 9px; font-size: 11.5px; }
+#roles-matrix { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+#roles-matrix th, #roles-matrix td { padding: 0 8px; border-bottom: 1px solid #edf0f4; vertical-align: middle; text-align: center; }
+#roles-matrix thead th { position: sticky; top: 0; z-index: 3; background: var(--panel); padding: 12px 8px 10px; border-bottom: 1px solid var(--sv-line); }
+#roles-matrix .rm-area-h { text-align: left; padding-left: 18px; font-size: 12px; font-weight: 600; color: var(--muted); }
+#roles-matrix .rm-role-h b { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
+#roles-matrix .rm-role-h b .ic { width: 13px; height: 13px; color: var(--muted); }
+#roles-matrix .rm-role-h small { display: block; margin-top: 2px; font-size: 11.5px; line-height: 1.35; color: var(--muted); font-weight: 400; }
+#roles-matrix .rm-area { text-align: left; padding: 8px 8px 8px 18px; font-weight: 400; min-width: 220px; }
+#roles-matrix .rm-area b { display: block; font-size: 13.5px; }
+#roles-matrix .rm-area small { display: block; font-size: 11.5px; color: var(--muted); }
+#roles-matrix .rm-group th { text-align: left; padding: 9px 18px; background: var(--bg-soft); font-size: 12px; font-weight: 700; color: var(--muted); }
+#roles-matrix tbody tr.rm-row:hover > * { background: #f4f7fb; }
+#roles-matrix tbody tr:last-child > * { border-bottom: 0; }
+#roles-matrix td { width: 118px; height: 48px; }
+/* a cell is the level itself: Edit is the strong one, View the soft one, Off the faint one — told apart by the word, not only by the colour */
+.rm-cell {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 66px; height: 30px; padding: 0 12px;
+  border: 1px solid transparent; border-radius: 7px; font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  transition: background-color .16s, border-color .16s, transform .1s;
 }
-.rm-role:first-child { border-top: 0; }
-.rm-role:hover { background: rgba(0, 58, 102, .04); }
-.rm-role[aria-pressed="true"] { background: var(--sv-mark); }
-.rm-role[aria-pressed="true"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--primary); }
-.rm-role:focus-visible { outline: 2.5px solid var(--primary-text); outline-offset: -2px; }
-.rm-role b { display: flex; align-items: center; gap: 6px; font-size: 14px; }
-.rm-role b .ic { width: 13px; height: 13px; color: var(--muted); }
-.rm-role small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }
-.rm-detail { min-width: 0; background: var(--panel); border-radius: var(--r-box); box-shadow: var(--sv-lift); padding: 22px 26px 20px; }
-.rm-head h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 20px; letter-spacing: -.02em; }
-.rm-head .import-note { margin: 4px 0 0; }
-.rm-locked { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--bg-soft); color: #46505e; font-size: 13px; }
-.rm-locked .ic { flex: none; margin-top: 2px; }
-.rm-group h3 { margin: 18px 0 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
-.rm-row { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-top: 1px solid #edf0f4; }
-.rm-group h3 + .rm-row { border-top: 0; }
-.rm-label { flex: 1; min-width: 0; }
-.rm-label b { display: block; font-size: 14px; }
-.rm-label small { display: block; font-size: 12px; color: var(--muted); }
-.seg-pick.rm-levels { flex: none; margin: 0; }
-.seg-pick.rm-levels button { flex: none; min-width: 58px; height: 30px; padding: 0 12px; font-size: 12.5px; }
-.seg-pick.rm-levels button:disabled { cursor: default; opacity: .7; }
-/* a permission staged but not yet applied */
-.rm-row.rm-changed { margin: 0 -12px; padding-left: 12px; padding-right: 12px; background: var(--warn-surface); box-shadow: inset 3px 0 0 var(--warn-text); border-radius: 6px; }
-.rm-row.rm-changed .seg-pick.rm-levels button[aria-pressed="true"] { font-weight: 700; }
+button.rm-cell { cursor: pointer; }
+button.rm-cell:hover { filter: brightness(.96); border-color: rgba(0, 58, 102, .35); }
+button.rm-cell:active { transform: scale(.97); }
+.rm-edit { background: var(--primary); color: #fff; }
+.rm-view { background: rgba(0, 58, 102, .10); color: var(--primary-text); }
+.rm-none { background: transparent; color: #8a93a0; border-color: var(--border); font-weight: 500; }
+.rm-locked-cell { opacity: .6; cursor: default; }
+td.rm-changed { background: var(--warn-surface); box-shadow: inset 0 0 0 1px var(--warn-line); }
+td.rm-changed .rm-cell { box-shadow: 0 0 0 2px var(--warn-surface), 0 0 0 3.5px #d98a1a; }
 .rm-note { margin-top: 18px; }
 .rm-stale { color: var(--warn-text); font-size: 11.5px; }
 /* Review permission changes: a box per role, a row per area (Before → After) */
@@ -3775,7 +3777,6 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
   #sv-head, #sv-scroll { padding-left: 24px; padding-right: 24px; }
   .sv-row-week { order: 5; flex-basis: 100%; padding: 0 16px 12px; }
   .sv-row-head { flex-wrap: wrap; }
-  .rm-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 16px; }
 }
 @media (max-width: 860px) {
   .sv-two { grid-template-columns: minmax(0, 1fr); }
@@ -3964,22 +3965,19 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
   .sv-person-main b, .sv-person-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #users-table .user-display-name { margin-left: 6px; }
 
-  /* --- Roles & permissions: the roles are chips, the chosen role's rows follow --- */
+  /* --- Roles & permissions: the same grid, tighter; it scrolls sideways if it must --- */
   #settings-view .sv-banner { padding: 9px 11px; font-size: 12px; }
-  .rm-layout { display: block; }
-  .rm-roles { flex-direction: row; gap: 6px; overflow-x: auto; background: none; box-shadow: none; border-radius: 0; position: static; margin: 0 -12px 10px; padding: 0 12px; scrollbar-width: none; }
-  .rm-roles::-webkit-scrollbar { display: none; }
-  .rm-role { flex: none; width: auto; height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); }
-  .rm-role:first-child { border-top: 1px solid var(--border); }
-  .rm-role small, .rm-role[aria-pressed="true"]::before { display: none; }
-  .rm-role b { height: 100%; }
-  .rm-role[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
-  .rm-role[aria-pressed="true"] b .ic { color: #fff; }
-  .rm-detail { padding: 14px; }
-  .rm-head h2 { font-size: 17px; }
-  .rm-row { gap: 10px; }
-  .seg-pick.rm-levels button { min-width: 0; padding: 0 10px; height: 38px; }
-  .rm-row.rm-changed { margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+  .rm-hint { display: none; }
+  .rm-wrap { overflow-x: auto !important; }
+  #roles-matrix { font-size: 12px; }
+  #roles-matrix th, #roles-matrix td { padding: 0 3px; }
+  #roles-matrix .rm-area-h, #roles-matrix .rm-area { padding-left: 12px; min-width: 100px; }
+  #roles-matrix .rm-area b { font-size: 12.5px; }
+  #roles-matrix .rm-area small, #roles-matrix .rm-role-h small { display: none; }
+  #roles-matrix .rm-role-h b { font-size: 11.5px; }
+  #roles-matrix td { width: auto; height: 52px; }
+  .rm-cell { min-width: 48px; height: 40px; padding: 0 3px; font-size: 11.5px; }
+  #roles-matrix .rm-group th { padding: 8px 12px; }
 }
 
 /* below 640 the top bar is the board's (its name, date and summary); Settings

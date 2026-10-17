@@ -406,26 +406,29 @@
         </div>
       </div>
 
-      <!-- Roles & permissions: one role at a time. The roles are a list (chips
-           on a phone); the chosen role's permissions are rows with Off / View /
-           Edit. Admin is shown locked, and database triggers back that up.
-           Changes are staged here and only written after the review dialog. -->
+      <!-- Roles & permissions: every role side by side, so what one position can
+           do reads against the others. A cell is the level (Edit / View / Off) and
+           a press steps it. Admin's column is shown but locked, and database
+           triggers back that up. Changes are staged here and only written after
+           the review dialog. -->
       <div class="settings-pane" data-pane="roles">
         <div class="sv-banner sv-banner-warn">
           <svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg>
           <div><b>Changes affect everyone with that role</b>, including anyone with the app open right now. You review them before they apply.</div>
         </div>
-        <div class="rm-layout">
-          <div id="rm-roles" class="rm-roles" role="group" aria-label="Role to review"></div>
-          <section class="rm-detail" aria-live="polite">
-            <div id="rm-head" class="rm-head"></div>
-            <div id="rm-perms"></div>
-            <details class="sv-details rm-note">
-              <summary>How hiding Overview sections works</summary>
-              <p class="import-note"><b>Edit</b> also grants view. <b>Off</b> removes access. Hiding an Overview section keeps it off the page and skips its query; it is not a data barrier — those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
-            </details>
-          </section>
+        <div class="rm-tools">
+          <button type="button" class="sv-chip" id="rm-diff" aria-pressed="false">Differences only <span class="n" id="rm-diff-n"></span></button>
+          <span class="rm-legend" aria-hidden="true"><span class="rm-cell rm-edit">Edit</span><span class="rm-cell rm-view">View</span><span class="rm-cell rm-none">Off</span></span>
+          <span class="grow"></span>
+          <span class="rm-hint">Press a cell to change it.</span>
         </div>
+        <div class="table-wrap rm-wrap">
+          <table id="roles-matrix"></table>
+        </div>
+        <details class="sv-details rm-note">
+          <summary>How hiding Overview sections works</summary>
+          <p class="import-note"><b>Edit</b> also grants view. <b>Off</b> removes access. Hiding an Overview section keeps it off the page and skips its query; it is not a data barrier — those sections are worked out from the same mission and assignment records the board itself needs, so treat it as tidying the dashboard, not as protecting a secret.</p>
+        </details>
       </div>
     </div>
 

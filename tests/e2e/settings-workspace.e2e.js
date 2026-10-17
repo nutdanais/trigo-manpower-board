@@ -360,19 +360,30 @@ async function step(name, fn) {
 
     await step("Roles & permissions: changes are staged, reviewed before / after, then applied", async () => {
       await tab("roles");
-      // one role at a time: the list of roles, then the chosen role's rows
-      assert.deepEqual(await p.locator("#rm-roles .rm-role b").allInnerTexts(), ["Admin", "Manager", "Engineer", "Viewer"]);
-      assert.equal(await p.locator("#rm-roles .rm-role[aria-pressed=true]").count(), 1);
-      assert.equal(await p.locator("#rm-perms .rm-row").count(), 19, "every permission area is a row");
-      assert.equal(await p.locator("#roles-matrix, select.rm-level").count(), 0, "no grid of dropdowns");
-      await p.click('[data-role-chip="admin"]');
-      assert.equal(await p.locator("#rm-perms .rm-levels button:enabled").count(), 0, "Admin's rows are shown but locked");
-      assert.match(await p.locator("#rm-head").innerText(), /always keeps full access/);
-      await p.click('[data-role-chip="manager"]');
-      const level = (area, role) => p.locator(`#rm-perms .rm-levels[aria-label="${area} for ${role}"] button[aria-pressed=true]`).innerText();
-      assert.equal(await level("Settings", "Manager"), "Edit");
-      await p.locator('#rm-perms .rm-levels[aria-label="Settings for Manager"] button', { hasText: "View" }).click();
-      assert.equal(await level("Settings", "Manager"), "View");
+      // every role side by side: roles across, areas down, a cell is the level
+      assert.deepEqual(await p.locator("#roles-matrix thead .rm-role-h b").allInnerTexts(), ["Admin", "Manager", "Engineer", "Viewer"]);
+      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row").count(), 19, "every permission area is a row");
+      assert.equal(await p.locator("#roles-matrix select").count(), 0, "no grid of dropdowns");
+      assert.equal(await p.locator("#roles-matrix td[data-role=admin] button").count(), 0, "Admin's column is shown but locked");
+      assert.match(await p.locator("#roles-matrix td[data-role=admin]").first().innerText(), /Edit/);
+      const cell = (area, role) => p.locator(`#roles-matrix button[aria-label^="${area} for ${role}:"]`);
+      assert.equal(await cell("Settings", "Manager").innerText(), "Edit");
+      assert.equal(await cell("Settings", "Viewer").innerText(), "Off", "a row reads across the roles");
+      // "Differences only" drops the rows where every role is the same
+      const rowsAll = await p.locator("#roles-matrix tbody tr.rm-row").count();
+      await p.click("#rm-diff");
+      const rowsDiff = await p.locator("#roles-matrix tbody tr.rm-row").count();
+      assert.ok(rowsDiff > 0 && rowsDiff < rowsAll, `${rowsDiff} of ${rowsAll}`);
+      assert.equal(await p.locator("#rm-diff-n").innerText(), String(rowsDiff));
+      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row", { hasText: "Org Chart" }).count(), 0, "an area every role sees the same is hidden");
+      await p.click("#rm-diff");
+      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row").count(), rowsAll);
+      // a press steps the cell: Edit -> Off -> View -> Edit
+      await cell("Settings", "Manager").click();
+      assert.equal(await cell("Settings", "Manager").innerText(), "Off");
+      await cell("Settings", "Manager").click();
+      assert.equal(await cell("Settings", "Manager").innerText(), "View");
+      assert.equal(await cell("Settings", "Manager").evaluate((e) => e.parentElement.classList.contains("rm-changed")), true, "a staged cell is marked");
       assert.match(await status(), /1 permission change ready to review/);
       assert.equal(await p.locator("#btn-sv-save").innerText(), "Review changes");
       assert.equal(perm("manager", "settings"), "edit", "nothing is written before Apply");
@@ -383,12 +394,11 @@ async function step(name, fn) {
       assert.match(await p.locator("#perm-review-body .hm-group-title").innerText(), /^Manager$/);
       assert.match(rows[0].replace(/\s+/g, " "), /Settings Edit View/);
       await p.click("#btn-perm-cancel");
-      assert.equal(await level("Settings", "Manager"), "View", "Keep editing keeps the staged change");
+      assert.equal(await cell("Settings", "Manager").innerText(), "View", "Keep editing keeps the staged change");
       assert.equal(perm("manager", "settings"), "edit");
-      // a staged change survives looking at another role, and put back it drops out of the draft
-      await p.click('[data-role-chip="viewer"]');
-      await p.click('[data-role-chip="manager"]');
-      assert.equal(await level("Settings", "Manager"), "View");
+      // a staged change survives the filter redrawing the grid
+      await p.click("#rm-diff"); await p.click("#rm-diff");
+      assert.equal(await cell("Settings", "Manager").innerText(), "View");
       // someone else changes the same cell while this is open: the review says so
       db.t("role_permissions").find((r) => r.role_key === "manager" && r.area === "settings").level = "none";
       await p.evaluate(() => cloud._loadIdentity());
@@ -401,9 +411,10 @@ async function step(name, fn) {
       assert.equal(perm("manager", "settings"), "view");
       assert.equal(await p.locator("#btn-sv-save").isVisible(), false);
       // putting a value back un-stages it
-      await p.locator('#rm-perms .rm-levels[aria-label="Host for Manager"] button', { hasText: "View" }).click();
+      await cell("Host", "Manager").click();   // Edit -> Off
       assert.match(await status(), /1 permission change/);
-      await p.locator('#rm-perms .rm-levels[aria-label="Host for Manager"] button', { hasText: "Edit" }).click();
+      await cell("Host", "Manager").click();   // Off -> View
+      await cell("Host", "Manager").click();   // View -> Edit
       assert.equal(await p.evaluate(() => sdCount("roles")), 0);
     });
 
@@ -483,13 +494,11 @@ async function step(name, fn) {
       await p.click('#users-chips [data-chip="all"]');
       // permissions: one role at a time, chosen by chip, levels as buttons
       await open("roles");
-      const chips = await p.$$eval("#rm-roles .rm-role", (c) => c.map((x) => Math.round(x.getBoundingClientRect().top)));
-      assert.equal(new Set(chips).size, 1, "the roles are one row of chips");
-      assert.equal(await p.locator("#rm-roles .rm-role small").first().isVisible(), false);
-      await p.click('#rm-roles [data-role-chip="engineer"]');
-      assert.match(await p.locator("#rm-head").innerText(), /^Engineer/);
-      const btn = p.locator("#rm-perms .rm-row").first().locator("button").first();
-      assert.ok((await btn.boundingBox()).height >= 36, "level buttons are a touch target");
+      const heads = await p.$$eval("#roles-matrix thead .rm-role-h", (c) => c.map((x) => Math.round(x.getBoundingClientRect().top)));
+      assert.equal(heads.length, 4);
+      assert.equal(new Set(heads).size, 1, "all four roles sit side by side on a phone too");
+      const btn = p.locator("#roles-matrix tbody tr.rm-row").first().locator("button").first();
+      assert.ok((await btn.boundingBox()).height >= 36, "a cell is a touch target");
       await btn.click();
       await p.waitForFunction(() => sdCount("roles") === 1);
       await p.click("#btn-sv-discard");

@@ -421,7 +421,7 @@ const state = {
   settingsStale: false,       // a live update arrived while a field had focus: redraw once it leaves
   settingsSave: { phase: "clean" },   // clean | dirty | saving | saved | error, per the open section
   settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, roles: {} },   // staged edits, by section
-  rolesColumn: null,          // Roles & permissions: the role whose permissions are showing
+  rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
   svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
   employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
@@ -13120,13 +13120,14 @@ function permShown(roleKey, item, viewOnly) {
   return levels.includes(cur) ? cur : (item.allowOnly ? "none" : "view");
 }
 
-/* Roles & permissions, one role at a time. The roles are a list on the left
-   (chips on a phone); the chosen role's permissions are rows, each with Off /
-   View / Edit — three buttons, so what a role can do reads off the page instead
-   of out of a grid of dropdowns. A press is staged exactly as the dropdown was
-   (sdSet "roles"), and nothing is written until the review dialog is applied.
-   Admin's rows are shown but locked: database triggers hold that line, and the
-   page says so rather than offering controls that cannot work. */
+/* Roles & permissions: every role side by side. Areas run down the page, roles
+   across, and a cell is the level — Edit, View or Off — so what one position can
+   do reads against the others, and "Differences only" drops the rows where every
+   role is the same. A press steps a cell Off → View → Edit (an area that can only
+   be viewed, or only allowed, has two steps). It is staged exactly as the old
+   dropdown was (sdSet "roles") and nothing is written until the review dialog is
+   applied. Admin's column is shown but locked: database triggers hold that line,
+   and the page says so rather than offering controls that cannot work. */
 function rolePermCounts(role) {
   let edit = 0, view = 0, off = 0;
   for (const group of PERM_AREAS) {
@@ -13138,99 +13139,106 @@ function rolePermCounts(role) {
   return { edit, view, off };
 }
 
+function permLevels(item, viewOnly) {
+  return item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
+}
+function permWord(level, item) {
+  return level === "none" ? "Off" : level === "view" ? "View" : item.allowOnly ? "Allowed" : "Edit";
+}
+
 function renderRolesPane() {
-  const list = $("#rm-roles");
-  if (!list || !can("users", "edit")) return;
+  const table = $("#roles-matrix");
+  if (!table || !can("users", "edit")) return;
   const roles = D().roles;
-  if (!roles.some(r => r.key === state.rolesColumn)) {
-    state.rolesColumn = (roles.find(r => !r.protected) || roles[0] || {}).key || null;
-  }
+  if (!roles.length) { table.innerHTML = ""; return; }
   ensureUsersLoaded();
-  const members = (key) => (D().users || []).filter(u => u.roleKey === key && u.status === "active");
-  const people = (n) => `${n} ${n === 1 ? "person" : "people"}`;
-  const roleCountsHtml = (r, c) => (D().users ? `<span>${people(members(r.key).length)}</span> · ` : "") +
-    `<span>${c.edit} edit</span> · <span>${c.view} view</span>${c.off ? ` · <span>${c.off} off</span>` : ""}`;
+  const people = (key) => (D().users || []).filter(u => u.roleKey === key && u.status === "active").length;
+  const shown = (role, item, viewOnly) => sdVal("roles", role.key + "|" + item.key, permShown(role.key, item, viewOnly));
+  const differs = (item, viewOnly) => new Set(roles.map(r => shown(r, item, viewOnly))).size > 1;
 
-  // the role list
-  list.innerHTML = "";
-  for (const r of roles) {
+  const diffOnly = !!state.rolesDiffOnly;
+  const btn = $("#rm-diff");
+  btn.setAttribute("aria-pressed", String(diffOnly));
+  let nDiff = 0;
+  for (const g of PERM_AREAS) for (const it of g.items) if (differs(it, g.viewOnly || it.viewOnly)) nDiff++;
+  $("#rm-diff-n").textContent = String(nDiff);
+
+  // the header: a role's name, how many people have it, and what it adds up to
+  const head = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.innerHTML = `<th scope="col" class="rm-area-h">Area</th>` + roles.map(r => {
     const c = rolePermCounts(r);
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "rm-role";
-    b.dataset.roleChip = r.key;
-    b.setAttribute("aria-pressed", String(r.key === state.rolesColumn));
-    b.innerHTML = `<b>${escapeHtml(r.label)}${r.protected ? icon("lock") : ""}</b>` +
-      `<small>${roleCountsHtml(r, c)}</small>`;
-    b.onclick = () => { state.rolesColumn = r.key; renderRolesPane(); };
-    list.appendChild(b);
-  }
+    return `<th scope="col" class="rm-role-h" data-role="${escapeHtml(r.key)}"><b>${escapeHtml(r.label)}${r.protected ? icon("lock") : ""}</b>` +
+      `<small>${D().users ? `<span>${people(r.key)} ${people(r.key) === 1 ? "person" : "people"}</span><br>` : ""}<span>${c.edit} edit</span> · <span>${c.view} view</span></small></th>`;
+  }).join("");
+  head.appendChild(hr);
 
-  // the chosen role
-  const role = roles.find(r => r.key === state.rolesColumn);
-  const head = $("#rm-head");
-  const perms = $("#rm-perms");
-  if (!role) { head.innerHTML = ""; perms.innerHTML = ""; return; }
-  const who = members(role.key).map(u => u.displayName || u.fullName || u.email);
-  head.innerHTML =
-    `<h2>${escapeHtml(role.label)}</h2>` +
-    (D().users ? `<p class="import-note">${who.length ? escapeHtml(who.join(", ")) : "Nobody has this role yet."}</p>` : "") +
-    (role.protected ? `<p class="rm-locked">${icon("lock")} Admin always keeps full access, so nobody can lock themselves out of this screen. These cannot be changed.</p>` : "");
-  perms.innerHTML = "";
+  const body = document.createElement("tbody");
   for (const group of PERM_AREAS) {
-    const sec = document.createElement("section");
-    sec.className = "rm-group";
-    sec.innerHTML = `<h3>${escapeHtml(group.group)}</h3>`;
+    const rows = [];
     for (const item of group.items) {
       const viewOnly = group.viewOnly || item.viewOnly;
-      const key = role.key + "|" + item.key;
-      // A section that nothing can "edit" only offers off/on — a third state
-      // that means nothing would just be a way to get it wrong. A one-off
-      // action (deleting a board) is simply allowed or not.
-      const levels = item.allowOnly ? ["none", "edit"] : viewOnly ? ["none", "view"] : ["none", "view", "edit"];
-      const word = (l) => l === "none" ? "Off" : l === "view" ? "View" : item.allowOnly ? "Allowed" : "Edit";
-      const saved = permShown(role.key, item, viewOnly);
-      const row = document.createElement("div");
-      row.className = "rm-row";
-      row.innerHTML = `<div class="rm-label"><b>${escapeHtml(item.label)}</b>${item.hint ? `<small>${escapeHtml(item.hint)}</small>` : ""}</div>`;
-      const seg = document.createElement("div");
-      seg.className = "seg-pick rm-levels";
-      seg.setAttribute("role", "group");
-      seg.setAttribute("aria-label", `${item.label} for ${role.label}`);
-      const show = () => {
-        const cur = sdVal("roles", key, saved);
-        for (const btn of seg.children) btn.setAttribute("aria-pressed", String(btn.dataset.v === cur));
-        row.classList.toggle("rm-changed", !!sdMap("roles")[key]);
-      };
-      for (const l of levels) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.dataset.v = l;
-        btn.textContent = word(l);
-        btn.disabled = !!role.protected;
-        if (role.protected) btn.title = "Admin always keeps full access.";
-        btn.onclick = () => {
-          if (sdVal("roles", key, saved) === l) return;
-          sdSet("roles", key, l, `${role.label}: ${item.label}`, () => permShown(role.key, item, viewOnly),
-            { roleKey: role.key, areaKey: item.key, roleLabel: role.label, areaLabel: item.label, allowOnly: !!item.allowOnly });
-          show();
-          // the counts under the role's name move with the change
-          const c = rolePermCounts(role);
-          const small = list.querySelector(`[data-role-chip="${CSS.escape(role.key)}"] small`);
-          if (small) small.innerHTML = roleCountsHtml(role, c);
+      if (diffOnly && !differs(item, viewOnly)) continue;
+      const tr = document.createElement("tr");
+      tr.className = "rm-row";
+      tr.innerHTML = `<th scope="row" class="rm-area"><b>${escapeHtml(item.label)}</b>${item.hint ? `<small>${escapeHtml(item.hint)}</small>` : ""}</th>`;
+      for (const role of roles) {
+        const key = role.key + "|" + item.key;
+        const td = document.createElement("td");
+        td.dataset.role = role.key;
+        const saved = permShown(role.key, item, viewOnly);
+        const levels = permLevels(item, viewOnly);
+        const paint = (b) => {
+          const cur = sdVal("roles", key, saved);
+          b.className = "rm-cell rm-" + cur;
+          b.textContent = permWord(cur, item);
+          b.setAttribute("aria-label", `${item.label} for ${role.label}: ${permWord(cur, item)}`);
+          td.classList.toggle("rm-changed", !!sdMap("roles")[key]);
         };
-        seg.appendChild(btn);
+        if (role.protected) {
+          const span = document.createElement("span");
+          span.title = "Admin always keeps full access.";
+          paint(span);
+          span.classList.add("rm-locked-cell");
+          td.appendChild(span);
+        } else {
+          const b = document.createElement("button");
+          b.type = "button";
+          paint(b);
+          b.title = "Press to change";
+          b.onclick = () => {
+            const cur = sdVal("roles", key, saved);
+            const next = levels[(levels.indexOf(cur) + 1) % levels.length];
+            sdSet("roles", key, next, `${role.label}: ${item.label}`, () => permShown(role.key, item, viewOnly),
+              { roleKey: role.key, areaKey: item.key, roleLabel: role.label, areaLabel: item.label, allowOnly: !!item.allowOnly });
+            paint(b);
+            // the totals under each role's name move with the change
+            const c = rolePermCounts(role);
+            const small = table.querySelector(`.rm-role-h[data-role="${CSS.escape(role.key)}"] small`);
+            if (small) small.innerHTML = (D().users ? `<span>${people(role.key)} ${people(role.key) === 1 ? "person" : "people"}</span><br>` : "") + `<span>${c.edit} edit</span> · <span>${c.view} view</span>`;
+          };
+          td.appendChild(b);
+        }
+        tr.appendChild(td);
       }
-      show();
-      row.appendChild(seg);
-      sec.appendChild(row);
+      rows.push(tr);
     }
-    perms.appendChild(sec);
+    if (!rows.length) continue;
+    const gr = document.createElement("tr");
+    gr.className = "rm-group";
+    gr.innerHTML = `<th colspan="${roles.length + 1}" scope="colgroup">${escapeHtml(group.group)}</th>`;
+    body.appendChild(gr);
+    for (const r of rows) body.appendChild(r);
   }
+  if (!body.children.length) {
+    body.innerHTML = `<tr><td colspan="${roles.length + 1}" class="import-note sv-empty">Every role has the same access to everything here.</td></tr>`;
+  }
+  table.replaceChildren(head, body);
 }
 
 function wireUserManagement() {
   $("#users-search").addEventListener("input", (e) => { state.users.search = e.target.value; renderUserRows(); });
+  $("#rm-diff").onclick = () => { state.rolesDiffOnly = !state.rolesDiffOnly; renderRolesPane(); };
   $("#btn-users-xlsx").onclick = () => safely(exportUsersXlsx);
   $("#btn-add-user").onclick = openAddUserModal;
   $("#form-add-user").onsubmit = addUser;

@@ -1838,9 +1838,14 @@ I18N.add({
   "Nobody has this role yet.": "ยังไม่มีใครมีบทบาทนี้",
   "No one has been approved yet.": "ยังไม่มีใครได้รับการอนุมัติ",
   "Yesterday": "เมื่อวาน",
+  "Differences only": "เฉพาะที่ต่างกัน",
+  "Press a cell to change it.": "กดช่องเพื่อเปลี่ยน",
+  "Press to change": "กดเพื่อเปลี่ยน",
+  "Every role has the same access to everything here.": "ทุกบทบาทมีสิทธิ์เหมือนกันทั้งหมดที่นี่",
   "asked today": "ขอสิทธิ์วันนี้",
   "asked yesterday": "ขอสิทธิ์เมื่อวาน"
 }, {
+  "{a} for {b}: {c}": "{a} สำหรับ{b}: {c}",
   "{a} permission change ready to review": "การเปลี่ยนแปลงสิทธิ์ {a} รายการรอตรวจสอบ",
   "{a} permission changes ready to review": "การเปลี่ยนแปลงสิทธิ์ {a} รายการรอตรวจสอบ",
   "{a} working days": "ทำงาน {a} วัน",
