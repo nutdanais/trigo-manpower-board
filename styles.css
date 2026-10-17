@@ -3243,57 +3243,13 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   margin: 0 0 12px;
   max-width: 760px;
 }
-.settings-list {
-  border: 1px solid var(--border);
-  border-radius: var(--r-box);
-  background: var(--panel);
-  /* `clip`, not `hidden`: it rounds the corners without becoming a scroll
-     container, so the sticky header keeps sticking to the page's scroll region.
-     Where `clip` is unknown the corners are simply square. */
-  overflow: visible;
-  overflow: clip;
-}
+
 .settings-count {
   color: var(--muted);
   font-size: 12px;
   margin: 8px 2px 0;
 }
 
-/* table-layout: fixed is load-bearing, not a tidy-up. The cells hold inputs at
-   width:100%, and a percentage width contributes NO intrinsic width — so under
-   the default auto layout the browser collapsed Name and Phone to their minimum
-   and left the header spread out above them. Fixed layout takes the widths
-   declared below and splits the rest evenly. */
-.settings-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
-.settings-table th {
-  position: sticky;
-  top: 0;
-  z-index: 2;   /* same as the Users and Roles headers on this page */
-  background: var(--bg-soft);
-  text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .3px;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-.settings-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.settings-table tr:last-child td { border-bottom: none; }
-.settings-table tbody tr:hover { background: var(--hover-tint, rgba(0,0,0,.02)); }
-/* the fields fill their column instead of being loose flex children */
-.settings-table td input[type="text"],
-.settings-table td input[type="tel"] { width: 100%; margin-top: 0; }
-.settings-table .st-act { width: 52px; text-align: right; }
-.settings-table .st-board { width: 200px; font-weight: 600; }
-/* Engineer pane: name and phone are the account's, shown rather than edited,
-   so they read as text in a table of inputs instead of as disabled boxes. */
-.settings-table .st-name { font-weight: 600; }
-.settings-table .st-phone { color: var(--muted); white-space: nowrap; }
-.settings-table .st-account { white-space: nowrap; }
-.settings-table .st-account select { width: 100%; margin-top: 0; }
 .st-hint { font-size: 11px; color: var(--muted); font-style: italic; }
 /* A bare <input type="color"> is drawn by the browser as a colour chip inside
    its OWN bordered box, in a fixed grey that ignores the theme — a box, inside
@@ -3320,8 +3276,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-.sw-pick input[type="color"],
-.settings-table td input[type="color"] {
+.sw-pick input[type="color"] {
   width: 20px;
   height: 20px;
   padding: 0;
@@ -3334,54 +3289,25 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   -webkit-appearance: none;
   appearance: none;
 }
-.sw-pick input[type="color"]::-webkit-color-swatch-wrapper,
-.settings-table td input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-.sw-pick input[type="color"]::-webkit-color-swatch,
-.settings-table td input[type="color"]::-webkit-color-swatch {
+.sw-pick input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.sw-pick input[type="color"]::-webkit-color-swatch {
   border: none;
   border-radius: var(--r-sm);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.16);
 }
-.sw-pick input[type="color"]::-moz-color-swatch,
-.settings-table td input[type="color"]::-moz-color-swatch {
+.sw-pick input[type="color"]::-moz-color-swatch {
   border: none;
   border-radius: var(--r-sm);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.16);
 }
-.settings-table .st-swatch { width: 132px; }
-/* A row of solid red blocks down the page shouted louder than deleting an
-   engineer deserves. Quiet until you reach for it. */
-.st-del {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1;
-  padding: 5px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.st-del:hover, .st-del:focus-visible {
-  background: var(--danger-tint);
-  border-color: var(--danger-line);
-  color: var(--danger-text);
-}
-/* the weekday chips sit on one line beside the board name */
-.settings-table .settings-board-days { display: inline-flex; flex-wrap: wrap; gap: 0; margin: 0; }
-.settings-table .settings-board-name { margin: 0; font-size: 13px; }
-
 /* Column headers stay put while the rows move under them, the same treatment
    #emplist-table th and #hostlist-table th already get on the two list tabs. */
-#users-table thead th,
-#roles-matrix .rm-head th {
+#users-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
   background: var(--bg-soft);
 }
-/* the group rows ("Tabs & menus", "Overview sections") pass underneath */
-#roles-matrix .rm-group td { z-index: 1; }
 
 #users-toolbar {
   display: flex;
@@ -3399,26 +3325,7 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   font-size: 13px;
   min-width: 200px;
 }
-#users-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 #users-count { color: var(--muted); font-size: 12.5px; }
-
-/* same amber "something needs your attention" bar as the Host list's duplicate
-   finder — one pattern for "there is a queue here", wherever it appears */
-#users-pending {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-  padding: 8px 12px;
-  border: 1px solid #e5b980;
-  border-left-width: 4px;
-  border-radius: 8px;
-  background: rgba(237,161,0,.10);
-  font-size: 13px;
-}
-#users-pending .dupbar-icon { color: var(--warn-text); font-weight: 700; }
-#users-pending-text { flex: 1; min-width: 180px; }
 
 #users-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 #users-table th, #users-table td {
@@ -3502,46 +3409,6 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
   font-weight: 400;
 }
 
-/* ----- the permission matrix -----
-   One select per cell: three states (—, View, Edit) is more than a checkbox can
-   carry, and a segmented control of three buttons across four roles and sixteen
-   rows would be 192 tap targets fighting for the same width. */
-#roles-matrix { width: 100%; border-collapse: collapse; font-size: 13px; }
-#roles-matrix th, #roles-matrix td {
-  text-align: left;
-  padding: 6px 9px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-#roles-matrix .rm-head th { font-size: 12px; color: var(--muted); font-weight: 700; text-align: center; }
-#roles-matrix .rm-head th:first-child { text-align: left; }
-#roles-matrix .rm-head small { font-weight: 400; font-size: 10px; }
-#roles-matrix .rm-group td {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .4px;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: rgba(0,0,0,.03);
-  padding-top: 10px;
-}
-#roles-matrix .rm-area { font-weight: 600; }
-#roles-matrix .rm-area small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
-#roles-matrix td:not(.rm-area) { text-align: center; }
-/* ...but a group row's <td> isn't .rm-area either, and that rule has the same
-   specificity while coming later — which left the section labels centred. */
-#roles-matrix .rm-group td { text-align: left; padding-left: 9px; }
-.rm-level {
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 12px;
-  min-width: 74px;
-}
-.rm-level:disabled { opacity: .55; cursor: not-allowed; }
-
 /* ----- login screen additions ----- */
 .login-links {
   display: flex;
@@ -3586,12 +3453,15 @@ body.touch-mode.has-selection #toast-stack { bottom: 76px; }
 .btn-inert { opacity: .55; cursor: default; }
 
 
-/* ===== Settings page =====
+/* ===== Settings page (direction A, design/settings-redesign-directions.html) =====
    A full page under the top bar (#settings-view), not a dialog. While it is up
    the board is display:none — the app underneath keeps its view, board, date
    and scroll position, and "Back to board" only hides this again. The page is
    a fixed-height flex column from the top bar down, so exactly one region (the
-   pane, #sv-scroll) scrolls between a fixed heading and a fixed action bar. */
+   pane, #sv-scroll) scrolls under a one-line heading. The action bar (#sv-foot)
+   floats over the pane and is only there while there is something to save.
+   Navy is kept for actions: where you are (the rail, an open row, a chosen role)
+   is a tint with a navy marker, not a navy block. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
@@ -3619,103 +3489,125 @@ body.settings-open #btn-lock { display: none !important; }
 body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong); }
 
 #settings-view {
+  --sv-line: #e6eaef;
+  --sv-mark: rgba(0, 58, 102, .09);     /* "you are here": the navy at 9%, on white */
+  --sv-lift: 0 1px 0 rgba(0, 40, 80, .05), 0 8px 24px -18px rgba(0, 50, 100, .35);
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: 236px minmax(0, 1fr);
   background: var(--bg);
   color: var(--text);
 }
 
+/* ----- the rail ----- */
 #settings-rail {
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
-  padding: 14px 0 12px;
+  padding: 14px 12px 12px;
   overflow-x: hidden;
   overflow-y: auto;
 }
-.sv-back { align-self: flex-start; margin: 0 8px 10px; color: var(--primary-text); font-weight: 600; }
-.sv-rail-title { margin: 0 16px 6px; font-size: 20px; line-height: 1.3; letter-spacing: -.2px; }
+.sv-back { align-self: flex-start; margin: 0 0 6px -4px; color: var(--primary-text); font-weight: 600; }
+.sv-rail-title { margin: 4px 6px 10px; font-size: 20px; line-height: 1.3; letter-spacing: -.2px; }
 #settings-tabs { display: flex; flex-direction: column; gap: 0; margin: 0; border-bottom: none; }
-/* group labels are real labels again (they were a bare divider rule in the
-   dialog); applySettingsTab hides one when nothing under it is permitted */
-#settings-tabs .settings-group {
-  margin: 16px 16px 6px;
-  font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase;
-  color: var(--muted);
-}
-#settings-tabs .settings-group:first-of-type { margin-top: 10px; }
+#settings-tabs .settings-group { margin: 16px 8px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+#settings-tabs .settings-group:first-of-type { margin-top: 6px; }
 #settings-tabs .settings-tab {
+  position: relative;
   display: flex; align-items: center; gap: 10px;
-  width: calc(100% - 16px);
-  min-height: 40px;
-  margin: 1px 8px;
-  padding: 8px 12px;
+  width: 100%;
+  min-height: 38px;
+  margin: 1px 0;
+  padding: 0 10px;
   border: 0;
   border-radius: var(--r);
   background: transparent;
-  color: var(--muted);
-  font-size: 13px; font-weight: 600; text-align: left;
+  color: #46505e;
+  font-size: 13.5px; font-weight: 600; text-align: left;
   cursor: pointer;
+  transition: background-color .16s, color .16s;
 }
 #settings-tabs .settings-tab .ic { width: 16px; height: 16px; flex: none; }
 #settings-tabs .settings-tab:hover { background: var(--hover-tint); color: var(--text); }
 #settings-tabs .settings-tab:focus-visible { outline: 2.5px solid var(--primary-text); outline-offset: 2px; }
-/* selected = the app's main-action navy with white text, in both themes */
-#settings-tabs .settings-tab.active { background: var(--primary); color: #fff; }
+#settings-tabs .settings-tab.active { background: var(--sv-mark); color: var(--primary-text); }
+#settings-tabs .settings-tab.active::before {
+  content: ""; position: absolute; left: -12px; top: 7px; bottom: 7px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--primary);
+}
+/* how many are in the list, or — in amber — how many are waiting on somebody */
+#settings-tabs .st-n { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+#settings-tabs .st-n:empty { display: none; }
+#settings-tabs .st-n.st-badge {
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 5px; display: grid; place-items: center;
+  background: var(--warn-surface); border: 1px solid var(--warn-line); color: var(--warn-text); font-size: 11.5px; font-weight: 700;
+}
 /* the version, pinned to the bottom of the rail */
-#settings-version { margin: auto 0 0; padding: 14px 16px 0; }
+#settings-version { margin: auto 0 0; padding: 14px 8px 0; }
 
-#sv-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* ----- the heading and the scroll region ----- */
+#sv-main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 #sv-head {
   flex: 0 0 auto;
-  display: flex; align-items: flex-start; gap: 12px;
-  padding: 20px 28px 16px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-end; gap: 12px;
+  max-width: 1052px;
+  padding: 22px 36px 14px;
 }
 .sv-heading { flex: 1; min-width: 0; }
-.sv-crumb { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-#sv-title { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 700; letter-spacing: -.3px; overflow-wrap: anywhere; }
+.sv-crumb { display: none; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+#sv-title { margin: 0; font-size: 26px; line-height: 1.15; font-weight: 700; letter-spacing: -.025em; overflow-wrap: anywhere; }
 #sv-title:focus { outline: none; }
-#sv-hint { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); max-width: 650px; }
+#sv-hint { margin: 4px 0 0; font-size: 13.5px; color: var(--muted); max-width: 70ch; }
 #sv-head-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .sv-back-icon { display: none; flex: none; }
-#sv-mobile-nav { display: none; padding: 12px 16px 0; }
-#sv-mobile-nav select { width: 100%; }
+#sv-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 6px 36px 96px; }
+.sv-wrap, .settings-pane[data-pane="users"], .settings-pane[data-pane="roles"] { max-width: 980px; }
+.settings-pane[data-pane="users"] { max-width: 1052px; }
 
-#sv-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  padding: 20px 28px;
-}
+/* ----- the action bar: there while there is something to say ----- */
 #sv-foot {
-  flex: 0 0 auto;
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 28px;
-  background: var(--panel);
-  border-top: 1px solid var(--border);
+  position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 4;
+  display: flex; align-items: center; gap: 12px;
+  width: max-content; max-width: min(720px, calc(100% - 48px));
+  padding: 9px 10px 9px 16px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 14px 34px -10px rgba(0, 40, 80, .35), 0 2px 6px rgba(0, 40, 80, .08);
 }
-#sv-status { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
-#sv-status.dirty { color: var(--warn-text); font-weight: 600; }
+#sv-foot.sv-foot-idle { display: none; }
+#sv-status { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; font-weight: 600; color: var(--muted); }
+#sv-status.dirty { color: var(--warn-text); }
+#sv-status.dirty::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #d98a1a; vertical-align: 1px; }
 #sv-status.saving { color: var(--text); }
-#sv-status.saved { color: var(--ok-text); font-weight: 600; }
-#sv-status.error { color: var(--danger-text); font-weight: 600; }
+#sv-status.saved { color: var(--ok-text); }
+#sv-status.error { color: var(--danger-text); }
 
 /* ----- My account ----- */
-.sv-cards { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; max-width: 980px; align-items: start; }
-.sv-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-box); padding: 18px; }
-.sv-card h2 { margin: 0 0 12px; font-size: 16px; line-height: 1.3; }
-.sv-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.sv-card-head h2 { margin: 0; flex: 1; }
-.sv-card .account-form { margin-bottom: 0; }
+.sv-card { background: var(--panel); border-radius: var(--r-box); padding: 20px 22px; margin-bottom: 14px; box-shadow: var(--sv-lift); }
+.sv-card h2 { margin: 0 0 3px; font-size: 15px; line-height: 1.3; }
+.sv-card .account-form { margin: 0; }
+.sv-card .import-note { margin: 5px 0 0; }
+.sv-line { display: flex; align-items: center; gap: 16px; }
+.sv-line .btn { flex: none; }
+.sv-two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 22px; }
+.sv-id { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.sv-id-main { flex: 1; min-width: 0; }
+.sv-id-main b { display: block; font-size: 17px; letter-spacing: -.01em; }
+.sv-id-main small { display: block; font-size: 13px; }
+.sv-id .account-meta { margin: 0; flex: none; }
+.sv-avatar {
+  flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--sv-mark); color: var(--primary-text); font-size: 12.5px; font-weight: 700;
+}
+.sv-id .sv-avatar { width: 56px; height: 56px; border-radius: 14px; font-size: 18px; }
+.sv-avatar-warn { background: #fbeccd; color: #7a4300; }
 .sv-details { font-size: 12.5px; }
 .sv-details summary { cursor: pointer; font-weight: 600; color: var(--primary-text); }
 .sv-details p { margin-top: 8px; }
+.sv-how { margin: 0 0 12px; }
 
 /* ----- notices ----- */
 .sv-banner {
@@ -3729,16 +3621,140 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
 .sv-banner-warn { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
 .sv-banner-warn b { color: inherit; }
 .settings-error { color: var(--danger-text); font-weight: 600; }
+.sv-empty { padding: 18px 16px; margin: 0; }
 
-/* ----- tables on the page ----- */
-#settings-view .table-wrap { background: var(--panel); overflow: visible; overflow: clip; }
-#users-table td { overflow-wrap: anywhere; }
-.settings-table tr.st-dirty td:first-child { box-shadow: inset 3px 0 0 var(--warn-text); }
-#roles-matrix td.rm-changed { background: var(--warn-surface); box-shadow: inset 0 0 0 1px var(--warn-line); }
-#roles-matrix td.rm-changed .rm-level { font-weight: 700; }
-.rm-role-pick { display: none; margin-bottom: 12px; }
-.rm-role-pick label { display: block; margin-bottom: 4px; font-size: 12.5px; font-weight: 600; }
-.rm-role-pick select { width: 100%; }
+/* ----- Engineers, Service areas, Boards: a row that opens in place ----- */
+.sv-list { background: var(--panel); border-radius: var(--r-box); box-shadow: var(--sv-lift); overflow: hidden; }
+.sv-row { border-top: 1px solid var(--sv-line); }
+.sv-row:first-child { border-top: 0; }
+.sv-row-head { display: flex; align-items: center; gap: 10px; min-height: 64px; padding-right: 8px; transition: background-color .16s; }
+.sv-row-head:hover { background: rgba(0, 58, 102, .03); }
+.sv-row-toggle {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 10px 0 10px 16px;
+  border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.sv-row-plain { cursor: default; }
+.sv-sq { width: 34px; height: 34px; border-radius: 9px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
+.sv-row-main { min-width: 0; display: flex; flex-direction: column; }
+.sv-row-main b { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-row-main small { margin-top: 1px; font-size: 12px; color: var(--muted); display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.sv-need { display: inline-flex; align-items: center; gap: 4px; color: var(--warn-text); font-weight: 600; }
+.sv-need .ic { width: 13px; height: 13px; }
+.sv-row-meta { flex: none; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+.sv-row-meta .ic { width: 13px; height: 13px; vertical-align: -2px; }
+.sv-row-chev { flex: none; width: 32px; display: grid; place-items: center; color: var(--muted); transition: transform .18s; }
+.sv-row-chev .ic { width: 16px; height: 16px; }
+.sv-row.open .sv-row-chev { transform: rotate(180deg); }
+.sv-row.open { background: #fafcfe; box-shadow: inset 3px 0 0 var(--primary); }
+/* a row with an unsaved edit is marked, open or not */
+.sv-row.st-dirty { box-shadow: inset 3px 0 0 var(--warn-text); }
+.sv-row-toggle:focus-visible { outline: 2.5px solid var(--primary-text); outline-offset: -2px; border-radius: var(--r); }
+.sv-row-edit { display: none; padding: 2px 16px 16px 64px; }
+.sv-row.open .sv-row-edit { display: block; }
+.sv-fields { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1.1fr); gap: 14px 22px; align-items: start; }
+.sv-fields-2 { grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr); }
+.sv-fields-1 { grid-template-columns: minmax(0, 360px); }
+.sv-field-label { display: block; margin-bottom: 5px; font-size: 12.5px; font-weight: 600; }
+.sv-field .import-note { margin: 5px 0 0; }
+.sv-field input[type="text"], .sv-field select:not(.pk-source), #settings-view .account-form input, #users-search {
+  min-height: 36px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text);
+  font-size: 13px; font-family: inherit;
+}
+.sv-field input[type="text"], .sv-field select:not(.pk-source), #settings-view .account-form input { width: 100%; }
+.sv-field .pk { display: block; }
+.sv-edit-foot > .grow, .sv-line > .grow { flex: 1; min-width: 0; }
+#users-search { width: 280px; max-width: 100%; }
+.sv-static { min-height: 36px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; }
+.sv-edit-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.sv-del { border-color: transparent; background: transparent; color: var(--danger-text); }
+.sv-del:hover, .sv-del:focus-visible { background: var(--danger-tint); border-color: var(--danger-line); }
+.sv-del .ic { width: 13px; height: 13px; }
+.sv-why { color: var(--muted); font-size: 12px; }
+/* Boards: the week as the days the board works */
+.sv-week { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; background: var(--panel); }
+.sv-day { position: relative; display: block; cursor: pointer; }
+.sv-day input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.sv-day span {
+  display: block; min-width: 46px; padding: 0 4px; line-height: 32px; text-align: center;
+  border-left: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--muted);
+  background: repeating-linear-gradient(135deg, #f1f3f6 0 5px, #e7ebf0 5px 10px);
+  transition: background-color .16s, color .16s;
+}
+.sv-day:first-child span { border-left: 0; }
+.sv-day.on span { background: var(--primary); color: #fff; }
+.sv-day:focus-within { outline: 2px solid var(--primary-text); outline-offset: -2px; z-index: 1; }
+.settings-count { color: var(--muted); font-size: 12px; margin: 8px 2px 0; }
+
+/* ----- Users ----- */
+.sv-queue { margin-bottom: 16px; background: #fffaf0; border: 1px solid var(--warn-line); border-radius: var(--r-box); overflow: hidden; }
+.sv-queue h2 { margin: 0; padding: 11px 16px 2px; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--warn-text); }
+.sv-queue h2 .ic { width: 14px; height: 14px; }
+.sv-queue-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid #f0e2c7; }
+.sv-queue-row:first-child { border-top: 0; }
+#users-pending-list { margin-top: 8px; }
+.sv-queue-who { flex: 1; min-width: 0; }
+.sv-queue-who b { display: block; font-size: 14px; }
+.sv-queue-who small { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-queue-act { flex: none; display: flex; gap: 8px; }
+.sv-queue-act .btn { gap: 6px; }
+.sv-chips { display: none; }
+#users-chips:not(:empty) { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.sv-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: #46505e;
+  font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background-color .16s, border-color .16s;
+}
+.sv-chip:hover { background: var(--hover-tint); }
+.sv-chip .n { color: inherit; opacity: .7; font-weight: 500; font-variant-numeric: tabular-nums; }
+.sv-chip.warn { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
+.sv-chip[aria-pressed="true"] { background: var(--sv-mark); border-color: rgba(0, 58, 102, .3); color: var(--primary-text); }
+.sv-chip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+#settings-view .table-wrap { border: 0; border-radius: var(--r-box); background: var(--panel); box-shadow: var(--sv-lift); overflow: visible; overflow: clip; }
+#users-table th { padding: 10px 16px; background: var(--panel); }
+#users-table td { padding: 10px 16px; border-bottom: 1px solid var(--sv-line); overflow-wrap: anywhere; }
+#users-table tbody tr:last-child td { border-bottom: 0; }
+#users-table tbody tr:hover { background: var(--hover-tint); }
+.sv-person { display: flex; align-items: center; gap: 12px; }
+.sv-person-main { min-width: 0; }
+.sv-person-main b { display: block; font-size: 14px; }
+.sv-person-main small { display: block; font-size: 12px; }
+
+/* ----- Roles & permissions: a role, then its permissions ----- */
+.rm-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 22px; align-items: start; }
+.rm-roles { display: flex; flex-direction: column; background: var(--panel); border-radius: var(--r-box); box-shadow: var(--sv-lift); overflow: hidden; position: sticky; top: 0; }
+.rm-role {
+  position: relative; display: block; width: 100%; padding: 11px 16px; text-align: left;
+  border: 0; border-top: 1px solid var(--sv-line); background: none; font: inherit; color: inherit; cursor: pointer;
+  transition: background-color .16s;
+}
+.rm-role:first-child { border-top: 0; }
+.rm-role:hover { background: rgba(0, 58, 102, .04); }
+.rm-role[aria-pressed="true"] { background: var(--sv-mark); }
+.rm-role[aria-pressed="true"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--primary); }
+.rm-role:focus-visible { outline: 2.5px solid var(--primary-text); outline-offset: -2px; }
+.rm-role b { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.rm-role b .ic { width: 13px; height: 13px; color: var(--muted); }
+.rm-role small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }
+.rm-detail { min-width: 0; background: var(--panel); border-radius: var(--r-box); box-shadow: var(--sv-lift); padding: 22px 26px 20px; }
+.rm-head h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 20px; letter-spacing: -.02em; }
+.rm-head .import-note { margin: 4px 0 0; }
+.rm-locked { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--bg-soft); color: #46505e; font-size: 13px; }
+.rm-locked .ic { flex: none; margin-top: 2px; }
+.rm-group h3 { margin: 18px 0 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.rm-row { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-top: 1px solid #edf0f4; }
+.rm-group h3 + .rm-row { border-top: 0; }
+.rm-label { flex: 1; min-width: 0; }
+.rm-label b { display: block; font-size: 14px; }
+.rm-label small { display: block; font-size: 12px; color: var(--muted); }
+.seg-pick.rm-levels { flex: none; margin: 0; }
+.seg-pick.rm-levels button { flex: none; min-width: 58px; height: 30px; padding: 0 12px; font-size: 12.5px; }
+.seg-pick.rm-levels button:disabled { cursor: default; opacity: .7; }
+/* a permission staged but not yet applied */
+.rm-row.rm-changed { margin: 0 -12px; padding-left: 12px; padding-right: 12px; background: var(--warn-surface); box-shadow: inset 3px 0 0 var(--warn-text); border-radius: 6px; }
+.rm-row.rm-changed .seg-pick.rm-levels button[aria-pressed="true"] { font-weight: 700; }
+.rm-note { margin-top: 18px; }
 .rm-stale { color: var(--warn-text); font-size: 11.5px; }
 /* Review permission changes: a box per role, a row per area (Before → After) */
 #perm-review-body { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
@@ -3751,84 +3767,226 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
 
 /* ----- form controls on the page (they used to inherit these from .modal) ----- */
 #settings-view .account-form label { display: block; margin-bottom: 4px; }
-#settings-view .settings-table td input[type="text"],
-#settings-view .settings-table td select,
-#settings-view #users-search,
-#settings-view .rm-role-pick select,
-#sv-mobile-nav select {
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 13px;
-  font-family: inherit;
-}
-#settings-view .settings-table td select { width: 100%; }
 #settings-view :is(input, select, button, summary):focus-visible { outline: 2.5px solid var(--primary-text); outline-offset: 2px; }
 
-/* ----- narrower than 960px: lists become labelled cards, one role at a time ----- */
-@media (max-width: 960px) {
-  #settings-view { grid-template-columns: 180px minmax(0, 1fr); }
-  .sv-cards { grid-template-columns: minmax(0, 1fr); }
-
-  .sv-responsive, .sv-responsive tbody, .sv-responsive tr, .sv-responsive td { display: block; width: auto !important; }
-  .sv-responsive thead { display: none; }
-  .sv-responsive tr { display: flex; flex-direction: column; padding: 12px 14px; border-bottom: 1px solid var(--border); }
-  .sv-responsive tr:last-child { border-bottom: 0; }
-  .sv-responsive td, .settings-table.sv-responsive td { padding: 3px 0; border: 0; text-align: left; }
-  .sv-responsive td[data-label]:not([data-label=""]) {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px;
-  }
-  .sv-responsive td[data-label]:not([data-label=""])::before {
-    content: attr(data-label); flex: 0 0 96px; font-size: 11.5px; font-weight: 600; color: var(--muted);
-  }
-  /* the identifying cell leads the card and carries no label */
-  .settings-table.sv-responsive td.st-primary { order: -1; display: block; margin: 0 0 4px; font-size: 14px; }
-  .settings-table.sv-responsive td.st-primary::before { content: none; }
-  .settings-table.sv-responsive td.st-primary input { width: 100%; }
-  .settings-table.sv-responsive td.st-days { display: block; }
-  .settings-table.sv-responsive td.st-days::before { display: block; margin-bottom: 6px; }
-  .settings-table.sv-responsive td.st-act { display: flex; justify-content: flex-end; margin-top: 6px; }
-  .settings-table.sv-responsive td.st-account { white-space: normal; flex-wrap: wrap; }
-  .settings-table.sv-responsive td.st-account select { width: auto; max-width: 220px; }
-  .settings-table tr.st-dirty td:first-child { box-shadow: none; }
-  .settings-table tr.st-dirty { box-shadow: inset 3px 0 0 var(--warn-text); }
-  #users-table.sv-responsive td:first-child { order: -1; display: block; margin-bottom: 4px; font-size: 14px; font-weight: 600; }
-  #users-table.sv-responsive td:first-child::before { content: none; }
-  #users-table.sv-responsive td.user-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  #users-table.sv-responsive td.user-actions .btn { margin-left: 0; }
-
-  /* Roles & permissions: pick one role; the others are hidden */
-  .rm-role-pick { display: block; }
-  #roles-matrix [data-role]:not([data-visible]) { display: none; }
-  #roles-matrix th, #roles-matrix td { padding: 9px 10px; }
-  #roles-matrix .rm-area { width: 62%; }
-  #roles-matrix .rm-level { min-width: 0; width: 100%; }
+/* ----- a narrower laptop: the rail slims, a board's week drops under its name ----- */
+@media (max-width: 1100px) {
+  #settings-view { grid-template-columns: 208px minmax(0, 1fr); }
+  #sv-head, #sv-scroll { padding-left: 24px; padding-right: 24px; }
+  .sv-row-week { order: 5; flex-basis: 100%; padding: 0 16px 12px; }
+  .sv-row-head { flex-wrap: wrap; }
+  .rm-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 16px; }
+}
+@media (max-width: 860px) {
+  .sv-two { grid-template-columns: minmax(0, 1fr); }
+  .sv-fields, .sv-fields-2 { grid-template-columns: minmax(0, 1fr); }
+  .sv-row-edit { padding-left: 16px; }
 }
 
-/* ----- phone ----- */
+/* ===== Settings on a phone (design/settings-mobile-options.html, option A) =====
+   At 720px and below Settings opens on a grouped list of its sections (#sv-home,
+   drawn by renderSvHome in app.js); a section then has the whole screen with a
+   back chevron to the list. Rows are compact, the header's add action is an
+   icon, and the action bar is a bar again, fixed under the pane (Save stays,
+   disabled until there is something to save). Wider screens keep the rail and
+   are untouched by this block, except the role list and the people picker in the
+   dialogs, which are used everywhere. */
+#sv-home { display: none; }
+.sv-ic-close { display: none; }
+.role-pick-src { display: none !important; }
+
+/* role list (User, Add user) */
+.role-pick { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px; }
+.role-opt {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; text-align: left;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--text);
+  font: inherit; cursor: pointer; transition: border-color .16s, background-color .16s;
+}
+.role-opt b { display: block; font-size: 13px; }
+.role-opt small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.role-opt:hover { background: var(--hover-tint); }
+.role-opt:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+.role-opt[aria-checked="true"] { border-color: var(--primary-text); background: var(--hover-tint); }
+.role-opt:disabled { cursor: default; opacity: .6; }
+.role-dot { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #9aa4b1; background: var(--panel); }
+.role-opt[aria-checked="true"] .role-dot { border: 5px solid var(--primary); }
+.field-hint-tight { margin: -4px 0 12px; }
+
+/* people picker (Add engineer) */
+.ae-pick { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
+.ae-pick.hidden { display: none; }
+/* The search row is one box: icon + a bare input. .hm-search is built for a wrapping
+   ROW (flex: 1 1 260px, and 100% basis on a phone); in this column it stretched to fill
+   the whole dialog, so it must not grow here. The focus ring belongs to the box, not
+   to the input inside it (which drew a second outline), and the input drops the
+   native search-field look Safari adds. */
+.modal .ae-search { flex: none; height: 38px; padding: 0 11px; gap: 8px; }
+.ae-search .ic { width: 16px; height: 16px; flex: none; }
+#modal-add-engineer .ae-search input {
+  flex: 1; min-width: 0; border: 0 !important; margin: 0 !important; padding: 0 !important; height: auto !important;
+  background: none; font-size: 14px; -webkit-appearance: none; appearance: none;
+}
+@media (max-width: 640px) { #modal-add-engineer .ae-search input { font-size: 16px; } }
+.ae-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; max-height: 50dvh; overflow-y: auto; }
+.ae-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 12px; text-align: left;
+  border: 0; border-top: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; cursor: pointer;
+}
+.ae-row:first-child { border-top: 0; }
+.ae-row:hover { background: var(--hover-tint); }
+.ae-row:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+.ae-row[aria-checked="true"] { background: var(--hover-tint); box-shadow: inset 3px 0 0 var(--primary); }
+.ae-avatar { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--hover-tint); color: var(--primary-text); font-size: 12px; font-weight: 700; }
+.ae-who { flex: 1; min-width: 0; }
+.ae-who b { display: block; font-size: 13.5px; }
+.ae-who small { display: block; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ae-empty { padding: 12px; margin: 0; }
+
 @media (max-width: 720px) {
   #settings-view { grid-template-columns: minmax(0, 1fr); }
   #settings-rail { display: none; }
-  #sv-mobile-nav { display: block; background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 16px; }
-  #sv-head { padding: 16px 16px 12px; gap: 8px; }
-  #sv-title { font-size: 21px; }
+  /* the page is the whole screen: no room kept for the hidden bottom bar */
+  body.settings-open #app-root { padding-bottom: 0 !important; }
+
+  /* --- header band --- */
+  #sv-head { align-items: center; max-width: none; padding: 10px 12px; gap: 8px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .sv-crumb { display: block; margin-bottom: 1px; }
+  .sv-crumb:empty { display: none; }
+  #sv-title { font-size: 18px; letter-spacing: -.2px; }
+  #sv-hint { margin-top: 2px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #sv-hint:empty { display: none; }
   .sv-back-icon { display: inline-flex; order: -1; }
-  #sv-head-actions .btn { font-size: 12px; }
-  #sv-scroll { padding: 14px 16px; }
-  #sv-foot { padding: 10px 16px; flex-wrap: wrap; }
-  #sv-status { flex: 1 1 100%; }
-  #sv-foot .btn { flex: 1; }
+  #settings-view .sv-back-icon { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; border-color: transparent; background: transparent; color: var(--muted); }
+  #settings-view .sv-back-icon:hover { background: var(--bg-soft); color: var(--text); }
+  #sv-head-actions .btn { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; font-size: 12px; }
+  #sv-head-actions .btn .ic { margin: 0; }
+  #settings-view .btn-label { display: none; }
+
+  /* --- the section list --- */
+  #settings-view.sv-at-home #sv-home { display: block; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 16px 20px; }
+  #settings-view.sv-at-home #sv-scroll,
+  #settings-view.sv-at-home #sv-foot,
+  #settings-view.sv-at-home #sv-head-actions { display: none; }
+  #settings-view.sv-at-home .sv-ic-back { display: none; }
+  #settings-view.sv-at-home .sv-ic-close { display: inline; }
+  .svh-label { margin: 16px 4px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .svh-group { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; }
+  .svh-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 12px; text-align: left;
+    border: 0; border-top: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; transition: background-color .16s;
+  }
+  .svh-row:first-child { border-top: 0; }
+  .svh-row:active { background: var(--hover-tint); }
+  .svh-row:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+  .svh-ic { flex: none; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--hover-tint); color: var(--primary-text); }
+  .svh-ic .ic { width: 17px; height: 17px; }
+  .svh-text { flex: 1; min-width: 0; }
+  .svh-text b { display: block; font-size: 14.5px; font-weight: 600; }
+  .svh-text small { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .svh-dirty, .svh-waiting {
+    flex: none; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 20px;
+    background: var(--warn-surface); color: var(--warn-text); border: 1px solid var(--warn-line);
+  }
+  .svh-chev { flex: none; width: 16px; height: 16px; color: #9aa4b1; }
+  .svh-version { margin: 18px 4px 0; text-align: center; }
+
+  /* --- the action bar: status left, actions right, one line, under the pane --- */
+  #sv-foot {
+    position: static; transform: none; width: auto; max-width: none; flex-wrap: nowrap; gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    border: 0; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none; background: var(--bg-soft);
+  }
+  #sv-status { flex: 1 1 auto; font-size: 12px; font-weight: 400; }
+  #sv-status.dirty, #sv-status.saved, #sv-status.error { font-weight: 600; }
+  #sv-foot .btn { flex: none; min-height: 40px; height: 40px; padding: 0 16px; }
+  #sv-foot .btn-primary:disabled { opacity: .45; }
+
+  #sv-scroll { padding: 12px; }
+  .settings-hint { font-size: 12px; margin-bottom: 10px; }
+  .settings-count { display: none; }
   .sv-card { padding: 16px; }
+  .sv-two { gap: 12px; }
+  .sv-id { flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .sv-id .sv-avatar { width: 48px; height: 48px; font-size: 16px; }
+  .sv-id .account-meta { flex-basis: 100%; }
+  .sv-line { flex-wrap: wrap; }
   /* 44px touch targets */
-  #settings-view .btn, #settings-view input:not([type="checkbox"]):not([type="color"]), #settings-view select,
-  #sv-mobile-nav select { min-height: 44px; }
+  #settings-view .btn, #settings-view input:not([type="checkbox"]):not([type="color"]), #settings-view select { min-height: 44px; }
   #settings-view .btn-small { min-height: 44px; padding: 0 14px; }
-  #settings-view .st-del { min-width: 44px; min-height: 44px; }
-  #settings-view .weekday-chip { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   #settings-view .sw-pick { min-height: 44px; }
   #settings-view .sw-pick input[type="color"] { width: 28px; height: 28px; }
+
+  /* --- Engineers / Service areas / Boards: one compact row, opening in place --- */
+  .sv-row-head { min-height: 60px; padding-right: 4px; }
+  .sv-row-toggle { padding-left: 12px; gap: 12px; min-height: 60px; }
+  .sv-row-meta:not(.sv-row-week) { display: none; }
+  .sv-row-chev { width: 40px; }
+  .sv-row-edit { padding: 0 12px 14px; }
+  .sv-fields, .sv-fields-2, .sv-fields-1 { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sv-edit-foot .btn { min-height: 44px; }
+  .sv-row-week { order: 5; flex-basis: 100%; padding: 0 12px 12px; }
+  .sv-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); width: 100%; }
+  .sv-day span { min-width: 0; line-height: 42px; font-size: 12px; }
+
+  /* --- Users --- */
+  .sv-queue-row { flex-wrap: wrap; padding: 10px 12px; }
+  .sv-queue-who { flex-basis: calc(100% - 52px); }
+  .sv-queue-who small { white-space: normal; }
+  .sv-queue-act { flex-basis: 100%; }
+  .sv-queue-act .btn { flex: 1; }
+  #users-chips:not(:empty) { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -12px 10px; padding: 0 12px; }
+  #users-chips::-webkit-scrollbar { display: none; }
+  .sv-chip { flex: none; height: 34px; border-radius: 999px; }
+  .sv-chip[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .sv-chip[aria-pressed="true"] .n { opacity: .8; }
+  #users-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  #users-toolbar #users-search { min-width: 0; width: 100%; height: 40px; min-height: 40px; }
+  #users-toolbar .toolbar-spacer, #users-toolbar #users-count { display: none; }
+  #users-toolbar #btn-users-xlsx { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; }
+  #users-table, #users-table tbody, #users-table tr, #users-table td { display: block; width: auto; }
+  #users-table thead { display: none; }
+  #users-table tr.user-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "person role" "person status" "act act";
+    align-items: center; column-gap: 10px; row-gap: 4px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--sv-line);
+  }
+  #users-table tr.user-row:last-child { border-bottom: 0; }
+  #users-table tr.user-row > td { display: block; margin: 0; padding: 0; min-width: 0; border: 0; }
+  #users-table tr.user-row > td::before { content: none; display: none; }
+  #users-table tr.user-row > td:nth-child(1) { grid-area: person; }
+  #users-table tr.user-row > td:nth-child(2) { grid-area: role; justify-self: end; }
+  #users-table tr.user-row > td:nth-child(3) { grid-area: status; justify-self: end; }
+  #users-table tr.status-active > td:nth-child(3) { display: none; }
+  #users-table tr.user-row > td:nth-child(4) { display: none; }
+  #users-table tr.user-row > td.user-actions { grid-area: act; display: flex; justify-content: flex-start; gap: 6px; margin-top: 6px; }
+  #users-table tr.user-row > td.user-actions:not(:has(.btn-primary)) { display: none; }
+  #users-table td.user-actions .btn:not(.btn-primary):last-child { display: none; }   /* the pencil: the row opens the person */
+  .sv-person-main b, .sv-person-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #users-table .user-display-name { margin-left: 6px; }
+
+  /* --- Roles & permissions: the roles are chips, the chosen role's rows follow --- */
+  #settings-view .sv-banner { padding: 9px 11px; font-size: 12px; }
+  .rm-layout { display: block; }
+  .rm-roles { flex-direction: row; gap: 6px; overflow-x: auto; background: none; box-shadow: none; border-radius: 0; position: static; margin: 0 -12px 10px; padding: 0 12px; scrollbar-width: none; }
+  .rm-roles::-webkit-scrollbar { display: none; }
+  .rm-role { flex: none; width: auto; height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); }
+  .rm-role:first-child { border-top: 1px solid var(--border); }
+  .rm-role small, .rm-role[aria-pressed="true"]::before { display: none; }
+  .rm-role b { height: 100%; }
+  .rm-role[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .rm-role[aria-pressed="true"] b .ic { color: #fff; }
+  .rm-detail { padding: 14px; }
+  .rm-head h2 { font-size: 17px; }
+  .rm-row { gap: 10px; }
+  .seg-pick.rm-levels button { min-width: 0; padding: 0 10px; height: 38px; }
+  .rm-row.rm-changed { margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+}
+
+/* below 640 the top bar is the board's (its name, date and summary); Settings
+   has its own header, so it takes the screen */
+@media (max-width: 640px) {
+  body.settings-open #sticky-header { display: none; }
+  body.settings-open #sv-head { padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
 }
 @media (prefers-reduced-motion: reduce) {
   #settings-view * { scroll-behavior: auto !important; transition: none !important; }
@@ -6075,235 +6233,6 @@ body.exporting #board-capture { background: var(--bg); }
   .dp-holiday small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
 }
 
-/* ===== Settings on a phone (2026-10-14, design/settings-mobile-options.html, option A) =====
-   At 720px and below Settings opens on a grouped list of its sections (#sv-home,
-   drawn by renderSvHome in app.js) instead of a native <select>; a section then
-   has the whole screen with a back chevron to the list. Lists are compact rows,
-   the header's add action is an icon, and Save stays in the footer. The pieces
-   are the modal kit's: the header band, grouped list boxes, chips, the grey
-   footer. Wider screens keep the rail and are untouched by this block, except
-   the role list and the people picker in the dialogs, which are used everywhere. */
-#sv-home { display: none; }
-.sv-chips { display: none; }
-.sv-ic-close { display: none; }
-.role-pick-src { display: none !important; }
-
-/* role list (User, Add user) */
-.role-pick { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px; }
-.role-opt {
-  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; text-align: left;
-  border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); color: var(--text);
-  font: inherit; cursor: pointer; transition: border-color .16s, background-color .16s;
-}
-.role-opt b { display: block; font-size: 13px; }
-.role-opt small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
-.role-opt:hover { background: var(--hover-tint); }
-.role-opt:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
-.role-opt[aria-checked="true"] { border-color: var(--primary-text); background: var(--hover-tint); }
-.role-opt:disabled { cursor: default; opacity: .6; }
-.role-dot { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #9aa4b1; background: var(--panel); }
-.role-opt[aria-checked="true"] .role-dot { border: 5px solid var(--primary); }
-.field-hint-tight { margin: -4px 0 12px; }
-
-/* people picker (Add engineer) */
-.ae-pick { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
-.ae-pick.hidden { display: none; }
-/* The search row is one box: icon + a bare input. .hm-search is built for a wrapping
-   ROW (flex: 1 1 260px, and 100% basis on a phone); in this column it stretched to fill
-   the whole dialog, so it must not grow here. The focus ring belongs to the box, not
-   to the input inside it (which drew a second outline), and the input drops the
-   native search-field look Safari adds. */
-.modal .ae-search { flex: none; height: 38px; padding: 0 11px; gap: 8px; }
-.ae-search .ic { width: 16px; height: 16px; flex: none; }
-#modal-add-engineer .ae-search input {
-  flex: 1; min-width: 0; border: 0 !important; margin: 0 !important; padding: 0 !important; height: auto !important;
-  background: none; font-size: 14px; -webkit-appearance: none; appearance: none;
-}
-@media (max-width: 640px) { #modal-add-engineer .ae-search input { font-size: 16px; } }
-.ae-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; max-height: 50dvh; overflow-y: auto; }
-.ae-row {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; padding: 8px 12px; text-align: left;
-  border: 0; border-top: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; cursor: pointer;
-}
-.ae-row:first-child { border-top: 0; }
-.ae-row:hover { background: var(--hover-tint); }
-.ae-row:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
-.ae-row[aria-checked="true"] { background: var(--hover-tint); box-shadow: inset 3px 0 0 var(--primary); }
-.ae-avatar { flex: none; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--hover-tint); color: var(--primary-text); font-size: 12px; font-weight: 700; }
-.ae-who { flex: 1; min-width: 0; }
-.ae-who b { display: block; font-size: 13.5px; }
-.ae-who small { display: block; font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ae-empty { padding: 12px; margin: 0; }
-
-/* the Roles level buttons only show where one role is shown at a time */
-.rm-seg { display: none; }
-
-@media (max-width: 960px) {
-  #roles-matrix td[data-role] .rm-level { display: none; }
-  #roles-matrix td[data-role] .rm-seg { display: flex; margin: 0; width: 100%; }
-  #roles-matrix .rm-seg button { height: 34px; font-size: 12.5px; }
-  #roles-matrix .rm-seg button[aria-pressed="true"] { background: var(--primary); color: #fff; box-shadow: none; }
-  #roles-matrix .rm-seg button:disabled { cursor: default; opacity: .7; }
-  .rm-role-pick { display: none; }
-  #rm-role-chips { display: flex; }
-}
-
-@media (max-width: 720px) {
-  /* the page is the whole screen: no room kept for the hidden bottom bar */
-  body.settings-open #app-root { padding-bottom: 0 !important; }
-
-  /* --- header band --- */
-  #sv-head { align-items: center; padding: 10px 12px; gap: 8px; }
-  .sv-crumb { margin-bottom: 1px; }
-  #sv-title { font-size: 18px; letter-spacing: -.2px; }
-  #sv-hint { margin-top: 2px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #sv-hint:empty { display: none; }
-  .sv-crumb:empty { display: none; }
-  #settings-view .sv-back-icon { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; border-color: transparent; background: transparent; color: var(--muted); }
-  #settings-view .sv-back-icon:hover { background: var(--bg-soft); color: var(--text); }
-  #sv-head-actions .btn { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; }
-  #sv-head-actions .btn .ic { margin: 0; }
-  #settings-view .btn-label { display: none; }
-
-  /* --- the section list --- */
-  #settings-view.sv-at-home #sv-home { display: block; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 16px 20px; }
-  #settings-view.sv-at-home #sv-scroll,
-  #settings-view.sv-at-home #sv-foot,
-  #settings-view.sv-at-home #sv-head-actions { display: none; }
-  #settings-view.sv-at-home .sv-ic-back { display: none; }
-  #settings-view.sv-at-home .sv-ic-close { display: inline; }
-  .svh-label { margin: 16px 4px 6px; font-size: 12px; font-weight: 700; color: var(--muted); }
-  .svh-group { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-box); overflow: hidden; }
-  .svh-row {
-    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 12px; text-align: left;
-    border: 0; border-top: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit; cursor: pointer;
-    -webkit-tap-highlight-color: transparent; transition: background-color .16s;
-  }
-  .svh-row:first-child { border-top: 0; }
-  .svh-row:active { background: var(--hover-tint); }
-  .svh-row:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
-  .svh-ic { flex: none; width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; background: var(--hover-tint); color: var(--primary-text); }
-  .svh-ic .ic { width: 17px; height: 17px; }
-  .svh-text { flex: 1; min-width: 0; }
-  .svh-text b { display: block; font-size: 14.5px; font-weight: 600; }
-  .svh-text small { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .svh-dirty, .svh-waiting {
-    flex: none; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 20px;
-    background: var(--warn-surface); color: var(--warn-text); border: 1px solid var(--warn-line);
-  }
-  .svh-chev { flex: none; width: 16px; height: 16px; color: #9aa4b1; }
-  .svh-version { margin: 18px 4px 0; text-align: center; }
-
-  /* --- footer: status left, actions right, one line --- */
-  #sv-foot { flex-wrap: nowrap; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg-soft); }
-  #sv-status { flex: 1 1 auto; font-size: 12px; }
-  #sv-foot .btn { flex: none; min-height: 40px; height: 40px; padding: 0 16px; }
-  #sv-foot .btn-primary:disabled { opacity: .45; }
-
-  #sv-scroll { padding: 12px; }
-  .settings-hint { font-size: 12px; margin-bottom: 10px; }
-  .settings-count { display: none; }
-  /* rows, not controls, are the touch targets */
-  #settings-view .btn-small { min-height: 36px; padding: 0 12px; }
-
-  /* --- Engineers / Service areas / Boards: one compact row each --- */
-  #settings-view .settings-table.sv-responsive tr.st-row {
-    display: grid; column-gap: 12px; row-gap: 2px; align-items: center; padding: 10px 8px 10px 12px;
-  }
-  #settings-view .settings-table.sv-responsive tr.st-row > td { display: block; margin: 0; padding: 0; min-width: 0; }
-  #settings-view .settings-table.sv-responsive tr.st-row > td::before { content: none; display: none; }
-  #settings-view .settings-table.sv-responsive td.st-swatch { grid-area: sw; }
-  #settings-view .settings-table.sv-responsive td.st-primary { grid-area: name; font-size: 14px; }
-  #settings-view .settings-table.sv-responsive td.st-act { grid-area: act; display: flex; justify-content: flex-end; margin: 0; }
-  #settings-view .sw-pick { padding: 0; border: 0; height: auto; min-height: 0; background: none; }
-  #settings-view .sw-pick b { display: none; }
-  #settings-view .sw-pick input[type="color"] { width: 32px; height: 32px; border-radius: 8px; }
-  #settings-view .st-del { min-width: 40px; min-height: 40px; }
-  #settings-view .settings-table td input[type="text"] { min-height: 38px; }
-
-  #settings-engineers tr.st-row { grid-template-columns: 32px auto minmax(0, 1fr) 40px; grid-template-areas: "sw name name act" "sw acct phone act"; }
-  #settings-engineers td.st-account { grid-area: acct; white-space: nowrap; }
-  #settings-engineers td.st-account .st-hint { display: none; }
-  #settings-engineers td.st-account select { width: 100%; max-width: none; }
-  #settings-engineers td.st-phone { grid-area: phone; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #settings-engineers td.st-phone:empty::after { content: "No phone yet"; }
-  #settings-engineers td.st-act:empty { visibility: hidden; }
-
-  #settings-areas tr.st-row { grid-template-columns: 32px minmax(0, 1fr) 40px; grid-template-areas: "sw name act"; }
-
-  #settings-boards tr.st-row { grid-template-columns: minmax(0, 1fr) 40px; grid-template-areas: "name act" "days days"; row-gap: 8px; }
-  #settings-boards td.st-days { grid-area: days; }
-  #settings-view .settings-table .settings-board-days {
-    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding: 2px; width: 100%; margin: 0;
-    border: 0; border-radius: var(--r); background: var(--bg-soft);
-  }
-  #settings-view .settings-board-days .weekday-chip {
-    min-width: 0; min-height: 36px; height: 36px; padding: 0; border: 0; border-radius: 6px; font-size: 12px; background: transparent;
-  }
-  #settings-view .settings-board-days .weekday-chip.on { background: var(--primary); color: #fff; }
-
-  /* --- chips (Users filters, Roles role) --- */
-  .sv-chips { gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -12px 10px; padding: 0 12px; }
-  .sv-chips::-webkit-scrollbar { display: none; }
-  #users-chips:not(:empty) { display: flex; }
-  .sv-chip {
-    flex: none; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px;
-    border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--text);
-    font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
-  }
-  .sv-chip .n { color: var(--muted); font-weight: 500; }
-  .sv-chip.warn { background: var(--warn-surface); border-color: var(--warn-line); color: var(--warn-text); }
-  .sv-chip[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
-  .sv-chip[aria-pressed="true"] .n { color: rgba(255, 255, 255, .75); }
-  .sv-chip:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
-
-  /* --- Users --- */
-  #users-pending { padding: 8px 10px; border-left-width: 1px; gap: 8px; flex-wrap: nowrap; font-size: 12.5px; }
-  #users-pending-text { min-width: 0; }
-  #users-pending #btn-users-pending { display: none; }   /* the Waiting chip does this */
-  #users-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-  #users-toolbar #users-search { min-width: 0; width: 100%; height: 40px; min-height: 40px; }
-  #users-toolbar #users-filters, #users-toolbar .toolbar-spacer, #users-toolbar #users-count { display: none; }
-  #users-toolbar #btn-users-xlsx { width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; }
-  #users-table.sv-responsive tr.user-row {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name role" "email status" "act act";
-    column-gap: 10px; row-gap: 2px; padding: 10px 12px; cursor: pointer;
-  }
-  #users-table.sv-responsive tr.user-row > td { display: block; margin: 0; padding: 0; min-width: 0; }
-  #users-table.sv-responsive tr.user-row > td::before { content: none; display: none; }
-  #users-table.sv-responsive tr.user-row > td:nth-child(1) { grid-area: name; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #users-table.sv-responsive tr.user-row > td:nth-child(2) { grid-area: email; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
-  #users-table.sv-responsive tr.user-row > td:nth-child(3) { grid-area: role; justify-self: end; }
-  #users-table.sv-responsive tr.user-row > td:nth-child(4) { grid-area: status; justify-self: end; }
-  #users-table.sv-responsive tr.status-active > td:nth-child(4) { display: none; }
-  #users-table.sv-responsive tr.user-row > td:nth-child(5),
-  #users-table.sv-responsive tr.user-row > td:nth-child(6) { display: none; }
-  #users-table.sv-responsive tr.user-row > td.user-actions { grid-area: act; display: flex; justify-content: flex-start; gap: 6px; margin-top: 6px; }
-  #users-table.sv-responsive tr.user-row > td.user-actions:not(:has(.btn-primary)) { display: none; }
-  #users-table.sv-responsive td.user-actions .btn:not(.btn-primary):last-child { display: none; }   /* the pencil: the row opens the person */
-  #users-table .user-display-name { margin-left: 6px; }
-
-  /* --- Roles & permissions --- */
-  #rm-role-chips { margin-bottom: 10px; }
-  #settings-view .sv-banner { padding: 9px 11px; font-size: 12px; }
-  .settings-pane[data-pane="roles"] > .import-note { font-size: 12px; }
-  #roles-matrix td[data-role] { width: 150px; }
-}
-
-/* below 640 the top bar is the board's (its name, date and summary); Settings
-   has its own header, so it takes the screen */
-@media (max-width: 640px) {
-  body.settings-open #sticky-header { display: none; }
-  body.settings-open #sv-head { padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
-}
-.settings-table td.st-phone:empty::after { content: "—"; }
-@media (max-width: 720px) {
-  #settings-engineers td.st-phone:empty::after { content: "No phone yet"; }
-  #users-table.sv-responsive tr.user-row > td { border: 0; }
-
-}
-
-
 /* ===== Signal polish (2026-10-15, design/signal-gaps-review.html) =====
    The approved items from the Signal review. Every dialog keeps the surface it
    already has (side panel, centred dialog, full-screen list); only the inside
@@ -6691,10 +6620,6 @@ label > .pk { margin-top: 5px; }
 #emplist-bulkbar .pk { display: inline-block; width: auto; }
 #emplist-bulkbar .pk-btn { width: auto; min-width: 150px; height: 30px; font-size: 12.5px; }
 #filter-pop .filter-sort .pk { margin-top: 0; }
-#roles-matrix .pk { display: inline-block; width: auto; vertical-align: middle; }
-#roles-matrix .pk-btn { width: auto; min-width: 84px; height: 28px; padding: 0 6px 0 9px; font-size: 12px; }
-#roles-matrix td.rm-changed .pk-btn { font-weight: 700; }
-@media (max-width: 960px) { #roles-matrix td[data-role] .pk { display: none; } }
 .cap-ph-hostbar .pk { flex: 1 1 auto; min-width: 0; }
 .cap-ph-hostbar .pk-btn { height: 40px; font-size: 14px; font-weight: 600; }
 
