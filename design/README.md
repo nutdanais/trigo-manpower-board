@@ -132,3 +132,17 @@ findings ranked P0 (fix before release) to P2 (polish), each with today's
 screenshot beside a live mockup of the proposed change. Screenshots come from
 the test harness's sample data at 1400 / 1100 / 390px in English and Thai.
 Like the rest of this folder it is not loaded by the app.
+
+## Settings redesign directions (2026-10-17)
+
+`settings-redesign-directions.html` is a standalone, interactive review page for the
+Settings page and its six sections (My account, Engineers, Service areas, Boards,
+Users, Roles & permissions). It has ten findings (F1–F10) read from `index.html`,
+`styles.css` and `app.js`, then today's page next to four directions, one section at a
+time, on desktop (1400×900) and phone (390×844): A Quiet rail (same rail and sections,
+calmer pages), B Master–detail, C Top tabs in one column, D Hub. "Today" frames are real
+screenshots from the test harness (sample data, Geist font), inlined as JPEG; the
+proposals are live HTML with a little script (open a row, toggle a working day, cycle a
+permission, approve a request). A comparison table and a recommendation (A as the base,
+with B's by-role permission editor and D's attention strip) close the page. Light only,
+like the app. Not loaded by the app.
