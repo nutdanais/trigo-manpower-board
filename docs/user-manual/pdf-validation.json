@@ -1,0 +1,22 @@
+{
+  "files": [
+    {
+      "language": "EN",
+      "slides": 43,
+      "contentsLinks": 16,
+      "qrDestination": "https://trigoth-manpowerboard.netlify.app",
+      "version": "2026-10-13x",
+      "sizeBytes": 4552551
+    },
+    {
+      "language": "TH",
+      "slides": 43,
+      "contentsLinks": 16,
+      "qrDestination": "https://trigoth-manpowerboard.netlify.app",
+      "version": "2026-10-13x",
+      "sizeBytes": 4577942
+    }
+  ],
+  "layoutIssues": 0,
+  "captureSource": "Real current app, synthetic example data; mobile emulated"
+}

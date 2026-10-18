@@ -1,0 +1,1074 @@
+{
+  "version": "2026-10-13x",
+  "appCommit": "722bf9d1083bec9a4f9b37d1fdd3bd5e53f897b5",
+  "updated": "14 Oct 2026",
+  "url": "https://trigoth-manpowerboard.netlify.app",
+  "lessons": [
+    {
+      "key": "access",
+      "image": "login",
+      "en": [
+        "Open the app and sign in",
+        "START HERE",
+        [
+          "Open the website|Scan the QR or open the link. Use your normal browser, with internet connected.",
+          "Enter your company account|Use your approved @trigo-group.com email and password.",
+          "Select Sign in|Check the board and date. Login starts on the next working day."
+        ],
+        "The QR opens the website. Account approval is still required."
+      ],
+      "th": [
+        "เปิดแอปและเข้าสู่ระบบ",
+        "เริ่มที่นี่",
+        [
+          "เปิดเว็บไซต์|สแกน QR หรือเปิดลิงก์ ใช้เบราว์เซอร์ปกติและเชื่อมต่ออินเทอร์เน็ต",
+          "กรอกบัญชีบริษัท|ใช้อีเมล @trigo-group.com และรหัสผ่านของบัญชีที่ได้รับอนุมัติ",
+          "กด Sign in|ตรวจบอร์ดและวันที่ แอปเปิดวันทำงานถัดไปเมื่อเข้าสู่ระบบ"
+        ],
+        "QR ใช้เปิดเว็บไซต์ แต่ยังต้องใช้บัญชีที่ได้รับอนุมัติ"
+      ],
+      "role": "all",
+      "kind": "access"
+    },
+    {
+      "key": "request",
+      "image": "request",
+      "en": [
+        "Request access or reset a password",
+        "START HERE",
+        [
+          "Select Request access|Enter your full name, company email and a password of at least 8 characters; select Send request.",
+          "Wait for an admin|Sign in after approval. An admin may instead provide a temporary password.",
+          "Choose your own password|The app asks you to replace an admin-issued password. If forgotten, ask an admin to reset it."
+        ],
+        "The app sends no password-reset email."
+      ],
+      "th": [
+        "ขอสิทธิ์หรือขอรหัสผ่านใหม่",
+        "เริ่มที่นี่",
+        [
+          "กด Request access|กรอกชื่อเต็ม อีเมลบริษัท และรหัสผ่านอย่างน้อย 8 ตัวอักษร แล้วกด Send request",
+          "รอผู้ดูแลอนุมัติ|เข้าสู่ระบบเมื่อได้รับอนุมัติ หรือผู้ดูแลอาจให้รหัสผ่านชั่วคราว",
+          "ตั้งรหัสผ่านของคุณ|แอปให้เปลี่ยนรหัสชั่วคราว หากลืมรหัส ให้ผู้ดูแลตั้งใหม่"
+        ],
+        "แอปไม่ส่งอีเมลรีเซ็ตรหัสผ่าน"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "android",
+      "image": "phone-board",
+      "en": [
+        "Install or add on Android Chrome",
+        "MOBILE SETUP",
+        [
+          "Open the website in Chrome|Use a normal tab. If the QR opens another browser, copy the link into Chrome.",
+          "Open the ⋮ menu|Choose Install and create shortcut. Select Install if offered, otherwise Create shortcut.",
+          "Confirm and open the icon|Follow the prompts or tap Add. The app's default name is Manpower Board; sign in if asked."
+        ],
+        "Older Chrome may say Add to Home screen. Keep internet connected to load and save plans."
+      ],
+      "th": [
+        "ติดตั้งหรือเพิ่มบน Android Chrome",
+        "ตั้งค่ามือถือ",
+        [
+          "เปิดเว็บไซต์ใน Chrome|ใช้แท็บปกติ หาก QR เปิดเบราว์เซอร์อื่น ให้คัดลอกลิงก์มาเปิดใน Chrome",
+          "เปิดเมนู ⋮|เลือก Install and create shortcut หากมี Install ให้เลือก มิฉะนั้นใช้ Create shortcut",
+          "ยืนยันแล้วเปิดไอคอน|ทำตามหน้าจอหรือกด Add ชื่อเริ่มต้นคือ Manpower Board แล้วเข้าสู่ระบบหากแอปถาม"
+        ],
+        "Chrome รุ่นเก่าอาจใช้ Add to Home screen เชื่อมต่ออินเทอร์เน็ตเพื่อโหลดและบันทึกแผน"
+      ],
+      "role": "all",
+      "kind": "android"
+    },
+    {
+      "key": "iphone",
+      "image": "phone-board",
+      "en": [
+        "Add the app on iPhone",
+        "MOBILE SETUP",
+        [
+          "Open the same link in Safari|Use Safari for these Home Screen steps.",
+          "Open Share|Scroll to Add to Home Screen.",
+          "Confirm the name and Add|Use Manpower Board. Keep Open as Web App on if available. Open the icon and sign in."
+        ],
+        "Browser and iOS wording can vary. Adding the icon does not grant account access."
+      ],
+      "th": [
+        "เพิ่มแอปบน iPhone",
+        "ตั้งค่ามือถือ",
+        [
+          "เปิดลิงก์เดียวกันใน Safari|ขั้นตอนเพิ่มไอคอนนี้ใช้ Safari",
+          "เปิดเมนู Share|เลื่อนหา Add to Home Screen",
+          "ตรวจชื่อแล้วกด Add|ใช้ชื่อ Manpower Board เปิด Open as Web App หากมี แล้วแตะไอคอนเพื่อเข้าสู่ระบบ"
+        ],
+        "ชื่อเมนูอาจต่างกันตาม iOS การเพิ่มไอคอนไม่ได้ให้สิทธิ์เข้าบัญชี"
+      ],
+      "role": "all",
+      "kind": "iphone"
+    },
+    {
+      "key": "design",
+      "image": "board",
+      "en": [
+        "Find controls in the updated design",
+        "THE UPDATED APP",
+        [
+          "Use the navy module bar|Board, Overview, Org Chart, Manpower, Host and Capacity are now modules in the header.",
+          "Choose a board from the dropdown|The Board selector is in the white toolbar on desktop. On a phone, tap the board name.",
+          "Use the right-hand controls|The status pill, Lock and date sit together. Settings opens a page; Sign out is in your avatar menu."
+        ],
+        "This manual uses current-release screenshots with example data. The app now uses a light interface."
+      ],
+      "th": [
+        "หาปุ่มในรูปแบบใหม่ของแอป",
+        "รูปแบบแอปใหม่",
+        [
+          "ใช้แถบโมดูลสีน้ำเงิน|Board, Overview, Org Chart, Manpower, Host และ Capacity อยู่ในแถบด้านบน",
+          "เลือกบอร์ดจากรายการ|บนคอมพิวเตอร์ Board อยู่ในแถบเครื่องมือสีขาว บนมือถือแตะชื่อบอร์ด",
+          "ใช้ปุ่มด้านขวา|สถานะแผน Lock และวันที่อยู่ด้วยกัน Settings เปิดเป็นหน้า และ Sign out อยู่ในเมนูอวตาร"
+        ],
+        "ภาพหน้าจอใช้แอปรุ่นปัจจุบันกับข้อมูลตัวอย่าง แอปใช้หน้าตาแบบสว่าง"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "navigation",
+      "image": "board-menu",
+      "en": [
+        "Choose the board, date and status",
+        "DAILY PLANNING",
+        [
+          "Open Board and choose your team|Use the Board dropdown; names and headcounts help identify the right board.",
+          "Check the planning date|Click the date for the calendar or use ‹ and › for adjacent days.",
+          "Read the status pill|Confirmed is the working plan. Forecast is tentative. Locked or Read-only means editing is restricted."
+        ],
+        "Each board and date has its own plan. A past day is read-only by default; any Edit anyway action needs a deliberate confirmation."
+      ],
+      "th": [
+        "เลือกบอร์ด วันที่ และสถานะแผน",
+        "วางแผนประจำวัน",
+        [
+          "เปิด Board แล้วเลือกทีม|ใช้รายการ Board โดยชื่อและจำนวนคนช่วยระบุบอร์ด",
+          "ตรวจวันที่วางแผน|คลิกวันที่เพื่อเปิดปฏิทิน หรือใช้ ‹ และ › เลื่อนวัน",
+          "อ่านสถานะแผน|Confirmed คือแผนใช้งาน Forecast คือแผนล่วงหน้า Locked หรือ Read-only จำกัดการแก้ไข"
+        ],
+        "แต่ละบอร์ดและวันที่มีแผนแยกกัน วันที่ผ่านมาดูได้อย่างเดียวโดยปริยาย หากใช้ Edit anyway ต้องยืนยันอย่างตั้งใจ"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "summary",
+      "image": "board",
+      "en": [
+        "Read the headcount and leave tabs",
+        "DAILY PLANNING",
+        [
+          "Read Total and Assigned|Assigned includes Day and Night. Day + Night equals Assigned.",
+          "Check the other status counts|Leave, Standby, Holiday when shown, and On-call free complete the total. Standby is flagged when permanent staff are idle.",
+          "Use By area and the leave tabs|Area counts add up to Total. Select Annual, Sick, Business, Unpaid or Exchange to see that lane."
+        ],
+        "Leave tabs show counts and accept placement. The app draws all non-empty leave lanes in board exports."
+      ],
+      "th": [
+        "อ่านจำนวนคนและแท็บวันลา",
+        "วางแผนประจำวัน",
+        [
+          "ดู Total และ Assigned|Assigned รวม Day และ Night โดย Day + Night เท่ากับ Assigned",
+          "ตรวจสถานะอื่น|Leave, Standby, Holiday เมื่อมี และ On-call free รวมเป็นยอดทั้งหมด Standby เตือนเมื่อพนักงานประจำยังไม่มีงาน",
+          "ใช้ By area และแท็บวันลา|ยอดพื้นที่รวมเป็น Total เลือก Annual, Sick, Business, Unpaid หรือ Exchange เพื่อดูแถววันลา"
+        ],
+        "แท็บวันลาแสดงจำนวนคนและใช้เป็นปลายทางจัดคน ไฟล์ส่งออกแสดงทุกประเภทลาที่มีคน"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "carry",
+      "image": "empty",
+      "en": [
+        "Start an empty day with Carry over",
+        "DAILY PLANNING",
+        [
+          "Check the board and date|An empty day does not copy yesterday automatically.",
+          "Select Carry over|Use the toolbar or the empty-day prompt to copy the last working day's missions and crew.",
+          "Review what was copied|Check hosts, shifts, times, people and leave before changing the plan."
+        ],
+        "Reset Board replaces an existing day's plan. Review changes is the gentler option when a carry-over becomes stale."
+      ],
+      "th": [
+        "เริ่มวันที่ว่างด้วย Carry over",
+        "วางแผนประจำวัน",
+        [
+          "ตรวจบอร์ดและวันที่|วันที่ว่างไม่คัดลอกแผนวันก่อนให้อัตโนมัติ",
+          "กด Carry over|ใช้ปุ่มในแถบเครื่องมือหรือข้อความบนบอร์ดว่าง เพื่อคัดลอกภารกิจและคนจากวันทำงานล่าสุด",
+          "ตรวจแผนที่คัดลอก|ตรวจ Host กะ เวลา คน และวันลาก่อนปรับแผน"
+        ],
+        "Reset Board แทนที่แผนของวันที่มีข้อมูล หากต้นทางเปลี่ยน ให้ใช้ Review changes เพื่อเลือกเฉพาะส่วนที่ต้องปรับ"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "mission",
+      "image": "mission",
+      "en": [
+        "Create a mission in the side panel",
+        "DAILY PLANNING",
+        [
+          "Select New Mission|Desktop opens a panel on the right. Phones open the form full screen.",
+          "Enter the work details|Fill mission number, Host and Customer. Use Day / Night segments, Start / End, and PPE.",
+          "Choose Engineer, then Save|Select a matching name, add a Remark if needed, and use the pinned Save button."
+        ],
+        "Choose a Host from the list. Follow the create-host prompt if it is missing."
+      ],
+      "th": [
+        "สร้างภารกิจในแผงด้านข้าง",
+        "วางแผนประจำวัน",
+        [
+          "กด New Mission|คอมพิวเตอร์เปิดแผงด้านขวา มือถือเปิดแบบเต็มหน้าจอ",
+          "กรอกรายละเอียดงาน|ใส่เลขภารกิจ Host และ Customer เลือก Day / Night ระบุ Start / End และ PPE",
+          "เลือก Engineer แล้ว Save|เลือกชื่อที่ตรงกัน เพิ่ม Remark หากต้องการ และกด Save ที่แถบด้านล่าง"
+        ],
+        "เลือก Host จากรายการ หากไม่มี ให้ทำตามคำแนะนำเพื่อสร้าง Host"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "edit-mission",
+      "image": "mission-edit",
+      "en": [
+        "Edit, pause or delete a mission",
+        "DAILY PLANNING",
+        [
+          "Open the mission header|Click its header to open the record panel.",
+          "Edit and Save|Check host, shift, times, engineer and remarks. Cancel or Escape closes the panel.",
+          "Use Hide for a paused mission|Its definition stays, while crew returns to the available pool. Delete removes the mission record."
+        ],
+        "Read any confirmation before deleting or changing a finished plan."
+      ],
+      "th": [
+        "แก้ไข พัก หรือลบภารกิจ",
+        "วางแผนประจำวัน",
+        [
+          "เปิดหัวการ์ดภารกิจ|คลิกส่วนหัวเพื่อเปิดแผงข้อมูล",
+          "แก้ไขแล้ว Save|ตรวจ Host กะ เวลา Engineer และหมายเหตุ ใช้ Cancel หรือ Escape เพื่อปิด",
+          "ใช้ Hide เมื่อพักภารกิจ|ข้อมูลภารกิจยังอยู่ แต่คนกลับเข้าพูล ส่วน Delete ใช้ลบภารกิจ"
+        ],
+        "อ่านข้อความยืนยันก่อนลบหรือแก้แผนที่ตรวจเสร็จแล้ว"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "hide",
+      "image": "hide",
+      "en": [
+        "Review Hide / Unhide before saving",
+        "DAILY PLANNING",
+        [
+          "Open Hide/Unhide or Hidden n|The button also flags missions with no crew.",
+          "Find the relevant missions|Suggested · no crew is first, followed by On the board and Hidden. Search or use All / No crew / Hidden / Day / Night.",
+          "Check the preview and Save|Selected rows say Will hide or Will unhide. The footer shows changes and how many people return to Standby."
+        ],
+        "An empty mission card can be hidden immediately with its Hide button; the toast offers Undo."
+      ],
+      "th": [
+        "ตรวจ Hide / Unhide ก่อนบันทึก",
+        "วางแผนประจำวัน",
+        [
+          "เปิด Hide/Unhide หรือ Hidden n|ปุ่มยังแจ้งจำนวนภารกิจที่ไม่มีคน",
+          "หาภารกิจที่ต้องการ|Suggested · no crew อยู่ก่อน ตามด้วย On the board และ Hidden ใช้คำค้นหรือ All / No crew / Hidden / Day / Night",
+          "ตรวจตัวอย่างแล้ว Save|แถวที่เลือกแสดง Will hide หรือ Will unhide ด้านล่างสรุปการเปลี่ยนและจำนวนคนกลับ Standby"
+        ],
+        "การ์ดภารกิจว่างมีปุ่ม Hide ที่ซ่อนทันที และมี Undo ในข้อความแจ้ง"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "assign",
+      "image": "assign",
+      "en": [
+        "Assign people on a computer",
+        "PEOPLE ON THE BOARD",
+        [
+          "Find the employee|Look in Standby or Available On-call. Check the name and TRIGO ID.",
+          "Select, then place|Click a card, then the mission; or drag it. Ctrl-click adds several people to the selection.",
+          "Use the actions menu if easier|Right-click → Assign to mission → choose the destination. Confirm the crew count afterward."
+        ],
+        "Every employee belongs to one board. Undo reverses the latest assignment when available."
+      ],
+      "th": [
+        "จัดคนบนคอมพิวเตอร์",
+        "จัดคนบนบอร์ด",
+        [
+          "ค้นหาพนักงาน|ดูใน Standby หรือ Available On-call แล้วตรวจชื่อและ TRIGO ID",
+          "เลือกแล้วจัดลงงาน|คลิกคนแล้วคลิกภารกิจ หรือใช้การลาก กด Ctrl ค้างเพื่อเลือกหลายคน",
+          "ใช้เมนูเมื่อสะดวกกว่า|คลิกขวา → Assign to mission → เลือกปลายทาง แล้วตรวจจำนวนคน"
+        ],
+        "พนักงานอยู่ได้หนึ่งบอร์ด ใช้ Undo ย้อนการจัดคนล่าสุดเมื่อปุ่มใช้งานได้"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "leave",
+      "image": "leave",
+      "en": [
+        "Record leave or return to Standby",
+        "PEOPLE ON THE BOARD",
+        [
+          "Select the correct people|Check the board and date before moving anyone.",
+          "Choose the leave type|Click or drop on the Annual / Sick / Business / Unpaid / Exchange tab, or use the actions menu.",
+          "Return people to the pool|Use the appropriate Standby or Available On-call action when they are no longer assigned."
+        ],
+        "Leave counts update with each move. A filter changes visibility, not assignments."
+      ],
+      "th": [
+        "บันทึกวันลาหรือส่งกลับ Standby",
+        "จัดคนบนบอร์ด",
+        [
+          "เลือกคนให้ถูกต้อง|ตรวจบอร์ดและวันที่ก่อนย้าย",
+          "เลือกประเภทวันลา|คลิกหรือลากไปแท็บ Annual / Sick / Business / Unpaid / Exchange หรือใช้เมนู",
+          "ส่งกลับเข้าพูล|เลือก Standby หรือ Available On-call ที่เหมาะสม เมื่อไม่อยู่ในภารกิจแล้ว"
+        ],
+        "จำนวนวันลาปรับตามการย้าย ตัวกรองเปลี่ยนการแสดงผล ไม่ได้เปลี่ยนการจัดคน"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "filters",
+      "image": "filter",
+      "en": [
+        "Search, filter and choose name language",
+        "PEOPLE ON THE BOARD",
+        [
+          "Find a person in Search employee|Assigned or leave matches are pointed out on the board.",
+          "Open Filter & sort|Choose Engineer, Host, Customer or Shift and the sort order. The button shows active filter count.",
+          "Use Thai / English|The board and Manpower list now have two name choices. Clear filters to return to the full view."
+        ],
+        "English display falls back to the Thai name when no English name is recorded. The old Both choice is no longer shown."
+      ],
+      "th": [
+        "ค้นหา กรอง และเลือกภาษาชื่อ",
+        "จัดคนบนบอร์ด",
+        [
+          "ค้นหาคนใน Search employee|หากอยู่ในภารกิจหรือวันลา แอปจะชี้ไปที่การ์ด",
+          "เปิด Filter & sort|เลือก Engineer, Host, Customer หรือ Shift และลำดับเรียง ปุ่มแสดงจำนวนตัวกรองที่ใช้",
+          "ใช้ Thai / English|บอร์ดและ Manpower มีสองตัวเลือกชื่อ ล้างตัวกรองเพื่อกลับไปดูทั้งหมด"
+        ],
+        "หากไม่มีชื่ออังกฤษ แอปใช้ชื่อไทยแทน ตัวเลือก Both แบบเดิมไม่แสดงแล้ว"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "phone-nav",
+      "image": "phone-board",
+      "en": [
+        "Navigate the new phone layout",
+        "ON YOUR PHONE",
+        [
+          "Tap the board name and date|Switch board from its name. Use the date arrows and the status pill to stay on the right day.",
+          "Tap the summary or Filter|The summary opens full numbers. Filter opens a sheet; ⋯ opens actions such as New mission and Export.",
+          "Use the bottom bar and Me|Board, Overview, Manpower and Host are direct tabs. Me contains Org Chart, Capacity, Lock, Settings and Sign out."
+        ],
+        "The header folds into one line while scrolling. Scroll to the top to open the full summary again."
+      ],
+      "th": [
+        "ใช้งานรูปแบบมือถือใหม่",
+        "บนมือถือ",
+        [
+          "แตะชื่อบอร์ดและวันที่|เปลี่ยนบอร์ดจากชื่อ ใช้ลูกศรวันที่และสถานะแผนเพื่ออยู่ในวันถูกต้อง",
+          "แตะยอดสรุปหรือ Filter|ยอดสรุปเปิดจำนวนเต็ม Filter เปิดแผง และ ⋯ เปิดคำสั่ง เช่น New mission และ Export",
+          "ใช้แถบล่างและ Me|Board, Overview, Manpower และ Host เปิดได้ตรง Me มี Org Chart, Capacity, Lock, Settings และ Sign out"
+        ],
+        "เมื่อเลื่อน แถบบนย่อเป็นหนึ่งแถว เลื่อนกลับด้านบนเพื่อเปิดยอดสรุปเต็ม"
+      ],
+      "role": "all",
+      "kind": "phone"
+    },
+    {
+      "key": "phone-place",
+      "image": "phone-drawer",
+      "en": [
+        "Select people, tap Place, then a target",
+        "ON YOUR PHONE",
+        [
+          "Open the people drawer|Tap the Standby / On-call strip above the bottom bar. Search for people if needed.",
+          "Tap the people to select|Add more people by tapping them. Then tap Place to close the drawer.",
+          "Tap a mission or leave tab|Place the selected people, then check the result. Use Clear to cancel or long-press for actions."
+        ],
+        "The drawer is the phone's people pool. It replaces the old always-visible side panel."
+      ],
+      "th": [
+        "เลือกคน กด Place แล้วแตะปลายทาง",
+        "บนมือถือ",
+        [
+          "เปิดลิ้นชักรายชื่อ|แตะแถบ Standby / On-call เหนือแถบล่าง แล้วค้นหาคนถ้าจำเป็น",
+          "แตะเลือกคน|แตะเพิ่มเพื่อเลือกหลายคน แล้วกด Place เพื่อปิดลิ้นชัก",
+          "แตะภารกิจหรือแท็บวันลา|จัดคนแล้วตรวจผล ใช้ Clear เพื่อยกเลิก หรือกดค้างเพื่อเปิดคำสั่ง"
+        ],
+        "ลิ้นชักคือพูลคนบนมือถือ แทนแผงด้านข้างแบบเดิม"
+      ],
+      "role": "edit",
+      "kind": "phone"
+    },
+    {
+      "key": "phone-lists",
+      "image": "phone-manpower",
+      "en": [
+        "Use mobile lists and More details",
+        "ON YOUR PHONE",
+        [
+          "Open Manpower or Host|Use the bottom navigation. Tap the summary for counts and area details.",
+          "Use Filter and ⋯|Filter holds search and list filters. ⋯ holds Bulk edit, Export and name-language choices where available.",
+          "Open More details on a card|Manpower reveals ID, position and dates. Host reveals extra site details. Record forms fill the screen."
+        ],
+        "Save stays at the bottom of full-screen forms. Available commands follow your role."
+      ],
+      "th": [
+        "ใช้รายการมือถือและ More details",
+        "บนมือถือ",
+        [
+          "เปิด Manpower หรือ Host|ใช้แถบนำทางด้านล่าง แตะยอดสรุปเพื่อดูจำนวนและพื้นที่",
+          "ใช้ Filter และ ⋯|Filter มีคำค้นและตัวกรอง ⋯ มี Bulk edit, Export และภาษาชื่อในหน้าที่รองรับ",
+          "เปิด More details บนการ์ด|Manpower แสดงรหัส ตำแหน่ง และวันที่ Host แสดงข้อมูลสถานที่เพิ่ม แบบฟอร์มเปิดเต็มหน้าจอ"
+        ],
+        "Save อยู่ด้านล่างของแบบฟอร์มเต็มหน้าจอ คำสั่งขึ้นกับสิทธิ์ของคุณ"
+      ],
+      "role": "all",
+      "kind": "phone"
+    },
+    {
+      "key": "employee",
+      "image": "employee",
+      "en": [
+        "Add or edit an employee record",
+        "ROSTER AND SITES",
+        [
+          "Open New Employee or Edit|On desktop, double-click a card or use its menu. On phone, use ⋯ or the card actions.",
+          "Enter identity separately|Thai name is required, English name optional. Put T + digits in TRIGO ID, not in the name.",
+          "Set contract, board and dates|Use the Permanent / On-call segments. Choose area, board, position and known dates, then Save."
+        ],
+        "Start date is the hire date. On the board from controls the first date the person counts in app plans."
+      ],
+      "th": [
+        "เพิ่มหรือแก้ไขข้อมูลพนักงาน",
+        "คนและสถานที่",
+        [
+          "เปิด New Employee หรือ Edit|คอมพิวเตอร์ดับเบิลคลิกการ์ดหรือใช้เมนู มือถือใช้ ⋯ หรือคำสั่งการ์ด",
+          "แยกชื่อกับรหัส|ต้องมีชื่อไทย ชื่ออังกฤษใส่ได้ ใส่ T ตามด้วยตัวเลขใน TRIGO ID ไม่ใส่ในชื่อ",
+          "กำหนดสัญญา บอร์ด และวันที่|เลือก Permanent / On-call ระบุพื้นที่ บอร์ด ตำแหน่ง และวันที่ที่ทราบ แล้ว Save"
+        ],
+        "Start date คือวันเริ่มงาน ส่วน On the board from คือวันแรกที่นับคนในแผนของแอป"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "manpower",
+      "image": "manpower",
+      "en": [
+        "Review the Manpower list and alerts",
+        "ROSTER AND SITES",
+        [
+          "Search, filter or sort|Search by name, TRIGO ID or phone. Open Filters or select a By area chip.",
+          "Repair missing details|Use a visible alert or + Add action to open the employee at the missing field.",
+          "Review Active status|Inactive staff leave today's and future plans, while earlier records are kept. Export follows the current filters."
+        ],
+        "Excel reports years, months and days of service from Start date. New hires do not rewrite older headcounts."
+      ],
+      "th": [
+        "ตรวจ Manpower และข้อมูลที่ขาด",
+        "คนและสถานที่",
+        [
+          "ค้นหา กรอง หรือเรียง|ค้นด้วยชื่อ TRIGO ID หรือโทรศัพท์ เปิด Filters หรือเลือกชิป By area",
+          "เติมข้อมูลที่ขาด|ใช้คำเตือนหรือ + Add ที่แสดง เพื่อเปิดพนักงานตรงช่องที่ขาด",
+          "ตรวจ Active|คน Inactive ไม่อยู่ในแผนวันนี้และอนาคต แต่ประวัติเดิมยังอยู่ ไฟล์ส่งออกตามตัวกรองปัจจุบัน"
+        ],
+        "Excel แสดงอายุงานเป็นปี เดือน และวันจาก Start date คนที่เพิ่มใหม่ไม่เปลี่ยนยอดของวันก่อน"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "bulk",
+      "image": "bulk",
+      "en": [
+        "Bulk edit with an Excel template",
+        "ROSTER AND SITES",
+        [
+          "Open Bulk edit and download the template|It contains the currently filtered list and internal IDs. Keep the ID column.",
+          "Edit and upload the .xlsx|Review To update, New, Unchanged and Problems, including each old → new value.",
+          "Back up, then Apply|Keep the backup option. Add new rows only if intended; correct flagged rows and upload again if needed."
+        ],
+        "Only .xlsx is accepted: up to 5 MB and 5,000 rows. Missing rows are not deleted; a board move clears that day's assignment."
+      ],
+      "th": [
+        "แก้ไขหลายรายการด้วย Excel",
+        "คนและสถานที่",
+        [
+          "เปิด Bulk edit แล้วโหลดแม่แบบ|แม่แบบใช้รายการที่กรองและมีรหัสภายใน เก็บคอลัมน์ ID ไว้",
+          "แก้แล้วอัปโหลด .xlsx|ตรวจ To update, New, Unchanged และ Problems รวมค่าเดิม → ค่าใหม่",
+          "สำรองแล้ว Apply|เก็บตัวเลือกสำรอง เพิ่มคนใหม่เฉพาะที่ตั้งใจ แก้แถวปัญหาแล้วอัปโหลดซ้ำได้"
+        ],
+        "รับเฉพาะ .xlsx ไม่เกิน 5 MB และ 5,000 แถว แถวที่หายไม่ถูกลบ การย้ายบอร์ดล้างการจัดคนของวันที่ดู"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "hosts",
+      "image": "hosts",
+      "en": [
+        "Find a host, site note and map",
+        "ROSTER AND SITES",
+        [
+          "Open Host and search|Search site, location, inspector or board. Use filters or By area chips.",
+          "Open the record to update details|Editors can set name, location, map link, area and note. Save the record panel.",
+          "Use the mission's host link|An underlined host with a map pin opens the recorded map or an address search."
+        ],
+        "Host notes also appear in the mission PPE line. Archive is for a retired site; Merge is for duplicates."
+      ],
+      "th": [
+        "หา Host หมายเหตุ และแผนที่",
+        "คนและสถานที่",
+        [
+          "เปิด Host แล้วค้นหา|ค้นด้วยสถานที่ ที่อยู่ คน หรือบอร์ด ใช้ตัวกรองหรือชิป By area",
+          "เปิดข้อมูลเพื่อแก้ไข|ผู้มีสิทธิ์แก้ไขระบุชื่อ ที่อยู่ ลิงก์แผนที่ พื้นที่ และหมายเหตุ แล้วบันทึก",
+          "ใช้ลิงก์ Host บนภารกิจ|ชื่อขีดเส้นใต้พร้อมหมุดเปิดแผนที่ที่บันทึก หรือค้นหาที่อยู่"
+        ],
+        "หมายเหตุ Host แสดงร่วมกับ PPE บนภารกิจ ใช้ Archive สำหรับสถานที่เลิกใช้งาน และ Merge สำหรับข้อมูลซ้ำ"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "overview",
+      "image": "overview",
+      "en": [
+        "Read Overview for all or one board",
+        "READ THE PLAN",
+        [
+          "Choose the date and Board|All boards or a single board scopes the entire dashboard and its export.",
+          "Read the attention card and KPIs|Check idle permanent people, utilization, deployed crew, missions and free on-call.",
+          "Follow the detail rows|By board can scope the dashboard. By engineer opens the filtered board; By area, Shifts and Host coverage explain the day."
+        ],
+        "Role permissions determine visible sections. Free on-call is surge capacity and is excluded from daily utilization's denominator."
+      ],
+      "th": [
+        "อ่าน Overview ของทุกบอร์ดหรือหนึ่งบอร์ด",
+        "อ่านแผน",
+        [
+          "เลือกวันที่และ Board|All boards หรือหนึ่งบอร์ดกำหนดข้อมูลทั้งหน้าและไฟล์ส่งออก",
+          "อ่านการ์ดเตือนและ KPI|ตรวจคนประจำที่ว่าง Utilization คนที่ลงงาน ภารกิจ และ On-call ที่ว่าง",
+          "ดูรายการรายละเอียด|By board กรองหน้าได้ By engineer เปิดบอร์ดที่กรองแล้ว ส่วนพื้นที่ กะ และ Host coverage อธิบายวันนี้"
+        ],
+        "ส่วนที่เห็นขึ้นกับสิทธิ์ On-call ที่ยังไม่ถูกเรียกเป็นกำลังเสริมและไม่นับในตัวหาร Utilization รายวัน"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "history",
+      "image": "overview-history",
+      "en": [
+        "Explore History and Engineer workload",
+        "READ THE PLAN",
+        [
+          "Choose the board and history range|Use This month, Last month, 30d, 90d, YTD or a custom range.",
+          "Choose the metric to chart|History offers Utilization, Deployed / day, Standby / day and Missions / day with range averages.",
+          "Read Engineer workload|The ranked table shows mission and crew load, permanent / on-call split, active days and trends."
+        ],
+        "Working-day calculations exclude weekends and holidays. Past reports keep historical headcounts and deployments."
+      ],
+      "th": [
+        "ดู History และภาระงาน Engineer",
+        "อ่านแผน",
+        [
+          "เลือกบอร์ดและช่วงย้อนหลัง|ใช้ This month, Last month, 30d, 90d, YTD หรือกำหนดเอง",
+          "เลือกตัวชี้วัดในกราฟ|History มี Utilization, Deployed / day, Standby / day และ Missions / day พร้อมค่าเฉลี่ย",
+          "อ่าน Engineer workload|ตารางเรียงภาระงานแสดงภารกิจและคน แยกประจำ / On-call จำนวนวันทำงาน และแนวโน้ม"
+        ],
+        "การคำนวณวันทำงานไม่รวมวันหยุดสุดสัปดาห์และวันหยุด รายงานอดีตเก็บจำนวนคนและการจัดงานของเวลานั้น"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "orgchart",
+      "image": "orgchart",
+      "en": [
+        "Explore and filter Org Chart",
+        "READ THE PLAN",
+        [
+          "Open Org Chart and check date|On phone, find it in Me.",
+          "Choose Board, Engineer and Service area|Use Show to to select how far down the hierarchy to display. Switch outline or chart as needed.",
+          "Filter Standby / Leave|All includes everyone. None shows mission crew only. Individual status choices carry through to counts and exports."
+        ],
+        "The chart represents the confirmed plan. Mission leads can show their account's role."
+      ],
+      "th": [
+        "ดูและกรอง Org Chart",
+        "อ่านแผน",
+        [
+          "เปิด Org Chart แล้วตรวจวันที่|บนมือถือเปิดจาก Me",
+          "เลือก Board, Engineer และ Service area|ใช้ Show to เลือกระดับที่แสดง และสลับ Outline หรือ Chart ตามต้องการ",
+          "กรอง Standby / Leave|All รวมทุกคน None แสดงเฉพาะคนในภารกิจ ตัวเลือกสถานะมีผลกับจำนวนและไฟล์ส่งออก"
+        ],
+        "แผนผังใช้แผนยืนยันแล้ว ผู้รับผิดชอบภารกิจอาจแสดง Role ของบัญชี"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "pptx",
+      "image": "orgchart-export",
+      "en": [
+        "Export Org Chart as editable PowerPoint",
+        "SAVE AND SHARE",
+        [
+          "Set the board, filters and Show to|The export follows the visible scope.",
+          "Select Export → PowerPoint|Check the slide count and thumbnail previews. Wide boards may split across slides.",
+          "Select Export n slides|Open the downloaded .pptx. Names and cards are editable PowerPoint text and shapes."
+        ],
+        "PowerPoint export is an Org Chart option. It is not offered as a board Excel replacement."
+      ],
+      "th": [
+        "ส่งออก Org Chart เป็น PowerPoint ที่แก้ไขได้",
+        "บันทึกและแชร์",
+        [
+          "กำหนดบอร์ด ตัวกรอง และ Show to|ไฟล์ส่งออกตามขอบเขตที่เลือก",
+          "เลือก Export → PowerPoint|ตรวจจำนวนและตัวอย่างสไลด์ บอร์ดกว้างอาจแบ่งหลายสไลด์",
+          "กด Export n slides|เปิดไฟล์ .pptx ชื่อและการ์ดเป็นข้อความและรูปร่างที่แก้ไขใน PowerPoint ได้"
+        ],
+        "PowerPoint เป็นตัวเลือกของ Org Chart ไม่ใช่การส่งออก Excel ของบอร์ด"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "lock",
+      "image": "locked",
+      "en": [
+        "Lock a finished plan and check save state",
+        "READ THE PLAN",
+        [
+          "Review the correct board and date|Check people, shifts, leave and mission details.",
+          "Select Lock|Desktop uses the header control; phone uses Me. The board becomes view-only for everyone.",
+          "Read any unlock confirmation|It identifies who locked the plan. Unlocking reopens it for everyone, not only you."
+        ],
+        "A saved / saving / failed indicator shows synchronization. On phone it is the dot on Me; investigate a failed state."
+      ],
+      "th": [
+        "ล็อกแผนและตรวจสถานะบันทึก",
+        "อ่านแผน",
+        [
+          "ตรวจบอร์ดและวันที่|ตรวจคน กะ วันลา และรายละเอียดภารกิจ",
+          "กด Lock|คอมพิวเตอร์ใช้ปุ่มด้านบน มือถือใช้ Me บอร์ดจะดูได้อย่างเดียวสำหรับทุกคน",
+          "อ่านคำยืนยันปลดล็อก|ดูว่าใครล็อก การปลดล็อกเปิดให้ทุกคนแก้ไข ไม่ใช่เฉพาะคุณ"
+        ],
+        "สถานะ saved / saving / failed แสดงการบันทึก บนมือถือเป็นจุดบน Me หากล้มเหลวให้ตรวจสอบ"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "forecast",
+      "image": "forecast",
+      "en": [
+        "Create a tentative forecast",
+        "PLAN AHEAD",
+        [
+          "Choose a later date|Beyond the board's next working day the status becomes Forecast.",
+          "Start from confirmed or Add Mission|Bring in the relevant confirmed missions, then adjust details and people.",
+          "Review holds and Copy forecast|People are tentative holds. Confirm before taking another engineer's hold. Copy only fills empty forecast working days."
+        ],
+        "Forecast does not change the confirmed board, Overview or exports until merged."
+      ],
+      "th": [
+        "สร้างแผนล่วงหน้า Forecast",
+        "วางแผนล่วงหน้า",
+        [
+          "เลือกวันที่ไกลออกไป|หลังวันทำงานถัดไปของบอร์ด สถานะจะเป็น Forecast",
+          "ใช้ Start from confirmed หรือ Add Mission|นำภารกิจยืนยันที่เกี่ยวข้องมา แล้วปรับข้อมูลและคน",
+          "ตรวจการจองและ Copy forecast|คนเป็นการจองชั่วคราว ยืนยันก่อนใช้คนที่ผู้อื่นจอง Copy เติมเฉพาะวันทำงานที่ Forecast ว่าง"
+        ],
+        "Forecast ไม่เปลี่ยนบอร์ดยืนยัน Overview หรือไฟล์ส่งออก จนกว่าจะรวมแผน"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "merge",
+      "image": "merge",
+      "en": [
+        "Review and merge the forecast",
+        "PLAN AHEAD",
+        [
+          "Open Review & merge when offered|When the day becomes confirmed, compare carry-over and forecast side by side.",
+          "Resolve every difference|Choose the side to keep for people, mission details and added or omitted missions.",
+          "Apply, inspect and confirm|Check the final crew summary. Give a reason when helpful; alerts and the Decisions log explain unused choices."
+        ],
+        "The app does not choose conflicting changes for you. Forecast is retained as a read-only reference."
+      ],
+      "th": [
+        "ตรวจและรวม Forecast",
+        "วางแผนล่วงหน้า",
+        [
+          "เปิด Review & merge เมื่อมี|เมื่อถึงวันยืนยัน ให้เทียบ Carry-over กับ Forecast สองฝั่ง",
+          "เลือกทุกจุดที่ต่างกัน|เลือกฝั่งที่จะใช้สำหรับคน รายละเอียด และภารกิจที่เพิ่มหรือเว้นไว้",
+          "Apply ตรวจแล้วยืนยัน|ตรวจสรุปจำนวนคน เพิ่มเหตุผลหากจำเป็น แจ้งเตือนและ Decisions อธิบายข้อเสนอที่ไม่ใช้"
+        ],
+        "แอปไม่เลือกความขัดแย้งแทนคุณ Forecast ยังเก็บไว้ให้อ่านย้อนหลัง"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "capacity",
+      "image": "capacity",
+      "en": [
+        "Plan demand in the updated Capacity grid",
+        "PLAN AHEAD",
+        [
+          "Choose one board and 1–8 weeks|A red board badge shows its short-day count.",
+          "Start from confirmed and enter demand|Add a Host from + Add host… at the last row. Set demand by host and shift.",
+          "Read the pinned totals|Dates, Demand, Available and Gap stay visible. The scaled gap plot shows the size of shortages and spare capacity."
+        ],
+        "Capacity plans numbers; it does not assign named people. Compare demand with people already named on missions."
+      ],
+      "th": [
+        "วางจำนวนคนในตาราง Capacity ใหม่",
+        "วางแผนล่วงหน้า",
+        [
+          "เลือกหนึ่งบอร์ดและช่วง 1–8 สัปดาห์|ป้ายสีแดงของบอร์ดบอกจำนวนวันที่คนขาด",
+          "เริ่มจากแผนยืนยันแล้วกรอกจำนวน|ใช้ + Add host… แถวล่างสุด เลือกความต้องการตาม Host และกะ",
+          "อ่านยอดที่ตรึงด้านบน|วันที่ Demand, Available และ Gap อยู่ให้เห็น กราฟ Gap แสดงขนาดคนขาดหรือคนเหลือ"
+        ],
+        "Capacity วางแผนตัวเลข ไม่ได้จัดชื่อคน เทียบความต้องการกับคนที่ระบุชื่อในภารกิจ"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "capacity-details",
+      "image": "capacity-details",
+      "en": [
+        "Check availability and manage demand rows",
+        "PLAN AHEAD",
+        [
+          "Click an Available number|Read the permanent / on-call split, leave and named-on-board count. Escape closes the details.",
+          "Copy or remove deliberately|Use Copy this week → next week, cell copy/paste, or row ⋯ → Remove this row… as permitted.",
+          "Find Reset to 0 in toolbar ⋯|It resets future demand for the selected board, keeping host rows and past days. Read the confirmation."
+        ],
+        "Reset to 0 cannot be undone. Export first if the current demand must be retained."
+      ],
+      "th": [
+        "ตรวจคนพร้อมและจัดการแถวจำนวน",
+        "วางแผนล่วงหน้า",
+        [
+          "คลิกจำนวน Available|ดูแยกประจำ / On-call วันลา และจำนวนที่ลงชื่อบนบอร์ด ใช้ Escape ปิด",
+          "คัดลอกหรือลบอย่างตั้งใจ|ใช้ Copy this week → next week คัดลอกเซลล์ หรือ ⋯ ของแถว → Remove this row… ตามสิทธิ์",
+          "หา Reset to 0 ใน ⋯ ของแถบเครื่องมือ|ล้างจำนวนอนาคตของบอร์ด แต่เก็บแถว Host และวันก่อน อ่านคำยืนยัน"
+        ],
+        "Reset to 0 ย้อนกลับไม่ได้ หากต้องเก็บจำนวนเดิม ให้ส่งออกก่อน"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "phone-capacity",
+      "image": "phone-capacity",
+      "en": [
+        "Plan Capacity one host at a time on phone",
+        "ON YOUR PHONE",
+        [
+          "Open Me → Capacity|Choose the board, then the Host or step with ‹ and ›.",
+          "Choose the week and edit each day|Daily cards show board Gap and a − / number / + stepper for this host. Viewers see numbers only.",
+          "Continue to the next host|Use Next host or + Add host… Start from confirmed, Copy week and Reset are in toolbar ⋯."
+        ],
+        "A host's day demand affects the board's total gap. Review the host and week before tapping a stepper."
+      ],
+      "th": [
+        "วาง Capacity ทีละ Host บนมือถือ",
+        "บนมือถือ",
+        [
+          "เปิด Me → Capacity|เลือกบอร์ด แล้วเลือก Host หรือใช้ ‹ และ ›",
+          "เลือกสัปดาห์แล้วแก้แต่ละวัน|การ์ดวันแสดง Gap ของบอร์ดและปุ่ม − / จำนวน / + ของ Host นี้ Viewer ดูตัวเลขได้อย่างเดียว",
+          "ไป Host ถัดไป|ใช้ Next host หรือ + Add host… ส่วน Start from confirmed, Copy week และ Reset อยู่ใน ⋯"
+        ],
+        "จำนวนของ Host มีผลกับ Gap รวมของบอร์ด ตรวจ Host และสัปดาห์ก่อนแตะปรับจำนวน"
+      ],
+      "role": "all",
+      "kind": "phone"
+    },
+    {
+      "key": "pdf",
+      "image": "export-pdf",
+      "en": [
+        "Save a board PDF or JPG",
+        "SAVE AND SHARE",
+        [
+          "Check Board, date and Thai / English|The exported board uses the name display you selected.",
+          "Select Export → PDF or JPG|On phone, Export is in ⋯. For PDF, select Export, then Save as PDF in browser printing.",
+          "Share as a file attachment|PDF keeps supported map and phone links clickable. JPG is suitable when an image is needed."
+        ],
+        "A forecast board has no export. Empty missions and empty leave lanes are excluded from board output."
+      ],
+      "th": [
+        "บันทึกบอร์ดเป็น PDF หรือ JPG",
+        "บันทึกและแชร์",
+        [
+          "ตรวจ Board วันที่ และ Thai / English|ไฟล์บอร์ดใช้ภาษาชื่อที่เลือก",
+          "เลือก Export → PDF หรือ JPG|บนมือถือ Export อยู่ใน ⋯ สำหรับ PDF กด Export แล้ว Save as PDF ในการพิมพ์",
+          "แชร์เป็นไฟล์แนบ|PDF เก็บลิงก์แผนที่และโทรศัพท์ที่รองรับ JPG ใช้เมื่อจำเป็นต้องเป็นภาพ"
+        ],
+        "บอร์ด Forecast ไม่มีการส่งออก ภารกิจว่างและประเภทลาว่างไม่อยู่ในไฟล์บอร์ด"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "excel",
+      "image": "export-excel",
+      "en": [
+        "Export Excel with language and columns",
+        "SAVE AND SHARE",
+        [
+          "Open Export → Excel|Board and Capacity offer Excel; Manpower and Host exports are Excel lists.",
+          "Choose language and included details|Board exports offer columns and extra Leave / Standby / On-call sheets. The TRIGO ID is retained.",
+          "Open and review the .xlsx|Names follow the file language where a matching name exists. Years of Service includes years, months and days."
+        ],
+        "Exported Excel is a copy. Editing it does not update the app; use Bulk edit's reviewed template flow for list changes."
+      ],
+      "th": [
+        "ส่งออก Excel พร้อมเลือกภาษาและคอลัมน์",
+        "บันทึกและแชร์",
+        [
+          "เปิด Export → Excel|Board และ Capacity มี Excel ส่วน Manpower และ Host เป็นรายการ Excel",
+          "เลือกภาษาและรายละเอียด|บอร์ดเลือกคอลัมน์และชีตวันลา Standby / On-call ได้ โดยเก็บ TRIGO ID ไว้",
+          "เปิดตรวจ .xlsx|ชื่อใช้ตามภาษาของไฟล์เมื่อมีชื่อที่ตรงกัน Years of Service รวมปี เดือน และวัน"
+        ],
+        "Excel ส่งออกเป็นสำเนา แก้ไฟล์ไม่เปลี่ยนแอป หากแก้รายการให้ใช้แม่แบบ Bulk edit และตรวจตัวอย่าง"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "settings",
+      "image": "settings",
+      "en": [
+        "Use Settings as a full page",
+        "YOUR ACCOUNT & SETUP",
+        [
+          "Open Settings|Desktop uses the header; phone uses Me. The last permitted section is remembered.",
+          "Select a section|Personal: My account. Board setup: Engineers, Service areas, Boards. Administration: Users, Roles & permissions.",
+          "Return with Back to board|Your original view, board, date and scroll position are restored."
+        ],
+        "Phone replaces the left rail with a section picker. Only sections allowed by your role are shown."
+      ],
+      "th": [
+        "ใช้งาน Settings แบบเต็มหน้า",
+        "บัญชีและการตั้งค่า",
+        [
+          "เปิด Settings|คอมพิวเตอร์ใช้ปุ่มด้านบน มือถือใช้ Me แอปจำส่วนล่าสุดที่คุณมีสิทธิ์",
+          "เลือกส่วน|Personal: My account; Board setup: Engineers, Service areas, Boards; Administration: Users, Roles & permissions",
+          "กลับด้วย Back to board|แอปคืนหน้า บอร์ด วันที่ และตำแหน่งเลื่อนเดิม"
+        ],
+        "มือถือใช้ตัวเลือกส่วนแทนแถบด้านซ้าย แสดงเฉพาะส่วนที่ Role อนุญาต"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "settings-save",
+      "image": "settings-draft",
+      "en": [
+        "Save changes, discard drafts or retry",
+        "YOUR ACCOUNT & SETUP",
+        [
+          "Edit the fields|Profile and board-setup edits are drafts. Amber markers and the bottom bar identify unsaved changes.",
+          "Select Save changes or Discard|Saving applies the edits. Discard restores saved values. Failed fields remain editable; Retry sends only those failures.",
+          "Respond when leaving|Choose Keep editing, Discard or Save & continue when changing section, returning to board or signing out."
+        ],
+        "Some successful fields may already be saved if others fail. Read the status rather than assuming a full rollback."
+      ],
+      "th": [
+        "บันทึก ทิ้งแบบร่าง หรือ Retry",
+        "บัญชีและการตั้งค่า",
+        [
+          "แก้ช่องข้อมูล|Profile และการตั้งค่าบอร์ดเป็นแบบร่าง ขอบสีเหลืองและแถบล่างบอกการแก้ที่ยังไม่บันทึก",
+          "เลือก Save changes หรือ Discard|บันทึกใช้ค่าที่แก้ Discard คืนค่าที่บันทึกแล้ว หากบางช่องล้มเหลว Retry ส่งเฉพาะช่องนั้น",
+          "ตอบก่อนออกจากหน้า|เลือก Keep editing, Discard หรือ Save & continue เมื่อเปลี่ยนส่วน กลับบอร์ด หรือออกจากระบบ"
+        ],
+        "หากบางช่องล้มเหลว ช่องที่สำเร็จอาจบันทึกแล้ว อ่านสถานะ ไม่ถือว่าทุกอย่างย้อนกลับ"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "account",
+      "image": "settings",
+      "en": [
+        "Update your profile and password",
+        "YOUR ACCOUNT & SETUP",
+        [
+          "Open Settings → My account|Check your role and status.",
+          "Edit Display name and Mobile number|Then select Save changes. Your display name and phone appear on missions you lead.",
+          "Use Change password… separately|Enter the new password twice, with at least 8 characters, and submit its own form."
+        ],
+        "Forgotten passwords are reset by an admin. Sign out is in the desktop avatar menu or phone Me."
+      ],
+      "th": [
+        "ปรับข้อมูลบัญชีและรหัสผ่าน",
+        "บัญชีและการตั้งค่า",
+        [
+          "เปิด Settings → My account|ตรวจ Role และสถานะ",
+          "แก้ Display name และ Mobile number|แล้วกด Save changes ชื่อและโทรศัพท์ใช้บนภารกิจที่คุณรับผิดชอบ",
+          "ใช้ Change password… แยกต่างหาก|กรอกรหัสใหม่สองครั้ง อย่างน้อย 8 ตัวอักษร แล้วส่งแบบฟอร์มของรหัสผ่าน"
+        ],
+        "หากลืมรหัส ให้ผู้ดูแลตั้งใหม่ Sign out อยู่ในอวตารบนคอมพิวเตอร์ หรือ Me บนมือถือ"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "board-setup",
+      "image": "settings-boards",
+      "en": [
+        "Maintain Engineers, Service areas and Boards",
+        "SETUP · EDITORS",
+        [
+          "Choose the relevant Settings section|Engineers links mission leads and colours; Service areas names and colours the area chips.",
+          "Add records or edit existing ones|Add engineer / Add area uses its own dialog. Board settings include name and non-working weekdays.",
+          "Save changes for staged edits|Review unsaved counts, then Save changes. An area with employees cannot be removed before they are moved."
+        ],
+        "Board non-working days affect the next working day, forecasts, holidays and working-day reports."
+      ],
+      "th": [
+        "ดูแล Engineers พื้นที่ และบอร์ด",
+        "ตั้งค่า · ผู้แก้ไข",
+        [
+          "เลือกส่วน Settings ที่ต้องการ|Engineers เชื่อมผู้รับผิดชอบและสี ส่วน Service areas กำหนดชื่อและสีชิปพื้นที่",
+          "เพิ่มหรือแก้รายการ|Add engineer / Add area มีแบบฟอร์มแยก บอร์ดตั้งชื่อและวันหยุดประจำสัปดาห์ได้",
+          "บันทึกแบบร่างด้วย Save changes|ตรวจจำนวนที่แก้ แล้ว Save changes พื้นที่ที่ยังมีคนลบไม่ได้ ต้องย้ายคนก่อน"
+        ],
+        "วันหยุดประจำบอร์ดมีผลกับวันทำงานถัดไป Forecast วันหยุด และรายงานวันทำงาน"
+      ],
+      "role": "edit",
+      "kind": "screen"
+    },
+    {
+      "key": "users",
+      "image": "settings-users",
+      "en": [
+        "Approve users and issue temporary passwords",
+        "ADMINISTRATORS",
+        [
+          "Open Settings → Users|Use Review requests for pending access, or Add user for a new company account.",
+          "Set the role and status|Approve the intended user. Disable preserves their history while preventing sign-in.",
+          "Reset a forgotten password|Use the user's Reset password action. Pass the temporary password through your normal secure channel."
+        ],
+        "The password is shown once. The user chooses their own on first sign-in. The last admin is protected."
+      ],
+      "th": [
+        "อนุมัติผู้ใช้และออกรหัสชั่วคราว",
+        "ผู้ดูแลระบบ",
+        [
+          "เปิด Settings → Users|ใช้ Review requests สำหรับคำขอ หรือ Add user เพื่อเพิ่มบัญชีบริษัท",
+          "กำหนด Role และสถานะ|อนุมัติคนที่ถูกต้อง Disable เก็บประวัติแต่หยุดการเข้าสู่ระบบ",
+          "ตั้งรหัสให้ผู้ที่ลืม|ใช้ Reset password ของผู้ใช้ แล้วส่งรหัสชั่วคราวตามช่องทางที่ปลอดภัยของทีม"
+        ],
+        "รหัสแสดงครั้งเดียว ผู้ใช้ตั้งรหัสของตนเมื่อเข้าใช้ครั้งแรก แอปป้องกันผู้ดูแลคนสุดท้าย"
+      ],
+      "role": "admin",
+      "kind": "screen"
+    },
+    {
+      "key": "permissions",
+      "image": "settings-roles",
+      "en": [
+        "Review and apply role permissions",
+        "ADMINISTRATORS",
+        [
+          "Open Roles & permissions|Choose the role on phone; desktop shows the permission matrix.",
+          "Stage View / Edit / Off changes|The Admin column is protected. Use Review changes to see before → after.",
+          "Inspect and Apply changes|Resolve any cell changed by someone else before applying. Verify the final access for the intended role."
+        ],
+        "Role changes reach open app sessions. Review changes is required before writing these staged permissions."
+      ],
+      "th": [
+        "ตรวจและใช้สิทธิ์ของ Role",
+        "ผู้ดูแลระบบ",
+        [
+          "เปิด Roles & permissions|มือถือเลือก Role คอมพิวเตอร์แสดงตารางสิทธิ์",
+          "แก้ View / Edit / Off เป็นแบบร่าง|คอลัมน์ Admin ถูกป้องกัน ใช้ Review changes ดูค่าเดิม → ค่าใหม่",
+          "ตรวจแล้ว Apply changes|ตรวจช่องที่คนอื่นเปลี่ยนก่อนใช้ แล้วตรวจสิทธิ์สุดท้ายของ Role ที่ตั้งใจ"
+        ],
+        "การเปลี่ยนสิทธิ์มีผลกับแอปที่เปิดอยู่ ต้อง Review changes ก่อนใช้สิทธิ์แบบร่าง"
+      ],
+      "role": "admin",
+      "kind": "screen"
+    },
+    {
+      "key": "help",
+      "image": "board",
+      "en": [
+        "Solve common problems and update safely",
+        "HELP",
+        [
+          "Cannot sign in or edit?|Check approved account, company email, role, board, date and Locked / Read-only state.",
+          "Cannot find a person or field?|Check filters, Active status and board membership. On phone, open the drawer or More details.",
+          "Seeing the old design?|Finish any form, then use Refresh now or reload. Include the app version when asking for help."
+        ],
+        "Report board, date, action, error text and app version. Never include your password."
+      ],
+      "th": [
+        "แก้ปัญหาและอัปเดตอย่างปลอดภัย",
+        "ช่วยเหลือ",
+        [
+          "เข้าสู่ระบบหรือแก้ไขไม่ได้?|ตรวจบัญชีอนุมัติ อีเมลบริษัท Role บอร์ด วันที่ และ Locked / Read-only",
+          "หาคนหรือช่องไม่เจอ?|ตรวจตัวกรอง Active และบอร์ด บนมือถือเปิดลิ้นชักหรือ More details",
+          "ยังเห็นรูปแบบเก่า?|กรอกแบบฟอร์มให้เสร็จ แล้วใช้ Refresh now หรือโหลดใหม่ แจ้งเวอร์ชันเมื่อขอความช่วยเหลือ"
+        ],
+        "แจ้งบอร์ด วันที่ สิ่งที่ทำ ข้อความผิดพลาด และเวอร์ชัน ห้ามส่งรหัสผ่าน"
+      ],
+      "role": "all",
+      "kind": "screen"
+    },
+    {
+      "key": "checklist",
+      "image": "board",
+      "en": [
+        "Daily checklist: check, plan, share",
+        "READY TO USE",
+        [
+          "Check the starting point|Sign in → Board → date/status → Carry over only when needed.",
+          "Build and review the plan|Missions → people → leave → headcounts → correct gaps or missing details.",
+          "Finalize and share|Check saved state → Lock if authorized → Export PDF → send as a file. Use Forecast / Capacity for later dates."
+        ],
+        "New layout reminders: phone ⋯ for actions, Me for Settings, people drawer → Place; Settings edits need Save changes."
+      ],
+      "th": [
+        "รายการประจำวัน: ตรวจ จัดแผน แชร์",
+        "พร้อมใช้งาน",
+        [
+          "ตรวจจุดเริ่มต้น|เข้าสู่ระบบ → Board → วันที่/สถานะ → Carry over เมื่อจำเป็น",
+          "จัดและตรวจแผน|ภารกิจ → คน → วันลา → จำนวนคน → แก้คนขาดหรือข้อมูลไม่ครบ",
+          "ปิดแผนและแชร์|ตรวจบันทึก → Lock ตามสิทธิ์ → Export PDF → ส่งเป็นไฟล์ ใช้ Forecast / Capacity สำหรับวันไกล"
+        ],
+        "เตือนรูปแบบใหม่: มือถือใช้ ⋯ สำหรับคำสั่ง Me สำหรับ Settings และลิ้นชักคน → Place; Settings ต้อง Save changes"
+      ],
+      "role": "all",
+      "kind": "screen"
+    }
+  ]
+}
