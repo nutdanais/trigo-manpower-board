@@ -3963,6 +3963,16 @@ function shares100(raw) {
   return out;
 }
 
+/* "30% permanent · 70% on-call" under a permanent / on-call bar. The two shares
+   come from shares100 so they always add up to 100; nothing when there is no
+   one to split. Returns [html, [permPct, oncallPct]] — the same percentages go
+   on the bar's hover tooltip so the two never disagree. */
+function ovMixLine(perm, oncall) {
+  const pcts = shares100([perm, oncall]);
+  if (!perm && !oncall) return ["", pcts];
+  return [`<span class="ov-mix"><b>${pcts[0]}%</b> permanent · <b>${pcts[1]}%</b> on-call</span>`, pcts];
+}
+
 /* ---------- Engineer workload: ranked bars + trend, missions and crew together ----------
    One row per engineer over the History range, busiest first: missions per
    day, crew per day split permanent / on-call (the team mix a manager asks
@@ -4004,13 +4014,14 @@ function engineerHistorySection(dates, recs) {
   wrap.innerHTML = `<table class="ov-table ov-rank"><thead><tr>
       <th>Engineer</th><th>Missions / day</th><th>Crew / day</th><th class="r ov-wide">Crew per mission</th>
       <th class="ov-wide">Trend · crew per day</th><th class="r ov-wide">Active days</th><th class="r ov-wide">Share of missions</th></tr></thead><tbody>`
-    + rows.map((r, i) => `<tr>
+    + rows.map((r, i) => { const [mix, pcts] = ovMixLine(r.avgP, r.avgO); return `<tr>
       <td><span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${escapeHtml(r.color)}"></span><span class="ov-table-label">${escapeHtml(r.name)}</span></span></td>
       <td><span class="ov-rk-bar"><span ${bar(r.avgM / maxM)}>${Charts.stackedBarH({ segments: [{ label: `${r.name}: missions per day`, value: +r1(r.avgM), color: "var(--muted)" }], height: 10 })}</span><b>${r1(r.avgM)}</b></span>
         <span class="ov-rk-sub">${r.totM} mission${r.totM === 1 ? "" : "s"} in the range</span></td>
       <td><span class="ov-rk-bar"><span ${bar(r.avgC / maxC)}>${Charts.stackedBarH({ segments: [
-          { label: `${r.name}: permanent crew per day`, value: +r1(r.avgP), color: "var(--chart-permanent)" },
-          { label: `${r.name}: on-call crew per day`, value: +r1(r.avgO), color: "var(--chart-oncall)" }], height: 10 })}</span><b>${r1(r.avgC)}</b></span>
+          { label: `${r.name}: permanent crew per day`, value: +r1(r.avgP), unit: "people", pct: pcts[0], color: "var(--chart-permanent)" },
+          { label: `${r.name}: on-call crew per day`, value: +r1(r.avgO), unit: "people", pct: pcts[1], color: "var(--chart-oncall)" }], height: 10 })}</span><b>${r1(r.avgC)}</b></span>
+        ${mix}
         <span class="ov-rk-sub">${r1(r.avgP)} permanent · ${r1(r.avgO)} on-call</span></td>
       <td class="r ov-wide">${r.totM ? r1(r.totC / r.totM) : "—"}</td>
       <td class="ov-wide">${ovTrendSvg(r.c, dates.map((d, k) => ({
@@ -4018,7 +4029,7 @@ function engineerHistorySection(dates, recs) {
           label: `${r.name} · ${fmtDate(d)} — ${r.p[k]} permanent · ${r.o[k]} on-call`,
         })), yMax)}</td>
       <td class="r ov-wide">${r.active} <span class="ov-muted">of ${n}</span></td>
-      <td class="r ov-wide">${share[i]}%</td></tr>`).join("")
+      <td class="r ov-wide">${share[i]}%</td></tr>`; }).join("")
     + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All engineers</span></td><td><b>${r1(T.m)}</b></td>
       <td><b>${r1(T.c)}</b> <span class="ov-muted">· ${r1(T.p)} permanent · ${r1(T.o)} on-call</span></td>
       <td class="r ov-wide"><b>${T.tm ? r1(T.tc / T.tm) : "—"}</b></td><td class="ov-wide"></td><td class="ov-wide"></td><td class="r ov-wide"><b>100%</b></td></tr>`
@@ -4351,9 +4362,14 @@ function renderOverview() {
       const pct = (v) => Math.round((v / (P + O)) * 100);
       const list = document.createElement("div");
       list.className = "ov-area-rows";
-      list.innerHTML = shown.map(r => `<div class="ov-area-row"><span class="ov-area-row-label" title="${escapeHtml(r.name)}"><span class="ov-area-dot" style="background:${escapeHtml(r.color)}"></span><span class="ov-area-row-name">${escapeHtml(r.name)}</span></span>
-          <div>${Charts.stackedBarH({ segments: [{ label: `${r.name}: permanent`, value: r.perm, color: "var(--chart-permanent)" }, { label: `${r.name}: on-call`, value: r.oncall, color: "var(--chart-oncall)" }], scaleMax: max, height: 16 })}</div>
-          <span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${r.total}</span><span class="ov-area-row-pct">${r.perm} P · ${r.oncall} OC</span></span></div>`).join("")
+      list.innerHTML = shown.map(r => {
+        const [mix, pcts] = ovMixLine(r.perm, r.oncall);
+        return `<div class="ov-area-row"><span class="ov-area-row-label" title="${escapeHtml(r.name)}"><span class="ov-area-dot" style="background:${escapeHtml(r.color)}"></span><span class="ov-area-row-name">${escapeHtml(r.name)}</span></span>
+          <div>${Charts.stackedBarH({ segments: [
+              { label: `${r.name}: permanent`, value: r.perm, unit: r.perm === 1 ? "employee" : "employees", pct: pcts[0], color: "var(--chart-permanent)" },
+              { label: `${r.name}: on-call`, value: r.oncall, unit: r.oncall === 1 ? "employee" : "employees", pct: pcts[1], color: "var(--chart-oncall)" }], scaleMax: max, height: 16 })}${mix}</div>
+          <span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${r.total}</span><span class="ov-area-row-pct">${r.perm} P · ${r.oncall} OC</span></span></div>`;
+      }).join("")
         + `<div class="ov-area-row ov-area-row-grandtotal"><span class="ov-area-row-label"><span class="ov-area-row-name">All areas</span></span>
           <span class="ov-muted">${P} permanent (${pct(P)}%) · ${O} on-call (${pct(O)}%)</span><span class="ov-area-row-totalwrap"><span class="ov-area-row-total">${P + O}</span></span></div>`;
       areaSec.appendChild(list);

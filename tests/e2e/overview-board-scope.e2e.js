@@ -76,6 +76,12 @@ async function step(name, fn) {
     await step("By service area shows each contract type's count; Engineer workload ranks with missions and crew together", async () => {
       const area = await p.$$eval(".ov-area-row:not(.ov-area-row-grandtotal) .ov-area-row-pct", (els) => els.map((e) => e.textContent));
       assert.deepEqual(area, ["8 P · 2 OC"], "Board One + Board Two in AREA1: 8 permanent, 2 on-call");
+      assert.deepEqual(await p.$$eval(".ov-area-row .ov-mix", (els) => els.map((e) => e.textContent)), ["80% permanent · 20% on-call"],
+        "the share of each contract type sits under the bar");
+      assert.deepEqual(await p.$$eval(".ov-area-row .chart-mark", (els) => els.map((e) => e.dataset.tipValue + " " + e.dataset.tipPct + "%")),
+        ["8 employees 80%", "2 employees 20%"], "hovering a segment gives its number of employees");
+      assert.ok((await p.$$eval(".ov-rank .ov-mix", (els) => els.map((e) => e.textContent))).every((t) => /^\d+% permanent · \d+% on-call$/.test(t)),
+        "each engineer's crew bar carries its % split too");
       const wl = await p.evaluate(() => {
         const sec = [...document.querySelectorAll(".ov-section")].find((x) => x.querySelector("h3").textContent === "Engineer workload");
         const rows = [...sec.querySelectorAll("tbody tr:not(.ov-table-totalrow)")];

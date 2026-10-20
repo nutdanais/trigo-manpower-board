@@ -2519,6 +2519,9 @@ body.fp-pools-empty { --fp-w: 264px; }
 /* a phone gives the bar a shorter track, so the By engineer table fits the card */
 @media (max-width: 640px) { .ov-crewbar { width: max(8px, calc(var(--f, 1) * 48px)); } .ov-crewcell { gap: 6px; } }
 .ov-rk-sub { display: block; font-size: 11.5px; color: var(--muted); }
+/* "30% permanent · 70% on-call" printed under a permanent / on-call bar */
+.ov-mix { display: block; margin-top: 3px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ov-mix b { font-weight: 600; color: var(--text); }
 .ov-eng-free { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
 .ov-eng-free .ov-table-nameinner { display: inline-flex; gap: 5px; }
 
