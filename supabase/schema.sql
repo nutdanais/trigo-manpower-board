@@ -118,6 +118,35 @@ create table if not exists assignments (
 );
 create index if not exists assignments_date_idx on assignments(plan_date);
 
+-- ===== Employee loans: lend someone to another board for a few days =====
+-- An employee still belongs to ONE board (employees.board_id); a loan says
+-- where they work on the dates it covers (both included). The day after it
+-- ends they are back on their own board. See migration-2026-10-20.
+create table if not exists employee_loans (
+  id          uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references employees(id) on delete cascade,
+  to_board_id uuid not null references boards(id) on delete cascade,
+  start_date  date not null,
+  end_date    date not null,
+  note        text,
+  created_by  text,
+  created_at  timestamptz not null default now(),
+  constraint employee_loans_dates check (end_date >= start_date)
+);
+create index if not exists employee_loans_employee_idx on employee_loans (employee_id, start_date);
+create index if not exists employee_loans_board_idx on employee_loans (to_board_id, start_date);
+
+/* The board someone works on that day: the loan covering it, else their own.
+   The app keeps loans from overlapping; if two ever did, the newest wins. */
+create or replace function public.effective_board(p_employee uuid, p_date date)
+returns uuid language sql stable set search_path = public, pg_temp as $fn$
+  select coalesce(
+    (select l.to_board_id from employee_loans l
+      where l.employee_id = p_employee and p_date between l.start_date and l.end_date
+      order by l.created_at desc limit 1),
+    (select e.board_id from employees e where e.id = p_employee))
+$fn$;
+
 -- ===== Deployment history: durable log for the employee Host Record tab =====
 -- Independent of assignments' lifecycle on purpose — hiding or deleting a
 -- mission deletes its assignment rows (see the assignments table's own
@@ -818,7 +847,6 @@ create or replace function public.bump_plan_day_stamp()
 returns trigger language plpgsql security definer set search_path = public, pg_temp as $fn$
 declare
   v_by    text := coalesce(auth.jwt() ->> 'email', 'system');
-  v_board uuid;
 begin
   if tg_table_name = 'missions' then
     if tg_op in ('UPDATE', 'DELETE') then
@@ -829,14 +857,12 @@ begin
     elsif tg_op = 'UPDATE' and (new.board_id is distinct from old.board_id or new.plan_date is distinct from old.plan_date) then
       perform public._bump_plan_day_stamp(new.board_id, new.plan_date, v_by);
     end if;
-  else  -- assignments: the board comes from the employee
+  else  -- assignments: the board the employee works on that day (effective_board: a loan, else their own)
     if tg_op in ('UPDATE', 'DELETE') then
-      select e.board_id into v_board from employees e where e.id = old.employee_id;
-      perform public._bump_plan_day_stamp(v_board, old.plan_date, v_by);
+      perform public._bump_plan_day_stamp(public.effective_board(old.employee_id, old.plan_date), old.plan_date, v_by);
     end if;
     if tg_op = 'INSERT' or (tg_op = 'UPDATE' and (new.employee_id is distinct from old.employee_id or new.plan_date is distinct from old.plan_date)) then
-      select e.board_id into v_board from employees e where e.id = new.employee_id;
-      perform public._bump_plan_day_stamp(v_board, new.plan_date, v_by);
+      perform public._bump_plan_day_stamp(public.effective_board(new.employee_id, new.plan_date), new.plan_date, v_by);
     end if;
   end if;
   return null;   -- AFTER trigger: the return value is ignored
@@ -1082,6 +1108,7 @@ grant execute on function public.stamp_forecast_merge(uuid, date)               
 grant execute on function public.set_forecast_assignment(uuid, date, uuid, text)   to authenticated;
 grant execute on function public.acknowledge_hold_events(uuid[])                   to authenticated;
 grant execute on function public.within_confirm_horizon(date)                      to authenticated;
+grant execute on function public.effective_board(uuid, date)                     to authenticated;
 
 -- ===== Row Level Security =====
 -- The rule is: read if your account is active, write only if your role has
@@ -1104,6 +1131,7 @@ alter table plan_days          enable row level security;
 alter table deployment_history enable row level security;
 alter table hosts              enable row level security;
 alter table employee_notes     enable row level security;
+alter table employee_loans     enable row level security;
 alter table plan_day_stamps      enable row level security;
 alter table capacity_demand      enable row level security;
 alter table forecast_missions    enable row level security;
@@ -1175,6 +1203,7 @@ begin
   for m in select * from (values
     ('missions',           'board'),
     ('assignments',        'board'),
+    ('employee_loans',     'board'),
     ('plan_days',          'board'),
     ('day_overrides',      'board'),
     ('deployment_history', 'board'),
@@ -1296,6 +1325,11 @@ end $$;
 do $$
 begin
   alter publication supabase_realtime add table assignments;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter publication supabase_realtime add table employee_loans;
 exception when duplicate_object then null;
 end $$;
 do $$

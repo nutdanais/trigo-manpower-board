@@ -6824,7 +6824,7 @@ label > .pk { margin-top: 5px; }
 
 /* Move/Copy mission: a side panel like Edit Mission. Boards are picked from a
    grid of tiles; the choices below are radio rows with a one-line hint. */
-#move-mission-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+#move-mission-sub, #lend-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .mm-boards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
 .mm-board {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0;
@@ -6851,8 +6851,8 @@ label > .pk { margin-top: 5px; }
 .mm-opt > span { min-width: 0; flex: 1; }
 .mm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 #modal-move-mission .mm-row input[type="text"] { flex: 1 1 160px; width: auto; margin-top: 0; height: 30px; padding: 0 9px; }
-#modal-move-mission label.mm-opt:has(.mm-row) { align-items: center; padding-block: 5px; }
-#modal-move-mission label.mm-opt:has(.mm-row) input[type="radio"] { margin-top: 0; }
+#modal-move-mission label.mm-opt:has(> .mm-row) { align-items: center; padding-block: 5px; }
+#modal-move-mission label.mm-opt:has(> .mm-row) input[type="radio"] { margin-top: 0; }
 .modal-side label.mm-carry {
   display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; padding: 8px 10px;
   border: 1px solid var(--border); border-radius: var(--r); background: var(--bg-soft); font-weight: 400; font-size: 12.5px; line-height: 1.45;
@@ -6862,3 +6862,37 @@ label > .pk { margin-top: 5px; }
 #move-mission-num-note .ic { margin-top: 1px; }
 #move-mission-summary { font-size: 12.5px; color: var(--muted); flex: 1 1 auto; min-width: 0; }
 #move-mission-summary b { color: var(--text); }
+
+/* ===== Lending staff between boards (employee_loans, 2026-10-20) =====
+   A loan is marked on the card itself: a small pill on its bottom edge names
+   the other board. Borrowed cards (working here, from another board) get a
+   solid violet pill; this board's own people working elsewhere sit dimmed in
+   the people panel's "Lent out" group with an outlined pill. Violet is used
+   for loans only, so it never reads as a service area or a status. */
+:root { --loan: #6d4fc2; --loan-tint: #f3effc; --loan-line: #d6cbf3; }
+.emp-card .emp-loan {
+  position: absolute; left: 6px; right: 6px; bottom: -8px; z-index: 1;
+  display: flex; justify-content: center; pointer-events: none;
+}
+.emp-card .emp-loan span {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 9px; font-weight: 700; line-height: 1.5; padding: 0 6px; border-radius: 999px;
+  background: var(--loan); color: #fff; box-shadow: 0 0 0 1.5px var(--panel);
+}
+.emp-card.lent-out { opacity: .6; border-style: dashed; cursor: default; }
+.emp-card.lent-out .emp-loan span { background: var(--panel); color: var(--loan); box-shadow: 0 0 0 1px var(--loan-line); }
+/* the pill hangs below the card: rows of cards keep it clear of the next row */
+.mission-emps:has(.emp-card.borrowed), .fp-body:has(.emp-loan) { row-gap: 12px; padding-bottom: 6px; }
+.fp-section.fp-lent .fp-label .fp-label-text { color: var(--loan); }
+.fp-section.fp-lent.hidden { display: none; }
+#stats-bar .st-loan { display: block; font-size: 11px; font-weight: 600; color: var(--loan); white-space: nowrap; }
+.el-loan { color: var(--loan); font-weight: 600; white-space: nowrap; }
+.el-loan small { color: var(--muted); font-weight: 400; }
+#lend-notes .lend-note { display: flex; align-items: flex-start; gap: 6px; margin: 0 0 8px; line-height: 1.45; }
+#lend-notes .lend-note .ic { margin-top: 1px; }
+#lend-dates-hint.hidden { display: none; }
+#lend-summary { font-size: 12.5px; color: var(--muted); flex: 1 1 auto; min-width: 0; }
+.mm-until { margin: 5px 0 3px; }
+.mm-until small { display: inline; }
+#modal-move-mission .mm-until input[type="date"] { flex: 0 1 170px; width: auto; height: 30px; margin-top: 0; padding: 0 8px; }
+#modal-move-mission label.mm-opt.hidden { display: none; }
