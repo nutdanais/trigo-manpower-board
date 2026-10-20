@@ -99,7 +99,8 @@ async function launch() {
 
   /* one signed-in user = one browser context + page */
   async function openAs(db, user, opts = {}) {
-    const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1400, height: 900 } });
+    // opts.touch: a phone-like context (coarse pointer, touch events), for the long-press paths
+    const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1400, height: 900 }, ...(opts.touch ? { hasTouch: true, isMobile: true } : {}) });
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));

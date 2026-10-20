@@ -6814,3 +6814,51 @@ label > .pk { margin-top: 5px; }
    more of the When row, and a switch label never wraps or touches its edge */
 @media (min-width: 641px) { #modal-mission .form-row:has(select[name="shift"]) > label:first-child { flex: 1.5 1 0; } }   /* a phone gives Shift a row of its own */
 .seg-pick button { white-space: nowrap; padding: 0 8px; }
+
+/* ===== Mission quick panel + Move/Copy mission (2026-10-20) =====
+   The quick panel reuses #context-menu as is; it only adds a row that can't be
+   used right now (a locked or non-working board), which shows why at its end. */
+.ctx-item.ctx-off { color: var(--muted); cursor: default; opacity: .7; }
+.ctx-item.ctx-off:hover { background: none; }
+.ctx-item .ctx-hint { margin-left: auto; padding-left: 12px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* Move/Copy mission: a side panel like Edit Mission. Boards are picked from a
+   grid of tiles; the choices below are radio rows with a one-line hint. */
+#move-mission-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.mm-boards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.mm-board {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel);
+  font: inherit; text-align: left; color: var(--text); cursor: pointer;
+}
+.mm-board b { font-size: 13px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mm-board small { font-size: 11.5px; color: var(--muted); }
+.mm-board:hover:not(:disabled) { background: var(--hover-tint); }
+.mm-board[aria-pressed="true"] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); background: var(--hover-tint); }
+.mm-board:disabled { cursor: not-allowed; background: var(--bg-soft); opacity: .7; }
+.mm-board:disabled small { color: var(--danger-text); }
+.mm-board:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+.mm-opts { display: flex; flex-direction: column; gap: 6px; }
+.modal-side label.mm-opt {
+  display: flex; align-items: flex-start; gap: 10px; margin: 0;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); cursor: pointer; font-weight: 400;
+}
+.modal-side label.mm-opt:hover { background: var(--hover-tint); }
+.modal-side label.mm-opt:has(input[type="radio"]:checked) { border-color: var(--primary); background: var(--hover-tint); }
+.mm-opt input[type="radio"], .mm-carry input[type="checkbox"] { width: auto; flex: none; margin: 3px 0 0; accent-color: var(--primary); }
+.mm-opt b { font-weight: 600; }
+.mm-opt small { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.mm-opt > span { min-width: 0; flex: 1; }
+.mm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#modal-move-mission .mm-row input[type="text"] { flex: 1 1 160px; width: auto; margin-top: 0; height: 30px; padding: 0 9px; }
+#modal-move-mission label.mm-opt:has(.mm-row) { align-items: center; padding-block: 5px; }
+#modal-move-mission label.mm-opt:has(.mm-row) input[type="radio"] { margin-top: 0; }
+.modal-side label.mm-carry {
+  display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--bg-soft); font-weight: 400; font-size: 12.5px; line-height: 1.45;
+}
+.modal-side label.mm-carry.hidden { display: none; }
+#move-mission-num-note { display: flex; align-items: flex-start; gap: 6px; margin: 6px 0 0; line-height: 1.45; }
+#move-mission-num-note .ic { margin-top: 1px; }
+#move-mission-summary { font-size: 12.5px; color: var(--muted); flex: 1 1 auto; min-width: 0; }
+#move-mission-summary b { color: var(--text); }
