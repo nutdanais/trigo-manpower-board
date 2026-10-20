@@ -416,17 +416,20 @@
      not known here (the UI says so). Leave and "named" come from confirmed
      rows up to a board's horizon and from forecast rows after it.
      boardOn (e, date) -> boardId, optional: where someone works that day (a
-     loan to another board); without it everyone counts on e.boardId. */
+     loan to another board); without it everyone counts on e.boardId. A board's
+     forecast date leaves loans out (a forecast is planned with everyone on
+     their own board); its confirmed dates follow them. */
   function aggregate({ boards, employees, dates, isForecast, confirmed, forecast, boardOn }) {
     const active = employees.filter((e) => e.active !== false);
     const empById = new Map(active.map((e) => [e.id, e]));
     const where = boardOn || ((e) => e.boardId);
+    const onBoard = (e, boardId, d) => (isForecast(boardId, d) ? e.boardId : where(e, d)) === boardId;
     const out = {};
     for (const b of boards) {
       out[b.id] = {};
       const own = active.filter((e) => e.boardId === b.id);
       for (const d of dates) {
-        const emps = boardOn ? active.filter((e) => where(e, d) === b.id) : own;
+        const emps = boardOn ? active.filter((e) => onBoard(e, b.id, d)) : own;
         const headPerm = emps.filter((e) => e.contract !== "oncall").length;
         const headOncall = emps.length - headPerm;
         out[b.id][d] = { headPerm, headOncall, leavePerm: 0, leaveOncall: 0, availPerm: headPerm, availOncall: headOncall, available: headPerm + headOncall, named: 0, _named: new Set() };
@@ -438,7 +441,8 @@
       for (const a of rows || []) {
         const e = empById.get(a.employee_id);
         if (!e) continue;
-        const bid = where(e, a.plan_date);
+        // a forecast place is always on their own board's forecast
+        const bid = wantForecast ? e.boardId : where(e, a.plan_date);
         const cell = out[bid] && out[bid][a.plan_date];
         if (!cell) continue;
         if (!!isForecast(bid, a.plan_date) !== wantForecast) continue;

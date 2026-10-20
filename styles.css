@@ -6896,6 +6896,31 @@ label > .pk { margin-top: 5px; }
 #lend-dates-hint.hidden { display: none; }
 #lend-summary { font-size: 12.5px; color: var(--muted); flex: 1 1 auto; min-width: 0; }
 .mm-until { margin: 5px 0 3px; }
+/* a forecast day leaves loans out: the card stays on its own board, placeable,
+   with the outlined "→ Other board" pill as a warning */
+.emp-card.lent-fc .emp-loan span { background: var(--panel); color: var(--loan); box-shadow: 0 0 0 1px var(--loan-line); }
+.mission-emps:has(.emp-card.lent-fc) { row-gap: 12px; padding-bottom: 6px; }
+/* phone summary: Total's loan words, as on the desktop tile */
+.md-line .md-loan { font-size: 11px; font-weight: 600; color: var(--loan); }
+/* Overview: the Headcount note, the board cards' line, borrowed idle names, Loans today */
+.ov-table .ov-loan { display: block; font-size: 11px; font-weight: 600; color: var(--loan); white-space: nowrap; }
+.ov-bcard-loan { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--loan); }
+.ov-mini.borrowed { border-color: var(--loan-line); }
+.ov-mini .ov-loan-pill { margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1.6;
+  background: var(--loan); color: #fff; white-space: nowrap; }
+.ov-loans-table .ov-loan-route { white-space: nowrap; }
+.ov-loans-table .ov-loan-route b { color: var(--loan); }
+/* phone: each loan is a small card (name and today on top, the route, then the dates), not a squeezed table */
+@media (max-width: 640px) {
+  .ov-loans-table thead { display: none; }
+  .ov-loans-table tr { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .ov-loans-table td { display: block; padding: 0; border: 0; }
+  .ov-loans-table td:nth-child(4) { grid-column: 2; grid-row: 1; text-align: right; }
+  .ov-loans-table td:nth-child(2), .ov-loans-table td:nth-child(3) { grid-column: 1 / -1; }
+}
+/* Org Chart: the loan chip, and the forecast merge's note on lent people */
+.oc-chip.oc-loan { background: var(--loan-tint); color: var(--loan); border: 1px solid var(--loan-line); }
+#merge-loans, #plandiff-loans { margin-top: -4px; }
 .mm-until small { display: inline; }
 #modal-move-mission .mm-until input[type="date"] { flex: 0 1 170px; width: auto; height: 30px; margin-top: 0; padding: 0 8px; }
 #modal-move-mission label.mm-opt.hidden { display: none; }

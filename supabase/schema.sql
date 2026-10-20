@@ -348,6 +348,7 @@ select v.role_key, v.area, v.level from (values
   ('admin','ov.kpi','view'),         ('manager','ov.kpi','view'),         ('engineer','ov.kpi','view'),         ('viewer','ov.kpi','view'),
   ('admin','ov.actionQueue','view'), ('manager','ov.actionQueue','view'), ('engineer','ov.actionQueue','view'), ('viewer','ov.actionQueue','view'),
   ('admin','ov.byBoard','view'),     ('manager','ov.byBoard','view'),     ('engineer','ov.byBoard','view'),     ('viewer','ov.byBoard','view'),
+  ('admin','ov.loans','view'),       ('manager','ov.loans','view'),       ('engineer','ov.loans','view'),       ('viewer','ov.loans','view'),
   ('admin','ov.history','view'),     ('manager','ov.history','view'),     ('engineer','ov.history','none'),     ('viewer','ov.history','none'),
   ('admin','ov.byEngineer','view'),  ('manager','ov.byEngineer','view'),  ('engineer','ov.byEngineer','none'),  ('viewer','ov.byEngineer','none'),
   ('admin','ov.dayNight','view'),    ('manager','ov.dayNight','view'),    ('engineer','ov.dayNight','view'),    ('viewer','ov.dayNight','view'),
