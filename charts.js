@@ -71,7 +71,7 @@ const Charts = (() => {
   }
 
   /* ---------- 100%-stacked horizontal bar ---------- */
-  /* `segments`: [{label, value, color}]. `scaleMax` lets several bars share one
+  /* `segments`: [{label, value, color, unit?, pct?}]. `scaleMax` lets several bars share one
      scale (e.g. the five leave-type rows, so "40 on Annual" visibly outweighs
      "2 on Exchange"); omit it and the bar always fills its full width instead
      (used for a single board's own deployment mix, which has no useful
@@ -86,9 +86,13 @@ const Charts = (() => {
       usable.forEach((seg, i) => {
         const raw = (seg.value / denom) * width;
         const w = Math.max(0, raw - (i < usable.length - 1 ? gap : 0));
+        // optional per-segment `unit` ("employees") and `pct` (a pre-rounded
+        // share, so the tooltip matches a "30% · 70%" line printed under the bar)
+        const val = `${seg.value}${seg.unit ? " " + seg.unit : ""}`;
+        const pct = seg.pct != null ? seg.pct : (total ? Math.round(seg.value / total * 100) : 0);
         rects += `<rect class="chart-mark" x="${x.toFixed(2)}" y="0" width="${w.toFixed(2)}" height="${height}" rx="3" fill="${seg.color}"
-          data-tip-label="${esc(seg.label)}" data-tip-value="${seg.value}" data-tip-pct="${total ? Math.round(seg.value / total * 100) : 0}"
-          tabindex="0"><title>${esc(seg.label)}: ${seg.value}${total ? ` (${Math.round(seg.value / total * 100)}%)` : ""}</title></rect>`;
+          data-tip-label="${esc(seg.label)}" data-tip-value="${esc(val)}" data-tip-pct="${pct}"
+          tabindex="0"><title>${esc(seg.label)}: ${esc(val)}${total ? ` (${pct}%)` : ""}</title></rect>`;
         x += w + gap;
       });
     }
