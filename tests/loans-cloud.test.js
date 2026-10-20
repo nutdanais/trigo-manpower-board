@@ -126,3 +126,20 @@ test("capacity counts people on the board they work on each date, when asked to"
   const lent = Capacity.aggregate({ ...args, boardOn: (e, d) => (e.id === "e1" && d === D(3) ? "b2" : e.boardId) });
   assert.deepEqual([lent.b1[D(2)].available, lent.b1[D(3)].available, lent.b2[D(3)].available], [2, 1, 1]);
 });
+
+test("capacity: a board's forecast date leaves loans out, its confirmed dates follow them", () => {
+  const { context } = setup();
+  const Capacity = context.Capacity || context.window.Capacity;
+  const emps = [{ id: "e1", boardId: "b1", contract: "permanent" }, { id: "e2", boardId: "b1", contract: "permanent" }];
+  // e1 is lent to b2 on D(3); Board One's D(3) is still a forecast, Board Two's is confirmed
+  const boardOn = (e, d) => (e.id === "e1" && d === D(3) ? "b2" : e.boardId);
+  const isForecast = (b, d) => b === "b1" && d >= D(3);
+  const out = Capacity.aggregate({
+    boards: [{ id: "b1" }, { id: "b2" }], employees: emps, dates: [D(3)], isForecast, boardOn,
+    confirmed: { assignments: [], missions: [] },
+    forecast: { assignments: [{ employee_id: "e1", plan_date: D(3), forecast_mission_id: "f1", zone: null }], missions: [{ id: "f1", board_id: "b1" }] },
+  });
+  assert.equal(out.b1[D(3)].available, 2, "Board One's forecast plans everyone on their own board");
+  assert.equal(out.b2[D(3)].available, 1, "Board Two's confirmed day has the borrowed person");
+  assert.equal(out.b1[D(3)].named, 1, "the forecast place on Board One's forecast counts there");
+});

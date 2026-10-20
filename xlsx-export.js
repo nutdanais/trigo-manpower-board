@@ -233,9 +233,9 @@
   function writeBodyCell(cell, col, r, k, spec) {
     const lang = normLang(spec.lang);
     let v = r[col.key];
-    if (col.key === "startDate") {
+    if (col.key === "startDate" || col.date) {
       // a real Excel date (sorts and filters as one), shown like the app: 20-Apr-2023
-      const d = parseIso(r.startDate);
+      const d = parseIso(r[col.key]);
       v = d || "";
       if (d) cell.numFmt = "dd-mmm-yyyy";
     } else if (col.key === "service") {
@@ -458,7 +458,9 @@
      total row under the table), frozen, filterable and repeated on every
      printed page. One row per person in the order given. A row is { name, contract: "Permanent"|"On-call",
      position (English label or ""), phone, trigoId, startDate: "YYYY-MM-DD"|"", area,
-     board, util: percent|null|undefined, active: boolean }. */
+     board, util: percent|null|undefined, active: boolean, and for someone on loan
+     to another board that day loanTo (board name), loanFrom / loanUntil: "YYYY-MM-DD" }.
+     The three loan columns follow Current Board, and only when a row has a loan. */
   const LIST_COLUMNS = [
     // the list carries both names whatever the file language: the language only changes the headers
     // and the words (the English column stays empty for someone with no English name yet)
@@ -475,9 +477,20 @@
     { key: "util",      label: "30D Utilization", th: "การใช้งาน 30 วัน",   width: 17, center: true },
     { key: "status",    label: "Status",          th: "สถานะ",             width: 12, center: true },
   ];
+  const LOAN_COLUMNS = [
+    { key: "loanTo",    label: "On Loan To",      th: "ให้ยืมไปที่",        width: 20 },
+    { key: "loanFrom",  label: "Loan From",       th: "ให้ยืมตั้งแต่",      width: 14, center: true, date: true },
+    { key: "loanUntil", label: "Loan Until",      th: "ให้ยืมถึง",          width: 14, center: true, date: true },
+  ];
+  function listColumns(rows) {
+    if (!rows.some((r) => r.loanTo)) return LIST_COLUMNS;
+    const at = LIST_COLUMNS.findIndex((c) => c.key === "board") + 1;
+    return [...LIST_COLUMNS.slice(0, at), ...LOAN_COLUMNS, ...LIST_COLUMNS.slice(at)];
+  }
   async function buildListWorkbook(ExcelJS, opts) {
     const lang = normLang(opts.lang), T = TEXT[lang];
     const rows = opts.rows || [];
+    const COLS = listColumns(rows);
     const wb = new ExcelJS.Workbook();
     wb.creator = "TRIGO Manpower Board";
     wb.created = new Date();
@@ -490,7 +503,7 @@
       },
       headerFooter: { oddFooter: "&L&8" + T.listSheet + "&R&8" + T.page },
     });
-    LIST_COLUMNS.forEach((col, i) => {
+    COLS.forEach((col, i) => {
       ws.getColumn(i + 1).width = col.width;
       const cell = ws.getCell(1, i + 1);
       cell.value = labelOf(col, lang);
@@ -503,14 +516,14 @@
     rows.forEach((r, k) => {
       const row = ws.getRow(2 + k);
       row.height = 20;
-      LIST_COLUMNS.forEach((col, i) => writeBodyCell(row.getCell(i + 1), col, r, k, { lang, today: opts.today }));
+      COLS.forEach((col, i) => writeBodyCell(row.getCell(i + 1), col, r, k, { lang, today: opts.today }));
     });
     const perm = rows.filter((r) => r.contract !== "On-call").length, oc = rows.length - perm;
-    writeTotalRow(ws, 2 + rows.length, LIST_COLUMNS.length, {
+    writeTotalRow(ws, 2 + rows.length, COLS.length, {
       main: T.totalEmployees + ": " + rows.length,
       detail: "(" + T.permanent + " " + perm + " · " + T.oncall + " " + oc + ")",
     });
-    if (rows.length) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1 + rows.length, column: LIST_COLUMNS.length } };
+    if (rows.length) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1 + rows.length, column: COLS.length } };
     return { workbook: wb, summary: { total: rows.length, permanent: perm, oncall: oc } };
   }
 
@@ -905,7 +918,7 @@
     return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
   }
 
-  const api = { buildCapacityWorkbook, addCapacityCharts, colLetter, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, buildListWorkbook, buildTableWorkbook };
+  const api = { buildCapacityWorkbook, addCapacityCharts, colLetter, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, LOAN_COLUMNS, buildListWorkbook, buildTableWorkbook };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

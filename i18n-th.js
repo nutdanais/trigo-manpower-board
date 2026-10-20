@@ -1997,3 +1997,28 @@ I18N.add({
   "Lent to {a}: {b}": "ให้ยืมไปที่ {a}: {b}",
   "On loan from {a}: {b}": "ยืมมาจาก {a}: {b}"
 });
+
+/* Loans in the Overview, Manpower List, Org Chart and forecast (2026-10-20) */
+I18N.add({
+  "Loans today": "การให้ยืมวันนี้",
+  "From → to": "จาก → ไปที่",
+  "today only": "วันนี้เท่านั้น",
+  "last day today": "วันนี้เป็นวันสุดท้าย",
+  "day off": "วันหยุด",
+  "on-call, free": "ออนคอล ว่าง",
+  "on loan": "ถูกให้ยืม",
+  "working on another board today": "ทำงานที่บอร์ดอื่นวันนี้",
+  "A forecast leaves loans out: place them here only if the loan will end before this day.": "ฟอร์แคสต์ไม่นับการให้ยืม: วางคนนี้ที่นี่เฉพาะเมื่อการให้ยืมจะสิ้นสุดก่อนวันนี้"
+}, {
+  "{num} on loan": "ถูกให้ยืม {num} คน",
+  "on mission {a}, night": "อยู่ในมิชชั่น {a} กะกลางคืน",
+  "on mission {a}": "อยู่ในมิชชั่น {a}",
+  "On loan from {a}": "ยืมมาจาก {a}",
+  "{a}. People working on another board, and until when. Click a row to open the board they work on today.": "{a} บุคลากรที่ทำงานที่บอร์ดอื่น และถึงวันไหน คลิกแถวเพื่อเปิดบอร์ดที่ทำงานวันนี้",
+  "{a}'s days after {b} are still a forecast, which leaves loans out: they can be planned there once those days are confirmed. Until then their own board's forecast shows them marked → {c}.": "วันของ {a} หลัง {b} ยังเป็นฟอร์แคสต์ ซึ่งไม่นับการให้ยืม: จะวางแผนที่นั่นได้เมื่อวันเหล่านั้นยืนยันแล้ว ระหว่างนี้ฟอร์แคสต์ของบอร์ดตนเองจะแสดงพร้อมเครื่องหมาย → {c}",
+  "Lent to another board on this day, so their places in the forecast are left out: {a}.": "ให้ยืมไปบอร์ดอื่นในวันนี้ จึงไม่นำตำแหน่งงานในฟอร์แคสต์มาใช้: {a}",
+  "{num} person is on loan to {a} now or later. End that loan first (right-click them on {b} → End loan).": "มี {num} คนถูกให้ยืมไปที่ {a} อยู่หรือกำลังจะถูกให้ยืม ให้สิ้นสุดการให้ยืมก่อน (คลิกขวาที่คนนั้นใน {b} → สิ้นสุดการให้ยืม)",
+  "{num} people are on loan to {a} now or later. End those loans first (right-click them on {b} → End loan).": "มี {num} คนถูกให้ยืมไปที่ {a} อยู่หรือกำลังจะถูกให้ยืม ให้สิ้นสุดการให้ยืมก่อน (คลิกขวาที่คนเหล่านั้นใน {b} → สิ้นสุดการให้ยืม)",
+  "Its {num} past loan goes with it, so History counts those days on the lenders' own boards.": "การให้ยืมที่ผ่านมา {num} รายการจะถูกลบไปด้วย ประวัติจะนับวันเหล่านั้นที่บอร์ดของผู้ให้ยืม",
+  "Its {num} past loans go with it, so History counts those days on the lenders' own boards.": "การให้ยืมที่ผ่านมา {num} รายการจะถูกลบไปด้วย ประวัติจะนับวันเหล่านั้นที่บอร์ดของผู้ให้ยืม"
+});

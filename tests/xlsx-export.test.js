@@ -491,3 +491,24 @@ test("addCapacityCharts: a native chart per sheet, wired through sheet -> drawin
   await wb.xlsx.load(Buffer.from(out));
   assert.deepEqual(wb.worksheets.map((w) => w.name), ["One", "O'Brien <Two>"]);
 });
+
+test("Manpower List sheet: On Loan To / Loan From / Loan Until follow Current Board, only when someone is on loan", async () => {
+  const rows = [{ ...LIST_ROWS[0], loanTo: "Board Two", loanFrom: "2026-10-20", loanUntil: "2026-10-23" }, LIST_ROWS[1]];
+  const { workbook } = await X.buildListWorkbook(ExcelJS, { rows, today: "2026-10-20" });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await workbook.xlsx.writeBuffer());
+  const ws = wb.worksheets[0];
+  const n = X.LIST_COLUMNS.length + X.LOAN_COLUMNS.length;
+  const head = []; for (let c = 1; c <= n; c++) head.push(ws.getCell(1, c).value);
+  assert.deepEqual(head.slice(9, 13), ["Current Board", "On Loan To", "Loan From", "Loan Until"]);
+  assert.equal(head[n - 1], "Status");
+  assert.equal(ws.getCell(2, 11).value, "Board Two");
+  assert.ok(ws.getCell(2, 12).value instanceof Date && ws.getCell(2, 12).value.toISOString().slice(0, 10) === "2026-10-20");
+  assert.equal(ws.getCell(2, 13).numFmt, "dd-mmm-yyyy");
+  assert.equal(ws.getCell(3, 11).value, "", "not on loan: empty");
+  assert.equal(ws.autoFilter, "A1:O3");
+  const { ws: plain } = await listRoundTrip({});
+  assert.equal(plain.getCell(1, 11).value, "30D Utilization", "nobody on loan: the file is as before");
+  const th = await X.buildListWorkbook(ExcelJS, { rows, today: "2026-10-20", lang: "th" });
+  assert.equal(th.workbook.worksheets[0].getCell(1, 11).value, "ให้ยืมไปที่");
+});

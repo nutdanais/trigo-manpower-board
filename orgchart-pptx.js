@@ -6,7 +6,8 @@
    app.js hands over the boards as plain trees, already cut to what is on
    screen: the filters applied and every collapsed node (the "Show to" level)
    left with no children. Each node: { type, name, sub, role, color, count,
-   position, contract, areaName, areaColor, status, shift, children }.
+   position, contract, areaName, areaColor, status, loan, shift, children }
+   (loan: "↔ Board One" on someone borrowed, "→ Board Two" on someone lent out).
 
    One board per slide. A board too wide for one slide (even shrunk to
    MIN_SCALE) is split: its children are cut into runs that fit, each run on its
@@ -162,7 +163,7 @@
   const hex = (c, d) => /^#[0-9a-f]{6}$/i.test(c || "") ? c.slice(1).toUpperCase() : /^#[0-9a-f]{3}$/i.test(c || "") ? c.slice(1).split("").map(x => x + x).join("").toUpperCase() : d;
   function cardText(n) {
     if (n.type === "employee") {
-      const bits = [n.position, n.contract === "oncall" ? "On-call" : "Permanent", STATUS[n.status] || ""].filter(Boolean);
+      const bits = [n.position, n.contract === "oncall" ? "On-call" : "Permanent", STATUS[n.status] || "", n.loan || ""].filter(Boolean);
       return { name: n.name, line: bits.join(" · ") };
     }
     const shift = n.type === "mission" ? (n.shift === "night" ? "Night" : "Day") : "";

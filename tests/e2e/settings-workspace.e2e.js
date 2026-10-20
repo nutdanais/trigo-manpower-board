@@ -362,7 +362,9 @@ async function step(name, fn) {
       await tab("roles");
       // every role side by side: roles across, areas down, a cell is the level
       assert.deepEqual(await p.locator("#roles-matrix thead .rm-role-h b").allInnerTexts(), ["Admin", "Manager", "Engineer", "Viewer"]);
-      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row").count(), 19, "every permission area is a row");
+      assert.equal(await p.locator("#roles-matrix tbody tr.rm-row").count(), 20, "every permission area is a row");
+      // Loans today has no row in this database: it shows (and works) as By board does
+      assert.equal(await p.locator('#roles-matrix [aria-label^="Loans today for Viewer:"]').innerText(), "View");
       assert.equal(await p.locator("#roles-matrix select").count(), 0, "no grid of dropdowns");
       assert.equal(await p.locator("#roles-matrix td[data-role=admin] button").count(), 0, "Admin's column is shown but locked");
       assert.match(await p.locator("#roles-matrix td[data-role=admin]").first().innerText(), /Edit/);
