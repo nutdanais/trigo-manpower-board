@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-16a">
+<link rel="stylesheet" href="styles.css?v=2026-10-20a">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-16a"></script>
+<script src="version.js?v=2026-10-20a"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -117,7 +117,11 @@
 <symbol id="i-area" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6zM9 4v14M15 6v14"/></symbol>
 <symbol id="i-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/></symbol>
 <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3.5V12c0 4.5-3.4 7.6-8 9-4.6-1.4-8-4.5-8-9V6.5L12 3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
-<symbol id="i-appmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13"/></symbol>
+<symbol id="i-appmark"viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
 </defs></svg>
 
 <div id="login-screen" class="hidden">
@@ -1375,6 +1379,42 @@
     </form>
   </div>
 
+  <!-- Move or copy one mission to another board, on the date on screen. Opened
+       from the mission card's quick panel (openMoveMissionModal). -->
+  <div class="modal modal-side hidden" id="modal-move-mission" role="dialog" aria-labelledby="move-mission-title">
+    <h3><span id="move-mission-title">Move mission</span><small id="move-mission-sub"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-move-mission" novalidate>
+      <div class="form-group">To board</div>
+      <div class="mm-boards" id="move-mission-boards" role="group" aria-label="To board"></div>
+      <label class="mm-carry hidden" id="move-mission-carry"><input type="checkbox" id="move-mission-carry-box" checked><span id="move-mission-carry-text"></span></label>
+      <div class="form-group">Move or copy</div>
+      <div class="mm-opts">
+        <label class="mm-opt"><input type="radio" name="mode" value="move" checked><span><b>Move</b><small id="move-mission-move-hint"></small></span></label>
+        <label class="mm-opt"><input type="radio" name="mode" value="copy"><span><b id="move-mission-copy-label">Keep a copy on this board</b><small>Both boards have it on this date.</small></span></label>
+      </div>
+      <div class="form-group" id="move-mission-crew-head">Crew</div>
+      <div class="mm-opts" id="move-mission-crew-opts">
+        <label class="mm-opt"><input type="radio" name="crew" value="without" checked><span><b>Without crew</b><small id="move-mission-crew-hint"></small></span></label>
+      </div>
+      <div class="form-group">Mission number</div>
+      <div class="mm-opts">
+        <label class="mm-opt"><input type="radio" name="num" value="keep" checked><span><b id="move-mission-keep-label">Keep the number</b></span></label>
+        <label class="mm-opt"><input type="radio" name="num" value="change"><span class="mm-row"><b>Change to</b><input type="text" name="newNumber" id="move-mission-number" autocomplete="off" aria-label="New mission number"></span></label>
+      </div>
+      <p id="move-mission-num-note" class="import-note hidden"></p>
+      <div class="form-group">Details</div>
+      <div class="mm-opts">
+        <label class="mm-opt"><input type="radio" name="det" value="keep" checked><span><b>Keep as they are</b><small>Host, customer, time, engineer, PPE and remark go with it.</small></span></label>
+        <label class="mm-opt"><input type="radio" name="det" value="edit"><span><b>Edit after moving</b><small>Opens Edit Mission on the other board.</small></span></label>
+      </div>
+      <div class="modal-actions">
+        <span id="move-mission-summary" aria-live="polite"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-move-mission">Move</button>
+      </div>
+    </form>
+  </div>
+
   <div class="modal hidden" id="modal-confirm">
     <h3><span id="confirm-title">Confirm</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p id="confirm-message"></p>
@@ -1397,15 +1437,15 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-10-16a"></script>
-<script src="i18n-th.js?v=2026-10-16a"></script>
-<script src="planning.js?v=2026-10-16a"></script>
-<script src="employee-id.js?v=2026-10-16a"></script>
-<script src="cloud.js?v=2026-10-16a"></script>
-<script src="charts.js?v=2026-10-16a"></script>
-<script src="xlsx-export.js?v=2026-10-16a"></script>
-<script src="orgchart-pptx.js?v=2026-10-16a"></script>
-<script src="bulk-edit.js?v=2026-10-16a"></script>
-<script src="app.js?v=2026-10-16a"></script>
+<script src="i18n.js?v=2026-10-20a"></script>
+<script src="i18n-th.js?v=2026-10-20a"></script>
+<script src="planning.js?v=2026-10-20a"></script>
+<script src="employee-id.js?v=2026-10-20a"></script>
+<script src="cloud.js?v=2026-10-20a"></script>
+<script src="charts.js?v=2026-10-20a"></script>
+<script src="xlsx-export.js?v=2026-10-20a"></script>
+<script src="orgchart-pptx.js?v=2026-10-20a"></script>
+<script src="bulk-edit.js?v=2026-10-20a"></script>
+<script src="app.js?v=2026-10-20a"></script>
 </body>
 </html>

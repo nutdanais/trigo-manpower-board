@@ -372,7 +372,7 @@ const CLOUD_WRITE_METHODS = [
   "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff", "applyForecastMerge",
   "setCapacityCells", "deleteCapacityRow", "resetCapacityDemand", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
   "startForecastFromConfirmed", "addForecastMissionsFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
-  "saveMission", "deleteMission", "importMissions", "setMissionsHidden", "setDayWorking",
+  "saveMission", "deleteMission", "moveMissionToBoard", "importMissions", "setMissionsHidden", "setDayWorking",
   "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
@@ -2110,14 +2110,16 @@ function empCard(emp) {
       role +
       (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
-  card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
+  card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select, click again to unselect · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
 
   card.addEventListener("click", (ev) => {
-    // don't treat the tail end of a drag as a click
-    if (ev.detail === 0) return;
+    // don't treat the tail end of a drag as a click; the second click of a
+    // double-click (Edit) leaves the selection as the first click set it
+    if (ev.detail === 0 || ev.detail > 1) return;
     // touch has no Ctrl key, so a plain tap toggles (builds a multi-selection);
-    // on desktop a plain click still replaces, Ctrl/Cmd-click adds
-    if (ev.ctrlKey || ev.metaKey || IS_TOUCH) toggleSelect(emp.id);
+    // on desktop a plain click replaces, Ctrl/Cmd-click adds, and a plain click
+    // on a card that is already selected takes it back out of the selection
+    if (ev.ctrlKey || ev.metaKey || IS_TOUCH || state.selectedEmps.has(emp.id)) toggleSelect(emp.id);
     else selectOnly(emp.id);
   });
   card.addEventListener("dragstart", (ev) => {
@@ -2288,7 +2290,6 @@ function positionContextMenu() {
 
 function renderCtxMenu(view) {
   const menu = $("#context-menu");
-  const { emp, ids, many } = ctxMenu;
   menu.innerHTML = "";
 
   const addTitle = (text) => { const h = document.createElement("div"); h.className = "ctx-title"; h.textContent = text; menu.appendChild(h); };
@@ -2320,7 +2321,30 @@ function renderCtxMenu(view) {
     menu.appendChild(it);
   };
   const addSep = () => { const s = document.createElement("div"); s.className = "ctx-sep"; menu.appendChild(s); };
+  // a row that can't be used right now, with the reason after its label
+  const addOff = (label, why, ico) => {
+    const it = document.createElement("div");
+    it.className = "ctx-item ctx-off";
+    it.setAttribute("aria-disabled", "true");
+    setIconLabel(it, ico, label);
+    const hint = document.createElement("span");
+    hint.className = "ctx-hint";
+    hint.textContent = why;
+    it.appendChild(hint);
+    it.onclick = (ev) => ev.stopPropagation();   // stays open, like a submenu row
+    menu.appendChild(it);
+  };
 
+  if (ctxMenu.mission) renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep, addOff });
+  else renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep });
+
+  menu.classList.remove("hidden");
+  menu.scrollTop = 0;   // a submenu opened after scrolling the level above starts at its own top
+  positionContextMenu();
+}
+
+function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) {
+  const { emp, ids, many } = ctxMenu;
   // peekPlan(menuBoardId) (not getPlan(), which reads state.date under
   // D().activeBoardId) — this menu also opens from the Manpower List, where
   // activeBoardId is "__emplist__", not the employee's real board. A
@@ -2381,10 +2405,131 @@ function renderCtxMenu(view) {
         () => safely(async () => { await cloud.setEmployeesActive(ids, false); clearSelection(); await refreshAndRender(); }));
     }, "ctx-danger", "ban");
   }
+}
 
-  menu.classList.remove("hidden");
-  menu.scrollTop = 0;   // a submenu opened after scrolling the level above starts at its own top
-  positionContextMenu();
+/* ---------- mission quick panel (right-click / long-press a mission card) ----------
+   The same menu element and the same two-level shape as the employee menu.
+   Everything here reuses an action the board already has (the mission form,
+   Hide, Delete, assigning, selecting); the only new pieces are Move/Copy to
+   another board (openMoveMissionModal), Copy as text and Open host location. */
+function openMissionMenu(m, x, y) {
+  ctxMenu = { mission: m, x, y };
+  renderCtxMenu("root");
+}
+
+/* Why a board can't take a mission on the date on screen, or "" when it can. */
+function moveTargetBlock(boardId, date) {
+  if (isForecastDateFor(boardId, date)) return "Forecast date";
+  if (isNonWorkingDate(date, boardId)) return "Not working";
+  if (isLocked(boardId, date)) return "Locked";
+  return "";
+}
+
+function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep, addOff }) {
+  const m = ctxMenu.mission;
+  const fc = isForecastView();
+  const canEdit = fc ? can("forecast", "edit") : can("board", "edit");
+  const crew = missionCrew(m);
+  // the selection, less anyone already on this mission
+  const sel = [...state.selectedEmps].filter(id => !m.members.includes(id));
+  const otherBoards = D().boards.filter(b => b.id !== D().activeBoardId);
+
+  if (view === "move") {
+    addBack("Move or copy to board");
+    for (const b of otherBoards) {
+      const why = moveTargetBlock(b.id, state.date);
+      if (why) addOff(b.name, why, "arrow-right");
+      else addItem(b.name, () => guardEdit(() => openMoveMissionModal(m.id, b.id)), null, "arrow-right");
+    }
+  } else if (view === "crew") {
+    addBack("Crew");
+    addItem(`Select crew (${crew.length})`, () => {
+      state.selectedEmps = new Set(crew.map(e => e.id));
+      markSelectedCards();
+    }, null, "check");
+    addItem("Return crew to Standby", () => guardEdit(() => showConfirm("Return crew to Standby?",
+      `Take ${crew.length === 1 ? crew[0].name : crew.length + " people"} off ${m.number}? ${crew.length === 1 ? "They go" : "They all go"} back to Standby. The mission stays on the board.`,
+      () => assignEmployeesTo(crew.map(e => e.id), null))), null, "return");
+  } else {
+    addTitle(`${m.number} · ${m.shift === "night" ? "Night" : "Day"} · ${crew.length} crew`);
+    if (canEdit) {
+      addItem("Edit mission", () => guardEdit(() => openMissionModal(m.id)), null, "edit");
+      addItem("Duplicate mission", () => guardEdit(() => openMissionModal(null, { from: m })), null, "copy");
+      if (!fc && otherBoards.length) addSub("Move or copy to board", "move", "swap");
+      if (sel.length) addItem(`Place ${sel.length} selected here`, () => guardEdit(() => assignEmployeesTo(sel, { missionId: m.id })), null, "plus");
+      if (crew.length) addSub("Crew", "crew", "users");
+    }
+    addItem("Copy as text", () => copyMissionText(m), null, "clipboard");
+    addItem("Open host location", () => openHostLocation(m.host), null, "pin");
+    if (canEdit) {
+      addSep();
+      if (!fc) {
+        addItem("Hide mission", () => crew.length ? guardEdit(() => hideMission(m.id)) : hideMissionFromCard(m), null, "eye-off");
+        addItem("Hide/Unhide missions…", () => openHideMissionsModal(), null, "eye");
+        addSep();
+      }
+      addItem("Delete mission", () => guardEdit(() => deleteMission(m.id)), "ctx-danger", "trash");
+    }
+  }
+}
+
+/* "Copy as text": the mission as a few plain lines for a LINE chat — what,
+   where, when, who runs it, what to wear, who is on it. Phone numbers stay
+   digits so they work in any app. */
+function missionAsText(m) {
+  const board = D().boards.find(b => b.id === D().activeBoardId);
+  const eng = D().engineers.find(e => e.id === m.engineerId);
+  const rec = hostRecordOf(m.host);
+  const map = hostMapHref(rec);
+  const ppe = [(rec || {}).note, m.ppe].filter(Boolean).join(" + ");
+  const crew = sortEmployeesDisplay(missionCrew(m));
+  // the labels in the app's language (the page is translated after it is
+  // drawn, but this text goes straight to the clipboard); the data stays as typed
+  const tx = (s) => (window.I18N ? I18N.t(s) : s);
+  const lines = [
+    `${board ? board.name + " · " : ""}${tx(fmtDow(state.date) + " " + fmtDate(state.date))}`,
+    `${m.number} | ${m.host} → ${m.customer}`,
+    `${tx(m.shift === "night" ? "Night" : "Day")} ${nightTimeNotSet(m) ? tx("(time not set)") : m.startTime + "–" + m.endTime}`
+      + (eng ? ` · ${tx("Engineer")}: ${eng.name}${eng.phone ? " " + eng.phone : ""}` : ""),
+  ];
+  if (map) lines.push(`${tx("Map")}: ${map}`);
+  if (ppe) lines.push(`PPE: ${ppe}`);
+  lines.push(crew.length ? `${tx("Crew")} (${crew.length}): ${crew.map(e => e.name).join(", ")}` : `${tx("Crew")}: -`);
+  if (m.remark) lines.push(`${tx("Remark")}: ${m.remark}`);
+  return lines.join("\n");
+}
+function copyMissionText(m) {
+  const text = missionAsText(m);
+  const done = () => toast(`${m.number} copied. Paste it into LINE or any chat.`, "info");
+  // the textarea route still works where the Clipboard API is refused
+  // (plain-http intranet pages, older tablets)
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    if (ok) done(); else toast("Couldn't reach the clipboard on this device.", "warn");
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+}
+
+/* The host's map (the same link the host name on the card opens), or its row
+   in the Host List when it has no location yet. */
+function openHostLocation(hostName) {
+  const href = hostMapHref(hostRecordOf(hostName));
+  if (href) { window.open(href, "_blank", "noopener"); return; }
+  if (!can("hostlist")) { toast(`${hostName} has no location in the Host List yet.`, "info"); return; }
+  toast(`${hostName} has no location yet. Add it in the Host List.`, "info");
+  clearSelection();
+  state.hostlist.search = hostName;
+  D().activeBoardId = HOSTLIST_ID;
+  refreshAndRender();
 }
 
 function renderZones() {
@@ -2712,6 +2857,14 @@ function renderMissions() {
       </div>
       ${ppeLine}`;
     header.onclick = () => guardEdit(() => openMissionModal(m.id));
+    // the quick panel: right-click anywhere on the card (a person's card inside
+    // it keeps its own menu), or hold the header on a phone
+    card.addEventListener("contextmenu", (ev) => {
+      if (ev.target.closest(".emp-card")) return;
+      ev.preventDefault();
+      openMissionMenu(m, ev.clientX, ev.clientY);
+    });
+    attachLongPress(header, (x, y) => openMissionMenu(m, x, y));
     if (fcView) {
       // D3: people taken out of this mission by another engineer, until acknowledged
       const lost = D().holdEvents.filter(e => e.fromMissionId === m.id);
@@ -6623,7 +6776,9 @@ function updateMissionEngineerNote() {
     + (match.engineerId ? "" : " · first mission for them — they'll get a colour of their own"));
 }
 
-function openMissionModal(missionId) {
+/* opts.from: a mission to start a NEW one from (the quick panel's Duplicate) —
+   every field but the number, which has to be new anyway on the same shift */
+function openMissionModal(missionId, opts = {}) {
   state.editingMissionId = missionId || null;
   const form = $("#form-mission");
   form.reset();
@@ -6633,9 +6788,10 @@ function openMissionModal(missionId) {
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
   $("#btn-hide-mission").classList.toggle("hidden", !missionId || isForecastView());
   $("#mission-modal-title").textContent = (missionId ? "Edit" : "New") + (isForecastView() ? " Forecast Mission" : " Mission");
-  if (missionId) {
-    const m = getPlan().missions.find(x => x.id === missionId);
-    form.number.value = m.number;
+  const src = missionId ? getPlan().missions.find(x => x.id === missionId) : opts.from;
+  if (src) {
+    const m = src;
+    form.number.value = missionId ? m.number : "";
     form.host.value = m.host;
     form.customer.value = m.customer;
     form.ppe.value = m.ppe || "";
@@ -6711,8 +6867,10 @@ function saveMission(ev) {
   });
 }
 
-function deleteMission() {
-  const m = getPlan().missions.find(x => x.id === state.editingMissionId);
+/* from the mission form (the one being edited) or the card's quick panel */
+function deleteMission(missionId = state.editingMissionId) {
+  const m = getPlan().missions.find(x => x.id === missionId);
+  if (!m) return;
   const forecast = isForecastView();
   const plan = getPlan();
   // someone else's holds go with the mission — say so rather than let it happen quietly
@@ -6721,8 +6879,8 @@ function deleteMission() {
     `Delete ${m.number}? Its employees return to the Available pool.` +
       (othersHolds ? ` ${othersHolds} of them ${othersHolds === 1 ? "is" : "are"} held by another engineer.` : ""), () => {
     safely(async () => {
-      if (forecast) await cloud.deleteForecastMission(state.editingMissionId);
-      else await cloud.deleteMission(state.editingMissionId);
+      if (forecast) await cloud.deleteForecastMission(missionId);
+      else await cloud.deleteMission(missionId);
       await refreshAndRender();
     });
   });
@@ -6733,10 +6891,11 @@ function deleteMission() {
    Carries forward day to day like any other mission field (cloud._copyPlanForward
    copies the hidden flag), so a dormant mission stays off every future board
    until someone explicitly unhides it. */
-function hideMission() {
-  const m = getPlan().missions.find(x => x.id === state.editingMissionId);
+function hideMission(missionId = state.editingMissionId) {
+  const m = getPlan().missions.find(x => x.id === missionId);
+  if (!m) return;
   const doHide = () => safely(async () => {
-    await cloud.setMissionsHidden([state.editingMissionId], true);
+    await cloud.setMissionsHidden([missionId], true);
     closeModal();
     await refreshAndRender();
   });
@@ -9624,6 +9783,167 @@ function saveHideMissions() {
     closeModal();
     await refreshAndRender();
   });
+}
+
+/* ---------- Move or copy a mission to another board ----------
+   Only the date on screen changes: later days carried over from this one
+   follow the new board by themselves, days already planned keep their own
+   copy. The target board's plan for the date is loaded when it is picked, so
+   the number check covers everything on it, hidden missions included (the
+   database's unique key is still the final guard). */
+let moveUi = null;   // { mission, fromBoardId, date, targetId, targetPlan, carrySrc, seq }
+
+function openMoveMissionModal(missionId, targetId) {
+  const m = getPlan().missions.find(x => x.id === missionId);
+  if (!m) return;
+  $("#form-move-mission").reset();
+  moveUi = { mission: m, fromBoardId: D().activeBoardId, date: state.date, targetId: null, targetPlan: null, carrySrc: null, seq: 0 };
+  const from = D().boards.find(b => b.id === moveUi.fromBoardId);
+  $("#move-mission-title").textContent = `Move or copy ${m.number}`;
+  $("#move-mission-sub").textContent = `${from ? from.name + " · " : ""}${fmtDow(state.date)} ${fmtDate(state.date)}`;
+  $("#move-mission-keep-label").textContent = `Keep ${m.number}`;
+  $("#move-mission-copy-label").textContent = `Keep a copy on ${from ? from.name : "this board"}`;
+  const box = $("#move-mission-boards");
+  box.innerHTML = "";
+  for (const b of D().boards.filter(x => x.id !== moveUi.fromBoardId)) {
+    const why = moveTargetBlock(b.id, state.date);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mm-board";
+    btn.dataset.board = b.id;
+    btn.disabled = !!why;
+    btn.innerHTML = `<b>${escapeHtml(b.name)}</b><small>${escapeHtml(why)}</small>`;
+    btn.title = why ? `${b.name}: ${why}` : b.name;
+    box.appendChild(btn);
+  }
+  openModal("#modal-move-mission");
+  pickMoveTarget(targetId);
+}
+
+async function pickMoveTarget(boardId) {
+  moveUi.targetId = boardId;
+  moveUi.targetPlan = null;
+  moveUi.carrySrc = null;
+  const seq = ++moveUi.seq;
+  updateMoveMission();
+  try {
+    const plan = await cloud.ensurePlanLoaded(boardId, moveUi.date);
+    // an untouched day: applyCarry seeds missions only into a day with none,
+    // so one mission dropped onto it would stop that board's own carry-over
+    const carrySrc = planIsEmpty(plan) ? await cloud.findLatestWeekdayMissionDate(boardId, moveUi.date) : null;
+    if (!moveUi || seq !== moveUi.seq) return;   // another board was picked meanwhile
+    moveUi.targetPlan = plan;
+    moveUi.carrySrc = carrySrc;
+  } catch (e) {
+    toast("Couldn't load that board's plan: " + (e.message || e), "error");
+  }
+  if (moveUi && seq === moveUi.seq) updateMoveMission();
+}
+
+function moveMissionChoice() {
+  const f = $("#form-move-mission");
+  return { mode: f.mode.value, crew: f.crew.value, num: f.num.value, newNumber: f.newNumber.value.trim(), det: f.det.value };
+}
+
+/* "สมชาย, วิชัย, ประเสริฐ +2": first names only, no English joining words, so
+   the sentence around it translates as a whole */
+function shortNameList(emps) {
+  const names = emps.map(e => splitFullName(e.name)[0]);
+  return names.slice(0, 3).join(", ") + (names.length > 3 ? ` +${names.length - 3}` : "");
+}
+
+function updateMoveMission() {
+  if (!moveUi) return;
+  const { mission: m, fromBoardId, targetId, targetPlan, carrySrc, date } = moveUi;
+  const c = moveMissionChoice();
+  const boardName = (id) => (D().boards.find(b => b.id === id) || {}).name || "the other board";
+  const from = boardName(fromBoardId), to = boardName(targetId);
+  const crew = missionCrew(m);
+  const shift = m.shift === "night" ? "Night" : "Day";
+  for (const b of $$("#move-mission-boards .mm-board")) b.setAttribute("aria-pressed", String(b.dataset.board === targetId));
+
+  const carry = $("#move-mission-carry");
+  carry.classList.toggle("hidden", !carrySrc);
+  if (carrySrc) {
+    $("#move-mission-carry-text").textContent =
+      `${to} has no plan for ${fmtDow(date)} ${fmtDate(date)} yet. Carry over its last working day (${fmtDow(carrySrc)} ${fmtDate(carrySrc)}) first, then add this mission.`;
+  }
+  $("#move-mission-move-hint").textContent = `It leaves ${from}.`;
+  $("#move-mission-crew-head").textContent = `Crew (${crew.length})`;
+  $("#move-mission-crew-hint").textContent = !crew.length ? "Nobody is on it."
+    : c.mode === "move" ? `${shortNameList(crew)} ${crew.length === 1 ? "returns" : "return"} to Standby on ${from}.`
+    : `${shortNameList(crew)} ${crew.length === 1 ? "stays" : "stay"} on ${m.number} on ${from}.`;
+
+  // the number: free on the target's same shift, hidden missions included
+  const number = c.num === "change" ? c.newNumber : m.number;
+  const note = $("#move-mission-num-note");
+  let blocked = !targetId, msg = null;
+  if (!targetPlan) { blocked = true; if (targetId) msg = ["host-note-info", "info", `Checking ${to}…`]; }
+  else if (!number) { blocked = true; msg = ["host-note-info", "info", "Type the new number."]; }
+  else {
+    const clash = targetPlan.missions.find(x => x.shift === m.shift && x.number.trim().toLowerCase() === number.toLowerCase());
+    if (clash) {
+      blocked = true;
+      msg = ["host-note-new", "alert", clash.hidden
+        ? `${clash.number} is a hidden mission on ${to}'s ${shift} shift on this date. Unhide and use that one, or pick another number.`
+        : `${clash.number} is already on ${to}'s ${shift} shift on this date. Pick another number.`];
+    } else if (c.num === "change") msg = ["host-note-ok", "check", `Free on ${to}'s ${shift} shift.`];
+  }
+  note.classList.toggle("hidden", !msg);
+  if (msg) { note.className = "import-note " + msg[0]; setIconLabel(note, msg[1], msg[2]); }
+
+  const verb = c.mode === "copy" ? "Copy" : "Move";
+  // plain text, one clause per " · " part, so each part translates on its own
+  const parts = [`${verb} ${number || m.number} to ${to}`];
+  if (carrySrc && $("#move-mission-carry-box").checked) parts.push(`after carrying over its ${fmtDow(carrySrc)} ${fmtDate(carrySrc)} plan`);
+  if (c.mode === "move" && crew.length) parts.push(`${crew.length} ${crew.length === 1 ? "person returns" : "people return"} to Standby`);
+  if (c.det === "edit") parts.push("then Edit Mission opens");
+  $("#move-mission-summary").textContent = targetId ? parts.join(" · ") : "Pick a board.";
+  const go = $("#btn-move-mission");
+  go.textContent = verb;
+  go.disabled = blocked;
+}
+
+function saveMoveMission(ev) {
+  ev.preventDefault();
+  if (!moveUi || $("#btn-move-mission").disabled) return;
+  const { mission: m, targetId, date, carrySrc } = moveUi;
+  const c = moveMissionChoice();
+  const number = c.num === "change" ? c.newNumber : m.number;
+  const copy = c.mode === "copy";
+  const carry = !!carrySrc && $("#move-mission-carry-box").checked;
+  const to = D().boards.find(b => b.id === targetId);
+  $("#btn-move-mission").disabled = true;
+  (async () => {
+    try {
+      if (carry) await cloud.resetBoardFromLastWorkingDay(targetId, date);
+      const id = await cloud.moveMissionToBoard(m.id, { targetBoardId: targetId, number, copy });
+      closeModal();
+      moveUi = null;
+      const goThere = async () => { clearSelection(); D().activeBoardId = targetId; await refreshAndRender(); };
+      if (c.det === "edit") { await goThere(); openMissionModal(id); return; }
+      await refreshAndRender();
+      toast(`${number} ${copy ? "copied" : "moved"} to ${to.name}.`, "info", {
+        duration: 7000, action: { label: `Go to ${to.name}`, run: () => safely(goThere) },
+      });
+    } catch (e) {
+      toast("Something went wrong: " + (e.message || e), "error");
+      // the carry may have landed before the failure: re-read the target
+      if (moveUi) pickMoveTarget(targetId);
+    }
+  })();
+}
+
+function bindMoveMissionModal() {
+  $("#move-mission-boards").onclick = (e) => {
+    const b = e.target.closest(".mm-board");
+    if (b && !b.disabled && b.dataset.board !== moveUi.targetId) pickMoveTarget(b.dataset.board);
+  };
+  const form = $("#form-move-mission");
+  form.addEventListener("change", updateMoveMission);
+  form.newNumber.addEventListener("input", () => { form.num.value = "change"; updateMoveMission(); });
+  form.newNumber.addEventListener("focus", () => { if (form.num.value !== "change") { form.num.value = "change"; updateMoveMission(); } });
+  form.onsubmit = saveMoveMission;
 }
 
 /* ---------- reset board (re-clone the last working day's plan) ---------- */
@@ -13469,11 +13789,12 @@ function wireApp() {
   initPickers();
   $("#form-employee").onsubmit = saveEmployee;
   $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
-  $("#btn-delete-mission").onclick = deleteMission;
-  $("#btn-hide-mission").onclick = hideMission;
+  $("#btn-delete-mission").onclick = () => deleteMission();
+  $("#btn-hide-mission").onclick = () => hideMission();
   $("#btn-hide-missions").onclick = openHideMissionsModal;
   $("#btn-hide-missions-save").onclick = saveHideMissions;
   bindHideMissionsModal();
+  bindMoveMissionModal();
   bindImportModal();
   bindRenameBoardModal();
   $("#btn-deactivate-employee").onclick = deactivateEmployee;

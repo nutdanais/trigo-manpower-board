@@ -832,6 +832,51 @@ const cloud = {
     this._invalidatePlans();
   },
 
+  /* Move a mission (or a copy of it) to another board on its own date — the
+     mission card's quick panel. `number` renames it on the way when given.
+     Move: the row itself changes board, so its id, history stamps and Realtime
+     echo stay one row; its crew are this board's people, who can't be on
+     another board's mission, so their assignments to it are removed (Standby).
+     The mission is written FIRST, so a number clash on the target fails before
+     anyone is taken off it. Copy: a new row on the target, the original and its
+     crew untouched. Returns the id of the mission now on the target board. */
+  async moveMissionToBoard(missionId, { targetBoardId, number, copy = false }) {
+    const updatedBy = await this._currentEmail();
+    let row, attempt;
+    if (copy) {
+      const { data: src, error: sErr } = await sb.from("missions").select("*").eq("id", missionId).single();
+      if (sErr) throw sErr;
+      row = {
+        board_id: targetBoardId, plan_date: src.plan_date, number: number || src.number, host: src.host, customer: src.customer,
+        shift: src.shift, start_time: src.start_time, end_time: src.end_time, engineer_id: src.engineer_id,
+        ppe: src.ppe, remark: src.remark, hidden: false, updated_by: updatedBy,
+      };
+      attempt = (r) => sb.from("missions").insert(r).select("id").single();
+    } else {
+      row = { board_id: targetBoardId, hidden: false, updated_at: new Date().toISOString(), updated_by: updatedBy };
+      if (number) row.number = number;
+      attempt = (r) => sb.from("missions").update(r).eq("id", missionId);
+    }
+    // same optional-column shedding as saveMission (remark / hidden / updated_by
+    // may predate their migrations on an older database)
+    let error, data;
+    for (let i = 0; i < 4; i++) {
+      ({ error, data } = await attempt(row));
+      if (!error) break;
+      const missingCol = this._missingColumnFromError(error);
+      if (!missingCol || !(missingCol in row)) break;
+      const { [missingCol]: _drop, ...rest } = row;
+      row = rest;
+    }
+    if (error) throw this._friendlyMissionError(error);
+    if (!copy) {
+      const { error: aErr } = await sb.from("assignments").delete().eq("mission_id", missionId);
+      if (aErr) throw aErr;
+    }
+    this._invalidatePlans();
+    return copy ? data && data.id : missionId;
+  },
+
   /* ---------- weekend "Add Mission" import ---------- */
   /* most recent weekday (strictly before `beforeDate`) that has missions on this board */
   async findLatestWeekdayMissionDate(boardId, beforeDate) {
