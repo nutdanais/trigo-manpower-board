@@ -414,17 +414,21 @@
 
      Available is the CURRENT roster minus leave — future hires and exits are
      not known here (the UI says so). Leave and "named" come from confirmed
-     rows up to a board's horizon and from forecast rows after it. */
-  function aggregate({ boards, employees, dates, isForecast, confirmed, forecast }) {
+     rows up to a board's horizon and from forecast rows after it.
+     boardOn (e, date) -> boardId, optional: where someone works that day (a
+     loan to another board); without it everyone counts on e.boardId. */
+  function aggregate({ boards, employees, dates, isForecast, confirmed, forecast, boardOn }) {
     const active = employees.filter((e) => e.active !== false);
     const empById = new Map(active.map((e) => [e.id, e]));
+    const where = boardOn || ((e) => e.boardId);
     const out = {};
     for (const b of boards) {
-      const emps = active.filter((e) => e.boardId === b.id);
-      const headPerm = emps.filter((e) => e.contract !== "oncall").length;
-      const headOncall = emps.length - headPerm;
       out[b.id] = {};
+      const own = active.filter((e) => e.boardId === b.id);
       for (const d of dates) {
+        const emps = boardOn ? active.filter((e) => where(e, d) === b.id) : own;
+        const headPerm = emps.filter((e) => e.contract !== "oncall").length;
+        const headOncall = emps.length - headPerm;
         out[b.id][d] = { headPerm, headOncall, leavePerm: 0, leaveOncall: 0, availPerm: headPerm, availOncall: headOncall, available: headPerm + headOncall, named: 0, _named: new Set() };
       }
     }
@@ -434,14 +438,15 @@
       for (const a of rows || []) {
         const e = empById.get(a.employee_id);
         if (!e) continue;
-        const cell = out[e.boardId] && out[e.boardId][a.plan_date];
+        const bid = where(e, a.plan_date);
+        const cell = out[bid] && out[bid][a.plan_date];
         if (!cell) continue;
-        if (!!isForecast(e.boardId, a.plan_date) !== wantForecast) continue;
+        if (!!isForecast(bid, a.plan_date) !== wantForecast) continue;
         if (a.zone && LEAVE_ZONE_KEYS.includes(a.zone)) {
           if (e.contract === "oncall") cell.leaveOncall++; else cell.leavePerm++;
         } else if (a[missionField]) {
           const m = missions.get(a[missionField]);
-          if (!m || m.hidden || m.board_id !== e.boardId) continue;
+          if (!m || m.hidden || m.board_id !== bid) continue;
           cell._named.add(a.employee_id);
         }
       }

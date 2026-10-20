@@ -372,7 +372,7 @@ const CLOUD_WRITE_METHODS = [
   "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff", "applyForecastMerge",
   "setCapacityCells", "deleteCapacityRow", "resetCapacityDemand", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
   "startForecastFromConfirmed", "addForecastMissionsFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
-  "saveMission", "deleteMission", "moveMissionToBoard", "importMissions", "setMissionsHidden", "setDayWorking",
+  "saveMission", "deleteMission", "moveMissionToBoard", "setLoan", "updateLoan", "endLoans", "importMissions", "setMissionsHidden", "setDayWorking",
   "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
@@ -623,7 +623,13 @@ const isLocked = (boardId, date) => !!lockInfo(boardId, date);
    A forecast date is never read-only: it is after tomorrow by definition, and
    locks belong to confirmed days (the Lock button is hidden there). */
 const isReadOnly = () => !isForecastView() && (isLocked(D().activeBoardId, state.date) || (state.date <= todayStr() && !state.unlockedDates.has(state.date)));
-const boardEmployees = (boardId) => D().employees.filter(e => e.boardId === boardId);
+/* Where someone works on `date`: the board they are lent to that day, else
+   their own (cloud.boardOn, employee_loans). A forecast date leaves loans out:
+   a forecast is planned with everyone on their own board. */
+const boardOf = (e, date = state.date) => (isForecastDateFor(e.boardId, date) ? e.boardId : cloud.boardOn(e, date));
+const loanOf = (e, date = state.date) => (isForecastDateFor(e.boardId, date) ? null : cloud.loanOn(e.id, date));
+/* this board's people on the date on screen: its own, less anyone lent out, plus anyone lent to it */
+const boardEmployees = (boardId) => D().employees.filter(e => boardOf(e) === boardId);
 /* A deactivated employee (Status column in the Manpower List) is off the
    planning roster: they disappear from the pools, from mission/leave cards and
    from the counts built out of them — but only on today's and future boards.
@@ -1222,7 +1228,7 @@ function buildOrgTree() {
     for (const z of ZONES) {
       for (const id of (plan.zones && plan.zones[z]) || []) {
         const e = empById.get(id);
-        if (e && e.boardId === b.id) bucket.children.push(empNode(bucketId, e, z));
+        if (e && boardOf(e) === b.id) bucket.children.push(empNode(bucketId, e, z));
       }
     }
     if (bucket.children.length) boardNode.children.push(bucket);
@@ -2074,7 +2080,19 @@ function cardNamesSaved() {   // also called while `state` is built, so the key 
   try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 
-function empCard(emp) {
+/* the Manpower List's board cell: "→ Rayong until Fri 24 Oct" while someone is
+   lent out on the date on screen (their own board stays in front of it) */
+function loanCellHtml(e) {
+  const l = loanOf(e);
+  if (!l) return "";
+  const to = (D().boards.find(b => b.id === l.toBoardId) || {}).name || "?";
+  const when = l.endDate === state.date ? `${fmtDow(state.date)} ${fmtDate(state.date)} only` : `until ${fmtDow(l.endDate)} ${fmtDate(l.endDate)}`;
+  return ` <span class="el-loan" title="Lent to ${escapeHtml(to)}: ${escapeHtml(fmtDayMon(l.startDate))} – ${escapeHtml(fmtDayMon(l.endDate))}">→ ${escapeHtml(to)} <small>${when}</small></span>`;
+}
+
+/* opts.lentOut: this board's person drawn in the people panel's "Lent out"
+   group — working on another board today, so it can't be selected or placed */
+function empCard(emp, opts = {}) {
   const area = D().areas.find(a => a.id === emp.areaId);
   const pos = emp.position ? POSITIONS[emp.position] : null;
   const card = document.createElement("div");
@@ -2087,7 +2105,7 @@ function empCard(emp) {
   // context menu — the two would race for it. Nothing is lost, because HTML5
   // drag never worked on touch anyway (iOS doesn't fire it at all); placing a
   // card by finger goes through tap-to-select then tap-a-mission, as before.
-  card.draggable = !IS_TOUCH;
+  card.draggable = !IS_TOUCH && !opts.lentOut;
   card.dataset.empId = emp.id;
   // Full name split for the card: first name on its own bold line (with the
   // TRIGO ID, always shown, in that line's corner), surname on a quieter line under it. One
@@ -2111,8 +2129,26 @@ function empCard(emp) {
       (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select, click again to unselect · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
+  // a loan (employee_loans): someone borrowed from another board, or this
+  // board's person working elsewhere today (opts.lentOut); the badge names the
+  // other board, the tooltip the dates
+  const loan = !isNonBoardView() ? loanOf(emp) : null;
+  if (loan && (opts.lentOut || emp.boardId !== D().activeBoardId)) {
+    const name = (id) => (D().boards.find(b => b.id === id) || {}).name || "?";
+    const span = loan.startDate === loan.endDate ? fmtDayMon(loan.startDate) : `${fmtDayMon(loan.startDate)} – ${fmtDayMon(loan.endDate)}`;
+    card.classList.add(opts.lentOut ? "lent-out" : "borrowed");
+    const badge = document.createElement("span");
+    badge.className = "emp-loan";
+    // the board only: a card is 116px wide, the dates are in the tooltip
+    badge.innerHTML = `<span>${escapeHtml(opts.lentOut ? `→ ${name(loan.toBoardId)}` : `↔ ${name(emp.boardId)}`)}</span>`;
+    card.appendChild(badge);
+    card.title += opts.lentOut
+      ? `\nLent to ${name(loan.toBoardId)}: ${span}`
+      : `\nOn loan from ${name(emp.boardId)}: ${span}`;
+  }
 
   card.addEventListener("click", (ev) => {
+    if (opts.lentOut) return;   // works on another board today: nothing to place here
     // don't treat the tail end of a drag as a click; the second click of a
     // double-click (Edit) leaves the selection as the first click set it
     if (ev.detail === 0 || ev.detail > 1) return;
@@ -2207,6 +2243,13 @@ function hideContextMenu() { $("#context-menu").classList.add("hidden"); }
    terms: pressing an unselected card acts on that card alone, pressing one
    that's part of a selection acts on the whole selection. */
 function openEmpMenu(emp, x, y) {
+  // a lent-out card (this board's person, on another board today) is never
+  // selected: a selection is something to place on this board
+  if (!isNonBoardView() && boardOf(emp) !== D().activeBoardId) {
+    ctxMenu = { emp, ids: [emp.id], many: false, x, y };
+    renderCtxMenu("root");
+    return;
+  }
   if (!state.selectedEmps.has(emp.id)) selectOnly(emp.id);
   showContextMenu(emp, x, y);
 }
@@ -2350,11 +2393,28 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
   // activeBoardId is "__emplist__", not the employee's real board. A
   // mixed-board bulk selection has no single mission list to offer, so the
   // placement actions are hidden then; "Move to board" still covers it.
-  const menuBoardId = emp.boardId;
+  // the board they work on today: a loan puts someone on another board's plan
+  const menuBoardId = boardOf(emp);
   const sameBoard = ids.every(id => {
     const e = D().employees.find(x => x.id === id);
-    return e && e.boardId === menuBoardId;
+    return e && boardOf(e) === menuBoardId;
   });
+  // On a board, people are LENT to another board for a few days; moving them
+  // for good is Edit Employee or the Manpower List (where "Move to board"
+  // stays). Without the loans table (migration-2026-10-20) nothing changes.
+  const lending = !isNonBoardView() && !isForecastView() && feat().loans && D().boards.length > 1;
+  const loan = !many && !isNonBoardView() ? loanOf(emp) : null;
+  const homeName = (D().boards.find(b => b.id === emp.boardId) || {}).name || "their board";
+  // a lent-out card on its own board: only what concerns the loan
+  if (!isNonBoardView() && menuBoardId !== D().activeBoardId) {
+    addTitle(emp.name);
+    addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
+    if (loan) {
+      addItem(`End loan (back to ${homeName})`, () => guardEdit(() => endLoanFor(emp)), null, "return");
+      addItem("Change loan dates…", () => guardEdit(() => openLendModal([emp.id], { loan })), null, "calendar");
+    }
+    return;
+  }
   // Placing someone needs the plan they would land in. On a forecast date that
   // is the forecast — which only the board itself has loaded — so from the
   // Manpower List the placement items are left out there rather than
@@ -2366,7 +2426,7 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
   // are is a no-op assignEmployeesTo would skip anyway
   const missions = placeable ? plan.missions.filter(m => !m.hidden && !(current && current.missionId === m.id)) : [];
   const leaveZones = placeable ? LEAVE_ZONES.filter(z => !(current && current.zone === z)) : [];
-  const targetBoards = many ? D().boards : D().boards.filter(b => b.id !== emp.boardId);
+  const targetBoards = many ? D().boards : D().boards.filter(b => b.id !== emp.boardId);   // a move for good: from their own board
   const who = many ? `${ids.length} employees` : emp.name;
 
   if (view === "boards") {
@@ -2391,7 +2451,12 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
   } else {
     addTitle(many ? `${ids.length} employees selected` : emp.name);
     if (!many) addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
-    if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
+    if (lending) addItem("Lend to board…", () => guardEdit(() => openLendModal(ids)), null, "swap");
+    else if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
+    if (loan) {
+      addItem(`End loan (back to ${homeName})`, () => guardEdit(() => endLoanFor(emp)), null, "return");
+      addItem("Change loan dates…", () => guardEdit(() => openLendModal([emp.id], { loan })), null, "calendar");
+    }
     if (missions.length) addSub("Assign to mission", "missions", "plus");
     if (leaveZones.length) addSub("Leave", "leave", "leave");
     if (placeable && (many || current)) {
@@ -2539,7 +2604,7 @@ function renderZones() {
     body.innerHTML = "";
     const emps = plan.zones[z]
       .map(empId => D().employees.find(e => e.id === empId))
-      .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
+      .filter(e => e && boardOf(e) === D().activeBoardId && onRoster(e));
     for (const emp of sortEmployeesDisplay(emps)) body.appendChild(empCard(emp));
     // headcount in the label, like a mission card's — it also goes out in the JPG export
     body.closest(".zone").querySelector(".zone-count").textContent = emps.length;
@@ -2688,6 +2753,16 @@ function renderFloatPool() {
   }
   $("#standby-count").textContent = standbyN;
   $("#oncall-count").textContent = oncallN;
+  // this board's people working on another board today (employee_loans):
+  // listed for reference, not counted in Standby or anywhere on this board
+  const lent = isForecastView() ? [] : D().employees.filter(e => e.boardId === D().activeBoardId && onRoster(e) && boardOf(e) !== e.boardId);
+  const lentBody = $("#lent-body");
+  if (lentBody) {
+    $("#lent-section").classList.toggle("hidden", !lent.length);
+    $("#lent-count").textContent = lent.length;
+    lentBody.innerHTML = "";
+    for (const emp of sortEmployeesDisplay(lent)) lentBody.appendChild(empCard(emp, { lentOut: true }));
+  }
   $("#fp-drawer-sum").textContent = `${$("#standby-label").textContent} ${standbyN} · On-call ${oncallN}`;
   if (!standbyBody.children.length) standbyBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : (holiday ? "No one on holiday" : "Everyone permanent is assigned")}</span>`;
   if (!oncallBody.children.length) oncallBody.innerHTML = `<span class="fp-empty">${filtered ? "No match" : "No on-call free"}</span>`;
@@ -3163,7 +3238,14 @@ function renderStats() {
   // Standby [+ Holiday] + On-call free = Total) and Day + Night split Assigned, so
   // they read as one structure instead of a flat run of 14 numbers. Standby is the
   // count a planner acts on: it is flagged (colour + icon) only when it is not 0.
-  const lead = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${s.total}</b></div>`;
+  // loans (employee_loans): Total counts who works here today, so it says how
+  // many of them are borrowed, and how many of this board's own are elsewhere
+  const here = D().activeBoardId;
+  const borrowedN = isForecastView() ? 0 : rosterEmployees(here).filter(e => e.boardId !== here).length;
+  const lentN = isForecastView() ? 0 : D().employees.filter(e => e.boardId === here && onRoster(e) && boardOf(e) !== here).length;
+  const loanLine = [borrowedN ? `incl. ${borrowedN} borrowed` : "", lentN ? `${lentN} lent out` : ""].filter(Boolean)
+    .map(t => `<small class="st-loan">${t}</small>`).join("");
+  const lead = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${s.total}</b>${loanLine}</div>`;
   const tile = (label, n, kind, extra = "", alert = false, title = "") =>
     `<div class="stat-tile st-${kind}${n === 0 && !alert ? " st-zero" : ""}${alert ? " st-alert" : ""}" data-stat="${label}"${title ? ` title="${title}"` : ""}>` +
     `<div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div>${extra}</div>`;
@@ -4326,7 +4408,7 @@ function renderOverview() {
       if (where.has(id)) return where.get(id);
       const e = empById.get(id);
       if (!e || !onRoster(e)) return { away: true, text: "no longer active" };
-      if (isNonWorkingDate(state.date, e.boardId)) return { away: false, text: "day off" };
+      if (isNonWorkingDate(state.date, boardOf(e))) return { away: false, text: "day off" };
       return { away: false, text: e.contract === "oncall" ? "on-call, free today" : "free today" };
     };
     const thin = todaysHosts.map(h => ({ host: h, ...(cov[h] || { count: 0, ids: [] }) }))
@@ -4967,7 +5049,7 @@ function renderEmployeeRows() {
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
       <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
-      <td data-label="Current board">${board ? escapeHtml(board.name) : add("boardId", "current board")}</td>
+      <td data-label="Current board">${board ? escapeHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
       <td data-label="30D utilization" class="el-util">${utilCell(util)}</td>
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
@@ -8657,7 +8739,7 @@ function xlsxRows() {
     const ppe = [(hostRecordOf(m.host) || {}).note, m.ppe].filter(Boolean).join(" + ");
     const emps = m.members
       .map(id => D().employees.find(e => e.id === id))
-      .filter(e => e && e.boardId === boardId && onRoster(e));
+      .filter(e => e && boardOf(e) === boardId && onRoster(e));
     for (const e of sortEmployeesDisplay(emps)) {
       const area = D().areas.find(a => a.id === e.areaId);
       const pos = e.position ? POSITIONS[e.position] : null;
@@ -8690,7 +8772,7 @@ function xlsxGroups() {
   for (const z of LEAVE_ZONES) {
     const emps = (plan.zones[z] || [])
       .map(id => D().employees.find(e => e.id === id))
-      .filter(e => e && e.boardId === boardId && onRoster(e));
+      .filter(e => e && boardOf(e) === boardId && onRoster(e));
     for (const e of sortEmployeesDisplay(emps)) {
       leave.push(person(e, { leaveKey: z, leaveEn: ZONE_LABELS[z], leaveTh: ZONE_LABELS_TH[z] }));
     }
@@ -9605,7 +9687,7 @@ const HIDE_FILTERS = [["all", "All"], ["empty", "No crew"], ["hidden", "Hidden"]
 function missionCrew(m) {
   return m.members
     .map(empId => D().employees.find(e => e.id === empId))
-    .filter(e => e && e.boardId === D().activeBoardId && onRoster(e));
+    .filter(e => e && boardOf(e) === D().activeBoardId && onRoster(e));
 }
 /* on the board with nobody from this board on it: the missions worth hiding */
 function missionHasNoCrew(m) { return !m.hidden && missionCrew(m).length === 0; }
@@ -9803,6 +9885,11 @@ function openMoveMissionModal(missionId, targetId) {
   $("#move-mission-sub").textContent = `${from ? from.name + " · " : ""}${fmtDow(state.date)} ${fmtDate(state.date)}`;
   $("#move-mission-keep-label").textContent = `Keep ${m.number}`;
   $("#move-mission-copy-label").textContent = `Keep a copy on ${from ? from.name : "this board"}`;
+  // "with crew" lends the mission's people to the other board (employee_loans)
+  const withCrew = !!feat().loans && missionCrew(m).length > 0;
+  $("#move-mission-with-crew").classList.toggle("hidden", !withCrew);
+  $("#move-mission-crew-until").value = state.date;
+  $("#move-mission-crew-until").min = state.date;
   const box = $("#move-mission-boards");
   box.innerHTML = "";
   for (const b of D().boards.filter(x => x.id !== moveUi.fromBoardId)) {
@@ -9842,7 +9929,7 @@ async function pickMoveTarget(boardId) {
 
 function moveMissionChoice() {
   const f = $("#form-move-mission");
-  return { mode: f.mode.value, crew: f.crew.value, num: f.num.value, newNumber: f.newNumber.value.trim(), det: f.det.value };
+  return { mode: f.mode.value, crew: f.crew.value, num: f.num.value, newNumber: f.newNumber.value.trim(), det: f.det.value, crewUntil: f.crewUntil.value };
 }
 
 /* "สมชาย, วิชัย, ประเสริฐ +2": first names only, no English joining words, so
@@ -9870,6 +9957,11 @@ function updateMoveMission() {
   }
   $("#move-mission-move-hint").textContent = `It leaves ${from}.`;
   $("#move-mission-crew-head").textContent = `Crew (${crew.length})`;
+  $("#move-mission-with-label").textContent = `With crew: lend them to ${to}`;
+  const until = c.crewUntil;
+  const badUntil = c.crew === "with" && (!until || until < date);
+  $("#move-mission-with-hint").textContent = badUntil ? "Until can't be before the date on screen."
+    : `${shortNameList(crew)} ${crew.length === 1 ? "goes" : "go"} with it, and ${crew.length === 1 ? "is" : "are"} back on ${from} the day after.`;
   $("#move-mission-crew-hint").textContent = !crew.length ? "Nobody is on it."
     : c.mode === "move" ? `${shortNameList(crew)} ${crew.length === 1 ? "returns" : "return"} to Standby on ${from}.`
     : `${shortNameList(crew)} ${crew.length === 1 ? "stays" : "stay"} on ${m.number} on ${from}.`;
@@ -9896,12 +9988,13 @@ function updateMoveMission() {
   // plain text, one clause per " · " part, so each part translates on its own
   const parts = [`${verb} ${number || m.number} to ${to}`];
   if (carrySrc && $("#move-mission-carry-box").checked) parts.push(`after carrying over its ${fmtDow(carrySrc)} ${fmtDate(carrySrc)} plan`);
-  if (c.mode === "move" && crew.length) parts.push(`${crew.length} ${crew.length === 1 ? "person returns" : "people return"} to Standby`);
+  if (c.crew === "with" && crew.length && !badUntil) parts.push(`${crew.length} ${crew.length === 1 ? "person" : "people"} lent ${until === date ? "for " + fmtDow(date) + " " + fmtDate(date) : "until " + fmtDow(until) + " " + fmtDate(until)}`);
+  else if (c.mode === "move" && crew.length) parts.push(`${crew.length} ${crew.length === 1 ? "person returns" : "people return"} to Standby`);
   if (c.det === "edit") parts.push("then Edit Mission opens");
   $("#move-mission-summary").textContent = targetId ? parts.join(" · ") : "Pick a board.";
   const go = $("#btn-move-mission");
   go.textContent = verb;
-  go.disabled = blocked;
+  go.disabled = blocked || badUntil;
 }
 
 function saveMoveMission(ev) {
@@ -9913,11 +10006,18 @@ function saveMoveMission(ev) {
   const copy = c.mode === "copy";
   const carry = !!carrySrc && $("#move-mission-carry-box").checked;
   const to = D().boards.find(b => b.id === targetId);
+  const crewIds = c.crew === "with" ? missionCrew(m).map(e => e.id) : [];
   $("#btn-move-mission").disabled = true;
   (async () => {
     try {
       if (carry) await cloud.resetBoardFromLastWorkingDay(targetId, date);
       const id = await cloud.moveMissionToBoard(m.id, { targetBoardId: targetId, number, copy });
+      // with crew: lent to the other board for those dates, and back on the
+      // mission there for the date on screen
+      if (crewIds.length) {
+        await cloud.setLoan(crewIds, targetId, date, c.crewUntil, `With ${number}`);
+        for (const empId of crewIds) await cloud.setAssignment(empId, date, { missionId: id });
+      }
       closeModal();
       moveUi = null;
       const goThere = async () => { clearSelection(); D().activeBoardId = targetId; await refreshAndRender(); };
@@ -9943,7 +10043,149 @@ function bindMoveMissionModal() {
   form.addEventListener("change", updateMoveMission);
   form.newNumber.addEventListener("input", () => { form.num.value = "change"; updateMoveMission(); });
   form.newNumber.addEventListener("focus", () => { if (form.num.value !== "change") { form.num.value = "change"; updateMoveMission(); } });
+  // picking an Until date means "with crew"
+  form.crewUntil.addEventListener("focus", () => { if (form.crew.value !== "with") { form.crew.value = "with"; updateMoveMission(); } });
+  form.crewUntil.addEventListener("input", updateMoveMission);
   form.onsubmit = saveMoveMission;
+}
+
+/* ---------- Lend people to another board (employee_loans) ----------
+   For a day or a few days, from the date on screen. Their places on that
+   span are cleared (cloud.setLoan); they start on the other board's Standby
+   and are back on their own board's Standby the day after the loan ends.
+   opts.loan: "Change loan dates…" — that loan's board, From fixed, Until and
+   the note editable. */
+let lendUi = null;   // { ids, from, targetId, loan }
+
+function openLendModal(ids, opts = {}) {
+  const emps = ids.map(id => D().employees.find(e => e.id === id)).filter(Boolean);
+  if (!emps.length) return;
+  const loan = opts.loan || null;
+  const form = $("#form-lend");
+  form.reset();
+  lendUi = { ids: emps.map(e => e.id), from: loan ? loan.startDate : state.date, targetId: loan ? loan.toBoardId : null, loan };
+  const who = emps.length === 1 ? emps[0].name : `${emps.length} people`;
+  $("#lend-title").textContent = loan ? `Change loan dates: ${who}` : `Lend ${who}`;
+  const here = D().boards.find(b => b.id === D().activeBoardId);
+  $("#lend-sub").textContent = `${here ? here.name + " · " : ""}${fmtDow(state.date)} ${fmtDate(state.date)}`;
+  $("#lend-from").value = lendUi.from;
+  $("#lend-until").value = loan ? loan.endDate : state.date;
+  $("#lend-until").min = loan ? state.date : lendUi.from;
+  $("#lend-note").value = loan ? loan.note : "";
+  $("#lend-dates-hint").classList.toggle("hidden", !!loan);
+  // where they can go: not where they all already work, not their own board
+  // (bringing someone home is End loan), not a board that can't take people that day
+  const box = $("#lend-boards");
+  box.innerHTML = "";
+  const boards = loan ? D().boards.filter(b => b.id === loan.toBoardId)
+    : D().boards.filter(b => !emps.every(e => boardOf(e) === b.id || e.boardId === b.id));
+  for (const b of boards) {
+    const why = loan ? "" : moveTargetBlock(b.id, state.date);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mm-board";
+    btn.dataset.board = b.id;
+    btn.disabled = !!why || !!loan;
+    btn.innerHTML = `<b>${escapeHtml(b.name)}</b><small>${escapeHtml(why)}</small>`;
+    box.appendChild(btn);
+  }
+  if (!lendUi.targetId) {
+    const first = boards.find(b => !moveTargetBlock(b.id, state.date));
+    lendUi.targetId = first ? first.id : null;
+  }
+  $("#btn-lend").textContent = loan ? "Save" : "Lend";
+  updateLend();
+  openModal("#modal-lend");
+}
+
+function updateLend() {
+  if (!lendUi) return;
+  const { ids, from, targetId, loan } = lendUi;
+  const until = $("#lend-until").value;
+  const boardName = (id) => (D().boards.find(b => b.id === id) || {}).name || "?";
+  for (const b of $$("#lend-boards .mm-board")) b.setAttribute("aria-pressed", String(b.dataset.board === targetId));
+  const emps = ids.map(id => D().employees.find(e => e.id === id)).filter(Boolean);
+  const notes = [];
+  const badDates = !until || until < (loan ? state.date : from);
+  if (badDates) notes.push(["host-note-new", "alert", loan ? `Until can't be before ${fmtDow(state.date)} ${fmtDate(state.date)}.` : "Until can't be before From."]);
+  if (!loan) {
+    // where they are on the date on screen: lending takes them off it
+    const plan = getPlan();
+    for (const e of emps) {
+      const at = currentAssignmentOfIn(plan, e.id);
+      const m = at && at.missionId && plan.missions.find(x => x.id === at.missionId);
+      if (m) notes.push(["host-note-info", "info", `${e.name} is on ${m.number} today. Lending takes them off it.`]);
+      else if (at && at.zone) notes.push(["host-note-info", "info", `${e.name} is on ${ZONE_LABELS[at.zone] || at.zone} today. Lending takes them off it.`]);
+      // an earlier loan overlapping these dates is replaced for them
+      const other = until && D().loans.find(l => l.employeeId === e.id && l.startDate <= until && l.endDate >= from);
+      if (other) notes.push(["host-note-gap", "alert", `${e.name} is already lent to ${boardName(other.toBoardId)} (${fmtDayMon(other.startDate)} – ${fmtDayMon(other.endDate)}). This replaces it for these dates.`]);
+    }
+  } else if (until && until < loan.endDate) {
+    notes.push(["host-note-info", "info", `From ${fmtDow(addDays(until, 1))} ${fmtDate(addDays(until, 1))} they are back on their own board. Their places on ${boardName(loan.toBoardId)} after Until are cleared.`]);
+  }
+  const box = $("#lend-notes");
+  box.innerHTML = "";
+  for (const [cls, ico, text] of notes) {
+    const p = document.createElement("p");
+    p.className = "import-note lend-note " + cls;
+    setIconLabel(p, ico, text);
+    box.appendChild(p);
+  }
+  const span = !until || badDates ? "" : until === from ? `${fmtDow(from)} ${fmtDate(from)} only` : `${fmtDow(from)} ${fmtDate(from)} – ${fmtDow(until)} ${fmtDate(until)}`;
+  const who = emps.length === 1 ? emps[0].name : `${emps.length} people`;
+  $("#lend-summary").textContent = !targetId ? "No board can take them on this date."
+    : `${loan ? "Lent" : "Lend"} ${who} to ${boardName(targetId)}${span ? " · " + span : ""}`;
+  $("#btn-lend").disabled = !targetId || badDates;
+}
+
+function saveLend(ev) {
+  ev.preventDefault();
+  if (!lendUi || $("#btn-lend").disabled) return;
+  const { ids, from, targetId, loan } = lendUi;
+  const until = $("#lend-until").value;
+  const note = $("#lend-note").value.trim();
+  const to = D().boards.find(b => b.id === targetId);
+  safely(async () => {
+    if (loan) await cloud.updateLoan(loan, { endDate: until, note });
+    else await cloud.setLoan(ids, targetId, from, until, note);
+    closeModal();
+    lendUi = null;
+    clearSelection();
+    await refreshAndRender();
+    const who = ids.length === 1 ? (D().employees.find(e => e.id === ids[0]) || {}).name : `${ids.length} people`;
+    toast(loan ? `Loan to ${to.name} now ends ${fmtDow(until)} ${fmtDate(until)}.`
+      : `${who} lent to ${to.name}${until === from ? " for " + fmtDow(from) + " " + fmtDate(from) : " until " + fmtDow(until) + " " + fmtDate(until)}.`, "info", {
+      duration: 7000,
+      action: { label: `Go to ${to.name}`, run: () => safely(async () => { clearSelection(); D().activeBoardId = targetId; await refreshAndRender(); }) },
+    });
+  });
+}
+
+/* "End loan": back on their own board from the date on screen */
+function endLoanFor(emp) {
+  const loan = loanOf(emp);
+  if (!loan) return;
+  const home = (D().boards.find(b => b.id === emp.boardId) || {}).name || "their board";
+  const away = (D().boards.find(b => b.id === loan.toBoardId) || {}).name || "the other board";
+  showConfirm("End loan?",
+    `${emp.name} goes back to ${home} from ${fmtDow(state.date)} ${fmtDate(state.date)}. Their places on ${away} from that day are cleared.`,
+    () => safely(async () => {
+      await cloud.endLoans([emp.id], state.date);
+      clearSelection();
+      await refreshAndRender();
+    }));
+}
+
+function bindLendModal() {
+  $("#lend-boards").onclick = (e) => {
+    const b = e.target.closest(".mm-board");
+    if (!b || b.disabled || !lendUi) return;
+    lendUi.targetId = b.dataset.board;
+    updateLend();
+  };
+  $("#lend-until").addEventListener("input", updateLend);
+  $("#lend-until").addEventListener("change", updateLend);
+  $("#form-lend").onsubmit = saveLend;
 }
 
 /* ---------- reset board (re-clone the last working day's plan) ---------- */
@@ -11700,7 +11942,7 @@ function capacityModel(boardId) {
   const demand = ((D().capacity && D().capacity.rows) || []).filter(r => r.board_id === boardId);
   const agg = inputs ? Capacity.aggregate({
     boards: [{ id: boardId }], employees: D().employees, dates, isForecast: isForecastDateFor,
-    confirmed: inputs.confirmed, forecast: inputs.forecast,
+    confirmed: inputs.confirmed, forecast: inputs.forecast, boardOn: (e, d) => boardOf(e, d),
   })[boardId] : {};
   const totals = Capacity.demandTotals(demand)[boardId] || {};
   const days = dates.map(d => {
@@ -12388,7 +12630,7 @@ function seedCapacityFromConfirmed() {
     const src = await cloud.findLatestWeekdayMissionDate(boardId, addDays(horizonEndFor(boardId), 1));
     if (!src) { toast(`${board.name} has no confirmed working day with missions to start from.`, "info"); return; }
     const plan = await cloud.ensurePlanLoaded(boardId, src);
-    const active = new Set(D().employees.filter(e => e.boardId === boardId && e.active !== false).map(e => e.id));
+    const active = new Set(D().employees.filter(e => boardOf(e, src) === boardId && e.active !== false).map(e => e.id));
     const seed = Capacity.seedFromPlan(plan, active);
     if (!seed.length) { toast(`Nobody is placed on a mission on ${board.name} on ${fmtShort(src)}, so there is nothing to start from.`, "info"); return; }
     const dates = capacityDates(boardId);
@@ -13795,6 +14037,7 @@ function wireApp() {
   $("#btn-hide-missions-save").onclick = saveHideMissions;
   bindHideMissionsModal();
   bindMoveMissionModal();
+  bindLendModal();
   bindImportModal();
   bindRenameBoardModal();
   $("#btn-deactivate-employee").onclick = deactivateEmployee;

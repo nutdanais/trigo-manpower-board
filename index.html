@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-10-20a">
+<link rel="stylesheet" href="styles.css?v=2026-10-20b">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-10-20a"></script>
+<script src="version.js?v=2026-10-20b"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -791,6 +791,12 @@
     <div class="fp-label"><span class="fp-label-text">Available On-call</span> <span class="fp-count" id="oncall-count"></span><small>not flagged</small></div>
     <div class="fp-body dropzone" data-drop="pool" data-pool="oncall"></div>
   </div>
+  <!-- this board's people working on another board today (employee_loans);
+       not a drop zone, and only shown when someone is lent out -->
+  <div class="fp-section fp-lent hidden" id="lent-section">
+    <div class="fp-label"><span class="fp-label-text">Lent out</span> <span class="fp-count" id="lent-count"></span><small>working on another board</small></div>
+    <div class="fp-body" id="lent-body"></div>
+  </div>
 </aside>
 <!-- drag handle on the panel's left edge: widen it and the employee cards wrap into
      several columns (a sibling, not a child, so it doesn't scroll with the panel) -->
@@ -1395,6 +1401,10 @@
       <div class="form-group" id="move-mission-crew-head">Crew</div>
       <div class="mm-opts" id="move-mission-crew-opts">
         <label class="mm-opt"><input type="radio" name="crew" value="without" checked><span><b>Without crew</b><small id="move-mission-crew-hint"></small></span></label>
+        <!-- needs employee_loans (migration-2026-10-20); hidden without it or with nobody on the mission -->
+        <label class="mm-opt hidden" id="move-mission-with-crew"><input type="radio" name="crew" value="with"><span><b id="move-mission-with-label">With crew: lend them to the other board</b>
+          <span class="mm-row mm-until"><small>until</small><input type="date" name="crewUntil" id="move-mission-crew-until" aria-label="Lend them until"></span>
+          <small id="move-mission-with-hint"></small></span></label>
       </div>
       <div class="form-group">Mission number</div>
       <div class="mm-opts">
@@ -1411,6 +1421,30 @@
         <span id="move-mission-summary" aria-live="polite"></span>
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary" id="btn-move-mission">Move</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Lend people to another board for a day or a few days (employee_loans),
+       or change the dates of a loan. Opened from the employee card's menu
+       (openLendModal). Moving someone for good stays in Edit Employee. -->
+  <div class="modal modal-side hidden" id="modal-lend" role="dialog" aria-labelledby="lend-title">
+    <h3><span id="lend-title">Lend to another board</span><small id="lend-sub"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-lend" novalidate>
+      <div class="form-group">To board</div>
+      <div class="mm-boards" id="lend-boards" role="group" aria-label="To board"></div>
+      <div class="form-group">Dates</div>
+      <div class="form-row">
+        <label>From <input type="date" name="from" id="lend-from" disabled></label>
+        <label>Until <input type="date" name="until" id="lend-until"></label>
+      </div>
+      <p class="field-hint" id="lend-dates-hint">The same day unless you change it. The day after, they are back on their own board's Standby.</p>
+      <div id="lend-notes"></div>
+      <label>Note (optional) <input type="text" name="note" id="lend-note" autocomplete="off" placeholder="e.g. Covering the audit week"></label>
+      <div class="modal-actions">
+        <span id="lend-summary" aria-live="polite"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-lend">Lend</button>
       </div>
     </form>
   </div>
@@ -1437,15 +1471,15 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-10-20a"></script>
-<script src="i18n-th.js?v=2026-10-20a"></script>
-<script src="planning.js?v=2026-10-20a"></script>
-<script src="employee-id.js?v=2026-10-20a"></script>
-<script src="cloud.js?v=2026-10-20a"></script>
-<script src="charts.js?v=2026-10-20a"></script>
-<script src="xlsx-export.js?v=2026-10-20a"></script>
-<script src="orgchart-pptx.js?v=2026-10-20a"></script>
-<script src="bulk-edit.js?v=2026-10-20a"></script>
-<script src="app.js?v=2026-10-20a"></script>
+<script src="i18n.js?v=2026-10-20b"></script>
+<script src="i18n-th.js?v=2026-10-20b"></script>
+<script src="planning.js?v=2026-10-20b"></script>
+<script src="employee-id.js?v=2026-10-20b"></script>
+<script src="cloud.js?v=2026-10-20b"></script>
+<script src="charts.js?v=2026-10-20b"></script>
+<script src="xlsx-export.js?v=2026-10-20b"></script>
+<script src="orgchart-pptx.js?v=2026-10-20b"></script>
+<script src="bulk-edit.js?v=2026-10-20b"></script>
+<script src="app.js?v=2026-10-20b"></script>
 </body>
 </html>

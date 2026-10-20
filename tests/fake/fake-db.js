@@ -43,6 +43,8 @@ class FakeDb {
     this.forwardPlanning = opts.forwardPlanning !== false;
     // migration-2026-09-29 (merge decisions + merge alerts) on top of it
     this.mergeLog = this.forwardPlanning && opts.mergeLog !== false;
+    // migration-2026-10-20 (employee_loans); { loans: false } is a database without it
+    this.loans = opts.loans !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -67,7 +69,8 @@ class FakeDb {
   }
 
   _missing(table) {
-    return (!this.forwardPlanning && FORWARD_TABLES.has(table)) || (!this.mergeLog && table === "forecast_merge_decisions");
+    return (!this.forwardPlanning && FORWARD_TABLES.has(table)) || (!this.mergeLog && table === "forecast_merge_decisions")
+      || (!this.loans && table === "employee_loans");
   }
 
   /* ---------- query execution ---------- */
@@ -260,7 +263,10 @@ class FakeDb {
       s.last_edited_at = this.now();
       s.last_edited_by = by;
     };
-    const boardOf = (r) => table === "missions" ? r.board_id : (this.t("employees").find((e) => e.id === r.employee_id) || {}).board_id;
+    // assignments: effective_board() — the loan covering that date, else the employee's own board
+    const loanOf = (r) => this.loans && this.t("employee_loans").find((l) => l.employee_id === r.employee_id && l.start_date <= r.plan_date && r.plan_date <= l.end_date);
+    const boardOf = (r) => table === "missions" ? r.board_id
+      : ((loanOf(r) || {}).to_board_id || (this.t("employees").find((e) => e.id === r.employee_id) || {}).board_id);
     if (old) bump(boardOf(old), old.plan_date);
     if (row && (!old || boardOf(row) !== boardOf(old) || row.plan_date !== old.plan_date)) bump(boardOf(row), row.plan_date);
   }

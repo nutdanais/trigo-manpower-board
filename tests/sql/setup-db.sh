@@ -17,4 +17,7 @@ done
 if [ "${2:-}" != "--base-only" ]; then
   $P -d "$DB" -f supabase/migration-2026-09-24-forward-planning.sql
   $P -d "$DB" -f supabase/migration-2026-09-29-forecast-merge-review.sql
+  # after forward planning: both define the day-stamp trigger, and the loans
+  # version (effective_board) is the current one
+  $P -d "$DB" -f supabase/migration-2026-10-20-employee-loans.sql
 fi

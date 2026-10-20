@@ -83,7 +83,10 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false, mergeLog: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false },
+          /* employee_loans (migration-2026-10-20): [{id, employeeId, toBoardId,
+             startDate, endDate, note, createdBy}] — see boardOn below */
+          loans: [],
           forecast: {},
           holdEvents: [],
           holdMissions: {},
@@ -307,6 +310,7 @@ const cloud = {
     await this._loadIdentity();
     await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts(), this._loadDirectory(), this._loadFeatures()]);
     if (this.data.features.forecast) await this.loadHoldEvents();
+    await this._loadLoans();
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
   },
@@ -330,7 +334,9 @@ const cloud = {
     // the merge review's decision log and alerts (migration-2026-09-29):
     // without it, Review & merge still works, it just can't tell anyone
     const mergeLog = forecast && stamps && (await probe("forecast_merge_decisions", "id"));
-    this.data.features = { stamps, forecast, capacity, mergeLog };
+    // lending people to another board (migration-2026-10-20)
+    const loans = await probe("employee_loans", "id");
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans };
   },
 
   async _loadAreas() {
@@ -419,6 +425,114 @@ const cloud = {
     // where "current roster" (not "who was really there") is the right idea.
     this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
   },
+  /* ---------- loans: someone lent to another board for a few days ----------
+     An employee belongs to ONE board (employees.board_id). A loan only says
+     where they work on the dates it covers, both included: boardOn() is that
+     rule, and every "who is on this board on this date" read goes through it.
+     The day after a loan ends the person is back on their own board, with
+     nothing to undo. Loans never overlap for one person (setLoan trims). */
+  async _loadLoans() {
+    if (!this.data.features.loans) { this.data.loans = []; return; }
+    const { data, error } = await sb.from("employee_loans").select("*").order("start_date");
+    if (error) { console.warn("employee_loans unavailable:", error.message || error); this.data.loans = []; return; }
+    this.data.loans = (data || []).map((l) => ({
+      id: l.id, employeeId: l.employee_id, toBoardId: l.to_board_id, startDate: l.start_date, endDate: l.end_date,
+      note: l.note || "", createdBy: l.created_by || "",
+    }));
+  },
+  loanOn(employeeId, date) {
+    for (const l of this.data.loans) if (l.employeeId === employeeId && l.startDate <= date && date <= l.endDate) return l;
+    return null;
+  },
+  /* the board someone works on that day: the board they are lent to, else their own */
+  boardOn(emp, date) {
+    if (!emp) return null;
+    const l = this.data.loans.length ? this.loanOn(emp.id, date) : null;
+    return l ? l.toBoardId : emp.boardId;
+  },
+
+  /* Lend `ids` to `toBoardId` from `from` to `until` (both included), or with
+     toBoardId null bring them home for those dates. Any loan of theirs that
+     overlaps the range is trimmed to make room (the dialog says so first).
+     Their assignments on those dates are cleared: a mission on their own board
+     is no longer theirs to work, and a mission on the board they leave is not
+     either — they start on the new board's Standby. Returns nothing. */
+  async setLoan(ids, toBoardId, from, until, note) {
+    if (!ids.length) return;
+    const byId = new Map(this.data.employees.map((e) => [e.id, e]));
+    for (const l of this.data.loans.filter((x) => ids.includes(x.employeeId) && x.startDate <= until && x.endDate >= from)) {
+      if (l.startDate < from) {
+        // keeps its days before the range, and its days after it as a loan of their own
+        const { error } = await sb.from("employee_loans").update({ end_date: addDaysISO(from, -1) }).eq("id", l.id);
+        if (error) throw error;
+        if (l.endDate > until) {
+          const { error: tErr } = await sb.from("employee_loans").insert({
+            employee_id: l.employeeId, to_board_id: l.toBoardId, start_date: addDaysISO(until, 1), end_date: l.endDate,
+            note: l.note || null, created_by: l.createdBy || null,
+          });
+          if (tErr) throw tErr;
+        }
+      } else if (l.endDate > until) {
+        const { error } = await sb.from("employee_loans").update({ start_date: addDaysISO(until, 1) }).eq("id", l.id);
+        if (error) throw error;
+      } else {
+        const { error } = await sb.from("employee_loans").delete().eq("id", l.id);
+        if (error) throw error;
+      }
+    }
+    const { error: aErr } = await sb.from("assignments").delete().in("employee_id", ids).gte("plan_date", from).lte("plan_date", until);
+    if (aErr) throw aErr;
+    const rows = ids.filter((id) => toBoardId && byId.get(id) && byId.get(id).boardId !== toBoardId)
+      .map((id) => ({ employee_id: id, to_board_id: toBoardId, start_date: from, end_date: until, note: note || null, created_by: null }));
+    if (rows.length) {
+      const by = await this._currentEmail();
+      const { error } = await sb.from("employee_loans").insert(rows.map((r) => ({ ...r, created_by: by })));
+      if (error) throw error;
+    }
+    await this._loadLoans();
+    this._invalidatePlans();
+  },
+  /* "Change loan dates": a new last day (and note) for one loan. Days it gives
+     up are cleared on the borrowing board (they are back home then); days it
+     takes on are cleared on their own board, and a later loan of theirs that
+     the new days run into gives way. */
+  async updateLoan(loan, { endDate, note }) {
+    const id = loan.employeeId;
+    const clear = async (from, until) => {
+      if (from > until) return;
+      const { error } = await sb.from("assignments").delete().eq("employee_id", id).gte("plan_date", from).lte("plan_date", until);
+      if (error) throw error;
+    };
+    if (endDate > loan.endDate) {
+      for (const l of this.data.loans.filter((x) => x.employeeId === id && x.id !== loan.id && x.startDate <= endDate && x.endDate > loan.endDate)) {
+        const { error } = l.endDate > endDate
+          ? await sb.from("employee_loans").update({ start_date: addDaysISO(endDate, 1) }).eq("id", l.id)
+          : await sb.from("employee_loans").delete().eq("id", l.id);
+        if (error) throw error;
+      }
+      await clear(addDaysISO(loan.endDate, 1), endDate);
+    } else {
+      await clear(addDaysISO(endDate, 1), loan.endDate);
+    }
+    const { error } = await sb.from("employee_loans").update({ end_date: endDate, note: note || null }).eq("id", loan.id);
+    if (error) throw error;
+    await this._loadLoans();
+    this._invalidatePlans();
+  },
+
+  /* End the loans of `ids` from `date` on: back on their own board that day.
+     Their assignments on the borrowing board from that date are cleared. */
+  async endLoans(ids, date) {
+    // one at a time: each person's own last loan day bounds what is cleared,
+    // so nobody loses assignments on their own board after their loan
+    for (const id of ids) {
+      const mine = this.data.loans.filter((l) => l.employeeId === id && l.endDate >= date);
+      if (!mine.length) continue;
+      const until = mine.reduce((m, l) => (l.endDate > m ? l.endDate : m), date);
+      await this.setLoan([id], null, date, until);
+    }
+  },
+
   async _loadOverrides() {
     // tolerate the table not existing yet (before the workweek migration is run) —
     // the app still works, overrides just stay empty until the migration + redeploy.
@@ -494,7 +608,9 @@ const cloud = {
     if (aErr) throw aErr;
     const assignRows = aRows || [];
 
-    const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId).map((e) => e.id));
+    // who works on this board that day: its own people, less anyone lent
+    // elsewhere, plus anyone lent to it (boardOn)
+    const boardEmpIds = new Set(this.data.employees.filter((e) => this.boardOn(e, date) === boardId).map((e) => e.id));
 
     const plan = { missions: [], zones: emptyZones(), updatedAt: null };
     const missionMap = {};
@@ -598,7 +714,7 @@ const cloud = {
      the destination mission with the same number+shift (matching by content,
      not id, since ids differ per day). Returns [{employeeId, missionId, zone,
      srcMission}] — missionId set for a mission placement, zone for leave. */
-  _carryPlacements(boardId, srcMissions, srcAssignments, destMissions) {
+  _carryPlacements(boardId, srcMissions, srcAssignments, destMissions, destDate) {
     const idMap = {};
     for (const sm of srcMissions) {
       const match = (destMissions || []).find((dm) => dm.number === sm.number && dm.shift === sm.shift);
@@ -610,7 +726,11 @@ const cloud = {
     // (see _loadEmployees), so a deactivated employee's old assignment would
     // otherwise get carried into a brand new day — exactly what deactivating
     // them should prevent.
-    const boardEmpIds = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
+    // ...and the people who work on this board on the DESTINATION day (a loan
+    // that ends on the source day sends its person home here; without a
+    // destDate, as for a forecast, everyone counts on their own board)
+    const onBoard = (e) => (destDate ? this.boardOn(e, destDate) : e.boardId) === boardId;
+    const boardEmpIds = new Set(this.data.employees.filter((e) => onBoard(e) && e.active !== false).map((e) => e.id));
     const srcMissionById = Object.fromEntries(srcMissions.map((m) => [m.id, m]));
     const out = [];
     for (const a of srcAssignments) {
@@ -629,7 +749,7 @@ const cloud = {
   /* What "Carry over" from srcDate would put on an EMPTY day — same shape as
      ensurePlanLoaded returns, no writes. Mission ids are placeholders
      ("preview:<number>|<shift>"); PlanDiff matches by number+shift anyway. */
-  async buildCarryPreview(boardId, srcDate) {
+  async buildCarryPreview(boardId, srcDate, destDate) {
     const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate);
     const plan = { missions: [], zones: emptyZones(), updatedAt: null, sourceDate: srcDate };
     const byId = {};
@@ -644,7 +764,7 @@ const cloud = {
       byId[obj.id] = obj;
       plan.missions.push(obj);
     }
-    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, virtualDest)) {
+    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, virtualDest, destDate)) {
       if (p.missionId) byId[p.missionId].members.push(p.employeeId);
       else if (plan.zones[p.zone]) plan.zones[p.zone].push(p.employeeId);
     }
@@ -681,7 +801,7 @@ const cloud = {
 
     const assignInserts = [];
     const historyInserts = [];
-    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, destMissions)) {
+    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, destMissions, destDate)) {
       assignInserts.push({ employee_id: p.employeeId, plan_date: destDate, mission_id: p.missionId, zone: p.zone, updated_by: updatedBy });
       // same content as the source mission (it was just cloned onto destDate),
       // so no extra lookup needed — see cloud.js's _writeDeploymentHistory for
@@ -726,7 +846,7 @@ const cloud = {
   async resetBoardFromLastWorkingDay(boardId, date) {
     const srcDate = await this.findLatestWeekdayMissionDate(boardId, date);
     if (!srcDate) return null;
-    const boardEmpIds = this.data.employees.filter((e) => e.boardId === boardId).map((e) => e.id);
+    const boardEmpIds = this.data.employees.filter((e) => this.boardOn(e, date) === boardId).map((e) => e.id);
     // clear the day first so the copy is a clean full clone, not a merge
     if (boardEmpIds.length) {
       const { error: aErr } = await sb.from("assignments").delete().eq("plan_date", date).in("employee_id", boardEmpIds);
@@ -770,7 +890,7 @@ const cloud = {
   async _writeDeploymentHistory(employeeId, date, missionId) {
     try {
       const emp = this.data.employees.find((e) => e.id === employeeId);
-      let boardId = emp && emp.boardId;
+      let boardId = emp && this.boardOn(emp, date);   // the board they worked on that day
       const cachedPlan = boardId && this.data.plans[boardId] && this.data.plans[boardId][date];
       let mission = cachedPlan && cachedPlan.missions.find((m) => m.id === missionId);
       if (!mission) {
@@ -1108,6 +1228,8 @@ const cloud = {
     await this._loadEmployees();
   },
   async moveEmployeeToBoard(employeeId, targetBoardId, date) {
+    // a move for good ends any loan from that day: they now belong there
+    await this.endLoans([employeeId], date);
     await sb.from("assignments").delete().eq("employee_id", employeeId).eq("plan_date", date);
     await this._clearForecastPlacements([employeeId], date);
     const { error } = await sb.from("employees").update({ board_id: targetBoardId }).eq("id", employeeId);
@@ -1125,6 +1247,7 @@ const cloud = {
       return e && e.boardId !== targetBoardId;
     });
     if (!movingIds.length) return;
+    await this.endLoans(movingIds, date);   // as moveEmployeeToBoard
     await sb.from("assignments").delete().in("employee_id", movingIds).eq("plan_date", date);
     await this._clearForecastPlacements(movingIds, date);
     const { error } = await sb.from("employees").update({ board_id: targetBoardId }).in("id", movingIds);
@@ -1351,6 +1474,7 @@ const cloud = {
     const activeEmpIds = new Set(this.data.employees.filter((e) => e.active !== false).map((e) => e.id));
     const isActiveEmp = (id, date) => date < today || activeEmpIds.has(id);
     const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
+    const empById = new Map(this.data.employees.map((e) => [e.id, e]));
     const empContract = new Map(this.data.employees.map((e) => [e.id, e.contract]));
     // An employee only counts from the day they were added to the app
     // (employees.added_on; blank = always counted), so people added later
@@ -1358,9 +1482,8 @@ const cloud = {
     // Same per-day rule as onRoster() in app.js.
     const empAddedOn = new Map(this.data.employees.filter((e) => e.addedOn).map((e) => [e.id, e.addedOn]));
     const isCounted = (id, date) => isActiveEmp(id, date) && !(empAddedOn.has(id) && empAddedOn.get(id) > date);
-    const rosterByBoard = {};
-    for (const id of boardIds) rosterByBoard[id] = this.data.employees.filter((e) => e.boardId === id);
-    const headcountOn = (boardId, date) => rosterByBoard[boardId].filter((e) => isCounted(e.id, date));
+    // by the board each person worked on that DATE (a loan moves them for its days)
+    const headcountOn = (boardId, date) => this.data.employees.filter((e) => this.boardOn(e, date) === boardId && isCounted(e.id, date));
 
     // seed every calendar date for every requested board so each chart has a
     // full axis to work from, even on dates with zero assignments
@@ -1394,10 +1517,11 @@ const cloud = {
         bucket.assigned++;
         if (isOncall) bucket.oncallAssigned++;
       } else if (a.zone && ZONES.includes(a.zone)) {
-        // A leave/zone entry isn't tied to a mission, so its board can only
-        // come from the employee's CURRENT board membership (same caveat as
-        // headcount above — board moves aren't tracked historically here).
-        const boardId = empBoard.get(a.employee_id);
+        // A leave/zone entry isn't tied to a mission, so its board comes from
+        // the employee: the board they worked on that day (a loan), else their
+        // CURRENT board (permanent board moves aren't tracked historically here).
+        const emp = empById.get(a.employee_id);
+        const boardId = emp ? this.boardOn(emp, a.plan_date) : empBoard.get(a.employee_id);
         const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
         if (!bucket) continue;
         bucket.leave++;
@@ -2327,7 +2451,8 @@ const cloud = {
   _attributionFromPayload(payload) {
     const row = payload && payload.new;
     if (!row || !row.updated_by) return null;
-    const boardId = row.board_id || (this.data.employees.find((e) => e.id === row.employee_id) || {}).boardId;
+    const emp = this.data.employees.find((e) => e.id === row.employee_id);
+    const boardId = row.board_id || (emp && this.boardOn(emp, row.plan_date));
     return boardId ? { boardId, planDate: row.plan_date, updatedBy: row.updated_by } : null;
   },
 
@@ -2356,6 +2481,14 @@ const cloud = {
           // user whose hold was taken (from_held_by), nobody else
           this.notify({ holdEvent: payload && payload.eventType === "INSERT" ? payload.new : null });
         });
+    }
+    if (this.data.features.loans) {
+      // a loan moves people between boards for its dates: every cached plan may change
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "employee_loans" }, async (payload) => {
+        await this._loadLoans();
+        this.data.plans = {};
+        this.notify(this._attributionFromPayload(payload));
+      });
     }
     if (this.data.features.capacity) {
       ch.on("postgres_changes", { event: "*", schema: "public", table: "capacity_demand" }, async () => {
