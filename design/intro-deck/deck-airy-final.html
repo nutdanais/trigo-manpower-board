@@ -338,7 +338,27 @@ h2.h em{font-style:normal; font-weight:600; background:var(--em); -webkit-backgr
 .sumb .pc{display:flex; align-items:baseline; gap:1cqw}
 .sumb .pc b{font-size:3cqw; font-weight:600; letter-spacing:-.04em; color:#B7DC4A}
 .sumb .pc span.tx{font-size:1cqw; color:rgba(255,255,255,.9)}
-.o12 .graphic{top:11cqw; width:44cqw}
+.o12 .graphic{top:14cqw; width:44cqw}
+.duo{position:relative; display:grid; gap:1.2cqw}
+.duo .lane{background:rgba(255,255,255,.82); border-radius:1.8cqw; box-shadow:0 0 0 1px var(--hair), 0 1.6cqw 4cqw rgba(6,42,68,.1); padding:1.6cqw 1.8cqw; display:grid; gap:1.1cqw}
+.crew{display:grid; grid-template-columns:repeat(4,1fr); gap:1cqw}
+.pp{display:grid; justify-items:center; gap:.35cqw; padding:1cqw .4cqw; border-radius:1.2cqw; background:rgba(46,127,184,.06); box-shadow:0 0 0 1px rgba(46,127,184,.16)}
+.pp i{width:3.4cqw; height:3.4cqw; border-radius:50%; font:600 1.2cqw/1 var(--f); display:grid; place-items:center; font-style:normal; margin-bottom:.2cqw}
+.pp b{font-size:1.1cqw; font-weight:600; color:var(--navy)}
+.pp span.tx{font:500 .8cqw/1 var(--f-mono); letter-spacing:.12em; color:var(--mut)}
+.duo .mis{justify-self:center; display:flex; align-items:center; gap:.8cqw; padding:.7cqw 1.5cqw; border-radius:5cqw; background:#8DB828; color:#fff; box-shadow:0 1cqw 2.2cqw rgba(110,147,18,.3)}
+.mis .ms{font-size:1.6cqw}
+.mis b{font-size:1.2cqw; font-weight:600}
+.mis span.tx{font-size:1cqw; opacity:.95}
+.gear{display:grid; grid-template-columns:repeat(3,1fr); gap:1cqw}
+.gg{display:grid; align-content:start; gap:.55cqw; padding:1cqw; border-radius:1.2cqw; background:rgba(46,127,184,.06); box-shadow:0 0 0 1px rgba(46,127,184,.16)}
+.gg b{font-size:1.1cqw; font-weight:600; color:var(--navy)}
+.gg .gb{position:relative; height:.9cqw; border-radius:1cqw; background:#DDE6ED; margin:.3cqw 0}
+.gg .gb i{display:block; height:100%; border-radius:1cqw; background:#8DB828}
+.gg .gb u{position:absolute; top:-.3cqw; display:block; width:.22cqw; height:1.5cqw; background:var(--navy); text-decoration:none}
+.gg span.tx{font-size:.9cqw; color:var(--mut)}
+.gg span.okp{font-size:1cqw; font-weight:600; color:#6E9312}
+
 .apps4{position:relative; display:grid; grid-template-columns:1fr 1fr; gap:2cqw}
 .apglow{position:absolute; left:-4cqw; right:-4cqw; top:-4cqw; bottom:-4cqw; background:radial-gradient(closest-side,#E3F0FB,rgba(227,240,251,0)); z-index:-1}
 .apps4 .ap{background:rgba(255,255,255,.82); border-radius:1.8cqw; box-shadow:0 0 0 1px var(--hair), 0 1.6cqw 4cqw rgba(6,42,68,.1); padding:2.4cqw 2cqw; display:grid; gap:.6cqw; justify-items:start; align-content:start}
@@ -527,7 +547,7 @@ h2.h em{font-style:normal; font-weight:600; background:var(--em); -webkit-backgr
       <div class="meta"><b>11 · Operation excellence: poka-yoke</b><span>Two controls stop bad data at capture, one tells the operator when a box is full, and the administrator reviews before release. Next: the two web apps.</span></div>
     </section>
     <section class="item">
-      <div class="slide o12 sect"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><span class="rule"></span><div class="copy hd"><span class="eyebrow">Non-Rayong overview 2026</span><h2 class="h">The two <em>apps.</em></h2><p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables.</p></div><div class="graphic"><div class="apps4"><div class="glow apglow"></div><div class="ap a1"><img class="ai" src="img/icon-manpower.png" alt="Manpower Board app icon"><b class="tx">Manpower Board</b><span class="tx">Plan who goes where</span><div class="tags"><span class="tx">Drag and drop board</span><span class="tx">Capacity grid</span><span class="tx">Host on Google Maps</span></div></div><div class="ap a2"><img class="ai" src="img/icon-inventory.png" alt="Inventory and Quality app icon"><b class="tx">Inventory &amp; Quality</b><span class="tx">Tools, parts and consumables</span><div class="tags"><span class="tx">Consumables and cart</span><span class="tx">Tools and calibration</span><span class="tx">Customer parts</span></div></div><div class="ap-foot"><span class="ms">smartphone</span><span class="tx">Both run in the browser and install on your phone</span></div></div></div>
+      <div class="slide o12 sect"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><span class="rule"></span><div class="copy hd"><span class="eyebrow">Non-Rayong overview 2026</span><h2 class="h">The two <em>apps.</em></h2><p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables.</p></div><div class="graphic"><div class="duo"><div class="glow apglow"></div><div class="lane"><span class="kick tx">Manpower Board · who goes</span><div class="crew"><div class="pp"><i style="background:#97C21D; color:#062A44">BS</i><b class="tx">Boonmee</b><span class="tx">BANGN</span></div><div class="pp"><i style="background:#A3B3C1; color:#062A44">CH</i><b class="tx">Chalerm</b><span class="tx">LCBTH</span></div><div class="pp"><i style="background:#97C21D; color:#062A44">DJ</i><b class="tx">Decha</b><span class="tx">BANGN</span></div><div class="pp"><i style="background:#0B3A5C; color:#FFFFFF">KS</i><b class="tx">Kasem</b><span class="tx">AMATA</span></div></div></div><div class="mis"><span class="ms">assignment</span><b class="tx">Mission 4411</b><span class="tx">AutoAlliance Rayong · Fri 16 Oct</span></div><div class="lane"><span class="kick tx">Inventory &amp; Quality · what they take</span><div class="gear"><div class="gg"><b class="tx">Cap Trigo</b><div class="gb"><i style="width:100%"></i><u style="left:40%"></u></div><span class="tx">25 on hand · safety 10</span></div><div class="gg"><b class="tx">Carbon Mask</b><div class="gb"><i style="width:100%"></i><u style="left:47%"></u></div><span class="tx">15 on hand · safety 7</span></div><div class="gg"><b class="tx">Digital Caliper</b><span class="tx okp">Calibration valid · 12 d</span><span class="tx">Borrow, return, on record</span></div></div></div></div></div>
       </div>
       <div class="meta"><b>12 · Section: The two apps</b><span>The last section moves from the numbers to the tools behind them. Two web apps support the Non-Rayong sites: the Manpower Board for planning people and missions, and the Inventory and Quality System for tools, parts and consumables. Both run in the browser and on a phone. First the Manpower Board, then Inventory.</span></div>
     </section>
