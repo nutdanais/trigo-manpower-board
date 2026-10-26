@@ -1,0 +1,13 @@
+# Quiet Instrumentation
+
+*A visual philosophy for work that is measured, placed and kept in order.*
+
+Quiet Instrumentation treats a surface as a calibrated field: a fine, regular lattice of identical cells laid out with the patience of a technical drawing. The lattice is the whole language. Nothing is decorated; everything is registered. Each cell is a unit of something countable, and the composition asks only where those units rest, where they gather, and where they are still empty. The result should read as a page torn from an imaginary instrument manual, a diagram of a discipline that does not exist but feels instantly familiar to anyone who has ever kept a careful record.
+
+Space is organised by pitch. One module, repeated without exception, sets every margin, every interval and every gap, so the eye finds order before it finds content. A single gentle curve crosses the field; where it passes, empty outlines thicken into tinted cells in four quiet steps, and the densest stretch holds a small solid mark, one per cell, like a person standing in a numbered bay. The edges of the field dissolve toward the places where words or logos need air. Negative space is not leftover. It is the calm that makes the dense passage legible, and it must be measured as exactly as the marks themselves.
+
+Colour is faded on purpose. A pale blue-grey or a deep navy that thins to slate carries the ground; hairlines are the same hue as the ground pushed a little darker or lighter, never a new colour. One accent, a muted spring green, appears in a rhythm so sparse that finding it is a small reward. Tints are discrete steps, never smooth blends, so the field feels counted rather than painted. Contrast stays gentle everywhere except in the one place that matters.
+
+Along one edge runs a ruler: long ticks, medium ticks, short ticks, a few numerals in a thin monospaced face, and a single green index mark where the scale is read. Registration crosses sit at the corners. A line of clinical caption, small enough to be a whisper, anchors the page and nothing more. Text is a footnote to the form; the form carries the meaning. Type stays thin, mono and exact, and never competes with the field.
+
+Every alignment must look like the product of countless hours at the bench: meticulously crafted, every cell snapped to the grid, every hairline the same weight, every tint step chosen with painstaking care. The work should show the deep expertise of someone at the very top of their field, someone who would redraw a whole sheet to move one tick by a pixel. Restraint is the proof of mastery. Nothing is added to impress; what remains is only what a master-level hand could not bring itself to remove.
