@@ -1,0 +1,25 @@
+-- Migration 2026-10-26: employees.deactivated_on — the day someone went off the roster
+-- Run once in the Supabase SQL Editor (safe to re-run). Then run
+-- migration-2026-10-26b-deactivated-on-backfill.sql to date the people who are
+-- already deactivated, then redeploy the app. Until the column exists the app works
+-- as before; deactivating just stores no date.
+--
+-- Why: "active" was a bare on/off switch, so the app had to guess which past days a
+-- deactivated person belonged to. It guessed "all of them": today leaves them out, every
+-- past day counts them, even the days after they left. They are on no mission on those
+-- days, so each reads as Standby, and a day that read 100% when it happened drops the
+-- moment it becomes yesterday (Overview → History, the board on a past date). With this
+-- column a person counts on the days BEFORE they were deactivated and not from that
+-- day on, the same way employees.added_on already dates the other end.
+--
+--   * deactivated_on is a plain date: the first day the person is NOT on the roster.
+--     Deactivating someone today stores today, so today is out (as it always was) and
+--     every earlier day keeps them.
+--   * Reactivating clears it. They then count on every date again, including the days
+--     they were away. (A person who really comes back after months is better added as a
+--     new row; a mistaken deactivation is put right by reactivating.)
+--   * NULL on someone who is deactivated means "no date known yet": the app keeps the old
+--     behaviour for them (out today, counted on every past day) until the back-fill dates
+--     them. Someone who is active is never affected by this column.
+
+alter table employees add column if not exists deactivated_on date;

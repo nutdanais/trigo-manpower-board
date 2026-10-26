@@ -646,17 +646,20 @@ const planBoardOf = (e, date = state.date) => (worksOn(e, e.boardId, date) ? e.b
 const boardEmployees = (boardId) => D().employees.filter(e => worksOn(e, boardId));
 /* A deactivated employee (Status column in the Manpower List) is off the
    planning roster: they disappear from the pools, from mission/leave cards and
-   from the counts built out of them — but only on today's and future boards.
-   A past date is a record of what actually happened, so it keeps showing
-   everyone who was really there; that's the whole reason deactivating is a
-   flag rather than a delete. boardEmployees() above stays unfiltered on
-   purpose — it's the raw lookup history rendering depends on. */
-const showsDeactivated = () => state.date < todayStr();
+   from the counts built out of them — from the day they were deactivated on
+   (employees.deactivated_on, so today and every later date). A date BEFORE that
+   is a record of what actually happened, so it keeps showing everyone who was
+   really there; that's the whole reason deactivating is a flag rather than a
+   delete. Counting them on EVERY past date, as this once did, made the days after
+   they left read as Standby: a day that was 100% when it happened was ~90% the day
+   after. cloud.rosterOn() is the one rule (the Overview History / Trend read it
+   too); boardEmployees() above stays unfiltered on purpose — it's the raw lookup
+   history rendering depends on. */
 /* Day-level join date: someone added to the app on the 1st doesn't exist on
    the board before that date, so a bulk add never inflates Standby/headcount for
    earlier days. Blank addedOn = predates the column = always counted. */
 const hasJoined = (e) => !e.addedOn || e.addedOn <= state.date;
-const onRoster = (e) => hasJoined(e) && (showsDeactivated() || e.active !== false);
+const onRoster = (e) => hasJoined(e) && cloud.rosterOn(e, state.date);
 const rosterEmployees = (boardId) => boardEmployees(boardId).filter(onRoster);
 
 /* ---------- plan access (reads the cache cloud.js keeps warm) ---------- */
@@ -3730,6 +3733,15 @@ function trendMetricValue(metric, rec) {
   const oncallFree = Math.max(0, rec.oncallHeadcount - rec.oncallAssigned - rec.oncallLeave);
   return utilizationPct(rec.assigned, rec.headcount, rec.leave, 0, oncallFree);
 }
+/* A board nobody planned on a date — no missions on it at all, hidden ones not
+   counted — has nothing to measure: its whole roster would read as Standby and its
+   utilization as 0%, for a day that was never entered rather than a day its people
+   sat idle. The History charts and the KPI sparkline leave such a board-day out, like
+   a weekend, and History says which boards it left out (historyUnplanned). The day's
+   own numbers on the board and in the attention card are unchanged: there, no plan
+   yet IS something to act on. A record with no `missions` (an older cache) counts as
+   planned. */
+const boardDayPlanned = (rec) => rec.missions == null || rec.missions > 0;
 /* the all-boards aggregate, for the KPI tile's sparkline — sums every board's
    raw numerator/denominator for the day before computing the metric, rather
    than averaging each board's own percentage (which would let a tiny board
@@ -3740,7 +3752,7 @@ function aggregateMetricPoint(metric, d, boards, util) {
   for (const b of boards) {
     if (isNonWorkingDate(d, b.id)) continue;
     const rec = util[b.id] && util[b.id][d];
-    if (!rec) continue;
+    if (!rec || !boardDayPlanned(rec)) continue;
     any = true;
     for (const k in sum) sum[k] += rec[k];
   }
@@ -3833,7 +3845,7 @@ function historyDayRec(d, boards, hist) {
   for (const b of boards) {
     if (isNonWorkingDate(d, b.id)) continue;
     const rec = hist[b.id] && hist[b.id][d];
-    if (!rec) continue;
+    if (!rec || !boardDayPlanned(rec)) continue;   // not planned: left out, see boardDayPlanned
     any = true;
     for (const k of HISTORY_SUM_KEYS) sum[k] += rec[k] || 0;
     for (const engId in (rec.byEngineer || {})) {
@@ -3856,6 +3868,26 @@ function historyMean(values) {
   const v = values.filter(x => x != null);
   if (!v.length) return null;
   return Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10;
+}
+/* The boards History left out on some of its working days because nobody planned
+   them (see boardDayPlanned): { board, days: how many, of: that board's working
+   days in the range }. Empty when every board in scope was planned every day it
+   worked. A board with nobody on it that day has nothing to leave out, so it is
+   not counted (an empty board would otherwise read "18 of 18 days"). */
+function historyUnplanned(dates, boards, hist) {
+  const out = [];
+  for (const b of boards) {
+    let days = 0, of = 0;
+    for (const d of dates) {
+      if (isNonWorkingDate(d, b.id)) continue;
+      const rec = hist[b.id] && hist[b.id][d];
+      if (!rec || !rec.headcount) continue;
+      of++;
+      if (!boardDayPlanned(rec)) days++;
+    }
+    if (days) out.push({ board: b, days, of });
+  }
+  return out;
 }
 
 /* The range control shared by BOTH new sections — presets, two native date
@@ -3936,7 +3968,7 @@ function historyRangeCaption(dates) {
    One measure per chart, on its own axis: six lines on one scale squashed
    Missions (~4) flat under Idle (~28). The tiles answer most visits on their
    own; picking one draws that measure day by day with its average as a rule. */
-function historySection(dates, recs, pendingCharts) {
+function historySection(dates, recs, unplanned, pendingCharts) {
   const ov = state.overview;
   const sec = ovSection("History", null);
   sec.querySelector("h3").insertAdjacentHTML("afterend",
@@ -3947,7 +3979,10 @@ function historySection(dates, recs, pendingCharts) {
     return sec;
   }
   const lastIdx = recs.map((r, i) => (r ? i : -1)).filter(i => i >= 0).pop();
-  const latestWord = ov.historyTo === todayStr() ? "today" : `on ${fmtDate(dates[dates.length - 1])}`;
+  // the day the "latest" figure belongs to: the last day with a record, which is not
+  // today when today's board was not planned
+  const latestDate = lastIdx != null ? dates[lastIdx] : dates[dates.length - 1];
+  const latestWord = latestDate === todayStr() ? "today" : `on ${fmtDate(latestDate)}`;
   const tiles = document.createElement("div");
   tiles.className = "ov-htiles";
   tiles.setAttribute("role", "group");
@@ -3971,6 +4006,23 @@ function historySection(dates, recs, pendingCharts) {
   // what the tile being charted means, in plain words, right under the tiles
   const picked = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
   sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help", textContent: `${picked.label}: ${picked.help}` }));
+  // boards nobody planned on some days: left out of every figure above and below, named here
+  if (unplanned.length) {
+    const note = document.createElement("p");
+    note.className = "ov-htile-help ov-unplanned";
+    note.appendChild(document.createTextNode("Not planned, so left out of these figures (no missions on the board that day):"));
+    for (const u of unplanned) {
+      const chip = document.createElement("span");
+      chip.className = "ov-unplanned-board";
+      const name = Object.assign(document.createElement("b"), { textContent: u.board.name });
+      name.setAttribute("data-no-i18n", "");   // a board's name is data, not interface
+      chip.appendChild(name);
+      chip.appendChild(document.createTextNode(" "));   // a real space for a screen reader; the flex gap does the spacing on screen
+      chip.appendChild(Object.assign(document.createElement("span"), { textContent: `${u.days} of ${u.of} ${u.of === 1 ? "day" : "days"}` }));
+      note.appendChild(chip);
+    }
+    sec.appendChild(note);
+  }
 
   const m = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
   const values = recs.map(r => (r ? m.value(r) : null));
@@ -4162,7 +4214,7 @@ function renderOverview() {
   // roster for the date on screen — boardStats() is already roster-filtered, so
   // these totals have to use the same set or the KPI strip, the By board table
   // and every utilization denominator disagree by however many people are
-  // currently deactivated. (Past dates keep everyone; see onRoster().)
+  // deactivated on that date. (Earlier dates keep them; see onRoster().)
   const rosterAll = scoped ? boards.flatMap(b => rosterEmployees(b.id)) : D().employees.filter(onRoster);
   const totalEmp = rosterAll.length;
   const totalAssigned = sum("assigned"), totalLeave = sum("leave"), totalStandby = sum("standby");
@@ -4603,7 +4655,7 @@ function renderOverview() {
     const histDates = historyDates(boards);
     const histRecs = histDates.map(d => historyDayRec(d, boards, state.overview.history || {}));
     panel.appendChild(ovGroupHead("Period", `${historyRangeCaption(histDates)}`));
-    panel.appendChild(historySection(histDates, histRecs, pendingCharts));
+    panel.appendChild(historySection(histDates, histRecs, historyUnplanned(histDates, boards, state.overview.history || {}), pendingCharts));
     panel.appendChild(engineerHistorySection(histDates, histRecs));
   }
 
