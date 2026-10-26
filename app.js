@@ -3872,7 +3872,8 @@ function historyMean(values) {
 /* The boards History left out on some of its working days because nobody planned
    them (see boardDayPlanned): { board, days: how many, of: that board's working
    days in the range }. Empty when every board in scope was planned every day it
-   worked. */
+   worked. A board with nobody on it that day has nothing to leave out, so it is
+   not counted (an empty board would otherwise read "18 of 18 days"). */
 function historyUnplanned(dates, boards, hist) {
   const out = [];
   for (const b of boards) {
@@ -3880,7 +3881,7 @@ function historyUnplanned(dates, boards, hist) {
     for (const d of dates) {
       if (isNonWorkingDate(d, b.id)) continue;
       const rec = hist[b.id] && hist[b.id][d];
-      if (!rec) continue;
+      if (!rec || !rec.headcount) continue;
       of++;
       if (!boardDayPlanned(rec)) days++;
     }

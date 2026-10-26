@@ -44,6 +44,8 @@ async function step(name, fn) {
     });
     db.seed("missions", missions);
     db.seed("assignments", placed);
+    // Board Three has no people and no missions: nothing to leave out, so the note must not name it
+    db.seed("boards", [{ id: "b3", name: "Board Three", weekend_days: [0, 6] }]);
     // Board Two (Persons I, J, both permanent) has no mission on P1 or P2: nobody planned it
     const a = await env.openAs(db, h.USERS.a);
     const p = a.page;
