@@ -5670,6 +5670,9 @@ body:not(.board-view) #toolbar-row2 #area-bar:not(:empty) { order: 5; flex: 0 0 
 
 /* History: the charted measure explained in plain words */
 .ov-htile-help { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; text-wrap: pretty; }
+/* the boards History left out because nobody planned them: the sentence, then one quiet chip per board */
+.ov-unplanned-board { display: inline-flex; gap: 5px; margin-left: 8px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ov-unplanned-board b { color: var(--text); font-weight: 600; }
 
 /* Overview "In detail": two independent columns so a short card never leaves a hole
    beside a tall one (the grid made every row as tall as its tallest card) */

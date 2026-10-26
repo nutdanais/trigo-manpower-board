@@ -59,6 +59,10 @@ create table if not exists employees (
   -- the day this person was added to the app; headcount/Standby/utilization count them only from
   -- this date on. NULL = always counted (people who predate the column). See migration-2026-10-02b.
   added_on date default ((now() at time zone 'Asia/Bangkok')::date),
+  -- the first day this person is NOT on the roster, set when they are deactivated and cleared when they
+  -- are reactivated; they count on the days before it. NULL on a deactivated person = no date known
+  -- (counted on every past day, as before). See migration-2026-10-26.
+  deactivated_on date,
   -- the TRIGO ID (T + digits, e.g. T329), kept apart from the full name; unique when set. See migration-2026-10-03.
   trigo_id text,
   area_id uuid references service_areas(id) on delete restrict,

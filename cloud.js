@@ -423,7 +423,20 @@ const cloud = {
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active }));
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active, deactivatedOn: e.deactivated_on || "" }));
+  },
+  /* Is `e` on the roster on `date`, as far as being deactivated goes? Someone active
+     counts on every date. Someone deactivated counts on the days BEFORE the day they
+     were deactivated (employees.deactivated_on, set by setEmployeesActive) and not from
+     that day on, so a day that read 100% when it happened still reads 100% once it is
+     in the past, and today is out the day it is done. A deactivated person with no date
+     yet (before migration-2026-10-26, until its back-fill dates them) keeps the old rule:
+     out today, counted on every past date. Reactivating clears the date, so they count
+     on every date again, the days they were away included. The one rule behind the
+     board, the Overview and the History / Trend charts (app.js onRoster, getUtilizationRange). */
+  rosterOn(e, date) {
+    if (e.active !== false) return true;
+    return e.deactivatedOn ? date < e.deactivatedOn : date < todayStrISO();
   },
   /* ---------- loans: someone lent to another board for a few days ----------
      An employee belongs to ONE board (employees.board_id). A loan only says
@@ -1192,7 +1205,22 @@ const cloud = {
      message is strictly better than silently doing the destructive thing. */
   async setEmployeesActive(ids, active) {
     if (!ids.length) return;
-    const { error } = await sb.from("employees").update({ active }).in("id", ids);
+    // Turning someone off stamps today as the first day they are off the roster
+    // (deactivated_on), so every earlier day keeps them; turning them on clears it.
+    // Someone already off keeps the date they have: a bulk Deactivate over a mixed
+    // selection must not move theirs to today.
+    let targets = ids;
+    let patch = { active: true, deactivated_on: null };
+    if (!active) {
+      targets = ids.filter((id) => { const e = this.data.employees.find((x) => x.id === id); return !e || e.active !== false; });
+      if (!targets.length) return;
+      patch = { active: false, deactivated_on: todayStrISO() };
+    }
+    let { error } = await sb.from("employees").update(patch).in("id", targets);
+    if (error && this._missingColumnFromError(error) === "deactivated_on") {
+      // migration-2026-10-26 has not been run yet: switch them as before, with no date
+      ({ error } = await sb.from("employees").update({ active }).in("id", targets));
+    }
     if (error) {
       if (this._missingColumnFromError(error) === "active") {
         throw new Error('Run supabase/migration-2026-08-23-employee-active.sql in the Supabase SQL editor to use Active/Inactive.');
@@ -1423,13 +1451,17 @@ const cloud = {
   /* Two bulk queries (not one per day) covering `boardIds` over
      [fromDate, toDate] inclusive. Returns { [boardId]: { [date]: { assigned,
      leave, headcount, oncallAssigned, oncallLeave, oncallHeadcount,
-     staffedMissions, byEngineer, holiday } } } with
+     missions, staffedMissions, byEngineer, holiday } } } with
      an entry for EVERY calendar date in range — working day, weekend, and
      holiday alike. Different charts need different subsets of dates (the
      utilization trend skips non-working days; the on-call availability trend
      skips only each board's weekly weekend, deliberately keeping holidays —
      see renderOverview() in app.js), so the "which dates count" decision is
      made by each chart at render time, not baked in here.
+     `missions` counts the missions (hidden ones left out) on that board+date,
+     staffed or not: 0 means nobody planned the board that day, and the History /
+     Trend charts leave such a board-day out ("not planned") rather than count its
+     whole roster as Standby.
      `staffedMissions` counts the missions on that board+date that have at
      least one (active, non-hidden) person on them, and `byEngineer` breaks
      those same missions down as { [engineerId|""]: { missions, crew,
@@ -1440,7 +1472,8 @@ const cloud = {
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
      use each employee's CURRENT board membership - board moves aren't tracked
      historically - but only from the day they were added to the app
-     (employees.added_on), so a bulk add never rewrites earlier days - and
+     (employees.added_on), so a bulk add never rewrites earlier days, and
+     only until the day they were deactivated (employees.deactivated_on) - and
      hidden missions on that date are excluded from `assigned`/`oncallAssigned`, matching what the board
      itself shows today. `byEngineer` is the one genuinely historical
      dimension in here: engineer_id lives on the mission row for that date,
@@ -1464,17 +1497,17 @@ const cloud = {
       missionEngineer.set(m.id, m.engineer_id || "");
       if (m.hidden) missionHidden.add(m.id);
     }
-    // A deactivated employee drops out of "today"'s figures everywhere else
-    // on the board, but a PAST date is a record of who was actually there, so
-    // it keeps showing them (onRoster() in app.js: showsDeactivated() ||
-    // active !== false). Applied per DATE, exactly like onRoster: keying it
-    // once on the window's end made deactivating someone today shrink the
-    // headcount of every earlier day in the History / sparkline window.
+    // A deactivated employee drops out from the day they were deactivated, and a
+    // date BEFORE that is a record of who was actually there, so it keeps showing
+    // them (rosterOn: the same rule as onRoster() in app.js). Applied per DATE:
+    // keying it once on the window's end made deactivating someone today shrink the
+    // headcount of every earlier day in the History / sparkline window, and counting
+    // every deactivated person on every past date (the rule before deactivated_on)
+    // made a day that read 100% when it happened read about 90% the day after.
     const today = todayStrISO();
-    const activeEmpIds = new Set(this.data.employees.filter((e) => e.active !== false).map((e) => e.id));
-    const isActiveEmp = (id, date) => date < today || activeEmpIds.has(id);
-    const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
     const empById = new Map(this.data.employees.map((e) => [e.id, e]));
+    const isActiveEmp = (id, date) => { const e = empById.get(id); return e ? this.rosterOn(e, date) : date < today; };
+    const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
     const empContract = new Map(this.data.employees.map((e) => [e.id, e.contract]));
     // An employee only counts from the day they were added to the app
     // (employees.added_on; blank = always counted), so people added later
@@ -1494,10 +1527,16 @@ const cloud = {
         result[boardId][d] = {
           assigned: 0, leave: 0, headcount: emps.length,
           oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: emps.filter((e) => e.contract === "oncall").length,
-          staffedMissions: 0, byEngineer: {},
+          missions: 0, staffedMissions: 0, byEngineer: {},
           holiday: isNonWorkingDate(d, boardId),   // weekend or holiday override: unassigned permanent staff are off, not on standby
         };
       }
+    }
+    // a board with no mission at all on a date was not planned that day
+    for (const m of missionRows) {
+      if (m.hidden) continue;
+      const bucket = result[m.board_id] && result[m.board_id][m.plan_date];
+      if (bucket) bucket.missions++;
     }
     for (const a of assignRows) {
       if (!isCounted(a.employee_id, a.plan_date)) continue;   // keep the numerator consistent with the headcount denominator above
