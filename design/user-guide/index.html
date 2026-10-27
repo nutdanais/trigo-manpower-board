@@ -1,0 +1,881 @@
+<title>คู่มือ Manpower Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap">
+<style>
+/* Layout: the app's navy band on top; below it a sticky contents rail (wide screens) beside one reading column of module sections. Every text block exists in EN and TH; a class on <html> shows one. Light mode only, like the app. */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --fg: #1f2937;
+  --muted: #5b6472;
+  --line: #d8dde4;
+  --navy: #003a66;
+  --green: #a8c855;
+  --green-ink: #2f3d0d;
+  --band-soft: #bfd1e0;
+  --note-bg: #eef3fb;
+  --note-line: #c3d3e6;
+  --ok-bg: #f7faef;
+  --ok-line: #cfdcae;
+  --ok-ink: #4d6810;
+  --warn-bg: #fdf8ef;
+  --warn-line: #e0c9a4;
+  --warn-ink: #8a4f10;
+  --red: #cf3a39;
+  --font-display: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  --font-body: "Sarabun", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  color-scheme: light;
+}
+html.ui-th .en, html.ui-en .th { display: none !important; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 17px; line-height: 1.7; }
+a { color: var(--navy); }
+.band { background: var(--navy); color: #fff; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 26px; }
+.band-in { max-width: 1040px; margin: 0 auto; }
+.topline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.brandline { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--band-soft); }
+.brandline svg { flex: none; border-radius: 7px; }
+.seg { display: inline-flex; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 3px; }
+.seg button { font: 600 14px var(--font-display); color: #fff; background: transparent; border: 0; border-radius: 999px; padding: 6px 16px; min-height: 36px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+.seg button:focus-visible, .copy:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 5.5vw, 36px); line-height: 1.3; margin: 14px 0 6px; text-wrap: balance; }
+.sub-h1 { color: var(--band-soft); margin: 0 0 16px; max-width: 62ch; }
+.link-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 10px; padding: 10px 12px; max-width: 680px; }
+.link-row > span { font-size: 14px; color: var(--band-soft); }
+.link-row a { color: #fff; font-weight: 600; word-break: break-all; min-width: 0; flex: 1 1 220px; }
+.copy { font: 600 14px var(--font-display); background: var(--green); color: var(--green-ink); border: 0; border-radius: 8px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
+
+.layout { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; display: grid; gap: 24px; }
+.content { min-width: 0; max-width: 720px; }
+@media (min-width: 960px) {
+  .layout { grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
+  .toc { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+}
+.toc details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.toc summary { font: 600 15px var(--font-display); cursor: pointer; color: var(--navy); }
+.toc ol { list-style: none; margin: 8px 0 2px; padding: 0; display: grid; gap: 1px; font: 500 15px/1.45 var(--font-display); }
+.toc li.grp { margin-top: 10px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.toc li.grp:first-child { margin-top: 0; }
+.toc a { display: block; text-decoration: none; color: var(--fg); padding: 4px 8px; border-radius: 6px; }
+.toc a:hover { background: var(--note-bg); color: var(--navy); }
+
+section { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 20px 20px; margin-bottom: 20px; scroll-margin-top: 16px; }
+.part { font: 600 13px var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 32px 0 10px 4px; }
+.part:first-child { margin-top: 0; }
+h2 { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.4; margin: 0 0 4px; text-wrap: balance; }
+h2 .tag { display: inline-block; font-size: 13px; font-weight: 600; background: var(--green); color: var(--green-ink); border-radius: 6px; padding: 2px 8px; margin-right: 8px; vertical-align: 3px; }
+h3 { font-family: var(--font-display); font-size: 17px; font-weight: 700; margin: 20px 0 6px; color: var(--navy); }
+.lede { color: var(--muted); margin: 0 0 14px; font-size: 16px; }
+p { margin: 0 0 10px; }
+ul.plain { margin: 0 0 10px; padding-left: 22px; }
+ul.plain li { margin: 4px 0; }
+ol.steps { list-style: none; counter-reset: s; margin: 0 0 6px; padding: 0; display: grid; gap: 12px; }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: start; }
+ol.steps > li::before { content: counter(s); font: 700 15px/32px var(--font-display); text-align: center; width: 32px; height: 32px; border-radius: 50%; background: var(--navy); color: #fff; }
+ol.steps > li > div { padding-top: 2px; min-width: 0; }
+ul.sub { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 16px; }
+ul.sub li { margin: 2px 0; }
+/* Button chips look like the app's buttons; .alt is the other language's label in small text */
+.btn { display: inline-block; font: 600 15px/1.4 var(--font-display); background: var(--surface); color: var(--fg); border: 1px solid #b9c3d1; border-radius: 7px; padding: 1px 8px; }
+.btn.main { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn.link { border-color: transparent; background: transparent; color: var(--navy); text-decoration: underline; text-underline-offset: 3px; padding-inline: 2px; }
+.alt { color: var(--muted); font-size: 14px; }
+.field { font-family: var(--font-display); font-weight: 600; }
+kbd { font: 600 13px var(--font-display); background: var(--bg); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; }
+.screen-msg { color: var(--fg); background: var(--bg); border-radius: 6px; padding: 0 6px; }
+.done { font-weight: 600; color: var(--ok-ink); }
+.note, .warn, .ok { border-radius: 10px; padding: 12px 14px; margin-top: 14px; font-size: 16px; border: 1px solid; }
+.note { background: var(--note-bg); border-color: var(--note-line); }
+.ok { background: var(--ok-bg); border-color: var(--ok-line); }
+.warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+.note b, .warn b, .ok b { font-family: var(--font-display); }
+.chip { display: inline-block; font: 600 13px/1.5 var(--font-display); border-radius: 999px; padding: 0 9px; border: 1px solid var(--line); background: var(--bg); }
+.chip.p { background: #fff; border: 2px solid #2a78d6; color: #2a78d6; }
+.chip.oc { background: #fff; border: 2px dashed #78808a; color: #4b5563; }
+.chip.red { color: #fff; background: var(--red); border-color: var(--red); }
+.chip.amber { color: var(--warn-ink); background: #fdf3df; border-color: #e8c98c; }
+.chip.green { color: var(--ok-ink); background: var(--ok-bg); border-color: var(--ok-line); }
+.chip.violet { color: #5b4fb8; background: #f1effc; border-color: #cfc8f3; }
+.tbl { overflow-x: auto; margin: 10px 0 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; min-width: 460px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { font-family: var(--font-display); background: var(--navy); color: #fff; font-weight: 600; }
+thead th:first-child { border-top-left-radius: 8px; } thead th:last-child { border-top-right-radius: 8px; }
+td.y { color: var(--navy); font-weight: 600; } td.v { color: var(--muted); } td.n { color: #9aa3ae; }
+.faq dt { font-family: var(--font-display); font-weight: 600; margin-top: 12px; }
+.faq dd { margin: 2px 0 0; color: var(--fg); }
+.totop { display: inline-block; margin-top: 8px; font-size: 14px; }
+/* Screenshots: one <img> per language, only the shown one loads (lazy). Click opens it full size. */
+.shots { display: grid; gap: 14px; margin: 16px 0 4px; }
+.shots.row { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: start; }
+.shots.small { grid-template-columns: repeat(auto-fit, minmax(220px, 300px)); }
+.shots.phones { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+figure.shot { margin: 16px 0 4px; min-width: 0; }
+.shots figure.shot { margin: 0; }
+figure.shot button { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); cursor: zoom-in; box-shadow: 0 1px 3px rgba(16, 24, 40, .08); }
+figure.shot.phone button { border-radius: 16px; max-width: 220px; margin: 0 auto; }
+figure.shot img { display: block; width: 100%; height: auto; }
+figure.shot figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+figure.shot.phone figcaption { text-align: center; }
+.lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(10, 20, 35, .88); display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); cursor: zoom-out; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
+.lightbox button { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); font: 600 15px var(--font-display); background: #fff; color: var(--navy); border: 0; border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
+footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 28px; }
+@media (max-width: 420px) { section { padding: 18px 14px; } body { font-size: 16px; } }
+</style>
+
+<header class="band" id="top">
+  <div class="band-in">
+    <div class="topline">
+      <div class="brandline">
+        <svg width="28" height="28" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" fill="#004983"/><rect x="16" y="16" width="32" height="32" rx="3" fill="#ffffff"/><rect x="52" y="16" width="32" height="32" rx="3" fill="#a8c855"/><rect x="16" y="52" width="32" height="32" rx="3" fill="#ffffff"/><rect x="52" y="52" width="32" height="32" rx="3" fill="#ffffff"/></svg>
+        TRIGO Manpower Board
+      </div>
+      <div class="seg" role="group" aria-label="Language / ภาษา">
+        <button type="button" id="lang-th" data-set-lang="th" lang="th" aria-pressed="true">ไทย</button>
+        <button type="button" id="lang-en" data-set-lang="en" lang="en" aria-pressed="false">English</button>
+      </div>
+    </div>
+    <h1><span class="th">คู่มือการใช้งาน Manpower Board</span><span class="en">Manpower Board user guide</span></h1>
+    <p class="sub-h1"><span class="th">ตั้งแต่เข้าสู่ระบบครั้งแรก ไปจนถึงการใช้งานทุกส่วนของแอป: บอร์ด ภาพรวม กำลังรองรับ ผังองค์กร รายชื่อพนักงาน โฮสต์ การส่งออก และการตั้งค่า ภาพหน้าจอทั้งหมดใช้ข้อมูลตัวอย่าง ไม่ใช่ข้อมูลจริง กดที่ภาพเพื่อดูขนาดเต็ม</span><span class="en">From your first sign-in to every part of the app: the board, Overview, Capacity, Org Chart, the Manpower and Host lists, exporting and Settings. The screenshots use sample data, not real people. Tap a picture to see it full size.</span></p>
+    <div class="link-row">
+      <span><span class="th">ลิงก์เข้าระบบ</span><span class="en">App link</span></span>
+      <a id="app-link" href="https://trigoth-manpowerboard.netlify.app/" target="_blank" rel="noopener">https://trigoth-manpowerboard.netlify.app/</a>
+      <button class="copy" id="copy-btn" type="button"><span class="th">คัดลอกลิงก์</span><span class="en">Copy link</span></button>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="Contents">
+    <details id="toc-d">
+      <summary><span class="th">สารบัญ</span><span class="en">Contents</span></summary>
+      <ol>
+        <li class="grp"><span class="th">เริ่มต้น</span><span class="en">Getting started</span></li>
+        <li><a href="#signin"><span class="th">เข้าสู่ระบบครั้งแรก</span><span class="en">First sign-in</span></a></li>
+        <li><a href="#forgot"><span class="th">ลืมรหัสผ่าน</span><span class="en">Forgotten password</span></a></li>
+        <li><a href="#around"><span class="th">รู้จักหน้าจอ</span><span class="en">Finding your way</span></a></li>
+        <li><a href="#language"><span class="th">เปลี่ยนภาษา</span><span class="en">Switching language</span></a></li>
+        <li class="grp"><span class="th">บอร์ดประจำวัน</span><span class="en">The daily board</span></li>
+        <li><a href="#board"><span class="th">บอร์ดและวันที่</span><span class="en">Boards and dates</span></a></li>
+        <li><a href="#missions"><span class="th">มิชชั่น</span><span class="en">Missions</span></a></li>
+        <li><a href="#people"><span class="th">จัดคนลงงาน</span><span class="en">Placing people</span></a></li>
+        <li><a href="#loans"><span class="th">ให้ยืมคนข้ามบอร์ด</span><span class="en">Lending people</span></a></li>
+        <li><a href="#finish"><span class="th">ปิดแผนประจำวัน</span><span class="en">Finishing a day</span></a></li>
+        <li><a href="#forecast"><span class="th">วางแผนล่วงหน้า</span><span class="en">Planning ahead</span></a></li>
+        <li class="grp"><span class="th">โมดูลอื่น</span><span class="en">Other modules</span></li>
+        <li><a href="#overview"><span class="th">ภาพรวม</span><span class="en">Overview</span></a></li>
+        <li><a href="#capacity"><span class="th">กำลังรองรับ</span><span class="en">Capacity</span></a></li>
+        <li><a href="#orgchart"><span class="th">ผังองค์กร</span><span class="en">Org Chart</span></a></li>
+        <li><a href="#manpower"><span class="th">กำลังคน (รายชื่อพนักงาน)</span><span class="en">Manpower list</span></a></li>
+        <li><a href="#host"><span class="th">โฮสต์ (สถานที่)</span><span class="en">Host list</span></a></li>
+        <li><a href="#export"><span class="th">ส่งออกและแชร์</span><span class="en">Export and share</span></a></li>
+        <li><a href="#settings"><span class="th">ตั้งค่า</span><span class="en">Settings</span></a></li>
+        <li class="grp"><span class="th">อ้างอิง</span><span class="en">Reference</span></li>
+        <li><a href="#phone"><span class="th">ใช้งานบนโทรศัพท์</span><span class="en">On a phone</span></a></li>
+        <li><a href="#roles"><span class="th">บทบาทและสิทธิ์</span><span class="en">Roles</span></a></li>
+        <li><a href="#faq"><span class="th">ปัญหาที่พบบ่อย</span><span class="en">Common questions</span></a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <main class="content">
+
+    <p class="part"><span class="th">เริ่มต้น</span><span class="en">Getting started</span></p>
+
+    <!-- ===================== SIGN IN ===================== -->
+    <section id="signin">
+      <h2><span class="th">เข้าสู่ระบบครั้งแรก</span><span class="en">First sign-in</span></h2>
+      <p class="lede"><span class="th">ใช้ได้เฉพาะอีเมลบริษัท @trigo-group.com และแอปนี้<b>ไม่ส่งอีเมล</b>ใดๆ หน้าเข้าสู่ระบบเป็นภาษาอังกฤษ จึงเขียนชื่อปุ่มตามที่เห็นบนจอ พร้อมคำแปล</span><span class="en">Only @trigo-group.com addresses can be used, and the app <b>sends no email</b> at any point. There are two ways to get an account.</span></p>
+
+      <h3><span class="th">ก. ขอสิทธิ์เข้าใช้งานด้วยตัวเอง</span><span class="en">A. Request access yourself</span></h3>
+      <ol class="steps th">
+        <li><div>เปิดลิงก์เข้าระบบด้านบน</div></li>
+        <li><div>กด <span class="btn link">Request access</span> <span class="alt">(ขอสิทธิ์เข้าใช้งาน)</span> ใต้ปุ่ม Sign in</div></li>
+        <li><div>กรอกข้อมูล
+          <ul class="sub">
+            <li><span class="field">Your name</span> <span class="alt">(ชื่อของคุณ)</span> — ชื่อและนามสกุล</li>
+            <li><span class="field">Work email</span> <span class="alt">(อีเมลที่ทำงาน)</span> — ต้องลงท้ายด้วย <b>@trigo-group.com</b></li>
+            <li><span class="field">Choose a password</span> <span class="alt">(ตั้งรหัสผ่าน)</span> — ตั้งใหม่สำหรับแอปนี้ อย่างน้อย 8 ตัวอักษร (ไม่ใช่รหัสผ่านอีเมลบริษัท)</li>
+          </ul></div></li>
+        <li><div>กด <span class="btn main">Send request</span> <span class="alt">(ส่งคำขอ)</span></div></li>
+        <li><div><b>แจ้งผู้ดูแลระบบเอง</b>ว่าส่งคำขอแล้ว (เช่น ทาง LINE) เพราะระบบไม่ส่งอีเมลแจ้งใคร</div></li>
+        <li><div>เมื่อผู้ดูแลอนุมัติแล้ว กลับมาที่ลิงก์ กรอก <span class="field">Email</span> และ <span class="field">Password</span> แล้วกด <span class="btn main">Sign in</span> <span class="alt">(เข้าสู่ระบบ)</span></div></li>
+        <li><div class="done">เข้าใช้งานได้เลย ✓</div></li>
+      </ol>
+      <ol class="steps en">
+        <li><div>Open the app link above.</div></li>
+        <li><div>Press <span class="btn link">Request access</span> under the Sign in button.</div></li>
+        <li><div>Fill in
+          <ul class="sub">
+            <li><span class="field">Your name</span> — first name and surname</li>
+            <li><span class="field">Work email</span> — must end in <b>@trigo-group.com</b></li>
+            <li><span class="field">Choose a password</span> — a new one for this app, at least 8 characters (not your company email password)</li>
+          </ul></div></li>
+        <li><div>Press <span class="btn main">Send request</span>.</div></li>
+        <li><div><b>Tell an admin yourself</b> that you have asked (for example on LINE). Nobody is notified by email.</div></li>
+        <li><div>Once an admin has approved you, come back, enter your <span class="field">Email</span> and <span class="field">Password</span> and press <span class="btn main">Sign in</span>.</div></li>
+        <li><div class="done">You're in ✓</div></li>
+      </ol>
+      <div class="shots row small"><figure class="shot" data-shot="signin"><figcaption><span class="th">หน้าเข้าสู่ระบบ: กด Request access ด้านล่าง</span><span class="en">The sign-in screen: Request access is at the bottom</span></figcaption></figure><figure class="shot" data-shot="request"><figcaption><span class="th">แบบฟอร์มขอสิทธิ์เข้าใช้งาน</span><span class="en">The Request access form</span></figcaption></figure></div>
+      <div class="note th"><b>เข้าสู่ระบบแล้วขึ้นว่า</b> <span class="screen-msg">Your request is in. An admin still has to approve it…</span> แสดงว่ายังรออนุมัติ กด <span class="btn main">Sign out</span> แล้วลองใหม่หลังผู้ดูแลอนุมัติ</div>
+      <div class="note en"><b>Signed in and see</b> <span class="screen-msg">Your request is in. An admin still has to approve it…</span>? You're still waiting for approval. Press <span class="btn main">Sign out</span> and try again once an admin has approved you.</div>
+      <div class="warn th"><b>หากขึ้นว่า</b> <span class="screen-msg">That address can't be used…</span> แสดงว่าอีเมลไม่ใช่ @trigo-group.com</div>
+      <div class="warn en"><b>See</b> <span class="screen-msg">That address can't be used…</span>? The address isn't an @trigo-group.com one.</div>
+
+      <h3 id="issued"><span class="th">ข. ผู้ดูแลสร้างบัญชีให้ (ได้รหัสผ่านชั่วคราว)</span><span class="en">B. An admin created your account (temporary password)</span></h3>
+      <ol class="steps th">
+        <li><div>เปิดลิงก์ กรอก <span class="field">Email</span> และ<b>รหัสผ่านชั่วคราว</b>ที่ได้จากผู้ดูแล แล้วกด <span class="btn main">Sign in</span></div></li>
+        <li><div>ระบบจะขึ้นหน้า <b>Set a new password</b> <span class="alt">(ตั้งรหัสผ่านใหม่)</span> ต้องตั้งรหัสของตัวเองก่อนจึงใช้งานได้</div></li>
+        <li><div>กรอก <span class="field">New password</span> <span class="alt">(รหัสผ่านใหม่)</span> และ <span class="field">Repeat it</span> <span class="alt">(พิมพ์ซ้ำ)</span> ให้ตรงกัน อย่างน้อย 8 ตัวอักษร</div></li>
+        <li><div>กด <span class="btn main">Save password</span> <span class="alt">(บันทึกรหัสผ่าน)</span> <span class="done">แล้วเข้าใช้งานได้เลย ✓</span></div></li>
+      </ol>
+      <ol class="steps en">
+        <li><div>Open the link, enter your <span class="field">Email</span> and the <b>temporary password</b> the admin gave you, and press <span class="btn main">Sign in</span>.</div></li>
+        <li><div>The app shows <b>Set a new password</b>. You have to choose your own before you can carry on.</div></li>
+        <li><div>Type it in <span class="field">New password</span> and again in <span class="field">Repeat it</span> (at least 8 characters).</div></li>
+        <li><div>Press <span class="btn main">Save password</span>. <span class="done">You're in ✓</span></div></li>
+      </ol>
+    
+      <div class="shots row small"><figure class="shot" data-shot="reset"><figcaption><span class="th">หน้า Set a new password หลังเข้าสู่ระบบด้วยรหัสชั่วคราว</span><span class="en">Set a new password, after signing in with a temporary password</span></figcaption></figure></div>
+    </section>
+
+    <section id="forgot">
+      <h2><span class="th">ลืมรหัสผ่าน / เปลี่ยนรหัสผ่าน</span><span class="en">Forgotten or changing your password</span></h2>
+      <p class="lede"><span class="th">ไม่มีปุ่ม “ลืมรหัสผ่าน” เพราะแอปไม่ส่งอีเมล ผู้ดูแลระบบเป็นผู้ออกรหัสใหม่ให้</span><span class="en">There is no "Forgot password?" button because the app sends no email. An admin issues a new one.</span></p>
+      <ol class="steps th">
+        <li><div>ติดต่อผู้ดูแลระบบ แจ้ง<b>อีเมลที่ใช้เข้าระบบ</b> และขอรหัสผ่านใหม่</div></li>
+        <li><div>ผู้ดูแลจะส่ง<b>รหัสผ่านชั่วคราว</b>ให้ (แสดงให้ผู้ดูแลเห็นเพียงครั้งเดียว)</div></li>
+        <li><div>ทำตาม <a href="#issued">ข้อ ข.</a> เพื่อเข้าสู่ระบบและตั้งรหัสผ่านของตัวเอง</div></li>
+      </ol>
+      <ol class="steps en">
+        <li><div>Contact an admin with the <b>email you sign in with</b> and ask for a new password.</div></li>
+        <li><div>They send you a <b>temporary password</b> (they see it only once).</div></li>
+        <li><div>Follow <a href="#issued">B above</a> to sign in and choose your own.</div></li>
+      </ol>
+      <div class="ok th"><b>จำรหัสได้ แต่อยากเปลี่ยน?</b> ตั้งค่า ⚙ → บัญชีของฉัน → <span class="btn">เปลี่ยนรหัสผ่าน…</span> <span class="alt">Settings → My account → Change password…</span></div>
+      <div class="ok en"><b>Know your password and want a new one?</b> Settings ⚙ → My account → <span class="btn">Change password…</span></div>
+    </section>
+
+    <!-- ===================== AROUND ===================== -->
+    <section id="around">
+      <h2><span class="th">รู้จักหน้าจอ</span><span class="en">Finding your way around</span></h2>
+      <div class="th">
+        <p>แถบด้านบนมีแท็บโมดูล ส่วนใหญ่ของงานประจำวันอยู่ที่ <b>บอร์ด</b></p>
+        <ul class="plain">
+          <li><b>บอร์ด</b> <span class="alt">Board</span> — แผนงานรายวัน: มิชชั่น ใครไปไหน ใครลา ใครว่าง แต่ละบอร์ดคือหนึ่งพื้นที่ (เช่น Rayong)</li>
+          <li><b>ภาพรวม</b> <span class="alt">Overview</span> — แดชบอร์ดผู้บริหาร: อัตราการใช้งาน คนที่ยังไม่มีงาน ประวัติย้อนหลัง</li>
+          <li><b>ผังองค์กร</b> <span class="alt">Org Chart</span> — บอร์ด → วิศวกร → พื้นที่บริการ → มิชชั่น → ทีม ของวันที่เลือก</li>
+          <li><b>กำลังคน</b> <span class="alt">Manpower</span> — รายชื่อพนักงานทุกบอร์ด</li>
+          <li><b>โฮสต์</b> <span class="alt">Host</span> — รายชื่อสถานที่ทำงาน (ไซต์ลูกค้า) พร้อมแผนที่</li>
+          <li><b>กำลังรองรับ</b> <span class="alt">Capacity</span> — ต้องการกี่คน เทียบกับมีกี่คน ล่วงหน้าหลายสัปดาห์</li>
+        </ul>
+        <p>มุมขวาบนคือ<b>เมนูบัญชี</b> (ตัวอักษรย่อชื่อของคุณ) มี ภาษา ตั้งค่า ⚙ และ ออกจากระบบ ปุ่มที่คุณเห็นขึ้นกับ<a href="#roles">บทบาท</a>ของคุณ</p>
+      </div>
+      <div class="en">
+        <p>The module tabs run along the top. Most daily work happens on the <b>Board</b>.</p>
+        <ul class="plain">
+          <li><b>Board</b> — the day's plan: missions, who goes where, who is on leave, who is free. Each board is one region (e.g. Rayong).</li>
+          <li><b>Overview</b> — the management dashboard: utilization, who has no mission, history.</li>
+          <li><b>Org Chart</b> — board → engineer → service area → mission → crew for the day shown.</li>
+          <li><b>Manpower</b> — every employee across every board.</li>
+          <li><b>Host</b> — the sites you send people to, with their map links.</li>
+          <li><b>Capacity</b> — how many people each site needs against how many you have, weeks ahead.</li>
+        </ul>
+        <p>Top right is the <b>account menu</b> (your initials): Language, Settings ⚙ and Sign out. Which buttons you see depends on your <a href="#roles">role</a>.</p>
+      </div>
+      <div class="note th"><b>บนโทรศัพท์</b> แท็บอยู่ที่แถบสีน้ำเงินด้านล่าง ดู <a href="#phone">ใช้งานบนโทรศัพท์</a></div>
+      <div class="note en"><b>On a phone</b> the tabs are in the navy bar at the bottom. See <a href="#phone">On a phone</a>.</div>
+    
+      <figure class="shot" data-shot="board"><figcaption><span class="th">บอร์ดบนคอมพิวเตอร์: แท็บโมดูลด้านบน ตัวเลขของวัน ช่องการลา การ์ดมิชชั่น และแผงคนว่างด้านขวา</span><span class="en">The board on a computer: module tabs on top, the day's numbers, leave tabs, mission cards and the free-people panel on the right</span></figcaption></figure>
+    </section>
+
+    <section id="language">
+      <h2><span class="th">เปลี่ยนเมนูเป็นภาษาไทย</span><span class="en">Switching the app's language</span></h2>
+      <ol class="steps th">
+        <li><div>เปิดเมนูบัญชี: <b>คอมพิวเตอร์</b> กดตัวอักษรย่อชื่อมุมขวาบน · <b>โทรศัพท์</b> กด <b>Me</b> ที่แถบล่าง</div></li>
+        <li><div>ที่แถว <b>Language</b> กด <span class="btn">ไทย</span> (หรือ <span class="btn">English</span>)</div></li>
+        <li><div class="done">ทั้งแอปเปลี่ยนภาษาทันที ✓ เบราว์เซอร์นี้จะจำไว้</div></li>
+      </ol>
+      <ol class="steps en">
+        <li><div>Open the account menu: on a <b>computer</b> your initials top right · on a <b>phone</b> <b>Me</b> in the bottom bar.</div></li>
+        <li><div>Under <b>Language</b> press <span class="btn">English</span> or <span class="btn">ไทย</span>.</div></li>
+        <li><div class="done">The whole app switches at once ✓ and this browser remembers it.</div></li>
+      </ol>
+      <p class="th">ชื่อที่ผู้ใช้พิมพ์ไว้ (พนักงาน โฮสต์ ลูกค้า หมายเหตุ) แสดงตามที่พิมพ์ ส่วนชื่อพนักงานบนการ์ดเลือกได้ที่ตัวเลือก <b>ชื่อ</b> (ไทย / อังกฤษ / ไทย + อังกฤษ) ในแถบเครื่องมือบอร์ด</p>
+      <p class="en">Names people typed (employees, hosts, customers, notes) stay as written. For employee names on the cards, use the <b>Names</b> selector in the board toolbar (Thai / English / Thai + English).</p>
+    
+      <div class="shots row"><figure class="shot" data-shot="account-menu"><figcaption><span class="th">เมนูบัญชีบนคอมพิวเตอร์: ภาษา ตั้งค่า ออกจากระบบ</span><span class="en">The account menu on a computer: Language, Settings, Sign out</span></figcaption></figure><figure class="shot phone" data-shot="phone-me"><figcaption><span class="th">เมนู Me บนโทรศัพท์</span><span class="en">Me on a phone</span></figcaption></figure></div>
+    </section>
+
+    <p class="part"><span class="th">บอร์ดประจำวัน</span><span class="en">The daily board</span></p>
+
+    <!-- ===================== BOARD ===================== -->
+    <section id="board">
+      <h2><span class="th">บอร์ดและวันที่</span><span class="en">Boards and dates</span></h2>
+      <div class="th">
+        <ul class="plain">
+          <li><b>เลือกบอร์ด</b> จากแท็บด้านซ้ายบน พนักงานแต่ละคนอยู่ได้<b>บอร์ดเดียว</b></li>
+          <li><b>เลือกวันที่</b> จากปุ่มปฏิทินด้านขวาบน แต่ละวันมีแผนของตัวเอง</li>
+          <li>เมื่อเข้าสู่ระบบ บอร์ดจะเปิดที่<b>วันทำงานถัดไป</b>เสมอ (พรุ่งนี้ หรือวันจันทร์ถ้าวันนี้วันศุกร์ ข้ามวันหยุด)</li>
+          <li><b>วันที่ผ่านมาแล้ว</b>เป็นแบบอ่านอย่างเดียว 🔒 หากพยายามแก้ไข ระบบจะถามยืนยันก่อน</li>
+        </ul>
+        <h3>เริ่มแผนของวันใหม่</h3>
+        <p>วันที่ยังไม่มีแผนจะว่างเปล่า ระบบ<b>ไม่คัดลอกให้อัตโนมัติ</b> กด <span class="btn">↺ ยกแผนมา</span> <span class="alt">Carry over</span> เพื่อนำมิชชั่นและทีมจากวันทำงานล่าสุดมา แล้วค่อยปรับ</p>
+        <h3>ตัวเลขบนบอร์ด</h3>
+        <p>แถวตัวเลขใต้แถบเครื่องมือ: <b>รวม</b> = <b>มอบหมายแล้ว</b> (แบ่งกะกลางวัน/กลางคืน) + <b>การลา</b> + <b>สแตนด์บาย</b> + <b>วันหยุด</b> + <b>ออนคอลว่าง</b> ช่องสแตนด์บายจะเป็น<span class="chip red">สีแดง ⚠</span> เมื่อมีพนักงานประจำที่ยังไม่มีงานและไม่ได้ลา ใต้ตัวเลขมีแถว <b>แยกตามพื้นที่บริการ</b></p>
+        <h3>แถบเครื่องมือ</h3>
+        <ul class="plain">
+          <li><b>สร้าง</b>: <span class="btn main">+ มิชชั่นใหม่</span> และ <span class="btn">+ พนักงานใหม่</span></li>
+          <li><b>กรอง</b>: ตามวิศวกร โฮสต์ ลูกค้า กะ (มิชชั่นที่ไม่ตรงจะจางลง) · <span class="btn">ซ่อน/แสดง</span> · เรียงลำดับ</li>
+          <li><b>แก้</b>: <span class="btn">เลิกทำ</span> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>) · <span class="btn">รีเซ็ตบอร์ด</span> · <span class="btn">ส่งออก</span></li>
+        </ul>
+      </div>
+      <div class="en">
+        <ul class="plain">
+          <li><b>Pick a board</b> from the tabs top left. Every employee belongs to <b>one board</b>.</li>
+          <li><b>Pick a date</b> with the calendar button top right. Each date has its own plan.</li>
+          <li>After signing in, the board always opens on the <b>next working day</b> (tomorrow, or Monday from a Friday, skipping holidays).</li>
+          <li><b>Past days</b> are read-only 🔒. Trying to edit one asks you first.</li>
+        </ul>
+        <h3>Starting a new day's plan</h3>
+        <p>A day with no plan yet starts empty. Nothing is <b>copied in automatically</b>. Press <span class="btn">↺ Carry over</span> to bring in the last working day's missions and crew, then adjust.</p>
+        <h3>The numbers on the board</h3>
+        <p>The tiles under the toolbar add up: <b>Total</b> = <b>Assigned</b> (split Day / Night) + <b>Leave</b> + <b>Standby</b> + <b>Holiday</b> + <b>On-call free</b>. Standby turns <span class="chip red">red ⚠</span> when permanent staff have no mission and no leave. Under the tiles, <b>By area</b> splits the same people by service area.</p>
+        <h3>The toolbar</h3>
+        <ul class="plain">
+          <li><b>Make</b>: <span class="btn main">+ New Mission</span> and <span class="btn">+ New Employee</span></li>
+          <li><b>Narrow</b>: filter by Engineer, Host, Customer, Shift (other missions fade) · <span class="btn">Hide/Unhide</span> · Sort</li>
+          <li><b>Fix</b>: <span class="btn">Undo</span> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>) · <span class="btn">Reset Board</span> · <span class="btn">Export</span></li>
+        </ul>
+      </div>
+    
+      <figure class="shot" data-shot="topbar"><figcaption><span class="th">มุมขวาบน: ล็อก วันหยุด เลือกวันที่ (‹ ›) และเมนูบัญชี</span><span class="en">Top right: Lock, Holiday, the date with ‹ ›, and the account menu</span></figcaption></figure>
+    </section>
+
+    <!-- ===================== MISSIONS ===================== -->
+    <section id="missions">
+      <h2><span class="th">มิชชั่น (งาน)</span><span class="en">Missions</span></h2>
+      <div class="th">
+        <h3>สร้างมิชชั่นใหม่</h3>
+        <ol class="steps">
+          <li><div>กด <span class="btn main">+ มิชชั่นใหม่</span> <span class="alt">New Mission</span></div></li>
+          <li><div>กรอกเลขมิชชั่น ลูกค้า กะ (กลางวัน/กลางคืน) และเวลาเริ่ม–เลิก</div></li>
+          <li><div><b>โฮสต์</b>: พิมพ์แล้วเลือกจากรายการ (แสดงพื้นที่บริการและที่ตั้ง) ถ้าเป็นโฮสต์ใหม่ ระบบจะให้สร้างพร้อมใส่ที่ตั้งก่อน ช่วยป้องกันชื่อซ้ำสะกดต่างกัน</div></li>
+          <li><div><b>วิศวกร</b>: พิมพ์ชื่อแล้วเลือก สีของวิศวกรจะเป็นกรอบการ์ดมิชชั่น</div></li>
+          <li><div>บันทึก แล้ว<a href="#people">จัดคนลงมิชชั่น</a></div></li>
+        </ol>
+        <h3>อ่านการ์ดมิชชั่น</h3>
+        <ul class="plain">
+          <li>หัวการ์ด: กะกลางวัน/กลางคืน และ<b>พื้นที่บริการ</b>ของโฮสต์</li>
+          <li><b>ชื่อโฮสต์ที่มี 📍</b> คือลิงก์ Google Maps กดเพื่อนำทางได้</li>
+          <li>บรรทัด <b>PPE</b> = หมายเหตุของโฮสต์ (ตัวเอียง) + PPE ของมิชชั่นนี้</li>
+          <li>เบอร์โทรวิศวกรกดโทรได้</li>
+        </ul>
+        <h3>เมนูด่วนของมิชชั่น</h3>
+        <p><b>คลิกขวา</b>ที่การ์ด (โทรศัพท์: กดค้างที่หัวการ์ด) จะมี: แก้ไขมิชชั่น · ทำสำเนามิชชั่น · ย้ายหรือคัดลอกไปบอร์ดอื่น · จัดวางคนที่เลือกไว้ที่นี่ · ทีม › (เลือกทั้งทีม / ส่งทีมกลับสแตนด์บาย) · <b>คัดลอกเป็นข้อความ</b> (สำหรับส่ง LINE) · เปิดตำแหน่งโฮสต์ · ซ่อนมิชชั่น · ลบมิชชั่น</p>
+        <h3>ซ่อนแทนลบ</h3>
+        <p><span class="btn">ซ่อน/แสดง</span> เอามิชชั่นที่พักไว้ออกจากบอร์ดโดยไม่ลบข้อมูล คนในมิชชั่นจะกลับไปสแตนด์บาย และมิชชั่นจะยังซ่อนอยู่ในวันถัดๆ ไปจนกว่าจะแสดงกลับ ปุ่มนี้มีตัวเลข<span class="chip amber">สีส้ม</span>บอกจำนวนมิชชั่นที่ยังไม่มีคน</p>
+      </div>
+      <div class="en">
+        <h3>Creating a mission</h3>
+        <ol class="steps">
+          <li><div>Press <span class="btn main">+ New Mission</span>.</div></li>
+          <li><div>Enter the mission number, customer, shift (day / night) and start and end time.</div></li>
+          <li><div><b>Host</b>: start typing and pick from the list (each shows its service area and location). A new host stops the save and asks you to create it with its location first, so one site never ends up under three spellings.</div></li>
+          <li><div><b>Engineer</b>: type a name and pick. The engineer's colour marks the card's border.</div></li>
+          <li><div>Save, then <a href="#people">place people on it</a>.</div></li>
+        </ol>
+        <h3>Reading a mission card</h3>
+        <ul class="plain">
+          <li>The header shows the shift and the host's <b>service area</b>.</li>
+          <li>A <b>host name with 📍</b> is a Google Maps link.</li>
+          <li>The <b>PPE</b> line is the host's note (in italics) plus this mission's PPE.</li>
+          <li>The engineer's phone number is tap-to-call.</li>
+        </ul>
+        <h3>The mission's quick panel</h3>
+        <p><b>Right-click</b> a card (on a phone, hold its header): Edit mission · Duplicate mission · Move or copy to board · Place selected people here · Crew › (select crew / return crew to Standby) · <b>Copy as text</b> (ready to paste into LINE) · Open host location · Hide mission · Delete mission.</p>
+        <h3>Hide instead of delete</h3>
+        <p><span class="btn">Hide/Unhide</span> takes a paused mission off the board without deleting it. Its crew returns to Standby and it stays hidden on later days until you unhide it. The button carries an <span class="chip amber">amber</span> count of missions with no crew.</p>
+      </div>
+    
+      <div class="shots row"><figure class="shot" data-shot="new-mission"><figcaption><span class="th">หน้าต่างมิชชั่นใหม่</span><span class="en">The New Mission form</span></figcaption></figure><figure class="shot" data-shot="mission-menu"><figcaption><span class="th">คลิกขวาที่มิชชั่นเพื่อเปิดเมนูด่วน</span><span class="en">Right-click a mission for its quick panel</span></figcaption></figure></div>
+    </section>
+
+    <!-- ===================== PEOPLE ===================== -->
+    <section id="people">
+      <h2><span class="th">จัดคนลงงาน</span><span class="en">Placing people</span></h2>
+      <div class="th">
+        <h3>การ์ดพนักงาน</h3>
+        <p><span class="chip p">P</span> ประจำ = การ์ดเส้นทึบ · <span class="chip oc">OC</span> ออนคอล = การ์ดเส้นประ สีการ์ดคือพื้นที่บริการ มุมขวาบนคือ TRIGO ID <b>ดับเบิลคลิก</b>การ์ดเพื่อแก้ไขพนักงาน</p>
+        <h3>คนที่ยังว่าง</h3>
+        <p>แผงลอยด้านขวามี <b>สแตนด์บาย</b> (พนักงานประจำที่ยังไม่มีงาน) และ <b>ออนคอลที่ว่าง</b> พร้อมช่องค้นหา ถ้าคนที่ค้นหาอยู่ในมิชชั่นหรือลาอยู่แล้ว ระบบจะบอกและพาไปที่การ์ดนั้น ลากขอบซ้ายของแผงเพื่อขยายได้</p>
+        <h3>3 วิธีจัดคน</h3>
+        <ul class="plain">
+          <li><b>ลากและวาง</b> การ์ดไปที่มิชชั่น ช่องลา หรือกลับไปสแตนด์บาย</li>
+          <li><b>คลิกขวา</b>ที่การ์ด → มอบหมายให้มิชชั่น / ส่งไปลา / กลับสแตนด์บาย (สะดวกเมื่อเป้าหมายเลื่อนพ้นจอ)</li>
+          <li><b>เลือกหลายคน</b>: คลิกการ์ดเพื่อเลือก (คลิกซ้ำเพื่อยกเลิก, <kbd>Ctrl</kbd>-คลิกเพื่อเพิ่ม) แล้วลากหรือคลิกมิชชั่นเพื่อวาง</li>
+        </ul>
+        <h3>ช่องการลา</h3>
+        <p>ลาพักร้อน · ลาป่วย · ลากิจ · ลาไม่รับค่าจ้าง · สลับวันหยุด แต่ละช่องแสดงจำนวนคน</p>
+        <h3>พนักงานใหม่และการปิดใช้งาน</h3>
+        <p><span class="btn">+ พนักงานใหม่</span>: ชื่อภาษาไทย (นามสกุลด้วย ห้ามใส่รหัส) ชื่ออังกฤษ (ไม่บังคับ) TRIGO ID ประเภทสัญญา พื้นที่บริการ คนที่ลาออกให้ <b>ปิดใช้งาน</b> (คลิกขวา → ปิดใช้งาน) แทนการลบ: จะหายจากบอร์ดตั้งแต่วันนั้น แต่วันก่อนหน้ายังเก็บไว้ครบ</p>
+      </div>
+      <div class="en">
+        <h3>Employee cards</h3>
+        <p><span class="chip p">P</span> Permanent = solid card · <span class="chip oc">OC</span> On-call = dashed card. The colour is the service area; the chip top right is the TRIGO ID. <b>Double-click</b> a card to edit the employee.</p>
+        <h3>Who is free</h3>
+        <p>The floating panel on the right holds <b>Standby</b> (permanent staff with no mission) and <b>Available On-call</b>, with a search box. If the person you search for is already on a mission or on leave, it says so and takes you to their card. Drag the panel's left edge to widen it.</p>
+        <h3>Three ways to place people</h3>
+        <ul class="plain">
+          <li><b>Drag and drop</b> a card onto a mission, a leave zone, or back to Standby.</li>
+          <li><b>Right-click</b> a card → assign to a mission / send on leave / return to Standby (handy when the target has scrolled off screen).</li>
+          <li><b>Select several</b>: click cards to select (click again to unselect, <kbd>Ctrl</kbd>-click to add), then drag, or click a mission to place them.</li>
+        </ul>
+        <h3>Leave zones</h3>
+        <p>Annual · Sick · Business · Unpaid Leave · Exchange Working Day. Each shows its headcount.</p>
+        <h3>New employees and leavers</h3>
+        <p><span class="btn">+ New Employee</span>: Thai name (full name, no ID in it), English name (optional), TRIGO ID, contract type, service area. For someone who has left, <b>Deactivate</b> (right-click → Deactivate) instead of deleting: they leave the board from that day, and earlier days keep them.</p>
+      </div>
+    
+      <div class="shots row"><figure class="shot" data-shot="people"><figcaption><span class="th">แผงคนว่าง: ค้นหา สแตนด์บาย ออนคอลที่ว่าง และคนที่ให้ยืมออกไป</span><span class="en">The free-people panel: search, Standby, Available On-call and Lent out</span></figcaption></figure><figure class="shot" data-shot="emp-menu"><figcaption><span class="th">คลิกขวาที่การ์ดพนักงาน</span><span class="en">Right-click an employee card</span></figcaption></figure></div>
+    </section>
+
+    <!-- ===================== LOANS ===================== -->
+    <section id="loans">
+      <h2><span class="th">ให้ยืมคนข้ามบอร์ด</span><span class="en">Lending people to another board</span></h2>
+      <div class="th">
+        <p>ใช้เมื่ออีกบอร์ดต้องการคนชั่วคราวไม่กี่วัน</p>
+        <ol class="steps">
+          <li><div>คลิกขวาที่การ์ดพนักงาน → <span class="btn">ให้ยืมไปบอร์ดอื่น…</span> <span class="alt">Lend to board…</span></div></li>
+          <li><div>เลือกบอร์ด วันที่ <b>ตั้งแต่</b> และ <b>ถึง</b> ใส่หมายเหตุได้</div></li>
+          <li><div>คนนั้นจะไปอยู่ในสแตนด์บายของบอร์ดที่ยืม พร้อมป้าย <span class="chip violet">↔ บอร์ดเดิม</span> ส่วนบอร์ดเดิมแสดงอยู่ใต้ <b>ให้ยืมออกไป</b></div></li>
+          <li><div>หมดกำหนด ระบบส่งกลับบอร์ดเดิมเอง หรือคลิกขวา → <b>End loan</b> / <b>เปลี่ยนวันที่ให้ยืม…</b></div></li>
+        </ol>
+        <p>ย้ายพนักงาน<b>ถาวร</b> ทำที่ แก้ไขพนักงาน หรือคลิกขวาในหน้ากำลังคน → Move to board</p>
+      </div>
+      <div class="en">
+        <p>For when another board needs someone for a day or a few days.</p>
+        <ol class="steps">
+          <li><div>Right-click an employee card → <span class="btn">Lend to board…</span></div></li>
+          <li><div>Pick the board, <b>From</b> and <b>Until</b>, and add a note if useful.</div></li>
+          <li><div>They start in the other board's Standby with a <span class="chip violet">↔ Their board</span> pill. Their own board lists them under <b>Lent out</b>.</div></li>
+          <li><div>They come back on their own after Until, or right-click → <b>End loan</b> / <b>Change loan dates…</b></div></li>
+        </ol>
+        <p>Moving someone <b>for good</b> is in Edit Employee, or right-click in the Manpower list → Move to board.</p>
+      </div>
+    
+      <div class="shots row small"><figure class="shot" data-shot="lend"><figcaption><span class="th">หน้าต่างให้ยืมไปบอร์ดอื่น</span><span class="en">The Lend to board dialog</span></figcaption></figure></div>
+    </section>
+
+    <!-- ===================== FINISH ===================== -->
+    <section id="finish">
+      <h2><span class="th">ปิดแผนประจำวัน</span><span class="en">Finishing a day</span></h2>
+      <div class="th">
+        <ul class="plain">
+          <li><b>🔒 ล็อก</b> (ข้างปุ่มวันที่): เมื่อแผนเสร็จแล้ว กดล็อกให้บอร์ดวันนั้นเป็นแบบดูอย่างเดียวสำหรับทุกคน ใครก็ปลดล็อกได้ แต่จะเห็นก่อนว่าใครล็อกไว้และเมื่อไร</li>
+          <li><b>แชร์ให้ทีม</b>: <a href="#export">ส่งออก</a> เป็น PDF แล้วส่งใน LINE <b>แบบไฟล์</b> หรือคลิกขวามิชชั่น → คัดลอกเป็นข้อความ</li>
+          <li><b>แผนที่ยกมาล้าสมัย</b>: ถ้าวันต้นทางถูกแก้ไขหลังยกแผนมา จะมีแถบแจ้งเตือน กด <span class="btn">ตรวจสอบการเปลี่ยนแปลง</span> แล้วเลือกเฉพาะที่ต้องการ</li>
+          <li><span class="btn">รีเซ็ตบอร์ด</span> ล้างแผนของวันแล้วเริ่มจากวันทำงานล่าสุดใหม่ (ถามยืนยันก่อน)</li>
+        </ul>
+      </div>
+      <div class="en">
+        <ul class="plain">
+          <li><b>🔒 Lock</b> (next to the date): once the plan is final, lock it so that board's day is view-only for everyone. Anyone can unlock, but first sees who locked it and when.</li>
+          <li><b>Share it with the crew</b>: <a href="#export">export</a> a PDF and send it in LINE <b>as a file</b>, or right-click a mission → Copy as text.</li>
+          <li><b>Out-of-date carry-over</b>: if the day it was copied from was edited later, a banner appears. Press <span class="btn">Review changes</span> and tick only what you want.</li>
+          <li><span class="btn">Reset Board</span> clears the day and starts again from the last working day (it asks first).</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===================== FORECAST ===================== -->
+    <section id="forecast">
+      <h2><span class="th">วางแผนล่วงหน้า (คาดการณ์)</span><span class="en">Planning ahead (forecast)</span></h2>
+      <div class="th">
+        <p>แผน<b>ยืนยันแล้ว</b>มีถึงวันทำงานถัดไปเท่านั้น วันหลังจากนั้นเป็น <b>คาดการณ์</b>: การ์ดเป็นเส้นประ ไม่มีปุ่มส่งออก/ล็อก และไม่กระทบบอร์ดจริงจนกว่าจะรวม</p>
+        <ul class="plain">
+          <li><span class="btn">เริ่มจากแผนที่ยืนยันแล้ว</span> เติมวันคาดการณ์ที่ว่างจากแผนล่าสุด</li>
+          <li><span class="btn">คัดลอกจากแผนที่ยืนยัน…</span> เลือกเฉพาะมิชชั่นที่คุณจะดูแล (พร้อมทีมได้)</li>
+          <li><span class="btn">คัดลอกคาดการณ์</span> ไปยังวันทำงานถัดๆ ไปที่ยังว่าง</li>
+          <li>การวางคนคือการ<b>จอง</b> ถ้าย้ายคนที่วิศวกรอื่นจองไว้ ระบบจะถามก่อน และแจ้งวิศวกรคนนั้น (มิชชั่นเป็นสีแดงจนกว่าจะกด <b>รับทราบ</b>)</li>
+          <li>เมื่อวันคาดการณ์กลายเป็นวันทำงานถัดไป ผู้วางแผนกด <span class="btn">ตรวจสอบและรวม</span> เพื่อเทียบแผนยกมากับคาดการณ์ทีละคน ส่วนที่ไม่ได้ใช้จะแจ้งผู้คาดการณ์</li>
+        </ul>
+      </div>
+      <div class="en">
+        <p>A <b>confirmed</b> plan exists up to the next working day. Later dates open as a <b>FORECAST</b>: dashed cards, no Export or Lock, and nothing reaches the real board until it is merged.</p>
+        <ul class="plain">
+          <li><span class="btn">Start from confirmed</span> fills an empty forecast day from the latest confirmed day.</li>
+          <li><span class="btn">Copy from confirmed…</span> lets you tick only the missions you will run (optionally with crew).</li>
+          <li><span class="btn">Copy forecast</span> copies it onto the next working days that have none.</li>
+          <li>Placing someone is a <b>hold</b>. Taking a person another engineer holds asks first, and flags their mission red until they press <b>Acknowledge</b>.</li>
+          <li>When a forecast day becomes the next working day, the planner uses <span class="btn">Review &amp; merge</span> to compare the carry-over and the forecast person by person. Anything not used alerts its forecaster.</li>
+        </ul>
+      </div>
+    
+      <figure class="shot" data-shot="forecast"><figcaption><span class="th">วันคาดการณ์: การ์ดเส้นประ แถบ Forecast และปุ่มคัดลอกจากแผนที่ยืนยัน</span><span class="en">A forecast day: dashed cards, the Forecast banner and Copy from confirmed…</span></figcaption></figure>
+    </section>
+
+    <p class="part"><span class="th">โมดูลอื่น</span><span class="en">Other modules</span></p>
+
+    <!-- ===================== OVERVIEW ===================== -->
+    <section id="overview">
+      <h2><span class="th">ภาพรวม</span><span class="en">Overview</span></h2>
+      <p class="lede"><span class="th">อ่านจากบนลงล่าง: สรุป → รายละเอียด → ประวัติ ทุกแท่งกราฟชี้เมาส์ดูตัวเลขได้</span><span class="en">Reads top to bottom: summary → detail → history. Hover any bar or tile for exact numbers.</span></p>
+      <div class="th">
+        <ul class="plain">
+          <li><b>เลือกบอร์ด</b> (แถวแรก): ทุกบอร์ด หรือบอร์ดเดียว มีผลกับทุกส่วนในหน้า</li>
+          <li><b>การ์ดแจ้งเตือน</b>: เช่น “พนักงานประจำ 20 คนยังไม่มีมิชชั่น” พร้อมรายชื่อ กดชื่อเพื่อไปที่บอร์ดนั้น</li>
+          <li><b>ตัวเลขหลัก</b>: อัตราการใช้งาน (กราฟ 14 วัน) · ได้ลงมิชชั่น · จำนวนมิชชั่น · ออนคอลว่าง</li>
+          <li><b>แยกตามบอร์ด</b>: กดแถวเพื่อดูเฉพาะบอร์ดนั้น ลูกศร → เปิดบอร์ด</li>
+          <li><b>รายละเอียดของวัน</b>: แยกตามวิศวกร · แยกตามพื้นที่บริการ (% ประจำ · % ออนคอล) · กะ · <b>ความครอบคลุมของโฮสต์</b> (ไซต์ที่มีคนเคยไปแค่ 1–2 คน)</li>
+          <li><b>ประวัติ</b> และ <b>ปริมาณงานของวิศวกร</b>: เลือกช่วงเวลา (เดือนนี้ เดือนก่อน 30 วัน 90 วัน ต้นปีถึงปัจจุบัน หรือกำหนดเอง)</li>
+        </ul>
+        <div class="note"><b>อัตราการใช้งานคิดอย่างไร</b> = คนที่ได้ลงงาน ÷ (จำนวนคน − ลา − วันหยุด − ออนคอลที่ไม่ได้เรียก) ออนคอลที่ไม่ได้เรียกจึงไม่ทำให้ตัวเลขลดลง</div>
+      </div>
+      <div class="en">
+        <ul class="plain">
+          <li><b>Board selector</b> (first row): All boards or one board. It scopes every section on the page.</li>
+          <li><b>Attention card</b>: e.g. "20 permanent staff have no mission", with the names. Click a name to open that board.</li>
+          <li><b>KPI tiles</b>: Utilization (14-day sparkline) · Deployed on a mission · Missions · On-call free.</li>
+          <li><b>By board</b>: click a row to show only that board; → opens the board.</li>
+          <li><b>In detail</b>: By engineer · By service area (% permanent · % on-call) · Shifts · <b>Host coverage</b> (sites only one or two people have ever worked).</li>
+          <li><b>History</b> and <b>Engineer workload</b>: pick a range (This month, Last month, 30d, 90d, YTD or custom).</li>
+        </ul>
+        <div class="note"><b>How utilization is counted</b>: assigned ÷ (headcount − leave − holiday − free on-call). On-call staff who weren't called don't pull the figure down.</div>
+      </div>
+    
+      <figure class="shot" data-shot="overview"><figcaption><span class="th">ภาพรวม: เลือกบอร์ด การ์ดแจ้งเตือน ตัวเลขหลัก และแยกตามบอร์ด</span><span class="en">Overview: board selector, attention card, KPI tiles and By board</span></figcaption></figure><figure class="shot" data-shot="overview-more"><figcaption><span class="th">เลื่อนลง: แยกตามวิศวกร แยกตามพื้นที่บริการ กะ และความครอบคลุมของโฮสต์</span><span class="en">Further down: By engineer, By service area, Shifts and Host coverage</span></figcaption></figure>
+    </section>
+
+    <!-- ===================== CAPACITY ===================== -->
+    <section id="capacity">
+      <h2><span class="th">กำลังรองรับ</span><span class="en">Capacity</span></h2>
+      <p class="lede"><span class="th">เป็นตัวเลข ไม่ใช่รายชื่อ: แต่ละโฮสต์ต้องการกี่คนต่อกะต่อวัน เทียบกับคนที่มี ทีละบอร์ด</span><span class="en">Numbers, not names: how many people each host needs per shift and day, against how many are available, one board at a time.</span></p>
+      <div class="th">
+        <ol class="steps">
+          <li><div>เลือกบอร์ดจากแถบเครื่องมือ (บอร์ดที่มีวันขาดคนจะมีตัวเลขสีแดง) และช่วง 1–8 สัปดาห์</div></li>
+          <li><div>กด <span class="btn">เริ่มจากแผนที่ยืนยันแล้ว</span> เพื่อเติมตัวเลขจากแผนจริงล่าสุด</div></li>
+          <li><div>แก้ตัวเลขในช่องของโฮสต์ที่คุณดูแล เพิ่มโฮสต์ใหม่ที่แถวล่างสุด <b>+ Add host…</b></div></li>
+          <li><div>ดูแถว <b>Gap</b>: <span class="chip red">▼ ขาด</span> <span class="chip amber">● พอดี</span> <span class="chip green">▲ เหลือ</span> กดตัวเลข Available เพื่อดูที่มา</div></li>
+        </ol>
+        <p>ใช้งานเหมือน Excel: ลากเลือกหลายช่อง <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> (คัดลอกจาก/ไป Excel ได้) <kbd>Delete</kbd> ล้างช่อง คลิกขวาที่ช่องเพื่อเติมถึงสิ้นสัปดาห์ หน้านี้<b>ไม่เปลี่ยนแปลงบอร์ดจริง</b></p>
+        <div class="warn"><b>Reset to 0</b> (ในเมนู ⋯) ตั้งตัวเลขทั้งหมดจากวันนี้เป็น 0 ย้อนกลับไม่ได้ ควรส่งออกก่อน</div>
+      </div>
+      <div class="en">
+        <ol class="steps">
+          <li><div>Pick the board in the toolbar (a board with short days carries a red count) and a range of 1–8 weeks.</div></li>
+          <li><div>Press <span class="btn">Start from confirmed plan</span> to fill the cells from the latest real plan.</div></li>
+          <li><div>Adjust the hosts you look after. Add a new host on the last row, <b>+ Add host…</b></div></li>
+          <li><div>Read the <b>Gap</b>: <span class="chip red">▼ short</span> <span class="chip amber">● tight</span> <span class="chip green">▲ spare</span>. Click an Available number to see why.</div></li>
+        </ol>
+        <p>It works like a spreadsheet: drag to select, <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> (to and from Excel), <kbd>Delete</kbd> to clear, right-click a cell to fill to the end of the week. Nothing here <b>changes a board</b>.</p>
+        <div class="warn"><b>Reset to 0</b> (in the ⋯ menu) sets every number from today on to 0. It can't be undone, so export first.</div>
+      </div>
+    
+      <figure class="shot" data-shot="capacity"><figcaption><span class="th">กำลังรองรับ: แถบ Gap ด้านบน และตัวเลขต่อโฮสต์ต่อวันด้านล่าง</span><span class="en">Capacity: the gap drawn on top, and each host's numbers per day below</span></figcaption></figure>
+    </section>
+
+    <!-- ===================== ORG CHART ===================== -->
+    <section id="orgchart">
+      <h2><span class="th">ผังองค์กร</span><span class="en">Org Chart</span></h2>
+      <div class="th">
+        <p>แสดง บอร์ด → วิศวกร → พื้นที่บริการ → มิชชั่น → ทีม ของวันที่เลือก ดูได้ 2 แบบ: <b>โครงร่าง</b> (รายการ) หรือ <b>ผัง</b> (ลากและซูมได้) คนที่ไม่มีมิชชั่นอยู่ในกลุ่ม สแตนด์บาย / ลา ใต้แต่ละบอร์ด</p>
+        <p>กรองได้ตาม บอร์ด วิศวกร พื้นที่บริการ และ สแตนด์บาย / ลา (เลือก <b>None</b> เพื่อดูเฉพาะมิชชั่น) ส่งออกเป็น JPG / PDF ได้ หน้านี้ดูอย่างเดียว</p>
+      </div>
+      <div class="en">
+        <p>Shows board → engineer → service area → mission → crew for the date shown, as an <b>Outline</b> or a pan-and-zoom <b>chart</b>. Everyone not on a mission sits in a Standby / Leave pool under each board.</p>
+        <p>Filter by Board, Engineer, Service area and Standby / Leave (<b>None</b> for missions only). Export as JPG or PDF. This tab is view only.</p>
+      </div>
+    
+      <figure class="shot" data-shot="orgchart"><figcaption><span class="th">ผังองค์กรแบบโครงร่าง</span><span class="en">The Org Chart as an outline</span></figcaption></figure>
+    </section>
+
+    <!-- ===================== MANPOWER ===================== -->
+    <section id="manpower">
+      <h2><span class="th">กำลังคน (รายชื่อพนักงาน)</span><span class="en">Manpower list</span></h2>
+      <div class="th">
+        <p>พนักงานทุกคนทุกบอร์ด ค้นหา (ชื่อไทย/อังกฤษ TRIGO ID) กรอง และเรียงได้ คอลัมน์ที่มีประโยชน์:</p>
+        <ul class="plain">
+          <li><b>30D utilization</b> — สัดส่วนวันที่ได้ลงมิชชั่นใน 30 วันทำงานล่าสุด</li>
+          <li><b>อายุงาน</b> — คำนวณจากวันเริ่มงาน กรองได้ (ต่ำกว่า 1 ปี / 1–2 / 2–3 / 3 ปีขึ้นไป)</li>
+          <li><b>สถานะ</b> — สวิตช์ ใช้งาน / ปิดใช้งาน</li>
+          <li>ตัวเลือก <b>ชื่อ</b>: ไทย / อังกฤษ / ไทย + อังกฤษ</li>
+        </ul>
+        <h3>แก้ไขเป็นกลุ่มด้วย Excel</h3>
+        <ol class="steps">
+          <li><div>กด <span class="btn">แก้ไขเป็นกลุ่ม</span> <span class="alt">Bulk edit</span> → ดาวน์โหลด <b>Excel template</b> (มีรายชื่อตามที่กรองอยู่)</div></li>
+          <li><div>แก้ไขในไฟล์ (เพิ่มคนใหม่ที่แถวว่างด้านล่างได้) แล้วอัปโหลดกลับ ต้องเป็น <b>.xlsx</b></div></li>
+          <li><div>ตรวจตัวอย่าง: จะอัปเดต / ใหม่ / ไม่เปลี่ยน / มีปัญหา ทีละฟิลด์ แล้วกด <b>Apply</b></div></li>
+        </ol>
+        <p>ระบบ<b>ไม่ลบ</b>คนที่ไม่มีในไฟล์ (ใช้สถานะ Inactive แทน) และสำรองรายชื่อเดิมให้ก่อนเสมอ ไฟล์สำรองนั้นใช้อัปโหลดกลับเพื่อย้อนคืนได้</p>
+      </div>
+      <div class="en">
+        <p>Everyone on every board. Search (Thai or English name, TRIGO ID), filter and sort. Useful columns:</p>
+        <ul class="plain">
+          <li><b>30D utilization</b> — the share of the last 30 working days they were on a mission.</li>
+          <li><b>Years of service</b> — from the start date, with a filter (under 1 / 1–2 / 2–3 / 3+ years).</li>
+          <li><b>Status</b> — the Active / Inactive switch.</li>
+          <li>The <b>Names</b> selector: Thai / English / Thai + English.</li>
+        </ul>
+        <h3>Bulk edit with Excel</h3>
+        <ol class="steps">
+          <li><div>Press <span class="btn">Bulk edit</span> → download the <b>Excel template</b> (it holds the rows the list is showing).</div></li>
+          <li><div>Edit it (add new people on the empty rows at the bottom) and upload it back, as <b>.xlsx</b>.</div></li>
+          <li><div>Check the preview (To update / New / Unchanged / Problems, field by field), then press <b>Apply</b>.</div></li>
+        </ol>
+        <p>People missing from the file are <b>never deleted</b> (set Status to Inactive instead), and a backup of the current list is downloaded first. Uploading that backup is the undo.</p>
+      </div>
+    
+      <figure class="shot" data-shot="manpower"><figcaption><span class="th">รายชื่อพนักงาน พร้อมตัวกรองและ 30D utilization</span><span class="en">The Manpower list with its filters and 30D utilization</span></figcaption></figure>
+    </section>
+
+    <!-- ===================== HOST ===================== -->
+    <section id="host">
+      <h2><span class="th">โฮสต์ (สถานที่ทำงาน)</span><span class="en">Host list</span></h2>
+      <div class="th">
+        <p>หนึ่งแถวต่อหนึ่งไซต์: <b>ที่ตั้ง</b> (ที่อยู่ / ลิงก์ Google Maps) · <b>พื้นที่บริการ</b> · <b>หมายเหตุ</b> (ประตู ผู้ติดต่อ PPE จะแสดงบนการ์ดมิชชั่นทุกใบของโฮสต์นี้) · <b>ผู้ตรวจที่เคยไป</b> พร้อมจำนวนวัน · บอร์ดที่ใช้</p>
+        <ul class="plain">
+          <li>กด ✎ หรือ “+ Add location” / “+ Set area” / “+ Add note” เพื่อกรอก โฮสต์ที่มีที่ตั้งจะมี 📍 บนบอร์ด</li>
+          <li><span class="btn">+ Host</span> เพิ่มไซต์ก่อนมีมิชชั่นแรก</li>
+          <li><b>ชื่อซ้ำ/สะกดผิด</b>: กด <span class="btn">ตรวจสอบรายการซ้ำ</span> แล้วเปิดตัวที่ผิด → <b>รวมเข้ากับโฮสต์อื่น</b> ประวัติทั้งหมดจะย้ายมารวมกัน</li>
+          <li><b>เก็บถาวร</b> (สวิตช์สถานะ) สำหรับไซต์ที่เลิกให้บริการ ข้อมูลยังอยู่ แต่จะไม่แสดงตอนสร้างมิชชั่น</li>
+          <li><b>เปลี่ยนชื่อ</b>จะเปลี่ยนในมิชชั่นย้อนหลังทั้งหมดด้วย (ระบบถามยืนยันก่อน)</li>
+        </ul>
+      </div>
+      <div class="en">
+        <p>One row per site: <b>Location</b> (address and/or Google Maps link) · <b>Service area</b> · <b>Note</b> (gate, contact, PPE — shown on every mission card for that host) · the <b>inspectors ever deployed there</b> with their day counts · which boards use it.</p>
+        <ul class="plain">
+          <li>Click ✎ or "+ Add location" / "+ Set area" / "+ Add note". A host with a location gets its 📍 on the board.</li>
+          <li><span class="btn">+ Host</span> records a site before its first mission.</li>
+          <li><b>Duplicates and typos</b>: press <span class="btn">Review duplicates</span>, open the wrong one → <b>Merge into another host</b>. Their histories join.</li>
+          <li><b>Archive</b> (the Status switch) is for a site you no longer serve: it keeps its record but stops being offered for new missions.</li>
+          <li><b>Renaming</b> a host also renames it on every past mission (it asks first).</li>
+        </ul>
+      </div>
+    
+      <figure class="shot" data-shot="host"><figcaption><span class="th">รายชื่อโฮสต์: ที่ตั้ง พื้นที่บริการ หมายเหตุ และผู้ตรวจที่เคยไป</span><span class="en">The Host list: location, service area, note and the inspectors who have worked there</span></figcaption></figure>
+    </section>
+
+    <!-- ===================== EXPORT ===================== -->
+    <section id="export">
+      <h2><span class="th">ส่งออกและแชร์</span><span class="en">Export and share</span></h2>
+      <div class="th">
+        <p>ทุกแท็บมีปุ่ม <span class="btn">⬇ ส่งออก</span> ที่ขวาสุดของแถบเครื่องมือ เลือกชนิดไฟล์ในหน้าต่าง:</p>
+        <div class="tbl"><table>
+          <thead><tr><th>ชนิด</th><th>ใช้เมื่อ</th><th>มีในแท็บ</th></tr></thead>
+          <tbody>
+            <tr><td><b>PDF</b></td><td>แชร์ให้ทีม: คมชัดทุกระดับซูม ลิงก์แผนที่และเบอร์โทรกดได้ (เลือก <b>Save as PDF</b> ในหน้าพิมพ์)</td><td>บอร์ด ภาพรวม ผังองค์กร กำลังรองรับ</td></tr>
+            <tr><td><b>JPG</b></td><td>เมื่อต้องการรูปภาพเท่านั้น</td><td>บอร์ด ภาพรวม ผังองค์กร กำลังรองรับ</td></tr>
+            <tr><td><b>Excel</b></td><td>จัดเรียง กรอง ส่งต่อ เลือกคอลัมน์และภาษาไฟล์ (ไทย/อังกฤษ) ได้</td><td>บอร์ด กำลังรองรับ กำลังคน โฮสต์</td></tr>
+          </tbody>
+        </table></div>
+        <div class="ok"><b>ส่งใน LINE ให้ชัด</b>: ส่ง PDF หรือ JPG <b>แบบไฟล์</b> ไม่ใช่แบบรูปภาพ แอปแชทจะย่อรูปจนเบลอ</div>
+        <p style="margin-top:12px">วันคาดการณ์ไม่มีปุ่มส่งออก บอร์ดที่ส่งออกจะเป็น 3 คอลัมน์เสมอไม่ว่าจอขนาดไหน</p>
+      </div>
+      <div class="en">
+        <p>Every tab has one <span class="btn">⬇ Export</span> button at the right of its toolbar. Choose the file type in the dialog:</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Type</th><th>Use it for</th><th>On</th></tr></thead>
+          <tbody>
+            <tr><td><b>PDF</b></td><td>Sharing with the crew: sharp at any zoom, map and phone links stay tappable (choose <b>Save as PDF</b> in the print dialog)</td><td>Board, Overview, Org Chart, Capacity</td></tr>
+            <tr><td><b>JPG</b></td><td>When only an image will do</td><td>Board, Overview, Org Chart, Capacity</td></tr>
+            <tr><td><b>Excel</b></td><td>Sorting, filtering, passing on; pick the columns and the file language (English / Thai)</td><td>Board, Capacity, Manpower, Host</td></tr>
+          </tbody>
+        </table></div>
+        <div class="ok"><b>Keep it sharp in LINE</b>: send the PDF or JPG <b>as a file</b>, not as a photo. Chat apps shrink photos until they blur.</div>
+        <p style="margin-top:12px">Forecast days have no Export. An exported board is always three cards wide, whatever screen you export from.</p>
+      </div>
+    
+      <div class="shots row small"><figure class="shot" data-shot="export"><figcaption><span class="th">หน้าต่างส่งออก: เลือกชนิดไฟล์ก่อน</span><span class="en">The Export dialog starts with the file type</span></figcaption></figure></div>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section id="settings">
+      <h2><span class="th">ตั้งค่า ⚙</span><span class="en">Settings ⚙</span></h2>
+      <div class="th">
+        <p>เปิดจากเมนูบัญชี → ตั้งค่า กด <b>← กลับไปที่บอร์ด</b> เพื่อกลับไปที่เดิม การแก้ไขเป็น<b>ฉบับร่าง</b>จนกว่าจะกด <span class="btn main">บันทึกการเปลี่ยนแปลง</span> (หรือ <span class="btn">ทิ้ง</span>)</p>
+        <ul class="plain">
+          <li><b>บัญชีของฉัน</b> — ชื่อที่แสดง (เช่น Somchai.P) <b>เบอร์มือถือ</b> (ใช้เป็นปุ่มโทรบนมิชชั่นที่คุณเป็นวิศวกร) และเปลี่ยนรหัสผ่าน</li>
+          <li><b>วิศวกร</b> — สีของวิศวกรแต่ละคน (สีกรอบการ์ดมิชชั่น)</li>
+          <li><b>พื้นที่บริการ</b> — ชื่อและสี (ลบไม่ได้ถ้ายังมีพนักงานอยู่)</li>
+          <li><b>บอร์ด</b> — ชื่อและ<b>วันทำงาน</b>ของสัปดาห์ (มีผลกับวันทำงานถัดไป วันหยุด และกราฟ) ตรวจให้ตรงกับตารางงานจริง</li>
+          <li><b>ผู้ใช้</b> (ผู้ดูแล) — การ์ด <b>รอสิทธิ์เข้าใช้งาน</b> พร้อมปุ่ม <span class="btn">อนุมัติ</span> / <span class="btn">ปฏิเสธ</span> · <span class="btn">+ เพิ่มผู้ใช้</span> ได้รหัสผ่านชั่วคราว · <span class="btn">รีเซ็ตรหัสผ่าน</span> · ใช้ <b>ปิดใช้งาน</b> แทนการลบ</li>
+          <li><b>บทบาทและสิทธิ์</b> (ผู้ดูแล) — ตารางบทบาท × ส่วนของแอป แต่ละช่องเป็น แก้ไข / ดู / ปิด กด <b>ตรวจสอบการเปลี่ยนแปลง</b> ก่อนบันทึก</li>
+        </ul>
+      </div>
+      <div class="en">
+        <p>Open it from the account menu → Settings. <b>← Back to board</b> returns you to exactly where you were. Edits are <b>drafts</b> until you press <span class="btn main">Save changes</span> (or <span class="btn">Discard</span>).</p>
+        <ul class="plain">
+          <li><b>My account</b> — your display name (e.g. Somchai.P), your <b>mobile number</b> (the call link on missions you run) and Change password.</li>
+          <li><b>Engineers</b> — each engineer's colour (the border of their mission cards).</li>
+          <li><b>Service areas</b> — name and colour (an area with employees can't be deleted).</li>
+          <li><b>Boards</b> — the name and its <b>working days</b> (they drive the next working day, holidays and the charts). Check they match the real schedule.</li>
+          <li><b>Users</b> (admins) — the <b>Waiting for access</b> card with <span class="btn">Approve</span> / <span class="btn">Reject</span> · <span class="btn">+ Add user</span> gives a temporary password · <span class="btn">Reset password</span> · use <b>Disable</b> rather than delete.</li>
+          <li><b>Roles &amp; permissions</b> (admins) — a grid of roles × areas, each cell Edit / View / Off. <b>Review changes</b> shows a before / after before anything is saved.</li>
+        </ul>
+      </div>
+    
+      <figure class="shot" data-shot="users"><figcaption><span class="th">ตั้งค่า → ผู้ใช้: คำขอที่รออนุมัติอยู่ด้านบน</span><span class="en">Settings → Users: access requests wait at the top</span></figcaption></figure><figure class="shot" data-shot="roles"><figcaption><span class="th">ตั้งค่า → บทบาทและสิทธิ์</span><span class="en">Settings → Roles & permissions</span></figcaption></figure>
+    </section>
+
+    <p class="part"><span class="th">อ้างอิง</span><span class="en">Reference</span></p>
+
+    <!-- ===================== PHONE ===================== -->
+    <section id="phone">
+      <h2><span class="th">ใช้งานบนโทรศัพท์</span><span class="en">Using it on a phone</span></h2>
+      <div class="th">
+        <ul class="plain">
+          <li><b>แถบล่างสีน้ำเงิน</b>: บอร์ด · ภาพรวม · กำลังคน · โฮสต์ · <b>Me</b> (ผังองค์กร กำลังรองรับ ล็อก ตั้งค่า ภาษา ออกจากระบบ)</li>
+          <li><b>หัวจอ</b>: กดชื่อบอร์ดเพื่อสลับบอร์ด ใช้ ‹ › เปลี่ยนวัน กด<b>การ์ดสรุป</b>เพื่อดูตัวเลขทั้งหมด</li>
+          <li><b>⋯</b> มี มิชชั่นใหม่ พนักงานใหม่ วันหยุด ชื่อไทย/อังกฤษ ซ่อน/แสดง ส่งออก เลิกทำ รีเซ็ต</li>
+          <li><b>วางคน</b>: แตะลิ้นชักด้านล่าง (สแตนด์บาย / ออนคอล) → แตะเลือกคน → <span class="btn main">จัดวาง</span> → แตะมิชชั่นหรือแท็บการลา</li>
+          <li>กดค้างที่หัวการ์ดมิชชั่นเพื่อเปิดเมนูด่วน</li>
+          <li>กำลังรองรับบนโทรศัพท์แสดง<b>ทีละโฮสต์</b> ใช้ปุ่ม − / + ปรับตัวเลข</li>
+        </ul>
+        <div class="note"><b>เพิ่มไว้ที่หน้าจอหลัก</b>: เปิดลิงก์ในเบราว์เซอร์ แล้วเลือก “เพิ่มไปยังหน้าจอหลัก” จะได้ไอคอน Manpower Board เหมือนแอป</div>
+      </div>
+      <div class="en">
+        <ul class="plain">
+          <li><b>The navy bottom bar</b>: Board · Overview · Manpower · Host · <b>Me</b> (Org Chart, Capacity, Lock, Settings, Language, Sign out).</li>
+          <li><b>The header</b>: tap the board name to switch board, ‹ › to change day, and the <b>summary card</b> for all the numbers.</li>
+          <li><b>⋯</b> holds New mission, New employee, Holiday, Thai / English names, Hide / unhide, Export, Undo and Reset.</li>
+          <li><b>Placing people</b>: tap the drawer at the bottom (Standby / On-call) → tap people → <span class="btn main">Place</span> → tap a mission or a leave tab.</li>
+          <li>Hold a mission's header for its quick panel.</li>
+          <li>Capacity on a phone shows <b>one host at a time</b>, with − / + steppers.</li>
+        </ul>
+        <div class="note"><b>Add it to your home screen</b>: open the link in your browser and choose "Add to Home Screen" to get a Manpower Board icon like an app.</div>
+      </div>
+    
+      <div class="shots row phones"><figure class="shot phone" data-shot="phone-board"><figcaption><span class="th">บอร์ด</span><span class="en">The board</span></figcaption></figure><figure class="shot phone" data-shot="phone-drawer"><figcaption><span class="th">ลิ้นชักคนว่าง</span><span class="en">The people drawer</span></figcaption></figure><figure class="shot phone" data-shot="phone-more"><figcaption><span class="th">เมนู ⋯</span><span class="en">The ⋯ menu</span></figcaption></figure><figure class="shot phone" data-shot="phone-overview"><figcaption><span class="th">ภาพรวม</span><span class="en">Overview</span></figcaption></figure><figure class="shot phone" data-shot="phone-manpower"><figcaption><span class="th">กำลังคน</span><span class="en">Manpower</span></figcaption></figure><figure class="shot phone" data-shot="phone-me"><figcaption><span class="th">เมนู Me</span><span class="en">Me</span></figcaption></figure></div>
+    </section>
+
+    <!-- ===================== ROLES ===================== -->
+    <section id="roles">
+      <h2><span class="th">บทบาทและสิทธิ์</span><span class="en">Roles: who can do what</span></h2>
+      <p class="lede"><span class="th">ค่าเริ่มต้น ผู้ดูแลปรับได้ที่ ตั้งค่า → บทบาทและสิทธิ์ ดูบทบาทของคุณได้ที่ บัญชีของฉัน</span><span class="en">The defaults. Admins can change them in Settings → Roles &amp; permissions. Your own role is shown in My account.</span></p>
+      <div class="tbl"><table>
+        <thead><tr><th></th><th>Admin</th><th>Manager</th><th>Engineer</th><th>Viewer</th></tr></thead>
+        <tbody>
+          <tr><td><span class="th">บอร์ด, กำลังคน, โฮสต์</span><span class="en">Board, Manpower, Host</span></td><td class="y"><span class="th">แก้ไข</span><span class="en">Edit</span></td><td class="y"><span class="th">แก้ไข</span><span class="en">Edit</span></td><td class="y"><span class="th">แก้ไข</span><span class="en">Edit</span></td><td class="v"><span class="th">ดูอย่างเดียว</span><span class="en">View only</span></td></tr>
+          <tr><td><span class="th">ตั้งค่า: วิศวกร / พื้นที่ / บอร์ด</span><span class="en">Settings: engineers / areas / boards</span></td><td class="y"><span class="th">แก้ไข</span><span class="en">Edit</span></td><td class="y"><span class="th">แก้ไข</span><span class="en">Edit</span></td><td class="y"><span class="th">แก้ไข</span><span class="en">Edit</span></td><td class="n">—</td></tr>
+          <tr><td><span class="th">ผู้ใช้และบทบาท</span><span class="en">Users &amp; roles</span></td><td class="y"><span class="th">แก้ไข</span><span class="en">Edit</span></td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><span class="th">ภาพรวม: ประวัติ, ปริมาณงานวิศวกร, แยกตามวิศวกร</span><span class="en">Overview: History, Engineer workload, By engineer</span></td><td class="v"><span class="th">ดู</span><span class="en">View</span></td><td class="v"><span class="th">ดู</span><span class="en">View</span></td><td class="n">—</td><td class="n">—</td></tr>
+          <tr><td><span class="th">ภาพรวม: ส่วนอื่นๆ</span><span class="en">Overview: everything else</span></td><td class="v"><span class="th">ดู</span><span class="en">View</span></td><td class="v"><span class="th">ดู</span><span class="en">View</span></td><td class="v"><span class="th">ดู</span><span class="en">View</span></td><td class="v"><span class="th">ดู</span><span class="en">View</span></td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ===================== FAQ ===================== -->
+    <section id="faq">
+      <h2><span class="th">ปัญหาที่พบบ่อย</span><span class="en">Common questions</span></h2>
+      <dl class="faq th">
+        <dt>บอร์ดว่างเปล่า</dt>
+        <dd>วันนั้นยังไม่มีแผน กด <span class="btn">↺ ยกแผนมา</span> เพื่อนำแผนวันทำงานล่าสุดมา</dd>
+        <dt>แก้ไขอะไรไม่ได้</dt>
+        <dd>ตรวจว่า: เป็นวันที่ผ่านมาแล้ว · บอร์ดถูกล็อก 🔒 · เป็นวันคาดการณ์ (บางปุ่มไม่มี) · หรือบทบาทของคุณเป็น Viewer</dd>
+        <dt>หาคนไม่เจอ</dt>
+        <dd>ใช้ช่องค้นหาในแผงด้านขวา ถ้าอยู่ในมิชชั่นหรือลาอยู่ ระบบจะพาไปที่การ์ด ถ้ายังไม่เจอ อาจอยู่คนละบอร์ด ถูกให้ยืม หรือถูกปิดใช้งาน (ดูที่กำลังคน)</dd>
+        <dt>แก้ผิด</dt>
+        <dd>กด <span class="btn">เลิกทำ</span> หรือ <kbd>Ctrl</kbd>+<kbd>Z</kbd></dd>
+        <dt>รูปที่ส่งใน LINE เบลอ</dt>
+        <dd>ส่งเป็น PDF แบบไฟล์ ดู <a href="#export">ส่งออกและแชร์</a></dd>
+        <dt>มีแถบแจ้งว่ามีเวอร์ชันใหม่</dt>
+        <dd>บันทึกงานที่ทำอยู่ให้เสร็จ แล้วรีเฟรชหน้า</dd>
+      </dl>
+      <dl class="faq en">
+        <dt>The board is empty</dt>
+        <dd>That day has no plan yet. Press <span class="btn">↺ Carry over</span> to bring in the last working day's plan.</dd>
+        <dt>I can't change anything</dt>
+        <dd>Check whether it's a past day, the board is locked 🔒, it's a forecast day (some buttons are gone), or your role is Viewer.</dd>
+        <dt>I can't find someone</dt>
+        <dd>Use the search in the right-hand panel; if they are on a mission or on leave it takes you to their card. Otherwise they may be on another board, lent out, or inactive (check Manpower).</dd>
+        <dt>I made a mistake</dt>
+        <dd>Press <span class="btn">Undo</span> or <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</dd>
+        <dt>The picture I sent in LINE is blurry</dt>
+        <dd>Send the PDF as a file. See <a href="#export">Export and share</a>.</dd>
+        <dt>A banner says there's a new version</dt>
+        <dd>Finish what you are typing, then refresh the page.</dd>
+      </dl>
+      <a class="totop" href="#top"><span class="th">↑ กลับด้านบน</span><span class="en">↑ Back to top</span></a>
+    </section>
+
+    <footer><span class="th">หากมีปัญหา กรุณาติดต่อผู้ดูแลระบบ</span><span class="en">If something isn't working, contact an admin.</span></footer>
+  </main>
+</div>
+
+<script>
+(function () {
+  var KEY = 'mpb-guide-lang', root = document.documentElement;
+  function setLang(l, save) {
+    root.classList.remove('ui-th', 'ui-en');
+    root.classList.add('ui-' + l);
+    root.lang = l;
+    document.title = l === 'en' ? 'Manpower Board guide' : 'คู่มือ Manpower Board';
+    ['th', 'en'].forEach(function (c) { document.getElementById('lang-' + c).setAttribute('aria-pressed', String(c === l)); });
+    if (save) { try { localStorage.setItem(KEY, l); } catch (e) { /* not remembered */ } }
+  }
+  var h = (location.hash || '').slice(1), l = 'th';
+  if (h === 'en' || h === 'th') l = h;
+  else { try { var s = localStorage.getItem(KEY); if (s === 'en' || s === 'th') l = s; } catch (e) { /* default Thai */ } }
+  setLang(l, false);
+  document.querySelectorAll('[data-set-lang]').forEach(function (b) {
+    b.addEventListener('click', function () { setLang(b.getAttribute('data-set-lang'), true); });
+  });
+
+  // Contents: open beside the page on a wide screen, folded on a phone
+  var d = document.getElementById('toc-d'), mq = matchMedia('(min-width: 960px)');
+  function syncToc() { d.open = mq.matches; }
+  syncToc();
+  if (mq.addEventListener) mq.addEventListener('change', syncToc);
+  d.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { if (!mq.matches) d.open = false; }); });
+
+  // Screenshots: an <img> per language inside a button; the hidden language's lazy image never loads
+  document.querySelectorAll('figure.shot').forEach(function (f) {
+    var name = f.getAttribute('data-shot'), cap = f.querySelector('figcaption');
+    var b = document.createElement('button');
+    b.type = 'button';
+    ['th', 'en'].forEach(function (l) {
+      var img = document.createElement('img');
+      img.className = l; img.loading = 'lazy'; img.decoding = 'async';
+      img.src = 'img/' + name + '.' + l + '.jpg';
+      img.alt = cap.querySelector('.' + l).textContent;
+      b.appendChild(img);
+    });
+    b.setAttribute('aria-label', 'Open full size / ดูภาพขนาดเต็ม');
+    b.addEventListener('click', function () { openBox(b.querySelector('img.' + (root.classList.contains('ui-en') ? 'en' : 'th'))); });
+    f.insertBefore(b, cap);
+  });
+  var box = null, lastBtn = null;
+  function closeBox() { if (box) { box.remove(); box = null; if (lastBtn) lastBtn.focus(); } }
+  function openBox(img) {
+    lastBtn = img.parentNode;
+    box = document.createElement('div');
+    box.className = 'lightbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', img.alt);
+    var big = document.createElement('img'); big.src = img.src; big.alt = img.alt;
+    var x = document.createElement('button'); x.type = 'button';
+    x.textContent = root.classList.contains('ui-en') ? 'Close ✕' : 'ปิด ✕';
+    box.appendChild(big); box.appendChild(x);
+    box.addEventListener('click', closeBox);
+    document.body.appendChild(box); x.focus();
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeBox(); });
+
+  document.getElementById('copy-btn').addEventListener('click', function () {
+    var btn = this, link = document.getElementById('app-link'), url = link.textContent, was = btn.innerHTML;
+    function done(ok) {
+      var en = root.classList.contains('ui-en');
+      btn.textContent = ok ? (en ? 'Copied' : 'คัดลอกแล้ว') : (en ? 'Selected — press Ctrl+C' : 'เลือกลิงก์แล้ว — กด Ctrl+C');
+      setTimeout(function () { btn.innerHTML = was; }, 2000);
+    }
+    function select() { var r = document.createRange(); r.selectNodeContents(link); var s = getSelection(); s.removeAllRanges(); s.addRange(r); done(false); }
+    try { navigator.clipboard.writeText(url).then(function () { done(true); }, select); } catch (e) { select(); }
+  });
+})();
+</script>
