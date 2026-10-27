@@ -177,6 +177,7 @@ class FakeDb {
     if (this._findConflict(table, row)) {
       const e = new Error(`duplicate key value violates unique constraint "${table}_key"`); e.code = "23505"; throw e;
     }
+    this._checkLoanOverlap(table, row);
     this.t(table).push(row);
     this._afterWrite(table, "INSERT", row, null, user);
     return row;
@@ -210,11 +211,22 @@ class FakeDb {
     return this._finish(written, { ...q, filters: [], order: null, range: null, limit: null });
   }
 
+  /* employee_loans_no_overlap (migration-2026-10-27): no two loans of one
+     person share a day */
+  _checkLoanOverlap(table, row) {
+    if (table !== "employee_loans") return;
+    if (this.t(table).some((l) => l !== row && l.id !== row.id && l.employee_id === row.employee_id
+        && l.start_date <= row.end_date && row.start_date <= l.end_date)) {
+      const e = new Error('conflicting key value violates exclusion constraint "employee_loans_no_overlap"'); e.code = "23P01"; throw e;
+    }
+  }
+
   _update(q, user) {
     const hits = this.t(q.table).filter((r) => this._match(r, q.filters));
     for (const r of hits) {
       const old = clone(r);
       Object.assign(r, clone(q.values));
+      try { this._checkLoanOverlap(q.table, r); } catch (e) { Object.assign(r, old); throw e; }
       this._afterWrite(q.table, "UPDATE", r, old, user);
     }
     if (!q.returning) return { data: null, error: null };

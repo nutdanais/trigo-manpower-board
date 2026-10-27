@@ -10346,19 +10346,29 @@ function updateLend() {
   const who = emps.length === 1 ? emps[0].name : `${emps.length} people`;
   $("#lend-summary").textContent = !targetId ? "No board can take them on this date."
     : `${loan ? "Lent" : "Lend"} ${who} to ${boardName(targetId)}${span ? " · " + span : ""}`;
-  $("#btn-lend").disabled = !targetId || badDates;
+  $("#btn-lend").disabled = !targetId || badDates || !!lendUi.saving;
 }
 
 function saveLend(ev) {
   ev.preventDefault();
-  if (!lendUi || $("#btn-lend").disabled) return;
-  const { ids, from, targetId, loan } = lendUi;
+  if (!lendUi || lendUi.saving || $("#btn-lend").disabled) return;
+  const ui = lendUi;
+  const { ids, from, targetId, loan } = ui;
   const until = $("#lend-until").value;
   const note = $("#lend-note").value.trim();
   const to = D().boards.find(b => b.id === targetId);
+  // one save at a time: a second click or Enter while this one runs would lend
+  // them twice (both saves read the loans before either has written its own)
+  ui.saving = true;
+  $("#btn-lend").disabled = true;
   safely(async () => {
-    if (loan) await cloud.updateLoan(loan, { endDate: until, note });
-    else await cloud.setLoan(ids, targetId, from, until, note);
+    try {
+      if (loan) await cloud.updateLoan(loan, { endDate: until, note });
+      else await cloud.setLoan(ids, targetId, from, until, note);
+    } finally {
+      ui.saving = false;
+      if (lendUi === ui) updateLend();
+    }
     closeModal();
     lendUi = null;
     clearSelection();

@@ -71,8 +71,18 @@ async function step(name, fn) {
       assert.equal(await p.locator("#btn-lend").isDisabled(), true);
       await p.fill("#lend-until", SRC);
       await p.fill("#lend-note", "Audit week");
-      await p.click("#btn-lend");
+      // a second click and an Enter while it saves lend them once (Loans today
+      // listed someone twice when a double click got through)
+      const during = await p.evaluate(() => {
+        $("#btn-lend").click();
+        const off = $("#btn-lend").disabled;
+        $("#btn-lend").click();
+        $("#form-lend").requestSubmit();
+        return off;
+      });
+      assert.equal(during, true, "Lend is disabled while it saves");
       await p.locator(".toast", { hasText: "Person C lent to Board Two for" }).waitFor();
+      assert.equal(await p.locator(".toast-error").count(), 0);
       const l = loans("e3");
       assert.equal(l.length, 1);
       assert.deepEqual([l[0].to_board_id, l[0].start_date, l[0].end_date, l[0].note], ["b2", SRC, SRC, "Audit week"]);

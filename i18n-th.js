@@ -1985,6 +1985,7 @@ I18N.add({
   "{a} only": "{a} เท่านั้น",
   "until {a}": "ถึง {a}",
   "Loan to {a} now ends {b}.": "การให้ยืมไปที่ {a} สิ้นสุดวันที่ {b}",
+  "Their loans were changed somewhere else at the same time. The board now shows the latest; check it and try again.": "การให้ยืมของบุคคลนี้ถูกแก้ไขจากที่อื่นในเวลาเดียวกัน บอร์ดแสดงข้อมูลล่าสุดแล้ว โปรดตรวจสอบแล้วลองอีกครั้ง",
   "{a} lent to {b} for {c}.": "ให้ยืม {a} ไปที่ {b} สำหรับ {c} แล้ว",
   "{a} lent to {b} until {c}.": "ให้ยืม {a} ไปที่ {b} ถึง {c} แล้ว",
   "{a} goes back to {b} from {c}.": "{a} กลับไป {b} ตั้งแต่ {c}",

@@ -443,7 +443,8 @@ const cloud = {
      where they work on the dates it covers, both included: boardOn() is that
      rule, and every "who is on this board on this date" read goes through it.
      The day after a loan ends the person is back on their own board, with
-     nothing to undo. Loans never overlap for one person (setLoan trims). */
+     nothing to undo. Loans never overlap for one person (setLoan trims, and
+     the database refuses an overlap since migration-2026-10-27). */
   async _loadLoans() {
     if (!this.data.features.loans) { this.data.loans = []; return; }
     const { data, error } = await sb.from("employee_loans").select("*").order("start_date");
@@ -483,7 +484,7 @@ const cloud = {
             employee_id: l.employeeId, to_board_id: l.toBoardId, start_date: addDaysISO(until, 1), end_date: l.endDate,
             note: l.note || null, created_by: l.createdBy || null,
           });
-          if (tErr) throw tErr;
+          if (tErr) throw await this._loanRefused(tErr);
         }
       } else if (l.endDate > until) {
         const { error } = await sb.from("employee_loans").update({ start_date: addDaysISO(until, 1) }).eq("id", l.id);
@@ -500,10 +501,20 @@ const cloud = {
     if (rows.length) {
       const by = await this._currentEmail();
       const { error } = await sb.from("employee_loans").insert(rows.map((r) => ({ ...r, created_by: by })));
-      if (error) throw error;
+      if (error) throw await this._loanRefused(error);
     }
     await this._loadLoans();
     this._invalidatePlans();
+  },
+  /* employee_loans_no_overlap (migration-2026-10-27) refused a loan: another
+     save for the same person landed after this browser read the loans (Lend
+     clicked twice, or two people lending them at once). Reload them so the
+     board shows the loan that won, and say so instead of the database text. */
+  async _loanRefused(error) {
+    if (!error || error.code !== "23P01") return error;
+    await this._loadLoans();
+    this._invalidatePlans();
+    return new Error("Their loans were changed somewhere else at the same time. The board now shows the latest; check it and try again.");
   },
   /* "Change loan dates": a new last day (and note) for one loan. Days it gives
      up are cleared on the borrowing board (they are back home then); days it
@@ -528,7 +539,7 @@ const cloud = {
       await clear(addDaysISO(endDate, 1), loan.endDate);
     }
     const { error } = await sb.from("employee_loans").update({ end_date: endDate, note: note || null }).eq("id", loan.id);
-    if (error) throw error;
+    if (error) throw await this._loanRefused(error);
     await this._loadLoans();
     this._invalidatePlans();
   },

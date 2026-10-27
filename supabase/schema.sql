@@ -3,6 +3,16 @@
 -- Safe to run more than once — every statement below skips anything already in place.
 
 create extension if not exists "pgcrypto";
+-- "=" on uuid inside a GiST index, for employee_loans_no_overlap; Supabase keeps
+-- extensions in their own schema when it has one
+do $$
+begin
+  if exists (select 1 from pg_namespace where nspname = 'extensions') then
+    create extension if not exists btree_gist with schema extensions;
+  else
+    create extension if not exists btree_gist;
+  end if;
+end $$;
 
 -- ===== Reference tables =====
 
@@ -126,6 +136,8 @@ create index if not exists assignments_date_idx on assignments(plan_date);
 -- An employee still belongs to ONE board (employees.board_id); a loan says
 -- where they work on the dates it covers (both included). The day after it
 -- ends they are back on their own board. See migration-2026-10-20.
+-- One loan per person per day: employee_loans_no_overlap refuses a loan that
+-- shares a day with another of theirs (migration-2026-10-27).
 create table if not exists employee_loans (
   id          uuid primary key default gen_random_uuid(),
   employee_id uuid not null references employees(id) on delete cascade,
@@ -135,13 +147,16 @@ create table if not exists employee_loans (
   note        text,
   created_by  text,
   created_at  timestamptz not null default now(),
-  constraint employee_loans_dates check (end_date >= start_date)
+  constraint employee_loans_dates check (end_date >= start_date),
+  constraint employee_loans_no_overlap
+    exclude using gist (employee_id with =, daterange(start_date, end_date, '[]') with &&)
 );
 create index if not exists employee_loans_employee_idx on employee_loans (employee_id, start_date);
 create index if not exists employee_loans_board_idx on employee_loans (to_board_id, start_date);
 
 /* The board someone works on that day: the loan covering it, else their own.
-   The app keeps loans from overlapping; if two ever did, the newest wins. */
+   employee_loans_no_overlap keeps loans from overlapping; a database that has
+   not run migration-2026-10-27 yet may still hold two, and then the newest wins. */
 create or replace function public.effective_board(p_employee uuid, p_date date)
 returns uuid language sql stable set search_path = public, pg_temp as $fn$
   select coalesce(

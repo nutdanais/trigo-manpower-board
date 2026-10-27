@@ -143,3 +143,30 @@ test("capacity: a board's forecast date leaves loans out, its confirmed dates fo
   assert.equal(out.b2[D(3)].available, 1, "Board Two's confirmed day has the borrowed person");
   assert.equal(out.b1[D(3)].named, 1, "the forecast place on Board One's forecast counts there");
 });
+
+test("two saves of the same loan at once (Lend clicked twice): one loan, the other refused and the loans reloaded", async () => {
+  const { cloud, db } = setup();
+  await cloud._loadEmployees();
+  // both start before either has written, so neither sees the other's loan
+  const [a, b] = await Promise.allSettled([
+    cloud.setLoan(["e1"], "b2", D(3), D(5), ""),
+    cloud.setLoan(["e1"], "b2", D(3), D(5), ""),
+  ]);
+  assert.deepEqual(loans(db, "e1"), [["b2", D(3), D(5)]], "only one loan in the database");
+  assert.deepEqual([a.status, b.status].sort(), ["fulfilled", "rejected"]);
+  const err = (a.status === "rejected" ? a : b).reason;
+  assert.match(err.message, /changed somewhere else at the same time/);
+  assert.equal(cloud.data.loans.length, 1, "the browser shows the loan that won");
+});
+
+test("the database refuses a loan that shares a day with another of the same person", async () => {
+  const { cloud, db } = setup();
+  await cloud._loadEmployees();
+  await cloud.setLoan(["e1"], "b2", D(3), D(5));
+  cloud.data.loans = [];   // a browser that has not seen that loan yet
+  await assert.rejects(cloud.setLoan(["e1"], "b3", D(5), D(6)), /changed somewhere else/);
+  assert.deepEqual(loans(db, "e1"), [["b2", D(3), D(5)]]);
+  await cloud.setLoan(["e1"], "b3", D(6), D(7));   // the next day is free
+  await cloud.setLoan(["e2"], "b2", D(3), D(5));   // someone else on the same days is fine
+  assert.deepEqual(loans(db, "e1"), [["b2", D(3), D(5)], ["b3", D(6), D(7)]]);
+});
