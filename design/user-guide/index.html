@@ -123,6 +123,9 @@ figure.shot.phone button { border-radius: 16px; max-width: 220px; margin: 0 auto
 figure.shot img { display: block; width: 100%; height: auto; }
 figure.shot figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
 figure.shot.phone figcaption { text-align: center; }
+.install-icon { display: flex; align-items: center; gap: 14px; margin: 0 0 16px; font-size: 15px; color: var(--muted); }
+.install-icon img { flex: none; border-radius: 14px; box-shadow: 0 2px 6px rgba(16, 24, 40, .18); }
+.install-icon b { color: var(--fg); font-family: var(--font-display); }
 .lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(10, 20, 35, .88); display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); cursor: zoom-out; }
 .lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
 .lightbox button { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); font: 600 15px var(--font-display); background: #fff; color: var(--navy); border: 0; border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
@@ -162,6 +165,7 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <li><a href="#forgot"><span class="th">ลืมรหัสผ่าน</span><span class="en">Forgotten password</span></a></li>
         <li><a href="#around"><span class="th">รู้จักหน้าจอ</span><span class="en">Finding your way</span></a></li>
         <li><a href="#language"><span class="th">เปลี่ยนภาษา</span><span class="en">Switching language</span></a></li>
+        <li><a href="#install"><span class="th">ติดตั้งบน Android</span><span class="en">Install on Android</span></a></li>
         <li class="grp"><span class="th">บอร์ดประจำวัน</span><span class="en">The daily board</span></li>
         <li><a href="#board"><span class="th">บอร์ดและวันที่</span><span class="en">Boards and dates</span></a></li>
         <li><a href="#missions"><span class="th">มิชชั่น</span><span class="en">Missions</span></a></li>
@@ -312,6 +316,45 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
       <p class="en">Names people typed (employees, hosts, customers, notes) stay as written. For employee names on the cards, use the <b>Names</b> selector in the board toolbar (Thai / English / Thai + English).</p>
     
       <div class="shots row"><figure class="shot" data-shot="account-menu"><figcaption><span class="th">เมนูบัญชีบนคอมพิวเตอร์: ภาษา ตั้งค่า ออกจากระบบ</span><span class="en">The account menu on a computer: Language, Settings, Sign out</span></figcaption></figure><figure class="shot phone" data-shot="phone-me"><figcaption><span class="th">เมนู Me บนโทรศัพท์</span><span class="en">Me on a phone</span></figcaption></figure></div>
+    </section>
+
+    <section id="install">
+      <h2><span class="th">ติดตั้งเป็นแอปบนโทรศัพท์ Android</span><span class="en">Install it as an app on an Android phone</span></h2>
+      <p class="lede"><span class="th">ไม่ต้องโหลดจาก Play Store: ติดตั้งจาก Chrome ได้เลย จะได้ไอคอน Manpower Board บนหน้าจอหลัก เปิดแบบเต็มจอเหมือนแอป และอัปเดตเองทุกครั้งที่เปิด</span><span class="en">No Play Store needed: install it from Chrome. You get a Manpower Board icon on your home screen, it opens full screen like an app, and it updates itself every time you open it.</span></p>
+      <div class="install-icon">
+        <img src="img/app-icon.png" width="64" height="64" alt="">
+        <span><b class="th">ไอคอนที่จะได้</b><b class="en">The icon you get</b><br><span class="th">Manpower Board · สี่เหลี่ยม 4 ช่องบนพื้นน้ำเงิน</span><span class="en">Manpower Board · four tiles on TRIGO blue</span></span>
+      </div>
+      <ol class="steps th">
+        <li><div>เปิดลิงก์เข้าระบบด้วย <b>Chrome</b>
+          <ul class="sub">
+            <li>ถ้ากดลิงก์จาก <b>LINE</b> ลิงก์จะเปิดในเบราว์เซอร์ของ LINE ซึ่งติดตั้งไม่ได้ ให้กด <b>⋮</b> มุมขวาบน แล้วเลือก <b>เปิดในเบราว์เซอร์อื่น</b> <span class="alt">Open in other app</span> → Chrome</li>
+            <li>หรือคัดลอกลิงก์ แล้ววางในช่องที่อยู่ของ Chrome</li>
+          </ul></div></li>
+        <li><div>กด <b>⋮</b> (สามจุด) มุมขวาบนของ Chrome</div></li>
+        <li><div>กด <b>ติดตั้งแอป</b> <span class="alt">Install app</span> หรือ <b>เพิ่มลงในหน้าจอหลัก</b> <span class="alt">Add to Home screen</span> (ชื่อเมนูต่างกันตามรุ่นของ Chrome)</div></li>
+        <li><div>ถ้ามีให้เลือก ให้เลือก <b>ติดตั้ง</b> <span class="alt">Install</span> (ไม่ใช่ “สร้างทางลัด” / Create shortcut) แล้วกด <b>ติดตั้ง</b> อีกครั้งเพื่อยืนยัน</div></li>
+        <li><div>รอสักครู่ ไอคอน <b>Manpower Board</b> จะอยู่บนหน้าจอหลักหรือในลิ้นชักแอป</div></li>
+        <li><div>เปิดจากไอคอน แล้ว<a href="#signin">เข้าสู่ระบบ</a>ถ้าระบบถาม <span class="done">ใช้งานได้เลย ✓</span></div></li>
+      </ol>
+      <ol class="steps en">
+        <li><div>Open the app link in <b>Chrome</b>.
+          <ul class="sub">
+            <li>A link tapped in <b>LINE</b> opens in LINE's own browser, which can't install apps. Tap <b>⋮</b> top right and choose <b>Open in other app</b> (or <b>Open in browser</b>) → Chrome.</li>
+            <li>Or copy the link and paste it into Chrome's address bar.</li>
+          </ul></div></li>
+        <li><div>Tap <b>⋮</b> (three dots) at the top right of Chrome.</div></li>
+        <li><div>Tap <b>Install app</b> or <b>Add to Home screen</b> (the name depends on your Chrome version).</div></li>
+        <li><div>If you're given a choice, pick <b>Install</b> (not <b>Create shortcut</b>), then tap <b>Install</b> again to confirm.</div></li>
+        <li><div>After a moment the <b>Manpower Board</b> icon appears on your home screen or in the app drawer.</div></li>
+        <li><div>Open it from the icon and <a href="#signin">sign in</a> if asked. <span class="done">You're ready ✓</span></div></li>
+      </ol>
+      <div class="note th"><b>Chrome อาจขึ้นแถบ “ติดตั้ง Manpower Board”</b> ด้านล่างจอเอง กดแถบนั้นแทนข้อ 2–4 ได้เลย</div>
+      <div class="note en"><b>Chrome may offer "Install Manpower Board"</b> in a bar at the bottom of the screen on its own. Tapping it does the same as steps 2–4.</div>
+      <div class="note th"><b>ใช้ Samsung Internet?</b> กด <b>≡</b> ด้านล่าง → <b>เพิ่มหน้าลงใน</b> <span class="alt">Add page to</span> → <b>หน้าจอหลัก</b> <span class="alt">Home screen</span></div>
+      <div class="note en"><b>Using Samsung Internet?</b> Tap <b>≡</b> at the bottom → <b>Add page to</b> → <b>Home screen</b>.</div>
+      <div class="ok th"><b>อยากลบ?</b> กดไอคอนค้างไว้ แล้วเลือก <b>ถอนการติดตั้ง</b> <span class="alt">Uninstall</span> ไม่มีข้อมูลหายเพราะข้อมูลทั้งหมดอยู่บนเซิร์ฟเวอร์ · <b>iPhone</b>: เปิดลิงก์ใน Safari → ปุ่มแชร์ → <b>เพิ่มไปยังหน้าจอโฮม</b></div>
+      <div class="ok en"><b>Want to remove it?</b> Press and hold the icon and choose <b>Uninstall</b>. Nothing is lost: all the data lives on the server. · <b>iPhone</b>: open the link in Safari → the Share button → <b>Add to Home Screen</b>.</div>
     </section>
 
     <p class="part"><span class="th">บอร์ดประจำวัน</span><span class="en">The daily board</span></p>
@@ -739,7 +782,7 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
           <li>กดค้างที่หัวการ์ดมิชชั่นเพื่อเปิดเมนูด่วน</li>
           <li>กำลังรองรับบนโทรศัพท์แสดง<b>ทีละโฮสต์</b> ใช้ปุ่ม − / + ปรับตัวเลข</li>
         </ul>
-        <div class="note"><b>เพิ่มไว้ที่หน้าจอหลัก</b>: เปิดลิงก์ในเบราว์เซอร์ แล้วเลือก “เพิ่มไปยังหน้าจอหลัก” จะได้ไอคอน Manpower Board เหมือนแอป</div>
+        <div class="note"><b>ติดตั้งเป็นแอป</b>: ดูขั้นตอนที่ <a href="#install">ติดตั้งบน Android</a> จะได้ไอคอน Manpower Board บนหน้าจอหลัก</div>
       </div>
       <div class="en">
         <ul class="plain">
@@ -750,7 +793,7 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
           <li>Hold a mission's header for its quick panel.</li>
           <li>Capacity on a phone shows <b>one host at a time</b>, with − / + steppers.</li>
         </ul>
-        <div class="note"><b>Add it to your home screen</b>: open the link in your browser and choose "Add to Home Screen" to get a Manpower Board icon like an app.</div>
+        <div class="note"><b>Install it as an app</b>: see <a href="#install">Install on Android</a> for a Manpower Board icon on your home screen.</div>
       </div>
     
       <div class="shots row phones"><figure class="shot phone" data-shot="phone-board"><figcaption><span class="th">บอร์ด</span><span class="en">The board</span></figcaption></figure><figure class="shot phone" data-shot="phone-drawer"><figcaption><span class="th">ลิ้นชักคนว่าง</span><span class="en">The people drawer</span></figcaption></figure><figure class="shot phone" data-shot="phone-more"><figcaption><span class="th">เมนู ⋯</span><span class="en">The ⋯ menu</span></figcaption></figure><figure class="shot phone" data-shot="phone-overview"><figcaption><span class="th">ภาพรวม</span><span class="en">Overview</span></figcaption></figure><figure class="shot phone" data-shot="phone-manpower"><figcaption><span class="th">กำลังคน</span><span class="en">Manpower</span></figcaption></figure><figure class="shot phone" data-shot="phone-me"><figcaption><span class="th">เมนู Me</span><span class="en">Me</span></figcaption></figure></div>
