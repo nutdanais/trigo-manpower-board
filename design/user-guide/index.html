@@ -111,6 +111,21 @@ td.y { color: var(--navy); font-weight: 600; } td.v { color: var(--muted); } td.
 .faq dt { font-family: var(--font-display); font-weight: 600; margin-top: 12px; }
 .faq dd { margin: 2px 0 0; color: var(--fg); }
 .totop { display: inline-block; margin-top: 8px; font-size: 14px; }
+/* Screenshots: one <img> per language, only the shown one loads (lazy). Click opens it full size. */
+.shots { display: grid; gap: 14px; margin: 16px 0 4px; }
+.shots.row { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: start; }
+.shots.small { grid-template-columns: repeat(auto-fit, minmax(220px, 300px)); }
+.shots.phones { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+figure.shot { margin: 16px 0 4px; min-width: 0; }
+.shots figure.shot { margin: 0; }
+figure.shot button { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); cursor: zoom-in; box-shadow: 0 1px 3px rgba(16, 24, 40, .08); }
+figure.shot.phone button { border-radius: 16px; max-width: 220px; margin: 0 auto; }
+figure.shot img { display: block; width: 100%; height: auto; }
+figure.shot figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+figure.shot.phone figcaption { text-align: center; }
+.lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(10, 20, 35, .88); display: flex; align-items: center; justify-content: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); cursor: zoom-out; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; }
+.lightbox button { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); font: 600 15px var(--font-display); background: #fff; color: var(--navy); border: 0; border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
 footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 28px; }
 @media (max-width: 420px) { section { padding: 18px 14px; } body { font-size: 16px; } }
 </style>
@@ -128,7 +143,7 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
       </div>
     </div>
     <h1><span class="th">คู่มือการใช้งาน Manpower Board</span><span class="en">Manpower Board user guide</span></h1>
-    <p class="sub-h1"><span class="th">ตั้งแต่เข้าสู่ระบบครั้งแรก ไปจนถึงการใช้งานทุกส่วนของแอป: บอร์ด ภาพรวม กำลังรองรับ ผังองค์กร รายชื่อพนักงาน โฮสต์ การส่งออก และการตั้งค่า</span><span class="en">From your first sign-in to every part of the app: the board, Overview, Capacity, Org Chart, the Manpower and Host lists, exporting and Settings.</span></p>
+    <p class="sub-h1"><span class="th">ตั้งแต่เข้าสู่ระบบครั้งแรก ไปจนถึงการใช้งานทุกส่วนของแอป: บอร์ด ภาพรวม กำลังรองรับ ผังองค์กร รายชื่อพนักงาน โฮสต์ การส่งออก และการตั้งค่า ภาพหน้าจอทั้งหมดใช้ข้อมูลตัวอย่าง ไม่ใช่ข้อมูลจริง กดที่ภาพเพื่อดูขนาดเต็ม</span><span class="en">From your first sign-in to every part of the app: the board, Overview, Capacity, Org Chart, the Manpower and Host lists, exporting and Settings. The screenshots use sample data, not real people. Tap a picture to see it full size.</span></p>
     <div class="link-row">
       <span><span class="th">ลิงก์เข้าระบบ</span><span class="en">App link</span></span>
       <a id="app-link" href="https://trigoth-manpowerboard.netlify.app/" target="_blank" rel="noopener">https://trigoth-manpowerboard.netlify.app/</a>
@@ -208,6 +223,7 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <li><div>Once an admin has approved you, come back, enter your <span class="field">Email</span> and <span class="field">Password</span> and press <span class="btn main">Sign in</span>.</div></li>
         <li><div class="done">You're in ✓</div></li>
       </ol>
+      <div class="shots row small"><figure class="shot" data-shot="signin"><figcaption><span class="th">หน้าเข้าสู่ระบบ: กด Request access ด้านล่าง</span><span class="en">The sign-in screen: Request access is at the bottom</span></figcaption></figure><figure class="shot" data-shot="request"><figcaption><span class="th">แบบฟอร์มขอสิทธิ์เข้าใช้งาน</span><span class="en">The Request access form</span></figcaption></figure></div>
       <div class="note th"><b>เข้าสู่ระบบแล้วขึ้นว่า</b> <span class="screen-msg">Your request is in. An admin still has to approve it…</span> แสดงว่ายังรออนุมัติ กด <span class="btn main">Sign out</span> แล้วลองใหม่หลังผู้ดูแลอนุมัติ</div>
       <div class="note en"><b>Signed in and see</b> <span class="screen-msg">Your request is in. An admin still has to approve it…</span>? You're still waiting for approval. Press <span class="btn main">Sign out</span> and try again once an admin has approved you.</div>
       <div class="warn th"><b>หากขึ้นว่า</b> <span class="screen-msg">That address can't be used…</span> แสดงว่าอีเมลไม่ใช่ @trigo-group.com</div>
@@ -226,6 +242,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <li><div>Type it in <span class="field">New password</span> and again in <span class="field">Repeat it</span> (at least 8 characters).</div></li>
         <li><div>Press <span class="btn main">Save password</span>. <span class="done">You're in ✓</span></div></li>
       </ol>
+    
+      <div class="shots row small"><figure class="shot" data-shot="reset"><figcaption><span class="th">หน้า Set a new password หลังเข้าสู่ระบบด้วยรหัสชั่วคราว</span><span class="en">Set a new password, after signing in with a temporary password</span></figcaption></figure></div>
     </section>
 
     <section id="forgot">
@@ -274,6 +292,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
       </div>
       <div class="note th"><b>บนโทรศัพท์</b> แท็บอยู่ที่แถบสีน้ำเงินด้านล่าง ดู <a href="#phone">ใช้งานบนโทรศัพท์</a></div>
       <div class="note en"><b>On a phone</b> the tabs are in the navy bar at the bottom. See <a href="#phone">On a phone</a>.</div>
+    
+      <figure class="shot" data-shot="board"><figcaption><span class="th">บอร์ดบนคอมพิวเตอร์: แท็บโมดูลด้านบน ตัวเลขของวัน ช่องการลา การ์ดมิชชั่น และแผงคนว่างด้านขวา</span><span class="en">The board on a computer: module tabs on top, the day's numbers, leave tabs, mission cards and the free-people panel on the right</span></figcaption></figure>
     </section>
 
     <section id="language">
@@ -290,6 +310,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
       </ol>
       <p class="th">ชื่อที่ผู้ใช้พิมพ์ไว้ (พนักงาน โฮสต์ ลูกค้า หมายเหตุ) แสดงตามที่พิมพ์ ส่วนชื่อพนักงานบนการ์ดเลือกได้ที่ตัวเลือก <b>ชื่อ</b> (ไทย / อังกฤษ / ไทย + อังกฤษ) ในแถบเครื่องมือบอร์ด</p>
       <p class="en">Names people typed (employees, hosts, customers, notes) stay as written. For employee names on the cards, use the <b>Names</b> selector in the board toolbar (Thai / English / Thai + English).</p>
+    
+      <div class="shots row"><figure class="shot" data-shot="account-menu"><figcaption><span class="th">เมนูบัญชีบนคอมพิวเตอร์: ภาษา ตั้งค่า ออกจากระบบ</span><span class="en">The account menu on a computer: Language, Settings, Sign out</span></figcaption></figure><figure class="shot phone" data-shot="phone-me"><figcaption><span class="th">เมนู Me บนโทรศัพท์</span><span class="en">Me on a phone</span></figcaption></figure></div>
     </section>
 
     <p class="part"><span class="th">บอร์ดประจำวัน</span><span class="en">The daily board</span></p>
@@ -333,6 +355,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
           <li><b>Fix</b>: <span class="btn">Undo</span> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>) · <span class="btn">Reset Board</span> · <span class="btn">Export</span></li>
         </ul>
       </div>
+    
+      <figure class="shot" data-shot="topbar"><figcaption><span class="th">มุมขวาบน: ล็อก วันหยุด เลือกวันที่ (‹ ›) และเมนูบัญชี</span><span class="en">Top right: Lock, Holiday, the date with ‹ ›, and the account menu</span></figcaption></figure>
     </section>
 
     <!-- ===================== MISSIONS ===================== -->
@@ -380,6 +404,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <h3>Hide instead of delete</h3>
         <p><span class="btn">Hide/Unhide</span> takes a paused mission off the board without deleting it. Its crew returns to Standby and it stays hidden on later days until you unhide it. The button carries an <span class="chip amber">amber</span> count of missions with no crew.</p>
       </div>
+    
+      <div class="shots row"><figure class="shot" data-shot="new-mission"><figcaption><span class="th">หน้าต่างมิชชั่นใหม่</span><span class="en">The New Mission form</span></figcaption></figure><figure class="shot" data-shot="mission-menu"><figcaption><span class="th">คลิกขวาที่มิชชั่นเพื่อเปิดเมนูด่วน</span><span class="en">Right-click a mission for its quick panel</span></figcaption></figure></div>
     </section>
 
     <!-- ===================== PEOPLE ===================== -->
@@ -417,6 +443,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <h3>New employees and leavers</h3>
         <p><span class="btn">+ New Employee</span>: Thai name (full name, no ID in it), English name (optional), TRIGO ID, contract type, service area. For someone who has left, <b>Deactivate</b> (right-click → Deactivate) instead of deleting: they leave the board from that day, and earlier days keep them.</p>
       </div>
+    
+      <div class="shots row"><figure class="shot" data-shot="people"><figcaption><span class="th">แผงคนว่าง: ค้นหา สแตนด์บาย ออนคอลที่ว่าง และคนที่ให้ยืมออกไป</span><span class="en">The free-people panel: search, Standby, Available On-call and Lent out</span></figcaption></figure><figure class="shot" data-shot="emp-menu"><figcaption><span class="th">คลิกขวาที่การ์ดพนักงาน</span><span class="en">Right-click an employee card</span></figcaption></figure></div>
     </section>
 
     <!-- ===================== LOANS ===================== -->
@@ -442,6 +470,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         </ol>
         <p>Moving someone <b>for good</b> is in Edit Employee, or right-click in the Manpower list → Move to board.</p>
       </div>
+    
+      <div class="shots row small"><figure class="shot" data-shot="lend"><figcaption><span class="th">หน้าต่างให้ยืมไปบอร์ดอื่น</span><span class="en">The Lend to board dialog</span></figcaption></figure></div>
     </section>
 
     <!-- ===================== FINISH ===================== -->
@@ -488,6 +518,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
           <li>When a forecast day becomes the next working day, the planner uses <span class="btn">Review &amp; merge</span> to compare the carry-over and the forecast person by person. Anything not used alerts its forecaster.</li>
         </ul>
       </div>
+    
+      <figure class="shot" data-shot="forecast"><figcaption><span class="th">วันคาดการณ์: การ์ดเส้นประ แถบ Forecast และปุ่มคัดลอกจากแผนที่ยืนยัน</span><span class="en">A forecast day: dashed cards, the Forecast banner and Copy from confirmed…</span></figcaption></figure>
     </section>
 
     <p class="part"><span class="th">โมดูลอื่น</span><span class="en">Other modules</span></p>
@@ -518,6 +550,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         </ul>
         <div class="note"><b>How utilization is counted</b>: assigned ÷ (headcount − leave − holiday − free on-call). On-call staff who weren't called don't pull the figure down.</div>
       </div>
+    
+      <figure class="shot" data-shot="overview"><figcaption><span class="th">ภาพรวม: เลือกบอร์ด การ์ดแจ้งเตือน ตัวเลขหลัก และแยกตามบอร์ด</span><span class="en">Overview: board selector, attention card, KPI tiles and By board</span></figcaption></figure><figure class="shot" data-shot="overview-more"><figcaption><span class="th">เลื่อนลง: แยกตามวิศวกร แยกตามพื้นที่บริการ กะ และความครอบคลุมของโฮสต์</span><span class="en">Further down: By engineer, By service area, Shifts and Host coverage</span></figcaption></figure>
     </section>
 
     <!-- ===================== CAPACITY ===================== -->
@@ -544,6 +578,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <p>It works like a spreadsheet: drag to select, <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> (to and from Excel), <kbd>Delete</kbd> to clear, right-click a cell to fill to the end of the week. Nothing here <b>changes a board</b>.</p>
         <div class="warn"><b>Reset to 0</b> (in the ⋯ menu) sets every number from today on to 0. It can't be undone, so export first.</div>
       </div>
+    
+      <figure class="shot" data-shot="capacity"><figcaption><span class="th">กำลังรองรับ: แถบ Gap ด้านบน และตัวเลขต่อโฮสต์ต่อวันด้านล่าง</span><span class="en">Capacity: the gap drawn on top, and each host's numbers per day below</span></figcaption></figure>
     </section>
 
     <!-- ===================== ORG CHART ===================== -->
@@ -557,6 +593,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <p>Shows board → engineer → service area → mission → crew for the date shown, as an <b>Outline</b> or a pan-and-zoom <b>chart</b>. Everyone not on a mission sits in a Standby / Leave pool under each board.</p>
         <p>Filter by Board, Engineer, Service area and Standby / Leave (<b>None</b> for missions only). Export as JPG or PDF. This tab is view only.</p>
       </div>
+    
+      <figure class="shot" data-shot="orgchart"><figcaption><span class="th">ผังองค์กรแบบโครงร่าง</span><span class="en">The Org Chart as an outline</span></figcaption></figure>
     </section>
 
     <!-- ===================== MANPOWER ===================== -->
@@ -594,6 +632,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         </ol>
         <p>People missing from the file are <b>never deleted</b> (set Status to Inactive instead), and a backup of the current list is downloaded first. Uploading that backup is the undo.</p>
       </div>
+    
+      <figure class="shot" data-shot="manpower"><figcaption><span class="th">รายชื่อพนักงาน พร้อมตัวกรองและ 30D utilization</span><span class="en">The Manpower list with its filters and 30D utilization</span></figcaption></figure>
     </section>
 
     <!-- ===================== HOST ===================== -->
@@ -619,6 +659,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
           <li><b>Renaming</b> a host also renames it on every past mission (it asks first).</li>
         </ul>
       </div>
+    
+      <figure class="shot" data-shot="host"><figcaption><span class="th">รายชื่อโฮสต์: ที่ตั้ง พื้นที่บริการ หมายเหตุ และผู้ตรวจที่เคยไป</span><span class="en">The Host list: location, service area, note and the inspectors who have worked there</span></figcaption></figure>
     </section>
 
     <!-- ===================== EXPORT ===================== -->
@@ -650,6 +692,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         <div class="ok"><b>Keep it sharp in LINE</b>: send the PDF or JPG <b>as a file</b>, not as a photo. Chat apps shrink photos until they blur.</div>
         <p style="margin-top:12px">Forecast days have no Export. An exported board is always three cards wide, whatever screen you export from.</p>
       </div>
+    
+      <div class="shots row small"><figure class="shot" data-shot="export"><figcaption><span class="th">หน้าต่างส่งออก: เลือกชนิดไฟล์ก่อน</span><span class="en">The Export dialog starts with the file type</span></figcaption></figure></div>
     </section>
 
     <!-- ===================== SETTINGS ===================== -->
@@ -677,6 +721,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
           <li><b>Roles &amp; permissions</b> (admins) — a grid of roles × areas, each cell Edit / View / Off. <b>Review changes</b> shows a before / after before anything is saved.</li>
         </ul>
       </div>
+    
+      <figure class="shot" data-shot="users"><figcaption><span class="th">ตั้งค่า → ผู้ใช้: คำขอที่รออนุมัติอยู่ด้านบน</span><span class="en">Settings → Users: access requests wait at the top</span></figcaption></figure><figure class="shot" data-shot="roles"><figcaption><span class="th">ตั้งค่า → บทบาทและสิทธิ์</span><span class="en">Settings → Roles & permissions</span></figcaption></figure>
     </section>
 
     <p class="part"><span class="th">อ้างอิง</span><span class="en">Reference</span></p>
@@ -706,6 +752,8 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
         </ul>
         <div class="note"><b>Add it to your home screen</b>: open the link in your browser and choose "Add to Home Screen" to get a Manpower Board icon like an app.</div>
       </div>
+    
+      <div class="shots row phones"><figure class="shot phone" data-shot="phone-board"><figcaption><span class="th">บอร์ด</span><span class="en">The board</span></figcaption></figure><figure class="shot phone" data-shot="phone-drawer"><figcaption><span class="th">ลิ้นชักคนว่าง</span><span class="en">The people drawer</span></figcaption></figure><figure class="shot phone" data-shot="phone-more"><figcaption><span class="th">เมนู ⋯</span><span class="en">The ⋯ menu</span></figcaption></figure><figure class="shot phone" data-shot="phone-overview"><figcaption><span class="th">ภาพรวม</span><span class="en">Overview</span></figcaption></figure><figure class="shot phone" data-shot="phone-manpower"><figcaption><span class="th">กำลังคน</span><span class="en">Manpower</span></figcaption></figure><figure class="shot phone" data-shot="phone-me"><figcaption><span class="th">เมนู Me</span><span class="en">Me</span></figcaption></figure></div>
     </section>
 
     <!-- ===================== ROLES ===================== -->
@@ -787,6 +835,37 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
   syncToc();
   if (mq.addEventListener) mq.addEventListener('change', syncToc);
   d.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { if (!mq.matches) d.open = false; }); });
+
+  // Screenshots: an <img> per language inside a button; the hidden language's lazy image never loads
+  document.querySelectorAll('figure.shot').forEach(function (f) {
+    var name = f.getAttribute('data-shot'), cap = f.querySelector('figcaption');
+    var b = document.createElement('button');
+    b.type = 'button';
+    ['th', 'en'].forEach(function (l) {
+      var img = document.createElement('img');
+      img.className = l; img.loading = 'lazy'; img.decoding = 'async';
+      img.src = 'img/' + name + '.' + l + '.jpg';
+      img.alt = cap.querySelector('.' + l).textContent;
+      b.appendChild(img);
+    });
+    b.setAttribute('aria-label', 'Open full size / ดูภาพขนาดเต็ม');
+    b.addEventListener('click', function () { openBox(b.querySelector('img.' + (root.classList.contains('ui-en') ? 'en' : 'th'))); });
+    f.insertBefore(b, cap);
+  });
+  var box = null, lastBtn = null;
+  function closeBox() { if (box) { box.remove(); box = null; if (lastBtn) lastBtn.focus(); } }
+  function openBox(img) {
+    lastBtn = img.parentNode;
+    box = document.createElement('div');
+    box.className = 'lightbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', img.alt);
+    var big = document.createElement('img'); big.src = img.src; big.alt = img.alt;
+    var x = document.createElement('button'); x.type = 'button';
+    x.textContent = root.classList.contains('ui-en') ? 'Close ✕' : 'ปิด ✕';
+    box.appendChild(big); box.appendChild(x);
+    box.addEventListener('click', closeBox);
+    document.body.appendChild(box); x.focus();
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeBox(); });
 
   document.getElementById('copy-btn').addEventListener('click', function () {
     var btn = this, link = document.getElementById('app-link'), url = link.textContent, was = btn.innerHTML;
