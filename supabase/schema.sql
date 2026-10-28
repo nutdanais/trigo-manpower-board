@@ -97,8 +97,9 @@ create table if not exists missions (
   ppe text,
   remark text,
   hidden boolean not null default false,
-  -- highlighted on the board: 'new' customer, 'focus' activity or 'other' with a
-  -- short note (migration-2026-10-28-mission-highlight.sql)
+  -- highlighted on the board: 'new' customer, 'focus' activity, 'short' (not enough
+  -- manpower) or 'other' with a short note (migration-2026-10-28-mission-highlight.sql,
+  -- migration-2026-10-28b-highlight-not-enough-manpower.sql)
   highlight text,
   highlight_note text,
   engineer_id uuid references engineers(id) on delete set null,
@@ -115,11 +116,9 @@ begin
 -- safe to run more than once
 exception when duplicate_object or duplicate_table then null;
 end $$;
-do $$
-begin
-  alter table missions add constraint missions_highlight_kind check (highlight in ('new', 'focus', 'other'));
-exception when duplicate_object then null;
-end $$;
+-- dropped and re-added, so a re-run also widens an older list of reasons
+alter table missions drop constraint if exists missions_highlight_kind;
+alter table missions add constraint missions_highlight_kind check (highlight in ('new', 'focus', 'short', 'other'));
 do $$
 begin
   alter table missions add constraint missions_highlight_note_len check (char_length(highlight_note) <= 40);

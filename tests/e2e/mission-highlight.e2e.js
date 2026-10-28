@@ -51,7 +51,7 @@ async function step(name, fn) {
       const labels = await menuLabels();
       assert.equal(labels[labels.indexOf("Crew") + 1], "Highlight");
       await item("Highlight").click();
-      assert.deepEqual(await menuLabels(), ["Highlight", "New customer", "Focus activity", "Other…"]);
+      assert.deepEqual(await menuLabels(), ["Highlight", "New customer", "Focus activity", "Not enough manpower", "Other…"]);
       await p.keyboard.press("Escape");
     });
 
@@ -77,12 +77,25 @@ async function step(name, fn) {
 
     await step("the submenu ticks the current reason and offers Remove highlight", async () => {
       await openHighlight("101");
-      assert.deepEqual(await menuLabels(), ["Highlight", "New customer", "Focus activity", "Other…", "Remove highlight"]);
+      assert.deepEqual(await menuLabels(), ["Highlight", "New customer", "Focus activity", "Not enough manpower", "Other…", "Remove highlight"]);
       assert.equal(await item("New customer").evaluate((el) => el.classList.contains("ctx-on")), true);
       assert.equal(await item("Focus activity").evaluate((el) => el.classList.contains("ctx-on")), false);
       await item("Focus activity").click();
       await p.waitForFunction(() => document.querySelector(".mission-card.hl .m-hl-text")?.textContent === "Focus activity");
       assert.equal(row("s101").highlight, "focus");
+    });
+
+    await step("Not enough manpower is a reason of its own, with the same look", async () => {
+      await openHighlight("102");
+      await item("Not enough manpower").click();
+      await tag("102").waitFor();
+      assert.equal(row("s102").highlight, "short");
+      assert.equal(await tag("102").innerText(), "Not enough manpower");
+      assert.equal(await card("102").evaluate((el) => getComputedStyle(el).borderLeftColor), "rgb(227, 160, 8)");
+      await openHighlight("102");
+      assert.equal(await item("Not enough manpower").evaluate((el) => el.classList.contains("ctx-on")), true);
+      await item("Remove highlight").click();
+      await tag("102").waitFor({ state: "detached" });
     });
 
     await step("a night card gets the same frame and tag", async () => {
@@ -207,7 +220,7 @@ async function step(name, fn) {
       await menu.waitFor();
       await menu.locator(".ctx-sub", { hasText: "ไฮไลต์" }).click();
       const sub = (await menuLabels()).join("|");
-      assert.equal(sub, "ไฮไลต์|ลูกค้าใหม่|งานที่ต้องเน้น|อื่นๆ…|เอาไฮไลต์ออก");
+      assert.equal(sub, "ไฮไลต์|ลูกค้าใหม่|งานที่ต้องเน้น|กำลังคนไม่พอ|อื่นๆ…|เอาไฮไลต์ออก");
       await menu.locator(".ctx-item", { hasText: "อื่นๆ…" }).click();
       await p.locator("#modal-highlight:not(.hidden)").waitFor();
       const shown = await p.evaluate(() => {
@@ -226,6 +239,27 @@ async function step(name, fn) {
 
     await step("no page errors", async () => {
       assert.deepEqual(a.errors, []);
+    });
+
+    await step("a database without migration-2026-10-28b: Not enough manpower says to run it, the others still work", async () => {
+      const mid = new h.FakeDb({ highlightShort: false });
+      h.seedBase(mid, { src: SRC });
+      const o = await env.openAs(mid, h.USERS.a);
+      await openDay(o.page, SRC);
+      const om = o.page.locator("#context-menu");
+      const pick = async (label) => {
+        await card("101", o.page).locator(".mission-header .m-line2").click({ button: "right" });
+        await om.locator(".ctx-sub", { hasText: "Highlight" }).click();
+        await om.locator(".ctx-item", { hasText: new RegExp("^" + label) }).click();
+      };
+      await pick("Not enough manpower");
+      await o.page.locator(".toast", { hasText: "migration-2026-10-28b-highlight-not-enough-manpower.sql" }).waitFor();
+      assert.equal(mid.t("missions").find((m) => m.id === "s101").highlight ?? null, null);
+      await pick("New customer");
+      await tag("101", o.page).waitFor();
+      assert.equal(mid.t("missions").find((m) => m.id === "s101").highlight, "new");
+      assert.deepEqual(o.errors.filter((e) => !/23514|check constraint|400/.test(e)), []);
+      await o.close();
     });
 
     await step("a database without migration-2026-10-28: the board works, no Highlight offered", async () => {
