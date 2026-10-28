@@ -98,7 +98,7 @@ async function step(name, fn) {
       await rightClick("101");
       assert.match(await menu.locator(".ctx-title").innerText(), /101 · Day · 2 crew/);
       assert.deepEqual(await menuLabels(), ["Edit mission", "Duplicate mission", "Move or copy to board", "Crew",
-        "Copy as text", "Open host location", "Hide mission", "Hide/Unhide missions…", "Delete mission"]);
+        "Highlight", "Copy as text", "Open host location", "Hide mission", "Hide/Unhide missions…", "Delete mission"]);
       await p.keyboard.press("Escape");
     });
 
