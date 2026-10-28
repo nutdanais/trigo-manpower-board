@@ -405,7 +405,7 @@ const state = {
   // restoreViewState() once cloud.init() has loaded both — that's the real value.
   date: defaultPlanningDate(),   // land on the next working day's plan, not today
   myEmail: null,   // set once at boot from cloud.getSession() — who to NOT toast about
-  filters: { engineer: [], host: [], customer: [], shift: [] },   // multi-select; [] = All
+  filters: { engineer: [], host: [], customer: [], shift: [], highlight: [] },   // multi-select; [] = All. highlight: ["on"] = Highlighted only
   sort: "number",                // default: sort by mission number on every board
   unlockedDates: new Set(),   // past/today dates the user confirmed they want to edit
   editingMissionId: null,
@@ -2887,6 +2887,7 @@ function missionMatchesFilters(m) {
   if (f.host.length && !f.host.includes(m.host)) return false;
   if (f.customer.length && !f.customer.includes(m.customer)) return false;
   if (f.shift.length && !f.shift.includes(m.shift)) return false;
+  if (f.highlight.length && !m.highlight) return false;
   return true;
 }
 
@@ -4767,6 +4768,12 @@ function renderFilterOptions() {
       pop.appendChild(row);
     }
   }
+  // Highlighted only: a switch, not a list, kept as a filter key so Clear, the
+  // count on Filter & sort and "matching cards first" treat it like the others.
+  // Hidden (and off) on a database without missions.highlight (migration-2026-10-28).
+  if (!feat().highlight) state.filters.highlight = [];
+  $("#filter-hl").classList.toggle("hidden", !feat().highlight);
+  $("#filter-hl-box").checked = state.filters.highlight.length > 0;
   $("#sort-by").value = state.sort;
   updateFilterBadge();
 }
@@ -14436,6 +14443,11 @@ function wireApp() {
     };
   }
   $("#sort-by").onchange = (e) => { state.sort = e.target.value; render(); };
+  $("#filter-hl-box").onchange = (e) => {
+    state.filters.highlight = e.target.checked ? ["on"] : [];
+    updateFilterBadge();
+    renderMissions();
+  };
 
   $("#btn-export").onclick = openExportModal;
   $("#card-names").value = state.cardNames;

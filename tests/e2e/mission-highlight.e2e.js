@@ -170,6 +170,37 @@ async function step(name, fn) {
       await v.close();
     });
 
+    await step("Filter & sort › Highlighted only fades the rest and puts highlighted cards first", async () => {
+      await p.click("#btn-filter-pop");
+      await p.locator("#filter-pop:not(.hidden)").waitFor();
+      assert.equal(await p.locator("#filter-hl").isVisible(), true);
+      assert.equal(await p.isChecked("#filter-hl-box"), false);
+      await p.click("#filter-hl");
+      assert.equal(await p.isChecked("#filter-hl-box"), true);
+      assert.equal(await p.locator("#filter-pop").isVisible(), true, "the popover stays open");
+      const dim = (num) => card(num).evaluate((el) => el.classList.contains("dimmed"));
+      assert.equal(await dim("101"), false);
+      assert.equal(await dim("102"), false);
+      assert.equal(await dim("103"), true);
+      assert.equal(await dim("102B"), true);
+      assert.equal(await p.locator("#filter-count").innerText(), "1");
+      const order = await p.locator("#missions-grid .mission-card .m-number").allInnerTexts();
+      assert.deepEqual(order.slice(0, 2).sort(), ["101", "102"]);
+      await p.click("#filter-hl");
+      assert.equal(await dim("103"), false);
+      assert.equal(await p.locator("#filter-count").isVisible(), false);
+      await p.keyboard.press("Escape");
+    });
+
+    await step("clearing every filter turns Highlighted only off too", async () => {
+      await p.evaluate(() => { state.filters.highlight = ["on"]; renderFilterOptions(); renderMissions(); });
+      assert.equal(await p.isChecked("#filter-hl-box"), true);
+      await p.evaluate(() => clearViewFilters());
+      assert.equal(await p.isChecked("#filter-hl-box"), false);
+      assert.deepEqual(await p.evaluate(() => state.filters.highlight), []);
+      assert.equal(await card("103").evaluate((el) => el.classList.contains("dimmed")), false);
+    });
+
     await step("in Thai: the submenu, the dialog and the tag are Thai; a typed note stays as typed", async () => {
       await p.evaluate(() => I18N.setLang("th"));
       await card("101").locator(".mission-header .m-line2").click({ button: "right" });
@@ -188,6 +219,7 @@ async function step(name, fn) {
       assert.deepEqual((shown.replace(/VIP|null|undefined/g, "").match(/[A-Za-z]{2,}/g) || []), []);
       await p.keyboard.press("Escape");
       assert.equal(await tag("101").innerText(), "งานที่ต้องเน้น");
+      assert.equal((await p.locator("#filter-hl .filter-hl-text").textContent()).trim(), "เฉพาะที่ไฮไลต์");
       assert.equal(await tag("102").innerText(), "VIP visit");
       await p.evaluate(() => I18N.setLang("en"));
     });
@@ -206,6 +238,8 @@ async function step(name, fn) {
       const labels = (await o.page.locator("#context-menu .ctx-item").allInnerTexts()).map((s) => s.trim());
       assert.equal(labels.includes("Highlight"), false);
       assert.equal(labels.includes("Crew"), true);
+      await o.page.keyboard.press("Escape");
+      assert.equal(await o.page.locator("#filter-hl").evaluate((el) => el.classList.contains("hidden")), true, "no Highlighted only switch");
       // the probe's failed read is expected; nothing else may go wrong
       assert.deepEqual(o.errors.filter((e) => !/highlight/.test(e)), []);
       await o.close();

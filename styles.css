@@ -1601,6 +1601,7 @@ body.fp-pools-empty { --fp-w: 264px; }
   .btn-small { min-height: 32px; }
   #topbar .btn-top { min-height: 34px; }
   .ms-btn, #filters select, #sort-by { min-height: 40px; }
+  #filter-pop .filter-hl { height: auto; min-height: 40px; }
   .ms-opt { padding: 9px 8px; }
   #emplist-table td.el-check input, #emplist-table th.el-check input { width: 22px; height: 22px; }
 
@@ -5555,6 +5556,11 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
 #filter-pop .ms-btn { width: 100%; justify-content: space-between; }
 #filter-pop .filter-sort { display: grid; gap: 4px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; font-weight: 600; color: var(--muted); }
 #filter-pop .filter-sort select { width: 100%; }
+/* Highlighted only: the label left, the switch right, the height of a filter button */
+#filter-pop .filter-hl { display: flex; justify-content: space-between; gap: 10px; height: var(--ctl-h); padding: 0 4px 0 11px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); font-size: 13px; font-weight: 600; color: var(--text); }
+#filter-pop .filter-hl-text { display: inline-flex; align-items: center; gap: 6px; }
+#filter-pop .filter-hl-text .ic { width: 14px; height: 14px; color: #b07c00; }
+#filter-pop .filter-hl .toggle-track { transform: scale(.85); }
 #filter-pop #filter-names .seg-pick { display: flex; width: 100%; }
 #filter-pop #filter-names .seg-pick button { flex: 1; }
 /* phone: the popover is just the open list inside the More dropdown */
@@ -6816,6 +6822,7 @@ label > .pk { margin-top: 5px; }
   body.oc-view.m-filter-open .oc-flabel { display: none; }
   /* each filter reads like a settings row: its name, then the value and a chevron */
   body.m-filter-open #filter-pop .ms-btn { min-height: 44px; font-size: 14px; }
+  body.m-filter-open #filter-pop .filter-hl { height: auto; min-height: 44px; font-size: 14px; }
 }
 
 /* 14 · Export is one decision (the file type, and for Excel the columns): a dialog

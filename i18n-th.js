@@ -2035,6 +2035,7 @@ I18N.add({
   "Focus activity": "งานที่ต้องเน้น",
   "Other…": "อื่นๆ…",
   "Remove highlight": "เอาไฮไลต์ออก",
+  "Highlighted only": "เฉพาะที่ไฮไลต์",
   "Highlight mission": "ไฮไลต์มิชชั่น",
   "Why is this mission highlighted?": "ทำไมจึงไฮไลต์มิชชั่นนี้",
   "e.g. VIP visit": "เช่น ลูกค้า VIP มาเยี่ยม",
