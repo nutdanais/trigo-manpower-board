@@ -47,6 +47,8 @@ class FakeDb {
     this.loans = opts.loans !== false;
     // migration-2026-10-28 (missions.highlight, highlight_note); { highlight: false } is a database without it
     this.highlight = opts.highlight !== false;
+    // migration-2026-10-28b ('short' allowed); { highlightShort: false } has the columns but the first list of reasons
+    this.highlightShort = this.highlight && opts.highlightShort !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -97,6 +99,9 @@ class FakeDb {
       }
       const noCol = this._missingColumn(q);
       if (noCol) return { data: null, error: noCol };
+      if (!this.highlightShort && q.table === "missions" && [].concat(q.values || []).some((v) => v && v.highlight === "short")) {
+        return { data: null, error: { code: "23514", message: 'new row for relation "missions" violates check constraint "missions_highlight_kind"' } };
+      }
       switch (q.op) {
         case "select": return this._select(q);
         case "insert": return this._write(q, user, false);

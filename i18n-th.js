@@ -2033,6 +2033,8 @@ I18N.add({
   "Highlight": "ไฮไลต์",
   "New customer": "ลูกค้าใหม่",
   "Focus activity": "งานที่ต้องเน้น",
+  "Not enough manpower": "กำลังคนไม่พอ",
+  "This reason needs a one-time database update (migration-2026-10-28b-highlight-not-enough-manpower.sql) before it can be used.": "ต้องอัปเดตฐานข้อมูลหนึ่งครั้ง (migration-2026-10-28b-highlight-not-enough-manpower.sql) ก่อนจึงจะใช้เหตุผลนี้ได้",
   "Other…": "อื่นๆ…",
   "Remove highlight": "เอาไฮไลต์ออก",
   "Highlighted only": "เฉพาะที่ไฮไลต์",

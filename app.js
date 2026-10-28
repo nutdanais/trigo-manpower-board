@@ -2561,6 +2561,7 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       m.highlight === key ? "ctx-on" : null, m.highlight === key ? "check" : ico);
     reason("new", "New customer", "star");
     reason("focus", "Focus activity", "star");
+    reason("short", "Not enough manpower", "star");
     reason("other", "Other…", "edit");
     if (m.highlight) {
       addSep();
@@ -2914,7 +2915,7 @@ const MISSION_TINT = 0.15;
    engineer colours, which already use every hue. "other" shows the note the
    engineer typed. design/mission-highlight-options.html has the options this
    was picked from (E). */
-const HIGHLIGHT_REASONS = { new: "New customer", focus: "Focus activity", other: "Other" };
+const HIGHLIGHT_REASONS = { new: "New customer", focus: "Focus activity", short: "Not enough manpower", other: "Other" };
 function highlightLabel(m) {
   return m.highlight === "other" ? (m.highlightNote || HIGHLIGHT_REASONS.other) : HIGHLIGHT_REASONS[m.highlight] || "";
 }

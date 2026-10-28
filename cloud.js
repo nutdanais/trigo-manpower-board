@@ -1094,8 +1094,8 @@ const cloud = {
   },
 
   /* Highlight one mission on its day, or clear it with highlight = null.
-     highlight is "new" (new customer), "focus" (focus activity) or "other",
-     which carries a short note. Nothing else copies it: Carry over, Duplicate,
+     highlight is "new" (new customer), "focus" (focus activity), "short" (not
+     enough manpower) or "other", which carries a short note. Nothing else copies it: Carry over, Duplicate,
      Copy to board and Copy from weekday all start without one, so a highlight
      belongs to the day it was set on. A move keeps it (same row). */
   async setMissionHighlight(missionId, highlight, note) {
@@ -1109,6 +1109,10 @@ const cloud = {
       const missingCol = this._missingColumnFromError(error);
       if (missingCol === "highlight" || missingCol === "highlight_note") {
         throw new Error("Highlighting missions needs a one-time database update (migration-2026-10-28-mission-highlight.sql) before it can be used.");
+      }
+      // a database that has the columns but not this reason yet (check_violation)
+      if (error.code === "23514" && /missions_highlight_kind/.test(error.message || "")) {
+        throw new Error("This reason needs a one-time database update (migration-2026-10-28b-highlight-not-enough-manpower.sql) before it can be used.");
       }
       throw error;
     }
