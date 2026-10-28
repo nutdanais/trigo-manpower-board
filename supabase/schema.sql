@@ -97,6 +97,10 @@ create table if not exists missions (
   ppe text,
   remark text,
   hidden boolean not null default false,
+  -- highlighted on the board: 'new' customer, 'focus' activity or 'other' with a
+  -- short note (migration-2026-10-28-mission-highlight.sql)
+  highlight text,
+  highlight_note text,
   engineer_id uuid references engineers(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -110,6 +114,16 @@ begin
 -- duplicate_object — catching only the latter broke this file's promise to be
 -- safe to run more than once
 exception when duplicate_object or duplicate_table then null;
+end $$;
+do $$
+begin
+  alter table missions add constraint missions_highlight_kind check (highlight in ('new', 'focus', 'other'));
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter table missions add constraint missions_highlight_note_len check (char_length(highlight_note) <= 40);
+exception when duplicate_object then null;
 end $$;
 
 -- ===== Assignments: where an employee is on a given date =====

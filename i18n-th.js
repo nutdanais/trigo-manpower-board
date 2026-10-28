@@ -2027,3 +2027,19 @@ I18N.add({
   "Its {num} past loan goes with it, so History counts those days on the lenders' own boards.": "การให้ยืมที่ผ่านมา {num} รายการจะถูกลบไปด้วย ประวัติจะนับวันเหล่านั้นที่บอร์ดของผู้ให้ยืม",
   "Its {num} past loans go with it, so History counts those days on the lenders' own boards.": "การให้ยืมที่ผ่านมา {num} รายการจะถูกลบไปด้วย ประวัติจะนับวันเหล่านั้นที่บอร์ดของผู้ให้ยืม"
 });
+
+/* Highlighting a mission: right-click → Highlight (2026-10-28) */
+I18N.add({
+  "Highlight": "ไฮไลต์",
+  "New customer": "ลูกค้าใหม่",
+  "Focus activity": "งานที่ต้องเน้น",
+  "Other…": "อื่นๆ…",
+  "Remove highlight": "เอาไฮไลต์ออก",
+  "Highlighted only": "เฉพาะที่ไฮไลต์",
+  "Highlight mission": "ไฮไลต์มิชชั่น",
+  "Why is this mission highlighted?": "ทำไมจึงไฮไลต์มิชชั่นนี้",
+  "e.g. VIP visit": "เช่น ลูกค้า VIP มาเยี่ยม",
+  "Shows on the card, up to 40 characters.": "แสดงบนการ์ด ไม่เกิน 40 ตัวอักษร",
+  "Say why, in a few words.": "บอกเหตุผลสั้นๆ",
+  "Highlighting missions needs a one-time database update (migration-2026-10-28-mission-highlight.sql) before it can be used.": "ต้องอัปเดตฐานข้อมูลหนึ่งครั้ง (migration-2026-10-28-mission-highlight.sql) ก่อนจึงจะไฮไลต์มิชชั่นได้"
+});

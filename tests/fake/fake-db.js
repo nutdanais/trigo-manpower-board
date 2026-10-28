@@ -45,6 +45,8 @@ class FakeDb {
     this.mergeLog = this.forwardPlanning && opts.mergeLog !== false;
     // migration-2026-10-20 (employee_loans); { loans: false } is a database without it
     this.loans = opts.loans !== false;
+    // migration-2026-10-28 (missions.highlight, highlight_note); { highlight: false } is a database without it
+    this.highlight = opts.highlight !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -73,12 +75,28 @@ class FakeDb {
       || (!this.loans && table === "employee_loans");
   }
 
+  /* A column-level migration not run yet: the errors Postgres / PostgREST give
+     for reading or writing a column that isn't there. Only the highlight columns
+     are emulated (the others predate every test). */
+  _missingColumn(q) {
+    if (this.highlight || q.table !== "missions") return null;
+    const col = ["highlight", "highlight_note"].find((c) =>
+      (typeof q.select === "string" && q.select.split(",").map((x) => x.trim()).includes(c))
+      || [].concat(q.values || []).some((v) => v && c in v));
+    if (!col) return null;
+    return q.op === "select"
+      ? { code: "42703", message: `column missions.${col} does not exist` }
+      : { code: "PGRST204", message: `Could not find the '${col}' column of 'missions' in the schema cache` };
+  }
+
   /* ---------- query execution ---------- */
   exec(q, user) {
     try {
       if (this._missing(q.table)) {
         return { data: null, error: { code: "PGRST205", message: `Could not find the table 'public.${q.table}' in the schema cache` } };
       }
+      const noCol = this._missingColumn(q);
+      if (noCol) return { data: null, error: noCol };
       switch (q.op) {
         case "select": return this._select(q);
         case "insert": return this._write(q, user, false);

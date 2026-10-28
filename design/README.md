@@ -146,3 +146,16 @@ proposals are live HTML with a little script (open a row, toggle a working day, 
 permission, approve a request). A comparison table and a recommendation (A as the base,
 with B's by-role permission editor and D's attention strip) close the page. Light only,
 like the app. Not loaded by the app.
+
+## Mission highlight options (2026-10-28)
+
+`mission-highlight-options.html` is a standalone, interactive page proposing how a
+mission card looks when engineers highlight it (new customer, focus activity, or
+another reason with a short note). It lists what the card already uses (engineer
+colour on the top edge and header, the night body, the filter fade, the amber jump
+outline), shows the new **Highlight** item in the card's existing right-click menu,
+then five looks on the same sample board: A Frame, B Reason ribbon, C Badge, D Side
+stripe, E Frame + tab (recommended), with a colour switcher (Gold, Rose, TRIGO green,
+Navy). Every board is live: right-click a card to set or remove its highlight. Uses
+borders, outer shadows and flat fills only, so it would survive the JPG export. Light
+only, like the app. Not loaded by the app.

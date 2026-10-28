@@ -83,7 +83,7 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false },
           /* employee_loans (migration-2026-10-20): [{id, employeeId, toBoardId,
              startDate, endDate, note, createdBy}] — see boardOn below */
           loans: [],
@@ -336,7 +336,10 @@ const cloud = {
     const mergeLog = forecast && stamps && (await probe("forecast_merge_decisions", "id"));
     // lending people to another board (migration-2026-10-20)
     const loans = await probe("employee_loans", "id");
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans };
+    // highlighting a mission (migration-2026-10-28): a column, not a table, but
+    // a missing column fails the same way, so the same probe tells
+    const highlight = await probe("missions", "highlight");
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight };
   },
 
   async _loadAreas() {
@@ -643,6 +646,7 @@ const cloud = {
         id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
         ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
+        highlight: m.highlight || null, highlightNote: m.highlight_note || "",
       };
       missionMap[m.id] = obj;
       plan.missions.push(obj);
@@ -783,6 +787,7 @@ const cloud = {
         id: "preview:" + m.number + "|" + m.shift, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
         ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
+        highlight: null, highlightNote: "",   // a carry never copies a highlight (setMissionHighlight)
       };
       if (byId[obj.id]) continue;   // a duplicate number+shift (pre-2026-07-15 data) carries once
       byId[obj.id] = obj;
@@ -1082,6 +1087,28 @@ const cloud = {
       const missingCol = this._missingColumnFromError(error);
       if (missingCol === "hidden") {
         throw new Error("Hiding missions needs a one-time database update (migration-2026-08-13-hidden-missions.sql) before it can be used.");
+      }
+      throw error;
+    }
+    this._invalidatePlans();
+  },
+
+  /* Highlight one mission on its day, or clear it with highlight = null.
+     highlight is "new" (new customer), "focus" (focus activity) or "other",
+     which carries a short note. Nothing else copies it: Carry over, Duplicate,
+     Copy to board and Copy from weekday all start without one, so a highlight
+     belongs to the day it was set on. A move keeps it (same row). */
+  async setMissionHighlight(missionId, highlight, note) {
+    const row = { highlight: highlight || null, highlight_note: highlight === "other" ? (note || "").trim().slice(0, 40) || null : null };
+    const updatedBy = await this._currentEmail();
+    let { error } = await sb.from("missions").update({ ...row, updated_by: updatedBy }).eq("id", missionId);
+    if (error && this._missingColumnFromError(error) === "updated_by") {
+      ({ error } = await sb.from("missions").update(row).eq("id", missionId));
+    }
+    if (error) {
+      const missingCol = this._missingColumnFromError(error);
+      if (missingCol === "highlight" || missingCol === "highlight_note") {
+        throw new Error("Highlighting missions needs a one-time database update (migration-2026-10-28-mission-highlight.sql) before it can be used.");
       }
       throw error;
     }

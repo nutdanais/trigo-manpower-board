@@ -372,7 +372,7 @@ const CLOUD_WRITE_METHODS = [
   "applyCarry", "resetBoardFromLastWorkingDay", "setAssignment", "applyPlanDiff", "applyForecastMerge",
   "setCapacityCells", "deleteCapacityRow", "resetCapacityDemand", "saveForecastMission", "deleteForecastMission", "setForecastAssignment",
   "startForecastFromConfirmed", "addForecastMissionsFromConfirmed", "copyForecastToDates", "acknowledgeHoldEvents",
-  "saveMission", "deleteMission", "moveMissionToBoard", "setLoan", "updateLoan", "endLoans", "importMissions", "setMissionsHidden", "setDayWorking",
+  "saveMission", "deleteMission", "moveMissionToBoard", "setLoan", "updateLoan", "endLoans", "importMissions", "setMissionsHidden", "setMissionHighlight", "setDayWorking",
   "lockDay", "unlockDay", "saveEmployee", "setEmployeesActive",
   "setEmployeesPosition", "setEmployeesContract", "setEmployeesArea", "moveEmployeeToBoard",
   "moveEmployeesToBoard", "createBoard", "renameBoard", "saveBoardWeekendDays",
@@ -405,7 +405,7 @@ const state = {
   // restoreViewState() once cloud.init() has loaded both — that's the real value.
   date: defaultPlanningDate(),   // land on the next working day's plan, not today
   myEmail: null,   // set once at boot from cloud.getSession() — who to NOT toast about
-  filters: { engineer: [], host: [], customer: [], shift: [] },   // multi-select; [] = All
+  filters: { engineer: [], host: [], customer: [], shift: [], highlight: [] },   // multi-select; [] = All. highlight: ["on"] = Highlighted only
   sort: "number",                // default: sort by mission number on every board
   unlockedDates: new Set(),   // past/today dates the user confirmed they want to edit
   editingMissionId: null,
@@ -2553,6 +2553,19 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       if (why) addOff(b.name, why, "arrow-right");
       else addItem(b.name, () => guardEdit(() => openMoveMissionModal(m.id, b.id)), null, "arrow-right");
     }
+  } else if (view === "highlight") {
+    addBack("Highlight");
+    // the reason it has now is ticked
+    const reason = (key, label, ico) => addItem(label,
+      () => guardEdit(() => key === "other" ? openHighlightNoteModal(m) : setMissionHighlight(m, key)),
+      m.highlight === key ? "ctx-on" : null, m.highlight === key ? "check" : ico);
+    reason("new", "New customer", "star");
+    reason("focus", "Focus activity", "star");
+    reason("other", "Other…", "edit");
+    if (m.highlight) {
+      addSep();
+      addItem("Remove highlight", () => guardEdit(() => setMissionHighlight(m, null)), null, "close");
+    }
   } else if (view === "crew") {
     addBack("Crew");
     addItem(`Select crew (${crew.length})`, () => {
@@ -2570,6 +2583,9 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       if (!fc && otherBoards.length) addSub("Move or copy to board", "move", "swap");
       if (sel.length) addItem(`Place ${sel.length} selected here`, () => guardEdit(() => assignEmployeesTo(sel, { missionId: m.id })), null, "plus");
       if (crew.length) addSub("Crew", "crew", "users");
+      // the confirmed board only (a forecast is a sketch), and only once the
+      // database has the columns (migration-2026-10-28)
+      if (!fc && feat().highlight) addSub("Highlight", "highlight", "star");
     }
     addItem("Copy as text", () => copyMissionText(m), null, "clipboard");
     addItem("Open host location", () => openHostLocation(m.host), null, "pin");
@@ -2871,6 +2887,7 @@ function missionMatchesFilters(m) {
   if (f.host.length && !f.host.includes(m.host)) return false;
   if (f.customer.length && !f.customer.includes(m.customer)) return false;
   if (f.shift.length && !f.shift.includes(m.shift)) return false;
+  if (f.highlight.length && !m.highlight) return false;
   return true;
 }
 
@@ -2890,6 +2907,17 @@ function missionSortValue(m) {
    enough that theme-coloured text stays legible on top of any engineer colour,
    high enough that the header still reads as that engineer's block. */
 const MISSION_TINT = 0.15;
+
+/* A highlighted mission (right-click → Highlight): a gold frame round the card
+   and a tag hanging from the engineer's edge that says why. One look for every
+   reason, only the words change: a colour per reason would compete with the
+   engineer colours, which already use every hue. "other" shows the note the
+   engineer typed. design/mission-highlight-options.html has the options this
+   was picked from (E). */
+const HIGHLIGHT_REASONS = { new: "New customer", focus: "Focus activity", other: "Other" };
+function highlightLabel(m) {
+  return m.highlight === "other" ? (m.highlightNote || HIGHLIGHT_REASONS.other) : HIGHLIGHT_REASONS[m.highlight] || "";
+}
 
 /* A mission's hours on its card. Times are stored NOT NULL with the day shift's
    08:00–17:00 as the default, so a Night mission still on exactly those hours was
@@ -2920,7 +2948,7 @@ function renderMissions() {
     const engColor = eng ? eng.color : "#ccc";
     const card = document.createElement("div");
     card.className = "mission-card" + (m.shift === "night" ? " night" : "") +
-      (missionMatchesFilters(m) ? "" : " dimmed");
+      (m.highlight ? " hl" : "") + (missionMatchesFilters(m) ? "" : " dimmed");
     // The engineer's colour is what lets you pick one engineer's missions out of
     // a full board at a glance — but as a solid header fill it was the loudest
     // thing on screen AND forced the header text to be pinned dark in both
@@ -2958,7 +2986,11 @@ function renderMissions() {
     if (m.ppe) ppeParts.push(escapeHtml(m.ppe));
     const ppeLine = ppeParts.length
       ? `<div class="m-ppe"><b>PPE</b> ${ppeParts.join(" + ")}</div>` : "";
-    header.innerHTML = `
+    // the note is what someone typed: data, never translated
+    const hlTag = m.highlight
+      ? `<div class="m-hl-tag"><span class="m-hl-star">${icon("star")}</span><span class="m-hl-text"${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span></div>`
+      : "";
+    header.innerHTML = `${hlTag}
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>
@@ -4736,6 +4768,12 @@ function renderFilterOptions() {
       pop.appendChild(row);
     }
   }
+  // Highlighted only: a switch, not a list, kept as a filter key so Clear, the
+  // count on Filter & sort and "matching cards first" treat it like the others.
+  // Hidden (and off) on a database without missions.highlight (migration-2026-10-28).
+  if (!feat().highlight) state.filters.highlight = [];
+  $("#filter-hl").classList.toggle("hidden", !feat().highlight);
+  $("#filter-hl-box").checked = state.filters.highlight.length > 0;
   $("#sort-by").value = state.sort;
   updateFilterBadge();
 }
@@ -7179,6 +7217,38 @@ function hideMission(missionId = state.editingMissionId) {
   } else {
     doHide();
   }
+}
+
+/* Set or clear a mission's highlight (the card's right-click → Highlight). */
+function setMissionHighlight(m, highlight, note) {
+  return safely(async () => {
+    await cloud.setMissionHighlight(m.id, highlight, note);
+    await refreshAndRender();
+  });
+}
+/* Highlight › Other…: the reason in the engineer's own words, shown on the card */
+function openHighlightNoteModal(m) {
+  state.highlightMissionId = m.id;
+  const form = $("#form-highlight");
+  form.reset();
+  form.note.value = m.highlight === "other" ? m.highlightNote : "";
+  $("#highlight-sub").textContent = m.number;
+  $("#highlight-error").classList.add("hidden");
+  openModal("#modal-highlight");
+  form.note.focus();
+}
+function saveHighlightNote(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const note = form.note.value.trim();
+  const err = $("#highlight-error");
+  err.textContent = note ? "" : "Say why, in a few words.";
+  err.classList.toggle("hidden", !!note);
+  if (!note) { form.note.focus(); return; }
+  const m = getPlan().missions.find(x => x.id === state.highlightMissionId);
+  if (!m) { closeModal(); return; }
+  closeModal();
+  setMissionHighlight(m, "other", note);
 }
 
 /* employee modal */
@@ -14319,6 +14389,7 @@ function wireApp() {
   $("#btn-add-engineer-cancel").onclick = reopenSettings;
   $("#btn-add-area").onclick = openAddAreaModal;
   $("#form-add-area").onsubmit = addAreaFromModal;
+  $("#form-highlight").onsubmit = saveHighlightNote;
   $("#form-add-area").areaColor.oninput = (ev) => { ev.target.parentElement.querySelector("b").textContent = swHex(ev.target.value); };
 
   initTheme();
@@ -14372,6 +14443,11 @@ function wireApp() {
     };
   }
   $("#sort-by").onchange = (e) => { state.sort = e.target.value; render(); };
+  $("#filter-hl-box").onchange = (e) => {
+    state.filters.highlight = e.target.checked ? ["on"] : [];
+    updateFilterBadge();
+    renderMissions();
+  };
 
   $("#btn-export").onclick = openExportModal;
   $("#card-names").value = state.cardNames;

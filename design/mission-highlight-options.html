@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Mission Highlight Options</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code. Card and menu styles are copied from styles.css
+   so the mockups match the board; everything prefixed .hl- is the proposal. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --brand-green: #a8c855; --night: #1c2430; --warn: #f59e0b; --warn-text: #8a4f10;
+  --hover-tint: #eef3fb; --danger: #dc2626;
+  --emp-bg: #e6e9ec; --emp-perm-border: #b4bcc4; --emp-oncall-border: #6b737c; --emp-oncall-bg: #dfe3e7;
+  --emp-ink: #1a1a1a; --emp-sub: #545c66; --charcoal: #59595b; --card-ink: #1a1a1a;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  /* highlight accent: switched by the toolbar (data-accent on <body>) */
+  --hl: #e3a008; --hl-soft: rgba(227,160,8,.30); --hl-ink: #3d2a00; --hl-wash: #fff6dc;
+  color-scheme: light;
+}
+body[data-accent="rose"]  { --hl: #c2335f; --hl-soft: rgba(194,51,95,.24); --hl-ink: #ffffff; --hl-wash: #fdecf1; }
+body[data-accent="green"] { --hl: #8db23a; --hl-soft: rgba(141,178,58,.30); --hl-ink: #22330a; --hl-wash: #f2f8e4; }
+body[data-accent="navy"]  { --hl: #003a66; --hl-soft: rgba(0,58,102,.22); --hl-ink: #ffffff; --hl-wash: #e8eff6; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-left, 0px)) 72px; display: grid; gap: 28px; }
+h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
+h2 { font-size: 19px; letter-spacing: -.2px; }
+h3 { font-size: 15px; }
+.lede { color: var(--muted); max-width: 72ch; margin-top: 6px; }
+p { max-width: 72ch; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 12px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+
+/* toolbar */
+.tools { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 8px rgba(31,41,55,.06); }
+.tools .lab { font-size: 12px; color: var(--muted); }
+.tg { font: inherit; font-size: 12.5px; font-weight: 600; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.tg i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid rgba(0,0,0,.15); }
+.tg[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tg:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tools .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* findings */
+.find { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+.find div { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.find b { display: block; font-size: 13px; margin-bottom: 2px; }
+
+/* options */
+.opt { display: grid; gap: 10px; }
+.opt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.opt-head h2 span { color: var(--muted); font-weight: 600; margin-right: 6px; }
+.rec { font-size: 11px; font-weight: 700; color: #fff; background: var(--primary); border-radius: 999px; padding: 1px 9px; letter-spacing: .2px; }
+.opt-why { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 6px 24px; font-size: 13px; }
+.opt-why ul { padding-left: 18px; }
+.opt-why li { margin: 2px 0; }
+.opt-why .lbl { font-weight: 700; font-size: 12px; color: var(--muted); }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; align-items: start; padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+
+/* ===== app's mission card + employee card (from styles.css) ===== */
+.mission-card { border: 1px solid var(--border); border-top-width: 5px; border-radius: 8px; background: var(--panel); overflow: hidden; position: relative; transition: opacity .15s, box-shadow .2s; }
+.mission-card.dimmed { opacity: .18; }
+.mission-header { padding: 7px 9px; font-size: 11.5px; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--text); }
+.m-line1 { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.m-number { font-weight: 700; font-size: 15px; line-height: 1.1; flex: none; }
+.m-host { font-weight: 700; font-size: 15px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.m-sep { opacity: .45; flex: none; }
+.m-pills { margin-left: auto; flex: none; display: flex; align-items: center; gap: 4px; }
+.m-shift, .m-area { font-weight: 700; font-size: 9px; line-height: 1.7; letter-spacing: .3px; padding: 0 4px; border-radius: 3px; flex: none; }
+.m-shift { background: rgba(255,255,255,.72); color: var(--primary); border: 1px solid rgba(0,73,131,.30); }
+.m-shift.night { background: var(--night); color: #fff; border-color: var(--night); }
+.m-shift .ic { width: 10px; height: 10px; vertical-align: -.12em; margin-right: 3px; }
+.m-area { color: #1a1a1a; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); padding: 0 5px; }
+.m-line2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; line-height: 1.35; color: var(--muted); min-width: 0; }
+.m-line2 .m-cust { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-line2 .m-time, .m-line2 .m-eng { flex: none; white-space: nowrap; }
+.m-line2 .m-eng { font-weight: 600; color: var(--text); }
+.m-count { margin-left: auto; font-weight: 700; font-size: 9px; line-height: 1.7; color: var(--card-ink); background: rgba(255,255,255,.72); border-radius: 999px; padding: 0 6px; flex: none; }
+.m-ppe { margin-top: 3px; font-size: 11px; color: var(--muted); }
+.m-ppe b { font-weight: 700; }
+.mission-body { display: flex; flex-direction: column; padding: 8px; }
+.mission-card.night .mission-body { background-color: #1a4478; background-image: linear-gradient(180deg, #0f2c52 0%, #2f5f9e 100%); }
+.mission-card.night .m-remark { color: #eaf2fb; }
+.mission-emps { display: flex; flex-wrap: wrap; gap: 6px; }
+.m-remark { padding-top: 6px; font-style: italic; color: var(--muted); font-size: 12px; }
+.emp-card { width: 116px; height: 70px; border-radius: 6px; padding: 5px 6px 6px; box-shadow: 0 1px 2px rgba(0,0,0,.14); background: var(--emp-bg); border: 1px solid var(--emp-perm-border); display: flex; flex-direction: column; color: var(--emp-ink); }
+.emp-card.oncall { border: 1px dashed var(--emp-oncall-border); background: var(--emp-oncall-bg); }
+.emp-name { font-size: 12.5px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-surname { font-size: 11px; font-weight: 500; line-height: 1.3; color: var(--emp-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-meta { margin-top: auto; display: flex; gap: 3px; }
+.emp-pos, .emp-oc, .emp-area { font-size: 9.5px; font-weight: 700; line-height: 1.6; padding: 0 5px; border-radius: 999px; }
+.emp-pos { color: var(--primary); background: rgba(0,73,131,.09); }
+.emp-oc { background: var(--charcoal); color: #fff; padding: 0 4px; }
+.emp-area { margin-left: auto; color: #1a1a1a; }
+.ic { width: 1em; height: 1em; display: inline-block; }
+
+/* ===== the proposal: one class per option on the board wrapper ===== */
+/* shared: the reason label and star, used by several options */
+.hl-star { display: inline-block; line-height: 0; }
+.hl-star .ic { width: 11px; height: 11px; vertical-align: -.1em; fill: currentColor; }
+
+/* A. Frame: sides and bottom take the accent, plus a soft halo. The top edge
+   stays the engineer's colour, so "whose mission" is never lost. */
+.opt-a .mission-card.hl { border-color: var(--hl); border-width: 2px; border-top-width: 5px; box-shadow: 0 0 0 3px var(--hl-soft); }
+.opt-a .mission-card.hl .m-number::before { content: "\2605"; color: var(--hl); margin-right: 4px; font-size: 13px; vertical-align: 1px; }
+
+/* B. Reason ribbon: a full-width band between the engineer edge and the header,
+   saying in words why the card is highlighted. */
+.hl-ribbon { display: none; align-items: center; gap: 6px; padding: 3px 9px; background: var(--hl); color: var(--hl-ink); font-size: 10.5px; line-height: 1.5; min-width: 0; }
+.hl-ribbon b { font-weight: 700; letter-spacing: .4px; text-transform: uppercase; flex: none; }
+.hl-ribbon span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; opacity: .9; }
+.opt-b .mission-card.hl .hl-ribbon { display: flex; }
+
+/* C. Badge: one chip in the header's pill group, nothing else changes. */
+.hl-badge { display: none; font-weight: 700; font-size: 9px; line-height: 1.7; letter-spacing: .3px; padding: 0 5px; border-radius: 3px; background: var(--hl); color: var(--hl-ink); border: 1px solid var(--hl); flex: none; text-transform: uppercase; }
+.hl-badge .ic { width: 9px; height: 9px; vertical-align: -.1em; margin-right: 2px; fill: currentColor; }
+.opt-c .mission-card.hl .hl-badge { display: inline-block; }
+
+/* D. Side stripe: the left edge is the one card edge nothing uses yet, and a
+   column of stripes is easy to scan down a masonry column. */
+.opt-d .mission-card.hl { border-left: 6px solid var(--hl); }
+.opt-d .mission-card.hl .m-number::before { content: "\2605"; color: var(--hl); margin-right: 4px; font-size: 13px; vertical-align: 1px; }
+
+/* E. Frame + hanging tab: A's frame, and a tag hanging from the engineer edge
+   with the reason in words. Recommended. */
+.opt-e .mission-card.hl { border-color: var(--hl); border-width: 2px; border-top-width: 5px; box-shadow: 0 0 0 3px var(--hl-soft); }
+.hl-tab { display: none; }
+.opt-e .mission-card.hl .hl-tab { display: flex; align-items: center; gap: 5px; width: max-content; max-width: calc(100% - 18px); margin: 0 0 0 9px; padding: 2px 8px 3px; border-radius: 0 0 6px 6px; background: var(--hl); color: var(--hl-ink); font-size: 10.5px; line-height: 1.4; font-weight: 700; min-width: 0; }
+.opt-e .mission-card.hl .hl-tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: 500; opacity: .92; }
+.opt-e .mission-card.hl .mission-header { padding-top: 5px; }
+
+/* turning a highlight on: one ring pulse, the same feedback idea as the app's
+   flash-outline when you jump to a card */
+@keyframes hl-pulse { 0% { box-shadow: 0 0 0 0 var(--hl); } 100% { box-shadow: 0 0 0 3px var(--hl-soft); } }
+@media (prefers-reduced-motion: no-preference) {
+  .opt-a .mission-card.hl.just, .opt-e .mission-card.hl.just { animation: hl-pulse .5s cubic-bezier(.16,1,.3,1); }
+  .mission-card.just { animation: hl-pop .35s cubic-bezier(.16,1,.3,1); }
+  @keyframes hl-pop { 0% { transform: scale(.985); } 100% { transform: none; } }
+}
+
+/* ===== context menu (from styles.css) ===== */
+#ctx { position: fixed; z-index: 200; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); min-width: 220px; padding: 4px; display: none; }
+#ctx.on { display: block; }
+.ctx-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 5px; cursor: pointer; font-size: 13px; color: var(--text); width: 100%; border: 0; background: none; font-family: inherit; text-align: left; }
+.ctx-item .ic { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.ctx-item:hover, .ctx-item:focus-visible { background: var(--hover-tint); outline: none; }
+.ctx-item.off { color: #9aa1ab; cursor: default; }
+.ctx-item.off:hover { background: none; }
+.ctx-sep { border-top: 1px solid var(--border); margin: 4px 0; }
+.ctx-title { padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.ctx-sub::after { content: "\203A"; margin-left: auto; font-size: 15px; line-height: 1; color: var(--muted); }
+.ctx-back { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; border-bottom: 1px solid var(--border); border-radius: 5px 5px 0 0; margin-bottom: 2px; }
+.ctx-danger { color: var(--danger); font-weight: 600; }
+.ctx-new { margin-left: auto; font-size: 9.5px; font-weight: 700; color: var(--hl-ink); background: var(--hl); border-radius: 999px; padding: 0 6px; line-height: 1.6; }
+.ctx-item.on .ic.chk { color: var(--primary); }
+.ctx-note { display: grid; gap: 6px; padding: 6px 12px 8px; }
+.ctx-note label { font-size: 12px; font-weight: 600; }
+.ctx-note input { font: inherit; font-size: 13px; height: 32px; padding: 0 8px; border: 1px solid #9aa3ae; border-radius: 6px; color: var(--text); }
+.ctx-note input:focus { outline: 2px solid var(--primary); outline-offset: 0; border-color: var(--primary); }
+.ctx-note small { font-size: 11px; color: var(--muted); }
+.ctx-note button { justify-self: end; font: inherit; font-size: 12.5px; font-weight: 600; height: 30px; padding: 0 14px; border-radius: 6px; border: 1px solid var(--primary); background: var(--primary); color: #fff; cursor: pointer; }
+
+/* menu illustration (static copy shown in section 2) */
+.menu-demo { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.menu-static { position: static; display: block; box-shadow: 0 8px 24px rgba(31,41,55,.14); }
+
+/* compare table */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; vertical-align: top; }
+thead th { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+tbody tr + tr td, tbody tr + tr th { border-top: 1px solid #eceff3; }
+tbody th { font-weight: 700; white-space: nowrap; }
+.y { color: #4d6810; font-weight: 700; }
+.n { color: #a3271f; font-weight: 700; }
+.m { color: var(--warn-text); font-weight: 700; }
+tr.best { background: #f5f8fc; }
+
+.addons { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.addons > div { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: grid; gap: 6px; font-size: 13px; align-content: start; }
+.q { padding-left: 18px; font-size: 13.5px; display: grid; gap: 6px; }
+
+@media (max-width: 640px) {
+  .tools .hint { margin-left: 0; width: 100%; }
+  h1 { font-size: 22px; }
+}
+</style>
+</head>
+<body data-accent="gold">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- icons copied from the app's own sprite in index.html -->
+  <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 21l-4-4 4-4"/><path d="M21 17H3"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header>
+    <h1>Highlighting a mission card</h1>
+    <p class="lede">Engineers want to mark some missions so they stand out on the board: a new customer, a focus activity, or another reason. Below: what the card already uses, how to turn a highlight on with a right-click, five looks to choose from, and a recommendation. Every board below is live. Right-click any card to highlight it or remove the highlight.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-find">
+    <h2 id="h-find">What the card already uses</h2>
+    <p class="small muted">A highlight has to use a signal the card is not already using, or it will be confused with something else.</p>
+    <div class="find">
+      <div><b>Top edge and header wash</b>The engineer's colour. Engineer colours cover every hue (gold, green, pink, navy and more), so a highlight cannot be colour alone.</div>
+      <div><b>Body</b>Night missions get the midnight-blue mat. A tinted body for highlight would fight it.</div>
+      <div><b>Whole-card fade</b>Filters fade non-matching cards to 18%. A highlighted card should still fade when it does not match.</div>
+      <div><b>Amber outline</b>Used for 1.6 s when the board jumps to a card. Short-lived, but a permanent amber frame would look like it got stuck.</div>
+      <div><b>Free to use</b>The card's frame (sides and bottom), the left edge, and a short text label. A label is the only thing that says <i>why</i>.</div>
+      <div><b>Picture of the board</b>The JPG export can't draw inset shadows, outlines or repeating gradients. Every option here uses borders, outer shadows and flat fills only, so it shows the same in the JPG and PDF.</div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-how">
+    <h2 id="h-how">Turning it on: right-click the card</h2>
+    <p>The card's right-click menu already exists (Edit, Duplicate, Move, Crew, Copy, Hide, Delete). Highlight goes in as one more item with its own sub-menu, so it takes no space on the board. On a phone, the same menu opens by holding the header, as today.</p>
+    <div class="menu-demo">
+      <div id="ctx-demo-root" class="menu-static" style="border:1px solid var(--border);border-radius:8px;background:var(--panel);padding:4px;min-width:230px"></div>
+      <div id="ctx-demo-sub" class="menu-static" style="border:1px solid var(--border);border-radius:8px;background:var(--panel);padding:4px;min-width:230px"></div>
+      <div class="small" style="max-width:38ch;display:grid;gap:8px">
+        <p><b>Three reasons, one look.</b> New customer and Focus activity are one tap. Other asks for a short note (up to 40 characters) that shows on the card.</p>
+        <p><b>Every highlight looks the same; only the words change.</b> Giving each reason its own colour would compete with the engineer colours, and nobody would remember which colour means what.</p>
+        <p><b>Remove highlight</b> appears once a card is highlighted, and a tick marks the current reason.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="tools" role="toolbar" aria-label="Highlight colour">
+    <span class="lab">Highlight colour</span>
+    <button class="tg" data-acc="gold" aria-pressed="true"><i style="background:#e3a008"></i>Gold</button>
+    <button class="tg" data-acc="rose" aria-pressed="false"><i style="background:#c2335f"></i>Rose</button>
+    <button class="tg" data-acc="green" aria-pressed="false"><i style="background:#8db23a"></i>TRIGO green</button>
+    <button class="tg" data-acc="navy" aria-pressed="false"><i style="background:#003a66"></i>Navy</button>
+    <span class="hint">Right-click a card to change its highlight. Tap the header on a phone.</span>
+  </div>
+
+  <div id="options" style="display:grid;gap:34px"></div>
+
+  <section class="panel" aria-labelledby="h-cmp">
+    <h2 id="h-cmp">Side by side</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Option</th><th>Seen from across the room</th><th>Says why</th><th>Engineer colour kept</th><th>Night cards</th><th>Many highlighted at once</th><th>Card height</th></tr></thead>
+        <tbody>
+          <tr><th>A. Frame</th><td class="y">Strong</td><td class="n">No (tooltip only)</td><td class="y">Yes</td><td class="y">Good</td><td class="m">Gets loud past 4 to 5</td><td class="y">Same</td></tr>
+          <tr><th>B. Reason ribbon</th><td class="y">Strong</td><td class="y">Yes, with note</td><td class="m">Pushed down a band</td><td class="y">Good</td><td class="m">Busy</td><td class="m">+20 px</td></tr>
+          <tr><th>C. Badge</th><td class="n">Weak</td><td class="m">One word</td><td class="y">Yes</td><td class="y">Good</td><td class="y">Calm</td><td class="y">Same</td></tr>
+          <tr><th>D. Side stripe</th><td class="m">Medium</td><td class="n">No</td><td class="y">Yes</td><td class="y">Good</td><td class="y">Calm</td><td class="y">Same</td></tr>
+          <tr class="best"><th>E. Frame + tab</th><td class="y">Strong</td><td class="y">Yes, with note</td><td class="y">Yes</td><td class="y">Good</td><td class="m">Fine up to about 6</td><td class="m">+18 px</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-rec">
+    <h2 id="h-rec">Recommendation: E, Frame + tab, in gold</h2>
+    <p>The frame makes a highlighted card stand out from across the room without touching the engineer's colour. The tab under the engineer edge says why in plain words, which is the part engineers asked for ("new customer", "focus activity"), and it still reads in the exported JPG, where there is no tooltip. Gold reads as a highlighter pen. The app already uses amber for a short warning flash, but gold is a different shade, comes with a star and a label, and stays put. If gold feels too close to that warning, Rose is the next best choice: no screen in the app uses it.</p>
+    <p>Look at M-117 in every option: its engineer, Wanida, is gold too, so in gold the frame and the engineer edge blend into one colour. Engineers can pick any colour, so whichever accent we choose, some engineer will share it. This is why the tab with words matters more than the colour, and why A and D, which have no words, are weaker. Switch to Rose to see the same card with no clash.</p>
+    <p class="small muted">If engineers expect to highlight most of the board on some days, C (Badge) is the quiet fallback. When every card is highlighted, none of them stands out.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="h-add">
+    <h2 id="h-add">Worth adding with it (optional)</h2>
+    <div class="addons">
+      <div><b>Filter: Highlighted only</b><span class="muted">One more choice in the board's existing filter. It reuses the 18% fade, so the highlighted missions are left standing out on their own. No new UI.</span></div>
+      <div><b>Copy as text carries it</b><span class="muted">The LINE text from "Copy as text" starts with "★ New customer" (or the note), so the crew get the same message in the chat.</span></div>
+      <div><b>Edit mission shows it too</b><span class="muted">A Highlight field in the mission editor, for anyone who doesn't right-click. Same three reasons and the note.</span></div>
+      <div><b>Who can set it</b><span class="muted">Anyone who can edit the board, the same rule as Hide. A board viewer sees the highlight but gets no menu item.</span></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-q">
+    <h2 id="h-q">Before we build: three questions</h2>
+    <ol class="q">
+      <li><b>Today only, or until removed?</b> Missions are saved per day. Should a highlight copy over to the next day when the plan is copied, or start fresh each day?</li>
+      <li><b>Duplicate mission:</b> should the copy keep the highlight? I suggest no.</li>
+      <li><b>Order on the board:</b> leave highlighted cards where they are, or move them to the top of the board (like matching cards move up when a filter is on)?</li>
+    </ol>
+  </section>
+</div>
+
+<div id="ctx" role="menu" aria-label="Mission menu"></div>
+
+<script>
+const OPTIONS = [
+  { id: "a", name: "Frame", tag: "", lead: "Sides and bottom of the card turn the accent colour, with a soft glow, and a small star sits before the mission number. The engineer's colour stays on the top edge.",
+    good: ["Strongest at a distance, zero extra height", "Engineer edge untouched", "Same on night cards"],
+    bad: ["Doesn't say why (tooltip only, not in the JPG)", "Several framed cards side by side get loud"] },
+  { id: "b", name: "Reason ribbon", tag: "", lead: "A full-width band in the accent colour under the engineer edge, with the reason in capitals and the note after it.",
+    good: ["Says why in words, readable in the JPG", "Very hard to miss"],
+    bad: ["Pushes the header down; the engineer edge and wash no longer sit together", "Adds a band of height to every highlighted card"] },
+  { id: "c", name: "Badge", tag: "", lead: "One chip in the header's pill group, next to the area and DAY or NIGHT chips. Nothing else on the card changes.",
+    good: ["Calmest; fine with many highlighted cards", "No layout change at all"],
+    bad: ["Easy to miss from across the room", "Room for one word only (NEW, FOCUS, VIP)"] },
+  { id: "d", name: "Side stripe", tag: "", lead: "A thick accent stripe down the card's left edge, the one edge nothing uses yet, plus the star before the number.",
+    good: ["Easy to scan down a column of cards", "No extra height"],
+    bad: ["Doesn't say why", "Next to a gold or green engineer edge it can read as more engineer colour"] },
+  { id: "e", name: "Frame + tab", tag: "Recommended", lead: "A's frame and glow, plus a small tag hanging from the engineer edge that says why: New customer, Focus activity, or the note typed for Other.",
+    good: ["Stands out from across the room and says why", "Engineer edge and header wash stay together", "Readable in the JPG and PDF"],
+    bad: ["About 18 px taller", "Like A, a board full of highlights gets loud"] },
+];
+
+const REASONS = { new: "New customer", focus: "Focus activity", other: "Other" };
+const SHORT = { new: "New", focus: "Focus", other: "Note" };
+
+/* sample board: realistic placeholders, not live data */
+const MISSIONS = [
+  { no: "M-114", host: "Map Ta Phut Plant 3", area: "RY", areaC: "#f6a06b", shift: "day", cust: "Siam Polyolefins", time: "08:00–17:00", eng: "Kittipong", engC: "#3b82f6", ppe: "Hard hat, FR coverall",
+    crew: [["Somchai", "Rattanakul", "TECH", "RY"], ["Anucha", "Pholsri", "TECH", "RY"], ["Narong", "Kaewmanee", "", "CB", true]], hl: { r: "new" } },
+  { no: "M-117", host: "Laem Chabang Terminal B", area: "CB", areaC: "#76d7c4", shift: "night", cust: "Eastern Seaboard Logistics", time: "20:00–05:00", eng: "Wanida", engC: "#d4a017", ppe: "",
+    crew: [["Prasert", "Boonmee", "SUP", "CB"], ["Thanakorn", "Sukjai", "TECH", "CB"]], hl: { r: "focus" }, remark: "Shutdown window, 2 nights" },
+  { no: "M-121", host: "Bowin Warehouse 7", area: "CB", areaC: "#76d7c4", shift: "day", cust: "Thai Cold Chain", time: "08:00–17:00", eng: "Pornthip", engC: "#22a06b", ppe: "Safety shoes",
+    crew: [["Wichai", "Chaiyaporn", "TECH", "CB"], ["Sutthipong", "Inthara", "TECH", "CB"]], hl: { r: "other", note: "Plant manager on site" } },
+  { no: "M-122", host: "Rayong Fab Shop", area: "RY", areaC: "#f6a06b", shift: "day", cust: "Gulf Coast Fabrication", time: "08:00–17:00", eng: "Kittipong", engC: "#3b82f6", ppe: "",
+    crew: [["Chatchai", "Meesuk", "TECH", "RY"], ["Kanya", "Thongdee", "", "RY", true]], hl: null },
+];
+
+const icon = (n, cls) => `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const label = (hl) => hl.r === "other" ? (hl.note || "Other") : REASONS[hl.r];
+
+/* each option has its own copy of the board, so highlights can differ per option */
+const state = {};
+for (const o of OPTIONS) state[o.id] = MISSIONS.map(m => m.hl ? { ...m.hl } : null);
+
+function cardHtml(m, hl, optId, idx) {
+  const hlTitle = hl ? ` title="Highlighted: ${esc(label(hl))}"` : "";
+  const reasonWord = hl ? (hl.r === "other" ? "" : REASONS[hl.r]) : "";
+  const note = hl && hl.r === "other" ? (hl.note || "") : "";
+  const emps = m.crew.map(([n, s, pos, a, oc]) => `
+    <div class="emp-card${oc ? " oncall" : ""}"><div class="emp-name">${n}</div><div class="emp-surname">${s}</div>
+      <div class="emp-meta">${oc ? `<span class="emp-oc">OC</span>` : `<span class="emp-pos">${pos}</span>`}<span class="emp-area" style="background:${a === "RY" ? "#f6a06b" : "#76d7c4"}">${a}</span></div></div>`).join("");
+  return `
+  <div class="mission-card${m.shift === "night" ? " night" : ""}${hl ? " hl" : ""}" style="border-top-color:${m.engC}" data-opt="${optId}" data-idx="${idx}"${hlTitle} tabindex="0" aria-label="Mission ${m.no}${hl ? ", highlighted: " + esc(label(hl)) : ""}. Press Shift+F10 for the menu.">
+    <div class="hl-ribbon">${hl ? `<span class="hl-star">${icon("star")}</span><b>${hl.r === "other" ? "Note" : reasonWord}</b>${note ? `<span>${esc(note)}</span>` : ""}` : ""}</div>
+    <div class="hl-tab">${hl ? `<span class="hl-star">${icon("star")}</span>${hl.r === "other" ? `<span style="font-weight:700;opacity:1">${esc(note || "Other")}</span>` : reasonWord}` : ""}</div>
+    <div class="mission-header" style="background:${tint(m.engC, .15)}">
+      <div class="m-line1">
+        <span class="m-number">${m.no}</span><span class="m-sep">|</span><span class="m-host">${m.host}</span>
+        <span class="m-pills">
+          ${hl ? `<span class="hl-badge">${icon("star")}${SHORT[hl.r]}</span>` : `<span class="hl-badge"></span>`}
+          <span class="m-area" style="background:${m.areaC}">${m.area}</span>
+          <span class="m-shift${m.shift === "night" ? " night" : ""}">${m.shift === "night" ? icon("moon") + "NIGHT" : "DAY"}</span>
+        </span>
+      </div>
+      <div class="m-line2"><span class="m-cust">${m.cust}</span><span class="m-sep">|</span><span class="m-time">${m.time}</span><span class="m-sep">|</span><span class="m-eng">${m.eng}</span><span class="m-count">${m.crew.length}</span></div>
+      ${m.ppe ? `<div class="m-ppe"><b>PPE</b> ${m.ppe}</div>` : ""}
+    </div>
+    <div class="mission-body"><div class="mission-emps">${emps}</div>${m.remark ? `<div class="m-remark">*${m.remark}</div>` : ""}</div>
+  </div>`;
+}
+
+function renderOption(o) {
+  const el = document.getElementById("opt-" + o.id + "-board");
+  el.innerHTML = MISSIONS.map((m, i) => cardHtml(m, state[o.id][i], o.id, i)).join("");
+}
+
+const root = document.getElementById("options");
+root.innerHTML = OPTIONS.map(o => `
+  <section class="opt panel" aria-labelledby="h-${o.id}">
+    <div class="opt-head"><h2 id="h-${o.id}"><span>${o.id.toUpperCase()}.</span>${o.name}</h2>${o.tag ? `<span class="rec">${o.tag}</span>` : ""}</div>
+    <p class="small">${o.lead}</p>
+    <div class="board opt-${o.id}" id="opt-${o.id}-board"></div>
+    <div class="opt-why">
+      <div><div class="lbl">Good</div><ul>${o.good.map(g => `<li>${g}</li>`).join("")}</ul></div>
+      <div><div class="lbl">Watch out</div><ul>${o.bad.map(g => `<li>${g}</li>`).join("")}</ul></div>
+    </div>
+  </section>`).join("");
+OPTIONS.forEach(renderOption);
+
+/* accent switcher */
+document.querySelectorAll(".tg[data-acc]").forEach(b => b.addEventListener("click", () => {
+  document.body.dataset.accent = b.dataset.acc;
+  document.querySelectorAll(".tg[data-acc]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+}));
+
+/* ===== live right-click menu ===== */
+const ctx = document.getElementById("ctx");
+let target = null;
+
+function menuRows(view, hl, demo) {
+  const rows = [];
+  if (view === "sub") {
+    rows.push(`<button class="ctx-item ctx-back" data-act="back">‹ Highlight</button>`);
+    for (const k of ["new", "focus"]) rows.push(`<button class="ctx-item${hl && hl.r === k ? " on" : ""}" data-act="set" data-r="${k}">${icon(hl && hl.r === k ? "check" : "star", hl && hl.r === k ? "chk" : "")}${REASONS[k]}</button>`);
+    rows.push(`<button class="ctx-item${hl && hl.r === "other" ? " on" : ""}" data-act="other">${icon(hl && hl.r === "other" ? "check" : "edit", hl && hl.r === "other" ? "chk" : "")}Other…</button>`);
+    if (hl || demo) { rows.push(`<div class="ctx-sep"></div>`); rows.push(`<button class="ctx-item" data-act="clear">${icon("close")}Remove highlight</button>`); }
+    return rows.join("");
+  }
+  if (view === "other") {
+    return `<button class="ctx-item ctx-back" data-act="sub">‹ Other</button>
+      <form class="ctx-note" data-act="note"><label for="hl-note">Why is this mission highlighted?</label>
+      <input id="hl-note" maxlength="40" value="${hl && hl.r === "other" ? esc(hl.note || "") : ""}" autocomplete="off">
+      <small>Shows on the card. Up to 40 characters, for example "VIP visit".</small><button type="submit">Highlight</button></form>`;
+  }
+  rows.push(`<div class="ctx-title">${demo ? "M-114 · Day · 3 crew" : ""}</div>`);
+  rows.push(`<button class="ctx-item" data-act="noop">${icon("edit")}Edit mission</button>`);
+  rows.push(`<button class="ctx-item" data-act="noop">${icon("copy")}Duplicate mission</button>`);
+  rows.push(`<button class="ctx-item ctx-sub" data-act="noop">${icon("swap")}Move or copy to board</button>`);
+  rows.push(`<button class="ctx-item ctx-sub" data-act="noop">${icon("users")}Crew</button>`);
+  rows.push(`<button class="ctx-item ctx-sub" data-act="sub">${icon("star")}${hl ? "Highlight: " + esc(label(hl)) : "Highlight"}${demo ? `<span class="ctx-new">New</span>` : ""}</button>`);
+  rows.push(`<button class="ctx-item" data-act="noop">${icon("clipboard")}Copy as text</button>`);
+  rows.push(`<button class="ctx-item" data-act="noop">${icon("pin")}Open host location</button>`);
+  rows.push(`<div class="ctx-sep"></div>`);
+  rows.push(`<button class="ctx-item" data-act="noop">${icon("eye-off")}Hide mission</button>`);
+  rows.push(`<div class="ctx-sep"></div>`);
+  rows.push(`<button class="ctx-item ctx-danger" data-act="noop">${icon("trash")}Delete mission</button>`);
+  return rows.join("");
+}
+
+/* static illustration in section 2 */
+document.getElementById("ctx-demo-root").innerHTML = menuRows("root", null, true);
+document.getElementById("ctx-demo-sub").innerHTML = menuRows("sub", { r: "new" }, true);
+document.querySelectorAll("#ctx-demo-root button, #ctx-demo-sub button").forEach(b => { b.tabIndex = -1; b.style.cursor = "default"; });
+
+function currentHl() { return target ? state[target.opt][target.idx] : null; }
+function showMenu(view) {
+  const hl = currentHl();
+  const m = MISSIONS[target.idx];
+  ctx.innerHTML = menuRows(view, hl, false).replace('<div class="ctx-title"></div>',
+    `<div class="ctx-title">${m.no} · ${m.shift === "night" ? "Night" : "Day"} · ${m.crew.length} crew</div>`);
+  ctx.classList.add("on");
+  const r = ctx.getBoundingClientRect();
+  ctx.style.left = Math.max(8, Math.min(target.x, innerWidth - r.width - 8)) + "px";
+  ctx.style.top = Math.max(8, Math.min(target.y, innerHeight - r.height - 8)) + "px";
+  const first = ctx.querySelector("input") || ctx.querySelector(".ctx-item:not(.ctx-back)") || ctx.querySelector(".ctx-item");
+  if (first) first.focus({ preventScroll: true });
+}
+function hideMenu() { ctx.classList.remove("on"); }
+function apply(hl) {
+  const { opt, idx } = target;
+  state[opt][idx] = hl;
+  renderOption(OPTIONS.find(o => o.id === opt));
+  const card = document.querySelector(`.mission-card[data-opt="${opt}"][data-idx="${idx}"]`);
+  if (card) { card.classList.add("just"); setTimeout(() => card.classList.remove("just"), 600); card.focus({ preventScroll: true }); }
+  hideMenu();
+}
+
+function openFor(card, x, y) {
+  target = { opt: card.dataset.opt, idx: +card.dataset.idx, x, y };
+  showMenu("root");
+}
+document.addEventListener("contextmenu", (ev) => {
+  const card = ev.target.closest(".board .mission-card");
+  if (!card) return;
+  ev.preventDefault();
+  openFor(card, ev.clientX, ev.clientY);
+});
+/* phones: tap the header opens the same menu (the app uses a long-press) */
+document.addEventListener("click", (ev) => {
+  if (ctx.contains(ev.target)) return;
+  const head = ev.target.closest(".board .mission-header");
+  if (head) { const card = head.closest(".mission-card"); openFor(card, ev.clientX, ev.clientY); return; }
+  hideMenu();
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") hideMenu();
+  const card = document.activeElement && document.activeElement.closest && document.activeElement.closest(".board .mission-card");
+  if (card && document.activeElement === card && ((ev.shiftKey && ev.key === "F10") || ev.key === "ContextMenu")) {
+    ev.preventDefault();
+    const r = card.getBoundingClientRect();
+    openFor(card, r.left + 20, r.top + 20);
+  }
+});
+addEventListener("scroll", hideMenu, { passive: true });
+ctx.addEventListener("click", (ev) => {
+  ev.stopPropagation();   // the menu redraws itself; the page's click-away must not see a detached target
+  const b = ev.target.closest("[data-act]");
+  if (!b || b.tagName === "FORM") return;
+  const act = b.dataset.act;
+  if (act === "sub") showMenu("sub");
+  else if (act === "back") showMenu("root");
+  else if (act === "other") showMenu("other");
+  else if (act === "set") apply({ r: b.dataset.r });
+  else if (act === "clear") apply(null);
+  else if (act === "noop") hideMenu();
+});
+ctx.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const v = ctx.querySelector("#hl-note").value.trim();
+  apply(v ? { r: "other", note: v } : null);
+});
+</script>
+</body>
+</html>
