@@ -3589,11 +3589,12 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: 5px; display: grid; place-items: center;
   background: var(--warn-surface); border: 1px solid var(--warn-line); color: var(--warn-text); font-size: 11.5px; font-weight: 700;
 }
-/* the TRIGO logo with the version under it, pinned to the bottom of the rail.
-   Grey (colour taken out, then lightened) so it signs the page quietly beside
-   the muted version text instead of competing with the tabs. */
-#settings-logo { display: block; width: 116px; height: auto; margin: auto 8px 0; padding-top: 18px; box-sizing: content-box; filter: grayscale(1); opacity: .55; }
-#settings-version { margin: 0; padding: 8px 8px 0; }
+/* the TRIGO logo with the version beside it, on one line pinned to the bottom
+   of the rail. Grey (colour taken out, then lightened) so it signs the page
+   quietly beside the muted version text instead of competing with the tabs. */
+#settings-brand { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 18px 8px 0; }
+#settings-logo { display: block; flex: none; width: 72px; height: auto; filter: grayscale(1); opacity: .55; }
+#settings-version { margin: 0; padding: 0; white-space: nowrap; }
 
 /* ----- the heading and the scroll region ----- */
 #sv-main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }

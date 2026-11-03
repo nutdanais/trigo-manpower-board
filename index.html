@@ -288,12 +288,14 @@
       <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg><span>Users</span><span class="st-n"></span></button>
       <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg><span>Roles &amp; permissions</span></button>
     </nav>
-    <!-- The TRIGO logo and, under it, the version (where a bug report quotes it
+    <!-- The TRIGO logo and, beside it, the version (where a bug report quotes it
          from), pinned to the bottom of the rail like the other apps in the
          family keep it at the bottom of their sidebar. A phone has no rail —
          the footer carries the version there. -->
-    <img id="settings-logo" src="logo.png" alt="TRIGO Global Quality Solutions" onerror="this.onerror=null;this.src='logo.svg'">
-    <p class="app-version" id="settings-version">Version <span data-app-version></span></p>
+    <div id="settings-brand">
+      <img id="settings-logo" src="logo.png" alt="TRIGO Global Quality Solutions" onerror="this.onerror=null;this.src='logo.svg'">
+      <p class="app-version" id="settings-version">Version <span data-app-version></span></p>
+    </div>
   </aside>
 
   <div id="sv-main">
