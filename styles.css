@@ -3589,8 +3589,12 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: 5px; display: grid; place-items: center;
   background: var(--warn-surface); border: 1px solid var(--warn-line); color: var(--warn-text); font-size: 11.5px; font-weight: 700;
 }
-/* the version, pinned to the bottom of the rail */
-#settings-version { margin: auto 0 0; padding: 14px 8px 0; }
+/* the TRIGO logo with the version beside it, on one line pinned to the bottom
+   of the rail. Grey (colour taken out, then lightened) so it signs the page
+   quietly beside the muted version text instead of competing with the tabs. */
+#settings-brand { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 18px 8px 0; }
+#settings-logo { display: block; flex: none; width: 72px; height: auto; filter: grayscale(1); opacity: .55; }
+#settings-version { margin: 0; padding: 0; white-space: nowrap; }
 
 /* ----- the heading and the scroll region ----- */
 #sv-main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -5344,8 +5348,11 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
    touches the board itself (mission / employee / leave cards). */
 #topbar { flex-wrap: nowrap; justify-content: flex-start; gap: 6px; min-height: 54px; padding: 0 20px; }
 #topbar .topbar-left { flex: none; margin-right: 10px; }
-#app-logo { height: 26px; }
-#app-title { display: none; }
+/* brand: the favicon and "Manpower Board", like the other apps in the family.
+   The favicon is navy on a navy bar, so a faint white ring marks its edge. */
+#app-logo { width: 28px; height: 28px; border-radius: 7px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .28); }
+#topbar .topbar-left { gap: 10px; }
+#app-title { display: block; font-size: 16px; font-weight: 700; padding-left: 0; margin-left: 0; border-left: 0; letter-spacing: -.1px; white-space: nowrap; }
 #topbar .topbar-right { margin-left: auto; flex-wrap: nowrap; flex: none; }
 #green-rule { height: 2px; }
 
@@ -5369,7 +5376,7 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 #topbar.tb-tight .topbar-right { gap: 6px; }
 #topbar.tb-snug #board-tabs .board-tab { padding: 0 8px; font-size: 13px; }
 #topbar.tb-snug #board-tabs .board-tab.active::after { left: 8px; right: 8px; }
-#topbar.tb-snug .topbar-left { gap: 4px; }
+#topbar.tb-snug .topbar-left { gap: 8px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 10px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
