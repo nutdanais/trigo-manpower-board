@@ -5344,8 +5344,11 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
    touches the board itself (mission / employee / leave cards). */
 #topbar { flex-wrap: nowrap; justify-content: flex-start; gap: 6px; min-height: 54px; padding: 0 20px; }
 #topbar .topbar-left { flex: none; margin-right: 10px; }
-#app-logo { height: 26px; }
-#app-title { display: none; }
+/* brand: the favicon and "Manpower Board", like the other apps in the family.
+   The favicon is navy on a navy bar, so a faint white ring marks its edge. */
+#app-logo { width: 28px; height: 28px; border-radius: 7px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .28); }
+#topbar .topbar-left { gap: 10px; }
+#app-title { display: block; font-size: 16px; font-weight: 700; padding-left: 0; margin-left: 0; border-left: 0; letter-spacing: -.1px; white-space: nowrap; }
 #topbar .topbar-right { margin-left: auto; flex-wrap: nowrap; flex: none; }
 #green-rule { height: 2px; }
 
@@ -5369,7 +5372,7 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 #topbar.tb-tight .topbar-right { gap: 6px; }
 #topbar.tb-snug #board-tabs .board-tab { padding: 0 8px; font-size: 13px; }
 #topbar.tb-snug #board-tabs .board-tab.active::after { left: 8px; right: 8px; }
-#topbar.tb-snug .topbar-left { gap: 4px; }
+#topbar.tb-snug .topbar-left { gap: 8px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 10px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
