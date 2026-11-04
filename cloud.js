@@ -1511,6 +1511,10 @@ const cloud = {
      permCrew+oncallCrew always summing to crew. Both feed the History
      charts; an EMPTY mission counts for neither, since "a mission nobody
      was sent to" is not deployment.
+     `leaveBy` splits `leave` by type ({ annual, sick, business, unpaid,
+     exchange }), and `leaveEmp` / `oncallEmp` say WHO was on leave (and on
+     which type) and which on-call people were on a mission: History's Leave
+     and On-call views and their name lists.
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
      use each employee's CURRENT board membership - board moves aren't tracked
      historically - but only from the day they were added to the app
@@ -1570,6 +1574,9 @@ const cloud = {
           assigned: 0, leave: 0, headcount: emps.length,
           oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: emps.filter((e) => e.contract === "oncall").length,
           missions: 0, staffedMissions: 0, byEngineer: {},
+          leaveBy: Object.fromEntries(ZONES.map((z) => [z, 0])),   // leave by type: sums to `leave`
+          leaveEmp: {},    // { employeeId: leave type } — who was on leave that day
+          oncallEmp: {},   // { employeeId: 1 } — on-call people on a (non-hidden) mission that day
           holiday: isNonWorkingDate(d, boardId),   // weekend or holiday override: unassigned permanent staff are off, not on standby
         };
       }
@@ -1596,7 +1603,7 @@ const cloud = {
         const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
         if (!bucket) continue;
         bucket.assigned++;
-        if (isOncall) bucket.oncallAssigned++;
+        if (isOncall) { bucket.oncallAssigned++; bucket.oncallEmp[a.employee_id] = 1; }
       } else if (a.zone && ZONES.includes(a.zone)) {
         // A leave/zone entry isn't tied to a mission, so its board comes from
         // the employee: the board they worked on that day (a loan), else their
@@ -1606,6 +1613,8 @@ const cloud = {
         const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
         if (!bucket) continue;
         bucket.leave++;
+        bucket.leaveBy[a.zone]++;
+        bucket.leaveEmp[a.employee_id] = a.zone;
         if (isOncall) bucket.oncallLeave++;
       }
     }

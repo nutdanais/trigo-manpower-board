@@ -294,7 +294,14 @@ const OV_HISTORY_MEASURES = [
     help: "Permanent people on no mission, no leave and no holiday each working day, the board's Standby, averaged over the range. It is the share Utilization misses. On-call people who were not called in are not idle." },
   { key: "missions", label: "Missions / day", suffix: "",  value: (r) => r.staffedMissions,
     help: "Missions with at least one person on them each working day, averaged over the range." },
+  { key: "leave",    label: "Leave / day",    suffix: "",  value: (r) => r.leave,
+    help: "People on leave each working day, all five types (Exchange Working Day included), permanent and on-call, averaged over the range. The type buttons show or hide a type in the chart and the calendar." },
+  { key: "oncall",   label: "On-call deployed / day", suffix: "", value: (r) => r.oncallAssigned,
+    help: "On-call people (the dashed OC cards) on a mission each working day, averaged over the range. The pale bar behind each day is the on-call people available that day: the on-call roster minus those on leave." },
 ];
+/* History's Leave view: one colour per leave type (the board itself has one leave colour) */
+const OV_LEAVE_COLORS = { annual: "var(--leave-annual)", sick: "var(--leave-sick)", business: "var(--leave-business)", unpaid: "var(--leave-unpaid)", exchange: "var(--leave-exchange)" };
+const OV_NAMES_SHOWN = 8;   // rows in History's "Most days on leave" / "Most called in" before "+N more"
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
 /* the utilization formula, said once behind an ⓘ (hover / focus) instead of
    printed under two sections */
@@ -477,6 +484,8 @@ const state = {
     boardId: ovBoardSaved(),      // the board selector at the top: "" = all boards; otherwise one
                                   // board id. Scopes EVERY section, History included (ovScopeBoards)
     historyMeasure: "util",       // the History tile charted day by day (OV_HISTORY_MEASURES key)
+    historyLeaveView: "chart",    // the Leave tile's view: "chart" (columns by type) | "calendar"
+    historyLeaveHidden: [],       // leave types switched off in the Leave chart and calendar
     history: null,                // cloud.getUtilizationRange() over the History range
     historyCacheKey: null,
   },
@@ -3872,8 +3881,9 @@ function historyDates(boards) {
    as hard as a large one. Boards that are off that date drop out (they have
    no headcount to contribute to a day they aren't working). */
 function historyDayRec(d, boards, hist) {
-  const sum = { staffedMissions: 0, byEngineer: {} };
+  const sum = { staffedMissions: 0, byEngineer: {}, leaveBy: {}, leaveEmp: {}, oncallEmp: {} };
   for (const k of HISTORY_SUM_KEYS) sum[k] = 0;
+  for (const z of LEAVE_ZONES) sum.leaveBy[z] = 0;
   let any = false;
   for (const b of boards) {
     if (isNonWorkingDate(d, b.id)) continue;
@@ -3881,6 +3891,10 @@ function historyDayRec(d, boards, hist) {
     if (!rec || !boardDayPlanned(rec)) continue;   // not planned: left out, see boardDayPlanned
     any = true;
     for (const k of HISTORY_SUM_KEYS) sum[k] += rec[k] || 0;
+    // leave by type and who: the Leave and On-call views (a person is on one board a day)
+    for (const z of LEAVE_ZONES) sum.leaveBy[z] += (rec.leaveBy && rec.leaveBy[z]) || 0;
+    Object.assign(sum.leaveEmp, rec.leaveEmp || {});
+    Object.assign(sum.oncallEmp, rec.oncallEmp || {});
     for (const engId in (rec.byEngineer || {})) {
       const src = rec.byEngineer[engId];
       const acc = sum.byEngineer[engId] ||
@@ -4024,13 +4038,15 @@ function historySection(dates, recs, unplanned, pendingCharts) {
     const values = recs.map(r => (r ? m.value(r) : null));
     const mean = historyMean(values);
     const latest = lastIdx != null ? values[lastIdx] : null;
+    // on-call reads against who could have been called that day: "today 6 of 18"
+    const of = m.key === "oncall" && latest != null ? ` of ${historyOncallAvail(recs[lastIdx])}` : "";
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "ov-htile";
     btn.setAttribute("aria-pressed", String(ov.historyMeasure === m.key));
     btn.innerHTML = `<span class="ov-htile-label">${m.label}</span>
       <span class="ov-htile-value">${mean == null ? "—" : mean + m.suffix}<small> avg</small></span>
-      <span class="ov-htile-sub">${latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}`}</span>`;
+      <span class="ov-htile-sub">${latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}${of}`}</span>`;
     btn.title = m.help;
     btn.onclick = () => { if (ov.historyMeasure !== m.key) { ov.historyMeasure = m.key; render(); } };
     tiles.appendChild(btn);
@@ -4058,6 +4074,8 @@ function historySection(dates, recs, unplanned, pendingCharts) {
   }
 
   const m = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
+  if (m.key === "leave") { sec.appendChild(historyLeaveView(dates, recs, pendingCharts)); return sec; }
+  if (m.key === "oncall") { sec.appendChild(historyOncallView(dates, recs, pendingCharts)); return sec; }
   const values = recs.map(r => (r ? m.value(r) : null));
   const mean = historyMean(values);
   const box = document.createElement("div");
@@ -4074,6 +4092,241 @@ function historySection(dates, recs, unplanned, pendingCharts) {
     emptyLabel: "No data in this range",
   }));
   return sec;
+}
+
+/* ---------- History → Leave / day and On-call deployed / day ----------
+   Both read the same per-day records as the other tiles (historyDayRec), so the
+   board selector, the range and the "not planned" rule apply unchanged: a
+   board-day nobody planned is left out here too. Figures are person-days (3
+   people on leave for 2 days = 6); the tables also count different people. */
+function historyOncallAvail(r) {
+  // on-call roster minus on-call leave; never below who was actually called in
+  return Math.max(r.oncallAssigned, r.oncallHeadcount - r.oncallLeave);
+}
+function fillColumnChart(wrap, opts) {
+  const w = Math.max(300, Math.round(wrap.clientWidth) || 720);   // same floor as fillLineChart
+  wrap.innerHTML = Charts.columnChart({ ...opts, width: w });
+}
+const fmt1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
+const ovEmpName = (id) => { const e = D().employees.find(x => x.id === id); return e ? e : null; };
+
+/* The ranked name list under Leave and On-call: [{id, days, sub}] busiest first */
+function historyNamesTable(rows, { title, sub, daysLabel, empty }) {
+  const box = document.createElement("div");
+  box.className = "ov-hnames";
+  box.innerHTML = `<div class="ov-hchart-head"><b>${escapeHtml(title)}</b> <span class="ov-muted">${escapeHtml(sub)}</span></div>`;
+  if (!rows.length) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: empty }));
+    return box;
+  }
+  const max = Math.max(1, ...rows.map(r => r.days));
+  const shown = rows.slice(0, OV_NAMES_SHOWN);
+  const wrap = document.createElement("div");
+  wrap.className = "ov-table-wrap";
+  wrap.innerHTML = `<table class="ov-table ov-hnames-table"><thead><tr><th>Name</th><th class="r">${escapeHtml(daysLabel)}</th><th></th></tr></thead><tbody>`
+    + shown.map(r => {
+      const e = ovEmpName(r.id);
+      const oc = e && e.contract === "oncall" ? ' <span class="ov-oc-tag">OC</span>' : "";
+      return `<tr><td><span data-no-i18n>${escapeHtml(e ? e.name : "Removed employee")}</span>${oc}</td>
+        <td class="r"><b>${r.days}</b></td>
+        <td><span class="ov-hbar"><i style="width:${(r.days / max * 100).toFixed(1)}%;background:${r.color}"></i></span>${r.sub ? ` <span class="ov-muted">${r.sub}</span>` : ""}</td></tr>`;
+    }).join("")
+    + (rows.length > shown.length ? `<tr><td colspan="3" class="ov-muted">+${rows.length - shown.length} more</td></tr>` : "")
+    + `</tbody></table>`;
+  box.appendChild(wrap);
+  return box;
+}
+
+function historyLeaveView(dates, recs, pendingCharts) {
+  const ov = state.overview;
+  const hidden = new Set(ov.historyLeaveHidden || []);
+  const shown = LEAVE_ZONES.filter(z => !hidden.has(z));
+  const byType = (z) => recs.map(r => (r ? r.leaveBy[z] || 0 : null));
+  const shownTotal = recs.map(r => (r ? shown.reduce((a, z) => a + (r.leaveBy[z] || 0), 0) : null));
+  const box = document.createElement("div");
+  box.className = "ov-hchart";
+
+  // heading + the Chart | Calendar switch
+  const head = document.createElement("div");
+  head.className = "ov-hchart-head ov-hchart-head-row";
+  head.innerHTML = `<b>Leave, day by day</b>`;
+  const views = document.createElement("div");
+  views.className = "ov-trend-btns ov-hview";
+  views.setAttribute("role", "group");
+  views.setAttribute("aria-label", "Leave view");
+  for (const [key, label] of [["chart", "Chart"], ["calendar", "Calendar"]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (ov.historyLeaveView === key ? " active" : "");
+    b.setAttribute("aria-pressed", String(ov.historyLeaveView === key));
+    b.textContent = label;
+    b.onclick = () => { if (ov.historyLeaveView !== key) { ov.historyLeaveView = key; render(); } };
+    views.appendChild(b);
+  }
+  head.appendChild(views);
+  box.appendChild(head);
+
+  // one button per type: shows / hides it in the chart and the calendar (never all off)
+  const chips = document.createElement("div");
+  chips.className = "ov-lv-chips";
+  for (const z of LEAVE_ZONES) {
+    const c = document.createElement("button");
+    c.type = "button";
+    c.className = "ov-lv-chip";
+    c.setAttribute("aria-pressed", String(!hidden.has(z)));
+    const avg = historyMean(byType(z));
+    c.innerHTML = `<i style="background:${OV_LEAVE_COLORS[z]}"></i><span>${escapeHtml(ZONE_LABELS[z])}</span> <small>${avg == null ? "—" : fmt1(avg)} / day</small>`;
+    c.title = `Show or hide ${ZONE_LABELS[z]}`;
+    c.onclick = () => {
+      if (hidden.has(z)) hidden.delete(z);
+      else if (shown.length > 1) hidden.add(z);
+      ov.historyLeaveHidden = [...hidden];
+      render();
+    };
+    chips.appendChild(c);
+  }
+  box.appendChild(chips);
+
+  if (ov.historyLeaveView === "calendar") {
+    box.appendChild(historyLeaveCalendar(dates, recs, shown));
+  } else {
+    const mean = historyMean(shownTotal);
+    const wrap = document.createElement("div");
+    wrap.className = "ov-trend-chart";
+    box.appendChild(wrap);
+    pendingCharts.push(() => fillColumnChart(wrap, {
+      stacks: shown.map(z => ({ label: ZONE_LABELS[z], color: OV_LEAVE_COLORS[z], values: byType(z) })),
+      xLabels: dates.map(shortDateLabel), dayTotals: shownTotal.map(v => (v == null ? null : `${v} on leave`)),
+      yMax: Charts.niceMax(shownTotal.filter(v => v != null)), height: 220,
+      refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: `avg ${fmt1(mean)}` }] : [],
+    }));
+  }
+
+  // by type: person-days, average, share, different people, busiest day (every type, whatever is hidden)
+  const totals = LEAVE_ZONES.map(z => byType(z).reduce((a, v) => a + (v || 0), 0));
+  const all = totals.reduce((a, b) => a + b, 0);
+  const pcts = shares100(totals);
+  const maxT = Math.max(1, ...totals);
+  const people = {}, everyone = new Set();
+  for (const z of LEAVE_ZONES) people[z] = new Set();
+  for (const r of recs) if (r) for (const id in r.leaveEmp) { people[r.leaveEmp[id]] && people[r.leaveEmp[id]].add(id); everyone.add(id); }
+  const tbl = document.createElement("div");
+  tbl.className = "ov-table-wrap";
+  tbl.innerHTML = `<table class="ov-table ov-lv-table"><thead><tr><th>Leave type</th><th class="r">Person-days</th><th class="r">Avg / day</th><th>Share</th><th class="r">People</th><th class="ov-wide">Peak day</th></tr></thead><tbody>`
+    + LEAVE_ZONES.map((z, i) => {
+      const v = byType(z);
+      let pk = -1;
+      v.forEach((x, k) => { if (x != null && x > 0 && (pk < 0 || x > v[pk])) pk = k; });
+      const avg = historyMean(v);
+      return `<tr${hidden.has(z) ? ' class="ov-lv-off"' : ""}><td><span class="ov-table-nameinner"><span class="ov-table-dot" style="background:${OV_LEAVE_COLORS[z]}"></span><span class="ov-table-label">${escapeHtml(ZONE_LABELS[z])}</span></span></td>
+        <td class="r">${totals[i]}</td><td class="r">${avg == null ? "—" : fmt1(avg)}</td>
+        <td><span class="ov-hbar"><i style="width:${(totals[i] / maxT * 100).toFixed(1)}%;background:${OV_LEAVE_COLORS[z]}"></i></span> ${pcts[i]}%</td>
+        <td class="r">${people[z].size}</td><td class="ov-wide">${pk < 0 ? "—" : `${escapeHtml(fmtDate(dates[pk]))} (${v[pk]})`}</td></tr>`;
+    }).join("")
+    + `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All leave</span></td><td class="r"><b>${all}</b></td>
+      <td class="r"><b>${historyMean(recs.map(r => (r ? r.leave : null))) == null ? "—" : fmt1(historyMean(recs.map(r => (r ? r.leave : null))))}</b></td><td></td>
+      <td class="r"><b>${everyone.size}</b></td><td class="ov-wide"></td></tr></tbody></table>`;
+  box.appendChild(tbl);
+
+  // who: most days on leave, with the split by type
+  const per = new Map();
+  for (const r of recs) if (r) for (const id in r.leaveEmp) {
+    const p = per.get(id) || { id, days: 0, by: {} };
+    p.days++; p.by[r.leaveEmp[id]] = (p.by[r.leaveEmp[id]] || 0) + 1;
+    per.set(id, p);
+  }
+  const nameOf = (id) => (ovEmpName(id) || { name: "" }).name;
+  const rows = [...per.values()].sort((a, b) => b.days - a.days || nameOf(a.id).localeCompare(nameOf(b.id)))
+    .map(p => ({ id: p.id, days: p.days, color: "var(--leave-annual)",
+      sub: LEAVE_ZONES.filter(z => p.by[z]).map(z => `${escapeHtml(ZONE_LABELS[z])} ${p.by[z]}`).join(" · ") }));
+  box.appendChild(historyNamesTable(rows, { title: "Most days on leave", sub: `${everyone.size} ${everyone.size === 1 ? "person" : "people"} took leave in the range`, daysLabel: "Days", empty: "Nobody was on leave in this range." }));
+  return box;
+}
+
+/* The Leave view's calendar: one month grid per month in the range, a cell per
+   day coloured by how many were on leave (the types shown), with the on-call
+   people deployed that day under it. Days History leaves out (weekends,
+   holidays, boards nobody planned) are plain grey cells. */
+function historyLeaveCalendar(dates, recs, shown) {
+  const ov = state.overview;
+  const byDate = new Map(dates.map((d, i) => [d, recs[i]]));
+  const count = (r) => shown.reduce((a, z) => a + (r.leaveBy[z] || 0), 0);
+  const max = Math.max(1, ...recs.filter(Boolean).map(count));
+  const wrap = document.createElement("div");
+  wrap.className = "ov-cal-wrap";
+  let html = "";
+  const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const monday = (d) => addDays(d, -((new Date(d + "T00:00:00").getDay() + 6) % 7));
+  const sunday = (d) => addDays(monday(d), 6);
+  const MONTHS_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  for (let m = monthStart(ov.historyFrom); m <= ov.historyTo; m = addDays(monthEnd(m), 1)) {
+    // only the weeks the range touches: a range of 15 Oct → 3 Nov draws three weeks of
+    // October and one of November, not two whole months of grey
+    const end = monthEnd(m) < sunday(ov.historyTo) ? monthEnd(m) : sunday(ov.historyTo);
+    const first = m > monday(ov.historyFrom) ? m : monday(ov.historyFrom);
+    html += `<div class="ov-cal-month"><div class="ov-cal-title">${`${MONTHS_FULL[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`}</div><div class="ov-cal">`
+      + DOW.map(d => `<div class="ov-cal-dow">${d}</div>`).join("");
+    const lead = (new Date(first + "T00:00:00").getDay() + 6) % 7;   // Monday first
+    for (let i = 0; i < lead; i++) html += `<div class="ov-cal-cell ov-cal-blank"></div>`;
+    for (let d = first; d <= end; d = addDays(d, 1)) {
+      const day = Number(d.slice(8));
+      const inRange = d >= ov.historyFrom && d <= ov.historyTo;
+      const plotted = byDate.has(d);
+      const r = byDate.get(d);
+      if (!inRange || !plotted || !r) {
+        const why = !inRange ? "" : !plotted ? "Day off" : "Not planned";
+        html += `<div class="ov-cal-cell ov-cal-off"><span class="ov-cal-d">${day}</span>${why ? `<span class="ov-cal-why">${why}</span>` : ""}</div>`;
+        continue;
+      }
+      const n = count(r);
+      const lvl = n ? Math.min(4, Math.ceil((n / max) * 4)) : 0;
+      const parts = shown.filter(z => r.leaveBy[z]).map(z => `${ZONE_LABELS[z]} ${r.leaveBy[z]}`);
+      const label = `${fmtDow(d)} ${fmtDate(d)}${parts.length ? " — " + parts.join(" · ") : ""} · ${r.oncallAssigned} on-call deployed of ${historyOncallAvail(r)}`;
+      html += `<div class="ov-cal-cell ov-cal-l${lvl} chart-mark" tabindex="0" data-tip-value="${n} on leave" data-tip-label="${escapeHtml(label)}">
+        <span class="ov-cal-d">${day}</span><span class="ov-cal-n">${n}</span><span class="ov-cal-oc">${r.oncallAssigned} on-call</span></div>`;
+    }
+    html += `</div></div>`;
+  }
+  wrap.innerHTML = html
+    + `<div class="ov-cal-key"><span>Fewer</span>${[0, 1, 2, 3, 4].map(l => `<i class="ov-cal-l${l}"></i>`).join("")}<span>More on leave</span>
+       <span class="ov-cal-key-oc">N on-call</span><span>on-call people deployed</span></div>`;
+  return wrap;
+}
+
+function historyOncallView(dates, recs, pendingCharts) {
+  const called = recs.map(r => (r ? r.oncallAssigned : null));
+  const avail = recs.map(r => (r ? historyOncallAvail(r) : null));
+  const sumOf = (a) => a.reduce((s, v) => s + (v || 0), 0);
+  const mean = historyMean(called), meanAvail = historyMean(avail);
+  const rate = sumOf(avail) ? Math.round((sumOf(called) / sumOf(avail)) * 100) : null;
+  const crew = sumOf(recs.map(r => (r ? r.assigned : 0)));
+  const share = crew ? Math.round((sumOf(called) / crew) * 100) : null;
+  const box = document.createElement("div");
+  box.className = "ov-hchart";
+  box.innerHTML = `<div class="ov-hchart-head ov-hchart-head-row"><b>On-call deployed, day by day</b>
+    <span class="ov-muted">${rate == null ? "" : `Called in on ${rate}% of the available on-call days`}${share == null ? "" : ` · ${share}% of the people on missions`}</span></div>`;
+  box.appendChild(ovLegend([
+    { label: `Called in · ${mean == null ? "—" : fmt1(mean)} / day`, color: "var(--chart-oncall)" },
+    { label: `Available, not called · ${meanAvail == null || mean == null ? "—" : fmt1(meanAvail - mean)} / day`, color: "var(--oncall-ghost)" },
+  ]));
+  const wrap = document.createElement("div");
+  wrap.className = "ov-trend-chart";
+  box.appendChild(wrap);
+  pendingCharts.push(() => fillColumnChart(wrap, {
+    stacks: [{ label: "Called in", color: "var(--chart-oncall)", values: called }],
+    ghost: { label: "On-call available", color: "var(--oncall-ghost)", values: avail },
+    xLabels: dates.map(shortDateLabel), dayTotals: called.map((v, i) => (v == null ? null : `${v} of ${avail[i]} on-call`)),
+    yMax: Charts.niceMax(avail.filter(v => v != null)), height: 220,
+    refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: `avg ${fmt1(mean)}` }] : [],
+  }));
+  // who carries the on-call load: days each on-call person was on a mission
+  const per = new Map();
+  for (const r of recs) if (r) for (const id in r.oncallEmp) per.set(id, (per.get(id) || 0) + 1);
+  const nameOf = (id) => (ovEmpName(id) || { name: "" }).name;
+  const rows = [...per.entries()].sort((a, b) => b[1] - a[1] || nameOf(a[0]).localeCompare(nameOf(b[0])))
+    .map(([id, days]) => ({ id, days, color: "var(--chart-oncall)", sub: "" }));
+  box.appendChild(historyNamesTable(rows, { title: "Most called in", sub: `${per.size} on-call ${per.size === 1 ? "person was" : "people were"} called in`, daysLabel: "Days", empty: "No on-call people were called in this range." }));
+  return box;
 }
 
 /* A small crew-per-day trend for one engineer row: area + line + today's dot,
