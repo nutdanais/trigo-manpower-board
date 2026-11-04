@@ -1,0 +1,489 @@
+<title>Leave & On-call History</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: options for showing leave (overall and by type)
+   and on-call staff deployed per day in Overview → History. Tokens copied from
+   styles.css so the mockups read like the real Overview. Light only, like the app.
+   Layout: a reading column of options, each a real-looking Overview section + verdict. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --primary-text: #003a66; --brand-green: #a8c855; --hover-tint: #eef3fb;
+  --chart-assigned: #2a78d6; --chart-oncall: #eb6834; --chart-standby: #e34948; --grid: #e6e9ee;
+  /* proposed leave-type colours (the app has one leave colour today, amber) */
+  --lv-annual: #eda100; --lv-sick: #e87ba4; --lv-business: #4a3aa7; --lv-unpaid: #7b8794; --lv-exchange: #1baf7a;
+  --ghost: #fbe3d8;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
+h2 { font-size: 19px; letter-spacing: -.2px; text-wrap: balance; }
+h3 { font-size: 15px; }
+p { max-width: 72ch; }
+.lede { color: var(--muted); margin-top: 6px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #e3e8ee; color: var(--muted); }
+.tag.rec { background: #eaf3d6; color: #3d5410; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 10px; }
+.panel ul { padding-left: 18px; display: grid; gap: 4px; max-width: 80ch; }
+.rec-panel { border-left: 4px solid var(--brand-green); }
+code { font-size: 12.5px; background: #eef1f4; padding: 1px 5px; border-radius: 4px; }
+
+.option { display: grid; gap: 12px; }
+.option-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.letter { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--primary); color: #fff; font-weight: 700; font-size: 14px; flex: none; align-self: center; }
+.verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.verdict > div { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 13px; min-width: 0; }
+.verdict b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+.verdict ul { padding-left: 16px; display: grid; gap: 3px; }
+@media (max-width: 720px) { .verdict { grid-template-columns: 1fr; } }
+
+/* ---- the app's Overview section look (copied from styles.css .ov-*) ---- */
+.ov-section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.ov-section h3 { margin-bottom: -6px; }
+.ov-sub { font-size: 12px; color: var(--muted); max-width: 760px; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+.btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.range { font-size: 12px; color: var(--muted); }
+.htiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1000px) { .htiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .htiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.htile { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; min-width: 0; position: relative; }
+.htile:hover { background: var(--hover-tint); }
+.htile[aria-pressed="true"] { border-color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-text); }
+.htile:focus-visible, .chip:focus-visible, .btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.htile-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.htile-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.htile-value small, .htile-sub { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.htile.new .htile-label { padding-right: 34px; }
+.htile.new::after { content: "new"; position: absolute; top: 7px; right: 8px; font-size: 10px; font-weight: 700; color: #3d5410; background: #eaf3d6; border-radius: 999px; padding: 1px 6px; }
+.help { font-size: 12px; color: var(--muted); max-width: 90ch; }
+.hchart { border-top: 1px solid var(--border); padding-top: 12px; display: grid; gap: 6px; min-width: 0; }
+.hchart-head { font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
+.chart { width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; }
+.chart text { font-family: var(--font-ui); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
+.chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.chip[aria-pressed="false"] { opacity: .45; }
+.chip[aria-pressed="false"] i { background: #c9ced6 !important; }
+.chip.static { cursor: default; }
+.chip small { color: var(--muted); font-weight: 600; }
+
+/* figure strip + tables for option B */
+.figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 720px) { .figs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fig { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; min-width: 0; }
+.fig span { display: block; font-size: 12px; font-weight: 600; color: var(--muted); }
+.fig b { font-size: 19px; font-variant-numeric: tabular-nums; }
+.fig small { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.two { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+.tbl-wrap { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 6px 8px; border-bottom: 1px solid #eef0f3; white-space: nowrap; vertical-align: middle; }
+td.num, th.num { text-align: right; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.bar { display: inline-block; width: 90px; height: 7px; background: #eef0f3; border-radius: 999px; overflow: hidden; vertical-align: middle; }
+.bar i { display: block; height: 100%; border-radius: 999px; }
+.oc { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--chart-oncall); background: rgba(235,104,52,.13); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+.gated { font-size: 11.5px; color: var(--muted); }
+
+/* calendar for option C */
+.cal-wrap { overflow-x: auto; }
+.cal { display: grid; grid-template-columns: repeat(5, minmax(96px, 1fr)) repeat(2, minmax(34px, .35fr)); gap: 5px; min-width: 600px; }
+.cal-dow { font-size: 11.5px; font-weight: 600; color: var(--muted); padding: 0 4px; }
+.cell { border-radius: 7px; border: 1px solid var(--border); min-height: 70px; padding: 6px 7px; display: grid; grid-template-rows: auto 1fr auto; font-variant-numeric: tabular-nums; position: relative; }
+.cell.off { background: #f3f5f7; border-style: dashed; color: #a3abb5; }
+.cell.empty { border: none; background: none; }
+.cell .d { font-size: 11px; font-weight: 600; color: var(--muted); }
+.cell .lv { font-size: 19px; font-weight: 700; align-self: center; }
+.cell .lv small { font-size: 11px; font-weight: 600; color: var(--muted); }
+.cell .ocb { font-size: 11px; font-weight: 700; color: var(--chart-oncall); justify-self: start; background: #fff; border-radius: 4px; padding: 0 5px; }
+.cell .hol { font-size: 10.5px; }
+.scale { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.scale i { width: 18px; height: 10px; border-radius: 3px; border: 1px solid var(--border); }
+
+#tip { position: fixed; pointer-events: none; z-index: 20; background: #1f2937; color: #fff; font-size: 12px; line-height: 1.4; padding: 6px 9px; border-radius: 6px; max-width: 240px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+#tip b { display: block; }
+.qs { counter-reset: q; display: grid; gap: 10px; }
+.qs li { list-style: none; counter-increment: q; display: grid; grid-template-columns: 26px 1fr; gap: 8px; }
+.qs li::before { content: counter(q); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) { .htile, .chip { transition: background .12s, opacity .12s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <span class="tag">Overview → History</span>
+      <span class="tag">Sample data · October 2026 · All boards · 20 working days</span>
+    </div>
+    <h1>Leave and on-call in History</h1>
+    <p class="lede">Three ways to show leave, as a total and by type, and how many on-call people were deployed each day. Every mockup is live: pick a tile, switch a leave type on or off, and hover a day for its numbers.</p>
+  </header>
+
+  <section class="panel">
+    <h2>What History has today</h2>
+    <ul>
+      <li>Four tiles: <b>Utilization</b>, <b>Deployed / day</b>, <b>Standby / day</b> and <b>Missions / day</b>. Pick one to chart it day by day with its average. They follow the range presets and the board selector, and leave out weekends, holidays and boards nobody planned.</li>
+      <li>The figures behind it already count <b>on-call people on a mission</b> each day (<code>oncallAssigned</code>) and the <b>on-call roster</b> (<code>oncallHeadcount</code>), but nothing shows them.</li>
+      <li>Leave comes in one row per person with its type (Annual, Sick, Business, Unpaid, Exchange Working Day). It is added into <b>one total</b>, so the split by type is lost at the very end. Keeping the type is a few lines in <code>cloud.js</code>, with <b>no database change</b>.</li>
+    </ul>
+  </section>
+
+  <section class="panel rec-panel">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h2>My recommendation</h2><span class="tag rec">A, with B's by-type table</span></div>
+    <p>Start with <b>Option A</b>: two more tiles in the History you already have. It is the smallest change and works the same way people already use History. Under the leave chart, add <b>B's small by-type table</b> (days, average per day, share, people). It answers "by type" with numbers you can read off, and the legend chips can't do that alone. Keep <b>C (calendar)</b> for later, if planners ask which days were heavy.</p>
+  </section>
+
+  <!-- ===================== OPTION A ===================== -->
+  <section class="option" id="opt-a">
+    <div class="option-head"><span class="letter">A</span><h2>Two more tiles in History</h2><span class="tag rec">Recommended</span></div>
+    <p class="muted">Add <b>Leave / day</b> and <b>On-call deployed / day</b> next to the four tiles. Picking Leave draws a stacked column per day by type, with a chip per type to show or hide it. Picking On-call draws the people called in against the on-call people available that day.</p>
+    <div class="ov-section">
+      <h3>History</h3>
+      <p class="ov-sub">Daily averages over the range. Pick a tile to see that measure day by day. Weekends and holidays are left out.</p>
+      <div class="controls">
+        <div class="btns"><button class="btn" type="button">This month</button><button class="btn active" type="button">Last month</button><button class="btn" type="button">Last 30d</button><button class="btn" type="button">Last 90d</button><button class="btn" type="button">YTD</button></div>
+        <span class="range">1 Oct 2026 → 31 Oct 2026 · 20 working days · All boards</span>
+      </div>
+      <div class="htiles" id="a-tiles" role="group" aria-label="History measure"></div>
+      <p class="help" id="a-help"></p>
+      <div class="hchart">
+        <div class="hchart-head"><b id="a-title"></b><span class="small muted" id="a-note"></span></div>
+        <div class="legend" id="a-legend"></div>
+        <div class="chart" id="a-chart"></div>
+        <div class="tbl-wrap" id="a-table"></div>
+      </div>
+    </div>
+    <div class="verdict">
+      <div><b>Good for</b><ul><li>Smallest change. The same tiles, range and board selector people already use.</li><li>One chart at a time on its own axis, the rule History already follows.</li><li>The by-type table gives exact figures to quote in a report.</li></ul></div>
+      <div><b>Watch out</b><ul><li>Six tiles wrap to two rows of three on a laptop and two columns on a phone.</li><li>You can't see leave and on-call side by side. You flip between them.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ===================== OPTION B ===================== -->
+  <section class="option" id="opt-b">
+    <div class="option-head"><span class="letter">B</span><h2>Their own sections, like Engineer workload</h2></div>
+    <p class="muted">History keeps its four tiles. Two new sections follow Engineer workload and use the same range and board: <b>Leave</b> and <b>On-call deployment</b>. Each has headline figures, a chart that is always visible, and a table. That includes who was called in most, which matters for keeping on-call work fair.</p>
+
+    <div class="ov-section">
+      <h3>Leave</h3>
+      <p class="ov-sub">People on leave each working day, by type. Same range and board as History.</p>
+      <div class="figs" id="b-lv-figs"></div>
+      <div class="two">
+        <div class="hchart" style="border:none;padding:0"><div class="legend" id="b-lv-legend"></div><div class="chart" id="b-lv-chart"></div></div>
+        <div class="tbl-wrap" id="b-lv-table"></div>
+      </div>
+      <div>
+        <div class="hchart-head"><b>Most days on leave</b><span class="gated">Names follow a Roles permission, like the attention card's idle names</span></div>
+        <div class="tbl-wrap" id="b-lv-people"></div>
+      </div>
+    </div>
+
+    <div class="ov-section">
+      <h3>On-call deployment</h3>
+      <p class="ov-sub">On-call people sent on a mission each working day, against the on-call people available (on-call roster minus on-call leave).</p>
+      <div class="figs" id="b-oc-figs"></div>
+      <div class="two">
+        <div class="hchart" style="border:none;padding:0"><div class="legend"><span class="chip static"><i style="background:var(--chart-oncall)"></i>Called in</span><span class="chip static"><i style="background:var(--ghost)"></i>Available, not called</span></div><div class="chart" id="b-oc-chart"></div></div>
+        <div><div class="hchart-head" style="margin-bottom:4px"><b>Most called in</b><span class="gated">of 20 working days</span></div><div class="tbl-wrap" id="b-oc-people"></div></div>
+      </div>
+    </div>
+    <div class="verdict">
+      <div><b>Good for</b><ul><li>Everything is visible at once, with no tile to pick.</li><li>Answers follow-up questions: the peak day, how many people took leave, call-in rate, who carries the on-call load.</li><li>Each section can have its own row in Roles &amp; permissions.</li></ul></div>
+      <div><b>Watch out</b><ul><li>The Overview page gets two sections longer.</li><li>The name lists need per-person data. The Manpower List's 30D column already fetches it, but it is a second query.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ===================== OPTION C ===================== -->
+  <section class="option" id="opt-c">
+    <div class="option-head"><span class="letter">C</span><h2>A calendar of the range</h2></div>
+    <p class="muted">One cell per day, coloured by how many people were on leave, with the on-call count in orange underneath. The chips filter the leave count by type. It reads like the planning calendar and shows at a glance which days were heavy, such as the days next to a holiday.</p>
+    <div class="ov-section">
+      <h3>Leave and on-call calendar</h3>
+      <p class="ov-sub">People on leave each day (colour and number) and on-call people deployed (orange). Hover a day for the breakdown.</p>
+      <div class="controls"><div class="legend" id="c-legend"></div>
+        <div class="scale"><span>Fewer</span><i style="background:#fff"></i><i style="background:#fdf3d8"></i><i style="background:#fae2a3"></i><i style="background:#f5cb6a"></i><i style="background:#eab33d"></i><span>More on leave</span></div></div>
+      <div class="cal-wrap"><div class="cal" id="c-cal"></div></div>
+    </div>
+    <div class="verdict">
+      <div><b>Good for</b><ul><li>Shows patterns by date: bridge days, Mondays and Fridays, a sick-leave wave.</li><li>Both answers sit in one view.</li></ul></div>
+      <div><b>Watch out</b><ul><li>Best for a month. 90d and YTD become a stack of small months.</li><li>It shows where leave was heavy, not exact totals. It needs A's or B's figures beside it.</li><li>On a phone the week needs a sideways scroll, or a list instead.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Questions before I build it</h2>
+    <ol class="qs">
+      <li><div><b>Exchange Working Day.</b> The board files it under leave, but it is a swapped day, not time off. Should it count in the leave total, or show as its own type outside the total? The mockups show it as a type that counts, and its chip can switch it off.</div></li>
+      <li><div><b>"On-call inspectors".</b> Does this mean everyone on an on-call contract (the dashed <b>OC</b> cards), or only on-call people whose position is Inspector? The mockups count every on-call person.</div></li>
+      <li><div><b>Leave on a day the board wasn't planned.</b> History leaves out a board-day nobody planned (no missions), and its leave goes with it. Leave is real even then. Should leave be counted on every working day?</div></li>
+      <li><div><b>Names.</b> Should the per-person lists (most days on leave, most called in) be in it at all? If yes, should they sit behind a permission in Roles?</div></li>
+      <li><div><b>Unit.</b> The figures are person-days (3 people on leave for 2 days = 6). The table also shows how many different people took each type. Is that the right pair?</div></li>
+    </ol>
+  </section>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+/* ---------- sample data: October 2026, all boards, 86 permanent + 20 on-call ---------- */
+let seed = 20261031;
+const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+const TYPES = [
+  { key: "annual", label: "Annual Leave", short: "Annual", color: "var(--lv-annual)", hex: "#eda100" },
+  { key: "sick", label: "Sick Leave", short: "Sick", color: "var(--lv-sick)", hex: "#e87ba4" },
+  { key: "business", label: "Business Leave", short: "Business", color: "var(--lv-business)", hex: "#4a3aa7" },
+  { key: "unpaid", label: "Unpaid Leave", short: "Unpaid", color: "var(--lv-unpaid)", hex: "#7b8794" },
+  { key: "exchange", label: "Exchange Working Day", short: "Exchange", color: "var(--lv-exchange)", hex: "#1baf7a" },
+];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const HOLIDAYS = { "2026-10-13": "King Bhumibol Memorial Day", "2026-10-23": "Chulalongkorn Day" };
+const PERM = 86, OC = 20;
+const days = [], calendar = [];
+for (let d = 1; d <= 31; d++) {
+  const iso = `2026-10-${String(d).padStart(2, "0")}`;
+  const dow = new Date(Date.UTC(2026, 9, d)).getUTCDay();
+  const off = dow === 0 || dow === 6 || HOLIDAYS[iso];
+  calendar.push({ iso, d, dow, off: !!off, hol: HOLIDAYS[iso] || "" });
+  if (off) continue;
+  const bridge = [12, 14, 22, 26].includes(d);           // next to a holiday: more annual leave
+  const lv = {
+    annual: ri(1, 4) + (bridge ? ri(3, 5) : 0) + (dow === 5 ? 1 : 0),
+    sick: (d >= 19 && d <= 21 ? ri(2, 4) : ri(0, 2)),     // a small sick wave in week 4
+    business: ri(0, 2) - (rnd() < .3 ? 1 : 0),
+    unpaid: rnd() < .2 ? 1 : 0,
+    exchange: rnd() < .3 ? ri(1, 2) : 0,
+  };
+  for (const k in lv) lv[k] = Math.max(0, lv[k]);
+  const leave = Object.values(lv).reduce((a, b) => a + b, 0);
+  const ocLeave = rnd() < .25 ? 1 : 0;
+  const ocAvail = OC - ocLeave;
+  const permLeave = leave - ocLeave;
+  const standby = ri(0, 3);
+  const permDeployed = PERM - permLeave - standby;
+  const ocDeployed = Math.min(ocAvail, Math.max(2, Math.round((dow === 1 || dow === 5 ? 6 : 10) + (bridge ? 4 : 0) + (d >= 19 && d <= 21 ? 3 : 0) + (rnd() * 5 - 2))));
+  days.push({ iso, d, dow, lv, leave, ocDeployed, ocAvail, standby, deployed: permDeployed + ocDeployed,
+    missions: ri(19, 27), util: Math.round(((permDeployed + ocDeployed) / (permDeployed + ocDeployed + standby)) * 1000) / 10 });
+  calendar[calendar.length - 1].rec = days[days.length - 1];
+}
+const N = days.length;
+const label = (r) => `${r.d} ${MON[9]}`;
+const longLabel = (r) => `${DOW[r.dow]} ${r.d} ${MON[9]}`;
+const mean = (a) => Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 10) / 10;
+const sum = (a) => a.reduce((x, y) => x + y, 0);
+const shares100 = (raw) => { const t = sum(raw); if (!t) return raw.map(() => 0); const ex = raw.map(v => v / t * 100), out = ex.map(Math.floor);
+  ex.map((v, i) => [v - out[i], i]).sort((a, b) => b[0] - a[0]).slice(0, 100 - sum(out)).forEach(([, i]) => out[i]++); return out; };
+
+/* people: distinct names per type and the sample per-person lists */
+const FIRST = ["Somchai","Anan","Kittipong","Wannaphat","Nattapong","Sirilak","Prasert","Chaiwat","Thanakorn","Pimchanok","Jirayu","Supachai","Arthit","Kanokwan","Phongsak","Rattana","Sakda","Teerawat","Narong","Boonmee"];
+const SUR = ["K.","S.","P.","W.","T.","C.","R.","N.","B.","J."];
+const name = (i) => `${FIRST[i % FIRST.length]} ${SUR[(i * 7) % SUR.length]}`;
+const PEOPLE_BY_TYPE = { annual: 31, sick: 14, business: 9, unpaid: 3, exchange: 6 };
+
+/* ---------- chart: columns on one scale, stacked, with an optional "available" ghost ---------- */
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; }
+function drawColumns(el, { stacks, ghost, avg, avgLabel, h = 210, tip }) {
+  const W = Math.max(280, el.clientWidth || 700);
+  const padL = 30, padR = 8, padT = 12, padB = 22, ih = h - padT - padB;
+  const totals = days.map((_, i) => sum(stacks.map(s => s.vals[i])));
+  const top = Math.max(1, ...totals, ...(ghost || [0]));
+  const step = niceStep(top / 4), yMax = step * Math.ceil(top / step);
+  const band = (W - padL - padR) / N, bw = Math.max(4, band * .64);
+  const y = (v) => padT + ih * (1 - v / yMax);
+  let s = "";
+  for (let v = 0; v <= yMax + 1e-9; v += step) s += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end">${+v.toFixed(1)}</text>`;
+  const every = band < 26 ? (band < 15 ? 5 : 2) : 1;
+  days.forEach((r, i) => {
+    const x = padL + i * band + (band - bw) / 2;
+    if (ghost) s += `<rect x="${x}" y="${y(ghost[i])}" width="${bw}" height="${y(0) - y(ghost[i])}" rx="2" fill="var(--ghost)"/>`;
+    let acc = 0;
+    for (const st of stacks) { const v = st.vals[i]; if (!v) continue;
+      s += `<rect x="${x}" y="${y(acc + v)}" width="${bw}" height="${y(acc) - y(acc + v) - (acc ? 0 : 0)}" fill="${st.color}" stroke="#fff" stroke-width=".8"/>`; acc += v; }
+    if (i % every === 0 || r.dow === 1 && every === 1) s += `<text x="${x + bw / 2}" y="${h - 6}" text-anchor="middle">${r.d}</text>`;
+    s += `<rect x="${padL + i * band}" y="${padT}" width="${band}" height="${ih}" fill="transparent" data-tip="${encodeURIComponent(tip(i))}"/>`;
+  });
+  if (avg != null) s += `<line x1="${padL}" x2="${W - padR}" y1="${y(avg)}" y2="${y(avg)}" stroke="var(--muted)" stroke-dasharray="4 3"/><text x="${W - padR}" y="${y(avg) - 4}" text-anchor="end" style="fill:var(--text);font-weight:600;stroke:#fff;stroke-width:4px;paint-order:stroke">${avgLabel || "avg"} ${avg}</text>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${h}" height="${h}" role="img" aria-label="day by day chart">${s}</svg>`;
+}
+const lineTip = (title, rows) => `<b>${title}</b>` + rows.map(([k, v, c]) => `${c ? `<span class="sw" style="background:${c}"></span>` : ""}${k}: <b style="display:inline">${v}</b>`).join("<br>");
+
+/* ---------- Option A ---------- */
+const A = { measure: "leave", hidden: new Set() };
+const leaveVals = (k) => days.map(r => r.lv[k]);
+const shownLeave = (r) => TYPES.filter(t => !A.hidden.has(t.key)).reduce((a, t) => a + r.lv[t.key], 0);
+const A_MEASURES = [
+  { key: "util", label: "Utilization", suffix: "%", val: r => r.util, help: "Assigned ÷ (Assigned + Standby), averaged over the working days." },
+  { key: "deployed", label: "Deployed / day", suffix: "", val: r => r.deployed, help: "People on a mission each working day (permanent and on-call), averaged over the range." },
+  { key: "idle", label: "Standby / day", suffix: "", val: r => r.standby, help: "Permanent people on no mission, no leave and no holiday each working day." },
+  { key: "missions", label: "Missions / day", suffix: "", val: r => r.missions, help: "Missions with at least one person on them each working day." },
+  { key: "leave", label: "Leave / day", suffix: "", val: r => r.leave, isNew: true, help: "People on any leave each working day (all five leave types, permanent and on-call), averaged over the range. The chips under the chart show or hide each type." },
+  { key: "oncall", label: "On-call deployed / day", suffix: "", val: r => r.ocDeployed, isNew: true, help: "On-call people on a mission each working day, averaged over the range. The pale bar behind each day is the on-call people available that day (on-call roster minus on-call leave)." },
+];
+function renderA() {
+  const tiles = document.getElementById("a-tiles"); tiles.innerHTML = "";
+  for (const m of A_MEASURES) {
+    const vals = days.map(m.val), last = vals[N - 1];
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "htile" + (m.isNew ? " new" : ""); b.setAttribute("aria-pressed", String(A.measure === m.key));
+    const sub = m.key === "oncall" ? `on 30 Oct ${last} of ${days[N - 1].ocAvail}` : `on 30 Oct ${last}${m.suffix}`;
+    b.innerHTML = `<span class="htile-label">${m.label}</span><span class="htile-value">${mean(vals)}${m.suffix}<small> avg</small></span><span class="htile-sub">${sub}</span>`;
+    b.onclick = () => { A.measure = m.key; renderA(); };
+    tiles.appendChild(b);
+  }
+  const m = A_MEASURES.find(x => x.key === A.measure);
+  document.getElementById("a-help").textContent = `${m.label}: ${m.help}`;
+  document.getElementById("a-title").textContent = m.key === "oncall" ? "On-call deployed, day by day" : `${m.label}, day by day`;
+  const legend = document.getElementById("a-legend"), chart = document.getElementById("a-chart"), table = document.getElementById("a-table"), note = document.getElementById("a-note");
+  legend.innerHTML = ""; table.innerHTML = ""; note.textContent = "";
+  if (m.key === "leave") {
+    for (const t of TYPES) {
+      const c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.setAttribute("aria-pressed", String(!A.hidden.has(t.key)));
+      c.innerHTML = `<i style="background:${t.color}"></i>${t.short} <small>${mean(leaveVals(t.key))}/day</small>`;
+      c.title = `Show or hide ${t.label}`;
+      c.onclick = () => { A.hidden.has(t.key) ? A.hidden.delete(t.key) : A.hidden.add(t.key); if (A.hidden.size === TYPES.length) A.hidden.delete(t.key); renderA(); };
+      legend.appendChild(c);
+    }
+    const shown = TYPES.filter(t => !A.hidden.has(t.key));
+    const avg = mean(days.map(shownLeave));
+    note.textContent = A.hidden.size ? `Showing ${shown.map(t => t.short).join(", ")}` : "All leave types";
+    drawColumns(chart, { stacks: shown.map(t => ({ color: t.color, vals: leaveVals(t.key) })), avg,
+      tip: i => lineTip(`${longLabel(days[i])} · ${shownLeave(days[i])} on leave`, shown.map(t => [t.short, days[i].lv[t.key], t.hex])) });
+    table.innerHTML = byTypeTable();
+  } else if (m.key === "oncall") {
+    const avgAvail = mean(days.map(r => r.ocAvail));
+    note.textContent = `Called in ${Math.round(sum(days.map(r => r.ocDeployed)) / sum(days.map(r => r.ocAvail)) * 100)}% of the available on-call days`;
+    legend.innerHTML = `<span class="chip static"><i style="background:var(--chart-oncall)"></i>Called in <small>${mean(days.map(r => r.ocDeployed))}/day</small></span><span class="chip static"><i style="background:var(--ghost)"></i>Available <small>${avgAvail}/day</small></span>`;
+    drawColumns(chart, { stacks: [{ color: "var(--chart-oncall)", vals: days.map(r => r.ocDeployed) }], ghost: days.map(r => r.ocAvail), avg: mean(days.map(r => r.ocDeployed)),
+      tip: i => lineTip(longLabel(days[i]), [["Called in", days[i].ocDeployed, "#eb6834"], ["Available, not called", days[i].ocAvail - days[i].ocDeployed, "#fbe3d8"], ["On leave", OC - days[i].ocAvail]]) });
+  } else {
+    const vals = days.map(m.val);
+    drawColumns(chart, { stacks: [{ color: "var(--chart-assigned)", vals }], avg: mean(vals), tip: i => lineTip(longLabel(days[i]), [[m.label, vals[i] + m.suffix]]) });
+  }
+}
+function byTypeTable() {
+  const totals = TYPES.map(t => sum(leaveVals(t.key))), all = sum(totals), pct = shares100(totals);
+  const max = Math.max(...totals);
+  const rows = TYPES.map((t, i) => {
+    const v = leaveVals(t.key), pk = v.indexOf(Math.max(...v));
+    return `<tr><td><span class="sw" style="background:${t.color}"></span>${t.label}</td><td class="num">${totals[i]}</td><td class="num">${mean(v)}</td>
+      <td><span class="bar"><i style="width:${totals[i] / max * 100}%;background:${t.color}"></i></span> ${pct[i]}%</td><td class="num">${PEOPLE_BY_TYPE[t.key]}</td><td>${Math.max(...v) ? `${label(days[pk])} (${Math.max(...v)})` : "—"}</td></tr>`;
+  }).join("");
+  return `<table><thead><tr><th>Leave type</th><th class="num">Person-days</th><th class="num">Avg / day</th><th>Share</th><th class="num">People</th><th>Peak day</th></tr></thead><tbody>${rows}
+    <tr><td><b>All leave</b></td><td class="num"><b>${all}</b></td><td class="num"><b>${mean(days.map(r => r.leave))}</b></td><td></td><td class="num"><b>44</b></td><td></td></tr></tbody></table>`;
+}
+
+/* ---------- Option B ---------- */
+const B = { hidden: new Set() };
+function renderB() {
+  const leave = days.map(r => r.leave), pk = leave.indexOf(Math.max(...leave));
+  const sickDays = sum(leaveVals("sick"));
+  document.getElementById("b-lv-figs").innerHTML = [
+    ["On leave / day", `${mean(leave)}`, `of 106 people`],
+    ["Person-days", `${sum(leave)}`, `over 20 working days`],
+    ["Peak day", `${leave[pk]}`, longLabel(days[pk])],
+    ["People who took leave", `44`, `Sick leave: ${sickDays} days`],
+  ].map(([a, b, c]) => `<div class="fig"><span>${a}</span><b>${b}</b> <small>${c}</small></div>`).join("");
+  const lg = document.getElementById("b-lv-legend"); lg.innerHTML = "";
+  for (const t of TYPES) {
+    const c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.setAttribute("aria-pressed", String(!B.hidden.has(t.key)));
+    c.innerHTML = `<i style="background:${t.color}"></i>${t.short}`;
+    c.onclick = () => { B.hidden.has(t.key) ? B.hidden.delete(t.key) : B.hidden.add(t.key); if (B.hidden.size === TYPES.length) B.hidden.delete(t.key); renderB(); };
+    lg.appendChild(c);
+  }
+  const shown = TYPES.filter(t => !B.hidden.has(t.key));
+  drawColumns(document.getElementById("b-lv-chart"), { h: 190, stacks: shown.map(t => ({ color: t.color, vals: leaveVals(t.key) })),
+    avg: mean(days.map(r => shown.reduce((a, t) => a + r.lv[t.key], 0))),
+    tip: i => lineTip(longLabel(days[i]), shown.map(t => [t.short, days[i].lv[t.key], t.hex])) });
+  // compact by-type table with a sparkline per type
+  const totals = TYPES.map(t => sum(leaveVals(t.key))), pct = shares100(totals);
+  document.getElementById("b-lv-table").innerHTML = `<table><thead><tr><th>Type</th><th class="num">Days</th><th class="num">%</th><th class="num">People</th><th>Day by day</th></tr></thead><tbody>${
+    TYPES.map((t, i) => `<tr><td><span class="sw" style="background:${t.color}"></span>${t.short}</td><td class="num">${totals[i]}</td><td class="num">${pct[i]}%</td><td class="num">${PEOPLE_BY_TYPE[t.key]}</td><td>${spark(leaveVals(t.key), t.hex)}</td></tr>`).join("")
+  }</tbody></table>`;
+  const lvPeople = [[0, 6, "Annual 5 · Business 1"], [3, 5, "Annual 5"], [8, 4, "Sick 3 · Annual 1"], [11, 4, "Annual 2 · Exchange 2"], [5, 3, "Sick 3"]];
+  document.getElementById("b-lv-people").innerHTML = `<table><thead><tr><th>Name</th><th class="num">Days</th><th>By type</th></tr></thead><tbody>${
+    lvPeople.map(([i, n, t], j) => `<tr><td>${name(i)}${j === 3 ? '<span class="oc">OC</span>' : ""}</td><td class="num">${n}</td><td class="muted">${t}</td></tr>`).join("")}</tbody></table>`;
+
+  const oc = days.map(r => r.ocDeployed), opk = oc.indexOf(Math.max(...oc));
+  const rate = Math.round(sum(oc) / sum(days.map(r => r.ocAvail)) * 100);
+  const share = Math.round(sum(oc) / sum(days.map(r => r.deployed)) * 100);
+  document.getElementById("b-oc-figs").innerHTML = [
+    ["Called in / day", `${mean(oc)}`, `of ${OC} on-call`],
+    ["Peak day", `${oc[opk]}`, longLabel(days[opk])],
+    ["Call-in rate", `${rate}%`, `of available on-call days`],
+    ["Share of crew", `${share}%`, `of people on missions`],
+  ].map(([a, b, c]) => `<div class="fig"><span>${a}</span><b>${b}</b> <small>${c}</small></div>`).join("");
+  drawColumns(document.getElementById("b-oc-chart"), { h: 190, stacks: [{ color: "var(--chart-oncall)", vals: oc }], ghost: days.map(r => r.ocAvail), avg: mean(oc),
+    tip: i => lineTip(longLabel(days[i]), [["Called in", oc[i], "#eb6834"], ["Available, not called", days[i].ocAvail - oc[i], "#fbe3d8"]]) });
+  // spread the sample's on-call person-days over 20 people, busiest first
+  const total = sum(oc); const w = Array.from({ length: OC }, (_, i) => 1.9 - i * .07); const ws = sum(w);
+  let ppl = w.map((x, i) => ({ i: i + 12, n: Math.min(N, Math.round(x / ws * total)) }));
+  document.getElementById("b-oc-people").innerHTML = `<table><thead><tr><th>Name</th><th class="num">Days</th><th></th></tr></thead><tbody>${
+    ppl.slice(0, 6).map(p => `<tr><td>${name(p.i)}<span class="oc">OC</span></td><td class="num">${p.n}</td><td><span class="bar"><i style="width:${p.n / N * 100}%;background:var(--chart-oncall)"></i></span></td></tr>`).join("")
+  }<tr><td class="muted" colspan="3">Least called in: ${name(ppl[OC - 1].i)}, ${ppl[OC - 1].n} days</td></tr></tbody></table>`;
+}
+function spark(vals, color) {
+  const w = 96, h = 22, p = 3, mx = Math.max(1, ...vals);
+  const x = i => p + i * (w - 2 * p) / (vals.length - 1), y = v => p + (h - 2 * p) * (1 - v / mx);
+  const d = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="vertical-align:middle"><path d="${d} L${x(vals.length - 1)} ${h - p} L${p} ${h - p} Z" fill="${color}" opacity=".15"/><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+}
+
+/* ---------- Option C ---------- */
+const C = { hidden: new Set() };
+const heat = ["#ffffff", "#fdf3d8", "#fae2a3", "#f5cb6a", "#eab33d"];
+function renderC() {
+  const lg = document.getElementById("c-legend"); lg.innerHTML = "";
+  for (const t of TYPES) {
+    const c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.setAttribute("aria-pressed", String(!C.hidden.has(t.key)));
+    c.innerHTML = `<i style="background:${t.color}"></i>${t.short}`;
+    c.onclick = () => { C.hidden.has(t.key) ? C.hidden.delete(t.key) : C.hidden.add(t.key); if (C.hidden.size === TYPES.length) C.hidden.delete(t.key); renderC(); };
+    lg.appendChild(c);
+  }
+  const shown = TYPES.filter(t => !C.hidden.has(t.key));
+  const cnt = r => shown.reduce((a, t) => a + r.lv[t.key], 0);
+  const mx = Math.max(1, ...days.map(cnt));
+  const cal = document.getElementById("c-cal");
+  let html = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => `<div class="cal-dow">${d}</div>`).join("");
+  const lead = (calendar[0].dow + 6) % 7;                  // Monday-first
+  for (let i = 0; i < lead; i++) html += `<div class="cell empty"></div>`;
+  for (const c of calendar) {
+    if (c.off) { html += `<div class="cell off"><span class="d">${c.d}</span>${c.hol ? `<span class="hol">${c.hol}</span>` : ""}</div>`; continue; }
+    const r = c.rec, n = cnt(r), lvl = n ? Math.min(4, Math.ceil(n / mx * 4)) : 0;
+    const tip = lineTip(`${longLabel(r)} · ${n} on leave`, [...shown.filter(t => r.lv[t.key]).map(t => [t.short, r.lv[t.key], t.hex]), ["On-call deployed", `${r.ocDeployed} of ${r.ocAvail}`, "#eb6834"]]);
+    html += `<div class="cell" style="background:${heat[lvl]}" data-tip="${encodeURIComponent(tip)}" tabindex="0"><span class="d">${c.d}</span><span class="lv">${n}<small> leave</small></span><span class="ocb">${r.ocDeployed} on-call</span></div>`;
+  }
+  cal.innerHTML = html;
+}
+
+/* ---------- tooltip ---------- */
+const tipEl = document.getElementById("tip");
+document.addEventListener("pointermove", (e) => {
+  const t = e.target.closest && e.target.closest("[data-tip]");
+  if (!t) { tipEl.hidden = true; return; }
+  tipEl.innerHTML = decodeURIComponent(t.getAttribute("data-tip"));
+  tipEl.hidden = false;
+  const r = tipEl.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tipEl.style.left = x + "px"; tipEl.style.top = y + "px";
+});
+document.addEventListener("focusin", (e) => { const t = e.target.closest("[data-tip]"); if (!t) return; tipEl.innerHTML = decodeURIComponent(t.getAttribute("data-tip")); tipEl.hidden = false; const b = t.getBoundingClientRect(); tipEl.style.left = b.left + "px"; tipEl.style.top = (b.bottom + 6) + "px"; });
+document.addEventListener("focusout", () => { tipEl.hidden = true; });
+
+function renderAll() { renderA(); renderB(); renderC(); }
+renderAll();
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 120); });
+</script>
