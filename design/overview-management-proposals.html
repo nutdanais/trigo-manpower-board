@@ -231,9 +231,9 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
           <div class="btns" role="group" aria-label="Who" id="wl-who"></div></div>
         <div class="tbl-wrap"><table id="wl-table"></table></div>
         <div class="legend"><span><i style="background:var(--chart-assigned)"></i>Worked</span><span><i style="background:var(--leave-annual)"></i>Leave</span><span><i style="background:#c9ced6"></i>Standby</span>
-          <span><span class="pill warn">10–20%</span> or <span class="pill bad">over 20%</span> of available days on leave</span></div>
+          <span><span class="pill warn">20–30%</span> or <span class="pill bad">over 30%</span> of available days on leave</span></div>
       </div>
-      <div class="callout">The thresholds (10% and 20%) are examples. They would be a setting, and could differ for permanent and on-call staff. On-call people have no Standby, so their split is worked vs leave vs not called.</div>
+      <div class="callout">The starting thresholds are 20% (amber) and 30% (red), for everyone. They would be a setting, so they can be changed later or set apart for on-call staff. On-call people have no Standby, so their split is worked vs leave vs not called.</div>
     </div>
 
     <!-- Ask 3 -->
@@ -279,7 +279,7 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
   <section id="questions" class="panel">
     <h2>Questions for you</h2>
     <ol class="qs">
-      <li><div><b>Worked : Leave thresholds.</b> What leave share should turn amber or red? 10% and 20% are placeholders. Same for on-call?</div></li>
+      <li><div><b>Worked : Leave thresholds.</b> <span class="tag ready">Decided</span> Start with 20% amber and 30% red, the same for permanent and on-call. Both are a setting that can change later.</div></li>
       <li><div><b>Exchange Working Day in the ratio.</b> It counts as leave in History. Should it count as leave here too, or be left out of the ratio, since the day is worked back?</div></li>
       <li><div><b>Who sees per-person figures.</b> Sick-leave patterns and leave ratios are sensitive. Should they follow the History permission like the names, or get their own row in Roles?</div></li>
       <li><div><b>Which ideas first.</b> Mark the ones you want from Part 3 (a comment on a card works), and I'll turn them into a build plan.</div></li>
@@ -437,7 +437,7 @@ function renderWL() {
   const th = cols.map(([k, l, c]) => `<th class="${c}"><button type="button" data-k="${k}" aria-sort="${W.key === k ? (W.dir < 0 ? "descending" : "ascending") : "none"}">${l}</button></th>`).join("") + "<th>Split of available days</th>";
   const body = rows.map(r => {
     const tot = r.worked + r.leave + r.standby + r.notCalled, pct = (v) => (100 * v / tot).toFixed(1);
-    const cls = r.share > 20 ? "bad" : r.share > 10 ? "warn" : "ok";
+    const cls = r.share > 30 ? "bad" : r.share > 20 ? "warn" : "ok";
     const ratio = r.leave ? `${r.worked} : ${r.leave} <span class="note">(${r1(r.worked / r.leave)} : 1)</span>` : `${r.worked} : 0`;
     return `<tr><td>${r.name}${r.oc ? '<span class="oc">OC</span>' : ""}</td><td class="r">${r.avail}</td><td class="r">${r.worked}</td><td class="r">${r.leave}</td><td class="r">${ratio}</td>
       <td><span class="pill ${cls}">${r1(r.share)}%</span></td><td class="r">${r.sick || "—"}</td>
@@ -464,7 +464,7 @@ function renderML() {
   });
   document.getElementById("ml-table").innerHTML = `<thead><tr><th>Name</th><th>TRIGO ID</th><th>Contract</th><th>Service area</th><th>${ML.period === "ytd" ? "YTD" : ML.period + "D"} utilization</th>
     <th class="r nc">Worked</th><th class="r nc">Leave</th><th class="nc">Worked : Leave</th><th class="r">Years</th></tr></thead><tbody>${
-    rows.map(r => { const share = 100 * r.leave / Math.max(1, r.avail); const cls = share > 20 ? "bad" : share > 10 ? "warn" : "ok";
+    rows.map(r => { const share = 100 * r.leave / Math.max(1, r.avail); const cls = share > 30 ? "bad" : share > 20 ? "warn" : "ok";
       return `<tr class="new-col"><td>${r.name}</td><td>${r.id}</td><td>${r.oc ? "On-call" : "Permanent"}</td><td>${r.area}</td>
       <td><span class="meter"><i style="width:${Math.min(100, r.util)}%"></i></span>${r.util}%</td>
       <td class="r nc">${r.worked}</td><td class="r nc">${r.leave}</td><td class="nc">${r.worked} : ${r.leave} <span class="pill ${cls}">${r1(share)}%</span></td><td class="r">${(i => [4, 2, 7, 1, 3, 9, 0, 5][i])(rows.indexOf(r))}</td></tr>`; }).join("")
