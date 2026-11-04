@@ -1199,6 +1199,8 @@ function render() {
   $("#btn-export").classList.toggle("hidden", fc);
   // the monthly report: Overview, for roles that can see its History (OvReport in report.js)
   $("#btn-report").classList.toggle("hidden", !(isOverview() && can("ov.history")));
+  // Present: Overview slides, or a board on a confirmed day (Present in present.js). Not on the other tabs.
+  $("#btn-present").classList.toggle("hidden", !(typeof Present !== "undefined" && (ov || board) && Present.canPresent()));
   // the phone's "More" dropdown only holds other tabs' controls — on Overview it
   // would open empty, and so would it on Capacity (whose own ⋯ holds its actions)
   $("#btn-toolbar-more").classList.toggle("hidden", ov || isCapacity());
@@ -1251,6 +1253,7 @@ function render() {
   updateUndoButton();
   applySearchHighlight();
   fitTopbar();
+  if (typeof Present !== "undefined") Present.redraw();   // a screen being presented follows the data
 }
 
 /* The top bar never hides a module tab. #board-tabs scrolls rather than run under
@@ -3698,6 +3701,7 @@ function buildPhoneMoreMenu() {
     if (shown("#btn-emplist-bulk") && isEmployeeList()) item("Bulk edit", "edit", click("#btn-emplist-bulk"));
     if (shown("#btn-hostlist-bulk") && isHostList()) item("Bulk edit", "edit", click("#btn-hostlist-bulk"));
     if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+    if (shown("#btn-present")) item("Present", "present", click("#btn-present"));
     if (shown("#btn-report")) item("Report", "clipboard", click("#btn-report"));
     if (!menu.children.length) menu.innerHTML = `<div class="tb-item tb-item-static">Nothing to do here</div>`;
     return;
@@ -3733,6 +3737,7 @@ function buildPhoneMoreMenu() {
   if (shown("#btn-hide-missions")) item("Hide / unhide missions", "eye-off", click("#btn-hide-missions"));
   if (shown("#btn-forecast-copy")) item("Copy forecast forward", "arrow-right", click("#btn-forecast-copy"));
   if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+  if (shown("#btn-present")) item("Present", "present", click("#btn-present"));
   if (shown("#btn-report")) item("Report", "clipboard", click("#btn-report"));
   sep();
   if (shown("#btn-undo")) item("Undo last change", "undo", click("#btn-undo"), "", $("#btn-undo").disabled);
@@ -11334,6 +11339,7 @@ function placeBoardRow1Tools(board) {
   for (const b of bulk) if (b.parentNode !== home) home.append(b);
   if (home.lastElementChild !== exp) home.append(exp);
   exp.before($("#btn-report"));   // the report sits just left of Export, which keeps the right edge
+  $("#btn-report").before($("#btn-present"));
   // Overview and Org Chart have no row-1 controls but Export: one row, numbers left, Export right
   document.body.classList.toggle("toolbar-one-row", wide && (isOverview() || isOrgChart()));
 }
@@ -16683,6 +16689,8 @@ function wireApp() {
 
   $("#btn-export").onclick = openExportModal;
   $("#btn-report").onclick = () => OvReport.open();
+  $("#btn-present").onclick = () => Present.open();
+  $("#btn-present-go").onclick = () => Present.go();
   $("#btn-report-go").onclick = () => safely(() => OvReport.generate());
   $("#card-names").value = state.cardNames;
   initSegmented();   // draws the Thai | English toggles (the selects stay the source of truth)
