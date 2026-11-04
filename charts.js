@@ -219,8 +219,11 @@ const Charts = (() => {
      filled part of a pale bar. Every segment is its own hover/focus target
      (chart-mark), its tooltip naming the day and that segment's count; a null
      day draws nothing, like lineChart's gaps. */
-  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null }) {
-    const padL = 32, padR = 16, padT = 10, padB = 22;
+  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null, notes = null }) {
+    // `notes` ([{ values, color, text, pos: "above" | "below" }]) writes a small figure above a column
+    // (+3 joiners) or under its baseline (-1 leavers); a column with 0 gets none. Used by Workforce.
+    const hasBelow = !!(notes && notes.some(n => n.pos === "below"));
+    const padL = 32, padR = 16, padT = hasBelow || notes ? 16 : 10, padB = hasBelow ? 36 : 22;
     const w = width - padL - padR, h = height - padT - padB;
     const n = xLabels.length;
     const band = n ? w / n : w;
@@ -260,6 +263,17 @@ const Charts = (() => {
         marks += `<rect class="chart-mark"${day} x="${x}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${(y0 - y1).toFixed(1)}" fill="${st.color}" stroke="var(--panel)" stroke-width="0.75"
           data-tip-label="${esc(st.label)} — ${esc(head)}" data-tip-value="${v}" tabindex="0"><title>${esc(st.label)} ${esc(xLabels[i])}: ${v}</title></rect>`;
         acc += v;
+      }
+    }
+    if (notes) {
+      for (let i = 0; i < n; i++) {
+        const top = stacks.reduce((a, st) => a + (st.values[i] || 0), 0);
+        for (const nt of notes) {
+          const v = nt.values[i];
+          if (!v) continue;
+          const y = nt.pos === "below" ? yAt(0) + 12 : yAt(top) - 5;
+          marks += `<text x="${xAt(i).toFixed(1)}" y="${y.toFixed(1)}" class="chart-note" text-anchor="middle" fill="${nt.color}">${esc(nt.text)}${v}</text>`;
+        }
       }
     }
     let refs = "";

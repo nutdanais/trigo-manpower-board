@@ -100,8 +100,8 @@ async function step(name, fn) {
       assert.equal(await p.locator(".ov-section .ov-history-controls").count(), 0, "and not inside History");
       assert.match((await read(".ov-period .ov-period-note"))[0], /apply to History, People and Engineer workload/);
       const order = await p.evaluate(() => [...document.querySelectorAll("#overview-panel > .ov-period, #overview-panel > .ov-section")]
-        .map((el) => (el.classList.contains("ov-period") ? "Period" : el.querySelector("h3").textContent.trim())).slice(-4));
-      assert.deepEqual(order, ["Period", "History", "People", "Engineer workload"]);
+        .map((el) => (el.classList.contains("ov-period") ? "Period" : el.querySelector("h3").textContent.trim())).slice(-5));
+      assert.deepEqual(order, ["Period", "History", "People", "Engineer workload", "Workforce"]);
       for (const gone of ["Workload alerts"]) assert.equal(await p.locator("h3", { hasText: gone }).count(), 0, gone + " is gone");
       assert.equal(await p.locator(".ov-wl, .ov-alert-grid, .ov-hnames").count(), 0, "no per-person lists outside People");
     });

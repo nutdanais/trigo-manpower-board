@@ -73,12 +73,17 @@ create table if not exists employees (
   -- are reactivated; they count on the days before it. NULL on a deactivated person = no date known
   -- (counted on every past day, as before). See migration-2026-10-26.
   deactivated_on date,
+  -- why they are off the roster: NULL = inactive for now (or active), 'resigned' = a leaver. The leaving date
+  -- is deactivated_on. Cleared on reactivating. More reasons later: widen the check. See migration-2026-11-04.
+  exit_reason text,
   -- the TRIGO ID (T + digits, e.g. T329), kept apart from the full name; unique when set. See migration-2026-10-03.
   trigo_id text,
   area_id uuid references service_areas(id) on delete restrict,
   board_id uuid not null references boards(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+alter table employees drop constraint if exists employees_exit_reason_check;
+alter table employees add constraint employees_exit_reason_check check (exit_reason is null or exit_reason in ('resigned'));
 create unique index if not exists employees_trigo_id_key
   on employees (upper(trigo_id)) where trigo_id is not null and trigo_id <> '';
 

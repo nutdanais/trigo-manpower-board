@@ -81,7 +81,7 @@
         "Inspector": "ผู้ตรวจสอบ", "Senior Inspector": "ผู้ตรวจสอบอาวุโส", "Technician": "ช่างเทคนิค",
         "Team Leader": "หัวหน้าทีม", "Assistant Site Engineer": "ผู้ช่วยวิศวกรหน้างาน",
       },
-      status: { "Active": "ใช้งาน", "Inactive": "ไม่ใช้งาน" },
+      status: { "Active": "ใช้งาน", "Inactive": "ไม่ใช้งาน", "Resigned": "ลาออก" },
     },
   };
   /* one English value -> the file's language; anything unknown is left as it is */
@@ -247,7 +247,7 @@
     } else if (col.key === "leave") {
       v = leaveLabel(r, lang);
     } else if (col.key === "status") {
-      v = say("status", r.active === false ? "Inactive" : "Active", lang);
+      v = say("status", r.active !== false ? "Active" : r.exitReason === "resigned" ? "Resigned" : "Inactive", lang);
     } else if (col.key === "util") {
       // a real percentage (0.05 shows as 5%); blank while unknown or no working days
       v = typeof r.util === "number" ? r.util / 100 : "";

@@ -354,6 +354,20 @@ test("Manpower List sheet: values", async () => {
   assert.equal(total.trim(), "TOTAL EMPLOYEES: 3   (Permanent 2 · On-call 1)");
 });
 
+test("Manpower List sheet: a resigned person's Status says Resigned (ลาออก in Thai), an inactive one still says Inactive", async () => {
+  const rows = [
+    { ...LIST_ROWS[1], name: "Resigned person", active: false, exitReason: "resigned" },
+    { ...LIST_ROWS[1], name: "Paused person", active: false, exitReason: "" },
+    { ...LIST_ROWS[0], name: "Active person", active: true, exitReason: "" },
+  ];
+  for (const [lang, want] of [["en", ["Resigned", "Inactive", "Active"]], ["th", ["ลาออก", "ไม่ใช้งาน", "ใช้งาน"]]]) {
+    const { workbook } = await X.buildListWorkbook(ExcelJS, { rows, today: "2026-10-02", lang });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await workbook.xlsx.writeBuffer());
+    assert.deepEqual([2, 3, 4].map((r) => rowOf(wb.worksheets[0], r)[11]), want, lang);
+  }
+});
+
 test("Manpower List sheet in Thai", async () => {
   const { ws } = await listRoundTrip({ lang: "th" });
   assert.equal(ws.name, "รายชื่อพนักงาน");

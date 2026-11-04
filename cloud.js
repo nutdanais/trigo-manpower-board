@@ -339,7 +339,9 @@ const cloud = {
     // highlighting a mission (migration-2026-10-28): a column, not a table, but
     // a missing column fails the same way, so the same probe tells
     const highlight = await probe("missions", "highlight");
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight };
+    // why someone left the roster (migration-2026-11-04): the Resigned choice needs the column
+    const exitReason = await probe("employees", "exit_reason");
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason };
   },
 
   async _loadAreas() {
@@ -426,7 +428,7 @@ const cloud = {
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active, deactivatedOn: e.deactivated_on || "" }));
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active, deactivatedOn: e.deactivated_on || "", exitReason: e.exit_reason || "" }));
   },
   /* Is `e` on the roster on `date`, as far as being deactivated goes? Someone active
      counts on every date. Someone deactivated counts on the days BEFORE the day they
@@ -1245,24 +1247,41 @@ const cloud = {
      missing, which meant the one path that was supposed to protect history
      could destroy it instead. Failing with a clear "run the migration"
      message is strictly better than silently doing the destructive thing. */
-  async setEmployeesActive(ids, active) {
+  /* `reason` (only when turning someone off): "resigned" marks a leaver (employees.exit_reason,
+     migration-2026-11-04); anything else is "inactive for now" and stores no reason. Turning
+     someone on clears it. A person who is already off keeps the date they have; picking Resigned
+     for them only adds the reason (a bulk Deactivate over a mixed selection), and "inactive for
+     now" never takes a reason away. */
+  async setEmployeesActive(ids, active, reason) {
     if (!ids.length) return;
+    const resigned = !active && reason === "resigned";
+    if (resigned && !this.data.features.exitReason) {
+      throw new Error("Resigned needs a one-time database update (migration-2026-11-04-employee-exit.sql) before it can be used.");
+    }
     // Turning someone off stamps today as the first day they are off the roster
     // (deactivated_on), so every earlier day keeps them; turning them on clears it.
-    // Someone already off keeps the date they have: a bulk Deactivate over a mixed
-    // selection must not move theirs to today.
     let targets = ids;
-    let patch = { active: true, deactivated_on: null };
+    let patch = { active: true, deactivated_on: null, exit_reason: null };
+    const alreadyOff = [];
     if (!active) {
       targets = ids.filter((id) => { const e = this.data.employees.find((x) => x.id === id); return !e || e.active !== false; });
-      if (!targets.length) return;
-      patch = { active: false, deactivated_on: todayStrISO() };
+      if (resigned) for (const id of ids) { const e = this.data.employees.find((x) => x.id === id); if (e && e.active === false && e.exitReason !== "resigned") alreadyOff.push(id); }
+      patch = { active: false, deactivated_on: todayStrISO(), exit_reason: resigned ? "resigned" : null };
     }
-    let { error } = await sb.from("employees").update(patch).in("id", targets);
-    if (error && this._missingColumnFromError(error) === "deactivated_on") {
-      // migration-2026-10-26 has not been run yet: switch them as before, with no date
-      ({ error } = await sb.from("employees").update({ active }).in("id", targets));
-    }
+    if (!targets.length && !alreadyOff.length) return;
+    // a column whose migration has not been run yet is left out of the update, one at a time
+    const send = async (rows, ids2) => {
+      let body = { ...rows };
+      for (;;) {
+        const { error } = await sb.from("employees").update(body).in("id", ids2);
+        if (!error) return null;
+        const col = this._missingColumnFromError(error);
+        if (col && col in body && Object.keys(body).length > 1) { delete body[col]; continue; }
+        return error;
+      }
+    };
+    let error = targets.length ? await send(patch, targets) : null;
+    if (!error && alreadyOff.length) error = await send({ exit_reason: "resigned" }, alreadyOff);
     if (error) {
       if (this._missingColumnFromError(error) === "active") {
         throw new Error('Run supabase/migration-2026-08-23-employee-active.sql in the Supabase SQL editor to use Active/Inactive.');
@@ -1786,9 +1805,10 @@ const cloud = {
 
   /* ---------- host coverage (Overview's "Host coverage risk" module) ---------- */
   /* The inverse of getEmployeeHostHistory: for each host in the given list,
-     how many distinct employees have ever been deployed there, and who (up to
-     2 names — enough to answer "who do I ask", not a full roster). Reads the
-     same deployment_history rows, grouped by host instead of by employee.
+     how many days each employee has been deployed there ({ [host]: { days:
+     { [employeeId]: n } } }). Reads the same deployment_history rows, grouped
+     by host instead of by employee; app.js hostExperience turns the days into
+     "experienced" and "at risk".
      Degrades to an empty coverage map (not an error) pre-migration, same as
      getEmployeeHostHistory. */
   /* `upTo` (optional, an ISO date) counts only deployments on or before that
@@ -1806,18 +1826,16 @@ const cloud = {
       if (this._tableMissing(error)) return {};
       throw error;
     }
-    const setsByHost = {};
+    // days[host][employee]: one deployment_history row per person per day, so a count of rows is
+    // the days they have worked there. The Overview's Host coverage and the Host tab's skills matrix
+    // both read experience from this (app.js hostExperience), never from a person count.
+    const daysByHost = {};
     for (const row of data || []) {
-      (setsByHost[row.host] || (setsByHost[row.host] = new Set())).add(row.employee_id);
+      const d = daysByHost[row.host] || (daysByHost[row.host] = {});
+      d[row.employee_id] = (d[row.employee_id] || 0) + 1;
     }
-    const nameOf = new Map(this.data.employees.map((e) => [e.id, e.name]));
     const out = {};
-    for (const host of hosts) {
-      const ids = setsByHost[host];
-      if (!ids) { out[host] = { count: 0, names: [], ids: [] }; continue; }
-      // ids: everyone, so the Overview can say where each of them is today
-      out[host] = { count: ids.size, names: [...ids].map((id) => nameOf.get(id)).filter(Boolean).slice(0, 2), ids: [...ids] };
-    }
+    for (const host of hosts) out[host] = { days: daysByHost[host] || {} };
     return out;
   },
 
@@ -2092,7 +2110,7 @@ const cloud = {
 
     const out = {};
     const rec = (host) => (out[host] = out[host] ||
-      { boards: {}, employees: {}, missionCount: 0, firstDate: null, lastDate: null });
+      { boards: {}, employees: {}, lastBy: {}, missionCount: 0, firstDate: null, lastDate: null });
     const stamp = (r, date) => {
       if (!date) return;
       if (!r.firstDate || date < r.firstDate) r.firstDate = date;
@@ -2115,6 +2133,8 @@ const cloud = {
       // render as a blank chip — count the day only where there's a person
       if (empExists.has(h.employee_id)) {
         r.employees[h.employee_id] = (r.employees[h.employee_id] || 0) + 1;
+        // the last day each person worked there (the Host tab's skills matrix)
+        if (h.plan_date && (!r.lastBy[h.employee_id] || h.plan_date > r.lastBy[h.employee_id])) r.lastBy[h.employee_id] = h.plan_date;
       }
       if (h.board_id && !r.boards[h.board_id]) r.boards[h.board_id] = 0;   // board known, mission row gone
       stamp(r, h.plan_date);
