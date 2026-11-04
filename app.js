@@ -301,11 +301,15 @@ const OV_HISTORY_MEASURES = [
 ];
 /* History's Leave view: one colour per leave type (the board itself has one leave colour) */
 const OV_LEAVE_COLORS = { annual: "var(--leave-annual)", sick: "var(--leave-sick)", business: "var(--leave-business)", unpaid: "var(--leave-unpaid)", exchange: "var(--leave-exchange)" };
-const OV_NAMES_SHOWN = 8;
 /* the four leave types History counts as leave; Exchange Working Day is worked back, so it is not leave */
 const OV_LEAVE_TYPES = ["annual", "sick", "business", "unpaid"];
 const OV_LEAVE_AMBER = 20, OV_LEAVE_RED = 30;   // Worked vs leave: leave share (% of working days) that turns amber / red
-const OV_WL_SHOWN = 10;                          // Worked vs leave rows before "Show all"   // rows in History's "Most days on leave" / "Most called in" before "+N more"
+const OV_WL_SHOWN = 10;                          // People rows before "Show all"
+/* People flags (the old Workload alerts, folded in): a run of days in a row, mostly nights,
+   leave share, never called in, a mission with only newcomers */
+const OV_RUN_AMBER = 7, OV_RUN_RED = 10, OV_NIGHT_MIN = 5, OV_NIGHT_SHARE = 50;
+const OV_NEWCOMER_YEARS = 1;          // under this many years of service = a newcomer
+const HOST_EXPERIENCED_DAYS = 5;      // experienced at a host after this many days there (deployment_history, all time)
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
 /* the utilization formula, said once behind an ⓘ (hover / focus) instead of
    printed under two sections */
@@ -448,6 +452,15 @@ const state = {
     period: null,        // "30" | "90" | "ytd": the period of util and Worked : Leave (remembered per device)
     utilCacheKey: null,  // same "fetch only when the window actually moved" trick as overview
   },
+  profile: {                  // the employee profile dialog (openProfile)
+    id: null,                 // whose profile is open
+    period: "range",          // "30" | "90" | "ytd" | "range" (History's range)
+    cache: null,              // { from, to, hist }: getUtilizationRange over every board, for the figures
+    hosts: null,              // getEmployeeHostHistory rows
+    notes: null,              // getEmployeeNotes rows
+    seq: 0,                   // out-of-order guard for the loads
+    hostsAll: false,          // "Show all" in the host table
+  },
   users: {                    // Settings > Users: search/filter/sort over the people list
     search: "",
     filters: { roleKey: [], status: [] },
@@ -492,6 +505,12 @@ const state = {
     historyMeasure: "util",       // the History tile charted day by day (OV_HISTORY_MEASURES key)
     historyLeaveView: "chart",    // the Leave tile's view: "chart" (columns by type) | "calendar"
     historyLeaveHidden: [],       // leave types switched off in the Leave chart and calendar
+    pplView: "workload",          // People quick view: workload | leave | nights | oncall | alerts
+    pplWho: "all",                // People table: all | permanent | oncall
+    pplSpread: "permanent",       // the spread chart's group: permanent | oncall
+    pplBand: null,                // a 10% band picked in the spread chart (0..9): filters the table
+    pplSort: null,                // { key, dir }, or null for the view's own order
+    pplAll: false,                // "Show all" past OV_WL_SHOWN rows
     history: null,                // cloud.getUtilizationRange() over the History range
     historyCacheKey: null,
   },
@@ -802,6 +821,35 @@ function emplistPeriodFrom(toDate) {
   const p = state.emplist.period || "30";
   return p === "ytd" ? yearStart(toDate) : addDays(toDate, -(Number(p) - 1));
 }
+/* ---------- One counting rule per person ----------
+   Worked, leave and working days per person are counted on PLANNED working days of the
+   board they worked on, the same rule as History's People table and the employee profile:
+   a day counts when the board they are on that day (a loan moves them) is working and has
+   at least one non-hidden mission, and they were on the roster (added, not yet deactivated).
+   Exchange Working Day is neither worked nor leave, and comes off the working days.
+   `raw` is cloud.getEmployeeUtilization(): { people, planned }. offDays is the one extra:
+   days worked on a weekend or holiday, which no planned-day count includes. */
+function empPlannedCounts(e, raw, from, to) {
+  const r = raw.people[e.id];
+  const out = { days: 0, worked: 0, leave: 0, sick: 0, exch: 0, nights: 0, offDays: 0 };
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    if ((e.addedOn && e.addedOn > d) || !cloud.rosterOn(e, d)) continue;
+    const w = r && r.workedOn.get(d);
+    const own = boardOf(e, d);
+    const ownPlanned = !isNonWorkingDate(d, own) && raw.planned.has(own + "|" + d);
+    const workedHere = !!w && !isNonWorkingDate(d, w.board);
+    if (w && !workedHere) out.offDays++;
+    if (!ownPlanned && !workedHere) continue;
+    out.days++;
+    const z = r && r.leaveZone.get(d);
+    if (workedHere) { out.worked++; if (w.night) out.nights++; }
+    else if (z === "exchange") out.exch++;
+    else if (z) { out.leave++; if (z === "sick") out.sick++; }
+  }
+  out.working = out.days - out.exch;
+  out.share = out.working > 0 ? (out.leave / out.working) * 100 : null;
+  return out;
+}
 let emplistUtilFetchSeq = 0;   // guards against an out-of-order response — see utilFetchSeq above
 async function ensureEmplistUtilLoaded() {
   if (!state.emplist.period) state.emplist.period = emplistPeriodSaved();
@@ -826,7 +874,7 @@ async function ensureEmplistUtilLoaded() {
   }
   const out = {}, wl = {};
   for (const e of D().employees) {
-    const r = raw[e.id];
+    const r = raw.people[e.id];
     const start = e.addedOn && e.addedOn > fromDate ? e.addedOn : fromDate;
     // a day is judged by the calendar of the board they worked on that day: a
     // loan to a board that works Saturdays makes those Saturdays working days
@@ -841,12 +889,9 @@ async function ensureEmplistUtilLoaded() {
     let worked = 0;
     if (r) for (const d of r.workedDates) if (d >= start && !isNonWorkingDate(d, boardOn(d))) worked++;
     out[e.id] = denom > 0 ? Math.round((worked / denom) * 100) : null;
-    // Worked : Leave (History's rule): Exchange Working Days are worked back, so they are
-    // neither leave nor working days; leave share = leave ÷ working days
-    let exch = 0;
-    if (r && r.exchangeDates) for (const d of r.exchangeDates) if (d >= start && !isNonWorkingDate(d, boardOn(d))) exch++;
-    const workingDays = Math.max(0, working - exch), leave = leaveOnWorkdays - exch;
-    wl[e.id] = { worked, leave, working: workingDays, share: workingDays > 0 ? (leave / workingDays) * 100 : null };
+    // Worked, Leave and Worked : Leave use History's rule instead (empPlannedCounts)
+    const c = empPlannedCounts(e, raw, fromDate, toDate);
+    wl[e.id] = { worked: c.worked, leave: c.leave, working: c.working, share: c.share };
   }
   state.emplist.wl = wl;
   state.emplist.util = out;
@@ -2534,6 +2579,8 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
   } else {
     addTitle(many ? `${ids.length} employees selected` : emp.name);
     if (!many) addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
+    // the Manpower List's menu: the employee profile (read-only, so no guardEdit)
+    if (!many && isEmployeeList() && can("emplist")) addItem("Profile", () => openProfile(emp.id, state.emplist.period || "30"), null, "person");
     if (lending) addItem("Lend to board…", () => guardEdit(() => openLendModal(ids)), null, "swap");
     else if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
     if (loan) {
@@ -3893,10 +3940,13 @@ function fillOvBoardSelect(scope) {
    works carries no information, so it's dropped from the axis entirely
    rather than plotted as a zero that would drag every average down. */
 /* The period History compares with: the same number of calendar days, just before the range */
+function prevRangeOf(from, to) {
+  const len = Math.round((new Date(to + "T00:00:00") - new Date(from + "T00:00:00")) / 86400000) + 1;
+  return [addDays(from, -len), addDays(from, -1)];
+}
 function historyPrevRange() {
   const ov = state.overview;
-  const len = Math.round((new Date(ov.historyTo + "T00:00:00") - new Date(ov.historyFrom + "T00:00:00")) / 86400000) + 1;
-  return [addDays(ov.historyFrom, -len), addDays(ov.historyFrom, -1)];
+  return prevRangeOf(ov.historyFrom, ov.historyTo);
 }
 function historyDates(boards, from, to) {
   const ov = state.overview;
@@ -3915,7 +3965,7 @@ function historyDates(boards, from, to) {
    as hard as a large one. Boards that are off that date drop out (they have
    no headcount to contribute to a day they aren't working). */
 function historyDayRec(d, boards, hist) {
-  const sum = { staffedMissions: 0, byEngineer: {}, leaveBy: {}, leaveEmp: {}, oncallEmp: {}, workEmp: {}, nightEmp: {}, roster: {} };
+  const sum = { staffedMissions: 0, byEngineer: {}, leaveBy: {}, leaveEmp: {}, oncallEmp: {}, workEmp: {}, nightEmp: {}, roster: {}, crews: [] };
   for (const k of HISTORY_SUM_KEYS) sum[k] = 0;
   for (const z of LEAVE_ZONES) sum.leaveBy[z] = 0;
   let any = false;
@@ -3931,6 +3981,7 @@ function historyDayRec(d, boards, hist) {
     Object.assign(sum.oncallEmp, rec.oncallEmp || {});
     Object.assign(sum.workEmp, rec.workEmp || {});
     Object.assign(sum.nightEmp, rec.nightEmp || {});
+    for (const crew of rec.crews || []) sum.crews.push(crew);   // who was on each mission (People: newcomer-only mission)
     for (const id of rec.roster || []) sum.roster[id] = 1;
     for (const engId in (rec.byEngineer || {})) {
       const src = rec.byEngineer[engId];
@@ -3976,9 +4027,9 @@ function historyUnplanned(dates, boards, hist) {
   return out;
 }
 
-/* The range control shared by BOTH new sections — presets, two native date
-   inputs, and the board scope. Rendered once, in the History header; the
-   Engineer workload section below reads the same state.
+/* The range control shared by every section of the Period group (History, People, Engineer
+   workload): presets and two native date inputs. Rendered once, in the Period heading
+   (ovPeriodHead), so it visibly applies to all of them; they read the same state.
    A native <input type="date"> rather than a range mode bolted onto the
    board's own date popover (toggleDatePicker): that popover exists to pick a
    PLANNING day and highlights weekends and holiday overrides to do it, none
@@ -4050,6 +4101,24 @@ function historyRangeCaption(dates) {
   return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${ovScopeName(ovScopeBoards())}`;
 }
 
+/* The Period group's heading: the title and what it covers, then the range control, so one
+   set of dates visibly drives History, People and Engineer workload */
+function ovPeriodHead(dates) {
+  const wrap = document.createElement("div");
+  wrap.className = "ov-period";
+  wrap.appendChild(ovGroupHead("Period", historyRangeCaption(dates)));
+  wrap.appendChild(historyControls());
+  wrap.appendChild(Object.assign(document.createElement("p"), { className: "ov-section-sub ov-period-note", textContent: "These dates apply to History, People and Engineer workload below." }));
+  return wrap;
+}
+
+/* The inside of a tile: label, value, sub-line and a change line. Shared by the History
+   tiles, the one-engineer tiles and the employee profile. `value` and `delta` are HTML. */
+function ovTileInner({ label, value, sub, delta }) {
+  return `<span class="ov-htile-label">${label}</span><span class="ov-htile-value">${value}</span>`
+    + (sub ? `<span class="ov-htile-sub">${sub}</span>` : "") + (delta || "");
+}
+
 /* ---------- History: four average tiles, one measure charted at a time ----------
    One measure per chart, on its own axis: six lines on one scale squashed
    Missions (~4) flat under Idle (~28). The tiles answer most visits on their
@@ -4059,7 +4128,6 @@ function historySection(dates, recs, unplanned, pendingCharts, prevRecs = []) {
   const sec = ovSection("History", null);
   sec.querySelector("h3").insertAdjacentHTML("afterend",
     `<p class="ov-section-sub">Daily averages over the range. Pick a tile to see that measure day by day. Weekends and holidays are left out.</p>`);
-  sec.appendChild(historyControls());
   if (!dates.length) {
     sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No working days in this range — every date was a weekend or a holiday." }));
     return sec;
@@ -4084,10 +4152,8 @@ function historySection(dates, recs, unplanned, pendingCharts, prevRecs = []) {
     btn.type = "button";
     btn.className = "ov-htile";
     btn.setAttribute("aria-pressed", String(ov.historyMeasure === m.key));
-    btn.innerHTML = `<span class="ov-htile-label">${m.label}</span>
-      <span class="ov-htile-value">${mean == null ? "—" : mean + m.suffix}<small> avg</small></span>
-      <span class="ov-htile-sub">${latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}${of}`}</span>
-      ${historyDelta(m, mean, prevMean)}`;
+    btn.innerHTML = ovTileInner({ label: m.label, value: `${mean == null ? "—" : mean + m.suffix}<small> avg</small>`,
+      sub: latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}${of}`, delta: historyDelta(m, mean, prevMean) });
     btn.title = m.help;
     btn.onclick = () => { if (ov.historyMeasure !== m.key) { ov.historyMeasure = m.key; render(); } };
     tiles.appendChild(btn);
@@ -4197,33 +4263,6 @@ function fillColumnChart(wrap, opts) {
 const fmt1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
 const ovEmpName = (id) => { const e = D().employees.find(x => x.id === id); return e ? e : null; };
 
-/* The ranked name list under Leave and On-call: [{id, days, sub}] busiest first */
-function historyNamesTable(rows, { title, sub, daysLabel, empty }) {
-  const box = document.createElement("div");
-  box.className = "ov-hnames";
-  box.innerHTML = `<div class="ov-hchart-head"><b>${escapeHtml(title)}</b> <span class="ov-muted">${escapeHtml(sub)}</span></div>`;
-  if (!rows.length) {
-    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: empty }));
-    return box;
-  }
-  const max = Math.max(1, ...rows.map(r => r.days));
-  const shown = rows.slice(0, OV_NAMES_SHOWN);
-  const wrap = document.createElement("div");
-  wrap.className = "ov-table-wrap";
-  wrap.innerHTML = `<table class="ov-table ov-hnames-table"><thead><tr><th>Name</th><th class="r">${escapeHtml(daysLabel)}</th><th></th></tr></thead><tbody>`
-    + shown.map(r => {
-      const e = ovEmpName(r.id);
-      const oc = e && e.contract === "oncall" ? ' <span class="ov-oc-tag">OC</span>' : "";
-      return `<tr><td><span data-no-i18n>${escapeHtml(e ? e.name : "Removed employee")}</span>${oc}</td>
-        <td class="r"><b>${r.days}</b></td>
-        <td><span class="ov-hbar"><i style="width:${(r.days / max * 100).toFixed(1)}%;background:${r.color}"></i></span>${r.sub ? ` <span class="ov-muted">${r.sub}</span>` : ""}</td></tr>`;
-    }).join("")
-    + (rows.length > shown.length ? `<tr><td colspan="3" class="ov-muted">+${rows.length - shown.length} more</td></tr>` : "")
-    + `</tbody></table>`;
-  box.appendChild(wrap);
-  return box;
-}
-
 function historyLeaveView(dates, recs, pendingCharts) {
   const ov = state.overview;
   const hidden = new Set(ov.historyLeaveHidden || []);
@@ -4327,111 +4366,12 @@ function historyLeaveView(dates, recs, pendingCharts) {
     + `</tbody></table>`;
   box.appendChild(tbl);
 
-  box.appendChild(historyWorkedLeave(recs));
+  box.appendChild(peopleLink("leave"));
   return box;
 }
 /* leave per day without Exchange Working Day: the four leave types */
 function shownTotalAll(recs) {
   return recs.map(r => (r ? OV_LEAVE_TYPES.reduce((a, z) => a + (r.leaveBy[z] || 0), 0) : null));
-}
-
-/* Worked vs leave, per person, over History's plotted days (planned working days of the
-   boards in scope). Working days = days on the roster, less Exchange Working Days (worked
-   back, so neither worked nor leave). Leave share = leave ÷ working days: amber above
-   OV_LEAVE_AMBER %, red above OV_LEAVE_RED %. The rest of the working days is Standby for
-   permanent staff and "not called" for on-call staff. */
-function historyWorkedLeaveRows(recs) {
-  const per = new Map();
-  const get = (id) => per.get(id) || per.set(id, { id, days: 0, worked: 0, leave: 0, sick: 0, exch: 0 }).get(id);
-  for (const r of recs) {
-    if (!r) continue;
-    const ids = new Set([...Object.keys(r.roster || {}), ...Object.keys(r.workEmp || {}), ...Object.keys(r.leaveEmp || {})]);
-    for (const id of ids) {
-      const p = get(id);
-      p.days++;
-      const z = r.leaveEmp[id];
-      if (r.workEmp && r.workEmp[id]) p.worked++;
-      else if (z === "exchange") p.exch++;
-      else if (z) { p.leave++; if (z === "sick") p.sick++; }
-    }
-  }
-  return [...per.values()].map(p => {
-    const e = ovEmpName(p.id);
-    const working = p.days - p.exch;
-    return { ...p, name: e ? e.name : "Removed employee", oncall: !!(e && e.contract === "oncall"), working,
-      other: Math.max(0, working - p.worked - p.leave), share: working ? (p.leave / working) * 100 : 0 };
-  }).filter(p => p.working > 0);
-}
-function historyWorkedLeave(recs) {
-  const ov = state.overview;
-  const box = document.createElement("div");
-  box.className = "ov-hnames ov-wl";
-  const all = historyWorkedLeaveRows(recs);
-  const who = ov.wlWho || "all";
-  const sort = ov.wlSort || { key: "share", dir: -1 };
-  const rows = all.filter(p => who === "all" || (who === "oncall") === p.oncall);
-  const val = (p) => (sort.key === "ratio" ? (p.leave ? p.worked / p.leave : 1e9) : p[sort.key]);
-  rows.sort((a, b) => (sort.key === "name" ? a.name.localeCompare(b.name) : (val(a) - val(b)) || (a.leave - b.leave)) * sort.dir || a.name.localeCompare(b.name));
-  const head = document.createElement("div");
-  head.className = "ov-hchart-head ov-hchart-head-row";
-  head.innerHTML = `<span><b>Worked vs leave, per person</b> <span class="ov-muted">${all.filter(p => p.leave).length} of ${all.length} people took leave in the range</span></span>`;
-  const seg = document.createElement("div");
-  seg.className = "ov-trend-btns";
-  seg.setAttribute("role", "group");
-  seg.setAttribute("aria-label", "Who");
-  for (const [k, l] of [["all", "Everyone"], ["permanent", "Permanent"], ["oncall", "On-call"]]) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "btn btn-small" + (who === k ? " active" : "");
-    b.setAttribute("aria-pressed", String(who === k));
-    b.textContent = l;
-    b.onclick = () => { ov.wlWho = k; render(); };
-    seg.appendChild(b);
-  }
-  head.appendChild(seg);
-  box.appendChild(head);
-  if (!rows.length) {
-    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Nobody in this range." }));
-    return box;
-  }
-  const shownRows = ov.wlAll ? rows : rows.slice(0, OV_WL_SHOWN);
-  const cols = [["name", "Name", ""], ["working", "Working days", "r"], ["worked", "Worked", "r"], ["leave", "Leave", "r"], ["ratio", "Worked : Leave", "r"], ["share", "Leave share", ""], ["sick", "Sick", "r"]];
-  const wrap = document.createElement("div");
-  wrap.className = "ov-table-wrap";
-  wrap.innerHTML = `<table class="ov-table ov-wl-table"><thead><tr>${cols.map(([k, l, c]) =>
-      `<th class="${c}"><button type="button" class="ov-sort" data-k="${k}" aria-sort="${sort.key === k ? (sort.dir < 0 ? "descending" : "ascending") : "none"}">${l}</button></th>`).join("")}<th class="ov-wide">Split of working days</th></tr></thead><tbody>`
-    + shownRows.map(p => {
-      const cls = p.share > OV_LEAVE_RED ? "bad" : p.share > OV_LEAVE_AMBER ? "warn" : "ok";
-      const pct = (v) => (p.working ? (v / p.working) * 100 : 0).toFixed(1);
-      const rest = p.oncall ? "not called" : "standby";
-      return `<tr><td><span data-no-i18n>${escapeHtml(p.name)}</span>${p.oncall ? ' <span class="ov-oc-tag">OC</span>' : ""}</td>
-        <td class="r">${p.working}</td><td class="r">${p.worked}</td><td class="r">${p.leave}</td>
-        <td class="r">${p.worked} : ${p.leave}${p.leave ? ` <span class="ov-muted">(${fmt1(p.worked / p.leave)} : 1)</span>` : ""}</td>
-        <td><span class="ov-share ov-share-${cls}">${fmt1(p.share)}%</span></td><td class="r">${p.sick || "—"}</td>
-        <td class="ov-wide"><span class="ov-split" title="Worked ${p.worked} · Leave ${p.leave} · ${p.other} ${rest}"><i style="width:${pct(p.worked)}%;background:var(--chart-assigned)"></i><i style="width:${pct(p.leave)}%;background:var(--leave-annual)"></i><i style="width:${pct(p.other)}%;background:var(--border)"></i></span></td></tr>`;
-    }).join("")
-    + `</tbody></table>`;
-  wrap.querySelectorAll(".ov-sort").forEach(b => b.onclick = () => {
-    const k = b.dataset.k;
-    ov.wlSort = { key: k, dir: sort.key === k ? -sort.dir : (k === "name" ? 1 : -1) };
-    render();
-  });
-  box.appendChild(wrap);
-  if (rows.length > OV_WL_SHOWN) {
-    const more = document.createElement("button");
-    more.type = "button";
-    more.className = "btn btn-small ov-wl-more";
-    more.textContent = ov.wlAll ? "Show fewer" : `Show all ${rows.length}`;
-    more.onclick = () => { ov.wlAll = !ov.wlAll; render(); };
-    box.appendChild(more);
-  }
-  box.appendChild(ovLegend([
-    { label: "Worked", color: "var(--chart-assigned)" },
-    { label: "Leave", color: "var(--leave-annual)" },
-    { label: "Standby / not called", color: "var(--border)" },
-    { label: `Leave share above ${OV_LEAVE_AMBER}% amber, above ${OV_LEAVE_RED}% red · Exchange Working Day is not leave`, color: "transparent" },
-  ]));
-  return box;
 }
 
 /* The Leave view's calendar: one month grid per month in the range, a cell per
@@ -4510,13 +4450,7 @@ function historyOncallView(dates, recs, pendingCharts) {
     yMax: Charts.niceMax(avail.filter(v => v != null)), height: 220, dates,
     refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: `avg ${fmt1(mean)}` }] : [],
   }));
-  // who carries the on-call load: days each on-call person was on a mission
-  const per = new Map();
-  for (const r of recs) if (r) for (const id in r.oncallEmp) per.set(id, (per.get(id) || 0) + 1);
-  const nameOf = (id) => (ovEmpName(id) || { name: "" }).name;
-  const rows = [...per.entries()].sort((a, b) => b[1] - a[1] || nameOf(a[0]).localeCompare(nameOf(b[0])))
-    .map(([id, days]) => ({ id, days, color: "var(--chart-oncall)", sub: "" }));
-  box.appendChild(historyNamesTable(rows, { title: "Most called in", sub: `${per.size} on-call ${per.size === 1 ? "person was" : "people were"} called in`, daysLabel: "Days", empty: "No on-call people were called in this range." }));
+  box.appendChild(peopleLink("oncall"));
   return box;
 }
 
@@ -4568,7 +4502,7 @@ function ovMixLine(perm, oncall) {
    engineer_id lives on the mission row for its own date, so these are the
    people who actually ran those jobs — and byEngineer already carries the
    permanent / on-call split, so nothing extra is fetched. */
-function engineerHistorySection(dates, recs, pendingCharts = []) {
+function engineerHistorySection(dates, recs, pendingCharts = [], prevRecs = []) {
   const sec = ovSection("Engineer workload", "Missions each engineer ran and the people they had out, per working day, busiest first. Same range and board as History.");
   const n = dates.length;
   const engById = new Map(D().engineers.map(e => [e.id, e]));
@@ -4634,78 +4568,661 @@ function engineerHistorySection(dates, recs, pendingCharts = []) {
     tr.onclick = pick;
     tr.onkeydown = (ev) => { if (ev.key === "Enter") pick(); };
   });
-  sec.appendChild(historyEngineerDetail(dates, recs, rows, pendingCharts));
+  sec.appendChild(historyEngineerDetail(dates, recs, rows, pendingCharts, prevRecs));
   return sec;
 }
 
-/* ---------- Workload alerts: days in a row, and nights ----------
-   Calendar days, weekends and holidays included (a run of work on a weekend is still work),
-   for everyone on a mission on a board in scope. History's fetch covers the period before the
-   range too, so a run that started before the range is counted whole. A run shows when it
-   reaches OV_RUN_AMBER days (red from OV_RUN_RED) and ends inside the range; nights show when
-   someone worked at least OV_NIGHT_MIN nights and they were at least OV_NIGHT_SHARE % of the
-   days they worked. */
-const OV_RUN_AMBER = 7, OV_RUN_RED = 10, OV_NIGHT_MIN = 5, OV_NIGHT_SHARE = 50;
-function historyWorkloadAlerts(boards) {
-  const ov = state.overview;
-  const hist = ov.history || {};
-  const [pFrom] = historyPrevRange();
-  const on = new Map(), night = new Map(), worked = new Map();   // id -> Set of dates (in range for night/worked)
-  for (let d = pFrom; d <= ov.historyTo; d = addDays(d, 1)) {
-    const inRange = d >= ov.historyFrom;
+/* ---------- People: one table of people, with flags and quick views ----------
+   Replaces the three per-person lists the Leave and On-call views and the Workload alerts used to
+   keep. One row per person over History's plotted days (planned working days of the boards in
+   scope, the one counting rule: see empPlannedCounts), with their flags:
+     - 7+ days in a row (calendar days, weekends and holidays included, counted from the period
+       before the range; red from 10; "still going" when the run reaches the range's end);
+     - mostly nights (OV_NIGHT_MIN nights and at least OV_NIGHT_SHARE % of the days worked);
+     - leave above OV_LEAVE_RED % of the working days;
+     - never called in (on-call, on the roster, available at least a day, 0 call-ins);
+     - newcomer-only mission (on a mission where everybody had under OV_NEWCOMER_YEARS year).
+   A spread chart above it shows how evenly the work is shared; a band filters the table. */
+
+/* a newcomer on `date`: a start date less than OV_NEWCOMER_YEARS years back. Someone with no
+   start date is not called a newcomer: nothing says they are. */
+function isNewcomerOn(e, date) {
+  return !!(e && e.startDate && (Number(e.startDate.slice(0, 4)) + OV_NEWCOMER_YEARS) + e.startDate.slice(4) > date);
+}
+
+/* Each person's longest run of days on a mission: calendar days, weekends and holidays included.
+   Reads the raw records of `boards` from `lookFrom` (the period before the range, which History's
+   fetch covers) to `to`, so a run that began before the range is counted whole. Only runs that
+   end inside the range count. Map id -> { len, start, end, ongoing } */
+function personRuns(hist, boards, from, to, lookFrom) {
+  const on = new Map();
+  for (let d = lookFrom; d <= to; d = addDays(d, 1)) {
     for (const b of boards) {
       const rec = hist[b.id] && hist[b.id][d];
       if (!rec) continue;
-      for (const id in (rec.workEmp || {})) {
-        (on.get(id) || on.set(id, new Set()).get(id)).add(d);
-        if (inRange) (worked.get(id) || worked.set(id, new Set()).get(id)).add(d);
-      }
-      if (inRange) for (const id in (rec.nightEmp || {})) (night.get(id) || night.set(id, new Set()).get(id)).add(d);
+      for (const id in (rec.workEmp || {})) (on.get(id) || on.set(id, new Set()).get(id)).add(d);
     }
   }
-  const runs = [];
+  const out = new Map();
   for (const [id, set] of on) {
     let best = null, start = null, len = 0;
-    for (let d = pFrom; d <= addDays(ov.historyTo, 1); d = addDays(d, 1)) {
+    for (let d = lookFrom; d <= addDays(to, 1); d = addDays(d, 1)) {
       if (set.has(d)) { if (!len) start = d; len++; continue; }
       const end = addDays(d, -1);
-      if (len >= OV_RUN_AMBER && end >= ov.historyFrom && (!best || len > best.len)) best = { id, len, start, end, ongoing: end === ov.historyTo };
+      if (len && end >= from && (!best || len > best.len)) best = { len, start, end, ongoing: end === to };
       len = 0;
     }
-    if (best) runs.push(best);
+    if (best) out.set(id, best);
   }
-  const nameOf = (id) => { const e = ovEmpName(id); return e ? e.name : "Removed employee"; };
-  runs.sort((a, b) => b.len - a.len || nameOf(a.id).localeCompare(nameOf(b.id)));
-  const nights = [];
-  for (const [id, set] of night) {
-    const w = (worked.get(id) || new Set()).size;
-    const share = w ? (100 * set.size) / w : 0;
-    if (set.size >= OV_NIGHT_MIN && share >= OV_NIGHT_SHARE) nights.push({ id, nights: set.size, worked: w, share });
-  }
-  nights.sort((a, b) => b.nights - a.nights || b.share - a.share);
+  return out;
+}
 
-  const sec = ovSection("Workload alerts", `People on a mission ${OV_RUN_AMBER} or more days in a row, and people working mostly nights, in the History range. Days in a row count weekends and holidays too.`);
-  const grid = document.createElement("div");
-  grid.className = "ov-alert-grid";
-  const name = (id) => { const e = ovEmpName(id); return `<span data-no-i18n>${escapeHtml(nameOf(id))}</span>${e && e.contract === "oncall" ? ' <span class="ov-oc-tag">OC</span>' : ""}`; };
-  const runBox = document.createElement("div");
-  runBox.className = "ov-alert-box";
-  runBox.innerHTML = `<div class="ov-hchart-head"><b>Days in a row</b> <span class="ov-muted">${runs.length ? `${runs.length} ${runs.length === 1 ? "person" : "people"}` : ""}</span></div>`
-    + (runs.length ? `<div class="ov-table-wrap"><table class="ov-table ov-alert-table"><thead><tr><th>Name</th><th class="r">Days</th><th>From → to</th></tr></thead><tbody>${
-      runs.map(r => `<tr><td>${name(r.id)}</td><td class="r"><span class="ov-share ov-share-${r.len >= OV_RUN_RED ? "bad" : "warn"}">${r.len}</span></td>
-        <td>${escapeHtml(fmtDayMon(r.start))} → ${r.ongoing ? "still going" : escapeHtml(fmtDayMon(r.end))}</td></tr>`).join("")}</tbody></table></div>`
-      : `<p class="ov-muted">Nobody worked ${OV_RUN_AMBER} or more days in a row in this range.</p>`);
-  const nightBox = document.createElement("div");
-  nightBox.className = "ov-alert-box";
-  nightBox.innerHTML = `<div class="ov-hchart-head"><b>Mostly nights</b> <span class="ov-muted">${nights.length ? `${nights.length} ${nights.length === 1 ? "person" : "people"}` : ""}</span></div>`
-    + (nights.length ? `<div class="ov-table-wrap"><table class="ov-table ov-alert-table"><thead><tr><th>Name</th><th class="r">Nights</th><th class="r">Days worked</th><th class="r">Night share</th></tr></thead><tbody>${
-      nights.map(r => `<tr><td>${name(r.id)}</td><td class="r"><b>${r.nights}</b></td><td class="r">${r.worked}</td><td class="r">${Math.round(r.share)}%</td></tr>`).join("")}</tbody></table></div>`
-      : `<p class="ov-muted">Nobody worked mostly nights (${OV_NIGHT_MIN}+ nights, ${OV_NIGHT_SHARE}% or more of their days) in this range.</p>`);
-  grid.appendChild(runBox);
-  grid.appendChild(nightBox);
-  sec.appendChild(grid);
+function peopleFlags(p) {
+  const f = [];
+  if (p.run && p.run.len >= OV_RUN_AMBER) f.push({ key: "run", level: p.run.len >= OV_RUN_RED ? "bad" : "warn" });
+  if (p.nights >= OV_NIGHT_MIN && p.nightShare >= OV_NIGHT_SHARE) f.push({ key: "nights", level: "warn" });
+  if (p.share > OV_LEAVE_RED) f.push({ key: "leave", level: "bad" });
+  if (p.oncall && p.calledIn === 0 && p.available > 0) f.push({ key: "never", level: "warn" });
+  if (p.newcomer > 0) f.push({ key: "newcomer", level: "warn" });
+  return f;
+}
+
+/* The rows. `dates` and `recs` are History's plotted days and their records (historyDayRec);
+   `hist` and `boards` are only for the runs. Working days = days on the roster, less Exchange
+   Working Days (worked back, so neither worked nor leave). Leave share = leave ÷ working days:
+   amber above OV_LEAVE_AMBER %, red above OV_LEAVE_RED %. The rest of the working days is
+   Standby for permanent staff and "not called" for on-call staff. */
+function historyPeopleRows({ dates, recs, hist, boards, from, to, runs = true }) {
+  const per = new Map();
+  const get = (id) => per.get(id) || per.set(id, { id, days: 0, worked: 0, leave: 0, sick: 0, exch: 0, nights: 0, newcomer: 0 }).get(id);
+  dates.forEach((d, i) => {
+    const r = recs[i];
+    if (!r) return;
+    const ids = new Set([...Object.keys(r.roster || {}), ...Object.keys(r.workEmp || {}), ...Object.keys(r.leaveEmp || {})]);
+    for (const id of ids) {
+      const p = get(id);
+      p.days++;
+      const z = r.leaveEmp[id];
+      if (r.workEmp && r.workEmp[id]) { p.worked++; if (r.nightEmp && r.nightEmp[id]) p.nights++; }
+      else if (z === "exchange") p.exch++;
+      else if (z) { p.leave++; if (z === "sick") p.sick++; }
+    }
+    for (const crew of r.crews || []) {
+      if (crew.length && crew.every(id => isNewcomerOn(ovEmpName(id), d))) for (const id of crew) get(id).newcomer++;
+    }
+  });
+  const runMap = runs ? personRuns(hist, boards, from, to, prevRangeOf(from, to)[0]) : new Map();
+  return [...per.values()].map(p => {
+    const e = ovEmpName(p.id);
+    const working = p.days - p.exch;
+    const oncall = !!(e && e.contract === "oncall");
+    const row = { ...p, name: e ? e.name : "Removed employee", oncall, working, run: runMap.get(p.id) || null,
+      other: Math.max(0, working - p.worked - p.leave), share: working ? (p.leave / working) * 100 : 0,
+      workedShare: working ? (p.worked / working) * 100 : 0, nightShare: p.worked ? (p.nights / p.worked) * 100 : 0,
+      calledIn: oncall ? p.worked : null, available: working - p.leave };
+    row.flags = peopleFlags(row);
+    return row;
+  }).filter(p => p.working > 0);
+}
+
+/* The five quick views: each sets the filter, the sort and the columns */
+const PPL_VIEWS = [
+  { key: "workload", label: "Workload", who: "all", sort: { key: "wshare", dir: -1 }, cols: ["name", "working", "worked", "wshare", "nights", "run", "flags"] },
+  { key: "leave", label: "Leave", who: "all", sort: { key: "share", dir: -1 }, cols: ["name", "working", "worked", "leave", "ratio", "share", "sick", "split"] },
+  { key: "nights", label: "Nights", who: "all", sort: { key: "nights", dir: -1 }, cols: ["name", "worked", "nights", "nshare", "flags"] },
+  { key: "oncall", label: "On-call", who: "oncall", sort: { key: "called", dir: -1 }, cols: ["name", "working", "leave", "called", "cshare", "flags"] },
+  { key: "alerts", label: "Alerts only", who: "all", sort: { key: "flags", dir: -1 }, cols: ["name", "worked", "share", "nights", "run", "flags"], flagged: true },
+];
+const PPL_COLS = {
+  name: ["Name", ""], working: ["Working days", "r"], worked: ["Worked", "r"], wshare: ["Share worked", "r"], leave: ["Leave", "r"],
+  ratio: ["Worked : Leave", "r"], share: ["Leave share", ""], sick: ["Sick", "r"], nights: ["Nights", "r"], nshare: ["Night share", "r"],
+  run: ["Days in a row", "r"], called: ["Called in", "r"], cshare: ["Share called in", "r"], split: ["Split of working days", "ov-wide"], flags: ["Flags", ""],
+};
+const PPL_NO_SORT = { split: 1 };
+const pplVal = (p, k) => ({
+  name: p.name, working: p.working, worked: p.worked, wshare: p.workedShare, leave: p.leave, ratio: p.leave ? p.worked / p.leave : 1e9,
+  share: p.share, sick: p.sick, nights: p.nights, nshare: p.nightShare, run: p.run ? p.run.len : 0,
+  called: p.oncall ? p.calledIn : -1, cshare: p.oncall && p.available > 0 ? p.calledIn / p.available : -1, flags: p.flags.length,
+})[k];
+
+function pplView() { return PPL_VIEWS.find(v => v.key === state.overview.pplView) || PPL_VIEWS[0]; }
+/* picking a view sets its filter and order; the table's Everyone / Permanent / On-call can still change it */
+function setPeopleView(key) {
+  const ov = state.overview, v = PPL_VIEWS.find(x => x.key === key) || PPL_VIEWS[0];
+  ov.pplView = v.key; ov.pplWho = v.who; ov.pplSort = null; ov.pplBand = null; ov.pplAll = false;
+  if (v.key === "oncall") ov.pplSpread = "oncall";
+}
+/* "Per person → People" under the Leave and On-call views: opens that quick view */
+function peopleLink(view) {
+  const p = document.createElement("p");
+  p.className = "ov-people-link";
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "ov-linkbtn";
+  b.textContent = "Per person → People";
+  b.onclick = () => {
+    setPeopleView(view);
+    render();
+    const el = document.getElementById("ov-people");
+    if (el) el.scrollIntoView({ block: "start" });
+  };
+  p.appendChild(b);
+  return p;
+}
+
+/* a flag as a pill: the words, and the numbers behind it in the tooltip */
+function pplFlagPill(p, f) {
+  const lvl = f.level === "bad" ? "bad" : "warn";
+  const pill = (text, tip) => `<span class="ov-flag ov-flag-${lvl}" title="${escapeHtml(tip)}">${escapeHtml(text)}</span>`;
+  if (f.key === "run") {
+    const r = p.run;
+    return pill(`${r.len} in a row${r.ongoing ? " · still going" : ""}`,
+      `${fmtDayMon(r.start)} → ${r.ongoing ? "still going" : fmtDayMon(r.end)}. Calendar days, weekends and holidays included.`);
+  }
+  if (f.key === "nights") return pill("mostly nights", `${p.nights} nights, ${Math.round(p.nightShare)}% of the days worked`);
+  if (f.key === "leave") return pill(`leave > ${OV_LEAVE_RED}%`, `Leave share ${fmt1(p.share)}% of ${p.working} working days`);
+  if (f.key === "never") return pill("never called in", `On the roster for ${p.available} available days, not called in once`);
+  return pill("newcomer-only mission", `${p.newcomer} ${p.newcomer === 1 ? "mission" : "missions"} where everyone had under ${OV_NEWCOMER_YEARS} year of service`);
+}
+function pplFlagsHtml(p) { return p.flags.length ? p.flags.map(f => pplFlagPill(p, f)).join(" ") : '<span class="ov-muted">—</span>'; }
+
+function peopleSection(boards, dates, recs) {
+  const ov = state.overview;
+  const sec = ovSection("People", "Workload, leave, nights and on-call for each person over the range, on planned working days. A name opens their profile.");
+  sec.id = "ov-people";
+  const rows = historyPeopleRows({ dates, recs, hist: ov.history || {}, boards, from: ov.historyFrom, to: ov.historyTo });
+  if (!rows.length) {
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "Nobody on a planned working day in this range." }));
+    return sec;
+  }
+  sec.appendChild(peopleSpread(rows));
+
+  // quick views
+  const v = pplView();
+  const bar = document.createElement("div");
+  bar.className = "ov-people-bar";
+  const views = document.createElement("div");
+  views.className = "ov-trend-btns";
+  views.setAttribute("role", "group");
+  views.setAttribute("aria-label", "People view");
+  for (const x of PPL_VIEWS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (v.key === x.key ? " active" : "");
+    b.setAttribute("aria-pressed", String(v.key === x.key));
+    b.textContent = x.label;
+    b.onclick = () => { setPeopleView(x.key); render(); };
+    views.appendChild(b);
+  }
+  bar.appendChild(views);
+  const seg = document.createElement("div");
+  seg.className = "ov-trend-btns";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", "Who");
+  for (const [k, l] of [["all", "Everyone"], ["permanent", "Permanent"], ["oncall", "On-call"]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (ov.pplWho === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(ov.pplWho === k));
+    b.textContent = l;
+    b.onclick = () => { ov.pplWho = k; ov.pplBand = null; ov.pplAll = false; render(); };
+    seg.appendChild(b);
+  }
+  bar.appendChild(seg);
+  sec.appendChild(bar);
+
+  // the table's rows: who, the picked band, alerts only
+  const group = (p) => (ov.pplWho === "all" ? true : (ov.pplWho === "oncall") === p.oncall);
+  let shown = rows.filter(group);
+  if (ov.pplBand != null) shown = shown.filter(p => pplBandOf(p) === ov.pplBand);
+  if (v.flagged) shown = shown.filter(p => p.flags.length);
+
+  // a summary line for the views that have one
+  const sum = pplSummary(v, rows, shown);
+  if (sum) sec.appendChild(sum);
+  if (ov.pplBand != null) {
+    const chip = document.createElement("p");
+    chip.className = "ov-band-chip";
+    chip.innerHTML = `<span>Share worked ${escapeHtml(pplBandLabel(ov.pplBand))}</span>`;
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = "ov-linkbtn";
+    x.textContent = "Clear";
+    x.onclick = () => { ov.pplBand = null; render(); };
+    chip.appendChild(x);
+    sec.appendChild(chip);
+  }
+
+  const sort = ov.pplSort || v.sort;
+  shown = shown.slice().sort((a, b) => {
+    if (sort.key === "name") return a.name.localeCompare(b.name) * sort.dir;
+    return ((pplVal(a, sort.key) - pplVal(b, sort.key)) * sort.dir) || (b.leave - a.leave) * (sort.key === "share" ? 1 : 0) || a.name.localeCompare(b.name);
+  });
+  if (!shown.length) {
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: v.flagged ? "No flags in this range." : "Nobody matches." }));
+    return sec;
+  }
+  const visible = ov.pplAll ? shown : shown.slice(0, OV_WL_SHOWN);
+  const cell = {
+    name: (p) => `<td><button type="button" class="ov-person-link" data-id="${escapeHtml(p.id)}"><span data-no-i18n>${escapeHtml(p.name)}</span></button>${p.oncall ? ' <span class="ov-oc-tag">OC</span>' : ""}</td>`,
+    working: (p) => `<td class="r">${p.working}</td>`,
+    worked: (p) => `<td class="r">${p.worked}</td>`,
+    wshare: (p) => `<td class="r">${fmt1(p.workedShare)}%</td>`,
+    leave: (p) => `<td class="r">${p.leave}</td>`,
+    ratio: (p) => `<td class="r">${p.worked} : ${p.leave}${p.leave ? ` <span class="ov-muted">(${fmt1(p.worked / p.leave)} : 1)</span>` : ""}</td>`,
+    share: (p) => `<td><span class="ov-share ov-share-${p.share > OV_LEAVE_RED ? "bad" : p.share > OV_LEAVE_AMBER ? "warn" : "ok"}">${fmt1(p.share)}%</span></td>`,
+    sick: (p) => `<td class="r">${p.sick || "—"}</td>`,
+    nights: (p) => `<td class="r">${p.nights}</td>`,
+    nshare: (p) => `<td class="r">${p.worked ? Math.round(p.nightShare) + "%" : "—"}</td>`,
+    run: (p) => `<td class="r">${p.run ? p.run.len + (p.run.ongoing ? ' <span class="ov-muted">still going</span>' : "") : "—"}</td>`,
+    called: (p) => `<td class="r">${p.oncall ? p.calledIn : "—"}</td>`,
+    cshare: (p) => `<td class="r">${p.oncall && p.available > 0 ? Math.round((p.calledIn / p.available) * 100) + "%" : "—"}</td>`,
+    split: (p) => {
+      const pct = (x) => (p.working ? (x / p.working) * 100 : 0).toFixed(1);
+      return `<td class="ov-wide"><span class="ov-split" title="Worked ${p.worked} · Leave ${p.leave} · ${p.other} ${p.oncall ? "not called" : "standby"}"><i style="width:${pct(p.worked)}%;background:var(--chart-assigned)"></i><i style="width:${pct(p.leave)}%;background:var(--leave-annual)"></i><i style="width:${pct(p.other)}%;background:var(--border)"></i></span></td>`;
+    },
+    flags: (p) => `<td class="ov-flags">${pplFlagsHtml(p)}</td>`,
+  };
+  const wrap = document.createElement("div");
+  wrap.className = "ov-table-wrap";
+  wrap.innerHTML = `<table class="ov-table ov-wl-table ov-people-table"><thead><tr>${v.cols.map(k => {
+      const [l, c] = PPL_COLS[k];
+      return PPL_NO_SORT[k] ? `<th class="${c}">${l}</th>`
+        : `<th class="${c}"><button type="button" class="ov-sort" data-k="${k}" aria-sort="${sort.key === k ? (sort.dir < 0 ? "descending" : "ascending") : "none"}">${l}</button></th>`;
+    }).join("")}</tr></thead><tbody>${visible.map(p => `<tr>${v.cols.map(k => cell[k](p)).join("")}</tr>`).join("")}</tbody></table>`;
+  wrap.querySelectorAll(".ov-sort").forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    ov.pplSort = { key: k, dir: sort.key === k ? -sort.dir : (k === "name" ? 1 : -1) };
+    render();
+  });
+  wrap.querySelectorAll(".ov-person-link").forEach(b => b.onclick = () => openProfile(b.dataset.id, "range"));
+  sec.appendChild(wrap);
+  if (shown.length > OV_WL_SHOWN) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "btn btn-small ov-wl-more";
+    more.textContent = ov.pplAll ? "Show fewer" : `Show all ${shown.length}`;
+    more.onclick = () => { ov.pplAll = !ov.pplAll; render(); };
+    sec.appendChild(more);
+  }
+  const legend = [{ label: `Leave share above ${OV_LEAVE_AMBER}% amber, above ${OV_LEAVE_RED}% red · Exchange Working Day is not leave`, color: "transparent" }];
+  if (v.key === "leave") legend.unshift({ label: "Worked", color: "var(--chart-assigned)" }, { label: "Leave", color: "var(--leave-annual)" }, { label: "Standby / not called", color: "var(--border)" });
+  sec.appendChild(ovLegend(legend));
+  // what the flags mean, one short piece each (so each reads in Thai on its own)
+  const help = document.createElement("p");
+  help.className = "ov-htile-help ov-people-help";
+  const bits = ["Days in a row count calendar days, weekends and holidays too, from the period before the range.", "Flags",
+    `${OV_RUN_AMBER}+ in a row (red from ${OV_RUN_RED})`, `mostly nights (${OV_NIGHT_MIN}+ nights, ${OV_NIGHT_SHARE}% or more of the days worked)`,
+    `leave above ${OV_LEAVE_RED}%`, "never called in", "newcomer-only mission"];
+  bits.forEach((t, i) => {
+    if (i) help.appendChild(document.createTextNode(i === 1 ? " " : i === 2 ? ": " : ", "));
+    help.appendChild(Object.assign(document.createElement("span"), { textContent: t }));
+  });
+  sec.appendChild(help);
   return sec;
 }
+
+/* the 10% band a person's share of working days worked falls in (0..9; 100% joins the top band) */
+function pplBandOf(p) { return Math.min(9, Math.floor((p.worked * 10) / p.working)); }
+function pplBandLabel(i) { return i === 9 ? "90–100%" : `${i * 10}–${i * 10 + 9}%`; }
+
+/* The spread: how many people sit in each 10% band of working days on a mission. A band is a
+   button: it filters the table below to that band (and to this chart's group). */
+function peopleSpread(rows) {
+  const ov = state.overview;
+  const grp = ov.pplSpread === "oncall" ? "oncall" : "permanent";
+  const mine = rows.filter(p => (grp === "oncall") === p.oncall);
+  const box = document.createElement("div");
+  box.className = "ov-hchart ov-spread";
+  const head = document.createElement("div");
+  head.className = "ov-hchart-head ov-hchart-head-row";
+  head.innerHTML = `<span><b>Workload spread</b> <span class="ov-muted">people by share of working days on a mission</span></span>`;
+  const seg = document.createElement("div");
+  seg.className = "ov-trend-btns";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", "Spread group");
+  for (const [k, l] of [["permanent", "Permanent"], ["oncall", "On-call"]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (grp === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(grp === k));
+    b.textContent = l;
+    b.onclick = () => { ov.pplSpread = k; ov.pplBand = null; render(); };
+    seg.appendChild(b);
+  }
+  head.appendChild(seg);
+  box.appendChild(head);
+  if (!mine.length) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: grp === "oncall" ? "No on-call people in this range." : "No permanent people in this range." }));
+    return box;
+  }
+  const bands = Array(10).fill(0);
+  for (const p of mine) bands[pplBandOf(p)]++;
+  const shares = mine.map(p => p.workedShare).sort((a, b) => a - b);
+  const mid = shares.length >> 1;
+  const median = shares.length % 2 ? shares[mid] : (shares[mid - 1] + shares[mid]) / 2;
+  const hi = mine.filter(p => p.worked * 10 >= p.working * 9).length, lo = mine.filter(p => p.worked * 2 < p.working).length;
+  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-sum",
+    textContent: `Median ${fmt1(median)}% · ${hi} at 90% or more · ${lo} under 50%` }));
+  const max = Math.max(1, ...bands);
+  const medBand = Math.min(9, Math.floor(median / 10));
+  const chart = document.createElement("div");
+  chart.className = "ov-bands";
+  chart.setAttribute("role", "group");
+  chart.setAttribute("aria-label", "Share of working days on a mission");
+  bands.forEach((n, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ov-band chart-mark" + (i === medBand ? " ov-band-median" : "");
+    b.setAttribute("data-band", String(i));
+    b.setAttribute("aria-pressed", String(ov.pplBand === i && ov.pplWho === grp));
+    b.setAttribute("data-tip-value", `${n} ${n === 1 ? "person" : "people"}`);
+    b.setAttribute("data-tip-label", `${pplBandLabel(i)} of working days on a mission${i === medBand ? " · median" : ""}`);
+    b.setAttribute("aria-label", `${pplBandLabel(i)}: ${n} ${n === 1 ? "person" : "people"}`);
+    b.innerHTML = `<span class="ov-band-n">${n || ""}</span><span class="ov-band-bar"><i style="height:${n ? Math.max(4, (n / max) * 100).toFixed(1) : 0}%"></i></span><span class="ov-band-l">${i * 10}${i === 9 ? "+" : ""}</span>`;
+    b.onclick = () => {
+      const on = ov.pplBand === i && ov.pplWho === grp;
+      ov.pplBand = on ? null : i;
+      ov.pplWho = on ? ov.pplWho : grp;
+      ov.pplAll = false;
+      render();
+    };
+    chart.appendChild(b);
+  });
+  box.appendChild(chart);
+  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-axis ov-muted", textContent: "Share of working days on a mission, %. Click a band to filter the table." }));
+  return box;
+}
+
+/* On-call: how many days people were called in (idea 6); Nights: how concentrated they are (idea 9) */
+function pplSummary(v, rows, shown) {
+  const el = document.createElement("p");
+  el.className = "ov-people-sum";
+  const names = (list) => list.map(p => `<span data-no-i18n>${escapeHtml(p.name)}</span>`).join(", ");
+  if (v.key === "oncall") {
+    const oc = rows.filter(p => p.oncall);
+    if (!oc.length) return null;
+    const days = oc.map(p => p.calledIn).sort((a, b) => a - b), mid = days.length >> 1;
+    const median = days.length % 2 ? days[mid] : (days[mid - 1] + days[mid]) / 2;
+    const never = oc.filter(p => p.flags.some(f => f.key === "never"));
+    el.innerHTML = `${escapeHtml(`Days called in: median ${fmt1(median)} · ${days[0]}–${days[days.length - 1]}`)}`
+      + (never.length ? ` · <b>${escapeHtml(`Never called in (${never.length})`)}:</b> ${names(never)}` : ` · ${escapeHtml("Everyone on call was called in")}`);
+    return el;
+  }
+  if (v.key === "nights") {
+    const withN = shown.filter(p => p.nights > 0).sort((a, b) => b.nights - a.nights);
+    const total = withN.reduce((a, p) => a + p.nights, 0);
+    if (!total) { el.textContent = "Nobody worked a night in this range."; return el; }
+    const top = withN.slice(0, 3).reduce((a, p) => a + p.nights, 0);
+    el.textContent = `${withN.length} ${withN.length === 1 ? "person shares" : "people share"} the ${total} nights · the top 3 worked ${Math.round((top / total) * 100)}% of them`;
+    return el;
+  }
+  return null;
+}
+
+/* ---------- Employee profile ----------
+   One person on one page: who they are, their figures for a period against the period before,
+   twelve months of worked against leave next to the average of their contract type, their flags,
+   the hosts they have worked, their loans and their notes. Opens from a name in People and from
+   the Manpower List's menu. Anyone who can view Manpower can open it; the figures (and the
+   chart and flags) need the Overview History permission, like History's own per-person numbers.
+   The figures are History's own: the same fetch (getUtilizationRange over every board), the
+   same day records and the same rows (historyPeopleRows), so they match the People row for the
+   same range. The layout is the one-engineer view's: tiles, a chart against an average, a foot
+   of chips and facts. */
+const PROFILE_PERIODS = [["30", "30D"], ["90", "90D"], ["ytd", "YTD"], ["range", "History range"]];
+
+function profileRange(period) {
+  const ov = state.overview, today = todayStr();
+  if (period === "range") { resolveHistoryRange(); return [ov.historyFrom, ov.historyTo]; }
+  return [period === "ytd" ? yearStart(today) : addDays(today, -(Number(period) - 1)), today];
+}
+/* the first day of each of the last 12 months, oldest first */
+function profileMonthStarts() {
+  const out = [monthStart(todayStr())];
+  while (out.length < 12) out.unshift(monthStart(addDays(out[0], -1)));
+  return out;
+}
+
+/* one person's row for a range, the period before it, and the days they worked on weekends and holidays */
+function profileFigures(id, hist, from, to) {
+  const boards = D().boards;
+  const rowsFor = (f, t, runs) => {
+    const dates = historyDates(boards, f, t);
+    const recs = dates.map(d => historyDayRec(d, boards, hist));
+    return historyPeopleRows({ dates, recs, hist, boards, from: f, to: t, runs });
+  };
+  const empty = () => ({ id, days: 0, worked: 0, leave: 0, sick: 0, exch: 0, nights: 0, newcomer: 0, working: 0, run: null, other: 0, share: 0,
+    workedShare: 0, nightShare: 0, flags: [], oncall: false, calledIn: null, available: 0 });
+  const off = (f, t) => {
+    let n = 0;
+    for (let d = f; d <= t; d = addDays(d, 1)) if (boards.some(b => hist[b.id] && hist[b.id][d] && hist[b.id][d].workEmp && hist[b.id][d].workEmp[id] && isNonWorkingDate(d, b.id))) n++;
+    return n;
+  };
+  const [pf, pt] = prevRangeOf(from, to);
+  return {
+    row: rowsFor(from, to, true).find(p => p.id === id) || empty(), off: off(from, to),
+    prev: rowsFor(pf, pt, true).find(p => p.id === id) || empty(), prevOff: off(pf, pt),
+  };
+}
+
+/* twelve months of worked and leave days for one person, and the average worked of their contract type */
+function profileMonths(id, hist) {
+  const boards = D().boards, today = todayStr();
+  const me = D().employees.find(e => e.id === id);
+  const oncall = !!(me && me.contract === "oncall");
+  return profileMonthStarts().map(m => {
+    const to = monthEnd(m) < today ? monthEnd(m) : today;
+    const dates = historyDates(boards, m, to);
+    const recs = dates.map(d => historyDayRec(d, boards, hist));
+    const rows = historyPeopleRows({ dates, recs, hist, boards, from: m, to, runs: false });
+    const mine = rows.find(p => p.id === id) || { worked: 0, leave: 0, working: 0 };
+    const same = rows.filter(p => p.oncall === oncall);
+    const avg = (k) => (same.length ? same.reduce((a, p) => a + p[k], 0) / same.length : 0);
+    return { month: m, worked: mine.worked, leave: mine.leave, working: mine.working, avgWorked: Math.round(avg("worked") * 10) / 10, avgLeave: Math.round(avg("leave") * 10) / 10 };
+  });
+}
+
+async function openProfile(id, period) {
+  if (!can("emplist") || !D().employees.some(e => e.id === id)) return;
+  const pr = state.profile;
+  pr.id = id;
+  pr.period = period && PROFILE_PERIODS.some(([k]) => k === period) ? period : "range";
+  pr.hosts = null; pr.notes = null; pr.hostsAll = false;
+  const e = D().employees.find(x => x.id === id);
+  $("#profile-title").textContent = e.name;
+  $("#profile-sub").textContent = "";
+  $("#profile-body").innerHTML = '<p class="ov-muted ov-prof-loading">Loading…</p>';
+  openModal("#modal-profile");
+  await safely(async () => {
+    await loadProfile();
+    renderProfile();
+  });
+}
+
+/* the figures' fetch is shared by every period that fits inside it, so switching 30D / 90D / YTD costs a redraw */
+async function loadProfile() {
+  const pr = state.profile, id = pr.id;
+  const seq = ++pr.seq;
+  const jobs = [];
+  if (can("ov.history")) {
+    const [from, to] = profileRange(pr.period);
+    const chartFrom = profileMonthStarts()[0], prevFrom = prevRangeOf(from, to)[0];
+    const needFrom = prevFrom < chartFrom ? prevFrom : chartFrom, needTo = to > todayStr() ? to : todayStr();
+    const c = pr.cache;
+    if (!c || c.from > needFrom || c.to < needTo) {
+      jobs.push(cloud.getUtilizationRange(D().boards.map(b => b.id), needFrom, needTo).then(hist => { if (seq === pr.seq) pr.cache = { from: needFrom, to: needTo, hist }; }));
+    }
+  }
+  if (pr.hosts == null) jobs.push(cloud.getEmployeeHostHistory(id).then(r => { if (seq === pr.seq) pr.hosts = r; }));
+  if (pr.notes == null && can("emplist", "edit")) jobs.push(cloud.getEmployeeNotes(id).then(r => { if (seq === pr.seq) pr.notes = r; }));
+  await Promise.all(jobs);
+}
+
+function renderProfile() {
+  const pr = state.profile, body = $("#profile-body");
+  const e = D().employees.find(x => x.id === pr.id);
+  if (!e || $("#modal-profile").classList.contains("hidden")) return;
+  const pendingCharts = [];
+  const showFigures = can("ov.history") && pr.cache;
+  const today = todayStr();
+  const board = D().boards.find(b => b.id === e.boardId), area = D().areas.find(a => a.id === e.areaId), pos = e.position ? POSITIONS[e.position] : null;
+  const loanNow = loanOf(e, today);
+  const loanTo = loanNow ? (D().boards.find(b => b.id === loanNow.toBoardId) || {}).name : "";
+  const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
+  $("#profile-sub").textContent = [board && board.name, e.contract === "oncall" ? "On-call" : "Permanent", area && area.name].filter(Boolean).join(" · ");
+
+  body.innerHTML = "";
+  const fact = (l, v) => `<div><span>${l}</span> <b>${v}</b></div>`;
+  const head = document.createElement("div");
+  head.className = "ov-eng-facts ov-prof-id";
+  head.innerHTML = [
+    fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : "—"),
+    fact("Contract", e.contract === "oncall" ? "On-call" : "Permanent"),
+    fact("Position", pos ? pos.label : "—"),
+    fact("Service area", area ? sc(area.name) : "—"),
+    fact("Board", (board ? sc(board.name) : "—") + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
+    fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : "—"),
+    fact("Status", e.active === false ? `<span>Inactive</span>${e.deactivatedOn ? ` <small class="ov-muted"><span>since ${escapeHtml(fmtDate(e.deactivatedOn))}</span></small>` : ""}` : "Active"),
+  ].join("");
+  body.appendChild(head);
+
+  if (!can("ov.history")) {
+    body.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help", textContent: "Worked, leave and nights are shown to roles that can see Overview History." }));
+  } else if (showFigures) {
+    const [from, to] = profileRange(pr.period);
+    const fig = profileFigures(pr.id, pr.cache.hist, from, to);
+    const cur = fig.row, prev = fig.prev;
+    // period switch
+    const bar = document.createElement("div");
+    bar.className = "ov-hchart-head ov-hchart-head-row ov-prof-bar";
+    bar.innerHTML = `<span><b>Period</b> <span class="ov-muted">${escapeHtml(fmtDate(from))} → ${escapeHtml(fmtDate(to))} · ${cur.working} working days</span></span>`;
+    const seg = document.createElement("div");
+    seg.className = "ov-trend-btns";
+    seg.setAttribute("role", "group");
+    seg.setAttribute("aria-label", "Profile period");
+    for (const [k, l] of PROFILE_PERIODS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-small" + (pr.period === k ? " active" : "");
+      b.setAttribute("aria-pressed", String(pr.period === k));
+      b.textContent = l;
+      b.onclick = () => { pr.period = k; safely(async () => { await loadProfile(); renderProfile(); }); };
+      seg.appendChild(b);
+    }
+    bar.appendChild(seg);
+    body.appendChild(bar);
+
+    // tiles, each against the period before (History's historyDelta)
+    const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
+    const pv = (fn) => (prev.working ? r1(fn(prev)) : null);
+    const oncall = e.contract === "oncall";
+    const cls = cur.share > OV_LEAVE_RED ? "bad" : cur.share > OV_LEAVE_AMBER ? "warn" : "ok";
+    const tiles = document.createElement("div");
+    tiles.className = "ov-htiles ov-prof-tiles";
+    const tile = (t) => { const d = document.createElement("div"); d.className = "ov-htile ov-htile-static"; d.innerHTML = ovTileInner(t); tiles.appendChild(d); };
+    tile({ label: "Worked", value: cur.worked, sub: `of ${cur.working} working days`, delta: historyDelta({ key: "p-worked", suffix: "" }, cur.worked, pv(p => p.worked)) });
+    tile({ label: "Leave", value: cur.leave, sub: cur.sick ? `${cur.sick} sick` : "Exchange Working Day not counted", delta: historyDelta({ key: "leave", suffix: "" }, cur.leave, pv(p => p.leave)) });
+    tile({ label: oncall ? "Not called in" : "Standby", value: cur.other, sub: oncall ? "available, not on a mission" : "no mission, no leave",
+      delta: historyDelta({ key: oncall ? "p-notcalled" : "idle", suffix: "" }, cur.other, pv(p => p.other)) });
+    tile({ label: "Worked : Leave", value: `${cur.worked} : ${cur.leave}`, sub: `<span class="ov-share ov-share-${cls}" title="Leave share ${fmt1(cur.share)}% of ${cur.working} working days">${fmt1(cur.share)}%</span>`,
+      delta: historyDelta({ key: "leave", suffix: "%" }, r1(cur.share), pv(p => p.share)) });
+    tile({ label: "Nights", value: cur.nights, sub: cur.worked ? `${Math.round(cur.nightShare)}% of the days worked` : "no days worked", delta: historyDelta({ key: "p-nights", suffix: "" }, cur.nights, pv(p => p.nights)) });
+    tile({ label: "Weekend and holiday days", value: fig.off, sub: "worked outside working days", delta: historyDelta({ key: "p-off", suffix: "" }, fig.off, prev.working || fig.prevOff ? fig.prevOff : null) });
+    tile({ label: "Longest run", value: cur.run ? cur.run.len : 0, sub: cur.run ? `days in a row${cur.run.ongoing ? " · still going" : ""}` : "days in a row",
+      delta: historyDelta({ key: "p-run", suffix: "" }, cur.run ? cur.run.len : 0, prev.working ? (prev.run ? prev.run.len : 0) : null) });
+    body.appendChild(tiles);
+    body.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help",
+      textContent: "Worked, leave and standby count planned working days. Days in a row count calendar days, weekends included." }));
+
+    // flags
+    const flags = document.createElement("div");
+    flags.className = "ov-prof-flags";
+    flags.innerHTML = `<b>Flags</b> ${cur.flags.length ? pplFlagsHtml(cur) : '<span class="ov-muted">None in this period</span>'}`;
+    body.appendChild(flags);
+
+    // twelve months against the average of their contract type
+    const months = profileMonths(pr.id, pr.cache.hist);
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const chart = document.createElement("div");
+    chart.className = "ov-hchart ov-prof-chart";
+    chart.innerHTML = `<div class="ov-hchart-head"><b>Last 12 months, worked and leave per month</b></div>`;
+    const type = e.contract === "oncall" ? "on-call" : "permanent";
+    ovChartAgainstAverage(chart, pendingCharts, {
+      legend: [{ label: "Worked days", color: "var(--chart-assigned)" }, { label: "Leave days", color: "var(--leave-annual)" }, { label: `Average worked, ${type} staff`, color: "var(--muted)" }],
+      stacks: [{ label: "Worked days", color: "var(--chart-assigned)", values: months.map(m => m.worked) }, { label: "Leave days", color: "var(--leave-annual)", values: months.map(m => m.leave) }],
+      line: { label: "avg worked", color: "var(--muted)", values: months.map(m => m.avgWorked) },
+      xLabels: months.map(m => MON[Number(m.month.slice(5, 7)) - 1]),
+      dayTotals: months.map(m => `${m.working} working ${m.working === 1 ? "day" : "days"} · average worked ${m.avgWorked} · average leave ${m.avgLeave}`),
+      yMax: Charts.niceMax(months.flatMap(m => [m.worked + m.leave, m.avgWorked])),
+    });
+    body.appendChild(chart);
+  } else {
+    body.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Loading…" }));
+  }
+
+  // hosts worked, all time (deployment_history), experienced at HOST_EXPERIENCED_DAYS days
+  const hostDays = new Map();
+  for (const r of pr.hosts || []) {
+    const h = hostDays.get(r.host) || hostDays.set(r.host, { host: r.host, dates: new Set(), last: "" }).get(r.host);
+    h.dates.add(r.date);
+    if (r.date > h.last) h.last = r.date;
+  }
+  const hosts = [...hostDays.values()].map(h => ({ host: h.host, days: h.dates.size, last: h.last }))
+    .sort((a, b) => b.days - a.days || b.last.localeCompare(a.last) || a.host.localeCompare(b.host));
+  const hostBox = document.createElement("div");
+  hostBox.className = "ov-prof-block";
+  hostBox.innerHTML = `<div class="ov-eng-foot-h">Hosts worked, all time <span class="ov-muted">${hosts.filter(h => h.days >= HOST_EXPERIENCED_DAYS).length} experienced (${HOST_EXPERIENCED_DAYS}+ days) of ${hosts.length}</span></div>`;
+  if (!hosts.length) hostBox.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "No mission history yet." }));
+  else {
+    const shownHosts = pr.hostsAll ? hosts : hosts.slice(0, OV_WL_SHOWN);
+    const wrap = document.createElement("div");
+    wrap.className = "ov-table-wrap";
+    wrap.innerHTML = `<table class="ov-table ov-prof-hosts"><thead><tr><th>Host</th><th class="r">Days</th><th>Last worked</th><th></th></tr></thead><tbody>${
+      shownHosts.map(h => `<tr><td>${sc(h.host)}</td><td class="r">${h.days}</td><td>${escapeHtml(fmtDate(h.last))}</td>
+        <td>${h.days >= HOST_EXPERIENCED_DAYS ? `<span class="ov-flag ov-flag-ok" title="${HOST_EXPERIENCED_DAYS} or more days at this host">experienced</span>` : ""}</td></tr>`).join("")}</tbody></table>`;
+    hostBox.appendChild(wrap);
+    if (hosts.length > OV_WL_SHOWN) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "btn btn-small ov-wl-more";
+      more.textContent = pr.hostsAll ? "Show fewer" : `Show all ${hosts.length}`;
+      more.onclick = () => { pr.hostsAll = !pr.hostsAll; renderProfile(); };
+      hostBox.appendChild(more);
+    }
+  }
+  body.appendChild(hostBox);
+
+  // loans
+  const loans = feat().loans ? (D().loans || []).filter(l => l.employeeId === e.id).sort((a, b) => b.startDate.localeCompare(a.startDate)) : [];
+  if (loans.length) {
+    const bn = (id) => (D().boards.find(b => b.id === id) || {}).name || "?";
+    const box = document.createElement("div");
+    box.className = "ov-prof-block";
+    box.innerHTML = `<div class="ov-eng-foot-h">Loans</div><div class="ov-table-wrap"><table class="ov-table"><thead><tr><th>From → to</th><th>Dates</th><th>Note</th></tr></thead><tbody>${
+      loans.map(l => `<tr><td>${sc(bn(e.boardId))} → <b>${sc(bn(l.toBoardId))}</b></td><td>${escapeHtml(l.startDate === l.endDate ? fmtDayMon(l.startDate) : `${fmtDayMon(l.startDate)} – ${fmtDayMon(l.endDate)}`)}</td><td>${l.note ? sc(l.note) : "—"}</td></tr>`).join("")}</tbody></table></div>`;
+    body.appendChild(box);
+  }
+
+  // notes, read-only, for anyone who can edit the roster (as in the Note tab)
+  if (can("emplist", "edit") && pr.notes) {
+    const box = document.createElement("div");
+    box.className = "ov-prof-block";
+    box.innerHTML = `<div class="ov-eng-foot-h">Notes</div>`;
+    if (!pr.notes.length) box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "No notes." }));
+    for (const n of pr.notes) {
+      const p = document.createElement("p");
+      p.className = "ov-prof-note";
+      p.innerHTML = `<span data-no-i18n>${escapeHtml(n.note)}</span> <small class="ov-muted"><span data-no-i18n>${escapeHtml(n.createdBy || "")}</span> ${escapeHtml(n.createdAt ? fmtDate(n.createdAt.slice(0, 10)) : "")}</small>`;
+      box.appendChild(p);
+    }
+    body.appendChild(box);
+  }
+
+  for (const fill of pendingCharts) fill();
+  Charts.wireChartTooltips(body);
+}
+
 
 /* ---------- Engineer workload → one engineer over the range ----------
    Pick an engineer (the picker, or a row above), a measure, and day / week / month: their
@@ -4730,7 +5247,7 @@ function historyEngPicked(rows) {
   const id = state.overview.engPick;
   return rows.some(r => r.id === id) ? id : (rows[0] && rows[0].id);
 }
-function historyEngineerDetail(dates, recs, rows, pendingCharts) {
+function historyEngineerDetail(dates, recs, rows, pendingCharts, prevRecs = []) {
   const ov = state.overview;
   const box = document.createElement("div");
   box.className = "ov-hchart ov-eng";
@@ -4742,6 +5259,8 @@ function historyEngineerDetail(dates, recs, rows, pendingCharts) {
   // each plotted day's record for one engineer (zeros on a day they ran nothing)
   const daysOf = (eid) => recs.map(r => (r && r.byEngineer[eid]) || OV_ENG_ZERO);
   const mine = daysOf(id);
+  // the same engineer over the period before (History's fetch covers it)
+  const prevMine = prevRecs.map(r => (r && r.byEngineer[id]) || OV_ENG_ZERO);
 
   // controls: picker + group
   const head = document.createElement("div");
@@ -4781,11 +5300,17 @@ function historyEngineerDetail(dates, recs, rows, pendingCharts) {
     const whole = x.agg(mine);
     const shown = whole == null ? "—" : x.key === "active" ? String(whole) : x.sum ? fmt1(whole / (n || 1)) : fmt1(whole) + x.unit;
     const sub = x.key === "active" ? `of ${n} working days` : x.per;
+    // against the previous period: per working day for the sums, over the range for the rest;
+    // Active days is scaled to this range's length so a longer or shorter period compares fairly
+    const nPrev = prevMine.length, prevWhole = nPrev ? x.agg(prevMine) : null;
+    const num = whole == null ? null : x.key === "active" ? whole : x.sum ? whole / (n || 1) : whole;
+    const prevNum = prevWhole == null ? null : x.key === "active" ? (prevWhole * n) / nPrev : x.sum ? prevWhole / nPrev : prevWhole;
+    const r1n = (v) => (v == null ? null : Math.round(v * 10) / 10);
     const b = document.createElement("button");
     b.type = "button";
     b.className = "ov-htile";
     b.setAttribute("aria-pressed", String(x.key === m.key));
-    b.innerHTML = `<span class="ov-htile-label">${x.label}</span><span class="ov-htile-value">${shown}</span><span class="ov-htile-sub">${sub}</span>`;
+    b.innerHTML = ovTileInner({ label: x.label, value: shown, sub, delta: historyDelta({ key: "eng-" + x.key, suffix: x.unit }, r1n(num), r1n(prevNum)) });
     b.onclick = () => { ov.engMeasure = x.key; render(); };
     tiles.appendChild(b);
   }
@@ -4815,20 +5340,17 @@ function historyEngineerDetail(dates, recs, rows, pendingCharts) {
     return x0(m.agg(pooled));
   });
   const per = group === "day" ? "per day" : group === "week" ? "per week" : "per month";
-  box.appendChild(ovLegend([
-    { label: `${eng ? eng.name : ""} · ${m.label.toLowerCase()}${m.sum ? ` ${per}` : ""}`, color: "var(--chart-assigned)" },
-    { label: "Average engineer", color: "var(--muted)" },
-  ]));
-  const wrap = document.createElement("div");
-  wrap.className = "ov-trend-chart";
-  box.appendChild(wrap);
-  pendingCharts.push(() => fillColumnChart(wrap, {
+  ovChartAgainstAverage(box, pendingCharts, {
+    legend: [
+      { label: `${eng ? eng.name : ""} · ${m.label.toLowerCase()}${m.sum ? ` ${per}` : ""}`, color: "var(--chart-assigned)" },
+      { label: "Average engineer", color: "var(--muted)" },
+    ],
     stacks: [{ label: eng ? eng.name : "", color: "var(--chart-assigned)", values: vals }],
     line: { label: "team avg", color: "var(--muted)", values: team },
     xLabels: buckets.map(label), dayTotals: team.map(t => `team avg ${t}${m.unit}`),
-    yMax: m.unit === "%" ? 100 : Charts.niceMax([...vals, ...team]), height: 220,
+    yMax: m.unit === "%" ? 100 : Charts.niceMax([...vals, ...team]),
     dates: group === "day" ? dates : null,
-  }));
+  });
   if (group === "day") wireHistoryDayClicks(box, () => id || undefined);
 
   // where they worked, and four facts
@@ -4838,18 +5360,32 @@ function historyEngineerDetail(dates, recs, rows, pendingCharts) {
   let run = 0, best = 0;
   for (const x of mine) { run = x.missions ? run + 1 : 0; best = Math.max(best, run); }
   const rank = rows.findIndex(r => r.id === id) + 1;
+  box.appendChild(ovFootHtml({
+    title: "Hosts they ran missions at",
+    chips: Object.entries(hosts).sort((a, b) => b[1] - a[1]).map(([h, c]) => `<span><span data-no-i18n>${escapeHtml(h)}</span> <b>${c}</b></span>`).join("") || '<span class="ov-muted">None in this range</span>',
+    facts: [["Rank by missions", `${rank} of ${rows.length}`], ["Missions in the range", totalM],
+      ["Person-days managed", mine.reduce((a, x) => a + x.crew, 0)], ["Longest run of active days", best]],
+  }));
+  return box;
+}
+
+/* The two parts the one-engineer view and the employee profile share: a column chart of one
+   person's figure against an average (dashed line), and the foot with a chip list beside
+   four facts. */
+function ovChartAgainstAverage(box, pendingCharts, { legend, stacks, line, xLabels, dayTotals, yMax, dates }) {
+  box.appendChild(ovLegend(legend));
+  const wrap = document.createElement("div");
+  wrap.className = "ov-trend-chart";
+  box.appendChild(wrap);
+  pendingCharts.push(() => fillColumnChart(wrap, { stacks, line, xLabels, dayTotals, yMax, height: 220, dates: dates || null }));
+  return wrap;
+}
+function ovFootHtml({ title, chips, facts }) {
   const foot = document.createElement("div");
   foot.className = "ov-eng-foot";
-  foot.innerHTML = `<div><div class="ov-eng-foot-h">Hosts they ran missions at</div><div class="ov-eng-hosts">${
-      Object.entries(hosts).sort((a, b) => b[1] - a[1]).map(([h, c]) => `<span><span data-no-i18n>${escapeHtml(h)}</span> <b>${c}</b></span>`).join("") || '<span class="ov-muted">None in this range</span>'}</div></div>
-    <div class="ov-eng-facts">
-      <div><span>Rank by missions</span> <b>${rank} of ${rows.length}</b></div>
-      <div><span>Missions in the range</span> <b>${totalM}</b></div>
-      <div><span>Person-days managed</span> <b>${mine.reduce((a, x) => a + x.crew, 0)}</b></div>
-      <div><span>Longest run of active days</span> <b>${best}</b></div>
-    </div>`;
-  box.appendChild(foot);
-  return box;
+  foot.innerHTML = `<div><div class="ov-eng-foot-h">${title}</div><div class="ov-eng-hosts">${chips}</div></div>
+    <div class="ov-eng-facts">${facts.map(([l, v]) => `<div><span>${l}</span> <b>${v}</b></div>`).join("")}</div>`;
+  return foot;
 }
 
 /* A plain, non-interactive legend: a swatch and a label (optionally a count). */
@@ -5344,7 +5880,7 @@ function renderOverview() {
     panel.appendChild(grid);
   }
 
-  /* ---------- Over time: History + Engineer workload ----------
+  /* ---------- The Period group: History, People and Engineer workload ----------
      Both read one fetch (state.overview.history) over one user-chosen range.
      Built only when shown: refreshData skips the range fetch for a role
      without ov.history. */
@@ -5352,12 +5888,12 @@ function renderOverview() {
     resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
     const histDates = historyDates(boards);
     const histRecs = histDates.map(d => historyDayRec(d, boards, state.overview.history || {}));
-    panel.appendChild(ovGroupHead("Period", `${historyRangeCaption(histDates)}`));
+    panel.appendChild(ovPeriodHead(histDates));
     const [pFrom, pTo] = historyPrevRange();
     const prevRecs = historyDates(boards, pFrom, pTo).map(d => historyDayRec(d, boards, state.overview.history || {}));
     panel.appendChild(historySection(histDates, histRecs, historyUnplanned(histDates, boards, state.overview.history || {}), pendingCharts, prevRecs));
-    panel.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts));
-    panel.appendChild(historyWorkloadAlerts(boards));
+    panel.appendChild(peopleSection(boards, histDates, histRecs));
+    panel.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts, prevRecs));
   }
 
   // A role with every section switched off would otherwise get a blank tab with
@@ -5607,10 +6143,11 @@ function emplistFilteredSorted() {
 }
 
 /* ---------- Manpower List: Worked, Leave, Worked : Leave ----------
-   Per person over the list's period (30D / 90D / YTD), on the working days of the board they
-   worked on, from the day they were added: days on a mission, days on leave (Exchange Working
-   Day left out: it is worked back), and the two side by side with the leave share, amber above
-   OV_LEAVE_AMBER %, red above OV_LEAVE_RED % (History's rule). Shown only to a role with the
+   Per person over the list's period (30D / 90D / YTD), on PLANNED working days (empPlannedCounts:
+   History's rule, so the same person and range read the same here and in People): days on a
+   mission, days on leave (Exchange Working Day left out: it is worked back), and the two side by
+   side with the leave share, amber above OV_LEAVE_AMBER %, red above OV_LEAVE_RED %. The
+   utilization column keeps its own rule. Shown only to a role with the
    History permission, like History's own per-person figures. */
 function emplistShowsWl() { return can("ov.history"); }
 function emplistWlOf(e) {
@@ -15551,6 +16088,7 @@ async function boot() {
   cloud.onChange((payload) => {
     state.overview.utilCacheKey = null;
     state.overview.historyCacheKey = null;
+    state.profile.cache = null;   // the profile's figures are refetched the next time it needs them
     // the Capacity grid's leave / named counts come from the same rows
     state.capacity.cacheKey = null;
     // D3: a live heads-up for the ONE person whose hold was just taken —

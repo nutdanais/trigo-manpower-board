@@ -1516,7 +1516,8 @@ const cloud = {
      which type) and which on-call people were on a mission: History's Leave
      and On-call views and their name lists. `roster`, `workEmp` and
      `nightEmp` say who was on the board, on a mission and on a night
-     mission (Worked : Leave and the workload alerts), and each `byEngineer`
+     mission (Worked : Leave and the People table), `crews` lists the people on
+     each staffed mission (the newcomer-only flag), and each `byEngineer`
      entry also counts its `nightMissions` and missions per host (`hosts`)
      for the one-engineer view.
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
@@ -1588,6 +1589,7 @@ const cloud = {
           leaveBy: Object.fromEntries(ZONES.map((z) => [z, 0])),   // leave by type: sums to `leave`
           leaveEmp: {},    // { employeeId: leave type } — who was on leave that day
           oncallEmp: {},   // { employeeId: 1 } — on-call people on a (non-hidden) mission that day
+          crews: [],       // one list of employee ids per staffed mission that day (People: "newcomer-only mission")
           holiday: isNonWorkingDate(d, boardId),   // weekend or holiday override: unassigned permanent staff are off, not on standby
         };
       }
@@ -1640,12 +1642,13 @@ const cloud = {
        date, so a mission NUMBER that runs both a day and a night shift is
        two missions here, exactly as the board and the single-day "By
        engineer" table already show it. */
-    const crewByMission = new Map();   // mission id -> {crew, permCrew, oncallCrew}
+    const crewByMission = new Map();   // mission id -> {crew, permCrew, oncallCrew, ids}
     for (const a of assignRows) {
       if (!a.mission_id || !isCounted(a.employee_id, a.plan_date)) continue;
       if (missionHidden.has(a.mission_id)) continue;
-      const m = crewByMission.get(a.mission_id) || { crew: 0, permCrew: 0, oncallCrew: 0 };
+      const m = crewByMission.get(a.mission_id) || { crew: 0, permCrew: 0, oncallCrew: 0, ids: [] };
       m.crew++;
+      m.ids.push(a.employee_id);
       if (empContract.get(a.employee_id) === "oncall") m.oncallCrew++; else m.permCrew++;
       crewByMission.set(a.mission_id, m);
     }
@@ -1654,6 +1657,7 @@ const cloud = {
       const bucket = boardId && result[boardId] && result[boardId][missionDate.get(missionId)];
       if (!bucket) continue;
       bucket.staffedMissions++;
+      bucket.crews.push(m.ids);
       const engId = missionEngineer.get(missionId) || "";
       const rec = bucket.byEngineer[engId] ||
         (bucket.byEngineer[engId] = { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0, nightMissions: 0, hosts: {} });
@@ -1668,29 +1672,42 @@ const cloud = {
     return result;
   },
 
-  /* ---------- per-employee utilization (Manpower List's 30D column) ---------- */
+  /* ---------- per-employee utilization (Manpower List's 30D column, Worked : Leave) ---------- */
   /* Same two bulk queries as getUtilizationRange, bucketed by employee instead
-     of by board. Returns { [employeeId]: { workedDates:Set, leaveDates:Set } }
-     — raw date sets, not a percentage, because the denominator is each
-     employee's own board's working days, and only app.js knows the weekend /
-     holiday rules. A hidden mission doesn't count as work; that's the only
-     exclusion — this is per-employee, so unlike getUtilizationRange there's
-     no board-level headcount denominator that active status could throw off. */
+     of by board. Returns { people, planned }:
+       people[employeeId] = { workedDates:Set, leaveDates:Set, exchangeDates:Set,
+                              workedOn:Map(date -> {board, night}), leaveZone:Map(date -> zone) }
+       planned = Set of "boardId|date" for every board-day with at least one
+                 non-hidden mission (a board-day nobody planned is "not planned").
+     Raw date sets, not percentages, because the denominator is each employee's
+     own board's working days, and only app.js knows the weekend / holiday rules.
+     `planned` and `workedOn` are what lets app.js count Worked and Leave on
+     PLANNED working days only, History's rule (the utilization column keeps
+     its own rule and reads the plain sets). A hidden mission doesn't count as
+     work; that's the only other exclusion — this is per-employee, so unlike
+     getUtilizationRange there's no board-level headcount denominator that
+     active status could throw off. */
   async getEmployeeUtilization(fromDate, toDate) {
     const [missionRows, assignRows] = await Promise.all([
-      fetchAllPages(() => sb.from("missions").select("id, plan_date, hidden")
+      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden, shift")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
       fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
     ]);
 
     const missionHidden = new Set();
-    for (const m of missionRows) if (m.hidden) missionHidden.add(m.id);
+    const missionInfo = new Map();   // mission id -> {board, night}
+    const planned = new Set();
+    for (const m of missionRows) {
+      if (m.hidden) { missionHidden.add(m.id); continue; }
+      missionInfo.set(m.id, { board: m.board_id, night: m.shift === "night" });
+      planned.add(m.board_id + "|" + m.plan_date);
+    }
     const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
 
-    const out = {};
+    const people = {};
     // exchangeDates: the Exchange Working Days among leaveDates (worked back, so not leave in Worked : Leave)
-    const rec = (id) => (out[id] = out[id] || { workedDates: new Set(), leaveDates: new Set(), exchangeDates: new Set() });
+    const rec = (id) => (people[id] = people[id] || { workedDates: new Set(), leaveDates: new Set(), exchangeDates: new Set(), workedOn: new Map(), leaveZone: new Map() });
     for (const a of assignRows) {
       if (!empBoard.has(a.employee_id)) continue;   // employee record no longer exists at all
       if (a.mission_id) {
@@ -1701,13 +1718,20 @@ const cloud = {
         // moved boards, undercounting exactly the person this 30D column
         // exists to show.
         if (missionHidden.has(a.mission_id)) continue;
-        rec(a.employee_id).workedDates.add(a.plan_date);
+        const r = rec(a.employee_id), info = missionInfo.get(a.mission_id);
+        r.workedDates.add(a.plan_date);
+        if (info) {
+          const prev = r.workedOn.get(a.plan_date);
+          r.workedOn.set(a.plan_date, { board: prev ? prev.board : info.board, night: !!(prev && prev.night) || info.night });
+        }
       } else if (a.zone && ZONES.includes(a.zone)) {
-        rec(a.employee_id).leaveDates.add(a.plan_date);
-        if (a.zone === "exchange") rec(a.employee_id).exchangeDates.add(a.plan_date);
+        const r = rec(a.employee_id);
+        r.leaveDates.add(a.plan_date);
+        r.leaveZone.set(a.plan_date, a.zone);
+        if (a.zone === "exchange") r.exchangeDates.add(a.plan_date);
       }
     }
-    return out;
+    return { people, planned };
   },
 
   /* ---------- per-employee host history (Manpower List's Host Record tab) ---------- */
