@@ -208,7 +208,7 @@ const Charts = (() => {
       const bandW = w / Math.max(1, n);
       for (const s of visible) s.points.forEach((p, i) => {
         if (p.y == null || !dates[i]) return;
-        marks += `<rect class="chart-mark chart-hit" data-date="${esc(dates[i])}" x="${(xAt(i) - bandW / 2).toFixed(1)}" y="${padT}" width="${bandW.toFixed(1)}" height="${h}" fill="transparent"
+        marks += `<rect class="chart-hit" data-date="${esc(dates[i])}" x="${(xAt(i) - bandW / 2).toFixed(1)}" y="${padT}" width="${bandW.toFixed(1)}" height="${h}" fill="transparent"
           data-tip-label="${esc(s.label)} — ${esc(xLabels[i])}" data-tip-value="${p.y}${p.suffix || ""}"/>`;
       });
     }
@@ -263,7 +263,7 @@ const Charts = (() => {
       // behind the column carries the date (tabbable only when there is no bar to tab to)
       if (dates && dates[i]) {
         const bars = stacks.some(st => st.values[i]);
-        marks += `<rect class="chart-mark chart-hit"${day} x="${(xAt(i) - band / 2).toFixed(1)}" y="${padT}" width="${band.toFixed(1)}" height="${h}" fill="transparent"${bars ? "" : ' tabindex="0"'}
+        marks += `<rect class="chart-hit"${day} x="${(xAt(i) - band / 2).toFixed(1)}" y="${padT}" width="${band.toFixed(1)}" height="${h}" fill="transparent"${bars ? "" : ' tabindex="0"'}
           data-tip-label="${esc(xLabels[i])}${total != null ? ` · ${esc(total)}` : ""}" data-tip-value="${bars ? "" : "0"}${bars ? "" : esc(suffix)}"><title>${esc(xLabels[i])}</title></rect>`;
       }
       if (ghost && ghost.values[i] != null) {
@@ -388,13 +388,13 @@ const Charts = (() => {
     };
     const hide = () => tip.classList.add("hidden");
     root.addEventListener("pointermove", (ev) => {
-      const mark = ev.target.closest(".chart-mark");
+      const mark = ev.target.closest(".chart-mark, .chart-hit");
       if (!mark || !root.contains(mark)) { hide(); return; }
       show(mark, ev.clientX, ev.clientY);
     });
     root.addEventListener("pointerleave", hide, true);
     root.addEventListener("focusin", (ev) => {
-      const mark = ev.target.closest(".chart-mark");
+      const mark = ev.target.closest(".chart-mark, .chart-hit");
       if (!mark) return;
       const r = mark.getBoundingClientRect();
       show(mark, r.left + r.width / 2, r.top);
