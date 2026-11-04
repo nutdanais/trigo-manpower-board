@@ -1511,6 +1511,14 @@ const cloud = {
      permCrew+oncallCrew always summing to crew. Both feed the History
      charts; an EMPTY mission counts for neither, since "a mission nobody
      was sent to" is not deployment.
+     `leaveBy` splits `leave` by type ({ annual, sick, business, unpaid,
+     exchange }), and `leaveEmp` / `oncallEmp` say WHO was on leave (and on
+     which type) and which on-call people were on a mission: History's Leave
+     and On-call views and their name lists. `roster`, `workEmp` and
+     `nightEmp` say who was on the board, on a mission and on a night
+     mission (Worked : Leave and the workload alerts), and each `byEngineer`
+     entry also counts its `nightMissions` and missions per host (`hosts`)
+     for the one-engineer view.
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
      use each employee's CURRENT board membership - board moves aren't tracked
      historically - but only from the day they were added to the app
@@ -1523,7 +1531,7 @@ const cloud = {
   async getUtilizationRange(boardIds, fromDate, toDate) {
     if (!boardIds.length) return {};
     const [missionRows, assignRows] = await Promise.all([
-      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden, engineer_id")
+      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, hidden, engineer_id, shift, host")
         .in("board_id", boardIds).gte("plan_date", fromDate).lte("plan_date", toDate)),
       fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
@@ -1533,7 +1541,11 @@ const cloud = {
     const missionDate = new Map();       // mission id -> plan date
     const missionEngineer = new Map();   // mission id -> engineer id ("" = none set)
     const missionHidden = new Set();     // mission ids that are hidden on their date
+    const missionNight = new Set();      // mission ids on the night shift
+    const missionHost = new Map();       // mission id -> host
     for (const m of missionRows) {
+      if (m.shift === "night") missionNight.add(m.id);
+      missionHost.set(m.id, m.host || "");
       missionBoard.set(m.id, m.board_id);
       missionDate.set(m.id, m.plan_date);
       missionEngineer.set(m.id, m.engineer_id || "");
@@ -1567,9 +1579,15 @@ const cloud = {
       for (const boardId of boardIds) {
         const emps = headcountOn(boardId, d);
         result[boardId][d] = {
+          roster: emps.map((e) => e.id),   // who was on this board that day (Worked : Leave's available days)
+          workEmp: {},                     // { employeeId: 1 } — on a (non-hidden) mission that day
+          nightEmp: {},                    // { employeeId: 1 } — on a night mission that day
           assigned: 0, leave: 0, headcount: emps.length,
           oncallAssigned: 0, oncallLeave: 0, oncallHeadcount: emps.filter((e) => e.contract === "oncall").length,
           missions: 0, staffedMissions: 0, byEngineer: {},
+          leaveBy: Object.fromEntries(ZONES.map((z) => [z, 0])),   // leave by type: sums to `leave`
+          leaveEmp: {},    // { employeeId: leave type } — who was on leave that day
+          oncallEmp: {},   // { employeeId: 1 } — on-call people on a (non-hidden) mission that day
           holiday: isNonWorkingDate(d, boardId),   // weekend or holiday override: unassigned permanent staff are off, not on standby
         };
       }
@@ -1596,7 +1614,9 @@ const cloud = {
         const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
         if (!bucket) continue;
         bucket.assigned++;
-        if (isOncall) bucket.oncallAssigned++;
+        bucket.workEmp[a.employee_id] = 1;
+        if (missionNight.has(a.mission_id)) bucket.nightEmp[a.employee_id] = 1;
+        if (isOncall) { bucket.oncallAssigned++; bucket.oncallEmp[a.employee_id] = 1; }
       } else if (a.zone && ZONES.includes(a.zone)) {
         // A leave/zone entry isn't tied to a mission, so its board comes from
         // the employee: the board they worked on that day (a loan), else their
@@ -1606,6 +1626,8 @@ const cloud = {
         const bucket = boardId && result[boardId] && result[boardId][a.plan_date];
         if (!bucket) continue;
         bucket.leave++;
+        bucket.leaveBy[a.zone]++;
+        bucket.leaveEmp[a.employee_id] = a.zone;
         if (isOncall) bucket.oncallLeave++;
       }
     }
@@ -1634,8 +1656,11 @@ const cloud = {
       bucket.staffedMissions++;
       const engId = missionEngineer.get(missionId) || "";
       const rec = bucket.byEngineer[engId] ||
-        (bucket.byEngineer[engId] = { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0 });
+        (bucket.byEngineer[engId] = { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0, nightMissions: 0, hosts: {} });
       rec.missions++;
+      if (missionNight.has(missionId)) rec.nightMissions++;
+      const host = missionHost.get(missionId);
+      if (host) rec.hosts[host] = (rec.hosts[host] || 0) + 1;
       rec.crew += m.crew;
       rec.permCrew += m.permCrew;
       rec.oncallCrew += m.oncallCrew;
@@ -1664,7 +1689,8 @@ const cloud = {
     const empBoard = new Map(this.data.employees.map((e) => [e.id, e.boardId]));
 
     const out = {};
-    const rec = (id) => (out[id] = out[id] || { workedDates: new Set(), leaveDates: new Set() });
+    // exchangeDates: the Exchange Working Days among leaveDates (worked back, so not leave in Worked : Leave)
+    const rec = (id) => (out[id] = out[id] || { workedDates: new Set(), leaveDates: new Set(), exchangeDates: new Set() });
     for (const a of assignRows) {
       if (!empBoard.has(a.employee_id)) continue;   // employee record no longer exists at all
       if (a.mission_id) {
@@ -1678,6 +1704,7 @@ const cloud = {
         rec(a.employee_id).workedDates.add(a.plan_date);
       } else if (a.zone && ZONES.includes(a.zone)) {
         rec(a.employee_id).leaveDates.add(a.plan_date);
+        if (a.zone === "exchange") rec(a.employee_id).exchangeDates.add(a.plan_date);
       }
     }
     return out;

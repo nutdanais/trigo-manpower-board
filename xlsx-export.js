@@ -252,6 +252,11 @@
       // a real percentage (0.05 shows as 5%); blank while unknown or no working days
       v = typeof r.util === "number" ? r.util / 100 : "";
       if (v !== "") cell.numFmt = "0%";
+    } else if (col.key === "workedLeave") {
+      v = r.worked != null ? `${r.worked} : ${r.leaveDays}` : "";
+    } else if (col.key === "leaveShare") {
+      v = typeof r.leaveShare === "number" ? r.leaveShare / 100 : "";
+      if (v !== "") cell.numFmt = "0.0%";
     }
     cell.value = v === undefined || v === null ? "" : v;
     cell.font = fontOf({ bold: col.key === "name" });
@@ -482,15 +487,33 @@
     { key: "loanFrom",  label: "Loan From",       th: "ให้ยืมตั้งแต่",      width: 14, center: true, date: true },
     { key: "loanUntil", label: "Loan Until",      th: "ให้ยืมถึง",          width: 14, center: true, date: true },
   ];
-  function listColumns(rows) {
-    if (!rows.some((r) => r.loanTo)) return LIST_COLUMNS;
-    const at = LIST_COLUMNS.findIndex((c) => c.key === "board") + 1;
-    return [...LIST_COLUMNS.slice(0, at), ...LOAN_COLUMNS, ...LIST_COLUMNS.slice(at)];
+  /* Worked, Leave, Worked : Leave and Leave Share, after Utilization: only when the rows carry
+     them (the app adds them for a role with the History permission). `period` ("30D", "90D",
+     "YTD") names the utilization column; 30D when not given. */
+  const WL_COLUMNS = [
+    { key: "worked",      label: "Worked (days)",  th: "ทำงาน (วัน)",      width: 13, center: true },
+    { key: "leaveDays",   label: "Leave (days)",   th: "ลา (วัน)",         width: 12, center: true },
+    { key: "workedLeave", label: "Worked : Leave", th: "ทำงาน : ลา",       width: 15, center: true },
+    { key: "leaveShare",  label: "Leave Share",    th: "สัดส่วนการลา",     width: 13, center: true },
+  ];
+  const PERIOD_TH = { "30D": "30 วัน", "90D": "90 วัน", YTD: "ตั้งแต่ต้นปี" };
+  function listColumns(rows, period) {
+    let cols = LIST_COLUMNS;
+    if (period && period !== "30D") {
+      cols = cols.map((c) => (c.key === "util" ? Object.assign({}, c, { label: period + " Utilization", th: "การใช้งาน " + (PERIOD_TH[period] || period) }) : c));
+    }
+    if (rows.some((r) => r.worked != null)) {
+      const u = cols.findIndex((c) => c.key === "util") + 1;
+      cols = [...cols.slice(0, u), ...WL_COLUMNS, ...cols.slice(u)];
+    }
+    if (!rows.some((r) => r.loanTo)) return cols;
+    const at = cols.findIndex((c) => c.key === "board") + 1;
+    return [...cols.slice(0, at), ...LOAN_COLUMNS, ...cols.slice(at)];
   }
   async function buildListWorkbook(ExcelJS, opts) {
     const lang = normLang(opts.lang), T = TEXT[lang];
     const rows = opts.rows || [];
-    const COLS = listColumns(rows);
+    const COLS = listColumns(rows, opts.period);
     const wb = new ExcelJS.Workbook();
     wb.creator = "TRIGO Manpower Board";
     wb.created = new Date();
@@ -918,7 +941,7 @@
     return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
   }
 
-  const api = { buildCapacityWorkbook, addCapacityCharts, colLetter, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, LOAN_COLUMNS, buildListWorkbook, buildTableWorkbook };
+  const api = { buildCapacityWorkbook, addCapacityCharts, colLetter, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, LOAN_COLUMNS, buildListWorkbook, buildTableWorkbook, listColumns, WL_COLUMNS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

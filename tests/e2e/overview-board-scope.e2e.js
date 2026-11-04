@@ -4,7 +4,7 @@
        plus one pill per board, and picking a board scopes every section
        (attention card, KPIs, By board, the day's cards and History);
      - the page reads summary -> "In detail" (By engineer | By service area,
-       Shifts | Host coverage) -> "Period" (History, Engineer workload);
+       Shifts | Host coverage) -> "Period" (History, Engineer workload, Workload alerts);
      - the idle names follow the "Action queue" permission, and Engineer
        workload ranks engineers with missions and crew in one table;
      - a newcomer who later works a host leaves a past day's Host coverage risk
@@ -68,7 +68,7 @@ async function step(name, fn) {
           : c.classList.contains("ov-detail-grid") ? "detail-cards"
           : c.querySelector("h3") ? c.querySelector("h3").firstChild.textContent.trim() : c.className.split(" ")[0]));
       assert.deepEqual(order, ["ov-attn", "ov-kpi-row", "By board",
-        "head:In detail", "detail-cards", "head:Period", "History", "Engineer workload"]);
+        "head:In detail", "detail-cards", "head:Period", "History", "Engineer workload", "Workload alerts"]);
       const cards = await p.$$eval(".ov-detail-grid > .ov-section > h3", (els) => els.map((e) => e.textContent));
       assert.deepEqual(cards, ["By engineer", "By service area", "Shifts", "Host coverage"]);
     });
@@ -90,7 +90,7 @@ async function step(name, fn) {
           heads: [...sec.querySelectorAll("thead th")].map((t) => t.textContent),
           split: rows.map((r) => r.querySelectorAll(".ov-rk-sub")[1].textContent),
           shares: rows.map((r) => parseInt(r.lastElementChild.textContent, 10)),
-          switches: sec.querySelectorAll("button").length,
+          switches: [...sec.querySelectorAll("button")].filter((b) => !b.closest(".ov-eng")).length,   // the one-engineer view below the table has its own
         };
       });
       assert.deepEqual(wl.names, ["Eng One", "Eng Two"], "tied on missions, so more crew ranks first");

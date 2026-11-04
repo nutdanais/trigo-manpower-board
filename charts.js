@@ -135,7 +135,7 @@ const Charts = (() => {
      it. Gridlines are hairline and recessive; every point is a real hit target
      (see wireChartTooltips), not just the line itself. */
   function lineChart({ series, xLabels, yMax = 100, width = 640, height = 220,
-                       refLines = [], emptyLabel = "No boards selected — click a legend entry to show it" }) {
+                       refLines = [], emptyLabel = "No boards selected — click a legend entry to show it", dates = null }) {
     const padL = 32, padR = 16, padT = 10, padB = 22;
     const w = width - padL - padR, h = height - padT - padB;
     const n = xLabels.length;
@@ -198,7 +198,7 @@ const Charts = (() => {
       if (!showDots) continue;
       s.points.forEach((p, i) => {
         if (p.y == null) return;   // no dot, no tooltip, no "null" text — the date simply isn't plotted
-        marks += `<circle class="chart-mark chart-dot" cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--panel)" stroke-width="2"
+        marks += `<circle class="chart-mark chart-dot"${dates && dates[i] ? ` data-date="${esc(dates[i])}"` : ""} cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--panel)" stroke-width="2"
           data-tip-label="${esc(s.label)} — ${esc(xLabels[i])}" data-tip-value="${p.y}${p.suffix || ""}" tabindex="0">
           <title>${esc(s.label)} ${esc(xLabels[i])}: ${p.y}${p.suffix || ""}</title></circle>`;
       });
@@ -208,6 +208,79 @@ const Charts = (() => {
     }
     return `<svg class="chart-svg chart-line-chart" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Trend chart">
       ${grid}${xAxis}${refs}${marks}
+    </svg>`;
+  }
+
+  /* ---------- day-by-day columns, stacked ---------- */
+  /* History's Leave and On-call views: one column per plotted day, `stacks`
+     ([{label, color, values}]) piled bottom-up in the order given, on ONE
+     y-scale. `ghost` ({label, color, values}) is drawn full height behind each
+     column (the on-call people available that day), so "6 of 18" reads as a
+     filled part of a pale bar. Every segment is its own hover/focus target
+     (chart-mark), its tooltip naming the day and that segment's count; a null
+     day draws nothing, like lineChart's gaps. */
+  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null }) {
+    const padL = 32, padR = 16, padT = 10, padB = 22;
+    const w = width - padL - padR, h = height - padT - padB;
+    const n = xLabels.length;
+    const band = n ? w / n : w;
+    const bw = Math.max(2, Math.min(28, band * 0.66));
+    const yAt = (v) => padT + h - (Math.max(0, Math.min(yMax, v)) / yMax) * h;
+    const xAt = (i) => padL + i * band + band / 2;
+    let grid = "";
+    for (let g = 0; g <= 4; g++) {
+      const v = (yMax / 4) * g, y = yAt(v);
+      grid += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + w}" y2="${y.toFixed(1)}" class="chart-grid"/>
+        <text x="${padL - 6}" y="${(y + 3.5).toFixed(1)}" class="chart-axis-label" text-anchor="end">${Math.round(v)}</text>`;
+    }
+    const step = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(w / 64))));
+    let xAxis = "";
+    xLabels.forEach((lbl, i) => {
+      // the last day too, unless it would sit on top of the label before it
+      if (i % step !== 0 && (i !== n - 1 || i % step < step / 2)) return;
+      xAxis += `<text x="${xAt(i).toFixed(1)}" y="${height - 4}" class="chart-axis-label" text-anchor="middle">${esc(lbl)}</text>`;
+    });
+    let marks = "";
+    for (let i = 0; i < n; i++) {
+      const x = (xAt(i) - bw / 2).toFixed(1);
+      const total = dayTotals ? dayTotals[i] : null;
+      const head = `${xLabels[i]}${total != null ? ` · ${total}` : ""}`;
+      // a day the caller can open (History: click a day to open that board on it)
+      const day = dates && dates[i] ? ` data-date="${esc(dates[i])}"` : "";
+      if (ghost && ghost.values[i] != null) {
+        const g = ghost.values[i], y = yAt(g);
+        marks += `<rect class="chart-mark"${day} x="${x}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${(yAt(0) - y).toFixed(1)}" rx="2" fill="${ghost.color}"
+          data-tip-label="${esc(ghost.label)} — ${esc(xLabels[i])}" data-tip-value="${g}"><title>${esc(ghost.label)} ${esc(xLabels[i])}: ${g}</title></rect>`;
+      }
+      let acc = 0;
+      for (const st of stacks) {
+        const v = st.values[i];
+        if (!v) continue;
+        const y0 = yAt(acc), y1 = yAt(acc + v);
+        marks += `<rect class="chart-mark"${day} x="${x}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${(y0 - y1).toFixed(1)}" fill="${st.color}" stroke="var(--panel)" stroke-width="0.75"
+          data-tip-label="${esc(st.label)} — ${esc(head)}" data-tip-value="${v}" tabindex="0"><title>${esc(st.label)} ${esc(xLabels[i])}: ${v}</title></rect>`;
+        acc += v;
+      }
+    }
+    let refs = "";
+    for (const rl of refLines) {
+      if (rl.y == null) continue;
+      const y = yAt(rl.y).toFixed(1);
+      refs += `<line x1="${padL}" y1="${y}" x2="${padL + w}" y2="${y}" stroke="${rl.color}" stroke-width="1.5" stroke-dasharray="5 4" opacity=".75"/>`;
+      if (rl.label) refs += `<text x="${padL + w - 2}" y="${(yAt(rl.y) - 4).toFixed(1)}" class="chart-axis-label chart-ref-label" text-anchor="end" fill="${rl.color}">${esc(rl.label)}</text>`;
+    }
+    // a comparison line over the columns (the one-engineer view's average engineer), dashed
+    if (line && line.values) {
+      const pts = line.values.map((v, i) => (v == null ? null : `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`)).filter(Boolean).join(" ");
+      refs += `<polyline points="${pts}" fill="none" stroke="${line.color}" stroke-width="1.8" stroke-dasharray="5 4" class="chart-line"/>`;
+      if (line.label) {
+        const last = line.values.length - 1;
+        refs += `<text x="${padL + w - 2}" y="${(yAt(line.values[last] || 0) - 6).toFixed(1)}" class="chart-axis-label chart-ref-label" text-anchor="end" fill="${line.color}">${esc(line.label)}</text>`;
+      }
+    }
+    // the average rule sits OVER the columns here (columns would hide it), its label haloed
+    return `<svg class="chart-svg chart-column-chart" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Day by day chart">
+      ${grid}${xAxis}${marks}${refs}
     </svg>`;
   }
 
@@ -294,5 +367,5 @@ const Charts = (() => {
     root.addEventListener("focusout", hide);
   }
 
-  return { sparkline, stackedBarH, barsH, lineChart, niceMax, legendEl, wireChartTooltips, catColor, esc };
+  return { sparkline, stackedBarH, barsH, lineChart, columnChart, niceMax, legendEl, wireChartTooltips, catColor, esc };
 })();

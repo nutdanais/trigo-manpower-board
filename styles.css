@@ -82,6 +82,14 @@
   --chart-holiday: #1baf7a;  /* reuses chart-cat-3 — unused elsewhere in this group */
   --chart-permanent: #2a78d6;
   --chart-oncall: #eb6834;
+  /* History's Leave view: one colour per leave type, and the pale "available"
+     bar behind the On-call view's columns */
+  --leave-annual: #eda100;
+  --leave-sick: #e87ba4;
+  --leave-business: #4a3aa7;
+  --leave-unpaid: #7b8794;
+  --leave-exchange: #1baf7a;
+  --oncall-ghost: #fbe1d5;
   --chart-cat-1: #2a78d6;
   --chart-cat-2: #eb6834;
   --chart-cat-3: #1baf7a;
@@ -1789,6 +1797,7 @@ body.fp-pools-empty { --fp-w: 264px; }
   #toolbar-more .toggle { width: 100%; justify-content: center; }
   #toolbar-more #emplist-search,
   #toolbar-more #emplist-name-view,
+  #toolbar-more #emplist-period,
   #toolbar-more #card-names,
   #toolbar-more #hostlist-search { width: 100%; }
 }
@@ -2575,7 +2584,8 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-host-note { font-size: 12px; color: var(--muted); margin: 0; }
 
 /* History: four average tiles; the picked one is charted below */
-.ov-htiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.ov-htiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+@media (max-width: 1100px) { .ov-htiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .ov-htiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ov-htile { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
 .ov-htile:hover { background: var(--hover-tint); }
@@ -2586,6 +2596,98 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-htile-value small, .ov-htile-sub { font-size: 11.5px; color: var(--muted); font-weight: 600; }
 .ov-hchart { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .ov-hchart-head { font-size: 13px; margin-bottom: 4px; }
+/* ---- History → Leave / day and On-call deployed / day ---- */
+.ov-hchart-head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.ov-hview .btn[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
+.ov-lv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.ov-lv-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
+.ov-lv-chip:hover { background: var(--hover-tint); }
+.ov-lv-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-lv-chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.ov-lv-chip small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.ov-lv-chip[aria-pressed="false"] { opacity: .5; }
+.ov-lv-chip[aria-pressed="false"] i { background: var(--border) !important; }
+.ov-lv-table { margin-top: 10px; }
+.ov-lv-table tr.ov-lv-off td { color: var(--muted); }
+.ov-hbar { display: inline-block; width: 90px; height: 7px; border-radius: 999px; background: var(--bg); overflow: hidden; vertical-align: middle; }
+.ov-hbar i { display: block; height: 100%; border-radius: 999px; }
+.ov-hnames { margin-top: 14px; }
+.ov-hnames-table { width: auto; min-width: min(100%, 420px); }
+.ov-hnames-table td { white-space: nowrap; }
+.ov-hnames-table td:last-child { white-space: normal; }
+.ov-oc-tag { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: 4px; font-size: 10.5px; font-weight: 700; color: var(--chart-oncall); background: rgba(235,104,52,.13); }
+.chart-ref-label { paint-order: stroke; stroke: var(--panel); stroke-width: 4px; font-weight: 600; }
+/* History tiles: the change against the previous period */
+.ov-htile-delta { font-size: 11px; font-weight: 600; color: var(--muted); }
+.ov-htile-delta.good { color: #1f8a4c; }
+.ov-htile-delta.bad { color: #b42318; }
+/* Leave view: Exchange Working Day as a note, not a type button; its row in the table */
+.ov-lv-exchange { font-size: 12px; color: var(--muted); align-self: center; padding: 3px 4px; }
+.ov-lv-table tr.ov-lv-exch td { color: var(--muted); font-style: italic; }
+/* Worked vs leave, per person */
+.ov-wl-table th .ov-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-transform: inherit; letter-spacing: inherit; }
+.ov-wl-table th .ov-sort[aria-sort="descending"]::after { content: " ↓"; }
+.ov-wl-table th .ov-sort[aria-sort="ascending"]::after { content: " ↑"; }
+.ov-wl-table th .ov-sort:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ov-wl-table td { white-space: nowrap; }
+.ov-share { display: inline-block; min-width: 46px; text-align: center; font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.ov-share-ok { background: #e6f4ec; color: #1f8a4c; }
+.ov-share-warn { background: #fdf0d9; color: #a15c00; }
+.ov-share-bad { background: #fde8e7; color: #b42318; }
+.ov-split { display: inline-flex; width: 120px; height: 9px; border-radius: 999px; overflow: hidden; background: var(--bg); vertical-align: middle; }
+.ov-split i { display: block; height: 100%; }
+.ov-wl-more { margin-top: 6px; }
+/* Engineer workload → one engineer */
+.ov-row-click.is-picked td { background: var(--hover-tint); }
+.ov-row-click.is-picked td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+.ov-eng-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.ov-eng-select { font: inherit; font-size: 13px; font-weight: 600; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); max-width: 60vw; }
+.ov-eng-tiles { margin: 8px 0 6px; }
+.ov-eng-foot { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; margin-top: 10px; }
+@media (max-width: 860px) { .ov-eng-foot { grid-template-columns: 1fr; } }
+.ov-eng-foot-h { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.ov-eng-hosts { display: flex; flex-wrap: wrap; gap: 5px; }
+.ov-eng-hosts > span { font-size: 12px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
+.ov-eng-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ov-eng-facts > div { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+.ov-eng-facts span { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.ov-eng-facts b { font-size: 17px; font-variant-numeric: tabular-nums; }
+/* Workload alerts */
+.ov-alert-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 860px) { .ov-alert-grid { grid-template-columns: 1fr; } }
+.ov-alert-box { min-width: 0; }
+.ov-alert-table td { white-space: nowrap; }
+/* the Leave view's calendar: a month grid per month, Monday first, weekends narrow */
+.ov-cal-wrap { overflow-x: auto; margin-top: 6px; }
+.ov-cal-month { min-width: 560px; margin-bottom: 12px; }
+.ov-cal-title { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; }
+.ov-cal { display: grid; grid-template-columns: repeat(5, minmax(72px, 1fr)) repeat(2, minmax(30px, .4fr)); gap: 4px; }
+.ov-cal-dow { font-size: 11px; font-weight: 600; color: var(--muted); padding: 0 4px; }
+.ov-cal-cell { min-height: 58px; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; display: grid; grid-template-rows: auto 1fr auto; font-variant-numeric: tabular-nums; }
+.ov-cal-blank { border: none; }
+.ov-cal-off { background: var(--bg); border-style: dashed; color: var(--muted); }
+.ov-cal-d { font-size: 11px; font-weight: 600; color: var(--muted); }
+.ov-cal-why { font-size: 10.5px; color: var(--muted); }
+.ov-cal-n { font-size: 17px; font-weight: 700; align-self: center; }
+.ov-cal-oc { justify-self: start; font-size: 10.5px; font-weight: 700; color: var(--chart-oncall); background: var(--panel); border-radius: 4px; padding: 0 4px; }
+.ov-cal-l0 { background: var(--panel); }
+.ov-cal-l1 { background: #fdf3d8; }
+.ov-cal-l2 { background: #fae2a3; }
+.ov-cal-l3 { background: #f5cb6a; }
+.ov-cal-l4 { background: #eab33d; }
+.ov-cal-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; color: var(--muted); }
+.ov-cal-key i { width: 16px; height: 10px; border-radius: 3px; border: 1px solid var(--border); }
+.ov-cal-key-oc { margin-left: 10px; font-weight: 700; color: var(--chart-oncall); }
+/* a phone: the week fits the screen (no sideways scroll), weekends narrower still */
+@media (max-width: 640px) {
+  .ov-cal-month { min-width: 0; }
+  .ov-cal { grid-template-columns: repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, .45fr)); gap: 3px; }
+  .ov-cal-cell { min-height: 50px; padding: 3px 4px; }
+  .ov-cal-n { font-size: 15px; }
+  .ov-cal-oc { font-size: 9.5px; padding: 0 2px; }
+  .ov-cal-why { display: none; }
+  .ov-cal-dow { padding: 0 2px; }
+}
 
 /* Engineer workload: ranked bars + trend — missions and crew in one table */
 .ov-rank { --ov-rkmax: 150px; }
@@ -2796,6 +2898,7 @@ body.exporting #app-root { margin-right: 0; }
 #emplist-toolbar { display: contents; }
 #emplist-search,
 #emplist-name-view,
+#emplist-period,
 #card-names {
   padding: 6px 10px;
   border: 1px solid var(--border);
@@ -2806,7 +2909,11 @@ body.exporting #app-root { margin-right: 0; }
   min-width: 200px;
 }
 #emplist-name-view,
+#emplist-period,
 #card-names { min-width: 0; }
+/* Worked, Leave, Worked : Leave (History permission only) */
+#emplist-table .el-wl { white-space: nowrap; font-variant-numeric: tabular-nums; }
+#emplist-table .el-wl.r { text-align: right; }
 #emplist-table .el-name-en { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
 #emplist-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 #emplist-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
@@ -5449,9 +5556,9 @@ body.settings-open #sticky-header #update-banner { margin-right: 0; }
 body.board-view #toolbar-row2 { border-bottom: 1px solid var(--border); }
 
 /* Thai | English toggle (a select[data-seg] drawn as two buttons) */
-#card-names + .seg-pick, #emplist-name-view + .seg-pick { margin: 0; align-self: center; }
+#card-names + .seg-pick, #emplist-name-view + .seg-pick, #emplist-period + .seg-pick { margin: 0; align-self: center; }
 select.hidden + .seg-pick { display: none; }
-#card-names + .seg-pick button, #emplist-name-view + .seg-pick button { flex: none; height: 28px; padding: 0 12px; font-size: 12.5px; }
+#card-names + .seg-pick button, #emplist-name-view + .seg-pick button, #emplist-period + .seg-pick button { flex: none; height: 28px; padding: 0 12px; font-size: 12.5px; }
 #sticky-header { z-index: 60; }   /* above the people panel, so the banner menus open over it */
 
 /* phone: the banner wraps into the brand + board pill, the scrolling module tabs, then the date row */
