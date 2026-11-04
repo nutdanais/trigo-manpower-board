@@ -159,3 +159,13 @@ right-click a card to change its highlight, and press the switch to try the filt
 folded section at the bottom, **How we chose this look**, keeps the five options it was
 picked from (A Frame, B Reason ribbon, C Badge, D Side stripe, E Frame + tab, chosen) and
 their comparison. Light only, like the app. Not loaded by the app.
+
+## Present mode and board selection (2026-11-04)
+
+`present-mode-board-selection.html` is a standalone, interactive proposal page. It reads what the app does today
+(the Overview sections already take a list of boards, the selector stores one id, no present mode exists), then
+shows four ways to pick several boards on the Overview (A tick list, B chips, C compare two, D saved groups) and
+four present options (P1 clean screen, P2 slides, P3 wall display, P4 spotlight strip) as working mockups on one
+sample day (4 boards, 106 people). It lists what every Overview section does with 2 or more boards, compares the
+options, recommends A for selection and P2 with P3's auto-advance for presenting, and ends with a decision picker.
+Light only, like the app. Not loaded by the app.
