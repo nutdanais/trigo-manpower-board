@@ -225,7 +225,7 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
     <!-- Ask 2 -->
     <div style="display:grid;gap:10px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h3>2 · Worked days : Leave days, per person</h3><span class="tag ask">Your ask</span><span class="tag ready">Data ready</span></div>
-      <p class="muted small">This goes in History's Leave view, after or in place of "Most days on leave". It counts each person's days over the History range, on the same planned working days as everything else. <b>Leave share</b> = leave ÷ (worked + leave + standby), so a person's figure isn't hidden by how many days they were available. Sort by any column.</p>
+      <p class="muted small">This goes in History's Leave view, after or in place of "Most days on leave". It counts each person's days over the History range, on the same planned working days as everything else. <b>Leave share</b> = leave ÷ (worked + leave + standby), so a person's figure isn't hidden by how many days they were available. <b>Exchange Working Day is not leave</b> here: the day is worked back, so it counts as neither worked nor leave. Sort by any column.</p>
       <div class="ov-section">
         <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3>Worked vs leave, per person</h3>
           <div class="btns" role="group" aria-label="Who" id="wl-who"></div></div>
@@ -239,7 +239,7 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
     <!-- Ask 3 -->
     <div style="display:grid;gap:10px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h3>3 · The same in the Manpower List</h3><span class="tag ask">Your ask</span><span class="tag ready">Data ready</span></div>
-      <p class="muted small">The Manpower List already fetches each person's worked and leave dates for its <b>30D utilization</b> column, so three columns cost nothing extra: <b>Worked</b>, <b>Leave</b> and <b>Worked : Leave</b>. They would be sortable and filterable, and included in the Excel export. A period switch (30D / 90D / YTD) applies to all four. The new columns are tinted green below.</p>
+      <p class="muted small">The Manpower List already fetches each person's worked and leave dates for its <b>30D utilization</b> column, so three columns cost nothing extra: <b>Worked</b>, <b>Leave</b> and <b>Worked : Leave</b>. Leave follows the same rule as History, without Exchange Working Day, so the two always match. They would be sortable and filterable, and included in the Excel export. A period switch (30D / 90D / YTD) applies to all four. The new columns are tinted green below.</p>
       <div class="ov-section">
         <div class="controls"><span class="lbl">Period</span><div class="btns" role="group" aria-label="Period" id="ml-period"></div><span class="note">Working days of each person's own board, from the day they were added</span></div>
         <div class="tbl-wrap"><table id="ml-table"></table></div>
@@ -280,7 +280,7 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
     <h2>Questions for you</h2>
     <ol class="qs">
       <li><div><b>Worked : Leave thresholds.</b> <span class="tag ready">Decided</span> Start with 20% amber and 30% red, the same for permanent and on-call. Both are a setting that can change later.</div></li>
-      <li><div><b>Exchange Working Day in the ratio.</b> It counts as leave in History. Should it count as leave here too, or be left out of the ratio, since the day is worked back?</div></li>
+      <li><div><b>Exchange Working Day in the ratio.</b> <span class="tag ready">Decided</span> Not leave, in History and in Manpower alike, so the figures match. The day is worked back, so it counts as neither worked nor leave.</div></li>
       <li><div><b>Who sees per-person figures.</b> Sick-leave patterns and leave ratios are sensitive. Should they follow the History permission like the names, or get their own row in Roles?</div></li>
       <li><div><b>Which ideas first.</b> Mark the ones you want from Part 3 (a comment on a card works), and I'll turn them into a build plan.</div></li>
     </ol>
