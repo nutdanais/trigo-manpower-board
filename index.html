@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-04e">
+<link rel="stylesheet" href="styles.css?v=2026-11-04f">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-04e"></script>
+<script src="version.js?v=2026-11-04f"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -649,6 +649,8 @@
            tab's export dialog, where the file type (JPG / PDF / Excel — whichever
            the tab offers) is picked. See openExportModal in app.js. -->
       <button id="btn-export" class="btn" title="Export — pick the file type (JPG, PDF or Excel) in the next step"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Export</button>
+      <!-- Overview only, for roles that can see its History: the monthly management report (PDF or Excel). See report.js. -->
+      <button id="btn-report" class="btn hidden" title="Monthly management report: pick the sections, then make a PDF or an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"></use></svg> Report</button>
     </div>
   </div>
 </div>
@@ -982,6 +984,16 @@
   <div class="modal modal-side modal-profile hidden" id="modal-profile" role="dialog" aria-modal="true" aria-labelledby="profile-title">
     <h3><span id="profile-title" data-no-i18n>Profile</span><small id="profile-sub" class="h3-sub"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <div id="profile-body" class="profile-body"></div>
+  </div>
+
+  <!-- Report: period, sections, names, format and language (report.js builds it) -->
+  <div class="modal modal-side modal-export hidden" id="modal-report" role="dialog" aria-modal="true" aria-labelledby="report-title">
+    <h3><span id="report-title">Report</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="modal-body" id="report-body"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-report-go">Make report</button>
+    </div>
   </div>
 
   <div class="modal modal-side hidden" id="modal-host">
@@ -1544,15 +1556,16 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-04e"></script>
-<script src="i18n-th.js?v=2026-11-04e"></script>
-<script src="planning.js?v=2026-11-04e"></script>
-<script src="employee-id.js?v=2026-11-04e"></script>
-<script src="cloud.js?v=2026-11-04e"></script>
-<script src="charts.js?v=2026-11-04e"></script>
-<script src="xlsx-export.js?v=2026-11-04e"></script>
-<script src="orgchart-pptx.js?v=2026-11-04e"></script>
-<script src="bulk-edit.js?v=2026-11-04e"></script>
-<script src="app.js?v=2026-11-04e"></script>
+<script src="i18n.js?v=2026-11-04f"></script>
+<script src="i18n-th.js?v=2026-11-04f"></script>
+<script src="planning.js?v=2026-11-04f"></script>
+<script src="employee-id.js?v=2026-11-04f"></script>
+<script src="cloud.js?v=2026-11-04f"></script>
+<script src="charts.js?v=2026-11-04f"></script>
+<script src="xlsx-export.js?v=2026-11-04f"></script>
+<script src="orgchart-pptx.js?v=2026-11-04f"></script>
+<script src="bulk-edit.js?v=2026-11-04f"></script>
+<script src="app.js?v=2026-11-04f"></script>
+<script src="report.js?v=2026-11-04f"></script>
 </body>
 </html>

@@ -203,6 +203,15 @@ const Charts = (() => {
           <title>${esc(s.label)} ${esc(xLabels[i])}: ${p.y}${p.suffix || ""}</title></circle>`;
       });
     }
+    // a long range has no dots (they would smear): a transparent hit area per point still opens its day
+    if (dates && !showDots) {
+      const bandW = w / Math.max(1, n);
+      for (const s of visible) s.points.forEach((p, i) => {
+        if (p.y == null || !dates[i]) return;
+        marks += `<rect class="chart-mark chart-hit" data-date="${esc(dates[i])}" x="${(xAt(i) - bandW / 2).toFixed(1)}" y="${padT}" width="${bandW.toFixed(1)}" height="${h}" fill="transparent"
+          data-tip-label="${esc(s.label)} — ${esc(xLabels[i])}" data-tip-value="${p.y}${p.suffix || ""}"/>`;
+      });
+    }
     if (!visible.length) {
       marks = `<text x="${width / 2}" y="${height / 2}" text-anchor="middle" class="chart-axis-label">${esc(emptyLabel)}</text>`;
     }
@@ -250,6 +259,13 @@ const Charts = (() => {
       const head = `${xLabels[i]}${total != null ? ` · ${total}` : ""}`;
       // a day the caller can open (History: click a day to open that board on it)
       const day = dates && dates[i] ? ` data-date="${esc(dates[i])}"` : "";
+      // a day with no bar still has to be clickable and reachable from the keyboard: a transparent hit area
+      // behind the column carries the date (tabbable only when there is no bar to tab to)
+      if (dates && dates[i]) {
+        const bars = stacks.some(st => st.values[i]);
+        marks += `<rect class="chart-mark chart-hit"${day} x="${(xAt(i) - band / 2).toFixed(1)}" y="${padT}" width="${band.toFixed(1)}" height="${h}" fill="transparent"${bars ? "" : ' tabindex="0"'}
+          data-tip-label="${esc(xLabels[i])}${total != null ? ` · ${esc(total)}` : ""}" data-tip-value="${bars ? "" : "0"}${bars ? "" : esc(suffix)}"><title>${esc(xLabels[i])}</title></rect>`;
+      }
       if (ghost && ghost.values[i] != null) {
         const g = ghost.values[i], y = yAt(g);
         marks += `<rect class="chart-mark"${day} x="${x}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${(yAt(0) - y).toFixed(1)}" rx="2" fill="${ghost.color}"

@@ -156,8 +156,17 @@
 
   /* Translate a string, keeping its leading and trailing spaces and treating
      any run of whitespace inside it as one space (HTML source is indented). */
-  function tr(s) {
-    if (lang !== "th" || typeof s !== "string" || !/[A-Za-z]/.test(s)) return s;
+  function tr(s) { return lang === "th" ? trCore(s) : s; }
+  /* the Thai for a string whatever language the page is in (the report is made in a language of its own):
+     the same translation, with the page's language held at Thai while it runs, so the pieces a pattern
+     captures are translated too */
+  function trTh(s) {
+    var saved = lang;
+    lang = "th";
+    try { return trCore(s); } finally { lang = saved; }
+  }
+  function trCore(s) {
+    if (typeof s !== "string" || !/[A-Za-z]/.test(s)) return s;
     var hit = cache.get(s);
     if (hit === undefined) {
       var lead = /^\s*/.exec(s)[0], trail = /\s*$/.exec(s)[0];
@@ -304,6 +313,7 @@
 
   window.I18N = {
     t: tr,
+    th: trTh,
     tm: tm,
     lang: function () { return lang; },
     setLang: setLang,

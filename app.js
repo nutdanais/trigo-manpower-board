@@ -1195,6 +1195,8 @@ function render() {
   // and a tentative plan must not reach it (exportBoard refuses as well).
   // Export is a read: a Viewer may take the board away with them.
   $("#btn-export").classList.toggle("hidden", fc);
+  // the monthly report: Overview, for roles that can see its History (OvReport in report.js)
+  $("#btn-report").classList.toggle("hidden", !(isOverview() && can("ov.history")));
   // the phone's "More" dropdown only holds other tabs' controls — on Overview it
   // would open empty, and so would it on Capacity (whose own ⋯ holds its actions)
   $("#btn-toolbar-more").classList.toggle("hidden", ov || isCapacity());
@@ -3694,6 +3696,7 @@ function buildPhoneMoreMenu() {
     if (shown("#btn-emplist-bulk") && isEmployeeList()) item("Bulk edit", "edit", click("#btn-emplist-bulk"));
     if (shown("#btn-hostlist-bulk") && isHostList()) item("Bulk edit", "edit", click("#btn-hostlist-bulk"));
     if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+    if (shown("#btn-report")) item("Report", "clipboard", click("#btn-report"));
     if (!menu.children.length) menu.innerHTML = `<div class="tb-item tb-item-static">Nothing to do here</div>`;
     return;
   }
@@ -3728,6 +3731,7 @@ function buildPhoneMoreMenu() {
   if (shown("#btn-hide-missions")) item("Hide / unhide missions", "eye-off", click("#btn-hide-missions"));
   if (shown("#btn-forecast-copy")) item("Copy forecast forward", "arrow-right", click("#btn-forecast-copy"));
   if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+  if (shown("#btn-report")) item("Report", "clipboard", click("#btn-report"));
   sep();
   if (shown("#btn-undo")) item("Undo last change", "undo", click("#btn-undo"), "", $("#btn-undo").disabled);
   if (shown("#btn-reset-board")) item($("#btn-reset-board").textContent.trim() || "Reset board", "reset", click("#btn-reset-board"), "tb-item-danger");
@@ -4458,16 +4462,21 @@ function wireHistoryDayClicks(sec, engIdOf) {
 /* "▲ 2.1 vs previous period" under a History tile. Green / red only where up or down is
    plainly better (more utilization, less standby, less leave); the rest stay grey. */
 const OV_DELTA_GOOD = { util: 1, idle: -1, leave: -1 };
-function historyDelta(m, mean, prevMean) {
+function historyDeltaParts(m, mean, prevMean, { loading = false } = {}) {
   const ly = state.overview.historyCompare === "ly", name = historyCompareName();
-  if (ly && historyCompareInfo().loading) return `<span class="ov-htile-delta">loading last year…</span>`;
-  if (mean == null || prevMean == null) return `<span class="ov-htile-delta">${ly ? "no data for the same period last year" : "no previous period"}</span>`;
+  if (loading) return { text: "loading last year…", cls: "" };
+  if (mean == null || prevMean == null) return { text: ly ? "no data for the same period last year" : "no previous period", cls: "" };
   const d = Math.round((mean - prevMean) * 10) / 10;
   const unit = m.suffix === "%" ? " pts" : "";
-  if (d === 0) return `<span class="ov-htile-delta">= ${name}</span>`;
+  if (d === 0) return { text: `= ${name}`, cls: "" };
   const good = OV_DELTA_GOOD[m.key];
-  const cls = !good ? "" : (d > 0) === (good > 0) ? " good" : " bad";
-  return `<span class="ov-htile-delta${cls}" title="${ly ? "Same period last year" : "Previous period"}: ${prevMean}${m.suffix} average">${d > 0 ? "▲" : "▼"} ${Math.abs(d)}${unit} vs ${name}</span>`;
+  return { text: `${d > 0 ? "▲" : "▼"} ${Math.abs(d)}${unit} vs ${name}`, cls: !good ? "" : (d > 0) === (good > 0) ? "good" : "bad",
+    title: `${ly ? "Same period last year" : "Previous period"}: ${prevMean}${m.suffix} average` };
+}
+function historyDelta(m, mean, prevMean) {
+  const ly = state.overview.historyCompare === "ly";
+  const x = historyDeltaParts(m, mean, prevMean, { loading: ly && historyCompareInfo().loading });
+  return `<span class="ov-htile-delta${x.cls ? " " + x.cls : ""}"${x.title ? ` title="${x.title}"` : ""}>${x.text}</span>`;
 }
 
 /* ---------- History → Leave / day and On-call deployed / day ----------
@@ -4812,18 +4821,15 @@ function ovMixLine(perm, oncall) {
    engineer_id lives on the mission row for its own date, so these are the
    people who actually ran those jobs — and byEngineer already carries the
    permanent / on-call split, so nothing extra is fetched. */
-function engineerHistorySection(dates, recs, pendingCharts = [], prevRecs = []) {
-  const sec = ovSection("Engineer workload", "Missions each engineer ran and the people they had out, per working day, busiest first. Same range and board as History.");
+/* one row per engineer who ran a staffed mission in the range, busiest first (the table below and the report read it) */
+function historyEngineerRows(dates, recs) {
   const n = dates.length;
   const engById = new Map(D().engineers.map(e => [e.id, e]));
   const ids = new Set();
   for (const r of recs) if (r) for (const id in r.byEngineer) if (r.byEngineer[id].missions) ids.add(id);
-  if (!n || !ids.size) {
-    sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions in this range." }));
-    return sec;
-  }
+  if (!n || !ids.size) return [];
   const tot = (a) => a.reduce((s, v) => s + v, 0);
-  const rows = [...ids].map(id => {
+  return [...ids].map(id => {
     const e = engById.get(id);
     const day = (k) => recs.map(r => (r && r.byEngineer[id] ? r.byEngineer[id][k] || 0 : 0));
     const m = day("missions"), c = day("crew"), p = day("permCrew"), o = day("oncallCrew");
@@ -4834,6 +4840,15 @@ function engineerHistorySection(dates, recs, pendingCharts = [], prevRecs = []) 
       active: m.filter(v => v > 0).length,
     };
   }).sort((a, b) => b.avgM - a.avgM || b.avgC - a.avgC || a.name.localeCompare(b.name));
+}
+function engineerHistorySection(dates, recs, pendingCharts = [], prevRecs = []) {
+  const sec = ovSection("Engineer workload", "Missions each engineer ran and the people they had out, per working day, busiest first. Same range and board as History.");
+  const n = dates.length;
+  const rows = historyEngineerRows(dates, recs);
+  if (!n || !rows.length) {
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions in this range." }));
+    return sec;
+  }
   const r1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
   const maxM = Math.max(0.1, ...rows.map(r => r.avgM)), maxC = Math.max(0.1, ...rows.map(r => r.avgC));
   const share = shares100(rows.map(r => r.totM));
@@ -5176,6 +5191,16 @@ function peopleSection(boards, dates, recs) {
 function pplBandOf(p) { return Math.min(9, Math.floor((p.worked * 10) / p.working)); }
 function pplBandLabel(i) { return i === 9 ? "90–100%" : `${i * 10}–${i * 10 + 9}%`; }
 
+/* the numbers behind the spread chart (and the report's): people per 10% band, the median share, N at 90% or more, N under 50% */
+function peopleSpreadStats(mine) {
+  const bands = Array(10).fill(0);
+  for (const p of mine) bands[pplBandOf(p)]++;
+  const shares = mine.map(p => p.workedShare).sort((a, b) => a - b);
+  const mid = shares.length >> 1;
+  const median = !shares.length ? 0 : shares.length % 2 ? shares[mid] : (shares[mid - 1] + shares[mid]) / 2;
+  return { n: mine.length, bands, median,
+    hi: mine.filter(p => p.worked * 10 >= p.working * 9).length, lo: mine.filter(p => p.worked * 2 < p.working).length };
+}
 /* The spread: how many people sit in each 10% band of working days on a mission. A band is a
    button: it filters the table below to that band (and to this chart's group). */
 function peopleSpread(rows) {
@@ -5206,12 +5231,7 @@ function peopleSpread(rows) {
     box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: grp === "oncall" ? "No on-call people in this range." : "No permanent people in this range." }));
     return box;
   }
-  const bands = Array(10).fill(0);
-  for (const p of mine) bands[pplBandOf(p)]++;
-  const shares = mine.map(p => p.workedShare).sort((a, b) => a - b);
-  const mid = shares.length >> 1;
-  const median = shares.length % 2 ? shares[mid] : (shares[mid - 1] + shares[mid]) / 2;
-  const hi = mine.filter(p => p.worked * 10 >= p.working * 9).length, lo = mine.filter(p => p.worked * 2 < p.working).length;
+  const { bands, median, hi, lo } = peopleSpreadStats(mine);
   box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-sum",
     textContent: `Median ${fmt1(median)}% · ${hi} at 90% or more · ${lo} under 50%` }));
   const max = Math.max(1, ...bands);
@@ -5652,9 +5672,9 @@ function historyEngineerDetail(dates, recs, rows, pendingCharts, prevRecs = []) 
     line: { label: "team avg", color: "var(--muted)", values: team },
     xLabels: buckets.map(label), dayTotals: team.map(t => `team avg ${t}${m.unit}`),
     yMax: m.unit === "%" ? 100 : Charts.niceMax([...vals, ...team]),
-    dates: group === "day" ? dates : null,
+    dates: buckets.map(b => b.first),   // a week or a month column opens its first day
   });
-  if (group === "day") wireHistoryDayClicks(box, () => id || undefined);
+  wireHistoryDayClicks(box, () => id || undefined);
 
   // where they worked, and four facts
   const hosts = {};
@@ -5736,6 +5756,27 @@ function wfHeadcountOn(date, ids) {
   }
   return out;
 }
+/* the months of the window with their headcount, joiners, leavers and inactive people, and the window's tiles */
+function workforceModel(ids, from, to) {
+  const today = todayStr();
+  const months = [];
+  for (let m = monthStart(from); m <= to; m = addDays(monthEnd(m), 1)) {
+    const a = m > from ? m : from, z = monthEnd(m) < to ? monthEnd(m) : to;
+    const end = z < today ? z : today;
+    const inMonth = (d) => !!d && d >= a && d <= z;
+    const hc = wfHeadcountOn(end, ids);
+    const mine = D().employees.filter(e => ids.has(e.boardId));
+    months.push({ month: m, end, hc,
+      joiners: mine.filter(e => inMonth(e.startDate || e.addedOn)),
+      leavers: mine.filter(e => empStatus(e) === "resigned" && inMonth(e.deactivatedOn)),
+      pausers: mine.filter(e => empStatus(e) === "inactive" && inMonth(e.deactivatedOn)) });
+  }
+  if (!months.length) return { months, now: null };
+  const now = months[months.length - 1].hc, before = wfHeadcountOn(addDays(from, -1), ids);
+  const joined = months.reduce((a, x) => a + x.joiners.length, 0), left = months.reduce((a, x) => a + x.leavers.length, 0);
+  const avg = months.reduce((a, x) => a + x.hc.total, 0) / months.length;
+  return { months, now, before, joined, left, turnover: avg ? (left / avg) * 100 : 0 };
+}
 function workforceSection(boards) {
   const ov = state.overview;
   const sec = ovSection("Workforce", "Headcount at the end of each month by years of service, with joiners and leavers. Follows the board selector.");
@@ -5765,26 +5806,12 @@ function workforceSection(boards) {
   bar.appendChild(seg);
   sec.appendChild(bar);
 
-  // the months of the window
-  const months = [];
-  for (let m = monthStart(from); m <= to; m = addDays(monthEnd(m), 1)) {
-    const a = m > from ? m : from, z = monthEnd(m) < to ? monthEnd(m) : to;
-    const end = z < today ? z : today;
-    const inMonth = (d) => !!d && d >= a && d <= z;
-    const hc = wfHeadcountOn(end, ids);
-    const mine = D().employees.filter(e => ids.has(e.boardId));
-    months.push({ month: m, end, hc,
-      joiners: mine.filter(e => inMonth(e.startDate || e.addedOn)),
-      leavers: mine.filter(e => empStatus(e) === "resigned" && inMonth(e.deactivatedOn)),
-      pausers: mine.filter(e => empStatus(e) === "inactive" && inMonth(e.deactivatedOn)) });
-  }
+  const model = workforceModel(ids, from, to);
+  const months = model.months;
   if (!months.length) { sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No months in this range." })); return sec; }
 
   // tiles
-  const now = months[months.length - 1].hc, before = wfHeadcountOn(addDays(from, -1), ids);
-  const joined = months.reduce((a, m) => a + m.joiners.length, 0), left = months.reduce((a, m) => a + m.leavers.length, 0);
-  const avg = months.reduce((a, m) => a + m.hc.total, 0) / months.length;
-  const turnover = avg ? (left / avg) * 100 : 0;
+  const { now, before, joined, left, turnover } = model;
   const d = now.total - before.total;
   const tiles = document.createElement("div");
   tiles.className = "ov-wf-tiles";
@@ -7709,6 +7736,15 @@ function renderHostRows() {
    count. Picking a person (the Person box, which is the Filter popover's Inspector filter) shows
    only the hosts they have worked, with their own days and last date. */
 const MX_COLS = { host: "Host", people: "People who worked there", exp: "Experienced", last: "Last worked", risk: "At risk" };
+/* every host two or fewer active people are experienced at (the shared rule), for the report: { host, experienced, active, who } */
+function hostRiskRows(withNames) {
+  const today = todayStr();
+  return allHostRows().filter(r => !r.archived).map(r => {
+    const x = hostExperience(Object.fromEntries(r.inspectors.map(i => [i.id, i.days])), today);
+    const names = x.active.map(id => (D().employees.find(e => e.id === id) || {}).name).filter(Boolean);
+    return { host: r.name, experienced: x.experienced.length, active: x.active.length, atRisk: x.atRisk, who: withNames ? names.join(", ") : "" };
+  }).filter(r => r.atRisk).sort((a, b) => a.active - b.active || a.host.localeCompare(b.host));
+}
 function hostMatrixRows() {
   const today = todayStr();
   const person = state.hostlist.filters.empId.length === 1 ? state.hostlist.filters.empId[0] : null;
@@ -11068,6 +11104,7 @@ function placeBoardRow1Tools(board) {
   const home = wide ? end : right;
   for (const b of bulk) if (b.parentNode !== home) home.append(b);
   if (home.lastElementChild !== exp) home.append(exp);
+  exp.before($("#btn-report"));   // the report sits just left of Export, which keeps the right edge
   // Overview and Org Chart have no row-1 controls but Export: one row, numbers left, Export right
   document.body.classList.toggle("toolbar-one-row", wide && (isOverview() || isOrgChart()));
 }
@@ -16416,6 +16453,8 @@ function wireApp() {
   };
 
   $("#btn-export").onclick = openExportModal;
+  $("#btn-report").onclick = () => OvReport.open();
+  $("#btn-report-go").onclick = () => safely(() => OvReport.generate());
   $("#card-names").value = state.cardNames;
   initSegmented();   // draws the Thai | English toggles (the selects stay the source of truth)
   syncSegmented();

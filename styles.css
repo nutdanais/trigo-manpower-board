@@ -7179,3 +7179,58 @@ label > .pk { margin-top: 5px; }
 .ov-small { min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px 6px; }
 .ov-small-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
 .chart-compare { pointer-events: none; }
+
+/* ===== Overview phase 2, batch D: the monthly report (report.js) ===== */
+.rp-period { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 6px; }
+.rp-period label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.rp-period input[type=month] { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); }
+.rp-sub-opts { margin: 0 0 8px 26px; padding-left: 12px; border-left: 2px solid var(--border); }
+.rp-sub-opts .import-row { margin: 2px 0; }
+.rp-format label { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; font-weight: 600; font-size: 13px; }
+/* the sheet that is printed: hidden on screen, the only thing on the page when printing */
+.rp { display: none; background: #fff; color: #13222f; font-family: inherit; font-size: 11px; line-height: 1.4; }
+.rp .good { color: #1f8a4c; }
+.rp .bad { color: #b42318; }
+.rp-head h1 { margin: 0 0 4px; font-size: 20px; color: #003a66; }
+.rp-head p, .rp-sub { margin: 2px 0 8px; color: #5c707f; font-size: 11px; }
+.rp-head { border-bottom: 3px solid #a8c855; margin-bottom: 14px; padding-bottom: 6px; }
+.rp-sec { margin: 0 0 18px; }
+.rp-sec h2 { margin: 0 0 8px; font-size: 14px; color: #003a66; border-bottom: 1px solid #d8e0e7; padding-bottom: 3px; break-after: avoid; }
+.rp-sec h3 { margin: 10px 0 4px; font-size: 12px; break-after: avoid; }
+.rp-block { break-inside: avoid; margin-bottom: 8px; }
+.rp-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+.rp-tile { border: 1px solid #d8e0e7; border-radius: 6px; padding: 6px 8px; break-inside: avoid; }
+.rp-tile span { display: block; font-size: 10px; font-weight: 700; color: #5c707f; }
+.rp-tile b { font-size: 17px; }
+.rp-tile b small { font-size: 10px; color: #5c707f; font-weight: 600; }
+.rp-tile i { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: #5c707f; }
+.rp-tile i.good { color: #1f8a4c; } .rp-tile i.bad { color: #b42318; }
+.rp-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 8px; }
+.rp-table th { background: #003a66; color: #fff; text-align: left; padding: 4px 6px; border-bottom: 2px solid #a8c855; }
+.rp-table td { padding: 3px 6px; border-bottom: 1px solid #d8e0e7; }
+.rp-table tbody tr:nth-child(even) td { background: #f2f5f8; }
+.rp-table th.r, .rp-table td.r { text-align: right; font-variant-numeric: tabular-nums; }
+.rp-table thead { display: table-header-group; }
+.rp-table tr { break-inside: avoid; }
+.rp svg { width: 100%; height: auto; display: block; }
+.rp-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; break-inside: avoid; }
+.rp-bands { display: flex; align-items: flex-end; gap: 3px; height: 70px; }
+.rp-bands span { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; font-size: 9px; }
+.rp-bands i { display: block; width: 100%; background: #2a78d6; border-radius: 2px 2px 0 0; }
+.rp-bands small { color: #5c707f; }
+@media print {
+  body.printing-report > *:not(#report-sheet) { display: none !important; }
+  body.printing-report { margin: 0 !important; padding: 0 !important; background: #fff !important; min-height: 0 !important; }
+  body.printing-report #report-sheet { display: block; }
+  .rp, .rp * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* the report dialog sits in a side panel whose generic label / input rules would stretch these */
+#modal-report .rp-period { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+#modal-report .rp-period label, #modal-report .rp-format label { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; margin: 0; font-size: 13px; font-weight: 600; }
+#modal-report .rp-format label { display: flex; margin: 4px 0; align-items: baseline; }
+#modal-report input[type=radio], #modal-report input[type=checkbox] { flex: none; width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; }
+#modal-report .rp-period input[type=month] { width: auto; height: 32px; margin: 0; }
+#modal-report .rp-scope { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; }
+#modal-report .rp-scope small { color: var(--muted); }
+#modal-report .rp-sub-opts small { display: block; margin: 2px 0 4px 26px; }
