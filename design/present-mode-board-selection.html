@@ -221,6 +221,29 @@ button { font: inherit; color: inherit; }
 .st-pill .sep { width: 1px; height: 2cqw; background: #4b5562; }
 .st-pill .ic { width: 1.8cqw; height: 1.8cqw; }
 
+/* option E: two scopes */
+.band { background: var(--navy); color: #fff; border-radius: 6px; padding: 7px 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.band b { font-family: var(--f-display); font-size: 16px; letter-spacing: .2px; padding-left: 8px; border-left: 4px solid var(--green); }
+.band span { color: #d5e1ec; }
+.scopebar { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13px; }
+.scopebar .lbl { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--mut); }
+.chips.sm .chip { min-height: 28px; padding: 0 9px; font-size: 12.5px; }
+.chips.sm .chip[disabled] { opacity: .55; cursor: default; }
+.lk { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: 12.5px; cursor: pointer; }
+.lk[aria-pressed="true"] { background: var(--ok-surface); border-color: var(--ok-line); color: var(--ok-text); font-weight: 600; }
+.seg.sm button { padding: 4px 10px; font-size: 12.5px; }
+.seg button[disabled] { opacity: .45; cursor: not-allowed; }
+.ph { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 6px; align-items: stretch; }
+.ph .yl { display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: var(--mut); text-align: right; font-variant-numeric: tabular-nums; padding: 2px 0; }
+.ph .xl { grid-column: 2; display: flex; justify-content: space-between; font-size: 11px; color: var(--mut); }
+.chart-e { width: 100%; height: 110px; display: block; }
+.chart-e.s { height: 70px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--mut); align-items: center; }
+.legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
+.legend i.d { border-top-style: dashed; }
+.hint-e { font-size: 12px; color: var(--warn-text); }
+.sidegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+
 /* rules table, comparison */
 .tbl { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
 .tbl table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
@@ -309,7 +332,7 @@ pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-r
 <section id="select">
   <div class="eyebrow">Proposal 1</div>
   <h2>Board selection on the Overview</h2>
-  <p class="lede">Four ways to pick boards, all driving the same Overview below. Tick, press <b>Only</b>, and compare the summary line. Option C changes the question: it compares two boards instead of adding them up.</p>
+  <p class="lede">Five ways to pick boards, driving the same sample Overview. Tick, press <b>Only</b>, and compare the summary line. Option C compares two boards instead of adding them up. Option E gives the Period group (History and the sections after it) its own board control, linked to the page by default.</p>
 
   <div class="opts">
 
@@ -395,10 +418,31 @@ pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-r
         <div class="app" data-k="D" id="mockD"></div>
       </div>
     </article>
+
+    <!-- E -->
+    <article class="opt" id="opt-e">
+      <div class="opt-t">
+        <span class="tag">E</span>
+        <h3>Two scopes: the page, and the Period</h3>
+        <p>The day sections (Overview, In detail) use a simple page scope, as in A. The Period group gets its own board control in its heading: <b>Combined</b>, <b>Side by side</b> or <b>A vs B</b>. It starts <b>linked</b> to the page, so most people never see a second choice. Unlink it to pick different boards.</p>
+        <ul class="pc">
+          <li class="p">Simple where people look quickly, as rich as needed where they analyse</li>
+          <li class="p">Fits the page's existing split: the Period group already has its own range and Compare with</li>
+          <li class="p">A vs B answers the board-against-board question over time, which C answers only for one day</li>
+          <li class="c">Two scopes on one page need clear labels, or the Report scope is ambiguous</li>
+          <li class="c">One comparison at a time: A vs B turns Compare with (previous period, last year) off</li>
+        </ul>
+        <div class="effort">Build: medium to large, in steps: page scope (A), then the linked Period scope with Combined, then A vs B for History and Boards &amp; areas. People, Engineer workload and Workforce only combine.</div>
+      </div>
+      <div class="opt-m">
+        <div class="app" data-k="E" id="mockE"></div>
+        <p class="cap">The page scope is shown as chips here to save room. In the app it is A's tick list. Try: unlink the Period, tick boards, switch to <b>A vs B</b>, then back to <b>Combined</b> and change Compare with.</p>
+      </div>
+    </article>
   </div>
 
   <h3>What each Overview section does with 2 or more boards</h3>
-  <p class="lede">The same rules apply to A, B and D. C shows its own columns.</p>
+  <p class="lede">The same rules apply to A, B, D and E. C shows its own columns. E adds the Period row.</p>
   <div class="tbl rules"><table>
     <thead><tr><th>Section</th><th>With the selection</th><th>Change needed</th></tr></thead>
     <tbody>
@@ -408,6 +452,7 @@ pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-r
       <tr><td>People, Engineer workload, Workforce</td><td>Union of the picked boards. Same counting rules as today.</td><td class="good">None</td></tr>
       <tr><td>Loans</td><td>A loan to or from a board outside the selection shows as "outside selection", so the net figure is not misread.</td><td class="mid">New label</td></tr>
       <tr><td>Report, Export</td><td>Scope is the selection. Title: "Manpower report · October 2026 · Board One + Board Three".</td><td class="mid">Title and scope</td></tr>
+      <tr><td>Period group (option E)</td><td>Own scope, linked to the page by default. History and Boards &amp; areas can show Combined, Side by side or A vs B. People, Engineer workload and Workforce only combine. The heading states the scope.</td><td class="mid">New control, new label</td></tr>
       <tr><td>Board, Capacity, lists</td><td><b>Not multi-select.</b> They edit or plan one board at a time, and dragging a person across two visible boards would read as a loan.</td><td class="good">None</td></tr>
     </tbody>
   </table></div>
@@ -506,14 +551,14 @@ pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-r
   <div class="eyebrow">Side by side</div>
   <h2>Comparison</h2>
   <div class="tbl"><table>
-    <thead><tr><th>Board selection</th><th>A Tick list</th><th>B Chips</th><th>C Compare two</th><th>D Saved groups</th></tr></thead>
+    <thead><tr><th>Board selection</th><th>A Tick list</th><th>B Chips</th><th>C Compare two</th><th>D Saved groups</th><th>E Two scopes</th></tr></thead>
     <tbody>
-      <tr><td>Scope visible at a glance</td><td class="mid">Via the label</td><td class="good">Always</td><td class="good">Always</td><td class="mid">Via the group name</td></tr>
-      <tr><td>Taps to change</td><td class="mid">2 to 3</td><td class="good">1 per board</td><td class="mid">2 to 3</td><td class="good">1 for a saved group</td></tr>
-      <tr><td>Works with 8+ boards</td><td class="good">Yes</td><td class="bad">Scrolls</td><td class="good">Yes</td><td class="good">Yes</td></tr>
-      <tr><td>Answers "A against B?"</td><td class="bad">No</td><td class="bad">No</td><td class="good">Yes</td><td class="bad">No</td></tr>
-      <tr><td>Build size</td><td class="good">Small</td><td class="good">Small to medium</td><td class="bad">Medium to large</td><td class="mid">Medium to large</td></tr>
-      <tr><td>Database change</td><td class="good">None</td><td class="good">None</td><td class="good">None</td><td class="mid">Only if shared</td></tr>
+      <tr><td>Scope visible at a glance</td><td class="mid">Via the label</td><td class="good">Always</td><td class="good">Always</td><td class="mid">Via the group name</td><td class="good">Each group names its own</td></tr>
+      <tr><td>Taps to change</td><td class="mid">2 to 3</td><td class="good">1 per board</td><td class="mid">2 to 3</td><td class="good">1 for a saved group</td><td class="mid">Same as A, more if unlinked</td></tr>
+      <tr><td>Works with 8+ boards</td><td class="good">Yes</td><td class="bad">Scrolls</td><td class="good">Yes</td><td class="good">Yes</td><td class="good">Yes</td></tr>
+      <tr><td>Answers "A against B?"</td><td class="bad">No</td><td class="bad">No</td><td class="good">Yes</td><td class="bad">No</td><td class="good">Yes, over time</td></tr>
+      <tr><td>Build size</td><td class="good">Small</td><td class="good">Small to medium</td><td class="bad">Medium to large</td><td class="mid">Medium to large</td><td class="mid">Medium to large, in steps</td></tr>
+      <tr><td>Database change</td><td class="good">None</td><td class="good">None</td><td class="good">None</td><td class="mid">Only if shared</td><td class="good">None</td></tr>
     </tbody>
   </table></div>
   <div class="tbl"><table>
@@ -535,10 +580,11 @@ pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-r
   <h2>A for selection, P2 with P3's timer for presenting</h2>
   <div class="rec">
     <div class="rec-l">
-      <p><b>Board selection: A, with no cap.</b> The Overview already handles any list of boards, so "2 of 4" is just a selection, and a cap blocks "3 of 4" without a reason. A cap also makes "All boards" an exception, which is awkward when the whole point of the Overview is the full picture. Add <b>C Compare</b> later if you find yourself asking board against board, and <b>D saved groups</b> if the same pairs keep coming back.</p>
+      <p><b>Board selection: A for the page, then E for the Period group.</b> The Overview already handles any list of boards, so "2 of 4" is just a selection, and a cap blocks "3 of 4" without a reason. A cap also makes "All boards" an exception, which is awkward when the whole point of the Overview is the full picture. Then add <b>E</b>: the Period group gets its own scope, linked to the page until someone unlinks it, with Combined, Side by side and A vs B. A vs B covers the board-against-board question over time, so <b>C</b> is only needed if you also want it for a single day. <b>D saved groups</b> can wait until the same pairs keep coming back.</p>
       <p><b>Present mode: P2, with P3's auto-advance as one switch in the same start sheet.</b> That is one build, with two uses: you drive it in a meeting, or you set it to rotate and leave it on a wall. P1 comes free as the first slide's look, so it needs no separate build. P4 is a good fit only if you mostly present on a laptop and want to click through, so I would keep it as a later extra.</p>
       <ul>
-        <li>Build order: A first (small, and P2 reads the same selection), then P2 with its start sheet, then P3's timer, then C or D.</li>
+        <li>Build order: A first (small, and P2 reads the same selection), then P2 with its start sheet, then P3's timer, then E in two steps (linked Period scope with Combined, then A vs B), then D if wanted.</li>
+        <li>E rules: the Period scope starts linked; each group heading names its scope; A vs B and Compare with are never on together; the Report names both scopes.</li>
         <li>Phone: P2's slides work in portrait with one tile per row. The wall display is for a TV, so it is not offered on a phone.</li>
         <li>Tests: scope list saved and restored, an old single id still works, a deleted board drops out, Thai labels, no sideways scroll at 400 px, and names hidden means no name in the page text.</li>
       </ul>
@@ -577,7 +623,8 @@ pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-r
     <div class="q"><b>2 · Where will it be shown?</b><span>A laptop on a projector favours P2 or P4. A TV on the wall favours P3.</span></div>
     <div class="q"><b>3 · Names on screen?</b><span>Should idle names ever show in present mode, and for which roles?</span></div>
     <div class="q"><b>4 · Board tab too?</b><span>Present the Board tab (one board, read-only) in the same build, or Overview only?</span></div>
-    <div class="q"><b>5 · Saved groups: mine or shared?</b><span>Only matters if you pick D. Shared groups need a database table.</span></div>
+    <div class="q"><b>5 · Period linked by default?</b><span>Option E: should the Period scope follow the page until someone unlinks it, or always start on All boards?</span></div>
+    <div class="q"><b>6 · Saved groups: mine or shared?</b><span>Only matters if you pick D. Shared groups need a database table.</span></div>
   </div>
 </section>
 
@@ -587,10 +634,12 @@ pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-r
   <h2>Pick and copy back to me</h2>
   <form class="decide" id="decide-form" autocomplete="off">
     <fieldset><legend>Board selection</legend>
-      <label><input type="radio" name="sel" value="A Tick list" checked> A Tick list</label>
+      <label><input type="radio" name="sel" value="A Tick list"> A Tick list</label>
       <label><input type="radio" name="sel" value="B Chips"> B Chips</label>
       <label><input type="radio" name="sel" value="C Compare two"> C Compare two</label>
       <label><input type="radio" name="sel" value="D Saved groups"> D Saved groups</label>
+      <label><input type="radio" name="sel" value="E Two scopes (A for the page, own Period scope)"> E Two scopes</label>
+      <label><input type="radio" name="sel" value="A now, E next" checked> A now, E next</label>
       <label><input type="radio" name="sel" value="A now, C later"> A now, C later</label>
     </fieldset>
     <fieldset><legend>How many boards</legend>
@@ -818,6 +867,80 @@ C.D = (function () {
     else if (a === "one") { var id = "one-" + v; if (!GROUPS.some(function (x) { return x.id === id; })) GROUPS.push({ id: id, name: byId[v].name, ids: [v], kind: "temp", hidden: true }); s.g = id; s.open = false; }
     draw();
   } };
+})();
+
+
+/* ---------- E: two scopes ---------- */
+C.E = (function () {
+  var s = { page: ["b1", "b3"], linked: true, own: ["b1", "b2"], mode: "combined", cmp: "prev", hint: "" }, el = $("#mockE"), api = {};
+  var DATES = ["16 Oct", "04 Nov"];
+  function pids() { return s.linked ? s.page : s.own; }
+  function ghost(vals) { return vals.map(function (v, i) { return s.cmp === "prev" ? Math.round(v * 0.95 - (i % 4 === 1 ? 1 : 0)) : Math.round(v * 0.9 + (i % 5 === 2 ? 1 : 0)); }); }
+  function range(list) { var all = [].concat.apply([], list); return [Math.floor(Math.min.apply(null, all)) - 1, Math.ceil(Math.max.apply(null, all)) + 1]; }
+  function lineChart(series, mn, mx, small) {
+    var W = 300, H = 100, pad = 6, g = "";
+    [0.25, 0.5, 0.75].forEach(function (f) { var y = pad + f * (H - 2 * pad); g += '<line x1="0" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#d8dde4" stroke-width="1" vector-effect="non-scaling-stroke"/>'; });
+    var body = series.map(function (sr) {
+      var pts = sr.vals.map(function (v, i) { return [i * W / (sr.vals.length - 1), H - pad - (v - mn) / (mx - mn) * (H - 2 * pad)]; });
+      var l = pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" "), last = pts[pts.length - 1];
+      var out = '<polyline points="' + l + '" fill="none" stroke="' + sr.color + '" stroke-width="' + (sr.dash ? 1.5 : 2.2) + '"' + (sr.dash ? ' stroke-dasharray="5 4"' : "") + ' stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
+      if (!sr.dash) out += '<path d="M' + last[0] + "," + last[1] + ' l0,0" stroke="#fff" stroke-width="11" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M' + last[0] + "," + last[1] + ' l0,0" stroke="' + sr.color + '" stroke-width="7" stroke-linecap="round" vector-effect="non-scaling-stroke"/>';
+      return out;
+    }).join("");
+    return '<div class="ph"><div class="yl"><span>' + mx + "</span><span>" + mn + '</span></div><svg class="chart-e' + (small ? " s" : "") + '" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="Deployed people per working day">' + g + body + '</svg><div class="xl"><span>' + DATES[0] + "</span><span>" + DATES[1] + "</span></div></div>";
+  }
+  function chipsFor(key, sel, off) {
+    return '<div class="chips sm" role="group" aria-label="' + key + ' boards">' + BOARDS.map(function (b) {
+      return '<button class="chip" aria-pressed="' + (sel.indexOf(b.id) > -1) + '"' + (off ? " disabled" : "") + ' data-k="E" data-a="tick" data-v="' + key + ":" + b.id + '"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name.replace("Board ", "")) + "</button>";
+    }).join("") + "</div>";
+  }
+  function avg(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
+  function fmt1(n) { return (Math.round(n * 10) / 10).toFixed(1); }
+  function chartBlock(ids) {
+    var bs = pick(ids), nm = s.cmp === "prev" ? "Previous period" : "Same period last year";
+    if (s.mode === "side" && bs.length > 1) {
+      var rg = range(bs.map(function (b) { return b.trend.concat(ghost(b.trend)); }));
+      return '<div class="sidegrid">' + bs.map(function (b) {
+        return '<div class="card"><h5 style="display:flex;gap:6px;align-items:center"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name) + '<span class="cap" style="margin-left:auto;font-weight:500">avg ' + fmt1(avg(b.trend)) + "</span></h5>" + lineChart([{ vals: ghost(b.trend), color: "#929496", dash: true }, { vals: b.trend, color: b.color }], rg[0], rg[1], true) + "</div>";
+      }).join("") + '</div><div class="legend"><span><i class="d" style="border-color:#929496"></i>' + nm + '</span><span>One shared scale, ' + rg[0] + " to " + rg[1] + " people</span></div>";
+    }
+    if (s.mode === "vs" && bs.length === 2) {
+      var a = bs[0], b = bs[1], rg2 = range([a.trend, b.trend]);
+      function row(lbl, fa, fb) { var d = fa - fb; return "<tr><td>" + lbl + '</td><td class="num">' + fmt1(fa) + '</td><td class="num">' + fmt1(fb) + '</td><td class="num dl ' + (d === 0 ? "" : d > 0 ? "up" : "dn") + '">' + (d > 0 ? "+" : "") + fmt1(d) + "</td></tr>"; }
+      return '<div class="card"><h5>' + esc(a.name) + " against " + esc(b.name) + " · deployed per day</h5>" + lineChart([{ vals: a.trend, color: a.color }, { vals: b.trend, color: b.color }], rg2[0], rg2[1]) +
+        '<div class="legend" style="margin-top:6px"><span><i style="border-color:' + a.color + '"></i>' + esc(a.name) + '</span><span><i style="border-color:' + b.color + '"></i>' + esc(b.name) + '</span></div></div>' +
+        '<div class="card scroll-x"><table class="cmp"><thead><tr><th>Over the period</th><th>' + esc(a.name) + "</th><th>" + esc(b.name) + "</th><th>Difference</th></tr></thead><tbody>" +
+        row("Average deployed / day", avg(a.trend), avg(b.trend)) + row("Peak", Math.max.apply(null, a.trend), Math.max.apply(null, b.trend)) + row("Lowest", Math.min.apply(null, a.trend), Math.min.apply(null, b.trend)) + "</tbody></table></div>";
+    }
+    var vals = trendOf(bs), gh = ghost(vals), rg3 = range([vals, gh]), d = avg(vals) - avg(gh);
+    return '<div class="card"><h5>Deployed per working day, ' + esc(scopeName(bs)) + '</h5>' + lineChart([{ vals: gh, color: "#929496", dash: true }, { vals: vals, color: "#003a66" }], rg3[0], rg3[1]) +
+      '<div class="legend" style="margin-top:6px"><span><i style="border-color:#003a66"></i>This period, avg <b class="num">' + fmt1(avg(vals)) + '</b> / day</span><span><i class="d" style="border-color:#929496"></i>' + nm + ", avg " + fmt1(avg(gh)) + '</span><span class="num" style="font-weight:650;color:' + (d >= 0 ? "var(--ok-text)" : "var(--bad-text)") + '">' + (d >= 0 ? "+" : "") + fmt1(d) + " vs " + nm.toLowerCase() + "</span></div></div>";
+  }
+  function draw() {
+    var pg = pick(s.page), ids = pids(), pb = pick(ids), two = ids.length === 2;
+    if (s.mode === "vs" && !two) { s.mode = "combined"; s.hint = "A vs B needs exactly 2 boards, so the view went back to Combined."; }
+    if (s.mode === "side" && ids.length < 2) { s.mode = "combined"; }
+    var idle = sum(pg, "idle");
+    var h = '<div class="scopebar"><span class="lbl">Page boards</span>' + chipsFor("page", s.page, false) + '<span class="cap">Overview and In detail · ' + DAY + "</span></div>" +
+      '<div class="ov" style="gap:10px"><div class="attn"><span class="t">' + idle + ' permanent staff have no mission</span><span class="s">' + DAY + " · " + esc(scopeName(pg)) + "</span></div></div>" +
+      '<div style="padding:0 14px"><div class="band"><b>Period</b><span>16 Oct → 04 Nov · 14 working days · ' + esc(scopeName(pb)) + (s.linked ? " (same as page)" : "") + '</span></div></div>' +
+      '<div class="scopebar" style="margin-top:10px;border-top:1px solid var(--line)"><span class="lbl">Boards</span><button class="lk" aria-pressed="' + s.linked + '" data-k="E" data-a="link" title="' + (s.linked ? "Unlink to pick other boards" : "Link back to the page boards") + '">' + (s.linked ? "Linked to page" : "Own boards · relink") + "</button>" + chipsFor("own", ids, s.linked) +
+      '<span class="lbl" style="margin-left:6px">View</span><div class="seg sm" role="group" aria-label="Period board view"><button aria-pressed="' + (s.mode === "combined") + '" data-k="E" data-a="mode" data-v="combined">Combined</button><button aria-pressed="' + (s.mode === "side") + '" data-k="E" data-a="mode" data-v="side"' + (ids.length < 2 ? " disabled" : "") + '>Side by side</button><button aria-pressed="' + (s.mode === "vs") + '" data-k="E" data-a="mode" data-v="vs"' + (two ? "" : " disabled") + '>A vs B</button></div>' +
+      '<span class="lbl" style="margin-left:6px">Compare with</span><div class="seg sm" role="group" aria-label="Compare with"><button aria-pressed="' + (s.cmp === "prev") + '" data-k="E" data-a="cmp" data-v="prev"' + (s.mode === "vs" ? " disabled" : "") + '>Previous period</button><button aria-pressed="' + (s.cmp === "ly") + '" data-k="E" data-a="cmp" data-v="ly"' + (s.mode === "vs" ? " disabled" : "") + '>Last year</button></div></div>' +
+      '<div class="ov" style="gap:10px;padding-top:4px">' + (s.mode === "vs" ? '<div class="mnote" style="padding:0">Compare with is off while two boards are compared.</div>' : "") + (s.hint ? '<div class="hint-e">' + s.hint + "</div>" : "") + (!two && !s.hint ? '<div class="cap">A vs B is available when exactly 2 boards are in the Period scope.</div>' : "") + chartBlock(ids) + "</div>";
+    el.innerHTML = h; s.hint = "";
+  }
+  api.act = function (a, v) {
+    if (a === "tick") {
+      var key = v.split(":")[0], id = v.split(":")[1], list = key === "page" ? s.page : s.own, i = list.indexOf(id);
+      if (i > -1) { if (list.length > 1) list.splice(i, 1); } else list.push(id);
+    } else if (a === "link") { s.linked = !s.linked; if (!s.linked) s.own = s.page.slice(); }
+    else if (a === "mode") s.mode = v;
+    else if (a === "cmp") s.cmp = v;
+    draw();
+  };
+  draw();
+  return api;
 })();
 
 /* ---------- present mode stages ---------- */
