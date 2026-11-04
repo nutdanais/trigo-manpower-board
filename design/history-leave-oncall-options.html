@@ -185,7 +185,7 @@ td.num, th.num { text-align: right; }
         <div class="tbl-wrap" id="b-lv-table"></div>
       </div>
       <div>
-        <div class="hchart-head"><b>Most days on leave</b><span class="gated">Names follow a Roles permission, like the attention card's idle names</span></div>
+        <div class="hchart-head"><b>Most days on leave</b><span class="gated">Shown to everyone who can see History</span></div>
         <div class="tbl-wrap" id="b-lv-people"></div>
       </div>
     </div>
@@ -200,7 +200,7 @@ td.num, th.num { text-align: right; }
       </div>
     </div>
     <div class="verdict">
-      <div><b>Good for</b><ul><li>Everything is visible at once, with no tile to pick.</li><li>Answers follow-up questions: the peak day, how many people took leave, call-in rate, who carries the on-call load.</li><li>Each section can have its own row in Roles &amp; permissions.</li></ul></div>
+      <div><b>Good for</b><ul><li>Everything is visible at once, with no tile to pick.</li><li>Answers follow-up questions: the peak day, how many people took leave, call-in rate, who carries the on-call load.</li><li>Uses the same History permission in Roles, so nothing new to set up.</li></ul></div>
       <div><b>Watch out</b><ul><li>The Overview page gets two sections longer.</li><li>The name lists need per-person data. The Manpower List's 30D column already fetches it, but it is a second query.</li></ul></div>
     </div>
   </section>
@@ -228,7 +228,7 @@ td.num, th.num { text-align: right; }
       <li><div><b>Exchange Working Day.</b> <span class="tag rec">Decided</span> It counts in the leave total, as its own type next to Annual, Sick, Business and Unpaid, as the mockups show. Its chip can still hide it.</div></li>
       <li><div><b>"On-call inspectors".</b> <span class="tag rec">Decided</span> Everyone on an on-call contract, the dashed <b>OC</b> cards, whatever their position. The mockups already count it this way.</div></li>
       <li><div><b>Leave on a day the board wasn't planned.</b> <span class="tag rec">Decided</span> Only planned boards count. A board-day with no missions is left out of leave and on-call too, like every other History figure, and is named in the "Not planned" line under the tiles.</div></li>
-      <li><div><b>Names.</b> Should the per-person lists (most days on leave, most called in) be in it at all? If yes, should they sit behind a permission in Roles?</div></li>
+      <li><div><b>Names.</b> <span class="tag rec">Decided</span> Show the per-person lists (most days on leave, most called in). They use the same Roles permission as History, so whoever can see History sees the names. With option A they go under the Leave and On-call charts.</div></li>
       <li><div><b>Unit.</b> The figures are person-days (3 people on leave for 2 days = 6). The table also shows how many different people took each type. Is that the right pair?</div></li>
     </ol>
   </section>
