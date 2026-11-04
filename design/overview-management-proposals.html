@@ -128,8 +128,16 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
 .count { font-size: 12.5px; color: var(--muted); }
 
 /* roadmap */
-.road { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 860px) { .road { grid-template-columns: 1fr; } }
+.road { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1000px) { .road { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.struct { list-style: none; display: grid; gap: 8px; counter-reset: s; }
+.struct li { counter-increment: s; display: grid; grid-template-columns: 26px auto 1fr; gap: 4px 10px; align-items: baseline; font-size: 13.5px; }
+.struct li::before { content: counter(s); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; grid-row: span 2; }
+.struct li > span:last-child { grid-column: 2 / -1; color: var(--muted); font-size: 12.8px; }
+.struct li > .tag { justify-self: start; }
+.tag.built { background: #e3e8ee; color: var(--primary); }
+.tag.phase2 { background: #eaf3d6; color: #3d5410; }
+@media (max-width: 560px) { .road { grid-template-columns: 1fr; } }
 .phase { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; gap: 8px; align-content: start; }
 .phase h3 { display: flex; gap: 8px; align-items: center; }
 .phase h3 em { font-style: normal; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--primary); color: #fff; font-size: 12.5px; }
@@ -150,7 +158,7 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
     <h1>Overview for management</h1>
     <p class="lede">What the Overview tab answers today, mockups of your three asks (one engineer's workload, worked vs leave days, and the same in Manpower), and a catalogue of other ideas. Each idea is marked by what it needs: data the app already has, a small change, or new data.</p>
     <nav class="toc" style="margin-top:14px" aria-label="On this page">
-      <a href="#today">Today</a><a href="#asks">Your three asks</a><a href="#ideas">All ideas</a><a href="#roadmap">Suggested order</a><a href="#questions">Questions</a>
+      <a href="#today">Today</a><a href="#asks">Your three asks</a><a href="#ideas">All ideas</a><a href="#roadmap">The plan</a><a href="#questions">Questions</a>
     </nav>
   </header>
 
@@ -261,18 +269,32 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
 
   <!-- ===================== ROADMAP ===================== -->
   <section id="roadmap" class="part-head" style="gap:14px">
-    <div class="part-head"><span class="eyebrow">Part 4</span><h2>Suggested order</h2>
-      <p class="muted">Start with what the data already supports and managers will use weekly. Leave anything that needs new records until the team agrees to keep them up.</p></div>
+    <div class="part-head"><span class="eyebrow">Part 4</span><h2>The plan: phase 1 built, phase 2 merged</h2>
+      <p class="muted">Phase 1 is in the app (PR #98). Phase 2 builds ideas 4, 5, 6, 9, 18, 23, 24, 25, 26, 27, 29, 30, 31 and 32, <b>merged into three new sections and one set of chart controls</b> instead of one section each. Most of them are the same rows of data seen a different way. The build brief is <code>design/handover-overview-phase-2.md</code>.</p></div>
+    <div class="panel">
+      <h3>The Overview's Period group after phase 2</h3>
+      <ol class="struct">
+        <li><b>Period heading</b><span>Range presets and dates, plus <b>Compare with: Previous period | Same period last year</b> (29). They apply to every section below.</span></li>
+        <li><b>History</b> <span class="tag">built · extended</span><span>The six tiles, with one chart toolbar for every tile: <b>Group by</b> Day · Week · Month, <b>Boards</b> Together · Side by side (31). The On-call view gets <b>Count | Share</b> (25). The Leave view keeps Chart | Calendar and its by-type table.</span></li>
+        <li><b>People</b> <span class="tag ask">new</span><span>The spread chart (4), then <b>one table</b> of people: worked, leave, ratio, nights (9), longest run, call-ins (6), with flags and quick views (Workload · Leave · Nights · On-call · Alerts only). It takes over Worked vs leave, Most called in and the Workload alerts section. A name opens the <b>profile</b> (5).</span></li>
+        <li><b>Engineer workload</b> <span class="tag">built</span><span>As today, plus "vs previous period" on its tiles. The profile reuses its one-engineer layout.</span></li>
+        <li><b>Workforce</b> <span class="tag ask">new</span><span>One chart: headcount per month by years of service (27), with joiners and leavers (24), and a <b>Resigned</b> status in Manpower.</span></li>
+        <li><b>Boards &amp; areas</b> <span class="tag ask">new</span><span>A period table per board with <b>net loans</b> (23), a <b>By service area</b> switch for demand vs supply (18), and the loan from → to table.</span></li>
+      </ol>
+      <p class="small muted">Elsewhere: the <b>Host tab</b> gets a Skills matrix (26). Overview's Host coverage uses the same "experienced" rule (≥ 5 days, ≤ 2 active = at risk) and links to it. The <b>Report</b> button (32) has one checkbox per section above. Every chart of days opens its board when clicked (30).</p>
+    </div>
     <div class="road">
-      <div class="phase"><h3><em>1</em>Your asks + quick wins</h3><ul>
-        <li>One engineer's workload (ask 1)</li><li>Worked : Leave in History (ask 2)</li><li>Worked / Leave columns in Manpower (ask 3)</li>
-        <li>This period vs last period on every tile</li><li>Click a chart day to open that board</li><li>Days-in-a-row and night-shift alerts</li></ul></div>
-      <div class="phase"><h3><em>2</em>Business view</h3><ul>
-        <li>Customers and hosts over time</li><li>Forecast vs actual (Capacity vs the board)</li><li>Joiners and leavers, headcount trend</li>
-        <li>On-call reliance trend</li><li>Who can work which host (skills matrix)</li><li>Monthly report export</li></ul></div>
-      <div class="phase"><h3><em>3</em>Needs new records</h3><ul>
-        <li>Targets (utilization, leave share) shown on tiles</li><li>Leave entitlement and balance</li><li>Cost per customer (day rates)</li>
-        <li>Certificates and training expiry</li><li>Weekly digest by email / LINE</li></ul></div>
+      <div class="phase"><h3><em>A</em>People</h3><ul>
+        <li>Manpower counts on History's rule (planned days)</li><li>Engineer tiles vs previous period</li><li>Range control moves to the Period heading</li>
+        <li>People section: spread chart, one table, flags, quick views (4, 6, 9)</li><li>Employee profile (5)</li></ul></div>
+      <div class="phase"><h3><em>B</em>Workforce and skills</h3><ul>
+        <li>Resigned status (one migration)</li><li>Workforce chart: headcount by years of service, joiners, leavers (24, 27)</li>
+        <li>Skills matrix in the Host tab (26), shared rule with Host coverage</li></ul></div>
+      <div class="phase"><h3><em>C</em>Chart controls, boards and areas</h3><ul>
+        <li>Group by Day · Week · Month</li><li>Compare with last year (29)</li><li>Boards side by side (31)</li><li>On-call Count | Share (25)</li>
+        <li>Boards &amp; areas: net loans, by service area (18, 23)</li></ul></div>
+      <div class="phase"><h3><em>D</em>Report</h3><ul>
+        <li>Monthly report: a checkbox per section, names on / off, PDF or Excel, EN / TH (32)</li><li>Click a day, everywhere (30)</li></ul></div>
     </div>
   </section>
 
@@ -282,7 +304,7 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
       <li><div><b>Worked : Leave thresholds.</b> <span class="tag ready">Decided</span> Start with 20% amber and 30% red, the same for permanent and on-call. Both are a setting that can change later.</div></li>
       <li><div><b>Exchange Working Day in the ratio.</b> <span class="tag ready">Decided</span> Not leave, in History and in Manpower alike, so the figures match. The day is worked back, so it counts as neither worked nor leave.</div></li>
       <li><div><b>Who sees per-person figures.</b> <span class="tag ready">Decided</span> They follow the History permission, like the names. In the Manpower List, the Worked, Leave and Worked : Leave columns show only to roles that can see History.</div></li>
-      <li><div><b>Which ideas first.</b> Mark the ones you want from Part 3 (a comment on a card works), and I'll turn them into a build plan.</div></li>
+      <li><div><b>Which ideas first.</b> <span class="tag ready">Decided</span> 4, 5, 6, 9, 18, 23, 24 (+ Resigned), 25, 26, 27, 29 (+ year on year), 30, 31 and 32 (+ choose sections), merged as in Part 4 and built in batches A–D.</div></li>
     </ol>
   </section>
 </div>
@@ -514,6 +536,16 @@ const IDEAS = [
   ["money", "new-data", "M", "Labour cost per customer", "Turns person-days into money: cost per customer, host and month.", "Day rates per contract or position (and a night premium); kept behind a finance permission."],
   ["money", "new-data", "M", "Billable vs non-billable days", "Separates paid customer work from training, travel and internal jobs.", "A billable flag on missions; billable utilization next to utilization."],
 ];
+/* where each idea stands: built in phase 1, or where it lands in phase 2 (the merged plan) */
+const STATUS = {
+  1: ["built", "Built · phase 1"], 2: ["built", "Built · phase 1 → People"], 3: ["built", "Built · phase 1"],
+  8: ["built", "Built · phase 1 → People flags"],
+  29: ["built", "Built (previous period) · C adds last year"], 30: ["built", "Built · D checks every chart"],
+  4: ["phase2", "Phase 2 A · People"], 5: ["phase2", "Phase 2 A · Profile"], 6: ["phase2", "Phase 2 A · People"],
+  9: ["phase2", "Phase 2 A · People"], 24: ["phase2", "Phase 2 B · Workforce"], 26: ["phase2", "Phase 2 B · Host tab"],
+  27: ["phase2", "Phase 2 B · Workforce"], 25: ["phase2", "Phase 2 C · History On-call"], 31: ["phase2", "Phase 2 C · History"],
+  18: ["phase2", "Phase 2 C · Boards & areas"], 23: ["phase2", "Phase 2 C · Boards & areas"], 32: ["phase2", "Phase 2 D · Report"],
+};
 const F = { group: "all", ready: "all" };
 function renderIdeas() {
   const mk = (box, map, key) => {
@@ -524,13 +556,13 @@ function renderIdeas() {
     }
   };
   mk("f-group", GROUPS, "group"); mk("f-ready", READY, "ready");
-  const list = IDEAS.map((x, i) => ({ n: i + 1, group: x[0], ready: x[1], effort: x[2], title: x[3], why: x[4], how: x[5], ask: x[6] }))
+  const list = IDEAS.map((x, i) => ({ n: i + 1, group: x[0], ready: x[1], effort: x[2], title: x[3], why: x[4], how: x[5], ask: x[6], status: STATUS[i + 1] }))
     .filter(x => (F.group === "all" || x.group === F.group) && (F.ready === "all" || x.ready === F.ready));
   document.getElementById("f-count").textContent = `${list.length} of ${IDEAS.length} ideas`;
   document.getElementById("ideas-grid").innerHTML = list.map(x => `<article class="idea">
     <div class="idea-top"><h3>${x.title}</h3><span class="num">#${x.n}</span></div>
     <p class="why">${x.why}</p><p class="how">${x.how}</p>
-    <div class="meta"><span class="tag">${GROUPS[x.group]}</span><span class="tag ${x.ready}">${READY[x.ready]}</span><span class="effort">Effort ${x.effort}</span>${x.ask ? '<span class="tag ask">Your ask</span>' : ""}</div></article>`).join("");
+    <div class="meta"><span class="tag">${GROUPS[x.group]}</span><span class="tag ${x.ready}">${READY[x.ready]}</span><span class="effort">Effort ${x.effort}</span>${x.ask ? '<span class="tag ask">Your ask</span>' : ""}${x.status ? `<span class="tag ${x.status[0]}">${x.status[1]}</span>` : ""}</div></article>`).join("");
 }
 
 /* ---------- tooltip ---------- */
