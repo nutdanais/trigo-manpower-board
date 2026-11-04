@@ -1,0 +1,551 @@
+<title>Overview Management Review</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: a review of the Overview tab for management,
+   with mockups of the three asks (engineer drill-in, worked : leave, the same in
+   Manpower) and a catalogue of further ideas. Tokens copied from styles.css so the
+   mockups read like the app. Light only, like the app.
+   Layout: one reading column; mockups sit in app-styled sections, ideas in a filterable grid. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --primary-text: #003a66; --brand-green: #a8c855; --hover-tint: #eef3fb;
+  --chart-assigned: #2a78d6; --chart-oncall: #eb6834; --chart-standby: #e34948; --grid: #e6e9ee;
+  --leave-annual: #eda100; --leave-sick: #e87ba4; --leave-business: #4a3aa7; --leave-unpaid: #7b8794; --leave-exchange: #1baf7a;
+  --ok: #1f8a4c; --ok-bg: #e6f4ec; --warn: #a15c00; --warn-bg: #fdf0d9; --bad: #b42318; --bad-bg: #fde8e7;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1140px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 30px; }
+h1 { font-size: 27px; letter-spacing: -.4px; text-wrap: balance; }
+h2 { font-size: 20px; letter-spacing: -.2px; text-wrap: balance; }
+h3 { font-size: 15px; }
+p { max-width: 76ch; }
+.lede { color: var(--muted); margin-top: 6px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #e3e8ee; color: var(--muted); white-space: nowrap; }
+.tag.ready { background: var(--ok-bg); color: var(--ok); }
+.tag.small-change { background: var(--warn-bg); color: var(--warn); }
+.tag.new-data { background: var(--bad-bg); color: var(--bad); }
+.tag.ask { background: #e8eff6; color: var(--primary); }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.part-head { display: grid; gap: 4px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--primary); }
+code { font-size: 12.5px; background: #eef1f4; padding: 1px 5px; border-radius: 4px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px; }
+nav.toc a { font-size: 12.5px; font-weight: 600; color: var(--primary); text-decoration: none; border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 4px 11px; }
+nav.toc a:hover { background: var(--hover-tint); }
+a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* inventory of today */
+.inv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .inv { grid-template-columns: 1fr; } }
+.inv-col { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.inv-col h3 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.inv-col h3 span { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.inv-item { border-top: 1px solid #eef0f3; padding-top: 7px; font-size: 13px; }
+.inv-item b { display: block; font-size: 13px; }
+.inv-item span { color: var(--muted); font-size: 12.5px; }
+.gaps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; padding-left: 0; list-style: none; }
+@media (max-width: 720px) { .gaps { grid-template-columns: 1fr; } }
+.gaps li { display: grid; grid-template-columns: 20px 1fr; gap: 6px; font-size: 13.5px; }
+.gaps li::before { content: "?"; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--warn-bg); color: var(--warn); font-weight: 700; font-size: 11.5px; margin-top: 1px; }
+
+/* the app's Overview look */
+.ov-section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.ov-sub { font-size: 12px; color: var(--muted); max-width: 780px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+.btn:hover { background: var(--hover-tint); }
+.btn[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
+select { font: inherit; font-size: 13px; font-weight: 600; padding: 5px 28px 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+.lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+.htiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1000px) { .htiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .htiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.htile { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; min-width: 0; }
+.htile:hover { background: var(--hover-tint); }
+.htile[aria-pressed="true"] { border-color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-text); }
+.htile-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.htile-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.htile-sub { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.delta-up { color: var(--ok); } .delta-down { color: var(--bad); }
+.chart { width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; }
+.chart text { font-family: var(--font-ui); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.legend i.line { height: 0; border-top: 2px dashed var(--muted); border-radius: 0; }
+.tbl-wrap { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+th button[aria-sort]::after { content: " ↕"; opacity: .45; }
+th button[aria-sort="descending"]::after { content: " ↓"; opacity: 1; }
+th button[aria-sort="ascending"]::after { content: " ↑"; opacity: 1; }
+td { padding: 6px 8px; border-bottom: 1px solid #eef0f3; white-space: nowrap; vertical-align: middle; }
+td.r, th.r { text-align: right; }
+tr.new-col td.nc, th.nc { background: #f4f9e9; }
+.oc { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--chart-oncall); background: rgba(235,104,52,.13); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); } .pill.warn { background: var(--warn-bg); color: var(--warn); } .pill.bad { background: var(--bad-bg); color: var(--bad); }
+.split { display: inline-flex; width: 120px; height: 9px; border-radius: 999px; overflow: hidden; background: #eef0f3; vertical-align: middle; }
+.split i { display: block; height: 100%; }
+.meter { display: inline-block; width: 70px; height: 7px; background: #eef0f3; border-radius: 999px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+.meter i { display: block; height: 100%; background: var(--chart-assigned); border-radius: 999px; }
+.note { font-size: 12px; color: var(--muted); }
+.callout { border-left: 3px solid var(--brand-green); background: #f6faee; padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 13px; }
+.two { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.fact { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.fact span { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.fact b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.fact small { font-size: 11.5px; color: var(--muted); }
+.hostchips { display: flex; flex-wrap: wrap; gap: 5px; }
+.hostchips span { font-size: 11.5px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
+.hostchips b { font-variant-numeric: tabular-nums; }
+
+/* idea catalogue */
+.filters { display: grid; gap: 8px; }
+.filters .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ideas { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.idea { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; gap: 7px; align-content: start; min-width: 0; }
+.idea-top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.idea h3 { font-size: 14.5px; text-wrap: balance; }
+.idea .num { font-size: 11.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.idea p { font-size: 12.8px; }
+.idea .why { color: var(--text); }
+.idea .how { color: var(--muted); font-size: 12.3px; }
+.idea .meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.effort { font-size: 11px; font-weight: 700; border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; color: var(--muted); }
+.count { font-size: 12.5px; color: var(--muted); }
+
+/* roadmap */
+.road { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .road { grid-template-columns: 1fr; } }
+.phase { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+.phase h3 { display: flex; gap: 8px; align-items: center; }
+.phase h3 em { font-style: normal; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--primary); color: #fff; font-size: 12.5px; }
+.phase ul { padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+.qs { counter-reset: q; display: grid; gap: 10px; list-style: none; }
+.qs li { counter-increment: q; display: grid; grid-template-columns: 26px 1fr; gap: 8px; font-size: 13.5px; }
+.qs li::before { content: counter(q); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; }
+#tip { position: fixed; pointer-events: none; z-index: 20; background: #1f2937; color: #fff; font-size: 12px; line-height: 1.4; padding: 6px 9px; border-radius: 6px; max-width: 260px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+@media (prefers-reduced-motion: no-preference) { .htile, .btn, .idea { transition: background .12s, opacity .12s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <span class="tag">Overview · Manpower</span>
+      <span class="tag">Proposal · sample data (Aug – Oct 2026)</span>
+    </div>
+    <h1>Overview for management</h1>
+    <p class="lede">What the Overview tab answers today, mockups of your three asks (one engineer's workload, worked vs leave days, and the same in Manpower), and a catalogue of other ideas. Each idea is marked by what it needs: data the app already has, a small change, or new data.</p>
+    <nav class="toc" style="margin-top:14px" aria-label="On this page">
+      <a href="#today">Today</a><a href="#asks">Your three asks</a><a href="#ideas">All ideas</a><a href="#roadmap">Suggested order</a><a href="#questions">Questions</a>
+    </nav>
+  </header>
+
+  <!-- ===================== TODAY ===================== -->
+  <section id="today" class="part-head" style="gap:14px">
+    <div class="part-head"><span class="eyebrow">Part 1</span><h2>What the Overview answers today</h2>
+      <p class="muted">The page reads summary → the day in detail → over time. Every section follows the board selector at the top.</p></div>
+    <div class="inv">
+      <div class="inv-col"><h3>Summary <span>the date on screen</span></h3>
+        <div class="inv-item"><b>Attention card</b><span>Who has no mission today, grouped by board; free on-call as surge capacity.</span></div>
+        <div class="inv-item"><b>KPI tiles</b><span>Utilization with a 14-day sparkline, deployed, missions, on-call free.</span></div>
+        <div class="inv-item"><b>By board</b><span>Utilized, missions, headcount, leave, idle, on-call free per board.</span></div>
+        <div class="inv-item"><b>Loans today</b><span>Who is lent where, until when, and what they do there.</span></div></div>
+      <div class="inv-col"><h3>In detail <span>the date on screen</span></h3>
+        <div class="inv-item"><b>By engineer</b><span>Each engineer's missions and crew today, permanent / on-call.</span></div>
+        <div class="inv-item"><b>By service area</b><span>Headcount per area, permanent / on-call share.</span></div>
+        <div class="inv-item"><b>Shifts</b><span>Day / night crew per board.</span></div>
+        <div class="inv-item"><b>Host coverage</b><span>Today's hosts only one or two people have ever worked.</span></div></div>
+      <div class="inv-col"><h3>Over time <span>a chosen range</span></h3>
+        <div class="inv-item"><b>History</b><span>Utilization, deployed, standby, missions, leave by type (chart or calendar), on-call deployed, with name lists.</span></div>
+        <div class="inv-item"><b>Engineer workload</b><span>One ranked table: missions / day, crew / day, crew per mission, trend, active days, share.</span></div>
+        <div class="inv-item"><b>Manpower List (other tab)</b><span>30D utilization and years of service per person.</span></div></div>
+    </div>
+    <div class="panel">
+      <h3>Questions a manager can't answer from it yet</h3>
+      <ul class="gaps">
+        <li>How has one engineer's load changed month to month?</li>
+        <li>Who is on leave a lot compared with the days they work?</li>
+        <li>Is anyone working too many days in a row, or too many nights?</li>
+        <li>Which customers and hosts are growing, and which are shrinking?</li>
+        <li>Did we plan the right number of people? Forecast vs what actually ran.</li>
+        <li>Are we leaning more on on-call staff? Is it time to hire?</li>
+        <li>How many people joined and left this quarter?</li>
+        <li>Who can cover a host if its regulars are away? Where should we cross-train?</li>
+        <li>Is this month better or worse than last month, at a glance?</li>
+        <li>How do I take a monthly report to a meeting without screenshots?</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== ASKS ===================== -->
+  <section id="asks" class="part-head" style="gap:18px">
+    <div class="part-head"><span class="eyebrow">Part 2</span><h2>Your three asks</h2>
+      <p class="muted">All three use data the app already loads. Nothing new has to be recorded.</p></div>
+
+    <!-- Ask 1 -->
+    <div style="display:grid;gap:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h3>1 · One engineer's workload over the period</h3><span class="tag ask">Your ask</span><span class="tag ready">Data ready</span></div>
+      <p class="muted small">Engineer workload keeps its ranked table, and a row (or the picker) opens this view. Pick a measure tile, then group by day, week or month. The dashed line is the average engineer, so you can see whether this engineer runs above or below the team.</p>
+      <div class="ov-section">
+        <h3>Engineer workload · one engineer</h3>
+        <div class="controls">
+          <label class="lbl" for="eng-pick">Engineer</label>
+          <select id="eng-pick"></select>
+          <div class="btns" role="group" aria-label="Group by" id="eng-group"></div>
+          <span class="note" id="eng-range"></span>
+        </div>
+        <div class="htiles" id="eng-tiles" role="group" aria-label="Engineer measure"></div>
+        <div class="legend" id="eng-legend"></div>
+        <div class="chart" id="eng-chart"></div>
+        <div class="two">
+          <div>
+            <div class="lbl" style="margin-bottom:6px">Hosts this engineer ran missions at</div>
+            <div class="hostchips" id="eng-hosts"></div>
+          </div>
+          <div class="facts" id="eng-facts"></div>
+        </div>
+      </div>
+      <p class="note">Also possible: pick two engineers to compare them on the same chart, and click a column to open that day's board filtered to the engineer.</p>
+    </div>
+
+    <!-- Ask 2 -->
+    <div style="display:grid;gap:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h3>2 · Worked days : Leave days, per person</h3><span class="tag ask">Your ask</span><span class="tag ready">Data ready</span></div>
+      <p class="muted small">This goes in History's Leave view, after or in place of "Most days on leave". It counts each person's days over the History range, on the same planned working days as everything else. <b>Leave share</b> = leave ÷ (worked + leave + standby), so a person's figure isn't hidden by how many days they were available. Sort by any column.</p>
+      <div class="ov-section">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3>Worked vs leave, per person</h3>
+          <div class="btns" role="group" aria-label="Who" id="wl-who"></div></div>
+        <div class="tbl-wrap"><table id="wl-table"></table></div>
+        <div class="legend"><span><i style="background:var(--chart-assigned)"></i>Worked</span><span><i style="background:var(--leave-annual)"></i>Leave</span><span><i style="background:#c9ced6"></i>Standby</span>
+          <span><span class="pill warn">10–20%</span> or <span class="pill bad">over 20%</span> of available days on leave</span></div>
+      </div>
+      <div class="callout">The thresholds (10% and 20%) are examples. They would be a setting, and could differ for permanent and on-call staff. On-call people have no Standby, so their split is worked vs leave vs not called.</div>
+    </div>
+
+    <!-- Ask 3 -->
+    <div style="display:grid;gap:10px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h3>3 · The same in the Manpower List</h3><span class="tag ask">Your ask</span><span class="tag ready">Data ready</span></div>
+      <p class="muted small">The Manpower List already fetches each person's worked and leave dates for its <b>30D utilization</b> column, so three columns cost nothing extra: <b>Worked</b>, <b>Leave</b> and <b>Worked : Leave</b>. They would be sortable and filterable, and included in the Excel export. A period switch (30D / 90D / YTD) applies to all four. The new columns are tinted green below.</p>
+      <div class="ov-section">
+        <div class="controls"><span class="lbl">Period</span><div class="btns" role="group" aria-label="Period" id="ml-period"></div><span class="note">Working days of each person's own board, from the day they were added</span></div>
+        <div class="tbl-wrap"><table id="ml-table"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== IDEAS ===================== -->
+  <section id="ideas" class="part-head" style="gap:14px">
+    <div class="part-head"><span class="eyebrow">Part 3</span><h2>All ideas</h2>
+      <p class="muted">Grouped by the question each one answers for management. <b>Data ready</b> means the app already stores it. <b>Small change</b> means a small addition to what is stored, or a new setting. <b>New data</b> means someone would have to start recording something. Effort: S = a day or two, M = about a week, L = more.</p></div>
+    <div class="panel filters">
+      <div class="row" role="group" aria-label="Filter by area" id="f-group"></div>
+      <div class="row" role="group" aria-label="Filter by data" id="f-ready"></div>
+      <span class="count" id="f-count"></span>
+    </div>
+    <div class="ideas" id="ideas-grid"></div>
+  </section>
+
+  <!-- ===================== ROADMAP ===================== -->
+  <section id="roadmap" class="part-head" style="gap:14px">
+    <div class="part-head"><span class="eyebrow">Part 4</span><h2>Suggested order</h2>
+      <p class="muted">Start with what the data already supports and managers will use weekly. Leave anything that needs new records until the team agrees to keep them up.</p></div>
+    <div class="road">
+      <div class="phase"><h3><em>1</em>Your asks + quick wins</h3><ul>
+        <li>One engineer's workload (ask 1)</li><li>Worked : Leave in History (ask 2)</li><li>Worked / Leave columns in Manpower (ask 3)</li>
+        <li>This period vs last period on every tile</li><li>Click a chart day to open that board</li><li>Days-in-a-row and night-shift alerts</li></ul></div>
+      <div class="phase"><h3><em>2</em>Business view</h3><ul>
+        <li>Customers and hosts over time</li><li>Forecast vs actual (Capacity vs the board)</li><li>Joiners and leavers, headcount trend</li>
+        <li>On-call reliance trend</li><li>Who can work which host (skills matrix)</li><li>Monthly report export</li></ul></div>
+      <div class="phase"><h3><em>3</em>Needs new records</h3><ul>
+        <li>Targets (utilization, leave share) shown on tiles</li><li>Leave entitlement and balance</li><li>Cost per customer (day rates)</li>
+        <li>Certificates and training expiry</li><li>Weekly digest by email / LINE</li></ul></div>
+    </div>
+  </section>
+
+  <section id="questions" class="panel">
+    <h2>Questions for you</h2>
+    <ol class="qs">
+      <li><div><b>Worked : Leave thresholds.</b> What leave share should turn amber or red? 10% and 20% are placeholders. Same for on-call?</div></li>
+      <li><div><b>Exchange Working Day in the ratio.</b> It counts as leave in History. Should it count as leave here too, or be left out of the ratio, since the day is worked back?</div></li>
+      <li><div><b>Who sees per-person figures.</b> Sick-leave patterns and leave ratios are sensitive. Should they follow the History permission like the names, or get their own row in Roles?</div></li>
+      <li><div><b>Which ideas first.</b> Mark the ones you want from Part 3 (a comment on a card works), and I'll turn them into a build plan.</div></li>
+    </ol>
+  </section>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+/* ---------- sample data: Aug 3 – Oct 30 2026, weekdays, Thai public holidays off ---------- */
+let seed = 4114;
+const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const HOL = new Set(["2026-08-12", "2026-10-13", "2026-10-23"]);
+const iso = (d) => d.toISOString().slice(0, 10);
+const days = [];
+for (let d = new Date(Date.UTC(2026, 7, 3)); d <= new Date(Date.UTC(2026, 9, 30)); d.setUTCDate(d.getUTCDate() + 1)) {
+  const dow = d.getUTCDay(); const s = iso(d);
+  if (dow === 0 || dow === 6 || HOL.has(s)) continue;
+  days.push({ iso: s, d: d.getUTCDate(), m: d.getUTCMonth(), dow, week: weekKey(d) });
+}
+function weekKey(d) { const x = new Date(d); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return iso(x); }
+const fmtShort = (s) => `${+s.slice(8)} ${MON[+s.slice(5, 7) - 1]}`;
+const HOSTS = ["Map Ta Phut Terminal", "Laem Chabang B5", "Rayong Refinery", "Sattahip Port", "Chonburi Tank Farm", "Bangpakong PP", "Si Racha Jetty", "LCB Port A2"];
+const ENGS = [
+  { id: "e1", name: "Krit S.", load: 1.25, night: .25, hosts: [0, 1, 2, 4] },
+  { id: "e2", name: "Pairoj T.", load: 1.0, night: .10, hosts: [1, 3, 7] },
+  { id: "e3", name: "Arunee W.", load: .85, night: .05, hosts: [2, 5, 6] },
+  { id: "e4", name: "Thanawat C.", load: 1.1, night: .35, hosts: [0, 4, 6, 7] },
+  { id: "e5", name: "Wichai P.", load: .6, night: 0, hosts: [3, 5] },
+  { id: "e6", name: "Nok R.", load: .9, night: .15, hosts: [1, 2, 7] },
+];
+// per engineer per day: missions [{host, crew, night, oc}]
+const work = {};
+for (const e of ENGS) {
+  work[e.id] = days.map((day, i) => {
+    const trend = 1 + (e.id === "e1" ? i / days.length * .5 : e.id === "e5" ? -i / days.length * .3 : 0);   // Krit busier over time, Wichai quieter
+    const n = Math.max(0, Math.round(e.load * trend * (1 + rnd()) - (rnd() < .18 ? 2 : 0)));
+    return Array.from({ length: n }, () => {
+      const crew = ri(2, 6); const oc = Math.min(crew, rnd() < .45 ? ri(1, 2) : 0);
+      return { host: e.hosts[ri(0, e.hosts.length - 1)], crew, oc, night: rnd() < e.night };
+    });
+  });
+}
+
+/* ---------- shared drawing ---------- */
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; }
+function drawChart(el, { labels, stacks, line, lineLabel, h = 230, tips, suffix = "" }) {
+  const W = Math.max(300, el.clientWidth || 700), n = labels.length;
+  const padL = 34, padR = 10, padT = 12, padB = 24, ih = h - padT - padB;
+  const totals = labels.map((_, i) => stacks.reduce((a, s) => a + (s.values[i] || 0), 0));
+  const top = Math.max(1, ...totals, ...(line || [0]));
+  const step = niceStep(top / 4), yMax = step * Math.ceil(top / step);
+  const band = (W - padL - padR) / n, bw = Math.max(3, Math.min(42, band * .62));
+  const y = (v) => padT + ih * (1 - v / yMax);
+  let s = "";
+  for (let v = 0; v <= yMax + 1e-9; v += step) s += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end">${+v.toFixed(1)}${suffix}</text>`;
+  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - padL) / 62))));
+  labels.forEach((lb, i) => {
+    const x = padL + i * band + (band - bw) / 2; let acc = 0;
+    for (const st of stacks) { const v = st.values[i] || 0; if (!v) continue; s += `<rect x="${x}" y="${y(acc + v)}" width="${bw}" height="${y(acc) - y(acc + v)}" fill="${st.color}" ${stacks.length > 1 ? 'stroke="#fff" stroke-width=".8"' : 'rx="2"'}/>`; acc += v; }
+    if (i % every === 0) s += `<text x="${x + bw / 2}" y="${h - 7}" text-anchor="middle">${lb}</text>`;
+    s += `<rect x="${padL + i * band}" y="${padT}" width="${band}" height="${ih}" fill="transparent" data-tip="${encodeURIComponent(tips(i))}"/>`;
+  });
+  if (line) {
+    const pts = line.map((v, i) => `${(padL + i * band + band / 2).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    s += `<polyline points="${pts}" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-dasharray="5 4"/>`;
+    if (lineLabel) s += `<text x="${W - padR}" y="${y(line[n - 1]) - 6}" text-anchor="end" style="fill:var(--text);font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:4px">${lineLabel}</text>`;
+  }
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${h}" height="${h}" role="img" aria-label="chart">${s}</svg>`;
+}
+const sum = (a) => a.reduce((x, y) => x + y, 0);
+const r1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
+
+/* ---------- Ask 1: one engineer ---------- */
+const E = { id: "e1", group: "week", measure: "missions" };
+const MEASURES = [
+  { key: "missions", label: "Missions", unit: "", agg: (b) => sum(b.map(d => d.length)) },
+  { key: "crew", label: "Crew (person-days)", unit: "", agg: (b) => sum(b.map(d => sum(d.map(m => m.crew)))) },
+  { key: "cpm", label: "Crew per mission", unit: "", agg: (b) => { const m = sum(b.map(d => d.length)); return m ? sum(b.map(d => sum(d.map(x => x.crew)))) / m : 0; }, avg: true },
+  { key: "active", label: "Active days", unit: "", agg: (b) => b.filter(d => d.length).length },
+  { key: "night", label: "Night share", unit: "%", agg: (b) => { const m = sum(b.map(d => d.length)); return m ? 100 * sum(b.map(d => d.filter(x => x.night).length)) / m : 0; }, avg: true },
+  { key: "oc", label: "On-call share", unit: "%", agg: (b) => { const c = sum(b.map(d => sum(d.map(m => m.crew)))); return c ? 100 * sum(b.map(d => sum(d.map(m => m.oc)))) / c : 0; }, avg: true },
+];
+function buckets() {
+  const keyOf = (d) => E.group === "day" ? d.iso : E.group === "week" ? d.week : d.iso.slice(0, 7);
+  const out = []; let cur = null;
+  days.forEach((d, i) => { const k = keyOf(d); if (!cur || cur.key !== k) { cur = { key: k, idx: [] }; out.push(cur); } cur.idx.push(i); });
+  return out.map(b => ({ ...b, label: E.group === "month" ? MON[+b.key.slice(5, 7) - 1] : fmtShort(days[b.idx[0]].iso), long: E.group === "day" ? fmtShort(b.key) : E.group === "week" ? `Week of ${fmtShort(b.key)}` : `${MON[+b.key.slice(5, 7) - 1]} 2026` }));
+}
+function renderEng() {
+  const pick = document.getElementById("eng-pick");
+  if (!pick.options.length) { for (const e of ENGS) pick.add(new Option(e.name, e.id)); pick.onchange = () => { E.id = pick.value; renderEng(); }; }
+  pick.value = E.id;
+  const g = document.getElementById("eng-group"); g.innerHTML = "";
+  for (const [k, l] of [["day", "Day"], ["week", "Week"], ["month", "Month"]]) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = l; b.setAttribute("aria-pressed", String(E.group === k));
+    b.onclick = () => { E.group = k; renderEng(); }; g.appendChild(b);
+  }
+  document.getElementById("eng-range").textContent = `3 Aug → 30 Oct 2026 · ${days.length} working days`;
+  const eng = ENGS.find(e => e.id === E.id), my = work[E.id], bs = buckets();
+  const tiles = document.getElementById("eng-tiles"); tiles.innerHTML = "";
+  const half = Math.floor(days.length / 2);
+  for (const m of MEASURES) {
+    const whole = m.agg(my), first = m.agg(my.slice(0, half)), second = m.agg(my.slice(half));
+    const per = m.avg ? whole : whole / days.length * (m.key === "active" ? days.length : 1);
+    const value = m.key === "active" ? `${whole}` : m.avg ? r1(whole) + m.unit : r1(whole / days.length);
+    const sub = m.key === "active" ? `of ${days.length} working days` : m.avg ? "over the period" : "per working day";
+    const ch = m.avg || m.key === "active" ? second - first : (second - first) / half;
+    const dir = Math.abs(ch) < (m.avg ? .5 : .05) ? "" : ch > 0 ? "▲" : "▼";
+    const b = document.createElement("button"); b.type = "button"; b.className = "htile"; b.setAttribute("aria-pressed", String(E.measure === m.key));
+    b.innerHTML = `<span class="htile-label">${m.label}</span><span class="htile-value">${value}</span><span class="htile-sub">${sub}${dir ? ` · <span class="${dir === "▲" ? "delta-up" : "delta-down"}">${dir} vs 1st half</span>` : ""}</span>`;
+    b.onclick = () => { E.measure = m.key; renderEng(); }; tiles.appendChild(b);
+  }
+  const m = MEASURES.find(x => x.key === E.measure);
+  const vals = bs.map(b => m.agg(b.idx.map(i => my[i])));
+  const team = bs.map(b => sum(ENGS.map(e => m.agg(b.idx.map(i => work[e.id][i])))) / ENGS.length);
+  document.getElementById("eng-legend").innerHTML = `<span><i style="background:var(--chart-assigned)"></i>${eng.name} · ${m.label.toLowerCase()} per ${E.group}</span><span><i class="line"></i>Average engineer</span>`;
+  drawChart(document.getElementById("eng-chart"), { labels: bs.map(b => b.label), stacks: [{ color: "var(--chart-assigned)", values: vals }], line: team, lineLabel: "team avg", suffix: m.unit,
+    tips: i => `<b>${bs[i].long}</b>${eng.name}: ${r1(vals[i])}${m.unit}<br>Average engineer: ${r1(team[i])}${m.unit}` });
+  const hostCount = {}; my.forEach(d => d.forEach(x => hostCount[x.host] = (hostCount[x.host] || 0) + 1));
+  document.getElementById("eng-hosts").innerHTML = Object.entries(hostCount).sort((a, b) => b[1] - a[1]).map(([h, n]) => `<span>${HOSTS[h]} <b>${n}</b></span>`).join("");
+  const rank = ENGS.map(e => ({ id: e.id, v: sum(work[e.id].map(d => d.length)) })).sort((a, b) => b.v - a.v).findIndex(x => x.id === E.id) + 1;
+  const people = sum(my.map(d => sum(d.map(x => x.crew))));
+  let streak = 0, best = 0; my.forEach(d => { streak = d.length ? streak + 1 : 0; best = Math.max(best, streak); });
+  document.getElementById("eng-facts").innerHTML = [
+    ["Rank by missions", `${rank} of ${ENGS.length}`, ""], ["Missions in the period", sum(my.map(d => d.length)), ""],
+    ["Person-days managed", people, ""], ["Longest run of active days", best, "working days"],
+  ].map(([a, b, c]) => `<div class="fact"><span>${a}</span><b>${b}</b> <small>${c}</small></div>`).join("");
+}
+
+/* ---------- Ask 2: worked vs leave ---------- */
+const NAMES = ["Somchai K.", "Wannaphat S.", "Kittipong P.", "Sirilak W.", "Prasert T.", "Chaiwat C.", "Thanakorn R.", "Pimchanok N.", "Jirayu B.", "Supachai J.", "Kanokwan S.", "Phongsak T.", "Rattana P.", "Sakda W."];
+const PEOPLE = NAMES.map((n, i) => {
+  const oc = i >= 10, avail = days.length - (i === 7 ? 30 : 0);   // Pimchanok added mid-period
+  const leave = oc ? ri(0, 4) : [2, 4, 1, 9, 3, 15, 5, 2, 6, 3][i];
+  const sick = Math.min(leave, i === 5 ? 7 : i === 3 ? 4 : ri(0, 1));
+  const standby = oc ? 0 : ri(0, 6);
+  const worked = oc ? ri(18, 40) : avail - leave - standby;
+  const notCalled = oc ? avail - leave - worked : 0;
+  return { name: n, oc, avail, worked, leave, sick, standby, notCalled };
+});
+const W = { who: "all", key: "share", dir: -1 };
+function renderWL() {
+  const who = document.getElementById("wl-who"); who.innerHTML = "";
+  for (const [k, l] of [["all", "Everyone"], ["perm", "Permanent"], ["oc", "On-call"]]) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = l; b.setAttribute("aria-pressed", String(W.who === k));
+    b.onclick = () => { W.who = k; renderWL(); }; who.appendChild(b);
+  }
+  const rows = PEOPLE.filter(p => W.who === "all" || (W.who === "oc") === p.oc).map(p => ({ ...p, share: 100 * p.leave / (p.worked + p.leave + p.standby + p.notCalled), ratio: p.leave ? p.worked / p.leave : Infinity }));
+  const val = (r) => r[W.key] === Infinity ? 1e9 : r[W.key];
+  rows.sort((a, b) => (typeof a[W.key] === "string" ? a[W.key].localeCompare(b[W.key]) : val(a) - val(b)) * W.dir);
+  const cols = [["name", "Name", ""], ["avail", "Working days", "r"], ["worked", "Worked", "r"], ["leave", "Leave", "r"], ["ratio", "Worked : Leave", "r"], ["share", "Leave share", ""], ["sick", "of which sick", "r"]];
+  const th = cols.map(([k, l, c]) => `<th class="${c}"><button type="button" data-k="${k}" aria-sort="${W.key === k ? (W.dir < 0 ? "descending" : "ascending") : "none"}">${l}</button></th>`).join("") + "<th>Split of available days</th>";
+  const body = rows.map(r => {
+    const tot = r.worked + r.leave + r.standby + r.notCalled, pct = (v) => (100 * v / tot).toFixed(1);
+    const cls = r.share > 20 ? "bad" : r.share > 10 ? "warn" : "ok";
+    const ratio = r.leave ? `${r.worked} : ${r.leave} <span class="note">(${r1(r.worked / r.leave)} : 1)</span>` : `${r.worked} : 0`;
+    return `<tr><td>${r.name}${r.oc ? '<span class="oc">OC</span>' : ""}</td><td class="r">${r.avail}</td><td class="r">${r.worked}</td><td class="r">${r.leave}</td><td class="r">${ratio}</td>
+      <td><span class="pill ${cls}">${r1(r.share)}%</span></td><td class="r">${r.sick || "—"}</td>
+      <td><span class="split" title="Worked ${r.worked} · Leave ${r.leave} · ${r.oc ? "Not called " + r.notCalled : "Standby " + r.standby}"><i style="width:${pct(r.worked)}%;background:var(--chart-assigned)"></i><i style="width:${pct(r.leave)}%;background:var(--leave-annual)"></i><i style="width:${pct(r.standby + r.notCalled)}%;background:#c9ced6"></i></span></td></tr>`;
+  }).join("");
+  const t = document.getElementById("wl-table");
+  t.innerHTML = `<thead><tr>${th}</tr></thead><tbody>${body}</tbody>`;
+  t.querySelectorAll("th button").forEach(b => b.onclick = () => { const k = b.dataset.k; W.dir = W.key === k ? -W.dir : (k === "name" ? 1 : -1); W.key = k; renderWL(); });
+}
+
+/* ---------- Ask 3: Manpower List columns ---------- */
+const ML = { period: "30" };
+function renderML() {
+  const per = document.getElementById("ml-period"); per.innerHTML = "";
+  for (const [k, l] of [["30", "30D"], ["90", "90D"], ["ytd", "YTD"]]) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = l; b.setAttribute("aria-pressed", String(ML.period === k));
+    b.onclick = () => { ML.period = k; renderML(); }; per.appendChild(b);
+  }
+  const scale = ML.period === "30" ? 21 / days.length : ML.period === "90" ? 1 : 3.2;
+  const rows = PEOPLE.slice(0, 8).map((p, i) => {
+    const avail = Math.round(p.avail * scale), worked = Math.round(p.worked * scale), leave = Math.round(p.leave * scale);
+    const util = Math.round(100 * worked / Math.max(1, avail - leave));
+    return { ...p, avail, worked, leave, util, id: "T" + (310 + i * 7), area: ["Inspection", "NDT", "Inspection", "Marine", "NDT", "Inspection", "Marine", "Inspection"][i] };
+  });
+  document.getElementById("ml-table").innerHTML = `<thead><tr><th>Name</th><th>TRIGO ID</th><th>Contract</th><th>Service area</th><th>${ML.period === "ytd" ? "YTD" : ML.period + "D"} utilization</th>
+    <th class="r nc">Worked</th><th class="r nc">Leave</th><th class="nc">Worked : Leave</th><th class="r">Years</th></tr></thead><tbody>${
+    rows.map(r => { const share = 100 * r.leave / Math.max(1, r.avail); const cls = share > 20 ? "bad" : share > 10 ? "warn" : "ok";
+      return `<tr class="new-col"><td>${r.name}</td><td>${r.id}</td><td>${r.oc ? "On-call" : "Permanent"}</td><td>${r.area}</td>
+      <td><span class="meter"><i style="width:${Math.min(100, r.util)}%"></i></span>${r.util}%</td>
+      <td class="r nc">${r.worked}</td><td class="r nc">${r.leave}</td><td class="nc">${r.worked} : ${r.leave} <span class="pill ${cls}">${r1(share)}%</span></td><td class="r">${(i => [4, 2, 7, 1, 3, 9, 0, 5][i])(rows.indexOf(r))}</td></tr>`; }).join("")
+  }</tbody>`;
+}
+
+/* ---------- Part 3: idea catalogue ---------- */
+const GROUPS = { people: "People & workload", wellbeing: "Fatigue & wellbeing", business: "Customers & hosts", planning: "Planning & forecast", workforce: "Headcount & skills", reporting: "Reporting & usability", money: "Cost & targets" };
+const READY = { ready: "Data ready", "small-change": "Small change", "new-data": "New data" };
+const IDEAS = [
+  ["people", "ready", "S", "One engineer's workload over time", "See whether an engineer's load is growing, and how they compare with the team average.", "Picker on Engineer workload; group by day / week / month; uses byEngineer already in History.", true],
+  ["people", "ready", "S", "Worked : Leave per person", "Spot people whose leave is high compared with the days they work, before it becomes a staffing problem.", "Per-person count of mission days vs leave days over the range; sortable; amber / red share.", true],
+  ["people", "ready", "S", "Worked, Leave, Worked : Leave in Manpower", "The same figure where managers already look up people, and in the Excel export.", "Manpower List already loads worked and leave dates for its 30D column.", true],
+  ["people", "ready", "S", "Workload spread across inspectors", "Shows whether work is shared fairly or a few people carry most of it.", "A histogram of days on a mission per person, with the busiest and least used named."],
+  ["people", "ready", "M", "Employee profile page", "One page per person for reviews: days worked, hosts, leave by type, nights, notes, loans.", "Opens from any name in Overview or Manpower; all from assignments, deployment history and employee notes."],
+  ["people", "ready", "S", "On-call call-in fairness", "On-call people expect a fair share of work; managers need to see who is never called.", "Days called in per on-call person, including those with zero; spread and median."],
+  ["people", "ready", "S", "Position mix on missions", "Missions with no Team Leader or Senior Inspector carry more risk.", "Count missions whose crew has no TL / SI, by engineer and host, from employees.position."],
+  ["wellbeing", "ready", "S", "Days-in-a-row alert", "Long runs without a day off are a safety and fatigue risk on site.", "Flag anyone on a mission N days in a row (N a setting, e.g. 12), weekends and holidays worked included."],
+  ["wellbeing", "ready", "S", "Night-shift load per person", "Nights should be shared; a few people on many nights wear out.", "Nights per person and their share, from mission.shift; amber above a limit."],
+  ["wellbeing", "ready", "M", "Planned hours and overtime estimate", "A first view of overtime exposure without a timesheet system.", "Hours from each mission's start and end times per person per week; flag above 48 h. Planned hours, not actual."],
+  ["wellbeing", "ready", "S", "Weekend and holiday work", "Who works on non-working days, and how often, for fairness and pay checks.", "Missions on a board's weekend or holiday override, per person and per month."],
+  ["wellbeing", "ready", "M", "Sick-leave pattern watch", "Frequent short sick spells are an early sign worth a conversation.", "Spells and days per person (a Bradford-style score), behind its own permission."],
+  ["wellbeing", "ready", "S", "Leave clashes ahead", "Avoid days where too many people from one area or host are away at once.", "Next 2–4 weeks of planned leave per area and host, from future plan and forecast days."],
+  ["business", "ready", "M", "Customers over time", "Which customers are growing or shrinking, in missions and person-days per month.", "Group missions and crew by customer; top 10 with trend lines and month-on-month change."],
+  ["business", "ready", "M", "Hosts over time", "The same for sites: busiest hosts, new hosts, hosts that went quiet.", "Group by host; first and last mission date; idle for 60+ days flagged."],
+  ["business", "ready", "S", "Customer concentration", "A high share of work from one or two customers is a business risk to report.", "Share of person-days from the top 1 / 3 / 5 customers, over time."],
+  ["business", "ready", "S", "\"Not enough manpower\" tally", "Turns the highlight reason into a number for management: how often, where, and for whom.", "Count missions highlighted Not enough manpower by host, customer and week; also New customer and Focus activity."],
+  ["business", "ready", "S", "Service area demand vs supply", "Do we have people with the right area for where the work is?", "Person-days needed per area (via host area) vs headcount per area."],
+  ["planning", "ready", "M", "Forecast vs actual", "Shows how good the Capacity plan was: planned headcount vs who actually ran, per host and day.", "capacity_demand against missions and assignments; accuracy % per board and engineer."],
+  ["planning", "ready", "S", "Short days ahead on Overview", "Put the Capacity gap where management looks first.", "Next 2 weeks: days short per board, worst day, from the Capacity numbers."],
+  ["planning", "ready", "S", "Planning timeliness", "Was tomorrow planned by 3 pm? Late plans create late calls to staff.", "When each day was first planned and locked vs the day itself (plan_days, plan_day_stamps)."],
+  ["planning", "ready", "S", "Late changes and plan churn", "Many changes after the plan is set point to unstable demand or planning gaps.", "Edits after the day was locked, and forecast hold events (people taken between engineers)."],
+  ["planning", "ready", "S", "Loans between boards over time", "Steady lending from one board to another means headcount is in the wrong place.", "Person-days lent and borrowed per board per month, from employee_loans."],
+  ["workforce", "ready", "S", "Joiners, leavers, headcount trend", "Attrition and growth per month and per board, ready for a quarterly review.", "added_on, start_date and deactivated_on per month; turnover rate."],
+  ["workforce", "ready", "S", "On-call reliance trend", "A rising on-call share of crew can be the signal to hire permanent staff.", "On-call person-days ÷ all person-days per month, per board."],
+  ["workforce", "ready", "M", "Who can work which host (skills matrix)", "Plan cover and cross-training: hosts with only one or two experienced people.", "People × hosts from deployment history; days at each host; gaps highlighted."],
+  ["workforce", "ready", "S", "Experience mix", "Too many new people on one board or mission is a quality risk.", "Share of crew under 1 year of service, per board and per mission, from start_date."],
+  ["workforce", "new-data", "M", "Certificates and training expiry", "Avoid sending someone whose licence or site induction has lapsed.", "A certificates table per person with expiry dates; alert 30 days ahead; warn when assigning."],
+  ["reporting", "ready", "S", "This period vs last period", "Every History tile shows its change against the previous period (▲ ▼), so the trend is visible at a glance.", "Fetch the previous range alongside; arrow and % on each tile."],
+  ["reporting", "ready", "S", "Click a chart day to open that board", "From \"why was the 14th low?\" to the actual plan in one click.", "Columns and calendar cells open the board on that date, filtered to the engineer if one is picked."],
+  ["reporting", "ready", "S", "Compare boards side by side", "Small charts per board on one scale show which board drives a change.", "Board selector gets \"Compare\": one small multiple per board for the picked tile."],
+  ["reporting", "ready", "M", "Monthly management report", "One click to a PDF or Excel for the monthly meeting, without screenshots.", "History tiles, leave, on-call, engineers and customers for the range, in the TRIGO header style."],
+  ["reporting", "small-change", "M", "Saved views", "Each manager opens Overview on their board, range and tiles.", "Store the selector state per user (profiles), with a few named views."],
+  ["reporting", "new-data", "L", "Weekly digest by email or LINE", "Management gets the key numbers without opening the app.", "A scheduled job and a mail / LINE Notify integration; needs a server-side function."],
+  ["money", "small-change", "S", "Targets on tiles", "Utilization reads better against a goal: 84% vs a target of 85% means something.", "A small settings table for targets (utilization, leave share, on-call share); tiles turn amber or green."],
+  ["money", "new-data", "M", "Leave entitlement and balance", "Shows who has leave left and who is over, not only days taken.", "Annual entitlement per person (or per contract) and carry-over; balance in Manpower and the profile."],
+  ["money", "new-data", "M", "Labour cost per customer", "Turns person-days into money: cost per customer, host and month.", "Day rates per contract or position (and a night premium); kept behind a finance permission."],
+  ["money", "new-data", "M", "Billable vs non-billable days", "Separates paid customer work from training, travel and internal jobs.", "A billable flag on missions; billable utilization next to utilization."],
+];
+const F = { group: "all", ready: "all" };
+function renderIdeas() {
+  const mk = (box, map, key) => {
+    const el = document.getElementById(box); el.innerHTML = "";
+    for (const [k, l] of [["all", key === "group" ? "All areas" : "Any data"], ...Object.entries(map)]) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = l; b.setAttribute("aria-pressed", String(F[key] === k));
+      b.onclick = () => { F[key] = k; renderIdeas(); }; el.appendChild(b);
+    }
+  };
+  mk("f-group", GROUPS, "group"); mk("f-ready", READY, "ready");
+  const list = IDEAS.map((x, i) => ({ n: i + 1, group: x[0], ready: x[1], effort: x[2], title: x[3], why: x[4], how: x[5], ask: x[6] }))
+    .filter(x => (F.group === "all" || x.group === F.group) && (F.ready === "all" || x.ready === F.ready));
+  document.getElementById("f-count").textContent = `${list.length} of ${IDEAS.length} ideas`;
+  document.getElementById("ideas-grid").innerHTML = list.map(x => `<article class="idea">
+    <div class="idea-top"><h3>${x.title}</h3><span class="num">#${x.n}</span></div>
+    <p class="why">${x.why}</p><p class="how">${x.how}</p>
+    <div class="meta"><span class="tag">${GROUPS[x.group]}</span><span class="tag ${x.ready}">${READY[x.ready]}</span><span class="effort">Effort ${x.effort}</span>${x.ask ? '<span class="tag ask">Your ask</span>' : ""}</div></article>`).join("");
+}
+
+/* ---------- tooltip ---------- */
+const tipEl = document.getElementById("tip");
+document.addEventListener("pointermove", (e) => {
+  const t = e.target.closest && e.target.closest("[data-tip]");
+  if (!t) { tipEl.hidden = true; return; }
+  tipEl.innerHTML = decodeURIComponent(t.getAttribute("data-tip")).replace(/<b>(.*?)<\/b>/, "<b style='display:block'>$1</b>");
+  tipEl.hidden = false;
+  const r = tipEl.getBoundingClientRect(); let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14; if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tipEl.style.left = x + "px"; tipEl.style.top = y + "px";
+});
+
+function renderAll() { renderEng(); renderWL(); renderML(); renderIdeas(); }
+renderAll();
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderEng, 120); });
+</script>
