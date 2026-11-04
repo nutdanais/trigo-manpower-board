@@ -281,7 +281,7 @@ tr.new-col td.nc, th.nc { background: #f4f9e9; }
     <ol class="qs">
       <li><div><b>Worked : Leave thresholds.</b> <span class="tag ready">Decided</span> Start with 20% amber and 30% red, the same for permanent and on-call. Both are a setting that can change later.</div></li>
       <li><div><b>Exchange Working Day in the ratio.</b> <span class="tag ready">Decided</span> Not leave, in History and in Manpower alike, so the figures match. The day is worked back, so it counts as neither worked nor leave.</div></li>
-      <li><div><b>Who sees per-person figures.</b> Sick-leave patterns and leave ratios are sensitive. Should they follow the History permission like the names, or get their own row in Roles?</div></li>
+      <li><div><b>Who sees per-person figures.</b> <span class="tag ready">Decided</span> They follow the History permission, like the names. In the Manpower List, the Worked, Leave and Worked : Leave columns show only to roles that can see History.</div></li>
       <li><div><b>Which ideas first.</b> Mark the ones you want from Part 3 (a comment on a card works), and I'll turn them into a build plan.</div></li>
     </ol>
   </section>
@@ -486,7 +486,7 @@ const IDEAS = [
   ["wellbeing", "ready", "S", "Night-shift load per person", "Nights should be shared; a few people on many nights wear out.", "Nights per person and their share, from mission.shift; amber above a limit."],
   ["wellbeing", "ready", "M", "Planned hours and overtime estimate", "A first view of overtime exposure without a timesheet system.", "Hours from each mission's start and end times per person per week; flag above 48 h. Planned hours, not actual."],
   ["wellbeing", "ready", "S", "Weekend and holiday work", "Who works on non-working days, and how often, for fairness and pay checks.", "Missions on a board's weekend or holiday override, per person and per month."],
-  ["wellbeing", "ready", "M", "Sick-leave pattern watch", "Frequent short sick spells are an early sign worth a conversation.", "Spells and days per person (a Bradford-style score), behind its own permission."],
+  ["wellbeing", "ready", "M", "Sick-leave pattern watch", "Frequent short sick spells are an early sign worth a conversation.", "Spells and days per person (a Bradford-style score), under the History permission like the other per-person figures."],
   ["wellbeing", "ready", "S", "Leave clashes ahead", "Avoid days where too many people from one area or host are away at once.", "Next 2–4 weeks of planned leave per area and host, from future plan and forecast days."],
   ["business", "ready", "M", "Customers over time", "Which customers are growing or shrinking, in missions and person-days per month.", "Group missions and crew by customer; top 10 with trend lines and month-on-month change."],
   ["business", "ready", "M", "Hosts over time", "The same for sites: busiest hosts, new hosts, hosts that went quiet.", "Group by host; first and last mission date; idle for 60+ days flagged."],
