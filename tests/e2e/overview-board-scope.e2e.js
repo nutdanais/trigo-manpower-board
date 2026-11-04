@@ -4,7 +4,7 @@
        plus one pill per board, and picking a board scopes every section
        (attention card, KPIs, By board, the day's cards and History);
      - the page reads summary -> "In detail" (By engineer | By service area,
-       Shifts | Host coverage) -> "Period" (History, People, Engineer workload);
+       Shifts | Host coverage) -> "Period" (History, People, Engineer workload, Workforce);
      - the idle names follow the "Action queue" permission, and Engineer
        workload ranks engineers with missions and crew in one table;
      - a newcomer who later works a host leaves a past day's Host coverage risk
@@ -68,7 +68,7 @@ async function step(name, fn) {
           : c.classList.contains("ov-detail-grid") ? "detail-cards"
           : c.querySelector("h3") ? c.querySelector("h3").firstChild.textContent.trim() : c.className.split(" ")[0]));
       assert.deepEqual(order, ["ov-attn", "ov-kpi-row", "By board",
-        "head:In detail", "detail-cards", "ov-period", "History", "People", "Engineer workload"]);   // the Period heading carries the range control
+        "head:In detail", "detail-cards", "ov-period", "History", "People", "Engineer workload", "Workforce"]);   // the Period heading carries the range control
       const cards = await p.$$eval(".ov-detail-grid > .ov-section > h3", (els) => els.map((e) => e.textContent));
       assert.deepEqual(cards, ["By engineer", "By service area", "Shifts", "Host coverage"]);
     });
@@ -132,7 +132,7 @@ async function step(name, fn) {
       await p.evaluate(() => { state.overview.hostCoverageCacheKey = null; });
       await go(PAST);
       return p.evaluate(() => ({
-        risk: [...document.querySelectorAll(".ov-host")].map((r) => r.querySelector(".ov-host-name").textContent + ":" + r.querySelectorAll(".ov-person").length),
+        risk: [...document.querySelectorAll(".ov-host")].map((r) => r.querySelector(".ov-host-name").textContent),
         crew: (state.overview.hostCoverage || {})["Host Alpha"],
       }));
     };
@@ -140,8 +140,8 @@ async function step(name, fn) {
 
     const before = await pastCoverage();
     const beforeHead = await pastHeadcount();
-    await step("a past day starts with Host Alpha as a single-person risk", async () => {
-      assert.deepEqual(before.risk, ["Host Alpha:1"]);
+    await step("a past day starts with Host Alpha at risk (nobody has 5 days there: the shared experienced rule)", async () => {
+      assert.deepEqual(before.risk, ["Host Alpha"]);
     });
 
     await step("a newcomer added today and sent to Host Alpha leaves that past day's risk unchanged", async () => {
@@ -154,7 +154,7 @@ async function step(name, fn) {
       assert.deepEqual(after.risk, before.risk);
       // and the day the newcomer worked it does see two people
       const now = await p.evaluate((d) => cloud.getHostCoverageForHosts(["Host Alpha"], d), SRC);
-      assert.equal(now["Host Alpha"].count, 2);
+      assert.equal(Object.keys(now["Host Alpha"].days).length, 2);
     });
 
     await step("someone deactivated today stays in a past day's History headcount", async () => {

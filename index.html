@@ -769,7 +769,15 @@
       <span id="hostlist-dup-text"></span>
       <button type="button" class="btn btn-small" id="btn-hostlist-dups">Review duplicates</button>
     </div>
-    <div class="table-wrap">
+    <!-- List | Skills matrix: the same hosts, filtered by the same search and Filter popover. The matrix says,
+         for each host, who has worked there, who is experienced (5+ days) and when the site is at risk. -->
+    <div id="hostlist-viewbar">
+      <div class="ov-trend-btns" id="hostlist-views" role="group" aria-label="Host view"></div>
+      <label id="hostlist-person-wrap" class="hidden">Person
+        <select id="hostlist-person" aria-label="Show the hosts one person has worked"></select></label>
+    </div>
+    <div class="table-wrap hidden" id="hostlist-matrix-wrap"></div>
+    <div class="table-wrap" id="hostlist-list-wrap">
       <table id="hostlist-table">
         <thead>
           <tr>
@@ -1495,6 +1503,23 @@
         <button type="submit" class="btn btn-primary" id="btn-lend">Lend</button>
       </div>
     </form>
+  </div>
+
+  <!-- Deactivate: asks why before it takes someone off the roster (Resigned or Inactive for now).
+       Used by the right-click menu, the Edit Employee panel, the Manpower List's bulk bar and its Status switch. -->
+  <div class="modal hidden" id="modal-deactivate" role="dialog" aria-modal="true" aria-labelledby="deactivate-title">
+    <h3><span id="deactivate-title">Deactivate employee?</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p id="deactivate-message"></p>
+    <div class="deactivate-choices" role="radiogroup" aria-label="Why they are leaving the roster">
+      <label class="deactivate-choice"><input type="radio" name="deactivate-reason" value="inactive" checked>
+        <span><b>Inactive for now</b><small>Off the boards for now. Not counted as a leaver.</small></span></label>
+      <label class="deactivate-choice" id="deactivate-resigned-label"><input type="radio" name="deactivate-reason" value="resigned" id="deactivate-resigned">
+        <span><b>Resigned</b><small id="deactivate-resigned-note">Counted as a leaver in Overview's Workforce section.</small></span></label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" id="btn-deactivate-no">Cancel</button>
+      <button type="button" class="btn btn-danger-solid" id="btn-deactivate-yes">Deactivate</button>
+    </div>
   </div>
 
   <div class="modal hidden" id="modal-confirm">

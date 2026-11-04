@@ -310,6 +310,24 @@ const OV_WL_SHOWN = 10;                          // People rows before "Show all
 const OV_RUN_AMBER = 7, OV_RUN_RED = 10, OV_NIGHT_MIN = 5, OV_NIGHT_SHARE = 50;
 const OV_NEWCOMER_YEARS = 1;          // under this many years of service = a newcomer
 const HOST_EXPERIENCED_DAYS = 5;      // experienced at a host after this many days there (deployment_history, all time)
+const HOSTLIST_VIEW_KEY = "manpower.hostView";
+const HOST_AT_RISK_MAX = 2;           // a host is at risk when at most this many ACTIVE people are experienced there
+/* The one "experienced" rule, shared by Overview's Host coverage and the Host tab's skills matrix.
+   `days` is { employeeId: days worked at the host }. A person is experienced at HOST_EXPERIENCED_DAYS
+   days or more; a host is at risk when HOST_AT_RISK_MAX or fewer of the experienced people are
+   active (on the roster on `date`: not deactivated or resigned yet). Someone whose record no longer
+   exists is not counted. Returns { experienced: [ids], active: [ids], atRisk } */
+function hostExperience(days, date = todayStr()) {
+  const emps = new Map(D().employees.map(e => [e.id, e]));
+  const experienced = [], active = [];
+  for (const id in days || {}) {
+    const e = emps.get(id);
+    if (!e || days[id] < HOST_EXPERIENCED_DAYS) continue;
+    experienced.push(id);
+    if (cloud.rosterOn(e, date)) active.push(id);
+  }
+  return { experienced, active, atRisk: active.length <= HOST_AT_RISK_MAX };
+}
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
 /* the utilization formula, said once behind an ⓘ (hover / focus) instead of
    printed under two sections */
@@ -478,6 +496,9 @@ const state = {
     dir: null,           // cloud.getHostDirectory() result; null = not fetched yet
     dirCacheKey: null,   // same "fetch once, reuse across redraws" trick as emplist below
     expanded: new Set(), // host names whose full inspector list is shown (the rest are capped)
+    view: hostlistViewSaved(),   // "list" | "matrix" (the Skills matrix), remembered per device
+    mxSort: null,        // the matrix's own sort: { key, dir }, or null for at-risk first
+    mxOpen: new Set(),   // host names whose people are shown in the matrix
     editingHost: null,   // host name the Host modal is editing; null = adding a new one
     returnToMission: false,   // Host modal was opened from the New Mission form — go back to it when done
   },
@@ -505,6 +526,7 @@ const state = {
     historyMeasure: "util",       // the History tile charted day by day (OV_HISTORY_MEASURES key)
     historyLeaveView: "chart",    // the Leave tile's view: "chart" (columns by type) | "calendar"
     historyLeaveHidden: [],       // leave types switched off in the Leave chart and calendar
+    wfWindow: "12",               // Workforce: "12" (the last 12 months) | "range" (History's range)
     pplView: "workload",          // People quick view: workload | leave | nights | oncall | alerts
     pplWho: "all",                // People table: all | permanent | oncall
     pplSpread: "permanent",       // the spread chart's group: permanent | oncall
@@ -532,6 +554,9 @@ const state = {
   },
 };
 
+function hostlistViewSaved() {   // also called while `state` is built, so the key is spelled out here
+  try { return localStorage.getItem("manpower.hostView") === "matrix" ? "matrix" : "list"; } catch (e) { return "list"; }
+}
 const D = () => cloud.data;
 const OVERVIEW_ID = "__overview__";
 const ORGCHART_ID = "__orgchart__";
@@ -2595,9 +2620,9 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
     }
     addSep();
     addItem(many ? `Deactivate ${ids.length} employees` : "Deactivate employee", () => {
-      showConfirm("Deactivate employee" + (many ? "s" : "") + "?",
+      askDeactivate("Deactivate employee" + (many ? "s" : "") + "?",
         `Deactivate ${who}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
-        () => safely(async () => { await cloud.setEmployeesActive(ids, false); clearSelection(); await refreshAndRender(); }));
+        (reason) => safely(async () => { await cloud.setEmployeesActive(ids, false, reason); clearSelection(); await refreshAndRender(); }));
     }, "ctx-danger", "ban");
   }
 }
@@ -3318,13 +3343,14 @@ function renderStats() {
     // and a "By area" line of area-coloured chips that also adds up to Total
     const emps = D().employees;
     const permN = emps.filter(e => e.contract === "permanent").length;
-    const inactiveN = emps.filter(e => e.active === false).length;
+    const inactiveN = emps.filter(e => empStatus(e) === "inactive").length, resignedN = emps.filter(e => empStatus(e) === "resigned").length;
     const tileHtml = (label, n, kind, title = "") =>
       `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"${title ? ` title="${title}"` : ""}><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
     bar.classList.add("stats-tiles");
     bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${emps.length}</b></div>` +
       tileHtml("Permanent", permN, "perm") + tileHtml("On-call", emps.length - permN, "oncall") +
       tileHtml("Inactive", inactiveN, "inactive", "Counted in Total; not on any board today") +
+      tileHtml("Resigned", resignedN, "inactive", "Counted in Total; left the roster for good") +
       `<div class="st-split" aria-hidden="true">${[["perm", permN], ["oncall", emps.length - permN]].filter(([, n]) => n > 0)
         .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
     const emplistAreaBar = $("#emplist-area-bar");
@@ -3353,10 +3379,10 @@ function renderStats() {
     const onN = emps.length - permN;
     renderPhoneViewCard({
       head: `<b>${emps.length}</b><span class="ms-w"> people</span>`,
-      label: `${emps.length} people: ${permN} permanent, ${onN} on-call, ${inactiveN} inactive`,
-      keys: [["perm", permN, "Permanent"], ["oncall", onN, "On-call"], ["inactive", inactiveN, "Inactive"]],
+      label: `${emps.length} people: ${permN} permanent, ${onN} on-call, ${inactiveN} inactive, ${resignedN} resigned`,
+      keys: [["perm", permN, "Permanent"], ["oncall", onN, "On-call"], ["inactive", inactiveN, "Inactive"], ["inactive", resignedN, "Resigned"]],
       bar: [["perm", permN], ["oncall", onN]],
-      tiles: [["perm", permN, "Permanent"], ["oncall", onN, "On-call"], ["inactive", inactiveN, "Inactive"]],
+      tiles: [["perm", permN, "Permanent"], ["oncall", onN, "On-call"], ["inactive", inactiveN, "Inactive"], ["inactive", resignedN, "Resigned"]],
       areaHtml: html,
       filterCount: Object.values(state.emplist.filters).filter(v => v && v.length).length + (state.emplist.search ? 1 : 0),
     });
@@ -5397,6 +5423,130 @@ function ovLegend(items) {
   return el;
 }
 
+/* ---------- Workforce: headcount by years of service, with joiners and leavers ----------
+   One bar per month: the headcount at the month's end (the roster rule, cloud.rosterOn, from the
+   day someone joined), stacked by years of service (under 1 year, 1 to 3, 3 or more, and unknown
+   when there is no start date). Joiners are written above the bar and leavers under it.
+   - A person's join date is their start date, else the day they were added to the app (added_on),
+     else they predate the records: counted in every month and never a joiner. (added_on alone is
+     the day they were typed in, which for a bulk upload is the same day for everybody.)
+   - Joiners: join date in the month. Leavers: RESIGNED people (employees.exit_reason) whose leaving
+     date (deactivated_on) is in the month. People who are only inactive for now are not leavers:
+     they are the muted line.
+   - Follows the board selector (a person belongs to their own board here, a loan does not move
+     them), the last 12 months or History's range. Under the History permission: names show on hover. */
+const WF_BANDS = [
+  { key: "u1", label: "Under 1 year", color: "var(--brand-green)" },
+  { key: "y13", label: "1 to 3 years", color: "#7fb8ec" },
+  { key: "y3", label: "3 years or more", color: "var(--chart-assigned)" },
+  { key: "unk", label: "No start date", color: "var(--border)" },
+];
+const wfJoinDate = (e) => e.startDate || e.addedOn || "";
+function wfBandOf(e, date) {
+  if (!e.startDate) return "unk";
+  const p = ManpowerXlsx.serviceParts(e.startDate, date);
+  const y = p ? p.years : 0;
+  return y < 1 ? "u1" : y < 3 ? "y13" : "y3";
+}
+/* everyone on the roster of `ids` at the end of `date`, by band */
+function wfHeadcountOn(date, ids) {
+  const out = { u1: 0, y13: 0, y3: 0, unk: 0, total: 0, people: [] };
+  for (const e of D().employees) {
+    if (!ids.has(e.boardId)) continue;
+    const j = wfJoinDate(e);
+    if ((j && j > date) || !cloud.rosterOn(e, date)) continue;
+    out[wfBandOf(e, date)]++; out.total++; out.people.push(e);
+  }
+  return out;
+}
+function workforceSection(boards) {
+  const ov = state.overview;
+  const sec = ovSection("Workforce", "Headcount at the end of each month by years of service, with joiners and leavers. Follows the board selector.");
+  sec.id = "ov-workforce";
+  const ids = new Set(boards.map(b => b.id));
+  const today = todayStr();
+  const win = ov.wfWindow === "range" ? "range" : "12";
+  const from = win === "range" ? ov.historyFrom : profileMonthStarts()[0];
+  const to = win === "range" ? ov.historyTo : today;
+
+  const bar = document.createElement("div");
+  bar.className = "ov-hchart-head ov-hchart-head-row ov-wf-bar";
+  bar.innerHTML = `<span class="ov-muted">${escapeHtml(fmtDate(from))} → ${escapeHtml(fmtDate(to))}</span>`;
+  const seg = document.createElement("div");
+  seg.className = "ov-trend-btns";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", "Workforce window");
+  for (const [k, l] of [["12", "Last 12 months"], ["range", "History range"]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (win === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(win === k));
+    b.textContent = l;
+    b.onclick = () => { ov.wfWindow = k; render(); };
+    seg.appendChild(b);
+  }
+  bar.appendChild(seg);
+  sec.appendChild(bar);
+
+  // the months of the window
+  const months = [];
+  for (let m = monthStart(from); m <= to; m = addDays(monthEnd(m), 1)) {
+    const a = m > from ? m : from, z = monthEnd(m) < to ? monthEnd(m) : to;
+    const end = z < today ? z : today;
+    const inMonth = (d) => !!d && d >= a && d <= z;
+    const hc = wfHeadcountOn(end, ids);
+    const mine = D().employees.filter(e => ids.has(e.boardId));
+    months.push({ month: m, end, hc,
+      joiners: mine.filter(e => inMonth(e.startDate || e.addedOn)),
+      leavers: mine.filter(e => empStatus(e) === "resigned" && inMonth(e.deactivatedOn)),
+      pausers: mine.filter(e => empStatus(e) === "inactive" && inMonth(e.deactivatedOn)) });
+  }
+  if (!months.length) { sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No months in this range." })); return sec; }
+
+  // tiles
+  const now = months[months.length - 1].hc, before = wfHeadcountOn(addDays(from, -1), ids);
+  const joined = months.reduce((a, m) => a + m.joiners.length, 0), left = months.reduce((a, m) => a + m.leavers.length, 0);
+  const avg = months.reduce((a, m) => a + m.hc.total, 0) / months.length;
+  const turnover = avg ? (left / avg) * 100 : 0;
+  const d = now.total - before.total;
+  const tiles = document.createElement("div");
+  tiles.className = "ov-htiles ov-wf-tiles";
+  const tile = (t) => { const x = document.createElement("div"); x.className = "ov-htile ov-htile-static"; x.innerHTML = ovTileInner(t); tiles.appendChild(x); };
+  tile({ label: "Headcount now", value: now.total, sub: `at the end of ${escapeHtml(fmtDate(months[months.length - 1].end))}`,
+    delta: `<span class="ov-htile-delta">${d === 0 ? "= " : d > 0 ? "▲ " + d + " " : "▼ " + Math.abs(d) + " "}since ${escapeHtml(fmtDate(addDays(from, -1)))}</span>` });
+  tile({ label: "Joiners", value: joined, sub: "start date in the window" });
+  tile({ label: "Leavers", value: left, sub: "resigned in the window" });
+  tile({ label: "Turnover", value: `${fmt1(turnover)}%`, sub: "leavers ÷ average headcount" });
+  tile({ label: "Under 1 year", value: now.total ? `${Math.round((now.u1 / now.total) * 100)}%` : "—", sub: `${now.u1} of ${now.total} people` });
+  sec.appendChild(tiles);
+
+  // chart
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MONFULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const names = (list) => list.map(e => e.name).join(", ");
+  const box = document.createElement("div");
+  box.className = "ov-hchart ov-wf-chart";
+  box.appendChild(ovLegend([...WF_BANDS.map(b => ({ label: b.label, color: b.color })),
+    { label: "Joiners (above the bar)", color: "#1f8a4c" }, { label: "Leavers, resigned (under the bar)", color: "#b42318" },
+    { label: "Inactive for now, not leavers", color: "var(--muted)" }]));
+  const wrap = document.createElement("div");
+  wrap.className = "ov-trend-chart";
+  box.appendChild(wrap);
+  sec.appendChild(box);
+  const totals = months.map(m => m.hc.total);
+  const pending = () => fillColumnChart(wrap, {
+    stacks: WF_BANDS.map(b => ({ label: b.label, color: b.color, values: months.map(m => m.hc[b.key]) })),
+    notes: [{ values: months.map(m => m.joiners.length), color: "#1f8a4c", text: "+", pos: "above" }, { values: months.map(m => m.leavers.length), color: "#b42318", text: "−", pos: "below" }],
+    line: { label: "inactive", color: "var(--muted)", values: months.map(m => m.pausers.length) },
+    xLabels: months.map(m => MON[Number(m.month.slice(5, 7)) - 1]),
+    dayTotals: months.map(m => [`${MONFULL[Number(m.month.slice(5, 7)) - 1]} ${m.month.slice(0, 4)}`, `${m.hc.total} people`,
+      m.joiners.length ? `joined ${names(m.joiners)}` : "", m.leavers.length ? `resigned ${names(m.leavers)}` : "", m.pausers.length ? `inactive for now ${names(m.pausers)}` : ""].filter(Boolean).join(" · ")),
+    yMax: Charts.niceMax([Math.max(...totals) * 1.1, ...months.map(m => m.pausers.length)]), height: 240,
+  });
+  sec._fill = pending;
+  return sec;
+}
+
 function renderOverview() {
   const panel = $("#overview-panel");
   panel.innerHTML = "";
@@ -5814,7 +5964,7 @@ function renderOverview() {
      A host only one or two people have ever worked (deployment_history, up to
      the date on screen) is only at risk when those people are away — so each
      one is listed with where they are today, read from every board's plan. */
-  const hostSec = ovSection("Host coverage", "Today's hosts that only one or two people have ever worked, and where those people are today.");
+  const hostSec = ovSection("Host coverage", `Today's hosts where ${HOST_AT_RISK_MAX} or fewer people on the roster are experienced (${HOST_EXPERIENCED_DAYS}+ days there), and where those people are today.`);
   {
     const cov = state.overview.hostCoverage || {};
     const empById = new Map(D().employees.map(e => [e.id, e]));
@@ -5827,27 +5977,31 @@ function renderOverview() {
     const statusOf = (id) => {
       if (where.has(id)) return where.get(id);
       const e = empById.get(id);
-      if (!e || !onRoster(e)) return { away: true, text: "no longer active" };
+      if (!e || !cloud.rosterOn(e, state.date)) return { away: true, text: "no longer active" };
       if (isNonWorkingDate(state.date, boardOf(e))) return { away: false, text: "day off" };
       return { away: false, text: e.contract === "oncall" ? "on-call, free today" : "free today" };
     };
-    const thin = todaysHosts.map(h => ({ host: h, ...(cov[h] || { count: 0, ids: [] }) }))
-      .filter(r => r.count >= 1 && r.count <= 2)
-      .map(r => ({ ...r, people: (r.ids || []).map(id => ({ id, name: (empById.get(id) || {}).name || "Unknown", ...statusOf(id) })) }))
-      .map(r => ({ ...r, away: r.people.filter(p => p.away).length }))
-      .sort((a, b) => b.away - a.away || a.count - b.count || a.host.localeCompare(b.host));
-    const covered = todaysHosts.map(h => ({ host: h, count: (cov[h] || {}).count || 0 })).filter(r => r.count >= 3).sort((a, b) => a.host.localeCompare(b.host));
+    // the shared rule (hostExperience): experienced = HOST_EXPERIENCED_DAYS+ days there, at risk = 2 or fewer of them active
+    const rated = todaysHosts.map(h => ({ host: h, ...hostExperience((cov[h] || {}).days, state.date) }));
+    const thin = rated.filter(r => r.atRisk)
+      .map(r => ({ ...r, people: r.experienced.map(id => ({ id, name: (empById.get(id) || {}).name || "Unknown", ...statusOf(id) })) }))
+      .map(r => ({ ...r, away: r.people.filter(p => p.away && r.active.includes(p.id)).length }))
+      .sort((a, b) => (b.away - a.away) || (a.active.length - b.active.length) || a.host.localeCompare(b.host));
+    const covered = rated.filter(r => !r.atRisk).sort((a, b) => a.host.localeCompare(b.host));
     if (!todaysHosts.length) {
       hostSec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "No missions today." }));
     }
     for (const r of thin) {
       const el = document.createElement("div");
-      el.className = "ov-host" + (r.away ? " risk" : "");
+      const none = !r.active.length;
+      el.className = "ov-host" + (r.away || none ? " risk" : "");
       const avail = r.people.filter(p => !p.away).map(p => p.name);
-      const note = r.away
-        ? (avail.length ? `If ${avail.join(" and ")} ${avail.length === 1 ? "is" : "are"} off, nobody else on the roster knows this site.` : "Nobody who knows this site is available today.")
-        : `Only ${r.count === 1 ? "one person has" : `${r.count} people have`} ever worked this host.`;
-      el.innerHTML = `<div class="ov-host-head"><span class="ov-host-name"></span><span class="ov-tag ${r.away ? "bad" : "warn"}">${r.away ? `${r.away} of ${r.count} away today` : "thin"}</span></div>
+      const note = none
+        ? "Nobody on the roster is experienced at this site."
+        : r.away
+          ? (avail.length ? `If ${avail.join(" and ")} ${avail.length === 1 ? "is" : "are"} off, nobody else on the roster is experienced here.` : "Nobody experienced here is available today.")
+          : `Only ${r.active.length === 1 ? "one person is" : `${r.active.length} people are`} experienced here (${HOST_EXPERIENCED_DAYS}+ days).`;
+      el.innerHTML = `<div class="ov-host-head"><span class="ov-host-name"></span><span class="ov-tag ${r.away || none ? "bad" : "warn"}">${none ? "no one experienced" : r.away ? `${r.away} of ${r.active.length} away today` : "at risk"}</span></div>
         <div class="ov-chips">${r.people.map(p => `<span class="ov-person"><span class="ov-table-dot" style="background:${p.away ? "var(--chart-leave)" : "var(--chart-assigned)"}"></span>${escapeHtml(p.name)} <small>${escapeHtml(p.text)}</small></span>`).join("")}</div>
         <p class="ov-host-note">${escapeHtml(note)}</p>`;
       el.querySelector(".ov-host-name").textContent = r.host;
@@ -5857,14 +6011,21 @@ function renderOverview() {
       const ok = document.createElement("p");
       ok.className = "ov-avail ov-avail-ok";
       ok.textContent = !thin.length
-        ? "No thin coverage today — every host on today's missions has 3+ people who've worked it before, or no history yet to worry about."
+        ? `No host at risk today: every host on today's missions has more than ${HOST_AT_RISK_MAX} experienced people on the roster.`
         : covered.length
           ? (covered.length <= 4
-            ? `${covered.map(c => `${c.host} (${c.count} people)`).join(", ").replace(/, ([^,]*)$/, " and $1")} ${covered.length === 1 ? "is" : "are"} well covered.`
-            : `The other ${covered.length} hosts have 3+ people who've worked them.`)
+            ? `${covered.map(c => `${c.host} (${c.active.length} experienced)`).join(", ").replace(/, ([^,]*)$/, " and $1")} ${covered.length === 1 ? "is" : "are"} well covered.`
+            : `The other ${covered.length} hosts have more than ${HOST_AT_RISK_MAX} experienced people.`)
           : "";
       if (ok.textContent) hostSec.appendChild(ok);
     }
+    // the whole picture is the Host tab's skills matrix
+    const all = document.createElement("button");
+    all.type = "button";
+    all.className = "ov-linkbtn ov-host-all";
+    all.textContent = "See all hosts";
+    all.onclick = () => { state.hostlist.view = "matrix"; try { localStorage.setItem(HOSTLIST_VIEW_KEY, "matrix"); } catch (e) { /* not remembered */ } openBoard(HOSTLIST_ID); };
+    hostSec.appendChild(all);
   }
 
   // "In detail" — two fixed pairs, in this order: By engineer | By service
@@ -5894,6 +6055,9 @@ function renderOverview() {
     panel.appendChild(historySection(histDates, histRecs, historyUnplanned(histDates, boards, state.overview.history || {}), pendingCharts, prevRecs));
     panel.appendChild(peopleSection(boards, histDates, histRecs));
     panel.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts, prevRecs));
+    const wf = workforceSection(boards);
+    panel.appendChild(wf);
+    if (wf._fill) pendingCharts.push(wf._fill);
   }
 
   // A role with every section switched off would otherwise get a blank tab with
@@ -6011,6 +6175,10 @@ function serviceBucketOf(e) {
   return SERVICE_BUCKETS.find(b => b.test(y)).value;
 }
 
+/* Active, Inactive (off the roster for now) or Resigned (a leaver, employees.exit_reason) */
+const empStatus = (e) => (e.active !== false ? "active" : e.exitReason === "resigned" ? "resigned" : "inactive");
+const EMP_STATUS_LABEL = { active: "Active", inactive: "Inactive", resigned: "Resigned" };
+
 function emplistFilterOptions(key) {
   if (key === "contract") return [{ value: "permanent", label: "Permanent" }, { value: "oncall", label: "On-call" }];
   if (key === "position") {
@@ -6019,7 +6187,7 @@ function emplistFilterOptions(key) {
   if (key === "service") return SERVICE_BUCKETS.map(b => ({ value: b.value, label: b.label }));
   if (key === "areaId") return D().areas.map(a => ({ value: a.id, label: a.name })).concat([{ value: "__none__", label: "No area" }]);
   if (key === "boardId") return D().boards.map(b => ({ value: b.id, label: b.name }));
-  if (key === "status") return [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }];
+  if (key === "status") return [{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }, { value: "resigned", label: "Resigned" }];
   return [];
 }
 function emplistMsLabel(key) {
@@ -6091,7 +6259,7 @@ function emplistFilteredSorted() {
     if (f.service.length && !f.service.includes(serviceBucketOf(e))) return false;
     if (f.areaId.length && !f.areaId.includes(D().areas.some(a => a.id === e.areaId) ? e.areaId : "__none__")) return false;
     if (f.boardId.length && !f.boardId.includes(e.boardId)) return false;
-    if (f.status.length && !f.status.includes(e.active === false ? "inactive" : "active")) return false;
+    if (f.status.length && !f.status.includes(empStatus(e))) return false;
     // a status chip narrowing the list: active people missing one thing, or (loan) on loan on the date on screen
     const issue = state.emplist.issue;
     if (issue === "loan" ? !loanOf(e) : issue && (e.active === false || (issue === "trigo" ? e.trigoId : issue === "en" ? (e.nameEn || "").trim() : D().areas.some(a => a.id === e.areaId)))) return false;
@@ -6108,7 +6276,7 @@ function emplistFilteredSorted() {
       case "startDate": return e.startDate || "";   // ISO text sorts in date order; people with none sort first
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
-      case "active": return e.active === false ? "Inactive" : "Active";
+      case "active": return EMP_STATUS_LABEL[empStatus(e)];
       default: return emplistShownName(e);
     }
   };
@@ -6196,7 +6364,7 @@ function emplistXlsxRows() {
       name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent", position: pos ? pos.label : "",
       phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", board: board ? board.name : "",
       loanTo: loan ? (to ? to.name : "?") : "", loanFrom: loan ? loan.startDate : "", loanUntil: loan ? loan.endDate : "",
-      util: state.emplist.util ? state.emplist.util[e.id] : undefined, active: e.active !== false,
+      util: state.emplist.util ? state.emplist.util[e.id] : undefined, active: e.active !== false, exitReason: e.exitReason || "",
       // Worked : Leave goes in the file only for a role that sees it in the table (the History permission)
       ...(emplistShowsWl() ? emplistWlOf(e) : {}),
     };
@@ -6523,25 +6691,28 @@ function renderEmployeeRows() {
       <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" class="el-util">${utilCell(util)}</td>${emplistShowsWl() ? emplistWlCells(e) : ""}
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
-        <label class="toggle toggle-active">
+        <label class="toggle toggle-active${empStatus(e) === "resigned" ? " is-resigned" : ""}">
           <input type="checkbox" ${isActive ? "checked" : ""} ${can("emplist", "edit") ? "" : "disabled"}>
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-text">${isActive ? "Active" : "Inactive"}</span>
+          <span class="toggle-text">${EMP_STATUS_LABEL[empStatus(e)]}</span>
         </label>
       </td>`;
     tr.classList.toggle("row-inactive", !isActive);
-    // No confirm: unlike the menu's Deactivate this is one click to undo. No guardEdit
-    // either — the roster is employee master data, not the day's plan (the
-    // existing bulk actions in this table take the same line).
+    // Turning on is one click (it is as easy to undo). Turning off asks why first (Resigned or
+    // Inactive for now); cancelling puts the switch back. No guardEdit either — the roster is
+    // employee master data, not the day's plan (the existing bulk actions in this table take the same line).
     tr.querySelector(".el-status input").onchange = (ev) => {
       const on = ev.target.checked;
-      safely(async () => {
-        await cloud.setEmployeesActive([e.id], on);
+      const apply = (reason) => safely(async () => {
+        await cloud.setEmployeesActive([e.id], on, reason);
         await refreshAndRender();
         toast(on
           ? `${e.name} is active again — back on today's and future boards.`
-          : `${e.name} deactivated — hidden from today's and future boards. Past dates keep them.`, "info");
+          : reason === "resigned"
+            ? `${e.name} marked as resigned — hidden from today's and future boards. Past dates keep them.`
+            : `${e.name} deactivated — hidden from today's and future boards. Past dates keep them.`, "info");
       });
+      if (on) apply(); else askDeactivate("Deactivate employee?", `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them.`, apply, () => renderEmployeeRows());
     };
     tr.querySelector(".el-check input").onchange = (ev) => {
       ev.target.checked ? state.selectedEmps.add(e.id) : state.selectedEmps.delete(e.id);
@@ -6557,9 +6728,9 @@ function renderEmployeeRows() {
   }
   // surface the inactive tally — otherwise deactivated people are invisible in
   // a long list and there's no hint the Status column has anything to find
-  const inactiveN = emps.filter(e => e.active === false).length;
+  const inactiveN = emps.filter(e => empStatus(e) === "inactive").length, resignedN = emps.filter(e => empStatus(e) === "resigned").length;
   $("#emplist-count").textContent = `${emps.length} of ${D().employees.length}`
-    + (inactiveN ? ` · ${inactiveN} inactive` : "");
+    + (inactiveN ? ` · ${inactiveN} inactive` : "") + (resignedN ? ` · ${resignedN} resigned` : "");
   $("#emplist-select-all").checked = emps.length > 0 && emps.every(e => state.selectedEmps.has(e.id));
   updateEmplistBulkBar();
   for (const th of $$("#emplist-table th[data-sort]")) {
@@ -6730,7 +6901,7 @@ function allHostRows() {
     const area = rec && rec.areaId ? D().areas.find(a => a.id === rec.areaId) || null : null;
     // most days first: "who knows this site best" is the question the column answers
     const inspectors = Object.entries(d.employees)
-      .map(([id, days]) => ({ id, name: empName.get(id) || "", days }))
+      .map(([id, days]) => ({ id, name: empName.get(id) || "", days, last: (d.lastBy || {})[id] || "" }))
       .filter(i => i.name)
       .sort((a, b) => b.days - a.days || a.name.localeCompare(b.name));
     // a board deleted since the mission was planned can't be named — skip it
@@ -6751,6 +6922,7 @@ function allHostRows() {
       boards,
       missionCount: d.missionCount,
       deployedDays: inspectors.reduce((n, i) => n + i.days, 0),
+      lastWorked: inspectors.reduce((m, i) => (i.last > m ? i.last : m), ""),   // the last day anyone worked there (the matrix's Last worked)
       firstDate: d.firstDate,
       lastDate: d.lastDate,
     });
@@ -7114,6 +7286,102 @@ function renderHostRows() {
     th.classList.toggle("sorted-desc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === -1);
   }
   quietTable("#hostlist-table");
+  renderHostView();
+}
+
+/* ---------- Host tab: List | Skills matrix ----------
+   The matrix reads the same rows as the list (allHostRows, the same search and filters) and
+   judges them by the one shared rule (hostExperience): a person is experienced at a host after
+   HOST_EXPERIENCED_DAYS days there, and a host is at risk when HOST_AT_RISK_MAX or fewer ACTIVE
+   people are experienced. Inactive and Resigned people stay in the lists, greyed, but do not
+   count. Picking a person (the Person box, which is the Filter popover's Inspector filter) shows
+   only the hosts they have worked, with their own days and last date. */
+const MX_COLS = { host: "Host", people: "People who worked there", exp: "Experienced", last: "Last worked", risk: "At risk" };
+function hostMatrixRows() {
+  const today = todayStr();
+  const person = state.hostlist.filters.empId.length === 1 ? state.hostlist.filters.empId[0] : null;
+  const rows = hostlistFilteredSorted().map(r => {
+    const x = hostExperience(Object.fromEntries(r.inspectors.map(i => [i.id, i.days])), today);
+    return { r, x, mine: person ? r.inspectors.find(i => i.id === person) || null : null };
+  });
+  const sort = state.hostlist.mxSort;
+  const val = (m) => ({ host: m.r.name, people: m.r.inspectors.length, exp: m.x.experienced.length, last: m.r.lastWorked, risk: m.x.atRisk ? 0 : 1 })[sort ? sort.key : "risk"];
+  rows.sort((a, b) => {
+    if (!sort) return (a.x.atRisk === b.x.atRisk ? 0 : a.x.atRisk ? -1 : 1) || (a.x.active.length - b.x.active.length) || a.r.name.localeCompare(b.r.name);
+    const x = val(a), y = val(b);
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * sort.dir || a.r.name.localeCompare(b.r.name);
+  });
+  return rows;
+}
+function renderHostView() {
+  const hl = state.hostlist, matrix = hl.view === "matrix";
+  const views = $("#hostlist-views");
+  views.innerHTML = "";
+  for (const [k, l] of [["list", "List"], ["matrix", "Skills matrix"]]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (hl.view === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(hl.view === k));
+    b.textContent = l;
+    b.onclick = () => {
+      hl.view = k;
+      try { localStorage.setItem(HOSTLIST_VIEW_KEY, k); } catch (e) { /* not remembered */ }
+      renderHostRows();
+    };
+    views.appendChild(b);
+  }
+  $("#hostlist-list-wrap").classList.toggle("hidden", matrix);
+  $("#hostlist-matrix-wrap").classList.toggle("hidden", !matrix);
+  $("#hostlist-person-wrap").classList.toggle("hidden", !matrix);
+  if (matrix) $("#hostlist-dupbar").classList.add("hidden");
+  if (!matrix) return;
+  const dir = hl.dir;
+  const sel = $("#hostlist-person");
+  const picked = hl.filters.empId.length === 1 ? hl.filters.empId[0] : "";
+  sel.innerHTML = `<option value="">Everyone</option>` + hostlistFilterOptions("empId").slice().sort((a, b) => a.label.localeCompare(b.label))
+    .map(o => `<option value="${escapeHtml(o.value)}"${o.value === picked ? " selected" : ""}>${escapeHtml(o.label)}</option>`).join("");
+  sel.onchange = () => { hl.filters.empId = sel.value ? [sel.value] : []; renderHostlistFilterOptions(); renderHostRows(); };
+
+  const rows = hostMatrixRows();
+  const wrap = $("#hostlist-matrix-wrap");
+  const sort = hl.mxSort || { key: "risk", dir: 1 };
+  const cols = ["host", "people", "exp", "last", "risk"];
+  const person = picked ? D().employees.find(e => e.id === picked) : null;
+  const statusTag = (e) => { const st = e ? empStatus(e) : "inactive"; return st === "active" ? "" : ` <span class="mx-tag">${EMP_STATUS_LABEL[st]}</span>`; };
+  const today = todayStr();
+  let html = `<table class="mx-table"><thead><tr>${cols.map(k => `<th class="${k === "host" ? "" : "r"}"><button type="button" class="ov-sort" data-k="${k}" aria-sort="${(hl.mxSort || {}).key === k ? (sort.dir < 0 ? "descending" : "ascending") : "none"}">${MX_COLS[k]}</button></th>`).join("")}${person ? "<th class=\"r\">Their days</th><th class=\"r\">Their last day</th>" : ""}</tr></thead><tbody>`;
+  if (!dir) html += `<tr><td colspan="${person ? 7 : 5}" class="ov-muted">…</td></tr>`;
+  else if (!rows.length) html += `<tr><td colspan="${person ? 7 : 5}" class="ov-muted">No hosts match the current filters.</td></tr>`;
+  for (const m of rows) {
+    const { r, x } = m, open = hl.mxOpen.has(r.name);
+    const totalDays = r.inspectors.reduce((n, i) => n + i.days, 0);
+    html += `<tr class="mx-row${x.atRisk ? " is-risk" : ""}${r.archived ? " row-archived" : ""}" data-host="${escapeHtml(r.name)}">
+      <td><button type="button" class="mx-host" aria-expanded="${open}"><span class="mx-caret" aria-hidden="true">${open ? "▾" : "▸"}</span><span>${escapeHtml(r.name)}</span></button>${r.archived ? ' <span class="mx-tag">archived</span>' : ""}</td>
+      <td class="r">${r.inspectors.length} <span class="ov-muted">· ${totalDays} days</span></td>
+      <td class="r"><b>${x.experienced.length}</b>${x.experienced.length !== x.active.length ? ` <span class="ov-muted">· ${x.active.length} active</span>` : ""}</td>
+      <td class="r">${r.lastWorked ? escapeHtml(fmtDate(r.lastWorked)) : "—"}</td>
+      <td class="r">${x.atRisk ? `<span class="ov-flag ov-flag-bad" title="${HOST_AT_RISK_MAX} or fewer active people are experienced here (${HOST_EXPERIENCED_DAYS}+ days)">at risk</span>` : "—"}</td>
+      ${person ? `<td class="r">${m.mine ? m.mine.days : 0}</td><td class="r">${m.mine && m.mine.last ? escapeHtml(fmtDate(m.mine.last)) : "—"}</td>` : ""}</tr>`;
+    if (open) {
+      html += `<tr class="mx-detail"><td colspan="${person ? 7 : 5}">${r.inspectors.length ? `<table class="mx-people"><thead><tr><th>Name</th><th class="r">Days</th><th>Last worked</th><th></th></tr></thead><tbody>${
+        r.inspectors.map(i => { const e = D().employees.find(z => z.id === i.id); const on = e && cloud.rosterOn(e, today);
+          return `<tr class="${on ? "" : "is-off"}"><td><span data-no-i18n>${escapeHtml(i.name)}</span>${on ? "" : statusTag(e)}</td><td class="r">${i.days}</td><td>${i.last ? escapeHtml(fmtDate(i.last)) : "—"}</td>
+            <td>${i.days >= HOST_EXPERIENCED_DAYS ? `<span class="ov-flag ov-flag-ok" title="${HOST_EXPERIENCED_DAYS} or more days at this host">experienced</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`
+        : '<span class="ov-muted">No one deployed yet</span>'}</td></tr>`;
+    }
+  }
+  html += `</tbody></table>`;
+  wrap.innerHTML = html;
+  wrap.querySelectorAll(".ov-sort").forEach(b => b.onclick = () => {
+    const k = b.dataset.k;
+    hl.mxSort = { key: k, dir: (hl.mxSort || {}).key === k ? -hl.mxSort.dir : (k === "last" || k === "people" || k === "exp" ? -1 : 1) };
+    renderHostRows();
+  });
+  wrap.querySelectorAll(".mx-host").forEach(b => b.onclick = () => {
+    const name = b.closest("tr").dataset.host;
+    hl.mxOpen.has(name) ? hl.mxOpen.delete(name) : hl.mxOpen.add(name);
+    renderHostRows();
+  });
 }
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
@@ -7135,11 +7403,30 @@ async function downloadTableXlsx(sheetName, fileName, columns, rows, totalText) 
 function openHostlistExportModal() {
   const n = hostlistFilteredSorted().length;
   if (!n) { toast("No hosts match the current filters, so there is nothing to export.", "info"); return; }
-  $("#hostlist-export-summary").textContent = `${n} ${n === 1 ? "host" : "hosts"} — the rows the table is showing now (search and filters apply).`;
+  $("#hostlist-export-summary").textContent = state.hostlist.view === "matrix"
+    ? `Skills matrix: the days each person has worked at the ${n} ${n === 1 ? "host" : "hosts"} the table is showing now (search and filters apply), people down the side and hosts across.`
+    : `${n} ${n === 1 ? "host" : "hosts"} — the rows the table is showing now (search and filters apply).`;
   renderExportTypes($("#hostlist-export-type"), "hostlist", ["xlsx"]);
   openModal("#modal-hostlist-export");
 }
+/* the Skills matrix as a file: one row per person, one column per host, the days worked there */
+async function exportHostMatrixXlsx() {
+  const rows = hostlistFilteredSorted();
+  const people = new Map();
+  for (const r of rows) for (const i of r.inspectors) people.set(i.id, i.name);
+  const list = [...people.entries()].map(([id, name]) => ({ id, name, e: D().employees.find(x => x.id === id) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const columns = [{ label: "Name", width: 30 }, { label: "Status", width: 11, center: true }, { label: "Hosts worked", width: 12, center: true },
+    ...rows.map(r => ({ label: r.name, width: Math.max(8, Math.min(18, r.name.length + 2)), center: true }))];
+  const out = list.map(p => {
+    const days = rows.map(r => (r.inspectors.find(i => i.id === p.id) || {}).days || "");
+    return [p.name, EMP_STATUS_LABEL[p.e ? empStatus(p.e) : "inactive"], days.filter(Boolean).length, ...days];
+  });
+  await downloadTableXlsx("Skills matrix", `host_skills_matrix_${todayStr()}.xlsx`, columns, out, "TOTAL PEOPLE: " + list.length);
+  toast(`Exported ${list.length} ${list.length === 1 ? "person" : "people"} across ${rows.length} ${rows.length === 1 ? "host" : "hosts"}.`, "info");
+}
 async function exportHostlistXlsx() {
+  if (state.hostlist.view === "matrix") return exportHostMatrixXlsx();
   const rows = hostlistFilteredSorted();   // same rows the table is showing right now
   if (!rows.length) { toast("No hosts match the current filters, so there is nothing to export.", "info"); return; }
   // "seen" covers both sources the dates come from — a mission planned for the
@@ -8190,6 +8477,29 @@ function showConfirm(title, message, onYes, onCancel, yesLabel) {
   $("#btn-confirm-no").onclick = closeModal;
 }
 
+/* Deactivate asks why: "Inactive for now" (the default) or "Resigned". Resigned is a leaver in
+   Overview's Workforce section; it needs employees.exit_reason (migration-2026-11-04), and is
+   disabled, with a note naming the file, until that has been run. onYes gets "resigned" or "inactive". */
+function askDeactivate(title, message, onYes, onCancel) {
+  $("#deactivate-title").textContent = title;
+  $("#deactivate-message").textContent = message;
+  const migrated = !!feat().exitReason;
+  const resigned = $("#deactivate-resigned");
+  resigned.disabled = !migrated;
+  $("#deactivate-resigned-label").classList.toggle("is-disabled", !migrated);
+  $("#deactivate-resigned-note").textContent = migrated
+    ? "Counted as a leaver in Overview's Workforce section."
+    : "Needs a one-time database update first: run migration-2026-11-04-employee-exit.sql in the Supabase SQL editor.";
+  document.querySelector('#modal-deactivate input[value="inactive"]').checked = true;
+  _confirmCancel = onCancel || null;
+  openModal("#modal-deactivate");
+  $("#btn-deactivate-yes").onclick = () => {
+    const reason = resigned.checked && !resigned.disabled ? "resigned" : "inactive";
+    _confirmCancel = null; closeModal(); onYes(reason);
+  };
+  $("#btn-deactivate-no").onclick = closeModal;
+}
+
 /* mission modal */
 /* The Host box is a search over the Host List: a <datalist> so the browser's
    own type-ahead does the filtering (it works on a phone keyboard too, which a
@@ -8598,10 +8908,10 @@ function saveEmployee(ev) {
 
 function deactivateEmployee() {
   const e = D().employees.find(x => x.id === state.editingEmployeeId);
-  showConfirm("Deactivate employee?",
-    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`, () => {
+  askDeactivate("Deactivate employee?",
+    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`, (reason) => {
     safely(async () => {
-      await cloud.setEmployeesActive([state.editingEmployeeId], false);
+      await cloud.setEmployeesActive([state.editingEmployeeId], false, reason);
       closeModal();
       await refreshAndRender();
     });
@@ -15872,9 +16182,9 @@ function wireApp() {
   $("#emplist-bulk-deactivate").onclick = () => {
     const ids = [...state.selectedEmps];
     if (!ids.length) return;
-    showConfirm("Deactivate employees?",
+    askDeactivate("Deactivate employees?",
       `Deactivate ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column.`,
-      () => safely(async () => { await cloud.setEmployeesActive(ids, false); state.selectedEmps = new Set(); await refreshAndRender(); }));
+      (reason) => safely(async () => { await cloud.setEmployeesActive(ids, false, reason); state.selectedEmps = new Set(); await refreshAndRender(); }));
   };
   $("#emplist-bulk-clear").onclick = clearSelection;
 

@@ -49,6 +49,8 @@ class FakeDb {
     this.highlight = opts.highlight !== false;
     // migration-2026-10-28b ('short' allowed); { highlightShort: false } has the columns but the first list of reasons
     this.highlightShort = this.highlight && opts.highlightShort !== false;
+    // migration-2026-11-04 (employees.exit_reason); { exitReason: false } is a database without it
+    this.exitReason = opts.exitReason !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -78,18 +80,21 @@ class FakeDb {
   }
 
   /* A column-level migration not run yet: the errors Postgres / PostgREST give
-     for reading or writing a column that isn't there. Only the highlight columns
+     for reading or writing a column that isn't there. Only the highlight columns and employees.exit_reason
      are emulated (the others predate every test). */
   _missingColumn(q) {
-    if (this.highlight || q.table !== "missions") return null;
-    const col = ["highlight", "highlight_note"].find((c) =>
+    const cols = q.table === "missions" && !this.highlight ? ["highlight", "highlight_note"]
+      : q.table === "employees" && !this.exitReason ? ["exit_reason"] : null;
+    if (!cols) return null;
+    const col = cols.find((c) =>
       (typeof q.select === "string" && q.select.split(",").map((x) => x.trim()).includes(c))
       || [].concat(q.values || []).some((v) => v && c in v));
     if (!col) return null;
     return q.op === "select"
-      ? { code: "42703", message: `column missions.${col} does not exist` }
-      : { code: "PGRST204", message: `Could not find the '${col}' column of 'missions' in the schema cache` };
+      ? { code: "42703", message: `column ${q.table}.${col} does not exist` }
+      : { code: "PGRST204", message: `Could not find the '${col}' column of '${q.table}' in the schema cache` };
   }
+
 
   /* ---------- query execution ---------- */
   exec(q, user) {
