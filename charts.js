@@ -186,7 +186,7 @@ const Charts = (() => {
       const flushRun = () => {
         if (run.length > 1) {
           const pts = run.map(i => `${xAt(i).toFixed(1)},${yAt(s.points[i].y).toFixed(1)}`).join(" ");
-          marks += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" class="chart-line"/>`;
+          marks += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${s.dashed ? 1.6 : 2}"${s.dashed ? ' stroke-dasharray="5 4"' : ""} stroke-linejoin="round" stroke-linecap="round" class="chart-line"/>`;
         }
         run = [];
       };
@@ -198,7 +198,7 @@ const Charts = (() => {
       if (!showDots) continue;
       s.points.forEach((p, i) => {
         if (p.y == null) return;   // no dot, no tooltip, no "null" text — the date simply isn't plotted
-        marks += `<circle class="chart-mark chart-dot"${dates && dates[i] ? ` data-date="${esc(dates[i])}"` : ""} cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="4" fill="${s.color}" stroke="var(--panel)" stroke-width="2"
+        marks += `<circle class="chart-mark chart-dot"${dates && dates[i] ? ` data-date="${esc(dates[i])}"` : ""} cx="${xAt(i).toFixed(1)}" cy="${yAt(p.y).toFixed(1)}" r="${s.dashed ? 3 : 4}" fill="${s.color}" stroke="var(--panel)" stroke-width="2"
           data-tip-label="${esc(s.label)} — ${esc(xLabels[i])}" data-tip-value="${p.y}${p.suffix || ""}" tabindex="0">
           <title>${esc(s.label)} ${esc(xLabels[i])}: ${p.y}${p.suffix || ""}</title></circle>`;
       });
@@ -219,7 +219,7 @@ const Charts = (() => {
      filled part of a pale bar. Every segment is its own hover/focus target
      (chart-mark), its tooltip naming the day and that segment's count; a null
      day draws nothing, like lineChart's gaps. */
-  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null, notes = null }) {
+  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null, notes = null, compare = null, suffix = "" }) {
     // `notes` ([{ values, color, text, pos: "above" | "below" }]) writes a small figure above a column
     // (+3 joiners) or under its baseline (-1 leavers); a column with 0 gets none. Used by Workforce.
     const hasBelow = !!(notes && notes.some(n => n.pos === "below"));
@@ -261,8 +261,13 @@ const Charts = (() => {
         if (!v) continue;
         const y0 = yAt(acc), y1 = yAt(acc + v);
         marks += `<rect class="chart-mark"${day} x="${x}" y="${y1.toFixed(1)}" width="${bw.toFixed(1)}" height="${(y0 - y1).toFixed(1)}" fill="${st.color}" stroke="var(--panel)" stroke-width="0.75"
-          data-tip-label="${esc(st.label)} — ${esc(head)}" data-tip-value="${v}" tabindex="0"><title>${esc(st.label)} ${esc(xLabels[i])}: ${v}</title></rect>`;
+          data-tip-label="${esc(st.label)} — ${esc(head)}" data-tip-value="${v}${suffix}" tabindex="0"><title>${esc(st.label)} ${esc(xLabels[i])}: ${v}${suffix}</title></rect>`;
         acc += v;
+      }
+      // the comparison (same period last year, the period before): a dashed outline of its column, over the bars
+      if (compare && compare.values[i] != null) {
+        const cv = compare.values[i], cy = yAt(cv);
+        marks += `<rect class="chart-compare" x="${x}" y="${cy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, yAt(0) - cy).toFixed(1)}" rx="2" fill="none" stroke="${compare.color}" stroke-width="1.5" stroke-dasharray="3 2" pointer-events="none"/>`;
       }
     }
     if (notes) {

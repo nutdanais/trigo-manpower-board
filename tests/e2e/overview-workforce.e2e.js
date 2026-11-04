@@ -145,8 +145,8 @@ async function step(name, fn) {
 
     await step("B2: the Workforce section follows Engineer workload; tiles from a hand count", async () => {
       await showOverview();
-      const order = await p.evaluate(() => [...document.querySelectorAll("#overview-panel > .ov-section")].map((s) => s.querySelector("h3").textContent.trim()).slice(-4));
-      assert.deepEqual(order, ["History", "People", "Engineer workload", "Workforce"]);
+      const order = await p.evaluate(() => [...document.querySelectorAll("#overview-panel > .ov-section")].map((s) => s.querySelector("h3").textContent.trim()).slice(-5));
+      assert.deepEqual(order, ["History", "People", "Engineer workload", "Workforce", "Boards & areas"]);
       const t = await p.evaluate(() => Object.fromEntries([...document.querySelectorAll(".ov-wf-tiles .ov-htile")].map((x) => [x.querySelector(".ov-htile-label").textContent, [x.querySelector(".ov-htile-value").textContent, (x.querySelector(".ov-htile-sub") || { textContent: "" }).textContent, (x.querySelector(".ov-htile-delta") || { textContent: "" }).textContent]])));
       // 8 people through the window, 9 at the end of two months ago, 8 since e5 resigned and e6 paused (e3 joined)
       assert.equal(t["Headcount now"][0], "8");
