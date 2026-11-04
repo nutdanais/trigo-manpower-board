@@ -2189,7 +2189,7 @@ I18N.add({
 
 /* Manpower List: period switch and Worked : Leave */
 I18N.add({
-  "The period of the utilization and Worked : Leave columns: the last 30 days, the last 90 days or the year to date": "ช่วงเวลาของคอลัมน์อัตราการใช้งานและทำงาน : ลา: 30 วันล่าสุด 90 วันล่าสุด หรือตั้งแต่ต้นปี",
+  "The period of the utilization, Worked, Leave and Leave share columns: the last 30 days, the last 90 days or the year to date": "ช่วงเวลาของคอลัมน์อัตราการใช้งาน ทำงาน ลา และสัดส่วนการลา: 30 วันล่าสุด 90 วันล่าสุด หรือตั้งแต่ต้นปี",
   "Days on a mission in the period, on working days. Shown to roles that can see Overview History.": "จำนวนวันที่ปฏิบัติมิชชั่นในช่วงเวลานี้ เฉพาะวันทำงาน แสดงเฉพาะบทบาทที่ดูประวัติในภาพรวมได้",
   "Days on leave in the period (annual, sick, business, unpaid). Exchange Working Day is not leave: it is worked back.": "จำนวนวันลาในช่วงเวลานี้ (ลาพักร้อน ลาป่วย ลากิจ ลาไม่รับค่าจ้าง) สลับวันหยุดไม่ใช่การลา เพราะทำงานชดเชยภายหลัง",
   "Worked days : leave days, and the leave share of the working days: amber above 20%, red above 30%.": "วันทำงาน : วันลา และสัดส่วนการลาต่อวันทำงาน สีเหลืองเมื่อเกิน 20% สีแดงเมื่อเกิน 30%",
@@ -2258,7 +2258,7 @@ I18N.add({
   "No mission history yet.": "ยังไม่มีประวัติมิชชั่น",
   "Loans": "การให้ยืม",
   "No notes.": "ไม่มีหมายเหตุ",
-  "Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for. It keeps its own rule: the columns to its right (Worked, Leave, Worked : Leave) count planned working days only, as History does.": "สัดส่วนของวันทำงานใน 30 วันที่ผ่านมาที่พนักงานคนนี้ปฏิบัติงานในมิชชั่น ตัวเลขนี้คิดรายบุคคล — ต่างจากตัวเลขอัตราการใช้งานของบอร์ด พนักงานออนคอลที่ไม่ได้ถูกเรียกตัวยังนับวันเหล่านั้น เพราะนี่คือสิ่งที่ต้องการรู้ คอลัมน์นี้ใช้กฎของตัวเอง ส่วนคอลัมน์ทำงาน ลา และทำงาน : ลาทางขวานับเฉพาะวันทำงานที่มีแผน เหมือนในประวัติ",
+  "Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for. It keeps its own rule: the columns to its right (Worked, Leave, Leave share) count planned working days only, as History does.": "สัดส่วนของวันทำงานใน 30 วันที่ผ่านมาที่พนักงานคนนี้ปฏิบัติงานในมิชชั่น ตัวเลขนี้คิดรายบุคคล — ต่างจากตัวเลขอัตราการใช้งานของบอร์ด พนักงานออนคอลที่ไม่ได้ถูกเรียกตัวยังนับวันเหล่านั้น เพราะนี่คือสิ่งที่ต้องการรู้ คอลัมน์นี้ใช้กฎของตัวเอง ส่วนคอลัมน์ทำงาน ลา และสัดส่วนการลาทางขวานับเฉพาะวันทำงานที่มีแผน เหมือนในประวัติ",
   "Days on a mission in the period, on planned working days (a day with no missions on the person's board is left out, as in Overview History). Shown to roles that can see Overview History.": "จำนวนวันที่ปฏิบัติมิชชั่นในช่วงเวลานี้ นับเฉพาะวันทำงานที่มีแผน (วันที่บอร์ดของพนักงานไม่มีมิชชั่นจะไม่นับ เหมือนในประวัติของภาพรวม) แสดงเฉพาะบทบาทที่ดูประวัติในภาพรวมได้",
 }, {
   "Median {num}%": "ค่ากลาง {num}%",
@@ -2548,7 +2548,12 @@ I18N.add({
   "Month ": "เดือน",
   "Missions": "มิชชั่น",
   "Headcount now": "จำนวนพนักงานตอนนี้",
+  "Highest leave share first": "สัดส่วนการลาสูงสุดก่อน",
+  "Worked days : leave days.": "วันทำงาน : วันลา",
+  "Leave days as a share of the working days in the period: amber above 20%, red above 30%. Click to sort, to find who takes the most leave.": "วันลาเป็นสัดส่วนของวันทำงานในช่วงเวลา: สีเหลืองเมื่อเกิน 20% สีแดงเมื่อเกิน 30% คลิกเพื่อเรียง จะได้เห็นว่าใครลามากที่สุด",
+  "Nobody took leave in this range.": "ไม่มีใครลาในช่วงนี้",
 }, {
+  "{num} of {b} people had leave in this range": "{num} จาก {b} คนมีการลาในช่วงนี้",
   "The dashed line is the comparison ({a}).": "เส้นประคือค่าที่ใช้เปรียบเทียบ ({a})",
   "previous period ({a} → {b})": "ช่วงก่อนหน้า ({a} → {b})",
   "same period last year ({a} → {b})": "ช่วงเวลาเดียวกันของปีก่อน ({a} → {b})",

@@ -121,7 +121,7 @@ const X = require("../../xlsx-export.js");
     let ws = wb.worksheets[0];
     assert.equal(ws.name, "Manpower List");
     const head = (w) => { const o = []; w.getRow(1).eachCell((c) => o.push(c.value)); return o; };
-    assert.deepEqual(head(ws), ["Thai Name", "English Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Current Board", "30D Utilization", "Worked (days)", "Leave (days)", "Worked : Leave", "Leave Share", "Status"]);
+    assert.deepEqual(head(ws), ["Thai Name", "English Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Current Board", "30D Utilization", "Worked (days)", "Leave (days)", "Leave Share", "Status"]);
     const names = []; const shown = (await rowsText()).length;
     for (let r = 2; r <= 1 + shown; r++) names.push(ws.getCell(r, 1).value);
     assert.deepEqual(names, await rowsText(), "same rows, same order as the table");
@@ -142,7 +142,7 @@ const X = require("../../xlsx-export.js");
     const row = {}; for (let r = 2; r <= 1 + shown; r++) row[ws.getCell(r, 1).value] = r;
     assert.equal(ws.getCell(row["Dated Person"], 4).value, "ประจำ");
     assert.equal(ws.getCell(row["Dated Person"], 8).value, X.serviceLength(ago(3, 5, 12), T, "th"));
-    assert.equal(ws.getCell(row["Dated Person"], 16).value, "ใช้งาน");   // after the four Worked : Leave columns
+    assert.equal(ws.getCell(row["Dated Person"], 15).value, "ใช้งาน");   // after the three Worked / Leave columns
     // the Thai choice is remembered by both exports
     await p.click("#btn-export");
     await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");

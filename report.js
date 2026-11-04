@@ -210,7 +210,13 @@ const OvReport = (() => {
     if (S.people) {
       const P = S.people;
       const sp = (name, s) => `<tr><td>${e(name)}</td><td class="r">${s.n}</td><td class="r">${s.n ? e(f1(s.median) + "%") : "—"}</td><td class="r">${s.hi}</td><td class="r">${s.lo}</td></tr>`;
-      const bands = (s) => `<div class="rp-bands">${s.bands.map((n, i) => `<span><i style="height:${s.n ? Math.max(2, (n / Math.max(1, ...s.bands)) * 40) : 2}px"></i><b>${n || ""}</b><small>${i * 10}${i === 9 ? "+" : ""}</small></span>`).join("")}</div>`;
+      /* the spread as a smooth curve over the ten bands, the counts above and the band labels below (the app's own chart, flat for print) */
+      const bands = (s) => {
+        const max = Math.max(1, ...s.bands);
+        const curve = spreadCurve(s.bands.map((n, k) => [k * 10 + 5, 42 - (s.n ? (n / max) * 38 : 0)]));
+        const row = (cls, f) => `<div class="${cls}">${s.bands.map((n, k) => `<span>${f(n, k)}</span>`).join("")}</div>`;
+        return `<div class="rp-bands">${row("rp-bn", (n) => (n || ""))}<svg viewBox="0 0 100 44" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="42" x2="100" y2="42" stroke="#d8e0e7" stroke-width="1" vector-effect="non-scaling-stroke"/><path d="${curve} L95,42 L5,42 Z" fill="#2a78d6" opacity=".16"/><path d="${curve}" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>${row("rp-bl", (n, k) => `${k * 10}${k === 9 ? "+" : ""}`)}</div>`;
+      };
       sec("People", `<table class="rp-table"><thead><tr><th>Share of working days on a mission</th><th class="r">People</th><th class="r">Median</th><th class="r">90% or more</th><th class="r">Under 50%</th></tr></thead><tbody>${sp("Permanent", P.permanent)}${sp("On-call", P.oncall)}</tbody></table>
         <div class="rp-two"><div><h3>Permanent</h3>${bands(P.permanent)}</div><div><h3>On-call</h3>${bands(P.oncall)}</div></div>
         <p class="rp-sub"><span>Flags</span>: <span>${e(`${P.flags.run || 0} in a row (${OV_RUN_AMBER}+ days)`)}</span> · <span>${e(`${P.flags.nights || 0} mostly nights`)}</span> · <span>${e(`${P.flags.leave || 0} with leave above ${OV_LEAVE_RED}%`)}</span> · <span>${e(`${P.flags.never || 0} never called in`)}</span> · <span>${e(`${P.flags.newcomer || 0} newcomer-only mission`)}</span></p>

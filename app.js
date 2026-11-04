@@ -5101,10 +5101,22 @@ function peopleSection(boards, dates, recs) {
   let shown = rows.filter(group);
   if (ov.pplBand != null) shown = shown.filter(p => pplBandOf(p) === ov.pplBand);
   if (v.flagged) shown = shown.filter(p => p.flags.length);
+  /* Leave view: with hundreds of people, only those who took leave, the highest leave share first; the rest are a count, not rows */
+  const inGroup = shown.length;
+  if (v.key === "leave") shown = shown.filter(p => p.leave > 0);
 
   // a summary line for the views that have one
   const sum = pplSummary(v, rows, shown);
   if (sum) sec.appendChild(sum);
+  if (v.key === "leave") {
+    const lv = document.createElement("p");
+    lv.className = "ov-people-sum ov-muted ov-leave-sum";
+    [`${shown.length} of ${inGroup} people had leave in this range`, "Highest leave share first"].forEach((t, i) => {
+      if (i) lv.appendChild(document.createTextNode(" · "));
+      lv.appendChild(Object.assign(document.createElement("span"), { textContent: t }));
+    });
+    sec.appendChild(lv);
+  }
   if (ov.pplBand != null) {
     const chip = document.createElement("p");
     chip.className = "ov-band-chip";
@@ -5124,7 +5136,7 @@ function peopleSection(boards, dates, recs) {
     return ((pplVal(a, sort.key) - pplVal(b, sort.key)) * sort.dir) || (b.leave - a.leave) * (sort.key === "share" ? 1 : 0) || a.name.localeCompare(b.name);
   });
   if (!shown.length) {
-    sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: v.flagged ? "No flags in this range." : "Nobody matches." }));
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: v.flagged ? "No flags in this range." : v.key === "leave" ? "Nobody took leave in this range." : "Nobody matches." }));
     return sec;
   }
   const visible = ov.pplAll ? shown : shown.slice(0, OV_WL_SHOWN);
@@ -5201,6 +5213,28 @@ function peopleSpreadStats(mine) {
   return { n: mine.length, bands, median,
     hi: mine.filter(p => p.worked * 10 >= p.working * 9).length, lo: mine.filter(p => p.worked * 2 < p.working).length };
 }
+/* a smooth path through points [[x, y], ...] (x ascending): a monotone cubic, so the curve keeps to the data's own highs and lows */
+function spreadCurve(pts) {
+  const n = pts.length;
+  if (n < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : "";
+  const dx = [], sl = [];
+  for (let i = 0; i < n - 1; i++) { dx.push(pts[i + 1][0] - pts[i][0]); sl.push((pts[i + 1][1] - pts[i][1]) / dx[i]); }
+  const t = [sl[0]];
+  for (let i = 1; i < n - 1; i++) t.push(sl[i - 1] * sl[i] <= 0 ? 0 : (sl[i - 1] + sl[i]) / 2);
+  t.push(sl[n - 2]);
+  for (let i = 0; i < n - 1; i++) {
+    if (sl[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / sl[i], b = t[i + 1] / sl[i], h = Math.hypot(a, b);
+    if (h > 3) { t[i] = (3 * a / h) * sl[i]; t[i + 1] = (3 * b / h) * sl[i]; }
+  }
+  const f = (v) => +v.toFixed(2);
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+  for (let i = 0; i < n - 1; i++) {
+    const w = dx[i] / 3;
+    d += ` C${f(pts[i][0] + w)},${f(pts[i][1] + t[i] * w)} ${f(pts[i + 1][0] - w)},${f(pts[i + 1][1] - t[i + 1] * w)} ${f(pts[i + 1][0])},${f(pts[i + 1][1])}`;
+  }
+  return d;
+}
 /* The spread: how many people sit in each 10% band of working days on a mission. A band is a
    button: it filters the table below to that band (and to this chart's group). */
 function peopleSpread(rows) {
@@ -5240,6 +5274,13 @@ function peopleSpread(rows) {
   chart.className = "ov-bands";
   chart.setAttribute("role", "group");
   chart.setAttribute("aria-label", "Share of working days on a mission");
+  /* the curve: a smooth line through the ten band counts (monotone, so it never dips below zero or overshoots a count),
+     with the bands still the buttons that carry the number, the dot and the click */
+  const yOf = (n) => 82 - (n / max) * 74;
+  const curve = spreadCurve(bands.map((n, i) => [i * 10 + 5, yOf(n)]));
+  const wrap = document.createElement("div");
+  wrap.className = "ov-bands-wrap";
+  wrap.innerHTML = `<svg class="ov-curve" viewBox="0 0 100 86" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line class="ov-curve-base" x1="0" y1="82" x2="100" y2="82"/><path class="ov-curve-area" d="${curve} L95,82 L5,82 Z"/><path class="ov-curve-line" d="${curve}"/></svg>`;
   bands.forEach((n, i) => {
     const b = document.createElement("button");
     b.type = "button";
@@ -5249,7 +5290,7 @@ function peopleSpread(rows) {
     b.setAttribute("data-tip-value", `${n} ${n === 1 ? "person" : "people"}`);
     b.setAttribute("data-tip-label", `${pplBandLabel(i)} of working days on a mission${i === medBand ? " · median" : ""}`);
     b.setAttribute("aria-label", `${pplBandLabel(i)}: ${n} ${n === 1 ? "person" : "people"}`);
-    b.innerHTML = `<span class="ov-band-n">${n || ""}</span><span class="ov-band-bar"><i style="height:${n ? Math.max(4, (n / max) * 100).toFixed(1) : 0}%"></i></span><span class="ov-band-l">${i * 10}${i === 9 ? "+" : ""}</span>`;
+    b.innerHTML = `<span class="ov-band-n">${n || ""}</span><span class="ov-band-pt"><i style="bottom:${((n / max) * 74).toFixed(1)}px"></i></span><span class="ov-band-l">${i * 10}${i === 9 ? "+" : ""}</span>`;
     b.onclick = () => {
       const on = ov.pplBand === i && ov.pplWho === grp;
       ov.pplBand = on ? null : i;
@@ -5259,7 +5300,8 @@ function peopleSpread(rows) {
     };
     chart.appendChild(b);
   });
-  box.appendChild(chart);
+  wrap.appendChild(chart);
+  box.appendChild(wrap);
   box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-axis ov-muted", textContent: "Share of working days on a mission, %. Click a band to filter the table." }));
   return box;
 }
@@ -6749,7 +6791,7 @@ function emplistFilteredSorted() {
   return emps;
 }
 
-/* ---------- Manpower List: Worked, Leave, Worked : Leave ----------
+/* ---------- Manpower List: Worked, Leave, Leave share ----------
    Per person over the list's period (30D / 90D / YTD), on PLANNED working days (empPlannedCounts:
    History's rule, so the same person and range read the same here and in People): days on a
    mission, days on leave (Exchange Working Day left out: it is worked back), and the two side by
@@ -6764,12 +6806,12 @@ function emplistWlOf(e) {
 }
 function emplistWlCells(e) {
   const w = state.emplist.wl && state.emplist.wl[e.id];
-  if (!w) return `<td data-label="Worked" class="el-wl r">…</td><td data-label="Leave" class="el-wl r">…</td><td data-label="Worked : Leave" class="el-wl">…</td>`;
+  if (!w) return `<td data-label="Worked" class="el-wl r">…</td><td data-label="Leave" class="el-wl r">…</td><td data-label="Leave share" class="el-wl r">…</td>`;
   const cls = w.share == null ? "" : w.share > OV_LEAVE_RED ? "bad" : w.share > OV_LEAVE_AMBER ? "warn" : "ok";
   return `<td data-label="Worked" class="el-wl r">${w.worked}</td><td data-label="Leave" class="el-wl r">${w.leave}</td>
-    <td data-label="Worked : Leave" class="el-wl">${w.worked} : ${w.leave}${w.share == null || !w.leave ? "" : ` <span class="ov-share ov-share-${cls}" title="Leave share ${fmt1(w.share)}% of ${w.working} working days">${fmt1(w.share)}%</span>`}</td>`;
+    <td data-label="Leave share" class="el-wl r">${w.share == null ? "—" : `<span class="ov-share ov-share-${cls}" title="Leave share ${fmt1(w.share)}% of ${w.working} working days">${fmt1(w.share)}%</span>`}</td>`;
 }
-/* the period in the utilization header, and the three Worked : Leave headers shown or not */
+/* the period in the utilization header, and the three Worked / Leave / Leave share headers shown or not */
 function emplistHeads() {
   const label = EMPLIST_PERIODS[state.emplist.period || "30"];
   const th = $('#emplist-table th[data-sort="util"]');

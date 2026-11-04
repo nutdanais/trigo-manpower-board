@@ -317,8 +317,6 @@
       // a real percentage (0.05 shows as 5%); blank while unknown or no working days
       v = typeof r.util === "number" ? r.util / 100 : "";
       if (v !== "") cell.numFmt = "0%";
-    } else if (col.key === "workedLeave") {
-      v = r.worked != null ? `${r.worked} : ${r.leaveDays}` : "";
     } else if (col.key === "leaveShare") {
       v = typeof r.leaveShare === "number" ? r.leaveShare / 100 : "";
       if (v !== "") cell.numFmt = "0.0%";
@@ -552,13 +550,12 @@
     { key: "loanFrom",  label: "Loan From",       th: "ให้ยืมตั้งแต่",      width: 14, center: true, date: true },
     { key: "loanUntil", label: "Loan Until",      th: "ให้ยืมถึง",          width: 14, center: true, date: true },
   ];
-  /* Worked, Leave, Worked : Leave and Leave Share, after Utilization: only when the rows carry
+  /* Worked, Leave and Leave Share, after Utilization: only when the rows carry
      them (the app adds them for a role with the History permission). `period` ("30D", "90D",
      "YTD") names the utilization column; 30D when not given. */
   const WL_COLUMNS = [
     { key: "worked",      label: "Worked (days)",  th: "ทำงาน (วัน)",      width: 13, center: true },
     { key: "leaveDays",   label: "Leave (days)",   th: "ลา (วัน)",         width: 12, center: true },
-    { key: "workedLeave", label: "Worked : Leave", th: "ทำงาน : ลา",       width: 15, center: true },
     { key: "leaveShare",  label: "Leave Share",    th: "สัดส่วนการลา",     width: 13, center: true },
   ];
   const PERIOD_TH = { "30D": "30 วัน", "90D": "90 วัน", YTD: "ตั้งแต่ต้นปี" };

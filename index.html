@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-04f">
+<link rel="stylesheet" href="styles.css?v=2026-11-04g">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-04f"></script>
+<script src="version.js?v=2026-11-04g"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -524,8 +524,8 @@
           <option value="th">ไทย</option>
           <option value="en">English</option>
         </select>
-        <!-- the period for the utilization and Worked : Leave columns -->
-        <select id="emplist-period" data-seg aria-label="Period" title="The period of the utilization and Worked : Leave columns: the last 30 days, the last 90 days or the year to date">
+        <!-- the period for the utilization, Worked, Leave and Leave share columns -->
+        <select id="emplist-period" data-seg aria-label="Period" title="The period of the utilization, Worked, Leave and Leave share columns: the last 30 days, the last 90 days or the year to date">
           <option value="30">30D</option>
           <option value="90">90D</option>
           <option value="ytd">YTD</option>
@@ -745,10 +745,10 @@
             <th data-sort="service">Years of service</th>
             <th data-sort="areaId">Service area</th>
             <th data-sort="boardId">Current board</th>
-            <th data-sort="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for. It keeps its own rule: the columns to its right (Worked, Leave, Worked : Leave) count planned working days only, as History does.">30D utilization</th>
+            <th data-sort="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for. It keeps its own rule: the columns to its right (Worked, Leave, Leave share) count planned working days only, as History does.">30D utilization</th>
             <th data-sort="worked" class="el-wl r" title="Days on a mission in the period, on planned working days (a day with no missions on the person's board is left out, as in Overview History). Shown to roles that can see Overview History.">Worked</th>
             <th data-sort="leaveDays" class="el-wl r" title="Days on leave in the period (annual, sick, business, unpaid). Exchange Working Day is not leave: it is worked back.">Leave</th>
-            <th data-sort="leaveShare" class="el-wl" title="Worked days : leave days, and the leave share of the working days: amber above 20%, red above 30%.">Worked : Leave</th>
+            <th data-sort="leaveShare" class="el-wl r" title="Leave days as a share of the working days in the period: amber above 20%, red above 30%. Click to sort, to find who takes the most leave.">Leave share</th>
             <th data-sort="active">Status</th>
           </tr>
         </thead>
@@ -1556,16 +1556,16 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-04f"></script>
-<script src="i18n-th.js?v=2026-11-04f"></script>
-<script src="planning.js?v=2026-11-04f"></script>
-<script src="employee-id.js?v=2026-11-04f"></script>
-<script src="cloud.js?v=2026-11-04f"></script>
-<script src="charts.js?v=2026-11-04f"></script>
-<script src="xlsx-export.js?v=2026-11-04f"></script>
-<script src="orgchart-pptx.js?v=2026-11-04f"></script>
-<script src="bulk-edit.js?v=2026-11-04f"></script>
-<script src="app.js?v=2026-11-04f"></script>
-<script src="report.js?v=2026-11-04f"></script>
+<script src="i18n.js?v=2026-11-04g"></script>
+<script src="i18n-th.js?v=2026-11-04g"></script>
+<script src="planning.js?v=2026-11-04g"></script>
+<script src="employee-id.js?v=2026-11-04g"></script>
+<script src="cloud.js?v=2026-11-04g"></script>
+<script src="charts.js?v=2026-11-04g"></script>
+<script src="xlsx-export.js?v=2026-11-04g"></script>
+<script src="orgchart-pptx.js?v=2026-11-04g"></script>
+<script src="bulk-edit.js?v=2026-11-04g"></script>
+<script src="app.js?v=2026-11-04g"></script>
+<script src="report.js?v=2026-11-04g"></script>
 </body>
 </html>
