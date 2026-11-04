@@ -3,16 +3,17 @@
      - Leave / day counts annual, sick, business and unpaid leave: Exchange Working Day is not
        leave (a note and its own row, outside every total); a button per type shows or hides it;
        Chart | Calendar; the by-type table;
-     - Worked vs leave, per person: working days (roster less Exchange days), worked, leave,
-       Worked : Leave, leave share (amber above 20%, red above 30%), sortable, Everyone /
-       Permanent / On-call;
-     - On-call deployed / day: called in against available, and Most called in;
+     - the People table's Leave view (the old Worked vs leave): working days (roster less Exchange
+       days), worked, leave, Worked : Leave, leave share (amber above 20%, red above 30%), sortable,
+       Everyone / Permanent / On-call;
+     - On-call deployed / day: called in against available, and a link to People's On-call view;
      - click a day in a chart or the calendar to open that board on that date;
      - Engineer workload → one engineer: a row or the picker picks them, six measures, day /
        week / month against the average engineer, hosts and facts; a day opens their board
        filtered to them;
-     - Workload alerts: days in a row (weekends and the period before the range included) and
-       people working mostly nights;
+     - People's flags (the old Workload alerts): days in a row (weekends and the period before the
+       range included) and people working mostly nights;
+     (tests/e2e/overview-people.e2e.js covers the rest of People, the profile and Manpower's counting rule)
      - a board-day nobody planned is left out, and it all reads in Thai.
      NODE_PATH=$(npm root -g) node tests/e2e/history-leave-oncall.e2e.js
    Exits non-zero on the first failed check. */
@@ -105,8 +106,10 @@ async function step(name, fn) {
       assert.equal(await p.locator(".ov-hchart:not(.ov-eng) .chart-column-chart rect.chart-mark").count(), 4, "Mon: annual + sick; Tue: annual + business");
     });
 
-    await step("Worked vs leave: per person, sorted by leave share, amber / red, Exchange days out of working days", async () => {
-      const rows = (await rowsOf(".ov-wl-table")).map((r) => r.slice(0, 7));
+    await step("People → Leave view: per person, sorted by leave share, amber / red, Exchange days out of working days", async () => {
+      assert.deepEqual(await read(".ov-hchart:not(.ov-eng) .ov-people-link"), ["Per person → People"], "a link where the list used to be");
+      await p.locator(".ov-people-bar .btn", { hasText: "Leave" }).click();
+      const rows = (await rowsOf(".ov-people-table")).map((r) => r.slice(0, 7));
       assert.deepEqual(rows, [
         ["Person D", "5", "3", "2", "3 : 2 (1.5 : 1)", "40.0%", "—"],
         ["Person E", "5", "4", "1", "4 : 1 (4.0 : 1)", "20.0%", "1"],
@@ -117,14 +120,13 @@ async function step(name, fn) {
         ["Person G OC", "5", "5", "0", "5 : 0", "0.0%", "—"],
         ["Person H OC", "4", "2", "0", "2 : 0", "0.0%", "—"],
       ]);
-      const pills = await p.evaluate(() => [...document.querySelectorAll(".ov-wl-table .ov-share")].slice(0, 3).map((x) => x.className.split(" ").pop()));
+      const pills = await p.evaluate(() => [...document.querySelectorAll(".ov-people-table .ov-share")].slice(0, 3).map((x) => x.className.split(" ").pop()));
       assert.deepEqual(pills, ["ov-share-bad", "ov-share-ok", "ov-share-ok"], "40% is red; exactly 20% is not above 20%");
-      assert.match((await read(".ov-wl .ov-hchart-head"))[0], /3 of 8 people took leave in the range/);
-      await p.locator(".ov-wl-table .ov-sort", { hasText: "Name" }).click();
-      assert.deepEqual((await rowsOf(".ov-wl-table")).map((r) => r[0]).slice(0, 2), ["Person A", "Person B"], "sorted by name");
-      await p.locator(".ov-wl .btn", { hasText: "On-call" }).click();
-      assert.deepEqual((await rowsOf(".ov-wl-table")).map((r) => r[0]), ["Person G OC", "Person H OC"]);
-      await p.locator(".ov-wl .btn", { hasText: "Everyone" }).click();
+      await p.locator(".ov-people-table .ov-sort", { hasText: "Name" }).click();
+      assert.deepEqual((await rowsOf(".ov-people-table")).map((r) => r[0]).slice(0, 2), ["Person A", "Person B"], "sorted by name");
+      await p.locator(".ov-people-bar .btn", { hasText: "On-call" }).nth(1).click();
+      assert.deepEqual((await rowsOf(".ov-people-table")).map((r) => r[0]), ["Person G OC", "Person H OC"]);
+      await p.locator(".ov-people-bar .btn", { hasText: "Everyone" }).click();
     });
 
     await step("a type button hides that type, never the last one; the calendar counts the types shown", async () => {
@@ -148,10 +150,14 @@ async function step(name, fn) {
       await showOverview();
     });
 
-    await step("On-call: called in against available, and who was called in most", async () => {
+    await step("On-call: called in against available, and People's On-call view says who was called in most", async () => {
       await pick("On-call deployed / day");
-      assert.deepEqual(await read(".ov-hchart-head-row .ov-muted"), ["Called in on 78% of the available on-call days · 21% of the people on missions"], "7 of 9 on-call days (Mon: H on Exchange); 7 of 33 people on missions");
-      assert.deepEqual((await rowsOf(".ov-hnames-table")).map((r) => r[0] + " | " + r[1]), ["Person G OC | 5", "Person H OC | 2"]);
+      assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .ov-muted"), ["Called in on 78% of the available on-call days · 21% of the people on missions"], "7 of 9 on-call days (Mon: H on Exchange); 7 of 33 people on missions");
+      assert.equal(await p.locator(".ov-hnames").count(), 0, "the Most called in list is gone");
+      await p.locator(".ov-hchart:not(.ov-eng) .ov-people-link .ov-linkbtn").click();
+      assert.equal(await p.locator(".ov-people-bar .btn.active").first().textContent(), "On-call", "the link opens People's On-call view");
+      const rows = await rowsOf(".ov-people-table");
+      assert.deepEqual(rows.map((r) => r[0] + " | " + r[3]), ["Person G OC | 5", "Person H OC | 2"], "Called in");
     });
 
     await step("Engineer workload → one engineer: tiles, chart against the average, hosts, facts", async () => {
@@ -173,10 +179,13 @@ async function step(name, fn) {
       await showOverview();
     });
 
-    await step("Workload alerts: 14 days in a row (the week before and the weekend included), mostly nights", async () => {
-      assert.deepEqual(await rowsOf(".ov-alert-grid .ov-alert-box:nth-child(1) .ov-alert-table"), [["Person A", "14", `${dayMon(pw[0])} → still going`]]);
-      assert.equal(await p.locator(".ov-alert-grid .ov-share-bad").count(), 1, "10 or more days is red");
-      assert.deepEqual(await rowsOf(".ov-alert-grid .ov-alert-box:nth-child(2) .ov-alert-table"), [["Person C", "5", "5", "100%"]]);
+    await step("People flags: 14 days in a row (the week before and the weekend included), mostly nights, leave above 30%", async () => {
+      assert.equal(await p.locator("h3", { hasText: "Workload alerts" }).count(), 0, "the Workload alerts section is gone");
+      await p.locator(".ov-people-bar .btn", { hasText: "Alerts only" }).click();
+      const flags = await p.evaluate(() => Object.fromEntries([...document.querySelectorAll(".ov-people-table tbody tr")].map((tr) => [tr.cells[0].textContent.replace(/\s+/g, " ").trim(), [...tr.querySelectorAll(".ov-flag")].map((f) => f.textContent.trim())])));
+      assert.deepEqual(flags, { "Person A": ["14 in a row · still going"], "Person C": ["mostly nights"], "Person D": ["leave > 30%"] });
+      assert.equal(await p.locator(".ov-people-table .ov-flag-bad").count(), 2, "10 or more days in a row and leave above 30% are red");
+      assert.match(await p.locator(".ov-people-table .ov-flag", { hasText: "in a row" }).getAttribute("title"), new RegExp(`${dayMon(pw[0])} → still going`));
     });
 
     await step("in Thai the new tiles, views, tables and alerts read in Thai", async () => {
@@ -186,13 +195,13 @@ async function step(name, fn) {
       const labels = await read(".ov-htiles:not(.ov-eng-tiles) .ov-htile-label");
       assert.deepEqual(labels.slice(4), ["ลา / วัน", "ออนคอลที่ปฏิบัติงาน / วัน"]);
       assert.deepEqual(english(await read(".ov-htile-delta, .ov-htile-help")), [], "deltas and help in Thai");
-      assert.deepEqual(english(await read(".ov-hchart-head-row .ov-muted, .ov-hchart .ov-legend, .ov-hnames")), [], "on-call view in Thai");
+      assert.deepEqual(english(await read(".ov-hchart-head-row .ov-muted, .ov-hchart .ov-legend, .ov-people-link")), [], "on-call view in Thai");
       assert.deepEqual(english(await read(".ov-eng")), [], "one-engineer view in Thai");
-      assert.deepEqual(english(await read(".ov-alert-grid, .ov-alert-grid ~ *")), [], "alerts in Thai");
+      assert.deepEqual(english(await read("#ov-people")), [], "People in Thai");
       await p.locator(".ov-htiles:not(.ov-eng-tiles) .ov-htile").nth(4).click();
       await p.waitForTimeout(200);
       assert.deepEqual(await read(".ov-hview .btn"), ["กราฟ", "ปฏิทิน"]);
-      assert.deepEqual(english(await read(".ov-lv-chips, .ov-lv-table, .ov-wl")), [], "leave view, by-type table and worked vs leave in Thai");
+      assert.deepEqual(english(await read(".ov-lv-chips, .ov-lv-table, .ov-people-link")), [], "leave view and by-type table in Thai");
       await p.locator(".ov-hview .btn").nth(1).click();
       await p.waitForTimeout(200);
       assert.deepEqual(english(await read(".ov-cal-cell, .ov-cal-key, .ov-cal-dow")), [], "the calendar in Thai");

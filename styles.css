@@ -2611,10 +2611,6 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-lv-table tr.ov-lv-off td { color: var(--muted); }
 .ov-hbar { display: inline-block; width: 90px; height: 7px; border-radius: 999px; background: var(--bg); overflow: hidden; vertical-align: middle; }
 .ov-hbar i { display: block; height: 100%; border-radius: 999px; }
-.ov-hnames { margin-top: 14px; }
-.ov-hnames-table { width: auto; min-width: min(100%, 420px); }
-.ov-hnames-table td { white-space: nowrap; }
-.ov-hnames-table td:last-child { white-space: normal; }
 .ov-oc-tag { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: 4px; font-size: 10.5px; font-weight: 700; color: var(--chart-oncall); background: rgba(235,104,52,.13); }
 .chart-ref-label { paint-order: stroke; stroke: var(--panel); stroke-width: 4px; font-weight: 600; }
 /* History tiles: the change against the previous period */
@@ -2624,7 +2620,7 @@ body.fp-pools-empty { --fp-w: 264px; }
 /* Leave view: Exchange Working Day as a note, not a type button; its row in the table */
 .ov-lv-exchange { font-size: 12px; color: var(--muted); align-self: center; padding: 3px 4px; }
 .ov-lv-table tr.ov-lv-exch td { color: var(--muted); font-style: italic; }
-/* Worked vs leave, per person */
+/* People: the table (also the old Worked vs leave rules) */
 .ov-wl-table th .ov-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-transform: inherit; letter-spacing: inherit; }
 .ov-wl-table th .ov-sort[aria-sort="descending"]::after { content: " ↓"; }
 .ov-wl-table th .ov-sort[aria-sort="ascending"]::after { content: " ↑"; }
@@ -2652,11 +2648,6 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-eng-facts > div { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; min-width: 0; }
 .ov-eng-facts span { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .ov-eng-facts b { font-size: 17px; font-variant-numeric: tabular-nums; }
-/* Workload alerts */
-.ov-alert-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-@media (max-width: 860px) { .ov-alert-grid { grid-template-columns: 1fr; } }
-.ov-alert-box { min-width: 0; }
-.ov-alert-table td { white-space: nowrap; }
 /* the Leave view's calendar: a month grid per month, Monday first, weekends narrow */
 .ov-cal-wrap { overflow-x: auto; margin-top: 6px; }
 .ov-cal-month { min-width: 560px; margin-bottom: 12px; }
@@ -7087,3 +7078,57 @@ label > .pk { margin-top: 5px; }
 .mm-until small { display: inline; }
 #modal-move-mission .mm-until input[type="date"] { flex: 0 1 170px; width: auto; height: 30px; margin-top: 0; padding: 0 8px; }
 #modal-move-mission label.mm-opt.hidden { display: none; }
+
+
+/* ===== Overview phase 2, batch A: Period heading, People, employee profile ===== */
+/* the range control now sits under the Period heading and drives every section below it */
+.ov-period { display: flex; flex-direction: column; gap: 8px; }
+.ov-period .ov-group-head { margin-bottom: 0; }
+.ov-period .ov-section-sub { margin: 0 2px; }
+/* tiles that are not buttons (the profile's) */
+.ov-htile-static { cursor: default; }
+.ov-htile-static:hover { background: var(--panel); }
+.ov-people-link { margin: 8px 0 0; font-size: 12.5px; }
+/* People: the spread chart, the quick views and the table */
+#ov-people .ov-hchart { margin-top: 10px; }
+.ov-spread-sum { margin: 2px 0 6px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ov-spread-axis { margin: 4px 0 0; font-size: 11.5px; }
+.ov-bands { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 6px; align-items: end; }
+.ov-band { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 4px 0 2px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text); font: inherit; cursor: pointer; }
+.ov-band:hover { background: var(--hover-tint); }
+.ov-band:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-band[aria-pressed="true"] { border-color: var(--primary-text); background: var(--hover-tint); }
+.ov-band-n { height: 16px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ov-band-bar { display: flex; align-items: flex-end; width: 100%; max-width: 40px; height: 86px; border-radius: 4px; background: var(--bg); overflow: hidden; }
+.ov-band-bar i { display: block; width: 100%; background: var(--chart-assigned); border-radius: 4px 4px 0 0; }
+.ov-band-l { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ov-band-median .ov-band-l { color: var(--primary-text); font-weight: 700; }
+.ov-band-median .ov-band-l::after { content: "▲"; display: block; font-size: 8px; line-height: 1; margin-top: 1px; }
+.ov-people-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-top: 14px; }
+.ov-people-sum { margin: 10px 0 0; font-size: 13px; }
+.ov-band-chip { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 12.5px; }
+.ov-band-chip > span { padding: 2px 10px; border-radius: 999px; background: var(--hover-tint); font-weight: 600; }
+.ov-person-link { font: inherit; padding: 0; border: 0; background: none; color: var(--primary-text); font-weight: 600; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; }
+.ov-person-link:hover { text-decoration-color: currentColor; }
+.ov-person-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+.ov-people-table td.ov-flags { white-space: normal; min-width: 160px; }
+.ov-flag { display: inline-block; margin: 1px 2px 1px 0; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.ov-flag-ok { background: #e6f4ec; color: #1f8a4c; }
+.ov-flag-warn { background: #fdf0d9; color: #a15c00; }
+.ov-flag-bad { background: #fde8e7; color: #b42318; }
+/* the employee profile: a wide side panel, full screen on a phone */
+#modal-profile.modal-side { width: min(1040px, 100vw); }
+.profile-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 22px 24px; display: flex; flex-direction: column; gap: 12px; }
+.ov-prof-id { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.ov-prof-id > div { overflow-wrap: anywhere; }
+.ov-prof-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 0; }
+@media (max-width: 860px) { .ov-prof-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ov-prof-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
+.ov-prof-block { min-width: 0; }
+.ov-prof-hosts td { white-space: nowrap; }
+.ov-prof-note { margin: 0 0 6px; font-size: 13px; }
+.profile-body .ov-hchart { margin-top: 0; }
+@media (max-width: 640px) {
+  #modal-profile.modal-side { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  .profile-body { padding: 12px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+}
