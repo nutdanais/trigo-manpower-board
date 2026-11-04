@@ -166,7 +166,8 @@ async function step(name, fn) {
         ["Person D", "5", "3", "2", "3 : 2 (1.5 : 1)", "40.0%", "—"],
         ["Person E", "5", "4", "1", "4 : 1 (4.0 : 1)", "20.0%", "1"],
         ["Person F", "5", "4", "1", "4 : 1 (4.0 : 1)", "20.0%", "—"]]);
-      assert.deepEqual(rows.find((r) => r[0].startsWith("Person H")), ["Person H OC", "4", "2", "0", "2 : 0", "0.0%", "—"], "Exchange Working Day is neither worked nor leave");
+      assert.equal(rows.length, 3, "only the people who took leave; the 0% rows are a count, not rows");
+      assert.deepEqual(await read(".ov-leave-sum"), ["3 of 12 people had leave in this range · Highest leave share first"]);
       assert.equal(rows.some((r) => /Person [IJ]\b/.test(r[0])), false, "Board Two was not planned: its people are left out");
     });
 
@@ -217,8 +218,11 @@ async function step(name, fn) {
     await step("A0 + A1: Manpower and People agree on worked, leave and working days for the same person and range", async () => {
       const from = h.addDays(today, -89);
       await showOverview(from, today);
-      await p.locator(".ov-people-bar .btn", { hasText: "Leave" }).click();
-      const people = Object.fromEntries((await rowsOf(".ov-people-table")).map((r) => [r[0].replace(" OC", ""), { working: Number(r[1]), worked: Number(r[2]), leave: Number(r[3]) }]));
+      await p.locator(".ov-people-bar .btn", { hasText: "Workload" }).click();
+      await p.locator(".ov-wl-more").click();
+      const people = Object.fromEntries((await rowsOf(".ov-people-table")).map((r) => [r[0].replace(" OC", ""), { working: Number(r[1]), worked: Number(r[2]), leave: 0 }]));
+      await p.locator(".ov-people-bar .btn", { hasText: "Leave" }).click();   // the Leave view lists only those who took leave
+      for (const r of await rowsOf(".ov-people-table")) people[r[0].replace(" OC", "")].leave = Number(r[3]);
       await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       await p.locator("#emplist-period + .seg-pick button", { hasText: "90D" }).click();
       await p.waitForTimeout(500);

@@ -127,6 +127,71 @@
     return unit(p.years, "year") + " " + unit(p.months, "month") + " " + unit(p.days, "day");
   }
 
+  /* The monthly report: one sheet per section, each with one or more stacked tables in the same
+     navy header / green rule style as the other tables. spec: { sheets: [{ name, blocks: [{ title,
+     columns: [{ label, width, center }], rows: [[value…]] }] }] }. A sheet with a single table gets
+     the header frozen and a filter; the others read top to bottom, a blank line between tables. */
+  async function buildReportWorkbook(ExcelJS, spec) {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "TRIGO Manpower Board";
+    wb.created = new Date();
+    if (spec.title) wb.title = spec.title;
+    const used = new Set();
+    for (const sh of spec.sheets) {
+      let name = safeSheetName(sh.name), n = 2;
+      while (used.has(name.toLowerCase())) name = safeSheetName(sh.name).slice(0, 28) + " " + n++;
+      used.add(name.toLowerCase());
+      const single = sh.blocks.length === 1 && !sh.blocks[0].title;
+      const ws = wb.addWorksheet(name, {
+        views: [{ showGridLines: false, ...(single ? { state: "frozen", ySplit: 1 } : {}) }],
+        pageSetup: { orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+          margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 } },
+      });
+      const widths = [];
+      for (const b of sh.blocks) b.columns.forEach((c, i) => { widths[i] = Math.max(widths[i] || 8, c.width || 12); });
+      widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+      let row = 1, firstHeader = 0, lastRow = 0;
+      for (const b of sh.blocks) {
+        if (b.title) {
+          const t = ws.getCell(row, 1);
+          t.value = b.title;
+          t.font = fontOf({ bold: true, size: 12, color: { argb: C.navy } });
+          ws.getRow(row).height = 22;
+          row++;
+        }
+        if (!firstHeader) firstHeader = row;
+        b.columns.forEach((col, i) => {
+          const cell = ws.getCell(row, i + 1);
+          cell.value = col.label;
+          cell.font = fontOf({ bold: true, color: { argb: "FFFFFFFF" } });
+          cell.fill = fillOf(C.navy);
+          cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1, wrapText: true };
+          cell.border = { bottom: { style: "medium", color: { argb: C.green } } };
+        });
+        ws.getRow(row).height = 24;
+        row++;
+        b.rows.forEach((r, k) => {
+          const rw = ws.getRow(row);
+          rw.height = 20;
+          b.columns.forEach((col, i) => {
+            const cell = rw.getCell(i + 1);
+            const v = r[i];
+            cell.value = v === undefined || v === null ? "" : v;
+            cell.font = fontOf({ bold: i === 0 });
+            cell.alignment = { vertical: "middle", horizontal: col.center ? "center" : "left", indent: col.center ? 0 : 1 };
+            cell.border = { bottom: { style: "thin", color: { argb: C.line } } };
+            if (k % 2 === 1) cell.fill = fillOf(C.paper);
+          });
+          row++;
+        });
+        lastRow = row - 1;
+        row++;   // a blank line between tables
+      }
+      if (single && sh.blocks[0].rows.length) ws.autoFilter = { from: { row: firstHeader, column: 1 }, to: { row: lastRow, column: sh.blocks[0].columns.length } };
+    }
+    return { workbook: wb };
+  }
+
   /* Keep only known keys, in sheet order, whatever order or junk was passed. */
   function normalizeColumns(keys) {
     const want = new Set(Array.isArray(keys) ? keys : ALL_KEYS);
@@ -252,8 +317,6 @@
       // a real percentage (0.05 shows as 5%); blank while unknown or no working days
       v = typeof r.util === "number" ? r.util / 100 : "";
       if (v !== "") cell.numFmt = "0%";
-    } else if (col.key === "workedLeave") {
-      v = r.worked != null ? `${r.worked} : ${r.leaveDays}` : "";
     } else if (col.key === "leaveShare") {
       v = typeof r.leaveShare === "number" ? r.leaveShare / 100 : "";
       if (v !== "") cell.numFmt = "0.0%";
@@ -487,13 +550,12 @@
     { key: "loanFrom",  label: "Loan From",       th: "ให้ยืมตั้งแต่",      width: 14, center: true, date: true },
     { key: "loanUntil", label: "Loan Until",      th: "ให้ยืมถึง",          width: 14, center: true, date: true },
   ];
-  /* Worked, Leave, Worked : Leave and Leave Share, after Utilization: only when the rows carry
+  /* Worked, Leave and Leave Share, after Utilization: only when the rows carry
      them (the app adds them for a role with the History permission). `period` ("30D", "90D",
      "YTD") names the utilization column; 30D when not given. */
   const WL_COLUMNS = [
     { key: "worked",      label: "Worked (days)",  th: "ทำงาน (วัน)",      width: 13, center: true },
     { key: "leaveDays",   label: "Leave (days)",   th: "ลา (วัน)",         width: 12, center: true },
-    { key: "workedLeave", label: "Worked : Leave", th: "ทำงาน : ลา",       width: 15, center: true },
     { key: "leaveShare",  label: "Leave Share",    th: "สัดส่วนการลา",     width: 13, center: true },
   ];
   const PERIOD_TH = { "30D": "30 วัน", "90D": "90 วัน", YTD: "ตั้งแต่ต้นปี" };
@@ -941,7 +1003,7 @@
     return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
   }
 
-  const api = { buildCapacityWorkbook, addCapacityCharts, colLetter, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, LOAN_COLUMNS, buildListWorkbook, buildTableWorkbook, listColumns, WL_COLUMNS };
+  const api = { buildCapacityWorkbook, addCapacityCharts, colLetter, personName, COLUMNS, ALL_KEYS, LEAVE_ORDER, GROUPS, GROUP_KEYS, normalizeColumns, summarize, summarizeLeave, groupColumns, safeSheetName, bannerLayout, serviceParts, serviceLength, buildWorkbook, LIST_COLUMNS, LOAN_COLUMNS, buildListWorkbook, buildTableWorkbook, buildReportWorkbook, listColumns, WL_COLUMNS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ManpowerXlsx = api;
 })(globalThis);

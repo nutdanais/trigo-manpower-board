@@ -114,18 +114,15 @@ async function step(name, fn) {
         ["Person D", "5", "3", "2", "3 : 2 (1.5 : 1)", "40.0%", "—"],
         ["Person E", "5", "4", "1", "4 : 1 (4.0 : 1)", "20.0%", "1"],
         ["Person F", "5", "4", "1", "4 : 1 (4.0 : 1)", "20.0%", "—"],
-        ["Person A", "5", "5", "0", "5 : 0", "0.0%", "—"],
-        ["Person B", "5", "5", "0", "5 : 0", "0.0%", "—"],
-        ["Person C", "5", "5", "0", "5 : 0", "0.0%", "—"],
-        ["Person G OC", "5", "5", "0", "5 : 0", "0.0%", "—"],
-        ["Person H OC", "4", "2", "0", "2 : 0", "0.0%", "—"],
-      ]);
+      ], "only the people who took leave, the highest leave share first (no 0% rows)");
+      assert.deepEqual(await read(".ov-leave-sum"), ["3 of 8 people had leave in this range · Highest leave share first"]);
       const pills = await p.evaluate(() => [...document.querySelectorAll(".ov-people-table .ov-share")].slice(0, 3).map((x) => x.className.split(" ").pop()));
       assert.deepEqual(pills, ["ov-share-bad", "ov-share-ok", "ov-share-ok"], "40% is red; exactly 20% is not above 20%");
       await p.locator(".ov-people-table .ov-sort", { hasText: "Name" }).click();
-      assert.deepEqual((await rowsOf(".ov-people-table")).map((r) => r[0]).slice(0, 2), ["Person A", "Person B"], "sorted by name");
+      assert.deepEqual((await rowsOf(".ov-people-table")).map((r) => r[0]).slice(0, 2), ["Person D", "Person E"], "sorted by name");
       await p.locator(".ov-people-bar .btn", { hasText: "On-call" }).nth(1).click();
-      assert.deepEqual((await rowsOf(".ov-people-table")).map((r) => r[0]), ["Person G OC", "Person H OC"]);
+      assert.equal(await p.locator(".ov-people-table").count(), 0, "no on-call person took leave: no table");
+      assert.equal(await p.getByText("Nobody took leave in this range.").count(), 1);
       await p.locator(".ov-people-bar .btn", { hasText: "Everyone" }).click();
     });
 
@@ -208,22 +205,24 @@ async function step(name, fn) {
       await p.evaluate(() => I18N.setLang("en"));
     });
 
-    await step("Manpower List: Worked, Leave, Worked : Leave over the period (90D), Exchange not leave, in the Excel rows", async () => {
+    await step("Manpower List: Worked, Leave, Leave share over the period (90D), Exchange not leave, in the Excel rows", async () => {
       await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       await p.locator("#emplist-period + .seg-pick button", { hasText: "90D" }).click();
       await p.waitForTimeout(500);
       const heads = (await p.locator("#emplist-table thead th:not(.hidden)").allTextContents()).map((x) => x.trim());
-      for (const hd of ["90D utilization", "Worked", "Leave", "Worked : Leave"]) assert.ok(heads.includes(hd), hd + " in " + heads.join(" | "));
+      for (const hd of ["90D utilization", "Worked", "Leave", "Leave share"]) assert.ok(heads.includes(hd), hd + " in " + heads.join(" | "));
+      assert.ok(!heads.includes("Worked : Leave"), "the ratio column is gone: the leave share replaces it");
       const cells = await p.evaluate(() => Object.fromEntries([...document.querySelectorAll("#emplist-body tr")].map((tr) =>
         [tr.querySelector("td[data-label=Name]").textContent.trim().split(/\s{2,}|\n/)[0], [...tr.querySelectorAll("td.el-wl")].map((td) => td.textContent.replace(/\s+/g, " ").trim())])));
       // seedBase also puts D on a mission and E on annual leave today
       assert.deepEqual(cells["Person D"].slice(0, 2), ["4", "2"], "Wed-Fri and today worked; annual leave Mon and Tue");
       assert.deepEqual(cells["Person E"].slice(0, 2), ["4", "2"], "sick Monday and annual leave today");
       assert.deepEqual(cells["Person H"].slice(0, 2), ["2", "0"], "Exchange Working Day is not leave");
-      assert.match(cells["Person D"][2], /^4 : 2 \d+\.\d%$/);
+      assert.match(cells["Person D"][2], /^\d+\.\d%$/, "the Leave share column");
+      assert.equal(cells["Person H"][2], "0.0%");
       const x = await p.evaluate(() => { const r = emplistXlsxRows().find((y) => y.name === "Person D"); return [r.worked, r.leaveDays, ManpowerXlsx.listColumns([r], "90D").map((c) => c.label)]; });
       assert.deepEqual(x.slice(0, 2), [4, 2]);
-      for (const l of ["90D Utilization", "Worked (days)", "Leave (days)", "Worked : Leave", "Leave Share"]) assert.ok(x[2].includes(l), l);
+      for (const l of ["90D Utilization", "Worked (days)", "Leave (days)", "Leave Share"]) assert.ok(x[2].includes(l), l);
     });
 
     await step("Manpower List: a role without History doesn't see Worked : Leave, in the table or the file", async () => {
