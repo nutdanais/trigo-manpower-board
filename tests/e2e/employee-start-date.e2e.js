@@ -138,7 +138,7 @@ const X = require("../../xlsx-export.js");
     await wb.xlsx.load(fs.readFileSync("/tmp/emplist-th.xlsx"));
     ws = wb.worksheets[0];
     assert.equal(ws.name, "รายชื่อพนักงาน");
-    assert.deepEqual(head(ws), ["ชื่อ (ไทย)", "ชื่อ (อังกฤษ)", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "บอร์ดปัจจุบัน", "การใช้งาน 30 วัน", "ทำงาน (วัน)", "ลา (วัน)", "ทำงาน : ลา", "สัดส่วนการลา", "สถานะ"]);
+    assert.deepEqual(head(ws), ["ชื่อ (ไทย)", "ชื่อ (อังกฤษ)", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "บอร์ดปัจจุบัน", "การใช้งาน 30 วัน", "ทำงาน (วัน)", "ลา (วัน)", "สัดส่วนการลา", "สถานะ"]);
     const row = {}; for (let r = 2; r <= 1 + shown; r++) row[ws.getCell(r, 1).value] = r;
     assert.equal(ws.getCell(row["Dated Person"], 4).value, "ประจำ");
     assert.equal(ws.getCell(row["Dated Person"], 8).value, X.serviceLength(ago(3, 5, 12), T, "th"));

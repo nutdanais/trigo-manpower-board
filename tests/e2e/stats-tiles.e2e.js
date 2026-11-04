@@ -97,7 +97,7 @@ async function step(name, fn) {
       await p.click(".tab-emplist");
       assert.match(await p.getAttribute("#btn-new-employee", "class"), /\bbtn-primary\b/, "on Manpower it is the only create button, so it stays filled");
       assert.match(await p.locator("#stats-bar .stat-lead").innerText(), /Total/, "Manpower uses the board's stats design: a Total lead");
-      assert.deepEqual(await p.$$eval("#stats-bar .stat-tile", (t) => t.map((x) => x.dataset.stat)), ["Permanent", "On-call", "Inactive"]);
+      assert.deepEqual(await p.$$eval("#stats-bar .stat-tile", (t) => t.map((x) => x.dataset.stat)), ["Permanent", "On-call", "Inactive", "Resigned"]);
       await p.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
     });
 

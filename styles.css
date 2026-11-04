@@ -5475,7 +5475,7 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 #topbar.tb-snug #board-tabs .board-tab { padding: 0 8px; font-size: 13px; }
 #topbar.tb-snug #board-tabs .board-tab.active::after { left: 8px; right: 8px; }
 #topbar.tb-snug .topbar-left { gap: 8px; }
-#topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 10px; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 9px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
 

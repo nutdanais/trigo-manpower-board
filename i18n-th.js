@@ -2621,5 +2621,6 @@ I18N.add({
   "Previous board": "บอร์ดก่อนหน้า",
   "Next board": "บอร์ดถัดไป",
   "There is nothing to present on this tab.": "ไม่มีอะไรให้นำเสนอในแท็บนี้",
+  "Stacked bar, total {a}": "แผนภูมิแท่งแบบซ้อน ผลรวม {a}",
 });
 
