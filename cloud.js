@@ -1536,7 +1536,8 @@ const cloud = {
      and On-call views and their name lists. `roster`, `workEmp` and
      `nightEmp` say who was on the board, on a mission and on a night
      mission (Worked : Leave and the People table), `crews` lists the people on
-     each staffed mission (the newcomer-only flag), and each `byEngineer`
+     each staffed mission (the newcomer-only flag), `areaCrew` the crew by the
+     service area of the mission's host (Boards & areas), and each `byEngineer`
      entry also counts its `nightMissions` and missions per host (`hosts`)
      for the one-engineer view.
      Caveats (surfaced in the UI, not hidden here): headcount/oncallHeadcount
@@ -1609,6 +1610,7 @@ const cloud = {
           leaveEmp: {},    // { employeeId: leave type } — who was on leave that day
           oncallEmp: {},   // { employeeId: 1 } — on-call people on a (non-hidden) mission that day
           crews: [],       // one list of employee ids per staffed mission that day (People: "newcomer-only mission")
+          areaCrew: {},    // { areaId|"": { crew, ownArea } }: crew on missions whose HOST sits in that service area, and how many of them are of that area (Boards & areas)
           holiday: isNonWorkingDate(d, boardId),   // weekend or holiday override: unassigned permanent staff are off, not on standby
         };
       }
@@ -1661,6 +1663,8 @@ const cloud = {
        date, so a mission NUMBER that runs both a day and a night shift is
        two missions here, exactly as the board and the single-day "By
        engineer" table already show it. */
+    const hostArea = new Map(this.data.hosts.map((h) => [h.name, h.areaId || ""]));   // a mission's host (by name) -> its service area
+    const empArea = new Map(this.data.employees.map((e) => [e.id, e.areaId]));
     const crewByMission = new Map();   // mission id -> {crew, permCrew, oncallCrew, ids}
     for (const a of assignRows) {
       if (!a.mission_id || !isCounted(a.employee_id, a.plan_date)) continue;
@@ -1677,6 +1681,10 @@ const cloud = {
       if (!bucket) continue;
       bucket.staffedMissions++;
       bucket.crews.push(m.ids);
+      const hostAreaId = hostArea.get(missionHost.get(missionId)) || "";
+      const ac = bucket.areaCrew[hostAreaId] || (bucket.areaCrew[hostAreaId] = { crew: 0, ownArea: 0 });
+      ac.crew += m.ids.length;
+      if (hostAreaId) ac.ownArea += m.ids.filter((id) => empArea.get(id) === hostAreaId).length;
       const engId = missionEngineer.get(missionId) || "";
       const rec = bucket.byEngineer[engId] ||
         (bucket.byEngineer[engId] = { missions: 0, crew: 0, permCrew: 0, oncallCrew: 0, nightMissions: 0, hosts: {} });
