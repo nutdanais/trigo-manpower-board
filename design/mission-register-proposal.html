@@ -162,7 +162,12 @@ label.opt input { grid-row: span 2; margin-top: 3px; accent-color: var(--primary
 label.opt b { font-size: 13px; }
 label.opt span { font-size: 12.5px; color: var(--muted); grid-column: 2; }
 label.opt:has(input:checked) { border-color: var(--primary); background: var(--hover-tint); }
-.rec { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ok); margin-left: 6px; }
+label.opt:has(input:checked) b::after { content: "Chosen"; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ok); margin-left: 8px; }
+label.opt:not(:has(input:checked)) { opacity: .55; cursor: default; }
+label.opt { cursor: default; }
+table.dec td { white-space: normal; vertical-align: top; }
+table.dec td:first-child { white-space: nowrap; }
+.chosen { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ok); margin-left: 6px; }
 
 /* summary */
 .summary { position: sticky; bottom: 0; background: var(--primary); color: #fff; border-radius: 10px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 -4px 16px rgba(0,58,102,.18); }
@@ -180,13 +185,38 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
 <div class="wrap">
 
 <header>
-  <div class="eyebrow">Proposal · Manpower Board · 4 Nov 2026</div>
+  <div class="eyebrow">Final spec · Manpower Board · decided 4 Nov 2026</div>
   <h1 style="margin-top:8px">Mission Register: starting data, closing missions and the year-end renumber</h1>
-  <p class="lede">You asked three questions. All three have the same root cause. Today a mission exists only as a copy on each day's plan, so the app has no single place that knows which missions a board has, which are still running and what each one is called. This page proposes adding that place, a <b>Mission Register</b> for each board, and shows how it answers each question. Pick an option in each decision block. The bar at the bottom collects your choices so you can send them back to me.</p>
+  <p class="lede">You asked three questions. All three have the same root cause. Today a mission exists only as a copy on each day's plan, so the app has no single place that knows which missions a board has, which are still running and what each one is called. This spec adds that place, a <b>Mission Register</b> for each board, and shows how it answers each question. Every decision below is settled. The options you didn't pick stay greyed out so the reasoning is still visible. Nothing has been built yet.</p>
   <nav class="toc" aria-label="Sections">
-    <a href="#idea">The idea</a><a href="#p1">1 · Starting data</a><a href="#p2">2 · Close a mission</a><a href="#p3">3 · Year-end renumber</a><a href="#open">Questions for you</a><a href="#plan">Build order</a>
+    <a href="#idea">The idea</a><a href="#p1">1 · Starting data</a><a href="#p2">2 · Close a mission</a><a href="#p3">3 · Year-end renumber</a><a href="#decided">Decisions</a><a href="#open">Your answers</a><a href="#plan">Build order</a>
   </nav>
 </header>
+
+
+<section class="part" id="decided">
+  <div class="part-head">
+    <div class="eyebrow">Decisions</div>
+    <h2>What was decided</h2>
+  </div>
+  <div class="panel tbl-wrap" style="padding:0">
+    <table class="dec">
+      <thead><tr><th>#</th><th>Topic</th><th>Decision</th><th>What it means for the build</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">D1</td><td>Where the register lives</td><td><b>A new Missions tab</b> next to Host</td><td>Same toolbar, filters, Bulk edit and Export as Manpower and Host.</td></tr>
+        <tr><td class="mono">D2</td><td>Editing a mission on the board</td><td><b>Ask each time</b>: this day only, or from this day on</td><td>"From this day on" updates the register and the days already planned after it.</td></tr>
+        <tr><td class="mono">D3</td><td>Wording</td><td><b>Hide · Close · Delete</b></td><td>Close (ปิดมิชชั่น) is new. Delete asks "Close instead?" when the mission has earlier days.</td></tr>
+        <tr><td class="mono">D4</td><td>Entering the new numbers</td><td><b>Excel, New number column empty</b></td><td>Changed from "prefilled" because of Q4: Finance, ERP or the customer issue the numbers, so a guess could be uploaded unchecked. The upload validates every row instead.</td></tr>
+        <tr><td class="mono">D5</td><td>Switch date</td><td><b>Each board's first working day</b> of the new year, editable</td><td>Uses the board's weekend and holidays, e.g. Mon 4 Jan 2027.</td></tr>
+        <tr><td class="mono">Q1</td><td>Uniqueness</td><td><b>Unique company-wide</b>, except one mission running on several boards</td><td>Typing a number open on another board asks "Same mission at another location?" Yes links the entries. No refuses it as a duplicate.</td></tr>
+        <tr><td class="mono">Q2</td><td>Day and Night</td><td><b>Same number</b> for both shifts</td><td>Two register rows, one number. They are renumbered together, and closing one asks about the other.</td></tr>
+        <tr><td class="mono">Q3</td><td>Number format</td><td><b>Always PREFIX.YY.NNNN</b>, validated</td><td>For example LCBTH.27.0001. A 2027 renumber must say <span class="mono">.27.</span></td></tr>
+        <tr><td class="mono">Q4</td><td>Who issues numbers</td><td><b>Finance, ERP or the customer</b></td><td>No suggestions (see D4).</td></tr>
+        <tr><td class="mono">Q5</td><td>Permissions</td><td><b>Close: Engineer and up · Reopen and renumber: Manager / Admin</b></td><td>Enforced in the database, like the other roles.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
 <!-- ============ THE IDEA ============ -->
 <section class="part" id="idea">
@@ -313,7 +343,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
         <tbody>
           <tr><td>ID</td><td>Grey, filled by the app. Leave empty for new missions.</td></tr>
           <tr><td>Board *</td><td>Dropdown of boards</td></tr>
-          <tr><td>Mission number *</td><td>Unique per board + shift</td></tr>
+          <tr><td>Mission number *</td><td>PREFIX.YY.NNNN, unique company-wide (linked missions excepted)</td></tr>
           <tr><td>Shift *</td><td>Day / Night</td></tr>
           <tr><td>Host *</td><td>Must be in the Host list</td></tr>
           <tr><td>Customer *</td><td>Free text</td></tr>
@@ -334,6 +364,28 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
         <li>New missions are held back until you tick them in the preview, as new people are today.</li>
         <li>A row with a problem (unknown host, duplicate number, end before start) is skipped with its row number. The rest can still be applied, and uploading the corrected file only changes what still differs.</li>
         <li>The register changes straight away. A change reaches the board from the <b>next day that is carried over or started from the register</b>. Days already planned are left alone unless you tick <b>Also update days already planned from…</b> in the preview.</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <div class="cols2" style="align-items:start">
+    <div class="dialog" aria-label="Mockup: same mission at another location">
+      <div class="dh"><b>LCBTH.26.0005 is already open on LCB Port</b><span class="small muted">Hino Motors Bangna → Denso Thailand · Day</span></div>
+      <div class="db">
+        <p>Mission numbers are unique across the company. Is this the same mission running at another location?</p>
+        <div class="note info">If you say yes, both boards share the number. A renumber or a close on either board offers to do the same on the other.</div>
+      </div>
+      <div class="df"><span class="btn">No, use another number</span><span class="btn fill">Yes, same mission on Rayong</span></div>
+    </div>
+    <div class="box">
+      <h3>One number, more than one board (Q1)</h3>
+      <ul class="small">
+        <li>A number belongs to one <b>mission</b>, and a mission can be open on several boards. The register links those rows together.</li>
+        <li>The Missions tab shows <span class="tag info">Also on Rayong</span> next to a linked row.</li>
+        <li>A number typed on a second board is never accepted silently. The New Mission form, Bulk edit and the renumber file all ask or refuse.</li>
+        <li>Day and Night with the same number (Q2) are the same mission too, so they move together the same way.</li>
+        <li>The database checks it as well: every register row with the same number must belong to the same linked mission.</li>
       </ul>
     </div>
   </div>
@@ -361,7 +413,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="decision" data-q="D1">
     <div class="q"><span class="id">D1</span><b>Where does the Mission Register live?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="D1" value="A new Missions tab next to Host" checked><b>A new Missions tab<span class="rec">Recommended</span></b><span>Next to Manpower and Host, with the same toolbar, filters, Bulk edit and Export. Engineers can view it. Managers and Admins can edit.</span></label>
+      <label class="opt"><input type="radio" name="D1" value="A new Missions tab next to Host" checked><b>A new Missions tab</b><span>Next to Manpower and Host, with the same toolbar, filters, Bulk edit and Export. Engineers can view it. Managers and Admins can edit.</span></label>
       <label class="opt"><input type="radio" name="D1" value="Inside Settings → Boards"><b>Inside Settings → Boards</b><span>Opened per board. Out of the way, but planners would have to go into Settings to see what's open.</span></label>
       <label class="opt"><input type="radio" name="D1" value="A side panel on the Board tab"><b>A panel on the Board tab</b><span>Opened from the toolbar, like Hide/Unhide. Close to the work, but crowds an already busy toolbar.</span></label>
     </div>
@@ -370,7 +422,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="decision" data-q="D2">
     <div class="q"><span class="id">D2</span><b>When someone edits a mission on the board (new engineer, new hours), what happens to the register?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="D2" value="Ask: this day only, or from this day on" checked><b>Ask each time<span class="rec">Recommended</span></b><span>Save offers "This day only" or "From this day on". "From this day on" updates the register and the days already planned after it. That's the honest version of what Carry over does today.</span></label>
+      <label class="opt"><input type="radio" name="D2" value="Ask: this day only, or from this day on" checked><b>Ask each time</b><span>Save offers "This day only" or "From this day on". "From this day on" updates the register and the days already planned after it. That's the honest version of what Carry over does today.</span></label>
       <label class="opt"><input type="radio" name="D2" value="Always update the register"><b>Always update the register</b><span>Simplest. A one-off change (an engineer covering for a day) would then stick for later days unless someone changes it back.</span></label>
       <label class="opt"><input type="radio" name="D2" value="Never; the register is edited only on its own tab"><b>Never</b><span>The register changes only on its own tab. Clean, but it drifts from what the board actually shows.</span></label>
     </div>
@@ -435,7 +487,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="decision" data-q="D3">
     <div class="q"><span class="id">D3</span><b>Which words do we use?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="D3" value="Keep Hide + add Close + keep Delete" checked><b>Hide · Close · Delete<span class="rec">Recommended</span></b><span>Keeps the word your team already knows for a pause. Adds Close for the end of a job. Delete stays for mistakes.</span></label>
+      <label class="opt"><input type="radio" name="D3" value="Keep Hide + add Close + keep Delete" checked><b>Hide · Close · Delete</b><span>Keeps the word your team already knows for a pause. Adds Close for the end of a job. Delete stays for mistakes.</span></label>
       <label class="opt"><input type="radio" name="D3" value="Rename Hide to Pause + add Close + keep Delete"><b>Pause · Close · Delete</b><span>"Pause" says what Hide is used for, but everyone has to learn a new word, and "Hidden 3" on the toolbar becomes "Paused 3".</span></label>
       <label class="opt"><input type="radio" name="D3" value="Replace Hide with Close"><b>Close only</b><span>Turns Hide into Close. Fewer buttons, but you lose the pause, which you use today.</span></label>
     </div>
@@ -447,29 +499,29 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="part-head">
     <div class="eyebrow">Question 3</div>
     <h2>Give every open mission its new-year number</h2>
-    <p class="muted">Your idea fits: the Administrator downloads the open missions, writes each one's new number and uploads the file. I'd add two things. The file comes back with a <b>suggested</b> number in each row, and the switch is <b>scheduled for a date</b>. Old days keep the old number, and days from the switch date on carry the new one, including days already carried over or forecast.</p>
+    <p class="muted">This follows your idea: the Administrator downloads the open missions, types in the new number Finance, ERP or the customer issued for each one, and uploads the file. The column starts <b>empty</b> (no guesses), every row is <b>validated</b>, and the switch is <b>scheduled for a date</b>. Old days keep the old number, and days from the switch date on carry the new one, including days already carried over or forecast.</p>
   </div>
 
   <div class="timeline">
     <div class="tl"><span class="when">Early December</span><b>Download</b><span>Missions tab → Year-end renumber → download every open mission (one board or all boards).</span></div>
-    <div class="tl"><span class="when">December</span><b>Fill in</b><span>One <b>New number</b> per row, or <b>Close at year end</b> for a job that won't continue. The suggestion is already there to keep or overwrite.</span></div>
-    <div class="tl"><span class="when">Before the switch</span><b>Upload + schedule</b><span>The preview checks the format, duplicates, numbers already used and missions with no new number. You pick the switch date.</span></div>
+    <div class="tl"><span class="when">December</span><b>Fill in</b><span>Type the issued <b>New number</b> in each row, or choose <b>Close at year end</b> for a job that won't continue. Linked missions and Day / Night pairs share one row.</span></div>
+    <div class="tl"><span class="when">Before the switch</span><b>Upload + schedule</b><span>The preview checks the format (PREFIX.27.NNNN), duplicates across all boards, numbers already in use and rows left empty. You pick the switch date.</span></div>
     <div class="tl key"><span class="when">Switch date · e.g. Mon 4 Jan</span><b>Automatic</b><span>The register shows the new number. Days from the switch date (planned or forecast) are renamed. Earlier days stay as they were.</span></div>
   </div>
 
   <div class="mock" aria-label="Mockup: year-end renumber file">
     <div class="mock-tools"><b>Year-end renumber · 2026 → 2027</b><span class="sp"></span><span class="cap">renumber_2027_all-boards.xlsx (Excel, Sheet 1)</span></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>ID</th><th>Board</th><th>Current number</th><th>Shift</th><th>Host</th><th>Customer</th><th style="background:#eef6e0;color:#3b5a12">New number for 2027 ✎</th><th style="background:#eef6e0;color:#3b5a12">Action ✎</th></tr></thead>
+      <thead><tr><th>ID</th><th>Board</th><th>Current number</th><th>Shifts</th><th>Host</th><th>Customer</th><th>Boards</th><th style="background:#eef6e0;color:#3b5a12">New number for 2027 ✎</th><th style="background:#eef6e0;color:#3b5a12">Action ✎</th></tr></thead>
       <tbody>
-        <tr><td class="muted">a81f…</td><td>LCB Port</td><td class="num">LCBTH.26.0005</td><td>Day</td><td>Hino Motors Bangna</td><td>Denso Thailand</td><td class="num">LCBTH.27.0001</td><td>Renumber</td></tr>
-        <tr><td class="muted">c3e0…</td><td>LCB Port</td><td class="num">LCBTH.26.0011</td><td>Night</td><td>AAT Rayong</td><td>Siam Furukawa</td><td class="num">LCBTH.27.0002</td><td>Renumber</td></tr>
-        <tr><td class="muted">0b9d…</td><td>LCB Port</td><td class="num">LCBTH.26.0014</td><td>Day</td><td>Laem Chabang Port B5</td><td>Aisin Takaoka</td><td class="muted">—</td><td>Close at year end</td></tr>
-        <tr><td class="muted">7f42…</td><td>LCB Port</td><td class="num">LCBTH.26.0019</td><td>Day</td><td>TS Tech Prachinburi</td><td>Honda Automobile</td><td class="num">LCBTH.27.0003</td><td>Renumber</td></tr>
-        <tr><td class="muted">e5a7…</td><td>Rayong</td><td class="num">RYGTH.26.0031</td><td>Day</td><td>AAT Rayong</td><td>Ford Thailand</td><td class="num">RYGTH.27.0001</td><td>Renumber</td></tr>
+        <tr><td class="muted">a81f…</td><td>LCB Port</td><td class="num">LCBTH.26.0005</td><td>Day + Night</td><td>Hino Motors Bangna</td><td>Denso Thailand</td><td>LCB Port, Rayong</td><td class="num">LCBTH.27.0012</td><td>Renumber</td></tr>
+        <tr><td class="muted">c3e0…</td><td>LCB Port</td><td class="num">LCBTH.26.0011</td><td>Night</td><td>AAT Rayong</td><td>Siam Furukawa</td><td>LCB Port</td><td class="num">LCBTH.27.0040</td><td>Renumber</td></tr>
+        <tr><td class="muted">0b9d…</td><td>LCB Port</td><td class="num">LCBTH.26.0014</td><td>Day</td><td>Laem Chabang Port B5</td><td>Aisin Takaoka</td><td>LCB Port</td><td class="muted">—</td><td>Close at year end</td></tr>
+        <tr><td class="muted">7f42…</td><td>LCB Port</td><td class="num">LCBTH.26.0019</td><td>Day</td><td>TS Tech Prachinburi</td><td>Honda Automobile</td><td>LCB Port</td><td style="background:#fff8e6"></td><td></td></tr>
+        <tr><td class="muted">e5a7…</td><td>Rayong</td><td class="num">RYGTH.26.0031</td><td>Day</td><td>AAT Rayong</td><td>Ford Thailand</td><td>Rayong</td><td class="num">RYGTH.27.0003</td><td>Renumber</td></tr>
       </tbody>
     </table></div>
-    <div class="mock-foot"><span class="cap">Green columns are the only ones to edit. Action is a dropdown: Renumber · Keep number · Close at year end.</span></div>
+    <div class="mock-foot"><span class="cap">The New number column starts empty, with one row per mission (its shifts and boards together). Green columns are the only ones to edit. Action is a dropdown: Renumber · Keep number · Close at year end. An empty row is reported, never guessed.</span></div>
   </div>
 
   <div class="cols2" style="align-items:start">
@@ -479,12 +531,13 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
         <div class="counter on"><b>41</b><span>Renumber</span></div>
         <div class="counter"><b>3</b><span>Close at year end</span></div>
         <div class="counter"><b>0</b><span>Keep</span></div>
-        <div class="counter bad"><b>2</b><span>Problems</span></div>
+        <div class="counter bad"><b>3</b><span>Problems</span></div>
       </div>
       <div class="tbl-wrap"><table><tbody>
-        <tr><td class="num">LCBTH.26.0005</td><td><span class="from">LCBTH.26.0005</span><span class="arrow">→</span><span class="to">LCBTH.27.0001</span></td></tr>
-        <tr><td class="num">LCBTH.26.0022</td><td><span class="tag bad">Problem</span> LCBTH.27.0004 is used twice (rows 6 and 19)</td></tr>
-        <tr><td class="num">RYGTH.26.0040</td><td><span class="tag bad">Problem</span> No new number and no action</td></tr>
+        <tr><td class="num">LCBTH.26.0005</td><td><span class="from">LCBTH.26.0005</span><span class="arrow">→</span><span class="to">LCBTH.27.0012</span> · Day + Night · LCB Port, Rayong</td></tr>
+        <tr><td class="num">LCBTH.26.0031</td><td><span class="tag bad">Problem</span> "LCBTH.26.0044" is not a 2027 number (expected LCBTH.27.NNNN)</td></tr>
+        <tr><td class="num">LCBTH.26.0022</td><td><span class="tag bad">Problem</span> LCBTH.27.0004 is used twice (row 6 on LCB Port, row 19 on Rayong) and they are not linked</td></tr>
+        <tr><td class="num">LCBTH.26.0019</td><td><span class="tag bad">Problem</span> Row 5 is empty: type the issued number, or choose Keep number or Close at year end</td></tr>
       </tbody></table></div>
       <div class="mock-foot">
         <span>Switch on <b>Mon 4 Jan 2027</b> (LCB Port's first working day)</span><span class="sp"></span><span class="btn fill">Schedule 44 changes</span>
@@ -494,7 +547,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
       <h3>On the board, the first weeks after the switch</h3>
       <div class="card" aria-label="Mockup: mission card after renumber">
         <div class="ch">
-          <div class="top"><span class="n">LCBTH.27.0001</span><span class="tag info">Day · East</span></div>
+          <div class="top"><span class="n">LCBTH.27.0012</span><span class="tag info">Day · East</span></div>
           <span class="was">was LCBTH.26.0005</span>
           <span>Hino Motors Bangna 📍 → Denso Thailand</span>
         </div>
@@ -504,7 +557,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
         <li>A small <b>was LCBTH.26.0005</b> line for the first 4 weeks, so the crew aren't confused. It's left out of the printed PDF.</li>
         <li>Searching the board, the Missions tab or the Host Record for <b>either</b> number finds the mission. That comes free: the old and the new number are two names for the same register row.</li>
         <li>Days before the switch keep the old number everywhere (board, Host Record, exports, reports). They were true when they happened.</li>
-        <li>Until the switch date nothing changes, and a scheduled renumber can be edited or cancelled.</li>
+        <li>Until the switch date nothing changes, and a Manager or Admin can edit or cancel a scheduled renumber (Q5).</li>
       </ul>
     </div>
   </div>
@@ -512,8 +565,8 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="decision" data-q="D4">
     <div class="q"><span class="id">D4</span><b>How should the Administrator enter the new numbers?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="D4" value="Excel file with suggested numbers prefilled" checked><b>Excel with suggestions<span class="rec">Recommended</span></b><span>Your idea, with each row prefilled: same prefix, next year, numbered from 0001 in the current order. Keep a suggestion or type over it.</span></label>
-      <label class="opt"><input type="radio" name="D4" value="Excel file with the New number column empty"><b>Excel, column empty</b><span>Best if the new numbers come from the customer or finance and never follow a pattern. A suggestion would only invite mistakes.</span></label>
+      <label class="opt"><input type="radio" name="D4" value="Excel file with suggested numbers prefilled"><b>Excel with suggestions</b><span>First picked, then dropped because of Q4: when the numbers come from Finance, ERP or the customer, a suggestion would often be wrong and could be uploaded unchecked.</span></label>
+      <label class="opt"><input type="radio" name="D4" value="Excel file with the New number column empty" checked><b>Excel, column empty</b><span>Best if the new numbers come from the customer or finance and never follow a pattern. A suggestion would only invite mistakes.</span></label>
       <label class="opt"><input type="radio" name="D4" value="In-app table, no file"><b>In the app, no file</b><span>The same columns as a table on the Missions tab. Fine for 10–20 missions, slower for a hundred.</span></label>
     </div>
   </div>
@@ -521,7 +574,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="decision" data-q="D5">
     <div class="q"><span class="id">D5</span><b>When does the new number start?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="D5" value="Each board's first working day of the new year, editable" checked><b>Each board's first working day<span class="rec">Recommended</span></b><span>Uses the board's weekend and holidays (e.g. Mon 4 Jan 2027). The Administrator can change it for the whole renumber.</span></label>
+      <label class="opt"><input type="radio" name="D5" value="Each board's first working day of the new year, editable" checked><b>Each board's first working day</b><span>Uses the board's weekend and holidays (e.g. Mon 4 Jan 2027). The Administrator can change it for the whole renumber.</span></label>
       <label class="opt"><input type="radio" name="D5" value="Always 1 January"><b>Always 1 January</b><span>Simplest. A mission planned on a 1 January holiday would already show the new number.</span></label>
       <label class="opt"><input type="radio" name="D5" value="A date per row"><b>A date per row</b><span>Most flexible, for customers whose numbers change at different times. One more column to fill in.</span></label>
     </div>
@@ -531,13 +584,13 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
 <!-- ============ OPEN QUESTIONS ============ -->
 <section class="part" id="open">
   <div class="part-head">
-    <div class="eyebrow">Questions for you</div>
-    <h2>Five things I can't tell from the code</h2>
+    <div class="eyebrow">Your answers</div>
+    <h2>The five questions, answered</h2>
   </div>
   <div class="decision" data-q="Q1">
     <div class="q"><span class="id">Q1</span><b>Is a mission number unique across the whole company, or only within one board?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="Q1" value="Unique company-wide"><b>Company-wide</b><span>LCBTH.27.0001 can exist on only one board. The renumber checks across all boards.</span></label>
+      <label class="opt"><input type="radio" name="Q1" value="Unique company-wide" checked><b>Company-wide, except a mission running on several boards</b><span>LCBTH.27.0001 is one mission. It may be open on two boards (two locations) only when someone has linked them.</span></label>
       <label class="opt"><input type="radio" name="Q1" value="Unique per board (prefix = board)"><b>Per board</b><span>The prefix (LCBTH, RYGTH…) belongs to a board. Today's database rule is per board + date + shift.</span></label>
       <label class="opt"><input type="radio" name="Q1" value="Not sure"><b>Not sure</b><span>I'll check per board and warn across boards.</span></label>
     </div>
@@ -545,7 +598,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="decision" data-q="Q2">
     <div class="q"><span class="id">Q2</span><b>When one job runs Day and Night, does it have one number or two?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="Q2" value="Same number for Day and Night"><b>One number, both shifts</b><span>Two register rows that share a number. They get renumbered and closed together.</span></label>
+      <label class="opt"><input type="radio" name="Q2" value="Same number for Day and Night" checked><b>One number, both shifts</b><span>Two register rows that share a number. They get renumbered and closed together.</span></label>
       <label class="opt"><input type="radio" name="Q2" value="Different numbers per shift"><b>A number per shift</b><span>Each shift is its own mission everywhere.</span></label>
       <label class="opt"><input type="radio" name="Q2" value="Both happen"><b>Both happen</b><span>Each row is handled on its own. Closing one asks about its twin.</span></label>
     </div>
@@ -553,7 +606,7 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
   <div class="decision" data-q="Q3">
     <div class="q"><span class="id">Q3</span><b>Do all numbers follow PREFIX.YY.NNNN (e.g. LCBTH.26.0005)?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="Q3" value="Always this format; validate it"><b>Always</b><span>The app checks the format and the year (a 2027 renumber must say .27.).</span></label>
+      <label class="opt"><input type="radio" name="Q3" value="Always this format; validate it" checked><b>Always</b><span>The app checks the format and the year (a 2027 renumber must say .27.).</span></label>
       <label class="opt"><input type="radio" name="Q3" value="Mostly; warn only"><b>Mostly</b><span>Warn on an odd number, never block it.</span></label>
       <label class="opt"><input type="radio" name="Q3" value="No fixed format"><b>No fixed format</b><span>No checks beyond duplicates. No suggestions either.</span></label>
     </div>
@@ -562,13 +615,13 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
     <div class="q"><span class="id">Q4</span><b>Who issues the new numbers?</b></div>
     <div class="opts">
       <label class="opt"><input type="radio" name="Q4" value="We number them ourselves in sequence"><b>We do, in sequence</b><span>A suggestion is usually right.</span></label>
-      <label class="opt"><input type="radio" name="Q4" value="Finance / ERP / customer issues them"><b>Finance, ERP or customer</b><span>Numbers arrive from outside. An empty column is safer (D4).</span></label>
+      <label class="opt"><input type="radio" name="Q4" value="Finance / ERP / customer issues them" checked><b>Finance, ERP or customer</b><span>Numbers arrive from outside. An empty column is safer (D4).</span></label>
     </div>
   </div>
   <div class="decision" data-q="Q5">
     <div class="q"><span class="id">Q5</span><b>Who may close, reopen and renumber?</b></div>
     <div class="opts">
-      <label class="opt"><input type="radio" name="Q5" value="Close: Engineer and up · Reopen + renumber: Manager/Admin"><b>Split</b><span>Engineers close their own finished jobs. Managers and Admins reopen and renumber.</span></label>
+      <label class="opt"><input type="radio" name="Q5" value="Close: Engineer and up · Reopen + renumber: Manager/Admin" checked><b>Split</b><span>Engineers close their own finished jobs. Managers and Admins reopen and renumber.</span></label>
       <label class="opt"><input type="radio" name="Q5" value="Manager/Admin only for all three"><b>Managers and Admins only</b><span>Engineers keep Hide and ask for a close.</span></label>
       <label class="opt"><input type="radio" name="Q5" value="Set in Roles & permissions (new Missions area)"><b>A new permission area</b><span>"Missions" in Settings → Roles, view / edit like the others.</span></label>
     </div>
@@ -583,55 +636,14 @@ label.opt:has(input:checked) { border-color: var(--primary); background: var(--h
     <p class="muted">The year end is about eight weeks away, so the order puts the register and the renumber first. The bulk upload for new boards reuses most of what Manpower and Host already have.</p>
   </div>
   <div class="panel" style="gap:0">
-    <div class="phase"><span class="pn">Release 1</span><div><b>Register + Close</b> <span class="tag">~2 weeks</span><p class="small muted">A <code>mission_register</code> table plus a link from each day's mission. A migration builds each board's register from its latest working day, safe to re-run like the others. The Missions tab (view, edit, close, reopen). Carry over and Start from register skip closed missions. Delete asks "Close instead?". All of it in Thai.</p></div></div>
-    <div class="phase"><span class="pn">Release 2</span><div><b>Year-end renumber</b> <span class="tag warn">needed by mid-December</span><p class="small muted">Download, fill in, preview and schedule, a register number history, renaming days from the switch date, "was …" on the card, search by either number. Tests for planned days, forecast days and locked days.</p></div></div>
+    <div class="phase"><span class="pn">Release 1</span><div><b>Register + Close</b> <span class="tag">~2 weeks</span><p class="small muted">A <code>mission_register</code> table (one row per board + number + shift, with a shared mission id for linked boards and Day / Night pairs), plus a link from each day's mission. A migration builds each board's register from its latest working day, safe to re-run like the others, and lists any number it finds on two boards for you to link or fix. The Missions tab (view, edit, close, reopen), the company-wide number check and the PREFIX.YY.NNNN format check, "This day only / From this day on" on Edit Mission, and permissions (Close: Engineer and up; Reopen: Manager / Admin). Carry over and Start from register skip closed missions. Delete asks "Close instead?". All of it in Thai.</p></div></div>
+    <div class="phase"><span class="pn">Release 2</span><div><b>Year-end renumber</b> <span class="tag warn">needed by mid-December</span><p class="small muted">Download (New number column empty), fill in, upload, validate (format, year, company-wide duplicates, empty rows) and schedule per board, Manager / Admin only. A register number history, renaming days from the switch date (linked boards and both shifts together), "was …" on the card, search by either number. Tests for planned days, forecast days and locked days.</p></div></div>
     <div class="phase"><span class="pn">Release 3</span><div><b>Bulk edit missions</b> <span class="tag">~1 week</span><p class="small muted">The template, upload and preview, reusing <code>bulk-edit.js</code>. Start from register on an empty first day. A short "Set up a new board" checklist in Settings.</p></div></div>
   </div>
 </section>
 
-<div class="summary" id="summary" aria-live="polite">
-  <span class="sp" id="sum-text">Your choices: D1–D5 set to the recommended options. Answer Q1–Q5 above.</span>
-  <button type="button" id="copy">Copy my choices</button>
-  <textarea id="out" hidden readonly aria-label="Your choices as text"></textarea>
-</div>
+
 
 </div>
 
-<script>
-(function () {
-  const KEY = "mission-register-proposal-v1";
-  const ids = ["D1", "D2", "D3", "D4", "D5", "Q1", "Q2", "Q3", "Q4", "Q5"];
-  try {
-    const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
-    for (const k of Object.keys(saved)) {
-      const el = document.querySelector(`input[name="${k}"][value="${CSS.escape(saved[k])}"]`);
-      if (el) el.checked = true;
-    }
-  } catch (e) {}
-  function picks() {
-    const o = {};
-    for (const k of ids) { const el = document.querySelector(`input[name="${k}"]:checked`); if (el) o[k] = el.value; }
-    return o;
-  }
-  function text() {
-    const p = picks();
-    return ids.map((k) => `${k}: ${p[k] || "(not answered)"}`).join("\n");
-  }
-  function refresh() {
-    const p = picks();
-    const answered = ids.filter((k) => k.startsWith("Q") && p[k]).length;
-    document.getElementById("sum-text").textContent =
-      `Decisions D1–D5 chosen · ${answered} of 5 questions answered. Copy and paste them back into the chat.`;
-    try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {}
-  }
-  document.addEventListener("change", (e) => { if (e.target.matches('input[type="radio"]')) refresh(); });
-  document.getElementById("copy").addEventListener("click", () => {
-    const t = text(); const out = document.getElementById("out"); const btn = document.getElementById("copy");
-    out.value = t;
-    const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy my choices"), 1600); };
-    const fallback = () => { out.hidden = false; out.focus(); out.select(); btn.textContent = "Select and copy the text"; };
-    try { navigator.clipboard.writeText(t).then(done, fallback); } catch (e) { fallback(); }
-  });
-  refresh();
-})();
-</script>
+<script>document.querySelectorAll('.decision input[type="radio"]').forEach((el) => { el.disabled = true; });</script>
