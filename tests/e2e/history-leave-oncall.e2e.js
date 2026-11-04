@@ -67,7 +67,7 @@ async function step(name, fn) {
     const OVERVIEW = await p.evaluate(() => OVERVIEW_ID);
     const showOverview = () => p.evaluate(async ([day, ov, from, to]) => {
       state.date = day; D().activeBoardId = ov; state.filters.engineer = [];
-      state.overview.boardId = "";
+      state.overview.boardIds = [];
       state.overview.historyPreset = "custom"; state.overview.historyFrom = from; state.overview.historyTo = to;
       state.overview.historyCacheKey = null;
       await refreshAndRender();

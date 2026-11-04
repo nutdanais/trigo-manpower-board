@@ -5808,10 +5808,30 @@ body.toolbar-one-row #row1-end { order: 2; padding: 7px 20px 7px 0; }
 .ovb-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 #btn-ov-board .ovb-dot[style*="transparent"] { display: none; }
 .ovb-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: 11.5px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
-#ov-board-menu { min-width: 240px; }
-#ov-board-menu .tb-item .ovb-name { flex: 1; }
-#ov-board-menu .tb-item.is-current { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; }
-#ov-board-menu .tb-item .ovb-dot[style*="transparent"] { box-shadow: inset 0 0 0 1.5px var(--border); }
+/* the Overview picker is a tick list: a checkbox per board, All boards on top, an Only shortcut per row */
+#ov-board-menu { min-width: 280px; }
+#ov-board-menu .ovb-row { padding: 0; gap: 2px; width: 100%; }
+#ov-board-menu .ovb-row:hover { background: var(--hover-tint); }
+#ov-board-menu .ovb-check { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; padding: 8px 10px; min-height: 36px; border-radius: var(--r); cursor: pointer; }
+#ov-board-menu .ovb-check:focus-visible, #ov-board-menu .ovb-only:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+#ov-board-menu .ovb-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#ov-board-menu .ovb-row.is-current .ovb-name { font-weight: 650; }
+.ovb-box { width: 16px; height: 16px; flex: none; border: 1.5px solid #8a929c; border-radius: 4px; background: var(--panel); display: grid; place-items: center; }
+.ovb-box[data-state="on"], .ovb-box[data-state="mixed"] { background: var(--primary); border-color: var(--primary); }
+.ovb-box[data-state="on"]::after { content: ""; width: 8px; height: 4px; border: solid #fff; border-width: 0 0 2px 2px; transform: rotate(-45deg) translate(1px, -1px); }
+.ovb-box[data-state="mixed"]::after { content: ""; width: 8px; height: 2px; background: #fff; }
+#ov-board-menu .ovb-only { flex: none; border: 1px solid transparent; background: none; color: var(--primary-text); font: inherit; font-size: 12px; font-weight: 600; padding: 3px 8px; margin-right: 6px; border-radius: 5px; cursor: pointer; min-height: 28px; }
+#ov-board-menu .ovb-only:hover { border-color: var(--border); background: var(--panel); }
+#ov-board-menu .ovb-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+#ov-board-menu .ovb-note { display: block; font-size: 12px; color: var(--muted); padding: 6px 10px 4px; }
+#ov-board-menu .ovb-note.warn { color: var(--warn-text); }
+/* the Period group's own board scope: linked to the page by default, then Combined / Side by side / A vs B */
+.ov-period-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.ov-period-boards { flex-wrap: wrap; }
+.ov-period-boards .btn:disabled { opacity: .6; cursor: default; }
+.ov-trend-btns .btn:disabled { cursor: not-allowed; }
+.ov-period-hint { font-size: 12.5px; }
+.ov-vs-diff { margin: 2px 0 6px; font-size: 13px; }
 body.ov-view #toolbar { position: sticky; top: var(--bar-h, 56px); z-index: 30; }
 
 /* Host stats: "No location" in the warning key colour, the By area line on its own row */
@@ -6039,6 +6059,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 
   /* ⋯ menu */
   #board-menu .tb-item, #more-menu .tb-item, #m-more-menu .tb-item { min-height: 44px; font-size: 14.5px; }
+  #ov-board-menu .ovb-check, #ov-board-menu .ovb-only { min-height: 44px; font-size: 14.5px; }
   #board-menu { min-width: min(300px, calc(100vw - 24px)); }
   #m-more-menu:not(.hidden) {
     display: block; position: fixed; top: calc(var(--bar-h, 110px) + 4px); right: 8px; left: auto;

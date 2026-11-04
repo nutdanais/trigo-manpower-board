@@ -1,7 +1,7 @@
 /* Acceptance run for the Overview's board selector and section order, and for
    "nothing done today changes a past day's Overview":
-     - the selector sits first, above the attention card, with All boards
-       plus one pill per board, and picking a board scopes every section
+     - the selector sits first, above the attention card, as a tick list (All boards
+       plus a checkbox and an Only shortcut per board), and picking a board scopes every section
        (attention card, KPIs, By board, the day's cards and History);
      - the page reads summary -> "In detail" (By engineer | By service area,
        Shifts | Host coverage) -> "Period" (History, People, Engineer workload, Workforce, Boards & areas);
@@ -57,8 +57,8 @@ async function step(name, fn) {
       assert.equal(await p.evaluate(() => getComputedStyle(document.getElementById("toolbar")).position), "sticky");
       assert.equal(await p.locator("#stats-bar .stat-tile").count(), 0, "Overview row 2 is a plain summary line, not the board tiles");
       await p.click("#btn-ov-board");
-      const opts = await p.$$eval("#ov-board-menu .tb-item", (els) => els.map((e) => [e.textContent.trim(), e.getAttribute("aria-current")]));
-      assert.deepEqual(opts, [["All boards10", "true"], ["Board One8", "false"], ["Board Two2", "false"]]);
+      const opts = await p.$$eval("#ov-board-menu .ovb-row", (els) => els.map((e) => [e.querySelector(".ovb-name").textContent, e.querySelector(".ovb-count").textContent, e.querySelector(".ovb-check").getAttribute("aria-checked")]));
+      assert.deepEqual(opts, [["All boards", "10", "true"], ["Board One", "8", "true"], ["Board Two", "2", "true"]], "a tick list: every board starts ticked");
       await p.click("#btn-ov-board");
     });
 
@@ -102,7 +102,7 @@ async function step(name, fn) {
 
     await step("picking a board scopes every section, and is remembered", async () => {
       await p.click("#btn-ov-board");
-      await p.click("#ov-board-menu .tb-item:has-text('Board Two')");
+      await p.click("#ov-board-menu .ovb-row:has(.ovb-name:text-is('Board Two')) .ovb-only");
       await p.waitForFunction(() => /Board Two/.test(document.querySelector("#btn-ov-board").textContent) && /Board Two/.test(document.querySelector(".ov-attn-sub").textContent));
       const view = await p.evaluate(() => ({
         title: document.querySelector(".ov-attn-title").textContent.trim(),
@@ -123,7 +123,7 @@ async function step(name, fn) {
       assert.equal(view.historySelect, 0, "History has no board select of its own any more");
       assert.equal(view.saved, "b2");
       await p.click("#btn-ov-board");
-      await p.click("#ov-board-menu .tb-item:has-text('All boards')");
+      await p.click("#ov-board-menu .ovb-check[data-key=all]");
       await p.waitForFunction(() => /All boards/.test(document.querySelector("#btn-ov-board").textContent));
       assert.equal(await p.evaluate(() => localStorage.getItem("manpower.ovBoard")), "");
     });

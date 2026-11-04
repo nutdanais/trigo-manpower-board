@@ -52,7 +52,7 @@ async function step(name, fn) {
     const OVERVIEW = await p.evaluate(() => OVERVIEW_ID);
     const show = (boardId) => p.evaluate(async ([d, ov, from, to, board]) => {
       state.date = d; D().activeBoardId = ov;
-      state.overview.boardId = board;
+      state.overview.boardIds = board ? [board] : [];
       state.overview.historyPreset = "custom"; state.overview.historyFrom = from; state.overview.historyTo = to;
       state.overview.historyCacheKey = null;
       await refreshAndRender();

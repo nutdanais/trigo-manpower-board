@@ -66,10 +66,10 @@ async function step(name, fn) {
     await p.evaluate(() => { localStorage.removeItem("manpower.report"); window.__printed = []; window.print = () => { const s = document.getElementById("report-sheet"); window.__printed.push({ html: s ? s.outerHTML : "", text: s ? s.innerText : "", sections: s ? [...s.querySelectorAll("h2")].map((x) => x.textContent) : [] }); setTimeout(() => window.dispatchEvent(new Event("afterprint")), 0); }; });
     const showOverview = (o = {}) => p.evaluate(async ([day, ov, f, t, opts]) => {
       state.date = day; D().activeBoardId = ov; state.filters.engineer = [];
-      state.overview.boardId = opts.board || "";
+      state.overview.boardIds = opts.board ? [opts.board] : [];
       state.overview.historyPreset = "custom"; state.overview.historyFrom = f; state.overview.historyTo = t;
       state.overview.historyCacheKey = null; state.overview.historyMeasure = "deployed";
-      state.overview.historyGroup = "day"; state.overview.historyBoards = "together"; state.overview.historyCompare = opts.compare || "prev";
+      state.overview.historyGroup = "day"; state.overview.period.view = "together"; state.overview.historyCompare = opts.compare || "prev";
       await refreshAndRender();
     }, [d[6], OVERVIEW, d[0], d[6], o]);
     await showOverview();
