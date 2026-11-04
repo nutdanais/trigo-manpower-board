@@ -7136,9 +7136,10 @@ label > .pk { margin-top: 5px; }
 /* ===== Overview phase 2, batch B: Resigned, Workforce, Skills matrix ===== */
 .toggle-active.is-resigned .toggle-text { color: #b42318; background: #fde8e7; padding: 1px 8px; border-radius: 999px; }
 .deactivate-choices { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 4px; }
-.deactivate-choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.deactivate-choices .deactivate-choice { display: flex; flex-direction: row; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
 .deactivate-choice:has(input:checked) { border-color: var(--primary-text); background: var(--hover-tint); }
-.deactivate-choice input { margin-top: 3px; }
+.deactivate-choice input { flex: none; width: 16px; height: 16px; min-height: 0; margin: 2px 0 0; padding: 0; }
+.deactivate-choice > span { flex: 1; min-width: 0; text-align: left; }
 .deactivate-choice b { display: block; font-size: 13.5px; }
 .deactivate-choice small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; margin-top: 2px; }
 .deactivate-choice.is-disabled { opacity: .6; cursor: not-allowed; }
@@ -7163,8 +7164,8 @@ label > .pk { margin-top: 5px; }
 .ov-host-all { margin-top: 8px; }
 @media (max-width: 640px) { .mx-table th, .mx-table td { padding: 7px 6px; } .mx-detail td { padding-left: 14px; } }
 .ov-wf-bar { margin-top: 4px; }
-.ov-wf-tiles { grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 10px 0 0; }
+.ov-wf-tiles { display: grid; gap: 10px; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 10px 0 0; }
 @media (max-width: 1100px) { .ov-wf-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .ov-wf-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ov-wf-chart { margin-top: 10px; }
+.ov-wf-chart { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .chart-note { font-size: 10.5px; font-weight: 700; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }

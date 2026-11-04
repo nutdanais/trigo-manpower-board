@@ -5510,7 +5510,7 @@ function workforceSection(boards) {
   const turnover = avg ? (left / avg) * 100 : 0;
   const d = now.total - before.total;
   const tiles = document.createElement("div");
-  tiles.className = "ov-htiles ov-wf-tiles";
+  tiles.className = "ov-wf-tiles";
   const tile = (t) => { const x = document.createElement("div"); x.className = "ov-htile ov-htile-static"; x.innerHTML = ovTileInner(t); tiles.appendChild(x); };
   tile({ label: "Headcount now", value: now.total, sub: `at the end of ${escapeHtml(fmtDate(months[months.length - 1].end))}`,
     delta: `<span class="ov-htile-delta">${d === 0 ? "= " : d > 0 ? "▲ " + d + " " : "▼ " + Math.abs(d) + " "}since ${escapeHtml(fmtDate(addDays(from, -1)))}</span>` });
@@ -5525,7 +5525,7 @@ function workforceSection(boards) {
   const MONFULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const names = (list) => list.map(e => e.name).join(", ");
   const box = document.createElement("div");
-  box.className = "ov-hchart ov-wf-chart";
+  box.className = "ov-wf-chart";   // not .ov-hchart: History's own tests count the charts under that class
   box.appendChild(ovLegend([...WF_BANDS.map(b => ({ label: b.label, color: b.color })),
     { label: "Joiners (above the bar)", color: "#1f8a4c" }, { label: "Leavers, resigned (under the bar)", color: "#b42318" },
     { label: "Inactive for now, not leavers", color: "var(--muted)" }]));
@@ -5537,7 +5537,7 @@ function workforceSection(boards) {
   const pending = () => fillColumnChart(wrap, {
     stacks: WF_BANDS.map(b => ({ label: b.label, color: b.color, values: months.map(m => m.hc[b.key]) })),
     notes: [{ values: months.map(m => m.joiners.length), color: "#1f8a4c", text: "+", pos: "above" }, { values: months.map(m => m.leavers.length), color: "#b42318", text: "−", pos: "below" }],
-    line: { label: "inactive", color: "var(--muted)", values: months.map(m => m.pausers.length) },
+    line: { label: "", color: "var(--muted)", values: months.map(m => m.pausers.length) },   // the legend names it
     xLabels: months.map(m => MON[Number(m.month.slice(5, 7)) - 1]),
     dayTotals: months.map(m => [`${MONFULL[Number(m.month.slice(5, 7)) - 1]} ${m.month.slice(0, 4)}`, `${m.hc.total} people`,
       m.joiners.length ? `joined ${names(m.joiners)}` : "", m.leavers.length ? `resigned ${names(m.leavers)}` : "", m.pausers.length ? `inactive for now ${names(m.pausers)}` : ""].filter(Boolean).join(" · ")),
