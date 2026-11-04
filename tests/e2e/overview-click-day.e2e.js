@@ -49,9 +49,9 @@ async function step(name, fn) {
     const OVERVIEW = await p.evaluate(() => OVERVIEW_ID);
     const showOverview = (o = {}) => p.evaluate(async ([day, ov, f, t, opts]) => {
       state.date = day; D().activeBoardId = ov; state.filters.engineer = [];
-      state.overview.boardId = ""; state.overview.historyPreset = "custom"; state.overview.historyFrom = opts.from || f; state.overview.historyTo = t;
+      state.overview.boardIds = []; state.overview.historyPreset = "custom"; state.overview.historyFrom = opts.from || f; state.overview.historyTo = t;
       state.overview.historyCacheKey = null; state.overview.historyMeasure = opts.measure || "deployed";
-      state.overview.historyGroup = opts.group || "day"; state.overview.historyBoards = opts.side ? "side" : "together"; state.overview.historyCompare = "prev";
+      state.overview.historyGroup = opts.group || "day"; state.overview.period.view = opts.side ? "side" : "together"; state.overview.historyCompare = "prev";
       state.overview.historyOncallMode = opts.share ? "share" : "count"; state.overview.historyLeaveView = opts.calendar ? "calendar" : "chart";
       state.overview.engGroup = opts.eng || "day"; state.overview.engPick = "eng-1";
       await refreshAndRender();

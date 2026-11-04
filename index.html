@@ -120,6 +120,7 @@
 <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
 <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
 <symbol id="i-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+<symbol id="i-present" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/></symbol>
 <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13"/></symbol>
 <symbol id="i-appmark"viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
 </defs></svg>
@@ -650,6 +651,8 @@
            the tab offers) is picked. See openExportModal in app.js. -->
       <button id="btn-export" class="btn" title="Export — pick the file type (JPG, PDF or Excel) in the next step"><svg class="ic" aria-hidden="true"><use href="#i-download"></use></svg> Export</button>
       <!-- Overview only, for roles that can see its History: the monthly management report (PDF or Excel). See report.js. -->
+      <!-- Overview (slides) and a board (read-only, bigger): a clean screen for a meeting room or a wall. See present.js. -->
+      <button id="btn-present" class="btn hidden" title="Present: a read-only, large-type screen for a meeting room or a wall display"><svg class="ic" aria-hidden="true"><use href="#i-present"></use></svg> Present</button>
       <button id="btn-report" class="btn hidden" title="Monthly management report: pick the sections, then make a PDF or an Excel file"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"></use></svg> Report</button>
     </div>
   </div>
@@ -993,6 +996,16 @@
     <div class="modal-actions">
       <button type="button" class="btn" data-close>Cancel</button>
       <button type="button" class="btn btn-primary" id="btn-report-go">Make report</button>
+    </div>
+  </div>
+
+  <!-- Present: boards, slides and names before a read-only presentation (present.js builds it) -->
+  <div class="modal modal-side modal-export hidden" id="modal-present" role="dialog" aria-modal="true" aria-labelledby="present-title">
+    <h3><span id="present-title">Present</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <div class="modal-body" id="present-body"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-present-go">Start presenting</button>
     </div>
   </div>
 
@@ -1567,5 +1580,6 @@
 <script src="bulk-edit.js?v=2026-11-04g"></script>
 <script src="app.js?v=2026-11-04g"></script>
 <script src="report.js?v=2026-11-04g"></script>
+<script src="present.js?v=2026-11-04g"></script>
 </body>
 </html>
