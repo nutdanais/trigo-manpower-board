@@ -7236,3 +7236,6 @@ label > .pk { margin-top: 5px; }
 #modal-report .rp-sub-opts small { display: block; margin: 2px 0 4px 26px; }
 .chart-hit { cursor: pointer; }
 .chart-hit:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.rp { box-sizing: border-box; padding-right: 2px; }
+.rp-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rp-tile { min-width: 0; box-sizing: border-box; }
