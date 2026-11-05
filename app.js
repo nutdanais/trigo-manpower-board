@@ -2261,6 +2261,13 @@ function cardNamesSaved() {   // also called while `state` is built, so the key 
   try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 
+/* the Manpower List's Years of service: each "7 years" stays on one line, so a cell that has to wrap reads
+   "7 years 8 months / 4 days" (the spaces stay plain, for copying and for tools) */
+function serviceCellHtml(text) {
+  if (!text) return "\u2014";
+  return text.split(/ (?=\d)/).map(part => `<span class="el-nw">${escapeHtml(part)}</span>`).join(" ");
+}
+
 /* the Manpower List's board cell: "→ Rayong until Fri 24 Oct" while someone is
    lent out on the date on screen (their own board stays in front of it) */
 function loanCellHtml(e) {
@@ -7361,12 +7368,12 @@ function renderEmployeeRows() {
       <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? " " + add("nameEn", "English name") : ""}</td>
       <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : add("trigoId", "TRIGO ID")}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td data-label="Position" class="m-x">${pos ? pos.label : add("position", "position")}</td>
+      <td data-label="Position" class="m-x el-wrap">${pos ? pos.label : add("position", "position")}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
-      <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
+      <td data-label="Years of service" class="m-x el-wrap el-svc">${e.startDate ? serviceCellHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
-      <td data-label="Current board">${board ? escapeHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
+      <td data-label="Current board" class="el-board">${board ? escapeHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
       <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" class="el-util">${utilCell(util)}</td>${emplistShowsWl() ? emplistWlCells(e) : ""}
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
@@ -7442,14 +7449,31 @@ function quietTable(sel) {
     }
     for (const pill of r.querySelectorAll(".area-pill")) pill.style.setProperty("--ac", pill.style.backgroundColor || "#999");
   }
-  if (!rows.length) return;
-  ths.forEach((th, i) => {
+  if (rows.length) ths.forEach((th, i) => {
     if (th.classList.contains("el-check")) return;
     if (!rows.every(r => quietCellEmpty(r.children[i]))) return;
     th.classList.add("col-off");
     for (const r of rows) r.children[i].classList.add("col-off");
   });
+  fitListTable(table);
 }
+/* On a computer the list's box doesn't scroll, so its headers can stick under the top bar while the page
+   scrolls. If the table still can't fit the window (a narrow one, after long cells and headers have taken
+   a second line), that box scrolls sideways instead (.tw-scroll), so the page never grows wider than the
+   header. */
+function fitListTable(table) {
+  const wrap = table && table.parentElement;
+  if (!wrap || !wrap.classList.contains("table-wrap")) return;
+  wrap.classList.remove("tw-scroll");
+  if (!wrap.clientWidth) return;   // hidden tab: measured again when it is drawn
+  wrap.classList.toggle("tw-scroll", table.offsetWidth > wrap.clientWidth + 1);
+}
+let _fitListQueued = false;
+window.addEventListener("resize", () => {
+  if (_fitListQueued) return;
+  _fitListQueued = true;
+  requestAnimationFrame(() => { _fitListQueued = false; for (const id of ["#emplist-table", "#hostlist-table"]) fitListTable($(id)); });
+});
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
 function renderEmployeeList() {
