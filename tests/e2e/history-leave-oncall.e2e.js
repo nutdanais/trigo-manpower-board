@@ -103,11 +103,11 @@ async function step(name, fn) {
       assert.deepEqual(rows.map((r) => r.slice(0, 5)), [
         ["Annual Leave", "2", "0.4", "50%", "1"], ["Sick Leave", "1", "0.2", "25%", "1"], ["Business Leave", "1", "0.2", "25%", "1"],
         ["Unpaid Leave", "0", "0.0", "0%", "0"], ["All leave", "4", "0.8", "", "3"], ["Exchange Working Day", "1", "0.2", "not leave", "1"]]);
-      assert.equal(await p.locator(".ov-hchart:not(.ov-eng) .chart-column-chart rect.chart-mark").count(), 4, "Mon: annual + sick; Tue: annual + business");
+      assert.equal(await p.locator(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart rect.chart-mark").count(), 4, "Mon: annual + sick; Tue: annual + business");
     });
 
     await step("People → Leave view: per person, sorted by leave share, amber / red, Exchange days out of working days", async () => {
-      assert.deepEqual(await read(".ov-hchart:not(.ov-eng) .ov-people-link"), ["Per person → People"], "a link where the list used to be");
+      assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-people-link"), ["Per person → People"], "a link where the list used to be");
       await p.locator(".ov-people-bar .btn", { hasText: "Leave" }).click();
       const rows = (await rowsOf(".ov-people-table")).map((r) => r.slice(0, 7));
       assert.deepEqual(rows, [
@@ -115,7 +115,7 @@ async function step(name, fn) {
         ["Person E", "5", "4", "1", "4 : 1 (4.0 : 1)", "20.0%", "1"],
         ["Person F", "5", "4", "1", "4 : 1 (4.0 : 1)", "20.0%", "—"],
       ], "only the people who took leave, the highest leave share first (no 0% rows)");
-      assert.deepEqual(await read(".ov-leave-sum"), ["3 of 8 people had leave in this range · Highest leave share first"]);
+      assert.deepEqual(await read(".ov-spread-sum"), [`4 leave days · 3 people took leave · busiest Mon ${dayMon(d[0])} (2)`], "the count that sat above the table is the chart's headline now");
       const pills = await p.evaluate(() => [...document.querySelectorAll(".ov-people-table .ov-share")].slice(0, 3).map((x) => x.className.split(" ").pop()));
       assert.deepEqual(pills, ["ov-share-bad", "ov-share-ok", "ov-share-ok"], "40% is red; exactly 20% is not above 20%");
       await p.locator(".ov-people-table .ov-sort", { hasText: "Name" }).click();
@@ -128,7 +128,7 @@ async function step(name, fn) {
 
     await step("a type button hides that type, never the last one; the calendar counts the types shown", async () => {
       await p.locator(".ov-lv-chip", { hasText: "Annual Leave" }).click();
-      assert.equal(await p.locator(".ov-hchart:not(.ov-eng) .chart-column-chart rect.chart-mark").count(), 2);
+      assert.equal(await p.locator(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart rect.chart-mark").count(), 2);
       for (const t of ["Sick Leave", "Business Leave", "Unpaid Leave"]) await p.locator(".ov-lv-chip", { hasText: t }).click();
       assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll(".ov-lv-chip")].map((c) => c.getAttribute("aria-pressed"))), ["false", "false", "false", "true"], "Unpaid, the last one on, stays on");
       for (const t of ["Annual Leave", "Sick Leave", "Business Leave"]) await p.locator(".ov-lv-chip", { hasText: t }).click();
@@ -140,7 +140,7 @@ async function step(name, fn) {
     });
 
     await step("click a day in the leave chart to open that board on that date", async () => {
-      await p.locator(`.ov-hchart:not(.ov-eng) .chart-column-chart rect.chart-mark[data-date="${d[1]}"]`).first().click();
+      await p.locator(`.ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart rect.chart-mark[data-date="${d[1]}"]`).first().click();
       await p.waitForTimeout(300);
       const at = await p.evaluate(() => [state.date, D().activeBoardId, state.filters.engineer.length]);
       assert.deepEqual(at, [d[1], "b1", 0]);
@@ -151,7 +151,7 @@ async function step(name, fn) {
       await pick("On-call deployed / day");
       assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .ov-muted"), ["Called in on 78% of the available on-call days · 21% of the people on missions"], "7 of 9 on-call days (Mon: H on Exchange); 7 of 33 people on missions");
       assert.equal(await p.locator(".ov-hnames").count(), 0, "the Most called in list is gone");
-      await p.locator(".ov-hchart:not(.ov-eng) .ov-people-link .ov-linkbtn").click();
+      await p.locator(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-people-link .ov-linkbtn").click();
       assert.equal(await p.locator(".ov-people-bar .btn.active").first().textContent(), "On-call", "the link opens People's On-call view");
       const rows = await rowsOf(".ov-people-table");
       assert.deepEqual(rows.map((r) => r[0] + " | " + r[3]), ["Person H OC | 2", "Person G OC | 5"], "least called in first (Share called in, lowest first)");

@@ -147,7 +147,7 @@ async function step(name, fn) {
       assert.equal(mon("Permanent").x, mon("On-call").x, "one bar: the same place, not side by side");
       assert.ok(Math.abs(mon("Permanent").y - (mon("On-call").y + mon("On-call").h)) < 0.3, "On-call sits on top of Permanent");
       assert.ok(Math.abs(mon("Total").y - mon("On-call").y) < 0.3, "the stack reaches the total");
-      assert.deepEqual([mon("Permanent").fill, mon("On-call").fill, mon("Total").fill], ["var(--chart-cat-3)", "var(--chart-oncall)", "var(--chart-assigned-ghost)"]);
+      assert.deepEqual([mon("Permanent").fill, mon("On-call").fill, mon("Total").fill], ["var(--chart-cat-3)", "var(--chart-oncall)", "var(--assigned-ghost)"]);
       assert.equal(mon("Permanent").label, `Permanent — ${MON} · 5 deployed`, "the total in the tooltip");
       assert.deepEqual(await totalsText(), ["5", "4", "4", "3", "1"], "the day's total above each bar");
 

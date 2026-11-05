@@ -90,7 +90,7 @@
   --leave-unpaid: #7b8794;
   --leave-exchange: #1baf7a;
   --oncall-ghost: #fbe1d5;
-  --chart-assigned-ghost: rgba(42,120,214,.2);   /* Deployed / day, Stacked: the pale Total bar behind the Permanent and On-call parts */
+  --assigned-ghost: #d6e6fa;   /* the pale bar behind a column of people on a mission: everyone on the roster */
   --oncall-free: #f2a07b;   /* On-call free columns: the on-call orange, lighter (between --oncall-ghost and --chart-oncall) */
   --chart-cat-1: #2a78d6;
   --chart-cat-2: #eb6834;
@@ -7141,8 +7141,7 @@ label > .pk { margin-top: 5px; }
 .ov-band-l { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ov-band-median .ov-band-l { color: var(--primary-text); font-weight: 700; }
 .ov-band-median .ov-band-l::after { content: "▲"; display: block; font-size: 8px; line-height: 1; margin-top: 1px; }
-.ov-people-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-top: 14px; }
-.ov-people-sum { margin: 10px 0 0; font-size: 13px; }
+.ov-people-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-top: 2px; }
 .ov-band-chip { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 12.5px; }
 .ov-band-chip > span { padding: 2px 10px; border-radius: 999px; background: var(--hover-tint); font-weight: 600; }
 .ov-person-link { font: inherit; padding: 0; border: 0; background: none; color: var(--primary-text); font-weight: 600; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; }
@@ -7153,6 +7152,34 @@ label > .pk { margin-top: 5px; }
 .ov-flag-ok { background: #e6f4ec; color: #1f8a4c; }
 .ov-flag-warn { background: #fdf0d9; color: #a15c00; }
 .ov-flag-bad { background: #fde8e7; color: #b42318; }
+/* People: the chart follows the view (spread, over time, calendar, flags) and a click on it filters the table */
+.ov-locked { font-size: 12px; font-weight: 600; color: var(--muted); }
+#ov-people .ov-hchart.ov-spread { margin-bottom: 12px; }
+.ov-empty { margin: 10px 0 0; font-size: 13px; }
+.ov-band-warn .ov-band-pt i { background: var(--leave-annual); }
+.ov-band-warn .ov-band-l { color: #a15c00; font-weight: 700; }
+.ov-band-bad .ov-band-pt i { background: var(--chart-standby); }
+.ov-band-bad .ov-band-l { color: #b42318; font-weight: 700; }
+.ov-band-l { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-band-chip small { font-size: 12px; }
+.ov-open-day { border: 0; background: none; padding: 2px 4px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--primary-text); cursor: pointer; }
+.ov-open-day:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; border-radius: 2px; }
+.chart-hit.is-picked { fill: var(--hover-tint); stroke: var(--primary-text); stroke-width: 1.5; }
+.ov-cal-cell.is-picked { border-color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-text); }
+#ov-people .ov-cal-cell[role="button"] { cursor: pointer; }
+/* Alerts, by flag: a label, a bar split amber and red, the count */
+.ov-flagrows { display: grid; gap: 4px; margin-top: 4px; }
+.ov-flagrow { display: grid; grid-template-columns: minmax(130px, 200px) minmax(0, 1fr) 150px; align-items: center; gap: 10px; font: inherit; text-align: left; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
+.ov-flagrow:hover { background: var(--hover-tint); }
+.ov-flagrow:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-flagrow[aria-pressed="true"] { border-color: var(--primary-text); background: var(--hover-tint); }
+.ov-flagrow > b { font-size: 13px; }
+.ov-flagbar { display: flex; height: 12px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.ov-flagbar i { display: block; height: 100%; }
+.ov-flagn { font-variant-numeric: tabular-nums; }
+.ov-flagn b { font-size: 13px; margin-right: 4px; }
+.ov-flagn small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+@media (max-width: 560px) { .ov-flagrow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ov-flagn { grid-column: 1 / -1; } }
 /* the employee profile: a wide side panel, full screen on a phone */
 #modal-profile.modal-side { width: min(1040px, 100vw); }
 .profile-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 22px 24px; display: flex; flex-direction: column; gap: 12px; }

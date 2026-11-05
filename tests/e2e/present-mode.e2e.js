@@ -75,7 +75,7 @@ async function step(name, fn) {
     const nameWords = /Person [A-Z]\b/;
     // the Overview state a presenter can change (present.js FIELDS): what Reset filters and leaving put back
     const FIELDS = ["boardIds", "period", "historyPreset", "historyFrom", "historyTo", "historyMeasure", "historyLeaveView", "historyLeaveHidden", "historyGroup", "historyCompare",
-      "historyOncallMode", "historyDeployedBy", "historyDeployedShow", "historyDeployedStyle", "historyAreaHidden", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplSpread", "pplBand", "pplSort", "pplAll", "engPick", "engGroup", "engMeasure"];
+      "historyOncallMode", "historyDeployedBy", "historyDeployedShow", "historyDeployedStyle", "historyAreaHidden", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplChart", "pplPick", "pplSort", "pplAll", "engPick", "engGroup", "engMeasure"];
     const filters = () => p.evaluate((f) => JSON.stringify(f.map((k) => (state.overview[k] === undefined ? null : state.overview[k]))), FIELDS);
     let startFilters = null;
     const SLIDE_NAMES = ["In detail", "History", "People", "Engineer workload", "Workforce", "Boards & areas"];
@@ -209,6 +209,16 @@ async function step(name, fn) {
       await p.locator("#overview-panel .ov-people-bar .btn", { hasText: "Nights" }).click();
       assert.equal(await ov("pplView"), "nights");
       assert.equal(await p.evaluate(() => { const e = document.querySelector("#overview-panel .ov-wl-more"); return e ? getComputedStyle(e).display : "none"; }), "none", "Show all is not offered");
+      // the chart follows the view: its own switch and a click on a day (which only filters the table) are live; the board link is not
+      await p.locator("#overview-panel .ov-spread .ov-pview .btn", { hasText: "Over time" }).click();
+      assert.equal(await ov("pplChart"), "time");
+      await p.locator("#overview-panel .ov-spread rect.chart-hit[data-date]").first().click({ force: true });
+      assert.equal((await ov("pplPick")).k, "day", "a day on the chart filters the table");
+      const board = await p.evaluate(() => D().activeBoardId);
+      await p.locator("#overview-panel .ov-open-day").click({ force: true });
+      assert.equal(await p.evaluate(() => D().activeBoardId), board, "Open that day's board does nothing on a slide");
+      await p.locator("#overview-panel .ov-people-bar .btn", { hasText: "Workload" }).click();
+      assert.equal(await ov("pplPick"), null, "a new view starts with no pick");
       await goTo(4);
       await p.selectOption("#overview-panel .ov-eng-select", "eng-2");
       assert.equal(await ov("engPick"), "eng-2");
