@@ -228,11 +228,15 @@ const Charts = (() => {
      filled part of a pale bar. Every segment is its own hover/focus target
      (chart-mark), its tooltip naming the day and that segment's count; a null
      day draws nothing, like lineChart's gaps. */
-  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null, notes = null, compare = null, suffix = "" }) {
+  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null, notes = null, totals = null, compare = null, suffix = "" }) {
     // `notes` ([{ values, color, text, pos: "above" | "below" }]) writes a small figure above a column
     // (+3 joiners) or under its baseline (-1 leavers); a column with 0 gets none. Used by Workforce.
+    // `totals` ([number|null]) prints each column's total directly above it, in the text colour; the
+    // "above" notes then sit one row higher so the two never overlap.
     const hasBelow = !!(notes && notes.some(n => n.pos === "below"));
-    const padL = 32, padR = 16, padT = hasBelow || notes ? 16 : 10, padB = hasBelow ? 36 : 22;
+    const hasAbove = !!(notes && notes.some(n => n.pos !== "below"));
+    const TOTAL_ROW = 13;   // one line of 10.5-11px text
+    const padL = 32, padR = 16, padT = 10 + (totals ? TOTAL_ROW : 0) + (hasAbove ? 6 + (totals ? 5 : 0) : hasBelow ? 6 : 0), padB = hasBelow ? 36 : 22;
     const w = width - padL - padR, h = height - padT - padB;
     const n = xLabels.length;
     const band = n ? w / n : w;
@@ -286,13 +290,22 @@ const Charts = (() => {
         marks += `<rect class="chart-compare" x="${x}" y="${cy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, yAt(0) - cy).toFixed(1)}" rx="2" fill="none" stroke="${compare.color}" stroke-width="1.5" stroke-dasharray="3 2" pointer-events="none"/>`;
       }
     }
+    if (totals) {
+      for (let i = 0; i < n; i++) {
+        const t = totals[i];
+        if (!t) continue;   // an empty column (or a null day) gets no "0"
+        const top = stacks.reduce((a, st) => a + (st.values[i] || 0), 0);
+        marks += `<text x="${xAt(i).toFixed(1)}" y="${(yAt(top) - 5).toFixed(1)}" class="chart-total" text-anchor="middle">${esc(t)}</text>`;
+      }
+    }
     if (notes) {
       for (let i = 0; i < n; i++) {
         const top = stacks.reduce((a, st) => a + (st.values[i] || 0), 0);
         for (const nt of notes) {
           const v = nt.values[i];
           if (!v) continue;
-          const y = nt.pos === "below" ? yAt(0) + 12 : yAt(top) - 5;
+          const lift = totals && totals[i] ? TOTAL_ROW - 1 : 0;   // clear of the total above this column
+          const y = nt.pos === "below" ? yAt(0) + 12 : yAt(top) - 5 - lift;
           marks += `<text x="${xAt(i).toFixed(1)}" y="${y.toFixed(1)}" class="chart-note" text-anchor="middle" fill="${nt.color}">${esc(nt.text)}${v}</text>`;
         }
       }

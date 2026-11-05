@@ -2600,13 +2600,13 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-hchart-head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
 .ov-hview .btn[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
 .ov-lv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
-.ov-lv-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
-.ov-lv-chip:hover { background: var(--hover-tint); }
-.ov-lv-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.ov-lv-chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.ov-lv-chip small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
-.ov-lv-chip[aria-pressed="false"] { opacity: .5; }
-.ov-lv-chip[aria-pressed="false"] i { background: var(--border) !important; }
+.ov-lv-chip, .ov-wf-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
+.ov-lv-chip:hover, .ov-wf-chip:hover { background: var(--hover-tint); }
+.ov-lv-chip:focus-visible, .ov-wf-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-lv-chip i, .ov-wf-chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.ov-lv-chip small, .ov-wf-chip small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.ov-lv-chip[aria-pressed="false"], .ov-wf-chip[aria-pressed="false"] { opacity: .5; }
+.ov-lv-chip[aria-pressed="false"] i, .ov-wf-chip[aria-pressed="false"] i { background: var(--border) !important; }
 .ov-lv-table { margin-top: 10px; }
 .ov-lv-table tr.ov-lv-off td { color: var(--muted); }
 .ov-hbar { display: inline-block; width: 90px; height: 7px; border-radius: 999px; background: var(--bg); overflow: hidden; vertical-align: middle; }
@@ -7220,6 +7220,8 @@ label > .pk { margin-top: 5px; }
 @media (max-width: 1100px) { .ov-wf-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .ov-wf-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ov-wf-chart { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.chart-total { font-size: 11px; font-weight: 700; fill: var(--text); font-variant-numeric: tabular-nums; pointer-events: none; }
+.ov-wf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 4px; }
 .chart-note { font-size: 10.5px; font-weight: 700; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
 
 /* ===== Overview phase 2, batch C: chart toolbar, Compare with, side by side ===== */
