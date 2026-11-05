@@ -177,6 +177,19 @@ button.ov-cal-cell:hover { border-color: var(--primary-text); }
     <nav class="jump" aria-label="Sections"><a href="#today">What it does today</a><a href="#proposal">What each chip shows</a><a href="#opt-a">A</a><a href="#opt-b">B</a><a href="#opt-c">C</a><a href="#decide">Decisions</a></nav>
   </header>
 
+  <section class="panel rec-panel" id="decided">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h2>What was decided and built</h2><span class="tag rec">Layout B</span></div>
+    <ol class="qs">
+      <li><div><b>Layout: B.</b> Every chip has a Spread · Over time switch (Alerts: By flag · Over time), and Leave also has Calendar. Leave opens on Over time, the others on their spread.</div></li>
+      <li><div><b>Chips above the chart.</b> Yes. They drive the chart and the table together.</div></li>
+      <li><div><b>One Who switch.</b> Yes. Everyone draws one combined curve, and the On-call chip is on-call people only and hides the switch.</div></li>
+      <li><div><b>Leave over time, in People and in History.</b> Both stay. A day click in People filters the table; the chip offers Open that day's board.</div></li>
+      <li><div><b>On-call spread.</b> Available days (working days less leave), with Never as its own red band.</div></li>
+      <li><div><b>Alerts chart.</b> One bar per flag, split amber and red; a click filters the table.</div></li>
+    </ol>
+    <p class="muted">The mockups below are the proposal as it was shown. Two small differences in the build: Leave's Spread draws only the people who took leave (the others are a count in the headline, like Nights), and the On-call axis labels never-called-in as 0.</p>
+  </section>
+
   <section class="panel" id="today">
     <h2>What People does today</h2>
     <ul>

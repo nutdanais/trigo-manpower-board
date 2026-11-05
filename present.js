@@ -42,12 +42,12 @@ const Present = (() => {
   /* what a click may reach on a slide (default deny). Everything here only changes what is shown. A day, a name, a
      row's arrow, "See all hosts" and "Show all" are left out on purpose: they open a board or a profile, or print
      a table that cannot fit. */
-  const LIVE = [".ov-trend-btns .btn", ".ov-htile", ".ov-lv-chip", ".ov-wf-chip", ".ov-band", ".ov-band-chip .ov-linkbtn", ".ov-sort",
+  const LIVE = [".ov-trend-btns .btn", ".ov-htile", ".ov-lv-chip", ".ov-wf-chip", ".ov-band", ".ov-flagrow", "[data-pslide=\"people\"] [data-date]", ".ov-band-chip .ov-linkbtn", ".ov-sort",
     ".ov-eng-select", "tr[data-eng]", ".ov-small-head .ov-linkbtn", ".ov-ba-table tr[data-i]", ".ov-ba-loans > .ov-linkbtn"].join(",");
   /* the Overview state a presenter can change, put back when they leave */
   const FIELDS = ["boardIds", "period", "historyPreset", "historyFrom", "historyTo", "historyMeasure", "historyLeaveView", "historyLeaveHidden",
-    "historyGroup", "historyCompare", "historyOncallMode", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplSpread",
-    "pplBand", "pplSort", "pplAll", "engPick", "engGroup", "engMeasure"];
+    "historyGroup", "historyCompare", "historyOncallMode", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplChart",
+    "pplPick", "pplSort", "pplAll", "engPick", "engGroup", "engMeasure"];
   const e = escapeHtml;
   let run = null;             // { kind: "overview" | "board", slides: [keys], i, names, t0, fs, snap, orig, home, keys }
   let wake = null, hideTimer = 0, noteTimer = 0, draft = null;
