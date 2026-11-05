@@ -4103,7 +4103,9 @@ function ovPeriodView(boards = ovPeriodBoards()) {
 function ovPeriodOnly(id) {
   if (state.overview.period.linked) setOvBoard(id); else setOvPeriod({ ids: [id], view: "together" });
 }
-function periodScopeControls() {
+/* opts.viewOnly: just the View switch (Combined, Side by side, A vs B), for Present's period strip, where the
+   stage's board chips already choose the boards */
+function periodScopeControls(opts = {}) {
   const ov = state.overview, p = ov.period, all = D().boards;
   if (all.length < 2) return null;
   const boards = ovPeriodBoards(), view = ovPeriodView(boards);
@@ -4125,21 +4127,23 @@ function periodScopeControls() {
     b.onclick = onclick;
     return b;
   };
-  wrap.appendChild(lab("Boards"));
-  wrap.appendChild(btn(p.linked ? "Linked to page" : "Own boards · relink", p.linked,
-    () => setOvPeriod(p.linked ? { linked: false, ids: ovScopeBoards().map(b => b.id) } : { linked: true }),
-    { title: p.linked ? "Following the page's boards. Unlink to pick other boards for the Period." : "Follow the page's boards again" }));
-  const chips = document.createElement("div");
-  chips.className = "ov-trend-btns ov-period-boards";
-  for (const b of all) {
-    const on = boards.some(x => x.id === b.id);
-    chips.appendChild(btn(b.name, on, () => {
-      const ids = boards.map(x => x.id), at = ids.indexOf(b.id);
-      if (at > -1) { if (ids.length === 1) return; ids.splice(at, 1); } else ids.push(b.id);
-      setOvPeriod({ ids });
-    }, { disabled: p.linked, noI18n: true, id: b.id }));
+  if (!opts.viewOnly) {
+    wrap.appendChild(lab("Boards"));
+    wrap.appendChild(btn(p.linked ? "Linked to page" : "Own boards · relink", p.linked,
+      () => setOvPeriod(p.linked ? { linked: false, ids: ovScopeBoards().map(b => b.id) } : { linked: true }),
+      { title: p.linked ? "Following the page's boards. Unlink to pick other boards for the Period." : "Follow the page's boards again" }));
+    const chips = document.createElement("div");
+    chips.className = "ov-trend-btns ov-period-boards";
+    for (const b of all) {
+      const on = boards.some(x => x.id === b.id);
+      chips.appendChild(btn(b.name, on, () => {
+        const ids = boards.map(x => x.id), at = ids.indexOf(b.id);
+        if (at > -1) { if (ids.length === 1) return; ids.splice(at, 1); } else ids.push(b.id);
+        setOvPeriod({ ids });
+      }, { disabled: p.linked, noI18n: true, id: b.id }));
+    }
+    wrap.appendChild(chips);
   }
-  wrap.appendChild(chips);
   wrap.appendChild(lab("View"));
   const seg = document.createElement("div");
   seg.className = "ov-trend-btns";
@@ -6932,6 +6936,7 @@ function renderOverview() {
     panel.appendChild(ovGroupHead("In detail", `${dayLabel} · ${scopeName}`));
     const grid = document.createElement("div");
     grid.className = "ov-detail-grid";
+    grid.dataset.pslide = "detail";   // Present shows this group as its "In detail" slide (see present.js)
     for (const sec of detail) grid.appendChild(sec);
     panel.appendChild(grid);
   }
@@ -6950,13 +6955,15 @@ function renderOverview() {
     // what every delta compares with: the period before, or the same period last year (Compare with)
     const cmpInfo = historyCompareInfo();
     const prevRecs = cmpInfo.loading ? [] : historyDates(pboards, cmpInfo.from, cmpInfo.to).map(d => historyDayRec(d, pboards, cmpInfo.hist));
-    panel.appendChild(historySection(histDates, histRecs, historyUnplanned(histDates, pboards, state.overview.history || {}), pendingCharts, prevRecs));
-    panel.appendChild(peopleSection(pboards, histDates, histRecs));
-    panel.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts, prevRecs));
-    const wf = workforceSection(pboards);
+    // data-pslide names the Present slide each section is: the one place the page and Present agree on them
+    const slide = (key, sec) => { sec.dataset.pslide = key; return sec; };
+    panel.appendChild(slide("history", historySection(histDates, histRecs, historyUnplanned(histDates, pboards, state.overview.history || {}), pendingCharts, prevRecs)));
+    panel.appendChild(slide("people", peopleSection(pboards, histDates, histRecs)));
+    panel.appendChild(slide("engineer", engineerHistorySection(histDates, histRecs, pendingCharts, prevRecs)));
+    const wf = slide("workforce", workforceSection(pboards));
     panel.appendChild(wf);
     if (wf._fill) pendingCharts.push(wf._fill);
-    panel.appendChild(boardsAreasSection(pboards, histDates));
+    panel.appendChild(slide("areas", boardsAreasSection(pboards, histDates)));
   }
 
   // A role with every section switched off would otherwise get a blank tab with
@@ -6970,6 +6977,8 @@ function renderOverview() {
   // single board, where "All boards" and that board are the same thing.
   if (allBoards.length > 1) fillOvBoardSelect(boards);
 
+  // a screen being presented shows only its own slide, and says which before the charts are measured
+  if (typeof Present !== "undefined") Present.mark(panel);
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(panel);
