@@ -2622,5 +2622,13 @@ I18N.add({
   "Next board": "บอร์ดถัดไป",
   "There is nothing to present on this tab.": "ไม่มีอะไรให้นำเสนอในแท็บนี้",
   "Stacked bar, total {a}": "แผนภูมิแท่งแบบซ้อน ผลรวม {a}",
+  "Edit details": "แก้ไขรายละเอียด",
+  "Reactivate": "เปิดใช้งานอีกครั้ง",
+  "Leave record": "ประวัติการลา",
+  "No leave in this period.": "ไม่มีการลาในช่วงเวลานี้",
+  "leave day": "วันลา",
+  "leave days": "วันลา",
+  "worked back, not leave": "ทำงานชดเชย ไม่นับเป็นการลา",
+  "Your role cannot open employee profiles.": "บทบาทของคุณไม่สามารถเปิดโปรไฟล์พนักงานได้",
 });
 

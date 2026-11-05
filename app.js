@@ -442,7 +442,6 @@ const state = {
   sort: "number",                // default: sort by mission number on every board
   unlockedDates: new Set(),   // past/today dates the user confirmed they want to edit
   editingMissionId: null,
-  editingEmployeeId: null,
   selectedEmps: new Set(),    // multi-select of employee ids (Ctrl-click); drag/click assigns the whole set
   empSearch: "",              // name filter for the floating available panel
   poolAreas: new Set(),       // service-area filter for the floating panel; empty = all
@@ -456,7 +455,6 @@ const state = {
   settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, roles: {} },   // staged edits, by section
   rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
   svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
-  employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
@@ -478,6 +476,11 @@ const state = {
     notes: null,              // getEmployeeNotes rows
     seq: 0,                   // out-of-order guard for the loads
     hostsAll: false,          // "Show all" in the host table
+    leaveAll: false,          // "Show all" in the leave record
+    editing: false,           // Details is the edit form
+    focus: null,              // the input to focus when it opens in the edit form
+    detailsEl: null,          // the Details block, kept between redraws so typed values survive a period switch
+    noteDraft: "",            // a note being typed
   },
   users: {                    // Settings > Users: search/filter/sort over the people list
     search: "",
@@ -2355,7 +2358,7 @@ function empCard(emp, opts = {}) {
     for (const c of $$(".emp-card.selected")) c.classList.add("dragging");
   });
   card.addEventListener("dragend", () => { for (const c of $$(".emp-card.dragging")) c.classList.remove("dragging"); });
-  card.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(emp.id)));
+  card.addEventListener("dblclick", () => openEmployeeModal(emp.id));
   card.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(emp, ev.clientX, ev.clientY); });
   attachLongPress(card, (x, y) => openEmpMenu(emp, x, y));
   return card;
@@ -2596,18 +2599,16 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
   // a lent-out card on its own board: only what concerns the loan
   if (!isNonBoardView() && menuBoardId !== D().activeBoardId) {
     addTitle(emp.name);
-    addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
+    addItem("Profile", () => openEmployeeModal(emp.id), null, "person");
     if (loan) {
       addItem(`End loan (back to ${homeName})`, () => guardEdit(() => endLoanFor(emp)), null, "return");
       addItem("Change loan dates…", () => guardEdit(() => openLendModal([emp.id], { loan })), null, "calendar");
     }
     return;
   }
-  // Placing someone needs the plan they would land in. On a forecast date that
-  // is the forecast — which only the board itself has loaded — so from the
-  // Manpower List the placement items are left out there rather than
-  // writing a confirmed assignment onto a forecast date.
-  const placeable = sameBoard && !(isNonBoardView() && isForecastDateFor(menuBoardId, state.date));
+  // Placing someone (a mission, leave, back to Standby) is the board's work: the
+  // Manpower List's menu is about the person, so it leaves those items out.
+  const placeable = sameBoard && !isNonBoardView();
   const plan = placeable ? peekPlan(menuBoardId) : null;
   const current = placeable && !many ? currentAssignmentOfIn(plan, emp.id) : null;
   // already-there targets are dropped: assigning someone to where they already
@@ -2638,9 +2639,8 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
     }
   } else {
     addTitle(many ? `${ids.length} employees selected` : emp.name);
-    if (!many) addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
-    // the Manpower List's menu: the employee profile (read-only, so no guardEdit)
-    if (!many && isEmployeeList() && can("emplist")) addItem("Profile", () => openProfile(emp.id, state.emplist.period || "30"), null, "person");
+    // the person's Profile: everything about them, and where they are edited (roster data, so no day lock)
+    if (!many) addItem("Profile", () => openEmployeeModal(emp.id), null, "person");
     if (lending) addItem("Lend to board…", () => guardEdit(() => openLendModal(ids)), null, "swap");
     else if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
     if (loan) {
@@ -5519,11 +5519,13 @@ function pplSummary(v, rows, shown) {
 }
 
 /* ---------- Employee profile ----------
-   One person on one page: who they are, their figures for a period against the period before,
-   twelve months of worked against leave next to the average of their contract type, their flags,
-   the hosts they have worked, their loans and their notes. Opens from a name in People and from
-   the Manpower List's menu. Anyone who can view Manpower can open it; the figures (and the
-   chart and flags) need the Overview History permission, like History's own per-person numbers.
+   One person on one page, and the one place they are edited: every detail (Edit details), their
+   figures for a period against the period before, their leave record, twelve months of worked
+   against leave next to the average of their contract type, their flags, the hosts they have
+   worked, their loans and their notes (add and delete). Opens from a name in People, from the
+   Manpower List (double-click or its menu) and from a board card. Anyone who can view Manpower
+   can open it and anyone who can edit the roster can change it; the figures (and the chart,
+   flags and leave record) need the Overview History permission, like History's own per-person numbers.
    The figures are History's own: the same fetch (getUtilizationRange over every board), the
    same day records and the same rows (historyPeopleRows), so they match the People row for the
    same range. The layout is the one-engineer view's: tiles, a chart against an average, a foot
@@ -5581,20 +5583,57 @@ function profileMonths(id, hist) {
   });
 }
 
-async function openProfile(id, period) {
-  if (!can("emplist") || !D().employees.some(e => e.id === id)) return;
+async function openProfile(id, period, opts = {}) {
+  if (!D().employees.some(e => e.id === id)) return;
+  if (!can("emplist")) { toast("Your role cannot open employee profiles.", "info"); return; }
   const pr = state.profile;
   pr.id = id;
-  pr.period = period && PROFILE_PERIODS.some(([k]) => k === period) ? period : "range";
-  pr.hosts = null; pr.notes = null; pr.hostsAll = false;
+  const want = period || state.emplist.period || "30";
+  pr.period = PROFILE_PERIODS.some(([k]) => k === want) ? want : "range";
+  pr.hosts = null; pr.notes = null; pr.hostsAll = false; pr.leaveAll = false;
+  pr.cache = null;   // the figures are read fresh: leave and missions may have changed since the last time
+  pr.editing = !!opts.edit && can("emplist", "edit");
+  pr.focus = pr.editing ? opts.focus || null : null;
+  pr.detailsEl = null; pr.noteDraft = "";
   const e = D().employees.find(x => x.id === id);
   $("#profile-title").textContent = e.name;
   $("#profile-sub").textContent = "";
   $("#profile-body").innerHTML = '<p class="ov-muted ov-prof-loading">Loading…</p>';
   openModal("#modal-profile");
+  renderProfile();   // the Details first (or the form, straight away); the figures follow once they are loaded
   await safely(async () => {
     await loadProfile();
     renderProfile();
+  });
+}
+
+/* back to the read-only Details after a save, a deactivation or a cancelled edit */
+function profileShowDetails() {
+  const pr = state.profile;
+  pr.editing = false; pr.focus = null; pr.detailsEl = null;
+  openModal("#modal-profile");   // a confirm in between may have closed it
+  renderProfile();
+}
+function profileDeactivate() {
+  const pr = state.profile, e = D().employees.find(x => x.id === pr.id);
+  if (!e) return;
+  askDeactivate("Deactivate employee?",
+    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
+    (reason) => safely(async () => {
+      await cloud.setEmployeesActive([e.id], false, reason);
+      await refreshAndRender();
+      profileShowDetails();
+    }),
+    () => openModal("#modal-profile"));
+}
+function profileReactivate() {
+  const pr = state.profile, e = D().employees.find(x => x.id === pr.id);
+  if (!e) return;
+  safely(async () => {
+    await cloud.setEmployeesActive([e.id], true);
+    await refreshAndRender();
+    profileShowDetails();
+    toast(`${e.name} is active again — back on today's and future boards.`, "info");
   });
 }
 
@@ -5630,20 +5669,11 @@ function renderProfile() {
   const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
   $("#profile-sub").textContent = [board && board.name, e.contract === "oncall" ? "On-call" : "Permanent", area && area.name].filter(Boolean).join(" · ");
 
-  body.innerHTML = "";
-  const fact = (l, v) => `<div><span>${l}</span> <b>${v}</b></div>`;
-  const head = document.createElement("div");
-  head.className = "ov-eng-facts ov-prof-id";
-  head.innerHTML = [
-    fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : "—"),
-    fact("Contract", e.contract === "oncall" ? "On-call" : "Permanent"),
-    fact("Position", pos ? pos.label : "—"),
-    fact("Service area", area ? sc(area.name) : "—"),
-    fact("Board", (board ? sc(board.name) : "—") + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
-    fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : "—"),
-    fact("Status", e.active === false ? `<span>Inactive</span>${e.deactivatedOn ? ` <small class="ov-muted"><span>since ${escapeHtml(fmtDate(e.deactivatedOn))}</span></small>` : ""}` : "Active"),
-  ].join("");
-  body.appendChild(head);
+  const scrollTop = body.scrollTop;
+  // putting the Details node back into the page drops focus from a field being typed in
+  const typing = pr.detailsEl && pr.detailsEl.contains(document.activeElement) ? document.activeElement : null;
+  body.replaceChildren(profileDetails(e, { board, area, pos, loanNow, loanTo, today }));
+  if (typing && typing.isConnected) typing.focus({ preventScroll: true });
 
   if (!can("ov.history")) {
     body.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help", textContent: "Worked, leave and nights are shown to roles that can see Overview History." }));
@@ -5699,6 +5729,8 @@ function renderProfile() {
     flags.innerHTML = `<b>Flags</b> ${cur.flags.length ? pplFlagsHtml(cur) : '<span class="ov-muted">None in this period</span>'}`;
     body.appendChild(flags);
 
+    body.appendChild(profileLeaveRecord(pr.id, pr.cache.hist, from, to));
+
     // twelve months against the average of their contract type
     const months = profileMonths(pr.id, pr.cache.hist);
     const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -5749,7 +5781,7 @@ function renderProfile() {
       hostBox.appendChild(more);
     }
   }
-  body.appendChild(hostBox);
+  if (pr.hosts) body.appendChild(hostBox);
 
   // loans
   const loans = feat().loans ? (D().loans || []).filter(l => l.employeeId === e.id).sort((a, b) => b.startDate.localeCompare(a.startDate)) : [];
@@ -5762,7 +5794,7 @@ function renderProfile() {
     body.appendChild(box);
   }
 
-  // notes, read-only, for anyone who can edit the roster (as in the Note tab)
+  // notes: for anyone who can edit the roster, who can add one and delete one
   if (can("emplist", "edit") && pr.notes) {
     const box = document.createElement("div");
     box.className = "ov-prof-block";
@@ -5771,14 +5803,164 @@ function renderProfile() {
     for (const n of pr.notes) {
       const p = document.createElement("p");
       p.className = "ov-prof-note";
-      p.innerHTML = `<span data-no-i18n>${escapeHtml(n.note)}</span> <small class="ov-muted"><span data-no-i18n>${escapeHtml(n.createdBy || "")}</span> ${escapeHtml(n.createdAt ? fmtDate(n.createdAt.slice(0, 10)) : "")}</small>`;
+      p.innerHTML = `<span data-no-i18n>${escapeHtml(n.note)}</span> <small class="ov-muted"><span data-no-i18n>${escapeHtml(n.createdBy || "")}</span> ${escapeHtml(n.createdAt ? fmtDate(n.createdAt.slice(0, 10)) : "")}</small> <button type="button" class="note-delete">Delete</button>`;
+      p.querySelector(".note-delete").onclick = () => profileDeleteNote(n.id);
       box.appendChild(p);
     }
+    const form = document.createElement("form");
+    form.className = "ov-prof-note-form";
+    form.innerHTML = `<label>Add a note <textarea name="note" rows="2" required placeholder="e.g. prefers day shifts, needs a safety refresher…"></textarea></label>
+      <button type="submit" class="btn btn-small btn-primary">Add note</button>`;
+    form.note.value = pr.noteDraft;
+    form.note.oninput = () => { pr.noteDraft = form.note.value; };
+    form.onsubmit = (ev) => { ev.preventDefault(); profileAddNote(form.note.value.trim()); };
+    box.appendChild(form);
     body.appendChild(box);
   }
 
   for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(body);
+  body.scrollTop = scrollTop;
+  if (pr.editing && pr.focus) {
+    const f = pr.detailsEl && pr.detailsEl.querySelector("form") && pr.detailsEl.querySelector("form")[pr.focus];
+    pr.focus = null;
+    if (f) requestAnimationFrame(() => { ((f._pk && f._pk.btn) || (f._dp && f._dp.btn) || f).focus(); });
+  }
+}
+
+function profileAddNote(text) {
+  const pr = state.profile, id = pr.id;
+  if (!text) return;
+  safely(async () => {
+    await cloud.addEmployeeNote(id, text);
+    const rows = await cloud.getEmployeeNotes(id);
+    if (pr.id !== id) return;
+    pr.notes = rows; pr.noteDraft = "";
+    renderProfile();
+  });
+}
+function profileDeleteNote(noteId) {
+  const pr = state.profile, id = pr.id;
+  showConfirm("Delete note?", "Remove this note? This can't be undone.", () => safely(async () => {
+    await cloud.deleteEmployeeNote(noteId);
+    const rows = await cloud.getEmployeeNotes(id);
+    openModal("#modal-profile");   // the confirm closed it
+    if (pr.id !== id) return;
+    pr.notes = rows;
+    renderProfile();
+  }), () => openModal("#modal-profile"));
+}
+
+/* Details: every field of the person, and the way to change them. Kept between redraws (pr.detailsEl)
+   so a period switch while the form is open does not wipe what was typed. */
+function profileDetails(e, ctx) {
+  const pr = state.profile;
+  if (pr.detailsEl) return pr.detailsEl;
+  const { board, area, pos, loanNow, loanTo, today } = ctx;
+  const canEdit = can("emplist", "edit");
+  const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
+  const box = document.createElement("div");
+  box.className = "ov-prof-block ov-prof-details";
+  const head = document.createElement("div");
+  head.className = "ov-prof-details-head";
+  head.innerHTML = `<div class="ov-eng-foot-h">${pr.editing ? "Edit details" : "Details"}</div>`;
+  box.appendChild(head);
+  if (pr.editing) {
+    const slot = document.createElement("div");
+    box.appendChild(slot);
+    const form = employeeFormMount(slot, e);
+    const cancel = form.querySelector(".emp-form-cancel");
+    cancel.removeAttribute("data-close");   // leaves the form, not the Profile
+    cancel.onclick = () => profileShowDetails();
+  } else {
+    if (canEdit) {
+      const acts = document.createElement("div");
+      acts.className = "ov-prof-details-acts";
+      const edit = document.createElement("button");
+      edit.type = "button"; edit.id = "btn-profile-edit"; edit.className = "btn btn-small";
+      edit.innerHTML = `${icon("edit")} Edit details`;
+      edit.onclick = () => { pr.editing = true; pr.focus = "name"; pr.detailsEl = null; renderProfile(); };
+      acts.appendChild(edit);
+      const off = e.active === false;
+      const tog = document.createElement("button");
+      tog.type = "button"; tog.id = "btn-profile-active";
+      tog.className = off ? "btn btn-small" : "btn btn-small btn-danger";
+      tog.innerHTML = off ? `${icon("return")} Reactivate` : `${icon("ban")} Deactivate`;
+      tog.onclick = off ? profileReactivate : profileDeactivate;
+      acts.appendChild(tog);
+      head.appendChild(acts);
+    }
+    const fact = (l, v) => `<div><span>${l}</span> <b>${v}</b></div>`;
+    const grid = document.createElement("div");
+    grid.className = "ov-eng-facts ov-prof-id";
+    grid.innerHTML = [
+      fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : "—"),
+      fact("Contract", e.contract === "oncall" ? "On-call" : "Permanent"),
+      fact("Position", pos ? pos.label : "—"),
+      fact("Service area", area ? sc(area.name) : "—"),
+      fact("Board", (board ? sc(board.name) : "—") + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
+      fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : "—"),
+      fact("Status", e.active === false ? `<span>${EMP_STATUS_LABEL[empStatus(e)]}</span>${e.deactivatedOn ? ` <small class="ov-muted"><span>since ${escapeHtml(fmtDate(e.deactivatedOn))}</span></small>` : ""}` : "Active"),
+      fact("English name", e.nameEn ? sc(e.nameEn) : "—"),
+      fact("Mobile number", e.phone ? telLink(e.phone) : "—"),
+      fact("On the board from", e.addedOn ? escapeHtml(fmtDate(e.addedOn)) : "—"),
+    ].join("");
+    box.appendChild(grid);
+  }
+  pr.detailsEl = box;
+  return box;
+}
+
+/* Leave record: each stretch of leave in the period as one line (the type, the dates, the days), and the
+   days by type above. Read from the same day records as the tiles, so it counts what they count: planned
+   working days, a stretch running on across a weekend or a holiday. An Exchange Working Day is listed
+   but is not leave (it is worked back), as in the Leave tile. */
+function profileLeaveStretches(id, hist, from, to) {
+  const boards = D().boards;
+  const dates = historyDates(boards, from, to);
+  const stretches = [], byType = Object.fromEntries(LEAVE_ZONES.map(z => [z, 0]));
+  let cur = null, last = -2;
+  dates.forEach((d, i) => {
+    const rec = historyDayRec(d, boards, hist);
+    const z = rec && rec.leaveEmp ? rec.leaveEmp[id] : null;
+    if (!z || !(z in byType)) { cur = null; return; }
+    byType[z]++;
+    if (cur && cur.zone === z && last === i - 1) { cur.to = d; cur.days++; }
+    else { cur = { zone: z, from: d, to: d, days: 1 }; stretches.push(cur); }
+    last = i;
+  });
+  return { stretches: stretches.reverse(), byType };
+}
+function profileLeaveRecord(id, hist, from, to) {
+  const pr = state.profile;
+  const { stretches, byType } = profileLeaveStretches(id, hist, from, to);
+  const leaveDays = LEAVE_ZONES.filter(z => z !== "exchange").reduce((a, z) => a + byType[z], 0);
+  const box = document.createElement("div");
+  box.className = "ov-prof-block ov-prof-leave";
+  box.innerHTML = `<div class="ov-eng-foot-h">Leave record <span class="ov-muted">${escapeHtml(fmtDate(from))} → ${escapeHtml(fmtDate(to))}</span></div>`;
+  if (!stretches.length) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "No leave in this period." }));
+    return box;
+  }
+  const chips = LEAVE_ZONES.filter(z => byType[z]).map(z =>
+    `<span class="ov-prof-lv"><i style="background:var(--leave-${z})"></i>${escapeHtml(ZONE_LABELS[z])} <b>${byType[z]}</b></span>`).join("");
+  box.insertAdjacentHTML("beforeend", `<p class="ov-prof-lv-sum"><b>${leaveDays}</b> leave ${leaveDays === 1 ? "day" : "days"}</p><div class="ov-prof-lv-chips">${chips}</div>`);
+  const dayText = (s) => (s.from === s.to ? `${fmtDow(s.from)} ${fmtDate(s.from)}` : `${fmtDow(s.from)} ${fmtDate(s.from)} – ${fmtDow(s.to)} ${fmtDate(s.to)}`);
+  const shown = pr.leaveAll ? stretches : stretches.slice(0, OV_WL_SHOWN);
+  const wrap = document.createElement("div");
+  wrap.className = "ov-table-wrap";
+  wrap.innerHTML = `<table class="ov-table ov-prof-leave-table"><thead><tr><th>Leave type</th><th>Dates</th><th class="r">Days</th></tr></thead><tbody>${
+    shown.map(s => `<tr><td><i class="ov-prof-lv-dot" style="background:var(--leave-${s.zone})"></i>${escapeHtml(ZONE_LABELS[s.zone])}${s.zone === "exchange" ? ` <small class="ov-muted">worked back, not leave</small>` : ""}</td><td>${escapeHtml(dayText(s))}</td><td class="r">${s.days}</td></tr>`).join("")}</tbody></table>`;
+  box.appendChild(wrap);
+  if (stretches.length > OV_WL_SHOWN) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "btn btn-small ov-wl-more";
+    more.textContent = pr.leaveAll ? "Show fewer" : `Show all ${stretches.length}`;
+    more.onclick = () => { pr.leaveAll = !pr.leaveAll; renderProfile(); };
+    box.appendChild(more);
+  }
+  return box;
 }
 
 
@@ -7394,7 +7576,7 @@ function renderEmployeeRows() {
       $("#emplist-select-all").checked = emps.length > 0 && emps.every(x => state.selectedEmps.has(x.id));
     };
     for (const b of tr.querySelectorAll(".el-fix")) b.onclick = (ev) => { ev.stopPropagation(); openEmployeeModal(e.id, b.dataset.fix); };   // roster master data: no day lock, as with Status
-    tr.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(e.id)));
+    tr.addEventListener("dblclick", () => openEmployeeModal(e.id));
     tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(e, ev.clientX, ev.clientY); });
     attachLongPress(tr, (x, y) => openEmpMenu(e, x, y));
     body.appendChild(tr);
@@ -9038,8 +9220,8 @@ new MutationObserver((muts) => {
   }
 }).observe(document.documentElement, { childList: true, subtree: true });
 
-function initSegmented() {
-  for (const sel of $$("select[data-seg]")) {
+function initSegmented(root = document) {
+  for (const sel of root.querySelectorAll("select[data-seg]")) {
     if (sel._seg) continue;
     const row = document.createElement("div");
     row.className = "seg-pick";
@@ -9487,92 +9669,92 @@ function saveHighlightNote(ev) {
   setMissionHighlight(m, "other", note);
 }
 
-/* employee modal */
-/* focusField: open straight on the Edit tab with that input focused — the
-   Manpower list's "+ Add TRIGO ID" style buttons land on the one thing missing */
-function openEmployeeModal(empId, focusField) {
-  if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
-  state.editingEmployeeId = empId || null;
-  const form = $("#form-employee");
-  form.reset();
-  // an existing person: their name leads the panel, with board · contract · area under it
-  const who0 = empId ? D().employees.find(e => e.id === empId) : null;
-  $("#employee-modal-title").textContent = who0 ? (who0.name || "Edit employee") : "New employee";
-  const sub = $("#employee-modal-sub");
-  if (who0) {
-    const b = D().boards.find(x => x.id === who0.boardId);
-    const ar = D().areas.find(x => x.id === who0.areaId);
-    sub.textContent = [b && b.name, who0.contract === "oncall" ? "On-call" : "Permanent", ar && ar.name].filter(Boolean).join(" · ");
-  }
-  sub.classList.toggle("hidden", !who0);
-  $("#btn-deactivate-employee").classList.toggle("hidden", !empId);
+/* ---------- employee form ----------
+   One form, drawn from #tpl-employee-form in two places: "New employee" (#modal-employee) and
+   "Edit details" inside the person's Profile (#modal-profile). Only one is ever on the page, so
+   it is always #form-employee. An existing person is opened and edited in their Profile
+   (openEmployeeModal hands them over); their host record and notes live there too. */
+function employeeFormMount(slot, emp) {
+  const old = $("#form-employee");
+  if (old) old.remove();
+  const form = $("#tpl-employee-form").content.firstElementChild.cloneNode(true);
+  slot.appendChild(form);
+  initSegmented(form);   // the slot may not be on the page yet (the Profile builds Details before showing it)
+  initPickers(form);
   form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}" data-color="${escapeHtml(a.color || "")}">${escapeHtml(a.name)}</option>`).join("");
   form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
-  if (empId) {
-    const e = D().employees.find(x => x.id === empId);
-    form.name.value = e.name;
-    form.nameEn.value = e.nameEn || "";
-    form.contract.value = e.contract;
-    form.position.value = e.position || "";
-    form.phone.value = e.phone || "";
-    form.trigoId.value = e.trigoId || "";
-    form.startDate.value = e.startDate || "";
-    form.addedOn.value = e.addedOn || "";
-    form.areaId.value = e.areaId;
-    form.boardId.value = e.boardId;
-  } else if (!isNonBoardView()) {
-    form.boardId.value = D().activeBoardId;
+  if (emp) {
+    form.name.value = emp.name;
+    form.nameEn.value = emp.nameEn || "";
+    form.contract.value = emp.contract;
+    form.position.value = emp.position || "";
+    form.phone.value = emp.phone || "";
+    form.trigoId.value = emp.trigoId || "";
+    form.startDate.value = emp.startDate || "";
+    form.addedOn.value = emp.addedOn || "";
+    form.areaId.value = emp.areaId;
+    form.boardId.value = emp.boardId;
   }
-  // Host Record opens first for an existing employee — it's the more common
-  // reason to double-click a card (checking where someone's worked before),
-  // Edit Employee is one tab away. It only makes sense once the employee has
-  // been saved (and thus could actually have an assignment history) though,
-  // so a brand-new employee skips straight to the edit form with no tab strip.
-  state.employeeTab = empId && !focusField ? "hosts" : "edit";
-  $("#employee-tabs").classList.toggle("hidden", !empId);
-  applyEmployeeTab();
-  if (empId) { loadEmployeeHostRecord(empId); loadEmployeeNotes(empId); }
+  syncSegmented(form);
+  form.addEventListener("submit", saveEmployee);
+  return form;
+}
+
+/* A new person gets a small form of their own. An existing one opens their Profile, where every
+   detail is shown and edited: focusField opens it straight on "Edit details" with that input
+   focused — the Manpower list's "+ Add TRIGO ID" style buttons land on the one thing missing. */
+function openEmployeeModal(empId, focusField) {
+  if (empId) { openProfile(empId, null, focusField ? { edit: true, focus: focusField } : {}); return; }
+  if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
+  $("#employee-modal-title").textContent = "New employee";
+  const form = employeeFormMount($("#employee-form-slot"), null);
+  if (!isNonBoardView()) form.boardId.value = D().activeBoardId;
   openModal("#modal-employee");
-  // a field drawn by an in-app picker focuses its button, not the hidden source
-  if (focusField && form[focusField]) requestAnimationFrame(() => { const f = form[focusField]; ((f._pk && f._pk.btn) || (f._dp && f._dp.btn) || f).focus(); });
 }
 
 function saveEmployee(ev) {
   ev.preventDefault();
-  const form = $("#form-employee");
+  const form = ev.target;
+  const inProfile = !!form.closest("#modal-profile");
+  const editingId = inProfile ? state.profile.id : null;
   const vals = { name: form.name.value.trim(), nameEn: form.nameEn.value.trim(), trigoId: form.trigoId.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
   // instant client-side checks (the same rules cloud.saveEmployee enforces, which is the real
   // guard): the name is the FULL name only, the TRIGO ID is T + digits and unique, and two people
   // may share a name only when both have a TRIGO ID. A short name saved earlier can be left as it is.
-  const editing = state.editingEmployeeId ? D().employees.find(x => x.id === state.editingEmployeeId) : null;
+  const editing = editingId ? D().employees.find(x => x.id === editingId) : null;
   const tid = EmployeeId.normalizeTrigoId(vals.trigoId);
   if (tid === null) { toast("The TRIGO ID must be the letter T and digits, like T329.", "warn"); return; }
   if (!editing || editing.name.trim() !== vals.name) {
     const why = EmployeeId.checkFullName(vals.name);
     if (why) { toast(why, "warn"); return; }
   }
-  if (EmployeeId.nameClash(D().employees, vals.name, tid, state.editingEmployeeId)) {
+  if (EmployeeId.nameClash(D().employees, vals.name, tid, editingId)) {
     toast(`An employee named "${vals.name}" already exists. Give each of them their TRIGO ID to tell them apart.`, "warn");
     return;
   }
-  const idOwner = EmployeeId.idClash(D().employees, tid, state.editingEmployeeId);
+  const idOwner = EmployeeId.idClash(D().employees, tid, editingId);
   if (idOwner) { toast(`The TRIGO ID ${tid} already belongs to ${idOwner.name}.`, "warn"); return; }
   const doSave = () => safely(async () => {
-    if (state.editingEmployeeId) {
-      const emp = D().employees.find(x => x.id === state.editingEmployeeId);
+    if (editingId) {
+      const emp = D().employees.find(x => x.id === editingId);
       if (emp.boardId !== vals.boardId) await cloud.moveEmployeeToBoard(emp.id, vals.boardId, state.date);
-      await cloud.saveEmployee(state.editingEmployeeId, vals);
+      await cloud.saveEmployee(editingId, vals);
     } else {
       await cloud.saveEmployee(null, vals);
     }
-    closeModal();
-    await refreshAndRender();
+    if (inProfile) {
+      await refreshAndRender();
+      profileShowDetails();
+    } else {
+      closeModal();
+      await refreshAndRender();
+    }
   });
   // A name typed into the wrong field: no Thai letters in the Thai name, or Thai letters in the English
   // name. A warning, not a block (a Thai name may be spelled in English for now), and on an edit only
   // for a field that was changed, so a person whose Thai column still holds the English copy from the
   // migration is not nagged every time their phone number is edited.
-  const hasThai = (t) => /[\u0E00-\u0E7F]/.test(t);
+  const hasThai = (t) => /[฀-๿]/.test(t);
   const mixUps = [];
   if (vals.name && !hasThai(vals.name) && (!editing || editing.name !== vals.name)) {
     mixUps.push(`The Thai name "${vals.name}" has no Thai letters. It is the name the app shows by default.`);
@@ -9582,132 +9764,10 @@ function saveEmployee(ev) {
   }
   if (mixUps.length) {
     // Cancel goes back to the form with everything still typed in
-    showConfirm("Check the names", mixUps.join("\n\n") + "\n\nSave anyway?", doSave, () => openModal("#modal-employee"), "Save anyway");
+    showConfirm("Check the names", mixUps.join("\n\n") + "\n\nSave anyway?", doSave, () => openModal(inProfile ? "#modal-profile" : "#modal-employee"), "Save anyway");
     return;
   }
   doSave();
-}
-
-function deactivateEmployee() {
-  const e = D().employees.find(x => x.id === state.editingEmployeeId);
-  askDeactivate("Deactivate employee?",
-    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`, (reason) => {
-    safely(async () => {
-      await cloud.setEmployeesActive([state.editingEmployeeId], false, reason);
-      closeModal();
-      await refreshAndRender();
-    });
-  });
-}
-
-/* employee modal — Edit Employee / Host Record sub-menu tabs (same pattern as
-   applySettingsTab, scoped to #modal-employee so the two tab strips don't
-   toggle each other's panes) */
-function applyEmployeeTab() {
-  for (const btn of $$("#employee-tabs .settings-tab")) {
-    btn.classList.toggle("active", btn.dataset.tab === state.employeeTab);
-  }
-  for (const pane of $$("#modal-employee .settings-pane")) {
-    pane.classList.toggle("hidden", pane.dataset.pane !== state.employeeTab);
-  }
-}
-
-/* Host Record tab: every host this employee has ever been deployed to, most
-   recent first. `getEmployeeHostHistory` reads deployment_history, which is
-   keyed one row per (employee, plan_date) — upserted, never duplicated, so
-   each row IS one distinct day worked, not one mission. Grouping those rows
-   by host and counting them therefore gives days at that host directly (same
-   figure the Host List's own inspector chips show, just from the other
-   side) — a host visited on ten different days is one line reading "10
-   days", not ten lines. Loaded on modal open (not on first tab click) so
-   switching tabs feels instant; the query is a single indexed read
-   (deployment_history.employee_id) so this is cheap even for someone with a
-   long history. */
-async function loadEmployeeHostRecord(empId) {
-  const box = $("#employee-hosts-list");
-  $("#employee-hosts-intro").classList.remove("hidden");
-  box.innerHTML = '<p class="import-note">Loading…</p>';
-  let rows;
-  try {
-    rows = await cloud.getEmployeeHostHistory(empId);
-  } catch (e) {
-    box.innerHTML = `<p class="import-note">Could not load host record: ${e.message || e}</p>`;
-    return;
-  }
-  // bail if the modal moved on to a different employee (or closed) while this was in flight
-  if (state.editingEmployeeId !== empId) return;
-  if (!rows.length) {
-    // the empty-state block, not a lone grey line; the intro has nothing to introduce
-    const emp = D().employees.find(e => e.id === empId);
-    $("#employee-hosts-intro").classList.add("hidden");
-    box.innerHTML = emptyStateHtml("No deployments yet",
-      `Hosts appear here once ${emp ? emp.name : "this person"} has worked a mission.`, "site");
-    return;
-  }
-  const byHost = new Map();   // host name -> { days, lastDate, lastNumber, lastCustomer }
-  for (const r of rows) {
-    const rec = byHost.get(r.host) || { days: 0, lastDate: r.date, lastNumber: r.number, lastCustomer: r.customer };
-    rec.days++;
-    byHost.set(r.host, rec);
-  }
-  // rows arrive most-recent-first, so the first row seen per host is already its most recent
-  const hosts = [...byHost.entries()].sort((a, b) => b[1].lastDate.localeCompare(a[1].lastDate));
-  box.innerHTML = `<div class="host-list">${hosts.map(([host, rec]) => `
-    <div class="host-row">
-      <div class="host-name">${escapeHtml(host)}</div>
-      <div class="host-meta">${rec.days} day${rec.days === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
-        (${escapeHtml(rec.lastNumber)}${rec.lastCustomer ? " — " + escapeHtml(rec.lastCustomer) : ""})</div>
-    </div>`).join("")}</div>`;
-}
-
-/* Note tab: free-text remarks left about this employee (not tied to any date
-   or assignment), most recent first. Same load-on-modal-open pattern as
-   loadEmployeeHostRecord, backed by its own employee_notes table so a note
-   survives independently of the roster edit form. */
-async function loadEmployeeNotes(empId) {
-  const box = $("#employee-notes-list");
-  box.innerHTML = '<p class="import-note">Loading…</p>';
-  let rows;
-  try {
-    rows = await cloud.getEmployeeNotes(empId);
-  } catch (e) {
-    box.innerHTML = `<p class="import-note">Could not load notes: ${e.message || e}</p>`;
-    return;
-  }
-  // bail if the modal moved on to a different employee (or closed) while this was in flight
-  if (state.editingEmployeeId !== empId) return;
-  if (!rows.length) {
-    box.innerHTML = '<p class="import-note">No notes yet.</p>';
-    return;
-  }
-  box.innerHTML = `<div class="note-list">${rows.map((r) => `
-    <div class="note-row" data-id="${escapeHtml(r.id)}">
-      <div class="note-text">${escapeHtml(r.note)}</div>
-      <div class="note-meta">${escapeHtml(r.createdBy || "unknown")} · ${new Date(r.createdAt).toLocaleString()}
-        <button type="button" class="note-delete">Delete</button></div>
-    </div>`).join("")}</div>`;
-  for (const btn of box.querySelectorAll(".note-delete")) {
-    btn.onclick = () => {
-      const id = btn.closest(".note-row").dataset.id;
-      showConfirm("Delete note?", "Remove this note? This can't be undone.", () => safely(async () => {
-        await cloud.deleteEmployeeNote(id);
-        await loadEmployeeNotes(empId);
-      }));
-    };
-  }
-}
-
-function saveEmployeeNote(ev) {
-  ev.preventDefault();
-  const form = ev.target;
-  const note = form.note.value.trim();
-  if (!note) return;
-  const empId = state.editingEmployeeId;
-  safely(async () => {
-    await cloud.addEmployeeNote(empId, note);
-    form.reset();
-    await loadEmployeeNotes(empId);
-  });
 }
 
 /* ---------- Settings: a full page below the top bar ----------
@@ -16579,8 +16639,6 @@ function wireApp() {
   $("#form-mission").onsubmit = saveMission;
   initSegmented();
   initPickers();
-  $("#form-employee").onsubmit = saveEmployee;
-  $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = () => deleteMission();
   $("#btn-hide-mission").onclick = () => hideMission();
   $("#btn-hide-missions").onclick = openHideMissionsModal;
@@ -16590,7 +16648,6 @@ function wireApp() {
   bindLendModal();
   bindImportModal();
   bindRenameBoardModal();
-  $("#btn-deactivate-employee").onclick = deactivateEmployee;
 
   $("#btn-settings").onclick = () => openSettingsView();
   for (const btn of $$("#settings-tabs .settings-tab")) {
@@ -16616,9 +16673,6 @@ function wireApp() {
   window.addEventListener("beforeunload", (ev) => {
     if (state.settingsOpen && anySettingsDirty()) { ev.preventDefault(); ev.returnValue = ""; }
   });
-  for (const btn of $$("#employee-tabs .settings-tab")) {
-    btn.onclick = () => { state.employeeTab = btn.dataset.tab; applyEmployeeTab(); };
-  }
   wireUserManagement();
   $("#btn-add-engineer").onclick = openAddEngineerModal;
   $("#form-add-engineer").onsubmit = addEngineerFromModal;
