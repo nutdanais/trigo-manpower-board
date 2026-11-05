@@ -106,7 +106,7 @@ async function step(name, fn) {
       await lent.click();
       assert.deepEqual(await p.evaluate(() => [...state.selectedEmps]), []);
       await lent.click({ button: "right" });
-      assert.deepEqual(await menuLabels(), ["Edit employee", "End loan (back to Board One)", "Change loan dates…"]);
+      assert.deepEqual(await menuLabels(), ["Profile", "End loan (back to Board One)", "Change loan dates…"]);
       await p.keyboard.press("Escape");
     });
 

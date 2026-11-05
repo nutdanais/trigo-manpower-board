@@ -23,7 +23,7 @@ const X = require("../../xlsx-export.js");
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
     const save = async () => {
       await h.submitEmployeeForm(p);
-      await p.waitForSelector("#modal-employee", { state: "hidden" });
+      await p.waitForSelector("#form-employee", { state: "hidden" });   // the New dialog closes, or the Profile goes back to Details
     };
 
     await p.evaluate(() => openEmployeeModal(null));
@@ -40,14 +40,16 @@ const X = require("../../xlsx-export.js");
     assert.equal(db.t("employees").find((e) => e.name_th === "Undated Person").start_date, null);
     console.log("ok - the start date is optional");
 
-    await p.evaluate((id) => { openEmployeeModal(id); state.employeeTab = "edit"; applyEmployeeTab(); }, dated.id);
+    await h.editEmployee(p, dated.id);
     assert.equal(await p.inputValue("#form-employee input[name=startDate]"), "2024-02-29");
     await p.fill("#form-employee input[name=startDate]", "2023-04-20");
     await save();
     assert.equal(db.t("employees").find((e) => e.id === dated.id).start_date, "2023-04-20");
-    await p.evaluate((id) => { openEmployeeModal(id); state.employeeTab = "edit"; applyEmployeeTab(); }, dated.id);
+    await p.evaluate(() => closeModal());   // an edit is saved in the Profile, which stays open
+    await h.editEmployee(p, dated.id);
     await p.fill("#form-employee input[name=startDate]", "");
     await save();
+    await p.evaluate(() => closeModal());
     assert.equal(db.t("employees").find((e) => e.id === dated.id).start_date, null);
     console.log("ok - editing changes and clears it");
 

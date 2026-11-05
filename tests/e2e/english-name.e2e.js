@@ -54,7 +54,7 @@ async function sheetOf(path) {
     });
 
     await step("a new employee is saved with both names; the English one can be left empty", async () => {
-      const save = async () => { await p.click("#form-employee button[type=submit]"); await p.waitForSelector("#modal-employee", { state: "hidden" }); };
+      const save = async () => { await p.click("#form-employee button[type=submit]"); await p.waitForSelector("#form-employee", { state: "hidden" }); };
       await p.evaluate(() => openEmployeeModal(null));
       await p.fill("#form-employee input[name=name]", "สมหญิง รักงาน");
       await p.fill("#form-employee input[name=nameEn]", "  Somying   Rakngan ");
@@ -68,7 +68,7 @@ async function sheetOf(path) {
       assert.equal(row.name_en, null, "left empty -> nothing stored");
       // editing shows the stored English name, and clearing it clears it
       const id = db.t("employees").find((e) => e.name_th === "สมหญิง รักงาน").id;
-      await p.evaluate((i) => { openEmployeeModal(i); state.employeeTab = "edit"; applyEmployeeTab(); }, id);
+      await h.editEmployee(p, id);
       assert.equal(await p.inputValue("#form-employee input[name=nameEn]"), "Somying Rakngan");
       await p.fill("#form-employee input[name=nameEn]", "");
       await save();
@@ -121,18 +121,23 @@ async function sheetOf(path) {
 
     await step("editing: only a name that was changed is checked (the migration's English copies are not nagged)", async () => {
       // e3's Thai column still holds the English copy; changing only the phone must save without a dialog
-      await p.evaluate(() => { openEmployeeModal("e3"); state.employeeTab = "edit"; applyEmployeeTab(); });
+      await h.editEmployee(p, "e3");
       await p.fill("#form-employee input[name=phone]", "081-999-9999");
       await p.click("#form-employee button[type=submit]");
-      await p.waitForSelector("#modal-employee", { state: "hidden" });
+      await p.waitForSelector("#form-employee", { state: "hidden" });
       assert.equal(db.t("employees").find((e) => e.id === "e3").phone, "081-999-9999");
       // changing that English-in-Thai name to another English one does warn
-      await p.evaluate(() => { openEmployeeModal("e3"); state.employeeTab = "edit"; applyEmployeeTab(); });
+      await h.editEmployee(p, "e3");
       await p.fill("#form-employee input[name=name]", "Pichai R.");
       await p.click("#form-employee button[type=submit]");
       assert.equal(await p.locator("#modal-confirm:not(.hidden)").count(), 1);
       await p.click("#btn-confirm-no");
-      await p.locator("#modal-employee [data-close].btn:visible").first().click();
+      assert.equal(await p.locator("#modal-profile:not(.hidden) #form-employee").count(), 1, "Cancel returns to the Profile's form");
+      assert.equal(await p.inputValue("#form-employee input[name=name]"), "Pichai R.", "what was typed is still there");
+      await p.click("#form-employee .emp-form-cancel");
+      assert.equal(await p.locator("#modal-profile:not(.hidden) #form-employee").count(), 0, "Cancel leaves the form, the Profile stays");
+      assert.equal(db.t("employees").find((e) => e.id === "e3").name_th, "Pichai Rakdee", "nothing saved");
+      await p.evaluate(() => closeModal());
     });
 
     await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return cloud._loadEmployees().then(refreshAndRender); });

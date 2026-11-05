@@ -227,7 +227,7 @@ async function step(name, fn) {
       assert.deepEqual(dbRow("e8"), [true, null, null], "reactivating clears the reason and the date");
     });
 
-    await step("B1: the right-click menu, the Edit Employee panel and the bulk bar ask too; a mixed bulk selection keeps the dates people already have", async () => {
+    await step("B1: the right-click menu, the Profile and the bulk bar ask too; a mixed bulk selection keeps the dates people already have", async () => {
       await p.evaluate(() => window.scrollTo(0, 0));
       await p.waitForTimeout(400);
       await p.evaluate(() => {
@@ -240,15 +240,16 @@ async function step(name, fn) {
       await p.locator("#btn-deactivate-yes").click();
       await p.waitForTimeout(400);
       assert.deepEqual(dbRow("e7"), [false, today, null], "Inactive for now: no reason");
-      // Edit Employee panel
+      // the Profile's Deactivate
       await p.evaluate(() => openEmployeeModal("e10"));
-      await p.locator("#employee-tabs [data-tab=edit]").click();
-      await p.locator("#btn-deactivate-employee").click();
+      await p.locator("#btn-profile-active").click();
       await p.waitForSelector("#modal-deactivate:not(.hidden)");
       await p.locator("#modal-deactivate label", { hasText: "Resigned" }).click();
       await p.locator("#btn-deactivate-yes").click();
       await p.waitForTimeout(400);
       assert.deepEqual(dbRow("e10"), [false, today, "resigned"]);
+      assert.equal(await p.locator("#modal-profile:not(.hidden) #btn-profile-active").textContent().then((t) => t.trim()), "Reactivate", "the Profile stays open and offers Reactivate");
+      await p.evaluate(() => closeModal());
       // bulk bar over e2 (active) and e6 (inactive for now since last month): Resigned for both; e6 keeps its date
       const e6date = dbRow("e6")[1];
       await p.evaluate(() => { state.selectedEmps = new Set(["e2", "e6"]); updateEmplistBulkBar(); });

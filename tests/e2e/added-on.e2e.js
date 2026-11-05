@@ -59,11 +59,11 @@ const h = require("./harness");
 
     // Edit Employee form
     await p.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
-    await p.evaluate(() => { openEmployeeModal("n0"); state.employeeTab = "edit"; applyEmployeeTab(); });
+    await h.editEmployee(p, "n0");
     assert.equal(await p.inputValue("#form-employee input[name=addedOn]"), SRC);
     await p.fill("#form-employee input[name=addedOn]", PAST);
     await h.submitEmployeeForm(p);
-    await p.waitForSelector("#modal-employee", { state: "hidden" });
+    await p.waitForSelector("#form-employee", { state: "hidden" });
     assert.equal(db.t("employees").find((e) => e.id === "n0").added_on, PAST);
     await go(PAST);
     assert.equal(await p.locator(".emp-card", { hasText: "Newcomer X" }).count() > 0, true, "back-dated person shows from the corrected day");

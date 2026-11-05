@@ -904,86 +904,62 @@
     </form>
   </div>
 
+  <!-- New employee. An existing person is edited in their Profile (#modal-profile); both
+       draw the same form from #tpl-employee-form, so the fields exist in one place. -->
   <div class="modal modal-side hidden" id="modal-employee">
-    <h3><span id="employee-modal-title">New Employee</span><small id="employee-modal-sub" class="h3-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <div id="employee-tabs" class="settings-tabs hidden">
-      <button type="button" class="settings-tab" data-tab="hosts">Host record</button>
-      <button type="button" class="settings-tab" data-tab="note">Note</button>
-      <button type="button" class="settings-tab" data-tab="edit">Details</button>
-    </div>
-    <!-- All three panes are stacked in the same grid cell (see .employee-pane-stack
-         in styles.css) so the box sizes itself to whichever is tallest — pixel-
-         accurate to the actual rendered content, not a guessed height — instead
-         of jumping to fit whichever one happens to be showing. -->
+    <h3><span id="employee-modal-title">New Employee</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <div class="employee-pane-stack">
-      <div class="settings-pane hidden" data-pane="hosts">
-        <p class="import-note" id="employee-hosts-intro">Every host this employee has been deployed to, most recent first.</p>
-        <div id="employee-hosts-list"></div>
-        <div class="modal-actions">
-          <button type="button" class="btn" data-close>Close</button>
-        </div>
-      </div>
-      <div class="settings-pane hidden" data-pane="note">
-        <p class="import-note">Notes and remarks about this employee, most recent first. Visible to anyone who can edit the roster.</p>
-        <div id="employee-notes-list"></div>
-        <form id="form-employee-note">
-          <label>Add a note <textarea name="note" rows="3" required placeholder="e.g. prefers day shifts, needs a safety refresher…"></textarea></label>
-          <div class="modal-actions">
-            <button type="button" class="btn" data-close>Close</button>
-            <button type="submit" class="btn btn-primary">Add note</button>
-          </div>
-        </form>
-      </div>
-      <div class="settings-pane" data-pane="edit">
-        <form id="form-employee">
-          <div class="form-group">Identity</div>
-          <label>Thai name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
-          <p class="field-hint" id="hint-name-th">Required. This is the name shown in the app by default.</p>
-          <label>English name (optional) <input name="nameEn" maxlength="200" autocomplete="off" placeholder="e.g. Somchai Jaidee" title="Used when you export to Excel in English. If it is empty, the Thai name is used."></label>
-          <p class="field-hint" id="hint-name-en">Used when you export to Excel in English. If it is empty, the Thai name is used.</p>
-          <label>TRIGO ID (optional) <input name="trigoId" placeholder="e.g. T329" maxlength="8" autocomplete="off" title="The letter T and digits, like T329. Must be unique; two people may share a name only when both have a TRIGO ID."></label>
-          <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
-          <div class="form-group">Contract</div>
-          <div class="form-row">
-          <label>Contract type
-            <select name="contract" data-seg>
-              <option value="permanent">Permanent</option>
-              <option value="oncall">On-call</option>
-            </select>
-          </label>
-          <label>Position
-            <select name="position" data-picker>
-              <option value="">— none —</option>
-              <option value="inspector">Inspector</option>
-              <option value="senior_inspector">Senior Inspector</option>
-              <option value="technician">Technician</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="assistant_site_engineer">Assistant Site Engineer</option>
-            </select>
-          </label>
-          </div>
-          <div class="form-row">
-          <label>Start date (optional) <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
-          <label>On the board from (optional) <input name="addedOn" type="date" min="2000-01-01" max="2099-12-31" title="The day this person was added to the app. Dashboard headcount and Standby count them only from this date. Blank on a new employee = today; clear it on an existing one = counted on every date."></label>
-          </div>
-          <div class="form-group">Placement</div>
-          <div class="form-row">
-          <label>Service area <select name="areaId" required data-picker></select></label>
-          <label>Board <select name="boardId" required data-picker></select></label>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="btn btn-danger hidden" id="btn-deactivate-employee"><svg class="ic" aria-hidden="true"><use href="#i-ban"></use></svg> Deactivate</button>
-            <span class="toolbar-spacer"></span>
-            <button type="button" class="btn" data-close>Cancel</button>
-            <button type="submit" class="btn btn-primary">Save</button>
-          </div>
-        </form>
-      </div>
+      <div class="settings-pane" id="employee-form-slot"></div>
     </div>
   </div>
 
-  <!-- Employee profile: opened from a name in Overview > People and from the Manpower List's menu.
-       Read-only; built by renderProfile in app.js. A side panel on a desktop, full screen on a phone. -->
+  <template id="tpl-employee-form">
+    <form id="form-employee">
+      <div class="form-group">Identity</div>
+      <label>Thai name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
+      <p class="field-hint" id="hint-name-th">Required. This is the name shown in the app by default.</p>
+      <label>English name (optional) <input name="nameEn" maxlength="200" autocomplete="off" placeholder="e.g. Somchai Jaidee" title="Used when you export to Excel in English. If it is empty, the Thai name is used."></label>
+      <p class="field-hint" id="hint-name-en">Used when you export to Excel in English. If it is empty, the Thai name is used.</p>
+      <label>TRIGO ID (optional) <input name="trigoId" placeholder="e.g. T329" maxlength="8" autocomplete="off" title="The letter T and digits, like T329. Must be unique; two people may share a name only when both have a TRIGO ID."></label>
+      <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+      <div class="form-group">Contract</div>
+      <div class="form-row">
+      <label>Contract type
+        <select name="contract" data-seg>
+          <option value="permanent">Permanent</option>
+          <option value="oncall">On-call</option>
+        </select>
+      </label>
+      <label>Position
+        <select name="position" data-picker>
+          <option value="">— none —</option>
+          <option value="inspector">Inspector</option>
+          <option value="senior_inspector">Senior Inspector</option>
+          <option value="technician">Technician</option>
+          <option value="team_leader">Team Leader</option>
+          <option value="assistant_site_engineer">Assistant Site Engineer</option>
+        </select>
+      </label>
+      </div>
+      <div class="form-row">
+      <label>Start date (optional) <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
+      <label>On the board from (optional) <input name="addedOn" type="date" min="2000-01-01" max="2099-12-31" title="The day this person was added to the app. Dashboard headcount and Standby count them only from this date. Blank on a new employee = today; clear it on an existing one = counted on every date."></label>
+      </div>
+      <div class="form-group">Placement</div>
+      <div class="form-row">
+      <label>Service area <select name="areaId" required data-picker></select></label>
+      <label>Board <select name="boardId" required data-picker></select></label>
+      </div>
+      <div class="modal-actions">
+        <span class="toolbar-spacer"></span>
+        <button type="button" class="btn emp-form-cancel" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </template>
+
+  <!-- Employee profile: opened from a name in Overview > People, from the Manpower List and from a board
+       card. Everything about one person, and where they are edited; built by renderProfile in app.js. A side panel on a desktop, full screen on a phone. -->
   <div class="modal modal-side modal-profile hidden" id="modal-profile" role="dialog" aria-modal="true" aria-labelledby="profile-title">
     <h3><span id="profile-title" data-no-i18n>Profile</span><small id="profile-sub" class="h3-sub"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <div id="profile-body" class="profile-body"></div>

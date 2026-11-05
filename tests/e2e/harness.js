@@ -138,4 +138,10 @@ async function submitEmployeeForm(page) {
   if (await page.locator("#modal-confirm:not(.hidden)").count()) await page.click("#btn-confirm-yes");
 }
 
-module.exports = { submitEmployeeForm, launch, seedBase, FakeDb, USERS, iso, addDays, nextWorking, prevWorking, isWeekend };
+/* An existing person is edited in their Profile now: open it straight on "Edit details" with `field` focused. */
+async function editEmployee(page, id, field = "name") {
+  await page.evaluate(([i, f]) => openEmployeeModal(i, f), [id, field]);
+  await page.waitForSelector("#modal-profile:not(.hidden) #form-employee");
+}
+
+module.exports = { editEmployee, submitEmployeeForm, launch, seedBase, FakeDb, USERS, iso, addDays, nextWorking, prevWorking, isWeekend };
