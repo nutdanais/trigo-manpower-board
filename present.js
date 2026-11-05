@@ -259,8 +259,13 @@ const Present = (() => {
     const stats = boards.map(b => ({ b, st: boardStats(b.id) }));
     const sum = (k) => stats.reduce((n, x) => n + x.st[k], 0);
     const roster = scoped ? boards.flatMap(b => rosterEmployees(b.id)) : D().employees.filter(onRoster);
+    // boardStats' dayMissions / nightMissions are a HEADCOUNT of the people on each shift, so they are the crew; the missions
+    // themselves are counted from the visible ones on the boards in scope, as the Overview's attention card does
+    const todays = boards.flatMap(b => peekPlan(b.id).missions.filter(m => !m.hidden));
+    const dayMissions = todays.filter(m => m.shift !== "night").length;
     const f = { boards, scoped, stats, total: roster.length, assigned: sum("assigned"), leave: sum("leave"), standby: sum("standby"),
-      holiday: sum("onHoliday"), free: sum("oncallAvailable"), missions: sum("missions"), day: sum("dayMissions"), night: sum("nightMissions") };
+      holiday: sum("onHoliday"), free: sum("oncallAvailable"), missions: sum("missions"),
+      dayMissions, nightMissions: todays.length - dayMissions, dayCrew: sum("dayMissions"), nightCrew: sum("nightMissions") };
     f.util = utilizationPct(f.assigned, f.total, f.leave, f.holiday, f.free);
     return f;
   }
@@ -274,7 +279,8 @@ const Present = (() => {
       const title = !f.standby ? "All permanent staff are on a mission" : f.standby === 1 ? "1 permanent staff member has no mission" : `${f.standby} permanent staff have no mission`;
       const tile = (label, value) => `<div class="pr-tile"><div class="k">${label}</div><div class="v num">${value}</div></div>`;
       return head(f) + `<div class="pr-h${f.standby ? "" : " ok"}">${title}</div>`
-        + `<div class="pr-sub"><span><b>Day:</b> ${plural(f.day, "mission", "missions")}</span><span><b>Night:</b> ${plural(f.night, "mission", "missions")}</span></div>`
+        + `<div class="pr-sub"><span><b>Day:</b> ${plural(f.dayMissions, "mission", "missions")} · <b>${f.dayCrew}</b> crew</span>`
+        + `<span><b>Night:</b> ${plural(f.nightMissions, "mission", "missions")} · <b>${f.nightCrew}</b> crew</span></div>`
         + `<div class="pr-tiles">${tile("Utilization", f.util + "%")}${tile("Deployed on a mission", `${f.assigned}<small> / ${f.total}</small>`)}${tile("Missions", f.missions)}${tile("On-call free", f.free)}</div>`;
     },
     idle() {
