@@ -5626,6 +5626,23 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   :is(#emplist-table, #hostlist-table) tbody tr:hover td { background: var(--hover-tint); }
   :is(#emplist-table, #hostlist-table) .col-off { display: none; }
   :is(#emplist-table, #hostlist-table) .el-tid { color: var(--muted); font-variant-numeric: tabular-nums; }
+  /* The table keeps to the page's width: the wrapper can't scroll sideways (overflow: visible above keeps the
+     headers sticky under the top bar), so a few long text columns may take a second line when the window is
+     narrow, instead of every cell holding one line and pushing the page wider than the header. */
+  /* wide enough that they take two lines at most ("7 years 8 months / 4 days", "Assistant Site / Engineer") */
+  #emplist-table td.el-wrap { white-space: normal; min-width: 8.6em; line-height: 1.3; }
+  #emplist-table td.el-svc { min-width: 9.8em; }   /* "7 years" kept together: serviceCellHtml in app.js */
+  #emplist-table td.el-svc .el-nw { white-space: nowrap; }
+  /* someone lent out: "LCB Port → Rayong", and "until Mon 30 Nov 2026" under it, so one loan doesn't
+     widen the column for everyone */
+  #emplist-table td.el-board .el-loan small { display: block; line-height: 1.25; }
+  #emplist-table td.el-board { line-height: 1.3; }
+  /* a long header ("Years of service", "30D utilization") may take two lines rather than set its column's width */
+  #emplist-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
+  /* still too wide for the window: the box scrolls sideways (fitListTable in app.js); its headers then sit at
+     its top, since a box that scrolls can't hold them under the page's top bar */
+  :is(#emplist-panel, #hostlist-panel) .table-wrap.tw-scroll { overflow-x: auto; }
+  :is(#emplist-panel, #hostlist-panel) .table-wrap.tw-scroll :is(#emplist-table, #hostlist-table) th { position: static; }
   :is(#emplist-table, #hostlist-table) .area-pill {
     background: transparent !important; color: var(--text) !important; padding: 0; font-weight: 550; letter-spacing: 0; font-size: 13.5px;
     display: inline-flex; align-items: center; gap: 7px; box-shadow: none; border-radius: 0; border: 0;

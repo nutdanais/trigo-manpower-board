@@ -185,9 +185,19 @@ async function step(name, fn) {
 
     await step("A1: On-call view: a person with 0 call-ins shows with 0; median, range and who was never called in", async () => {
       await view("On-call");
+      // least called in first: Share called in, lowest first
       const rows = (await rowsOf(".ov-people-table")).map((r) => [r[0], r[3]]);
-      assert.deepEqual(rows, [["Person G OC", "5"], ["Person H OC", "2"], ["Person K OC", "0"]]);
+      assert.deepEqual(rows, [["Person K OC", "0"], ["Person H OC", "2"], ["Person G OC", "5"]]);
+      const shares = (await rowsOf(".ov-people-table")).map((r) => parseInt(r[4], 10));
+      assert.deepEqual(shares, shares.slice().sort((a, b) => a - b), "Share called in goes up the table");
+      assert.equal(await p.locator('.ov-people-table .ov-sort[data-k="cshare"]').getAttribute("aria-sort"), "ascending", "the column says it is the sort");
       assert.deepEqual(await read(".ov-people-sum"), ["Days called in: median 2.0 · 0–5 · Never called in (1): Person K"]);
+      // with Everyone, the permanent people (no share, "—") come after every on-call person
+      await p.locator(".ov-people-bar .btn", { hasText: "Everyone" }).click();
+      const all = (await rowsOf(".ov-people-table")).map((r) => r[4]);
+      const firstDash = all.indexOf("—");
+      assert.ok(firstDash > 0 && all.slice(firstDash).every((c) => c === "—"), `on-call rows first, then "—": ${all.join(", ")}`);
+      await view("On-call");
     });
 
     await step("A1: Nights view: the nights add up to the sum of nightEmp, and who shares them", async () => {

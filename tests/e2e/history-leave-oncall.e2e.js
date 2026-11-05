@@ -147,14 +147,14 @@ async function step(name, fn) {
       await showOverview();
     });
 
-    await step("On-call: called in against available, and People's On-call view says who was called in most", async () => {
+    await step("On-call: called in against available, and People's On-call view lists the least called in first", async () => {
       await pick("On-call deployed / day");
       assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .ov-muted"), ["Called in on 78% of the available on-call days · 21% of the people on missions"], "7 of 9 on-call days (Mon: H on Exchange); 7 of 33 people on missions");
       assert.equal(await p.locator(".ov-hnames").count(), 0, "the Most called in list is gone");
       await p.locator(".ov-hchart:not(.ov-eng) .ov-people-link .ov-linkbtn").click();
       assert.equal(await p.locator(".ov-people-bar .btn.active").first().textContent(), "On-call", "the link opens People's On-call view");
       const rows = await rowsOf(".ov-people-table");
-      assert.deepEqual(rows.map((r) => r[0] + " | " + r[3]), ["Person G OC | 5", "Person H OC | 2"], "Called in");
+      assert.deepEqual(rows.map((r) => r[0] + " | " + r[3]), ["Person H OC | 2", "Person G OC | 5"], "least called in first (Share called in, lowest first)");
     });
 
     await step("Engineer workload → one engineer: tiles, chart against the average, hosts, facts", async () => {
