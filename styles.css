@@ -91,6 +91,7 @@
   --leave-exchange: #1baf7a;
   --oncall-ghost: #fbe1d5;
   --assigned-ghost: #d6e6fa;   /* the pale bar behind a column of people on a mission: everyone on the roster */
+  --oncall-free: #f2a07b;   /* On-call free columns: the on-call orange, lighter (between --oncall-ghost and --chart-oncall) */
   --chart-cat-1: #2a78d6;
   --chart-cat-2: #eb6834;
   --chart-cat-3: #1baf7a;
@@ -2602,6 +2603,10 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-hview .btn[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
 .ov-lv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
 .ov-lv-chip, .ov-wf-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
+/* Deployed / day: the series or service-area chips, with the Line | Bars choice pushed to the right edge */
+.ov-dep-chips { align-items: center; }
+.ov-dep-chips .ov-htool { margin-left: auto; }
+.ov-dep-note { margin: 2px 0 6px; font-size: 12px; }
 .ov-lv-chip:hover, .ov-wf-chip:hover { background: var(--hover-tint); }
 .ov-lv-chip:focus-visible, .ov-wf-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .ov-lv-chip i, .ov-wf-chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }

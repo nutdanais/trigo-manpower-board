@@ -299,6 +299,14 @@ const OV_HISTORY_MEASURES = [
   { key: "oncall",   label: "On-call deployed / day", suffix: "", value: (r) => r.oncallAssigned,
     help: "On-call people (the dashed OC cards) on a mission each working day, averaged over the range. The pale bar behind each day is the on-call people available that day: the on-call roster minus those on leave." },
 ];
+/* Deployed / day can be split by contract: Total is the blue every other "deployed" uses, On-call the orange of
+   every contract split, and Permanent takes a categorical slot (the permanent split had no colour of its own
+   before). Permanent + On-call = Total, so a person is counted once, in the one they belong to. */
+const OV_DEPLOYED_SERIES = [
+  { key: "total",  label: "Total",     title: "Deployed / day",           color: "var(--chart-assigned)", value: (r) => r.assigned },
+  { key: "perm",   label: "Permanent", title: "Permanent deployed / day", color: "var(--chart-cat-3)",    value: (r) => r.assigned - r.oncallAssigned },
+  { key: "oncall", label: "On-call",   title: "On-call deployed / day",   color: "var(--chart-oncall)",   value: (r) => r.oncallAssigned },
+];
 /* History's Leave view: one colour per leave type (the board itself has one leave colour) */
 const OV_LEAVE_COLORS = { annual: "var(--leave-annual)", sick: "var(--leave-sick)", business: "var(--leave-business)", unpaid: "var(--leave-unpaid)", exchange: "var(--leave-exchange)" };
 /* the four leave types History counts as leave; Exchange Working Day is worked back, so it is not leave */
@@ -534,7 +542,11 @@ const state = {
     period: ovPeriodSaved(),      // the Period group's own boards: { linked, ids, view }. Linked = it follows the
                                   // page selector; otherwise ids. view: "together" | "side" | "vs" (A vs B, exactly 2)
     historyCompare: "prev",       // Compare with (every section of the Period group): "prev" | "ly" (same period last year)
-    historyOncallMode: "count",   // the On-call view: "count" | "share"
+    historyOncallMode: "count",   // the On-call view: "count" | "share" | "free" (on-call available and not on a mission)
+    historyDeployedBy: "contract",   // the Deployed view's split: "contract" (Total / Permanent / On-call) | "area" (service area)
+    historyDeployedShow: ["total"],  // Deployed by contract: the series drawn (OV_DEPLOYED_SERIES keys); Total alone is the plain line
+    historyDeployedStyle: "line",    // Deployed by contract: "line" | "bars" (side by side, one colour a series) | "stacked" (Permanent + On-call piled up)
+    historyAreaHidden: [],           // Deployed by service area: areas switched off ("" is No area)
     historyLY: null,              // getUtilizationRange over the range moved back 364 days; fetched only when "ly" is chosen
     historyLYKey: null,
     baView: "board",              // Boards & areas: "board" | "area"
@@ -4485,6 +4497,7 @@ function historySection(dates, recs, unplanned, pendingCharts, prevRecs = []) {
   wireHistoryDayClicks(sec);
   if (m.key === "leave") { sec.appendChild(historyLeaveView(dates, recs, pendingCharts, ctx)); return sec; }
   if (m.key === "oncall") { sec.appendChild(historyOncallView(dates, recs, pendingCharts, ctx)); return sec; }
+  if (m.key === "deployed") { sec.appendChild(historyDeployedView(m, ctx, pendingCharts)); return sec; }
   sec.appendChild(historyMeasureView(m, ctx, pendingCharts));
   return sec;
 }
@@ -4512,39 +4525,45 @@ function historyChartCtx(dates, recs, boards) {
   ctx.per = group === "day" ? "day by day" : group === "week" ? "week by week" : "month by month";
   return ctx;
 }
+/* A label and a row of buttons, one pressed: picking another runs set(key) and redraws. Shared by History's
+   toolbar (Group by) and the Deployed view (Split by, Style). */
+function ovSegEl(label, aria, items, current, set) {
+  const wrap = document.createElement("div");
+  wrap.className = "ov-htool";
+  wrap.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: label }));
+  const g = document.createElement("div");
+  g.className = "ov-trend-btns";
+  g.setAttribute("role", "group");
+  g.setAttribute("aria-label", aria);
+  for (const [k, l] of items) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (current === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(current === k));
+    b.textContent = l;
+    b.onclick = () => { if (current !== k) { set(k); render(); } };
+    g.appendChild(b);
+  }
+  wrap.appendChild(g);
+  return wrap;
+}
 function historyToolbar(ctx) {
   const ov = state.overview;
   const bar = document.createElement("div");
   bar.className = "ov-htoolbar";
-  const seg = (label, aria, items, current, set) => {
-    const wrap = document.createElement("div");
-    wrap.className = "ov-htool";
-    wrap.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: label }));
-    const g = document.createElement("div");
-    g.className = "ov-trend-btns";
-    g.setAttribute("role", "group");
-    g.setAttribute("aria-label", aria);
-    for (const [k, l] of items) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "btn btn-small" + (current === k ? " active" : "");
-      b.setAttribute("aria-pressed", String(current === k));
-      b.textContent = l;
-      b.onclick = () => { if (current !== k) { set(k); render(); } };
-      g.appendChild(b);
-    }
-    wrap.appendChild(g);
-    bar.appendChild(wrap);
-  };
-  seg("Group by", "Group by", [["day", "Day"], ["week", "Week"], ["month", "Month"]], ctx.group, (k) => { ov.historyGroup = k; });
+  bar.appendChild(ovSegEl("Group by", "Group by", [["day", "Day"], ["week", "Week"], ["month", "Month"]], ctx.group, (k) => { ov.historyGroup = k; }));
   return bar;
 }
 /* the dashed grey comparison series of a line chart, named for what it compares with */
 const historyCmpSeriesLabel = () => (state.overview.historyCompare === "ly" ? "Same period last year" : "Previous period");
-function historyMeasureView(m, ctx, pendingCharts) {
+/* `m.color` (default: the assigned blue) is the line's colour; `tools` ({ head, below }, the Deployed view's
+   controls) goes in the title row and under it. */
+function historyMeasureView(m, ctx, pendingCharts, tools = null) {
+  const color = m.color || "var(--chart-assigned)";
   const box = document.createElement("div");
   box.className = "ov-hchart";
-  box.innerHTML = `<div class="ov-hchart-head"><b>${m.label}, ${ctx.per}</b></div>`;
+  box.innerHTML = `<div class="ov-hchart-head${tools ? " ov-hchart-head-row" : ""}"><b>${m.label}, ${ctx.per}</b></div>`;
+  if (tools) { box.firstChild.appendChild(tools.head); box.appendChild(tools.below); }
   const cmpNote = ctx.cmp.loading && !ctx.vs ? "Loading the same period last year…" : "";
   if (cmpNote) box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-loading", textContent: cmpNote }));
   if (ctx.vs) {
@@ -4567,7 +4586,7 @@ function historyMeasureView(m, ctx, pendingCharts) {
   if (ctx.side) { historySideBySide(box, ctx, pendingCharts, (bs) => {
       const vals = ctx.mean(ctx.recsOf(bs), m.value);
       return { vals, cmp: ctx.mean(ctx.cmpRecsOf(bs), m.value), suffix: m.suffix, draw: (wrap, yMax, mean, cmpVals) => fillLineChart(wrap, {
-        series: [{ key: m.key, label: m.label, color: "var(--chart-assigned)", visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
+        series: [{ key: m.key, label: m.label, color, visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
           ...(cmpVals && cmpVals.some(v => v != null) ? [{ key: "cmp", label: historyCmpSeriesLabel(), color: "var(--muted)", visible: true, dashed: true, points: cmpVals.map(y => ({ y, suffix: m.suffix })) }] : [])],
         xLabels: ctx.labels, yMax, height: 130, dates: ctx.clickDates,
         refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: "avg" }] : [], emptyLabel: "No data in this range" }) };
@@ -4576,12 +4595,12 @@ function historyMeasureView(m, ctx, pendingCharts) {
   const cvals = ctx.mean(ctx.cmpRecsOf(ctx.boards), m.value);
   const showCmp = ctx.hasCmp(ctx.cmpRecsOf(ctx.boards)) && cvals.some(v => v != null);
   const mean = historyMean(ctx.recs.map(r => (r ? m.value(r) : null)));
-  box.appendChild(ovLegend([{ label: m.label, color: "var(--chart-assigned)" }, ...(showCmp ? [{ label: historyCmpSeriesLabel(), color: "var(--muted)" }] : [])]));
+  box.appendChild(ovLegend([{ label: m.label, color }, ...(showCmp ? [{ label: historyCmpSeriesLabel(), color: "var(--muted)" }] : [])]));
   const wrap = document.createElement("div");
   wrap.className = "ov-trend-chart";
   box.appendChild(wrap);
   pendingCharts.push(() => fillLineChart(wrap, {
-    series: [{ key: m.key, label: m.label, color: "var(--chart-assigned)", visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
+    series: [{ key: m.key, label: m.label, color, visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
       ...(showCmp ? [{ key: "cmp", label: historyCmpSeriesLabel(), color: "var(--muted)", visible: true, dashed: true, points: cvals.map(y => ({ y, suffix: m.suffix })) }] : [])],
     xLabels: ctx.labels, yMax: Charts.niceMax([...vals, ...(showCmp ? cvals : [])].filter(v => v != null)), height: 220,
     refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: "avg" }] : [],
@@ -4591,10 +4610,11 @@ function historyMeasureView(m, ctx, pendingCharts) {
 }
 /* Boards: Side by side: one small chart per board on ONE shared y-scale, each with the board's name
    and average; its name sets the board selector and a day opens that board. `build(boards)` returns
-   { vals, cmp, draw(wrap, yMax, mean, cmpVals) } for one board. */
+   { vals, cmp, draw(wrap, yMax, mean, cmpVals) } for one board. Optional: `yVals` (what sets the shared scale
+   when it is not `vals`, e.g. the tallest of several series) and `notes` (text spans in place of "avg 12.3"). */
 function historySideBySide(box, ctx, pendingCharts, build) {
   const per = ctx.boards.map(b => ({ b, ...build([b]) }));
-  const yMax = Charts.niceMax(per.flatMap(x => [...x.vals, ...(x.cmp || [])]).filter(v => v != null));
+  const yMax = Charts.niceMax(per.flatMap(x => [...(x.yVals || x.vals), ...(x.cmp || [])]).filter(v => v != null));
   const grid = document.createElement("div");
   grid.className = "ov-small-multiples";
   for (const x of per) {
@@ -4612,8 +4632,10 @@ function historySideBySide(box, ctx, pendingCharts, build) {
     name.title = "Show only this board";
     name.onclick = () => ovPeriodOnly(x.b.id);
     head.appendChild(name);
-    head.appendChild(document.createTextNode(" "));   // a real space for a screen reader; the flex gap spaces it on screen
-    head.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: `avg ${mean == null ? "—" : fmt1(mean)}${x.suffix || ""}` }));
+    for (const note of x.notes || [`avg ${mean == null ? "—" : fmt1(mean)}${x.suffix || ""}`]) {
+      head.appendChild(document.createTextNode(" "));   // a real space for a screen reader; the flex gap spaces it on screen
+      head.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: note }));
+    }
     cell.appendChild(head);
     const wrap = document.createElement("div");
     wrap.className = "ov-trend-chart ov-small-chart";
@@ -4622,6 +4644,183 @@ function historySideBySide(box, ctx, pendingCharts, build) {
     pendingCharts.push(() => x.draw(wrap, yMax, mean, x.cmp));
   }
   box.appendChild(grid);
+}
+
+/* ---------- History → Deployed / day, split ----------
+   The tile's chart answers "how many were out each day". Two ways to ask "who":
+   - by contract: Total, Permanent and On-call as chips that show or hide each, drawn as lines or as bars side by
+     side, one colour a series. Total alone is the plain line the tile always drew (with the comparison and the
+     average), so nothing changes until a chip is switched on.
+   - by service area: one stacked column a day, one colour (the area's own) a service area, with each day's total
+     above it; a chip per area shows or hides it. Counted by the PERSON's own service area, not the area of the
+     host they were sent to (that is what Boards & areas counts as demand).
+   Both read the same per-day records (assigned, oncallAssigned, workEmp) as the rest of History, so the board
+   selector, the range, Group by and the "not planned" rule apply unchanged. */
+function historyAreaCounter() {
+  // { areaId | "": people deployed } for a day's record, by each person's own area; a person whose area is gone,
+  // or who is no longer in the roster, counts under "" (No area). Memoised per record: several chips ask.
+  const known = new Set(D().areas.map(a => a.id));
+  const areaOf = new Map(D().employees.map(e => [e.id, known.has(e.areaId) ? e.areaId : ""]));
+  const cache = new WeakMap();
+  return (r) => {
+    let c = cache.get(r);
+    if (!c) {
+      c = {};
+      for (const id in (r.workEmp || {})) { const a = areaOf.has(id) ? areaOf.get(id) : ""; c[a] = (c[a] || 0) + 1; }
+      cache.set(r, c);
+    }
+    return c;
+  };
+}
+/* a chip that shows or hides a series: a colour square, its name and its average a day */
+function historyDeployedChip({ color, label, data, avg, pressed, title, onclick }) {
+  const c = document.createElement("button");
+  c.type = "button";
+  c.className = "ov-lv-chip";
+  c.setAttribute("aria-pressed", String(pressed));
+  c.innerHTML = `<i style="background:${escapeHtml(color)}"></i><span${data ? " data-no-i18n" : ""}>${escapeHtml(label)}</span> <small>${avg == null ? "—" : fmt1(avg)} / day</small>`;
+  c.title = title;
+  c.onclick = onclick;
+  return c;
+}
+function historyDeployedView(m, ctx, pendingCharts) {
+  const ov = state.overview;
+  const by = ov.historyDeployedBy === "area" ? "area" : "contract";
+  const tools = {
+    head: ovSegEl("Split by", "Split deployed by", [["contract", "Permanent / on-call"], ["area", "Service area"]], by, (k) => { ov.historyDeployedBy = k; }),
+    below: Object.assign(document.createElement("div"), { className: "ov-lv-chips ov-dep-chips" }),
+  };
+  return by === "area" ? historyDeployedAreaView(ctx, pendingCharts, tools) : historyDeployedContractView(m, ctx, pendingCharts, tools);
+}
+function historyDeployedContractView(m, ctx, pendingCharts, tools) {
+  const ov = state.overview;
+  const picked = new Set(ov.historyDeployedShow || []);
+  let shown = OV_DEPLOYED_SERIES.filter(s => picked.has(s.key));
+  if (!shown.length) shown = [OV_DEPLOYED_SERIES[0]];
+  const style = ov.historyDeployedStyle === "bars" ? "bars" : ov.historyDeployedStyle === "stacked" ? "stacked" : "line";
+  const on = new Set(shown.map(s => s.key));
+  for (const s of OV_DEPLOYED_SERIES) {
+    tools.below.appendChild(historyDeployedChip({ color: s.color, label: s.label, avg: historyMean(ctx.recs.map(r => (r ? s.value(r) : null))), pressed: on.has(s.key),
+      title: `Show or hide ${s.label}`,
+      onclick: () => {
+        // never all off: the last one stays on
+        if (on.has(s.key)) { if (on.size > 1) on.delete(s.key); } else on.add(s.key);
+        ov.historyDeployedShow = OV_DEPLOYED_SERIES.filter(x => on.has(x.key)).map(x => x.key);
+        render();
+      } }));
+  }
+  tools.below.appendChild(ovSegEl("Style", "Chart style", [["line", "Line"], ["bars", "Bars"], ["stacked", "Stacked"]], style, (k) => { ov.historyDeployedStyle = k; }));
+  // one series as a line is the tile's own chart: its comparison, average, A vs B and Side by side all stay
+  if (shown.length === 1 && style === "line") {
+    const s = shown[0];
+    return historyMeasureView({ ...m, label: s.title, value: s.value, color: s.color }, ctx, pendingCharts, tools);
+  }
+  const box = document.createElement("div");
+  box.className = "ov-hchart";
+  box.innerHTML = `<div class="ov-hchart-head ov-hchart-head-row"><b>${m.label}, ${ctx.per}</b></div>`;
+  box.firstChild.appendChild(tools.head);
+  box.appendChild(tools.below);
+  if (ctx.hasCmp(ctx.cmpRecsOf(ctx.boards))) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-dep-note", textContent: "The comparison is drawn when one series is shown as a line." }));
+  }
+  const rowsOf = (arr) => shown.map(s => ({ s, vals: ctx.mean(arr, s.value) }));
+  const perDay = ctx.group === "day" ? "" : " / day";
+  // the tallest each bucket gets, for the axis: the biggest series, or (Stacked) the parts piled up, or the total if that is higher
+  const topsOf = (rows) => (style !== "stacked" ? rows.flatMap(x => x.vals).filter(v => v != null)
+    : ctx.buckets.map((_, i) => Math.max(rows.reduce((a, x) => a + (x.s.key === "total" ? 0 : x.vals[i] || 0), 0), ...rows.filter(x => x.s.key === "total").map(x => x.vals[i] || 0))));
+  const draw = (wrap, arr, yMax, h) => {
+    const rows = rowsOf(arr);
+    if (style === "stacked") {
+      // Permanent at the bottom, On-call on top: one bar a day. Total is not a part but the whole: a pale bar behind the
+      // stack and its figure above it (with one part hidden, the part reads as a share of that whole). With no part on, Total is the bar.
+      const parts = rows.filter(({ s }) => s.key !== "total"), total = rows.find(({ s }) => s.key === "total");
+      const whole = total && parts.length ? total.vals : null;
+      fillColumnChart(wrap, { stacks: (parts.length ? parts : rows).map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
+        ghost: whole ? { label: "Total", color: "var(--assigned-ghost)", values: whole } : null, totals: whole,
+        dayTotals: whole ? whole.map(v => (v == null ? null : `${v} deployed${perDay}`)) : null,
+        xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
+    } else if (style === "bars") {
+      fillColumnChart(wrap, { grouped: true, stacks: rows.map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
+        xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
+    } else {
+      fillLineChart(wrap, { series: rows.map(({ s, vals }) => ({ key: s.key, label: s.label, color: s.color, visible: true, points: vals.map(y => ({ y })) })),
+        xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates, emptyLabel: "No data in this range" });
+    }
+  };
+  if (ctx.side) {
+    historySideBySide(box, ctx, pendingCharts, (bs) => {
+      const arr = ctx.recsOf(bs), rows = rowsOf(arr);
+      return { vals: rows[0].vals, yVals: topsOf(rows), cmp: null, suffix: "",
+        notes: rows.map(({ s, vals }) => { const mean = historyMean(vals.filter(v => v != null)); return `${s.label} ${mean == null ? "—" : fmt1(mean)}`; }),
+        draw: (wrap, yMax) => draw(wrap, arr, yMax, 130) };
+    });
+  } else {
+    const wrap = document.createElement("div");
+    wrap.className = "ov-trend-chart";
+    box.appendChild(wrap);
+    pendingCharts.push(() => draw(wrap, ctx.recs, Charts.niceMax(topsOf(rowsOf(ctx.recs))), 220));
+  }
+  return box;
+}
+function historyDeployedAreaView(ctx, pendingCharts, tools) {
+  const ov = state.overview;
+  const count = historyAreaCounter();
+  const all = [...D().areas.map(a => ({ id: a.id, name: a.name, color: a.color || "var(--muted)", data: true })), { id: "", name: "No area", color: "var(--muted)", data: false }];
+  const rows = all.filter(a => ctx.recs.some(r => r && (count(r)[a.id] || 0) > 0));   // areas somebody deployed from in the range
+  const hidden = new Set(ov.historyAreaHidden || []);
+  let shown = rows.filter(a => !hidden.has(a.id));
+  if (!shown.length) shown = rows;
+  const box = document.createElement("div");
+  box.className = "ov-hchart";
+  box.innerHTML = `<div class="ov-hchart-head ov-hchart-head-row"><b>Deployed by service area, ${ctx.per}</b></div>`;
+  box.firstChild.appendChild(tools.head);
+  box.appendChild(tools.below);
+  if (!rows.length) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Nobody was deployed in this range." }));
+    return box;
+  }
+  const on = new Set(shown.map(a => a.id));
+  for (const a of rows) {
+    tools.below.appendChild(historyDeployedChip({ color: a.color, label: a.name, data: a.data, pressed: on.has(a.id),
+      avg: historyMean(ctx.recs.map(r => (r ? count(r)[a.id] || 0 : null))), title: `Show or hide ${a.name}`,
+      onclick: () => {
+        if (on.has(a.id)) { if (on.size > 1) on.delete(a.id); } else on.add(a.id);
+        ov.historyAreaHidden = rows.filter(x => !on.has(x.id)).map(x => x.id);   // saved as what is OFF, so a new area starts on
+        render();
+      } }));
+  }
+  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-dep-note", textContent: "By each person's own service area, not the area of the host they were sent to." }));
+  const perDay = ctx.group === "day" ? "" : " / day";
+  const sumShown = (r) => shown.reduce((acc, a) => acc + (count(r)[a.id] || 0), 0);
+  const stacksOf = (arr) => shown.map(a => ({ label: a.name, color: a.color, values: ctx.mean(arr, r => count(r)[a.id] || 0) }));
+  // each day's total: the sum of the areas shown (a bucket nobody planned stays empty)
+  const totalsOf = (stacks) => ctx.buckets.map((_, i) => (stacks.every(st => st.values[i] == null) ? null : Math.round(stacks.reduce((acc, st) => acc + (st.values[i] || 0), 0) * 10) / 10));
+  const carr = ctx.cmpRecsOf(ctx.boards);
+  const showCmp = ctx.hasCmp(carr);
+  if (showCmp) box.appendChild(ovLegend([{ label: historyCmpSeriesLabel(), color: "var(--muted)" }]));
+  // no average rule here: the totals sit above the columns and a rule would run through them (the tile has the average)
+  const draw = (wrap, arr, cArr, yMax, h, big) => {
+    const stacks = stacksOf(arr), tot = totalsOf(stacks);
+    const cv = cArr && ctx.hasCmp(cArr) ? ctx.mean(cArr, sumShown) : null;
+    fillColumnChart(wrap, { stacks, xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates,
+      dayTotals: tot.map(v => (v == null ? null : `${v} deployed${perDay}`)), totals: big ? tot : null,
+      compare: cv ? { label: historyCmpSeriesLabel(), color: "var(--muted)", values: cv } : null });
+  };
+  if (ctx.side) {
+    historySideBySide(box, ctx, pendingCharts, (bs) => {
+      const arr = ctx.recsOf(bs), cArr = ctx.cmpRecsOf(bs);
+      const tot = totalsOf(stacksOf(arr)), ctot = ctx.hasCmp(cArr) ? ctx.mean(cArr, sumShown) : null;
+      return { vals: tot, cmp: ctot, suffix: "", draw: (wrap, yMax) => draw(wrap, arr, cArr, yMax, 130, false) };
+    });
+  } else {
+    const wrap = document.createElement("div");
+    wrap.className = "ov-trend-chart";
+    box.appendChild(wrap);
+    const tot = totalsOf(stacksOf(ctx.recs));
+    const cv = showCmp ? ctx.mean(carr, sumShown) : [];
+    pendingCharts.push(() => draw(wrap, ctx.recs, carr, Charts.niceMax([...tot, ...cv].filter(v => v != null)), 220, true));
+  }
+  return box;
 }
 
 /* Click a day in a History chart (or a calendar cell) to open a board on that date: the one
@@ -4881,7 +5080,8 @@ function historyLeaveCalendar(dates, recs, shown, opts = {}) {
 
 function historyOncallView(dates, recs, pendingCharts, ctx) {
   const ov = state.overview;
-  const share = ov.historyOncallMode === "share";
+  const mode = ov.historyOncallMode === "share" ? "share" : ov.historyOncallMode === "free" ? "free" : "count";
+  const share = mode === "share", free = mode === "free";
   const called = recs.map(r => (r ? r.oncallAssigned : null));
   const avail = recs.map(r => (r ? historyOncallAvail(r) : null));
   const sumOf = (a) => a.reduce((s, v) => s + (v || 0), 0);
@@ -4889,24 +5089,30 @@ function historyOncallView(dates, recs, pendingCharts, ctx) {
   const rate = sumOf(avail) ? Math.round((sumOf(called) / sumOf(avail)) * 100) : null;
   const crew = sumOf(recs.map(r => (r ? r.assigned : 0)));
   const shareAll = crew ? Math.round((sumOf(called) / crew) * 100) : null;
+  // free: on-call people available that day and not on a mission (the board's On-call free, per day)
+  const freeOf = (r) => historyOncallAvail(r) - r.oncallAssigned;
+  const meanFree = historyMean(recs.map(r => (r ? freeOf(r) : null)));
   const box = document.createElement("div");
   box.className = "ov-hchart";
   const head = document.createElement("div");
   head.className = "ov-hchart-head ov-hchart-head-row";
-  head.innerHTML = `<span><b>${share ? `On-call share, ${ctx.per}` : `On-call deployed, ${ctx.per}`}</b>
+  head.innerHTML = `<span><b>${share ? `On-call share, ${ctx.per}` : free ? `On-call free, ${ctx.per}` : `On-call deployed, ${ctx.per}`}</b>
     <span class="ov-muted">${share
       ? (shareAll == null ? "" : `On-call is ${shareAll}% of the person-days on missions`)
-      : `${rate == null ? "" : `Called in on ${rate}% of the available on-call days`}${shareAll == null ? "" : ` · ${shareAll}% of the people on missions`}`}</span></span>`;
+      : free
+        ? (rate == null ? "" : `Free on ${100 - rate}% of the available on-call days · avg ${fmt1(meanFree)} / day`)
+        : `${rate == null ? "" : `Called in on ${rate}% of the available on-call days`}${shareAll == null ? "" : ` · ${shareAll}% of the people on missions`}`}</span></span>`;
   const seg = document.createElement("div");
   seg.className = "ov-trend-btns";
   seg.setAttribute("role", "group");
   seg.setAttribute("aria-label", "On-call view");
-  for (const [k, l] of [["count", "Count"], ["share", "Share"]]) {
+  for (const [k, l] of [["count", "Count"], ["share", "Share"], ["free", "Free"]]) {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "btn btn-small" + ((share ? "share" : "count") === k ? " active" : "");
-    b.setAttribute("aria-pressed", String((share ? "share" : "count") === k));
+    b.className = "btn btn-small" + (mode === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(mode === k));
     b.textContent = l;
+    b.title = k === "free" ? "On-call people available and not on a mission each day" : k === "share" ? "On-call as a share of everyone on a mission" : "On-call people on a mission, against those available";
     b.onclick = () => { ov.historyOncallMode = k; render(); };
     seg.appendChild(b);
   }
@@ -4940,6 +5146,38 @@ function historyOncallView(dates, recs, pendingCharts, ctx) {
       wrap.className = "ov-trend-chart";
       box.appendChild(wrap);
       pendingCharts.push(() => draw(wrap, x.vals, x.cmp, Math.min(100, Charts.niceMax([...x.vals, ...(x.cmp || [])].filter(v => v != null))), 220, shareAll == null ? null : shareAll));
+    }
+    box.appendChild(peopleLink("oncall"));
+    return box;
+  }
+  if (free) {
+    // Free: one column a day, the on-call people available and not called in. Count's pale bar shows the same
+    // thing as what is left above the called-in part; this puts the number itself on the axis, with the average
+    // and the comparison, so "how much spare on-call did we have" reads straight off.
+    const carr0 = ctx.cmpRecsOf(ctx.boards);
+    box.appendChild(ovLegend([
+      { label: `On-call free · ${meanFree == null ? "—" : fmt1(meanFree)} / day`, color: "var(--oncall-free)" },
+      ...(ctx.hasCmp(carr0) ? [{ label: historyCmpSeriesLabel(), color: "var(--muted)" }] : []),
+    ]));
+    const drawFree = (wrap, arr, carr, yMax, h, m2) => {
+      const f = ctx.mean(arr, freeOf), a2 = ctx.mean(arr, r => historyOncallAvail(r));
+      const cv = carr && ctx.hasCmp(carr) ? ctx.mean(carr, freeOf) : null;
+      fillColumnChart(wrap, {
+        stacks: [{ label: "On-call free", color: "var(--oncall-free)", values: f }],
+        xLabels: ctx.labels, dayTotals: f.map((v, i) => (v == null ? null : `${v} of ${a2[i]} on-call${perDay}${cv && cv[i] != null ? ` · ${cmpName} ${cv[i]}` : ""}`)),
+        yMax, height: h, dates: ctx.clickDates, compare: cv ? { label: historyCmpSeriesLabel(), color: "var(--muted)", values: cv } : null,
+        refLines: m2 != null ? [{ y: m2, color: "var(--muted)", label: `avg ${fmt1(m2)}` }] : [] });
+    };
+    if (ctx.side) {
+      historySideBySide(box, ctx, pendingCharts, (bs) => {
+        const arr = ctx.recsOf(bs), carr = ctx.cmpRecsOf(bs);
+        return { vals: ctx.mean(arr, freeOf), cmp: ctx.hasCmp(carr) ? ctx.mean(carr, freeOf) : null, suffix: "", draw: (wrap, yMax, m2) => drawFree(wrap, arr, carr, yMax, 130, m2) };
+      });
+    } else {
+      const wrap = document.createElement("div");
+      wrap.className = "ov-trend-chart";
+      box.appendChild(wrap);
+      pendingCharts.push(() => drawFree(wrap, recs, carr0, Charts.niceMax([...ctx.mean(recs, freeOf), ...(ctx.hasCmp(carr0) ? ctx.mean(carr0, freeOf) : [])].filter(v => v != null)), 220, meanFree));
     }
     box.appendChild(peopleLink("oncall"));
     return box;
