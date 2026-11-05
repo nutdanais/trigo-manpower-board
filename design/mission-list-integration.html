@@ -120,6 +120,12 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
 .sugg.s-ask { color: var(--warn); border-color: #f0d49a; background: var(--warn-bg); }
 .guide input.disc { width: 16px; height: 16px; accent-color: var(--primary); }
 .guide tr:has(input.disc:checked) td { background: #fbfcf7; }
+.guide textarea.fb { font: inherit; font-size: 12.5px; width: 220px; min-height: 44px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; color: var(--text); background: #fff; }
+.guide textarea.fb:focus { border-color: var(--primary); }
+.guide tr.has-fb textarea.fb { border-color: #f0d49a; background: #fffbf2; }
+.fb-state { display: block; min-height: 1em; margin-top: 2px; font-size: 11px; }
+.fb-note { font-size: 12.5px; padding: 8px 12px; border-radius: 8px; background: var(--info-bg); color: var(--primary); }
+.fb-note.local { background: var(--warn-bg); color: var(--warn); }
 .group-row td { background: #f5f7f9; font-weight: 700; color: var(--primary); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
 
 /* methods */
@@ -321,7 +327,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       <li><span class="sugg s-drop">Pre-filled default</span> The field stays, already filled with the value used almost every time. Change it only when it's different. Still shown and exported.</li>
       <li><span class="sugg s-ask">Ask in meeting</span> Its meaning isn't clear from the file.</li>
     </ul>
-    <p class="muted"><b>Drop</b> in the <b>Team decision</b> column is the only choice that really removes a column: it's left out of the app and the export. <b>Status</b> says how the column relates to the app today. <b>Entry</b> is one of the six ways above, and <b>Owner</b> is who fills it in. <b>Flag</b> marks columns that need a <span class="flag special">Special</span> way of entering or editing them, <span class="flag attn">Attention</span> for a data problem the file shows, or <span class="flag ask">Ask</span> when only the admins know the answer. <b>Copy meeting decisions</b> gives me the result. Your ticks and choices are remembered in this browser.</p>
+    <p class="muted"><b>Drop</b> in the <b>Team decision</b> column is the only choice that really removes a column: it's left out of the app and the export. <b>Status</b> says how the column relates to the app today. <b>Entry</b> is one of the six ways above, and <b>Owner</b> is who fills it in. <b>Flag</b> marks columns that need a <span class="flag special">Special</span> way of entering or editing them, <span class="flag attn">Attention</span> for a data problem the file shows, or <span class="flag ask">Ask</span> when only the admins know the answer. Write anything you want me to change for a column in <b>Remark / feedback for Claude</b>. <b>Copy meeting decisions</b> gives me the result. Your ticks and choices are remembered in this browser.</p>
   </div>
   <div class="filters" role="group" aria-label="Filter columns">
     <span class="lbl">Show</span>
@@ -334,14 +340,16 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     <button type="button" data-f="auto">Automatic</button>
     <button type="button" data-f="drop">Automatic or default</button>
     <button type="button" data-f="open">Not discussed yet</button>
+    <button type="button" data-f="fb">With a remark</button>
     <button type="button" data-f="admin">Admin only</button>
   </div>
   <div class="panel tbl-wrap" style="padding:0">
     <table class="guide" id="guide-table">
-      <thead><tr><th>✓</th><th>Col</th><th>Column in the file</th><th>Suggested</th><th>Status</th><th>Entry</th><th>Owner</th><th>Flag</th><th>How the app handles it</th><th>Evidence from the file</th><th>Team decision</th></tr></thead>
+      <thead><tr><th>✓</th><th>Col</th><th>Column in the file</th><th>Suggested</th><th>Status</th><th>Entry</th><th>Owner</th><th>Flag</th><th>How the app handles it</th><th>Evidence from the file</th><th>Team decision</th><th>Remark / feedback for Claude</th></tr></thead>
       <tbody id="guide-body"></tbody>
     </table>
   </div>
+  <div class="fb-note" id="fb-note">Remarks are loading…</div>
   <div class="copybar">
     <button type="button" id="copy-guide">Copy meeting decisions</button>
     <span class="small muted" id="guide-count"></span>
@@ -483,7 +491,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
   let html = "";
   for (const [gname, rows] of G) {
-    html += `<tr class="group-row" data-group><td colspan="11">${esc(gname)}</td></tr>`;
+    html += `<tr class="group-row" data-group><td colspan="12">${esc(gname)}</td></tr>`;
     for (const [col, name, subname, st, inp, w, flag, how, ev] of rows) {
       const [sl, sc] = S[st];
       const d = saved[col] || "";
@@ -501,7 +509,8 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
         <td class="ev small">${esc(ev)}</td>
         <td><select aria-label="Meeting decision for column ${col}" id="dec-${col}">
           <option value="">—</option><option value="keep"${d === "keep" ? " selected" : ""}>Keep</option><option value="drop"${d === "drop" ? " selected" : ""}>Drop (remove)</option><option value="discuss"${d === "discuss" ? " selected" : ""}>Discuss again</option>
-        </select></td></tr>`;
+        </select></td>
+        <td><textarea class="fb" id="fb-${col}" rows="2" aria-label="Remark or feedback for column ${col}" placeholder="Remark or change for Claude…"></textarea><span class="fb-state small muted" id="fbs-${col}"></span></td></tr>`;
     }
   }
   body.innerHTML = html;
@@ -530,7 +539,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   const tests = {
     all: () => true, flag: (t) => !!t.dataset.flag, special: (t) => t.dataset.flag === "special", ask: (t) => t.dataset.flag === "ask" || t.dataset.st === "ask",
     inapp: (t) => t.dataset.st === "inapp", auto: (t) => t.dataset.st === "auto", drop: (t) => t.dataset.st === "drop" || t.dataset.st === "auto",
-    keep: (t) => ["new", "newp", "cust", "host"].includes(t.dataset.st), open: (t) => !t.querySelector(".disc").checked, admin: (t) => t.dataset.admin === "1",
+    keep: (t) => ["new", "newp", "cust", "host"].includes(t.dataset.st), fb: (t) => !!t.querySelector(".fb").value.trim(), open: (t) => !t.querySelector(".disc").checked, admin: (t) => t.dataset.admin === "1",
   };
   document.querySelector(".filters").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-f]"); if (!b) return;
@@ -554,9 +563,63 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     cb.checked = !!ticks[cb.id];
     cb.addEventListener("change", () => { ticks[cb.id] = cb.checked; try { localStorage.setItem(CK, JSON.stringify(ticks)); } catch (e) {} });
   });
+  /* remarks: shared through the artifact's db when available (the team and Claude
+     see them); otherwise kept in this browser and carried by Copy. */
+  const FBK = "mission-list-feedback-v1";
+  let fbLocal = {}; try { fbLocal = JSON.parse(localStorage.getItem(FBK) || "{}"); } catch (e) {}
+  const fbBox = (c) => document.getElementById("fb-" + c);
+  function fbText(c) { const el = fbBox(c); return el ? el.value.trim() : ""; }
+  function markRow(c) { const el = fbBox(c); if (el) el.closest("tr").classList.toggle("has-fb", !!el.value.trim()); }
+  const note = document.getElementById("fb-note");
+  let shared = null, myId = null; const lastShared = {};
+  for (const r of ALL) { const el = fbBox(r[0]); if (fbLocal[r[0]]) { el.value = fbLocal[r[0]]; markRow(r[0]); } }
+  function setNote(mode) {
+    if (mode === "shared") { note.className = "fb-note"; note.textContent = "Remarks are shared: everyone who opens this page sees them, and Claude can read them directly. They save when you click outside the box."; }
+    else { note.className = "fb-note local"; note.textContent = "Remarks are saved in this browser only. Use Copy meeting decisions to send them to Claude."; }
+  }
+  const fallback = setTimeout(() => { if (!shared) setNote("local"); }, 10000);
+  (async () => {
+    try {
+      const db = await window.claude?.use?.("db");
+      if (!db) { clearTimeout(fallback); setNote("local"); return; }
+      const user = await window.claude.use("user");
+      try { myId = user ? await user.id() : null; } catch (e) {}
+      shared = db; clearTimeout(fallback); setNote("shared");
+      db.collection("feedback").onSnapshot((snap) => {
+        const present = new Set(snap.docs.map((d) => d.id));
+        for (const r of ALL) {
+          const el = fbBox(r[0]);
+          if (!present.has(r[0]) && document.activeElement !== el) { lastShared[r[0]] = ""; el.value = ""; markRow(r[0]); document.getElementById("fbs-" + r[0]).textContent = ""; }
+        }
+        for (const d of snap.docs) {
+          const el = fbBox(d.id); if (!el) continue;
+          const v = d.data(); const t = v && typeof v.text === "string" ? v.text : ""; lastShared[d.id] = t;
+          if (document.activeElement !== el) { el.value = t; markRow(d.id); }
+          const at = v && typeof v.at === "number" ? new Date(v.at) : null;
+          document.getElementById("fbs-" + d.id).textContent = t && at ? "saved " + at.toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
+        }
+      }, () => setNote("local"));
+    } catch (e) { clearTimeout(fallback); setNote("local"); }
+  })();
+  body.addEventListener("focusout", async (e) => {
+    const el = e.target.closest("textarea.fb"); if (!el) return;
+    const c = el.closest("tr").dataset.col; const t = el.value.trim(); markRow(c);
+    const before = shared ? (lastShared[c] || "") : (fbLocal[c] || "");
+    if (before === t) return;
+    if (t) fbLocal[c] = t; else delete fbLocal[c];
+    try { localStorage.setItem(FBK, JSON.stringify(fbLocal)); } catch (err) {}
+    if (!shared) return;
+    const st = document.getElementById("fbs-" + c);
+    st.textContent = "saving…";
+    try {
+      if (t) await shared.collection("feedback").doc(c).set({ text: t.slice(0, 2000), by: myId, at: Date.now() });
+      else await shared.collection("feedback").doc(c).delete();
+      lastShared[c] = t; st.textContent = t ? "saved" : "";
+    } catch (err) { st.textContent = "not saved: kept in this browser"; }
+  });
   /* copy */
   document.getElementById("copy-guide").addEventListener("click", () => {
-    const lines = ALL.map((r) => `${r[0]} ${r[1]}${r[2] ? " (" + r[2] + ")" : ""} | suggested: ${SG[r[3]][0]} | team: ${saved[r[0]] ? saved[r[0]].toUpperCase() : "-"}${saved["_d" + r[0]] ? " | discussed" : ""}`);
+    const lines = ALL.map((r) => `${r[0]} ${r[1]}${r[2] ? " (" + r[2] + ")" : ""} | suggested: ${SG[r[3]][0]} | team: ${saved[r[0]] ? saved[r[0]].toUpperCase() : "-"}${saved["_d" + r[0]] ? " | discussed" : ""}${fbText(r[0]) ? " | remark: " + fbText(r[0]).replace(/\s+/g, " ") : ""}`);
     const t = "Mission List meeting decisions\n" + lines.join("\n");
     const out = document.getElementById("guide-out"); const btn = document.getElementById("copy-guide");
     out.value = t;
