@@ -46,7 +46,7 @@ const Present = (() => {
     ".ov-eng-select", "tr[data-eng]", ".ov-small-head .ov-linkbtn", ".ov-ba-table tr[data-i]", ".ov-ba-loans > .ov-linkbtn"].join(",");
   /* the Overview state a presenter can change, put back when they leave */
   const FIELDS = ["boardIds", "period", "historyPreset", "historyFrom", "historyTo", "historyMeasure", "historyLeaveView", "historyLeaveHidden",
-    "historyGroup", "historyCompare", "historyOncallMode", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplSpread",
+    "historyGroup", "historyCompare", "historyOncallMode", "historyDeployedBy", "historyDeployedShow", "historyDeployedStyle", "historyAreaHidden", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplSpread",
     "pplBand", "pplSort", "pplAll", "engPick", "engGroup", "engMeasure"];
   const e = escapeHtml;
   let run = null;             // { kind: "overview" | "board", slides: [keys], i, names, t0, fs, snap, orig, home, keys }

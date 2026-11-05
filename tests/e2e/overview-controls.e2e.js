@@ -7,7 +7,7 @@
        loading state, and once;
      - Boards: Together | Side by side, one small chart per board on one shared scale, its name sets
        the board selector, a day opens that board; only offered for All boards with more than one;
-     - the On-call view's Count | Share (on-call person-days ÷ all person-days on missions, pooled);
+     - the On-call view's Count | Share | Free (Free is in history-deployed-split.e2e.js; on-call person-days ÷ all person-days on missions, pooled);
      - Boards & areas: a period table per board with net loans, By service area (demand, supply, gap,
        covered by other areas) and the from → to loan table;
      - Thai and a 400 px phone.
@@ -147,9 +147,9 @@ async function step(name, fn) {
       assert.deepEqual(await read(".ov-hview .btn"), ["Chart", "Calendar"]);
     });
 
-    await step("On-call: Count | Share; share is on-call person-days ÷ all person-days on missions, pooled over a bucket", async () => {
+    await step("On-call: Count | Share | Free; share is on-call person-days ÷ all person-days on missions, pooled over a bucket", async () => {
       await p.locator(".ov-htiles:not(.ov-eng-tiles) .ov-htile", { hasText: "On-call deployed" }).click();
-      assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .btn").then((x) => x.slice(-2)), ["Count", "Share"]);
+      assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .btn").then((x) => x.slice(-3)), ["Count", "Share", "Free"]);
       await p.locator(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .btn", { hasText: "Share" }).click();
       assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head b"), ["On-call share, day by day"]);
       assert.match((await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head .ov-muted"))[0], /On-call is 9% of the person-days on missions/, "3 of 33");

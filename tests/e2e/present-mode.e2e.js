@@ -75,7 +75,7 @@ async function step(name, fn) {
     const nameWords = /Person [A-Z]\b/;
     // the Overview state a presenter can change (present.js FIELDS): what Reset filters and leaving put back
     const FIELDS = ["boardIds", "period", "historyPreset", "historyFrom", "historyTo", "historyMeasure", "historyLeaveView", "historyLeaveHidden", "historyGroup", "historyCompare",
-      "historyOncallMode", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplSpread", "pplBand", "pplSort", "pplAll", "engPick", "engGroup", "engMeasure"];
+      "historyOncallMode", "historyDeployedBy", "historyDeployedShow", "historyDeployedStyle", "historyAreaHidden", "baView", "baLoansOpen", "wfWindow", "wfHidden", "pplView", "pplWho", "pplSpread", "pplBand", "pplSort", "pplAll", "engPick", "engGroup", "engMeasure"];
     const filters = () => p.evaluate((f) => JSON.stringify(f.map((k) => (state.overview[k] === undefined ? null : state.overview[k]))), FIELDS);
     let startFilters = null;
     const SLIDE_NAMES = ["In detail", "History", "People", "Engineer workload", "Workforce", "Boards & areas"];
