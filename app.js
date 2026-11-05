@@ -5181,7 +5181,8 @@ const PPL_VIEWS = [
   { key: "workload", label: "Workload", who: "all", sort: { key: "wshare", dir: -1 }, cols: ["name", "working", "worked", "wshare", "nights", "run", "flags"] },
   { key: "leave", label: "Leave", who: "all", sort: { key: "share", dir: -1 }, cols: ["name", "working", "worked", "leave", "ratio", "share", "sick", "split"] },
   { key: "nights", label: "Nights", who: "all", sort: { key: "nights", dir: -1 }, cols: ["name", "worked", "nights", "nshare", "flags"] },
-  { key: "oncall", label: "On-call", who: "oncall", sort: { key: "called", dir: -1 }, cols: ["name", "working", "leave", "called", "cshare", "flags"] },
+  // least called in first: the on-call people the roster leans on least lead the table
+  { key: "oncall", label: "On-call", who: "oncall", sort: { key: "cshare", dir: 1 }, cols: ["name", "working", "leave", "called", "cshare", "flags"] },
   { key: "alerts", label: "Alerts only", who: "all", sort: { key: "flags", dir: -1 }, cols: ["name", "worked", "share", "nights", "run", "flags"], flagged: true },
 ];
 const PPL_COLS = {
@@ -5319,7 +5320,12 @@ function peopleSection(boards, dates, recs) {
   const sort = ov.pplSort || v.sort;
   shown = shown.slice().sort((a, b) => {
     if (sort.key === "name") return a.name.localeCompare(b.name) * sort.dir;
-    return ((pplVal(a, sort.key) - pplVal(b, sort.key)) * sort.dir) || (b.leave - a.leave) * (sort.key === "share" ? 1 : 0) || a.name.localeCompare(b.name);
+    const va = pplVal(a, sort.key), vb = pplVal(b, sort.key);
+    // Called in / Share called in read "—" (-1) for someone not on call: last whichever way it is sorted
+    if (sort.key === "called" || sort.key === "cshare") { const na = va < 0, nb = vb < 0; if (na !== nb) return na ? 1 : -1; }
+    return ((va - vb) * sort.dir) || (b.leave - a.leave) * (sort.key === "share" ? 1 : 0)
+      || (b.available - a.available) * (sort.key === "cshare" ? 1 : 0)   // same share: the one available more days first
+      || a.name.localeCompare(b.name);
   });
   if (!shown.length) {
     sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: v.flagged ? "No flags in this range." : v.key === "leave" ? "Nobody took leave in this range." : "Nobody matches." }));
