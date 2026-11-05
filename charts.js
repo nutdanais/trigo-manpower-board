@@ -228,9 +228,10 @@ const Charts = (() => {
      filled part of a pale bar. Every segment is its own hover/focus target
      (chart-mark), its tooltip naming the day and that segment's count; a null
      day draws nothing, like lineChart's gaps. */
-  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null, notes = null, totals = null, compare = null, suffix = "", grouped = false }) {
+  function columnChart({ stacks, ghost = null, xLabels, yMax, width = 640, height = 220, refLines = [], dayTotals = null, line = null, dates = null, notes = null, totals = null, compare = null, suffix = "", grouped = false, barValues = false }) {
     // `grouped` draws the series side by side in each day's slot (Deployed: Total, Permanent and On-call, each
     // from the baseline) instead of piling them up; ghost, totals, notes and compare are for stacked columns.
+    // `barValues` (grouped) prints each bar's own figure above it, while the bars are wide enough to hold it.
     // `notes` ([{ values, color, text, pos: "above" | "below" }]) writes a small figure above a column
     // (+3 joiners) or under its baseline (-1 leavers); a column with 0 gets none. Used by Workforce.
     // `totals` ([number|null]) prints each column's total directly above it, in the text colour; the
@@ -238,13 +239,13 @@ const Charts = (() => {
     const hasBelow = !!(notes && notes.some(n => n.pos === "below"));
     const hasAbove = !!(notes && notes.some(n => n.pos !== "below"));
     const TOTAL_ROW = 13;   // one line of 10.5-11px text
-    const padL = 32, padR = 16, padT = 10 + (totals ? TOTAL_ROW : 0) + (hasAbove ? 6 + (totals ? 5 : 0) : hasBelow ? 6 : 0), padB = hasBelow ? 36 : 22;
+    const padL = 32, padR = 16, padT = 10 + (totals || barValues ? TOTAL_ROW : 0) + (hasAbove ? 6 + (totals ? 5 : 0) : hasBelow ? 6 : 0), padB = hasBelow ? 36 : 22;
     const w = width - padL - padR, h = height - padT - padB;
     const n = xLabels.length;
     const band = n ? w / n : w;
     const bw = Math.max(2, Math.min(28, band * 0.66));
     const k = grouped ? Math.max(1, stacks.length) : 1;
-    const cw = grouped ? Math.max(2 * k, Math.min(18 * k, band * 0.8)) : bw;   // the width of one day's cluster of bars
+    const cw = grouped ? Math.max(2 * k, Math.min(22 * k, band * 0.9)) : bw;   // the width of one day's cluster of bars
     const sub = cw / k;
     // a total over every column needs room: on a long range (a band under ~19px) the numbers would overprint.
     // Workforce's twelve bars stay above that even on a phone (300px wide chart: 21px a bar).
@@ -292,6 +293,8 @@ const Charts = (() => {
         const bx = grouped ? (xAt(i) - cw / 2 + j * sub).toFixed(1) : x, bwid = grouped ? Math.max(1, sub - 1) : bw;
         marks += `<rect class="chart-mark"${day} x="${bx}" y="${y1.toFixed(1)}" width="${bwid.toFixed(1)}" height="${(y0 - y1).toFixed(1)}" fill="${st.color}" stroke="var(--panel)" stroke-width="0.75"
           data-tip-label="${esc(st.label)} — ${esc(head)}" data-tip-value="${v}${suffix}" tabindex="0"><title>${esc(st.label)} ${esc(xLabels[i])}: ${v}${suffix}</title></rect>`;
+        // under ~10px a bar cannot hold a figure (a long range): the tooltip still has it
+        if (grouped && barValues && sub >= 10) marks += `<text x="${(+bx + bwid / 2).toFixed(1)}" y="${(y1 - 3).toFixed(1)}" class="chart-bar-value" text-anchor="middle">${esc(v)}</text>`;
         acc += v;
       });
       // the comparison (same period last year, the period before): a dashed outline of its column, over the bars

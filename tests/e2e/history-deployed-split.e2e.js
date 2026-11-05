@@ -77,8 +77,11 @@ async function step(name, fn) {
     const title = () => read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head b");
     const dots = () => p.evaluate(() => [...document.querySelectorAll(".chart-line-chart circle.chart-dot")].map((c) => c.dataset.tipLabel.split(" — ")[0] + "=" + c.dataset.tipValue));
     // every column segment of the chart: "Series — day · total" → value
-    const marks = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart rect.chart-mark")].map((r) => ({ label: r.dataset.tipLabel, value: r.dataset.tipValue, fill: r.getAttribute("fill"), x: Number(r.getAttribute("x")), y: Number(r.getAttribute("y")), h: Number(r.getAttribute("height")) })));
+    const marks = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart rect.chart-mark")].map((r) => ({ label: r.dataset.tipLabel, value: r.dataset.tipValue, fill: r.getAttribute("fill"), x: Number(r.getAttribute("x")), y: Number(r.getAttribute("y")), h: Number(r.getAttribute("height")), w: Number(r.getAttribute("width")) })));
     const totalsText = () => read(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart .chart-total");
+    // Bars: the figure above each bar, with where it sits
+    const barValues = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart .chart-bar-value")].map((t) => t.textContent));
+    const barFigures = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart .chart-bar-value")].map((t) => [Number(t.getAttribute("x")), Number(t.getAttribute("y"))]));
     const totalsY = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart .chart-total")].map((t) => Number(t.getAttribute("y"))));
 
     await step("Total alone is the plain line: chips with their averages, Split by and Line | Bars", async () => {
@@ -124,6 +127,29 @@ async function step(name, fn) {
       assert.deepEqual(await title(), ["Deployed / day, day by day"]);
     });
 
+    await step("Bars: every bar carries its own figure on top, whichever chips are on", async () => {
+      assert.deepEqual(await barValues(), ["5", "4", "1", "4", "3", "1", "4", "4", "3", "1", "2", "1", "1"], "Total, Permanent, On-call: Mon, Tue, Wed (no On-call), Thu, Fri");
+      const m = await marks(), figs = await barFigures();
+      assert.equal(figs.length, m.length, "one figure a bar");
+      m.forEach((r, i) => {
+        assert.ok(Math.abs(figs[i][0] - (r.x + r.w / 2)) < 0.3, "centred on its bar: " + r.label);
+        assert.ok(figs[i][1] < r.y, "above its bar: " + r.label);
+      });
+      await chip("Total");   // Total off: the two parts keep theirs
+      assert.deepEqual(await barValues(), ["4", "1", "3", "1", "4", "1", "2", "1"], "Permanent and On-call: Mon 4 1, Tue 3 1, Wed 4, Thu 1 2, Fri 1");
+      await chip("Permanent");   // On-call alone
+      assert.deepEqual(await barValues(), ["1", "1", "2"]);
+      await chip("Permanent"); await chip("Total");
+      assert.deepEqual(await pressed(), ["true", "true", "true"]);
+      // a long range: bars too narrow to hold a figure go without (the tooltip still has the value)
+      const long = await p.evaluate(() => {
+        const mk = (n) => Charts.columnChart({ grouped: true, barValues: true, width: 700, height: 200, yMax: 8, xLabels: Array.from({ length: n }, (_, i) => "d" + i),
+          stacks: [{ label: "A", color: "#000", values: Array(n).fill(4) }, { label: "B", color: "#111", values: Array(n).fill(2) }, { label: "C", color: "#222", values: Array(n).fill(1) }] });
+        return [mk(5).split("chart-bar-value").length - 1, mk(80).split("chart-bar-value").length - 1];
+      });
+      assert.deepEqual(long, [15, 0], "5 days: a figure on each of 15 bars; 80 days: none");
+    });
+
     await step("never all off: the last series stays on, and a single series as bars is still bars", async () => {
       await chip("Total"); await chip("Permanent");
       assert.deepEqual(await pressed(), ["false", "false", "true"]);
@@ -155,8 +181,8 @@ async function step(name, fn) {
       m = await marks();
       assert.equal(of("Total").length, 0, "no pale bar");
       assert.equal(m.length, 8, "5 Permanent + 3 On-call");
-      assert.deepEqual(await totalsText(), [], "no totals above the bars");
-      assert.equal(of("Permanent")[0].label, `Permanent — ${MON}`, "no total in the tooltip either");
+      assert.deepEqual(await totalsText(), ["5", "4", "4", "3", "1"], "the figure above each bar stays: the parts shown added up");
+      assert.equal(of("Permanent")[0].label, `Permanent — ${MON}`, "but no Total in the tooltip");
 
       await chip("Total"); await chip("On-call");   // Total on, On-call off: Permanent is a share of the total
       m = await marks();
@@ -169,8 +195,12 @@ async function step(name, fn) {
       await chip("Permanent");   // only Total on: it is the bar
       m = await marks();
       assert.deepEqual(m.map((x) => [x.label.split(" — ")[0], x.value, x.fill]), ["5", "4", "4", "3", "1"].map((v) => ["Total", v, "var(--chart-assigned)"]));
-      assert.deepEqual(await totalsText(), []);
-      await chip("Permanent"); await chip("On-call");
+      assert.deepEqual(await totalsText(), ["5", "4", "4", "3", "1"], "and the bar has its figure too");
+      await chip("Permanent"); await chip("Total");   // Permanent alone, Total off: the figure is the Permanent bar's
+      m = await marks();
+      assert.equal(m.length, 5);
+      assert.deepEqual(await totalsText(), ["4", "3", "4", "1", "1"], "Permanent only: its own height on top");
+      await chip("Total"); await chip("On-call");
       assert.deepEqual(await pressed(), ["true", "true", "true"]);
     });
 

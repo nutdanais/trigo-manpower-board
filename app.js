@@ -4735,12 +4735,14 @@ function historyDeployedContractView(m, ctx, pendingCharts, tools) {
       // stack and its figure above it (with one part hidden, the part reads as a share of that whole). With no part on, Total is the bar.
       const parts = rows.filter(({ s }) => s.key !== "total"), total = rows.find(({ s }) => s.key === "total");
       const whole = total && parts.length ? total.vals : null;
+      // the figure above each bar is its height: the day's total (behind the stack), else the parts shown added up
+      const sums = ctx.buckets.map((_, i) => (parts.every(({ vals }) => vals[i] == null) ? null : Math.round(parts.reduce((a, { vals }) => a + (vals[i] || 0), 0) * 10) / 10));
       fillColumnChart(wrap, { stacks: (parts.length ? parts : rows).map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
-        ghost: whole ? { label: "Total", color: "var(--assigned-ghost)", values: whole } : null, totals: whole,
+        ghost: whole ? { label: "Total", color: "var(--assigned-ghost)", values: whole } : null, totals: whole || (parts.length ? sums : total.vals),
         dayTotals: whole ? whole.map(v => (v == null ? null : `${v} deployed${perDay}`)) : null,
         xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
     } else if (style === "bars") {
-      fillColumnChart(wrap, { grouped: true, stacks: rows.map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
+      fillColumnChart(wrap, { grouped: true, barValues: true, stacks: rows.map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
         xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
     } else {
       fillLineChart(wrap, { series: rows.map(({ s, vals }) => ({ key: s.key, label: s.label, color: s.color, visible: true, points: vals.map(y => ({ y })) })),
