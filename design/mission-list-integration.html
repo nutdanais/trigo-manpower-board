@@ -119,11 +119,18 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
 .sugg.s-drop { color: var(--bad); border-color: #f2c3bf; background: var(--bad-bg); }
 .sugg.s-ask { color: var(--warn); border-color: #f0d49a; background: var(--warn-bg); }
 .guide input.disc { width: 16px; height: 16px; accent-color: var(--primary); }
-.guide tr:has(input.disc:checked) td { background: #fbfcf7; }
-.guide textarea.fb { font: inherit; font-size: 12.5px; width: 220px; min-height: 44px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; color: var(--text); background: #fff; }
+.guide tr.main-row:has(input.disc:checked) td, .guide tr.main-row:has(input.disc:checked) + tr.fb-row td { background: #fbfcf7; }
+.guide textarea.fb { font: inherit; font-size: 12.5px; flex: 1 1 260px; min-width: 0; width: 100%; min-height: 32px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; color: var(--text); background: #fff; }
 .guide textarea.fb:focus { border-color: var(--primary); }
-.guide tr.has-fb textarea.fb { border-color: #f0d49a; background: #fffbf2; }
-.fb-state { display: block; min-height: 1em; margin-top: 2px; font-size: 11px; }
+.guide tr.fb-row.has-fb textarea.fb { border-color: #f0d49a; background: #fffbf2; }
+.fb-state { font-size: 11px; white-space: nowrap; }
+.guide tr.main-row td { border-bottom: 0; padding-bottom: 4px; }
+.guide tr.fb-row td { padding-top: 0; padding-bottom: 10px; }
+.fb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.fb-lbl { font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.guide tr.fb-row.d-keep select { border-color: var(--ok); color: var(--ok); }
+.guide tr.fb-row.d-drop select { border-color: var(--bad); color: var(--bad); }
+.guide tr.fb-row.d-discuss select { border-color: var(--warn); color: var(--warn); }
 .fb-note { font-size: 12.5px; padding: 8px 12px; border-radius: 8px; background: var(--info-bg); color: var(--primary); }
 .fb-note.local { background: var(--warn-bg); color: var(--warn); }
 .group-row td { background: #f5f7f9; font-weight: 700; color: var(--primary); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
@@ -345,7 +352,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   </div>
   <div class="panel tbl-wrap" style="padding:0">
     <table class="guide" id="guide-table">
-      <thead><tr><th>✓</th><th>Col</th><th>Column in the file</th><th>Suggested</th><th>Status</th><th>Entry</th><th>Owner</th><th>Flag</th><th>How the app handles it</th><th>Evidence from the file</th><th>Team decision</th><th>Remark / feedback for Claude</th></tr></thead>
+      <thead><tr><th>✓</th><th>Col</th><th>Column in the file</th><th>Suggested</th><th>Status</th><th>Entry</th><th>Owner</th><th>Flag</th><th>How the app handles it</th><th>Evidence from the file</th></tr></thead>
       <tbody id="guide-body"></tbody>
     </table>
   </div>
@@ -491,12 +498,12 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
   let html = "";
   for (const [gname, rows] of G) {
-    html += `<tr class="group-row" data-group><td colspan="12">${esc(gname)}</td></tr>`;
+    html += `<tr class="group-row" data-group><td colspan="10">${esc(gname)}</td></tr>`;
     for (const [col, name, subname, st, inp, w, flag, how, ev] of rows) {
       const [sl, sc] = S[st];
       const d = saved[col] || "";
       const admin = /admin/i.test(gname) || st === "cust";
-      html += `<tr data-col="${col}" data-st="${st}" data-flag="${flag}" data-admin="${admin ? 1 : 0}" class="${d ? "d-" + d : ""}">
+      html += `<tr data-col="${col}" data-st="${st}" data-flag="${flag}" data-admin="${admin ? 1 : 0}" class="main-row">
         <td><input type="checkbox" class="disc" id="disc-${col}" aria-label="Column ${col} discussed"${saved["_d" + col] ? " checked" : ""}></td>
         <td class="num">${col}</td>
         <td class="colname">${esc(name)}${subname ? `<small>${esc(subname)}</small>` : ""}</td>
@@ -506,11 +513,15 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
         <td>${who[w]}</td>
         <td>${flag ? `<span class="flag ${flag}">${FL[flag]}</span>` : ""}</td>
         <td class="how">${esc(how)}</td>
-        <td class="ev small">${esc(ev)}</td>
-        <td><select aria-label="Meeting decision for column ${col}" id="dec-${col}">
+        <td class="ev small">${esc(ev)}</td></tr>
+        <tr class="fb-row${d ? " d-" + d : ""}" data-for="${col}"><td></td><td colspan="9"><div class="fb-line">
+        <label class="fb-lbl" for="dec-${col}">Team decision</label>
+        <select aria-label="Meeting decision for column ${col}" id="dec-${col}">
           <option value="">—</option><option value="keep"${d === "keep" ? " selected" : ""}>Keep</option><option value="drop"${d === "drop" ? " selected" : ""}>Drop (remove)</option><option value="discuss"${d === "discuss" ? " selected" : ""}>Discuss again</option>
-        </select></td>
-        <td><textarea class="fb" id="fb-${col}" rows="2" aria-label="Remark or feedback for column ${col}" placeholder="Remark or change for Claude…"></textarea><span class="fb-state small muted" id="fbs-${col}"></span></td></tr>`;
+        </select>
+        <label class="fb-lbl" for="fb-${col}">Remark for Claude</label>
+        <textarea class="fb" id="fb-${col}" rows="1" aria-label="Remark or feedback for column ${col}" placeholder="Write a remark or a change you want for column ${col}…"></textarea>
+        <span class="fb-state small muted" id="fbs-${col}"></span></div></td></tr>`;
     }
   }
   body.innerHTML = html;
@@ -528,9 +539,9 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       count(); return;
     }
     const sel = e.target.closest("select"); if (!sel) return;
-    const tr = sel.closest("tr"); const col = tr.dataset.col;
+    const tr = sel.closest("tr"); const col = tr.dataset.for;
     if (sel.value) saved[col] = sel.value; else delete saved[col];
-    tr.className = sel.value ? "d-" + sel.value : "";
+    tr.className = "fb-row" + (sel.value ? " d-" + sel.value : "") + (tr.classList.contains("has-fb") ? " has-fb" : "");
     try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (err) {}
     count();
   });
@@ -539,7 +550,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   const tests = {
     all: () => true, flag: (t) => !!t.dataset.flag, special: (t) => t.dataset.flag === "special", ask: (t) => t.dataset.flag === "ask" || t.dataset.st === "ask",
     inapp: (t) => t.dataset.st === "inapp", auto: (t) => t.dataset.st === "auto", drop: (t) => t.dataset.st === "drop" || t.dataset.st === "auto",
-    keep: (t) => ["new", "newp", "cust", "host"].includes(t.dataset.st), fb: (t) => !!t.querySelector(".fb").value.trim(), open: (t) => !t.querySelector(".disc").checked, admin: (t) => t.dataset.admin === "1",
+    keep: (t) => ["new", "newp", "cust", "host"].includes(t.dataset.st), fb: (t) => !!fbText(t.dataset.col), open: (t) => !t.querySelector(".disc").checked, admin: (t) => t.dataset.admin === "1",
   };
   document.querySelector(".filters").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-f]"); if (!b) return;
@@ -552,6 +563,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
         if (groupRow) groupRow.hidden = !any;
         groupRow = tr; any = false; return;
       }
+      if (tr.classList.contains("fb-row")) { tr.hidden = tr.previousElementSibling.hidden; return; }
       const show = f(tr); tr.hidden = !show; if (show) any = true;
     });
     if (groupRow) groupRow.hidden = !any;
@@ -603,7 +615,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   })();
   body.addEventListener("focusout", async (e) => {
     const el = e.target.closest("textarea.fb"); if (!el) return;
-    const c = el.closest("tr").dataset.col; const t = el.value.trim(); markRow(c);
+    const c = el.closest("tr").dataset.for; const t = el.value.trim(); markRow(c);
     const before = shared ? (lastShared[c] || "") : (fbLocal[c] || "");
     if (before === t) return;
     if (t) fbLocal[c] = t; else delete fbLocal[c];
