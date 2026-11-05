@@ -1,0 +1,753 @@
+<title>People chart views</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: what the chart in Overview → People could show for each
+   chip (Workload, Leave, Nights, On-call, Alerts only), in three layouts to choose from.
+   Tokens and class names are copied from styles.css so the mockups read like the real Overview.
+   Light only, like the app. Layout: a reading column; each option is a live People section + verdict. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --primary-text: #003a66; --brand-green: #a8c855; --hover-tint: #eef3fb;
+  --chart-assigned: #2a78d6; --chart-oncall: #eb6834; --chart-standby: #e34948; --oncall-ghost: #fbe1d5; --grid: #e6e9ee;
+  --leave-annual: #eda100; --leave-sick: #e87ba4; --leave-business: #4a3aa7; --leave-unpaid: #7b8794;
+  --ok-bg: #e6f4ec; --ok-fg: #1f8a4c; --warn-bg: #fdf0d9; --warn-fg: #a15c00; --bad-bg: #fde8e7; --bad-fg: #b42318;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
+h2 { font-size: 19px; letter-spacing: -.2px; text-wrap: balance; }
+h3 { font-size: 15px; }
+p { max-width: 74ch; }
+.lede { color: var(--muted); margin-top: 6px; }
+.muted { color: var(--muted); }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #e3e8ee; color: var(--muted); }
+.tag.rec { background: #eaf3d6; color: #3d5410; }
+.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.jump { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 13px; }
+.jump a { color: var(--primary-text); font-weight: 600; text-decoration: none; }
+.jump a:hover { text-decoration: underline; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 10px; min-width: 0; }
+.panel ul, .panel ol { padding-left: 18px; display: grid; gap: 5px; max-width: 82ch; }
+.rec-panel { border-left: 4px solid var(--brand-green); }
+code { font-size: 12.5px; background: #eef1f4; padding: 1px 5px; border-radius: 4px; }
+.option { display: grid; gap: 12px; min-width: 0; }
+.option-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.letter { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--primary); color: #fff; font-weight: 700; font-size: 14px; flex: none; align-self: center; }
+.verdict { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.verdict > div { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 13px; min-width: 0; }
+.verdict b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+.verdict ul { padding-left: 16px; display: grid; gap: 3px; }
+@media (max-width: 720px) { .verdict { grid-template-columns: 1fr; } }
+
+/* the proposal table */
+.tbl-wrap { overflow-x: auto; min-width: 0; }
+.spec { border-collapse: collapse; width: 100%; min-width: 880px; font-size: 13px; }
+.spec th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 600; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.spec td { padding: 10px 12px 10px 0; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+.spec tr:last-child td { border-bottom: none; }
+.spec td:first-child { font-weight: 700; white-space: nowrap; }
+.spec .eg { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.spec .sw { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: 0; }
+.rules { counter-reset: r; }
+.rules li { list-style: none; counter-increment: r; display: grid; grid-template-columns: 26px 1fr; gap: 8px; }
+.rules li::before { content: counter(r); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; }
+.qs { counter-reset: q; display: grid; gap: 12px; padding-left: 0 !important; }
+.qs li { list-style: none; counter-increment: q; display: grid; grid-template-columns: 26px 1fr; gap: 8px; }
+.qs li::before { content: counter(q); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; }
+
+/* ---- the app's Overview look (from styles.css .ov-*) ---- */
+.ov-section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px 18px; display: grid; gap: 0; min-width: 0; }
+.ov-section h3 { font-size: 15px; margin-bottom: 2px; }
+.ov-section-sub { font-size: 12px; color: var(--muted); margin-bottom: 4px; max-width: 760px; }
+.ov-muted { color: var(--muted); }
+.btn { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+.btn:hover { background: var(--hover-tint); }
+.btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn:focus-visible, .ov-band:focus-visible, .ov-cal-cell:focus-visible, .ov-flagrow:focus-visible, .ov-person-link:focus-visible, .ov-linkbtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-trend-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.ov-linkbtn { font: inherit; font-size: 12.5px; padding: 0; border: 0; background: none; color: var(--primary-text); font-weight: 600; cursor: pointer; text-decoration: underline; }
+.ov-hchart { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border); min-width: 0; }
+.ov-hchart-head { font-size: 13px; margin-bottom: 4px; }
+.ov-hchart-head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.ov-spread-sum { margin: 2px 0 6px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ov-spread-axis { margin: 4px 0 0; font-size: 11.5px; }
+.ov-bands-wrap { position: relative; }
+.ov-bands { display: grid; align-items: start; }
+.ov-band { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; margin: 0 3px; padding: 4px 0 2px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text); font: inherit; cursor: pointer; }
+.ov-band:hover { background: var(--hover-tint); }
+.ov-band[aria-pressed="true"] { border-color: var(--primary-text); background: var(--hover-tint); }
+.ov-band-n { height: 16px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ov-curve { position: absolute; left: 0; top: 24px; width: 100%; height: 86px; pointer-events: none; overflow: visible; }
+.ov-curve-base { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ov-curve-area { fill: var(--chart-assigned); opacity: .16; }
+.ov-curve-line { fill: none; stroke: var(--chart-assigned); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.ov-band-pt { position: relative; display: block; width: 100%; height: 86px; }
+.ov-band-pt i { position: absolute; left: 50%; width: 10px; height: 10px; margin: 0 0 0 -5px; border-radius: 50%; background: var(--chart-assigned); box-shadow: 0 0 0 2px var(--panel); transform: translateY(1px); }
+.ov-band-l { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-band-median .ov-band-pt i { background: var(--primary-text); }
+.ov-band-median .ov-band-l { color: var(--primary-text); font-weight: 700; }
+.ov-band-median .ov-band-l::after { content: "▲"; display: block; font-size: 8px; line-height: 1; margin-top: 1px; }
+.tone-warn .ov-band-pt i { background: var(--leave-annual); }
+.tone-warn .ov-band-l { color: var(--warn-fg); font-weight: 700; }
+.tone-bad .ov-band-pt i { background: var(--chart-standby); }
+.tone-bad .ov-band-l { color: var(--bad-fg); font-weight: 700; }
+.ov-chart { width: 100%; min-width: 0; }
+.ov-chart svg { display: block; width: 100%; }
+.ov-chart text { font-family: var(--font-ui); font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.ov-chart rect[data-act] { cursor: pointer; }
+.ov-chart rect[data-act]:hover { fill: rgba(0, 58, 102, .07); }
+.ov-chart rect[data-act]:focus-visible { outline: 2px solid var(--primary); }
+.ov-legend { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 4px 0 2px; font-size: 12px; }
+.ov-lv-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); font-variant-numeric: tabular-nums; }
+.ov-lv-chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.ov-lv-chip small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+/* alerts: one row per flag */
+.ov-flagrows { display: grid; gap: 4px; margin-top: 4px; }
+.ov-flagrow { display: grid; grid-template-columns: minmax(130px, 200px) minmax(0, 1fr) 150px; align-items: center; gap: 10px; font: inherit; text-align: left; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
+.ov-flagrow:hover { background: var(--hover-tint); }
+.ov-flagrow[aria-pressed="true"] { border-color: var(--primary-text); background: var(--hover-tint); }
+.ov-flagrow b { font-size: 13px; }
+.ov-flagbar { display: flex; height: 12px; border-radius: 999px; background: #eef0f3; overflow: hidden; }
+.ov-flagbar i { display: block; height: 100%; }
+.ov-flagrow small { color: var(--muted); font-weight: 600; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ov-flagrow .n { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; margin-right: 6px; }
+@media (max-width: 560px) { .ov-flagrow { grid-template-columns: 1fr 1fr; } .ov-flagrow small { grid-column: 1 / -1; } }
+/* calendar */
+.ov-cal-wrap { overflow-x: auto; margin-top: 6px; }
+.ov-cal-month { min-width: 360px; margin-bottom: 8px; }
+.ov-cal-title { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; }
+.ov-cal { display: grid; grid-template-columns: repeat(5, minmax(52px, 1fr)) repeat(2, minmax(28px, .4fr)); gap: 4px; }
+.ov-cal-dow { font-size: 11px; font-weight: 600; color: var(--muted); padding: 0 4px; }
+.ov-cal-cell { min-height: 54px; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; display: grid; grid-template-rows: auto 1fr; font: inherit; font-variant-numeric: tabular-nums; text-align: left; color: var(--text); }
+button.ov-cal-cell { cursor: pointer; }
+button.ov-cal-cell:hover { border-color: var(--primary-text); }
+.ov-cal-cell[aria-pressed="true"] { border-color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-text); }
+.ov-cal-blank { border: none; }
+.ov-cal-off { background: var(--bg); border-style: dashed; color: var(--muted); }
+.ov-cal-d { font-size: 11px; font-weight: 600; color: var(--muted); }
+.ov-cal-why { font-size: 10px; color: var(--muted); }
+.ov-cal-n { font-size: 17px; font-weight: 700; align-self: center; }
+.ov-cal-l0 { background: var(--panel); } .ov-cal-l1 { background: #fdf3d8; } .ov-cal-l2 { background: #fae2a3; } .ov-cal-l3 { background: #f5cb6a; } .ov-cal-l4 { background: #eab33d; }
+.ov-cal-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; color: var(--muted); }
+.ov-cal-key i { width: 16px; height: 10px; border-radius: 3px; border: 1px solid var(--border); }
+/* people bar, filter chip, table */
+.ov-people-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin: 12px 0 2px; }
+.ov-locked { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ov-band-chip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 12.5px; }
+.ov-band-chip > span { padding: 2px 10px; border-radius: 999px; background: var(--hover-tint); font-weight: 600; }
+.ov-table-wrap { overflow-x: auto; margin-top: 10px; }
+.ov-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ov-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); font-weight: 600; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.ov-table td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ov-table tr:last-child td { border-bottom: none; }
+.ov-table th.r, .ov-table td.r { text-align: right; }
+.ov-table td.ov-flags { white-space: normal; min-width: 170px; }
+.ov-person-link { font: inherit; padding: 0; border: 0; background: none; color: var(--primary-text); font-weight: 600; text-align: left; cursor: default; }
+.ov-oc-tag { display: inline-block; margin-left: 4px; padding: 0 4px; border-radius: 4px; font-size: 10.5px; font-weight: 700; color: var(--chart-oncall); background: rgba(235,104,52,.13); }
+.ov-flag { display: inline-block; margin: 1px 2px 1px 0; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.ov-flag-warn { background: var(--warn-bg); color: var(--warn-fg); }
+.ov-flag-bad { background: var(--bad-bg); color: var(--bad-fg); }
+.ov-share { display: inline-block; min-width: 46px; text-align: center; font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.ov-share-ok { background: var(--ok-bg); color: var(--ok-fg); } .ov-share-warn { background: var(--warn-bg); color: var(--warn-fg); } .ov-share-bad { background: var(--bad-bg); color: var(--bad-fg); }
+.ov-split { display: inline-flex; width: 120px; height: 9px; border-radius: 999px; overflow: hidden; background: var(--bg); vertical-align: middle; }
+.ov-split i { display: block; height: 100%; }
+.ov-wl-more { margin-top: 10px; justify-self: start; }
+.ov-people-help { margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+.ov-empty { margin-top: 10px; color: var(--muted); font-size: 13px; }
+/* option C: two charts side by side */
+.dual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 22px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border); }
+.dual > div { min-width: 0; }
+.dual .ov-hchart { margin-top: 0; padding-top: 0; border-top: none; }
+@media (max-width: 900px) { .dual { grid-template-columns: 1fr; gap: 16px; } }
+
+#tip { position: fixed; pointer-events: none; z-index: 20; background: #1f2937; color: #fff; font-size: 12px; line-height: 1.4; padding: 6px 9px; border-radius: 6px; max-width: 260px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+#tip b { display: block; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="tags"><span class="tag">Overview → People</span><span class="tag">Sample data · October 2026 · 206 people · 20 working days</span></div>
+    <h1>The People chart follows the chip</h1>
+    <p class="lede">Today the chart in People always shows Workload spread. This page shows what it could show for each chip (Workload, Leave, Nights, On-call, Alerts only), in three layouts to choose from. Every mockup is live: pick a chip, switch a view, then click a band, a day or a flag and the table filters.</p>
+    <nav class="jump" aria-label="Sections"><a href="#today">What it does today</a><a href="#proposal">What each chip shows</a><a href="#opt-a">A</a><a href="#opt-b">B</a><a href="#opt-c">C</a><a href="#decide">Decisions</a></nav>
+  </header>
+
+  <section class="panel" id="today">
+    <h2>What People does today</h2>
+    <ul>
+      <li><b>The chips only change the table</b>: its columns, its sort and its filter. The chart above them never changes.</li>
+      <li><b>The chart sits above the chips</b>, so it reads as the section's header, not as something a chip controls.</li>
+      <li><b>Two "who" switches.</b> Permanent / On-call on the chart, Everyone / Permanent / On-call on the table. Clicking a band copies the chart's group into the table.</li>
+      <li><b>Chart-like lines sit between the chips and the table</b>: the On-call chip's "days called in: median, never called in" and the Nights chip's "N people share the nights".</li>
+      <li><b>History already draws</b> leave per day (with the Calendar) and on-call per day. People can reuse that drawing for the people in scope.</li>
+      <li><b>The data is already loaded.</b> Who was on leave, who worked, who worked nights and who was on call each day all come from History's fetch. No new query and no database change.</li>
+      <li><b>One trap for On-call.</b> For on-call people, "share called in" and "share worked" differ only by their leave, so a straight copy of the workload curve would look the same. The On-call chart divides by available days (working days less leave) and gives "never called in" its own bar.</li>
+    </ul>
+  </section>
+
+  <section class="panel rec-panel" id="proposal">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h2>What each chip shows</h2><span class="tag rec">The same in all three layouts</span></div>
+    <p class="muted">The headline column is worked out from the sample data below. The layouts differ only in how the second view is reached.</p>
+    <div class="tbl-wrap"><table class="spec" id="spec-table"></table></div>
+    <h3 style="margin-top:6px">The same rules for every chart</h3>
+    <ul class="rules">
+      <li><span><b>One scope.</b> The Who switch (Everyone, Permanent, On-call) scopes the chart and the table together. The On-call chip sets it to On-call and hides it.</span></li>
+      <li><span><b>A headline line above each chart</b> carries the numbers that sit above the table today.</span></li>
+      <li><span><b>Click to filter.</b> A band, a day or a flag filters the table. A chip names the filter, with Clear. A day also offers "Open that day's board", the click History already has.</span></li>
+      <li><span><b>The app's colours.</b> Blue for worked, orange for on-call, the four leave-type colours, amber above 20% and red above 30% leave share.</span></li>
+      <li><span><b>The table stays as it is</b>: columns per chip, sorting, flags, a name opens the profile. Per-person figures stay behind the Overview History permission.</span></li>
+    </ul>
+  </section>
+
+  <!-- ===================== OPTION A ===================== -->
+  <section class="option" id="opt-a">
+    <div class="option-head"><span class="letter">A</span><h2>One chart per chip</h2><span class="tag rec">Recommended</span></div>
+    <p class="muted">The chip picks the chart. Where a second view answers a different question it is one small switch in the chart header: Leave has <b>Over time · Calendar · Spread</b> (it opens on Over time), On-call has <b>Spread · Per day</b>. Workload, Nights and Alerts show one chart.</p>
+    <div class="ov-section mock" id="mock-a"></div>
+    <div class="verdict">
+      <div><b>Good for</b><ul><li>It is what you described: Leave shows leave over the period with a Calendar, On-call shows the call-in spread.</li><li>Least on screen. A switch only appears where it earns its place.</li><li>The day-by-day charts that History already has are not repeated for Workload.</li></ul></div>
+      <div><b>Watch out</b><ul><li>Leave opens on "when" while the other chips open on "who". That follows the question each chip asks.</li><li>Nights and Alerts have no time view.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ===================== OPTION B ===================== -->
+  <section class="option" id="opt-b">
+    <div class="option-head"><span class="letter">B</span><h2>Spread and Over time on every chip</h2></div>
+    <p class="muted">The same switch on all five chips: <b>Spread · Over time</b> (Alerts says <b>By flag · Over time</b>), and Leave adds <b>Calendar</b>. Every chip can answer "who" and "when". Each opens on the view that fits its question.</p>
+    <div class="ov-section mock" id="mock-b"></div>
+    <div class="verdict">
+      <div><b>Good for</b><ul><li>One habit to learn. Every chip behaves the same way.</li><li>Any chip can answer "when did it happen", for example nights per day or the days people were on a long run.</li></ul></div>
+      <div><b>Watch out</b><ul><li>Workload's Over time repeats History's Deployed / day.</li><li>Ten charts to build, translate and test instead of seven.</li><li>The extra switch is on screen even where nobody will use it.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ===================== OPTION C ===================== -->
+  <section class="option" id="opt-c">
+    <div class="option-head"><span class="letter">C</span><h2>Both charts at once</h2></div>
+    <p class="muted">Two panels side by side: <b>who</b> (the spread) on the left, <b>when</b> (per day, with Chart | Calendar for Leave) on the right. No switch to find. On a phone the panels stack.</p>
+    <div class="ov-section mock" id="mock-c"></div>
+    <div class="verdict">
+      <div><b>Good for</b><ul><li>Nothing is hidden behind a switch. A band and a day are both one click away.</li><li>Reads like a small dashboard for the chip.</li></ul></div>
+      <div><b>Watch out</b><ul><li>Each chart gets half the width. The calendar and the 11 on-call bands are tight.</li><li>It doubles the chart height on a phone, and the table starts further down.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="panel" id="decide">
+    <h2>Decisions for you</h2>
+    <p class="muted">The first answer in each line is my recommendation.</p>
+    <ol class="qs">
+      <li><div><b>Layout.</b> <span class="tag rec">A</span> A is the least to build and the closest to your description. B is more uniform, C shows everything at once. If you pick A and later want a time view for Nights, B's switch is a small step.</div></li>
+      <li><div><b>Chips above the chart.</b> <span class="tag rec">Yes</span> The chips move above the chart so they clearly drive both the chart and the table. The chart stops being the section's fixed header.</div></li>
+      <li><div><b>One Who switch.</b> <span class="tag rec">Yes</span> Everyone / Permanent / On-call scopes the chart and the table. With Everyone the spread is one combined curve. The alternative, two curves (permanent and on-call), is richer but busier.</div></li>
+      <li><div><b>Leave over time, in People and in History.</b> <span class="tag rec">Keep both</span> They use the same drawing. History shows leave for the board scope. People shows it for the Who scope, and a day click filters the table. History's day click still opens the board.</div></li>
+      <li><div><b>On-call spread.</b> <span class="tag rec">Available days</span> The bands use called in ÷ available days (working days less leave), with "Never" as its own red bar. Dividing by working days would repeat the Workload chart.</div></li>
+      <li><div><b>Alerts chart.</b> <span class="tag rec">Bars by flag</span> One bar per flag, split amber and red, and a click shows those people. The other choice is no chart for Alerts: the table stays the only view.</div></li>
+    </ol>
+  </section>
+
+  <section class="panel">
+    <h2>What it takes to build</h2>
+    <ul>
+      <li>Turn <code>peopleSpread</code> from ten fixed bands into one function that takes a list of bands (label, tone, count). Workload, Leave, Nights and On-call all use it.</li>
+      <li>Replace <code>pplBand</code> with one pick: a band, a day or a flag, shown as a chip with Clear.</li>
+      <li>Leave and on-call per day: call the History drawing code (<code>historyLeaveView</code>, <code>historyLeaveCalendar</code>, <code>historyOncallView</code>) with the people in scope. History's day records already hold <code>leaveEmp</code>, <code>oncallEmp</code>, <code>workEmp</code> and <code>nightEmp</code> per person.</li>
+      <li>The flag bars are the one new drawing.</li>
+      <li>Thai text for each new string, and tests in <code>tests/e2e/overview-people.e2e.js</code>.</li>
+      <li>No new query, no migration. A is about one pull request. B and C add the extra charts.</li>
+    </ul>
+  </section>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+/*DATA-START*/
+/* ---------- sample data: October 2026, 104 permanent + 102 on-call ---------- */
+let seed = 20261105;
+const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+const pick = (a) => a[Math.floor(rnd() * a.length)];
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sum = (a) => a.reduce((x, y) => x + y, 0);
+const DOWN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const HOL = { 13: "Holiday", 23: "Holiday" };
+const CAL = [];
+for (let d = 1; d <= 31; d++) {
+  const dow = new Date(Date.UTC(2026, 9, d)).getUTCDay();
+  CAL.push({ d, dow, working: dow > 0 && dow < 6 && !HOL[d], hol: HOL[d] || "" });
+}
+const WDAYS = CAL.filter(c => c.working);
+const NW = WDAYS.length;                                  // 20
+const T = {}; WDAYS.forEach((c, i) => { T[c.d] = i; });
+const BRIDGE = [12, 14, 22, 26].map(d => T[d]);           // next to a holiday
+const SICKWAVE = [19, 20].map(d => T[d]);
+const LT = [
+  { key: "annual", label: "Annual", color: "#eda100" }, { key: "sick", label: "Sick", color: "#e87ba4" },
+  { key: "business", label: "Business", color: "#4a3aa7" }, { key: "unpaid", label: "Unpaid", color: "#7b8794" },
+];
+const FIRST = ["ธนกร","วีรภัทร","ปิยะพงษ์","สุรเชษฐ์","อนุชา","ณัฐวุฒิ","พงศกร","ชัยวัฒน์","กิตติศักดิ์","ภานุพงศ์","ศุภชัย","อภิชาติ","เทวฤทธิ์","นพดล","ปรเมษฐ์","วรวุฒิ","สมพร","จิราพร","พัชรี","รัตนา","กนกวรรณ","สุภาพร","อรอุมา","ศิริพร","ณัฐธิดา","ปรียา","มณีรัตน์","วิภา","ธัญญา","เบญจวรรณ","ชลธิชา","นิตยา","ประภาส","บุญเลิศ","สมศักดิ์","ไพโรจน์"];
+const SUR = ["ใจดี","แก้วมณี","ศรีสุข","บุญมา","วงศ์ใหญ่","ทองคำ","มั่นคง","เพชรรัตน์","สุขสวัสดิ์","รุ่งเรือง","ศรีวิชัย","คำภู","ชัยมงคล","พิมพ์ทอง","อินทร์แก้ว","สายทอง","แสงจันทร์","ดวงดี","เจริญสุข","พูนทรัพย์","ทิพย์รัตน์","ศรีทอง","วัฒนกุล","สมบัติ","จันทร์เพ็ญ","บัวผัน","ขำเจริญ","นาคแก้ว","รอดพ้น","สีสด","โพธิ์ทอง","กล้าหาญ","เกษมสุข","ปานทอง","สุวรรณ","อุดมผล","ธีรกุล","ภู่ระย้า","มีสุข","ลาภเลิศ","ใสสะอาด","จินดา","เรืองศรี","แสนดี"];
+const usedNames = new Set();
+function nameFor(i) {
+  for (let j = 0; ; j++) {
+    const nm = `${FIRST[(i * 5 + 3) % FIRST.length]} ${SUR[(i * 7 + Math.floor(i / FIRST.length) * 3 + 1 + j) % SUR.length]}`;
+    if (!usedNames.has(nm)) { usedNames.add(nm); return nm; }
+  }
+}
+const wpick = (o) => { let r = rnd(), a = 0; for (const k in o) { a += o[k]; if (r < a) return k; } return Object.keys(o)[0]; };
+const bandList = (counts) => { const o = []; counts.forEach((c, b) => { for (let i = 0; i < c; i++) o.push(b); }); return shuffle(o); };
+// people per 10% band of working days worked: the on-call curve is the one in the screenshot (102 people)
+const BANDS_PERM = [1, 0, 1, 1, 2, 3, 6, 12, 28, 50];
+const BANDS_OC = [5, 1, 1, 0, 3, 8, 11, 10, 35, 28];
+
+function genPerson(oncall, band) {
+  const joiner = rnd() < .07, s = joiner ? ri(4, 14) : 0, n = NW - s;
+  const lo = band * 10, hi = band === 9 ? 100 : band * 10 + 9.99;
+  let k = Math.max(0, Math.min(n, Math.round(n * (lo + rnd() * (hi - lo)) / 100)));
+  if (oncall && band === 0) k = rnd() < .6 ? 0 : 1;
+  const st = Array.from({ length: NW }, (_, t) => (t < s ? null : "W"));
+  const room = n - k;
+  let l = 0;
+  if (room > 0) {
+    if (oncall) { if (rnd() < .28) l = Math.min(room, ri(1, 3)); }
+    else if (room >= 6 && rnd() < .5) l = ri(6, Math.min(room, 10));
+    else if (rnd() < .6) l = Math.min(room, pick([1, 1, 1, 2, 2, 2, 3, 3, 4, 5, 6, 8]));
+  }
+  const blocks = [];
+  for (let left = l; left > 0;) {
+    const type = wpick({ annual: .55, sick: .25, business: .12, unpaid: .08 });
+    const m = Math.min(left, ri(1, type === "sick" ? 2 : 5));
+    blocks.push([type, m]); left -= m;
+  }
+  for (const [type, m] of blocks) {
+    let placed = false;
+    for (let tries = 0; tries < 40 && !placed; tries++) {
+      let a;
+      if (type === "annual" && rnd() < .4) a = pick(BRIDGE);
+      else if (type === "sick" && rnd() < .5) a = pick(SICKWAVE);
+      else a = ri(s, NW - m);
+      if (a < s || a + m > NW) continue;
+      let ok = true; for (let j = 0; j < m; j++) if (st[a + j] !== "W") ok = false;
+      if (ok) { for (let j = 0; j < m; j++) st[a + j] = type; placed = true; }
+    }
+    if (!placed) for (let j = 0; j < m; j++) { const free = st.map((v, t) => (v === "W" ? t : -1)).filter(t => t >= 0); if (free.length) st[pick(free)] = type; }
+  }
+  const ws = []; st.forEach((v, t) => { if (v === "W") ws.push(t); });
+  shuffle(ws).slice(0, Math.max(0, ws.length - k)).forEach(t => { st[t] = "S"; });
+  const wk = new Set();
+  if (k >= 14 && rnd() < .3) {
+    for (const d of shuffle([3, 10, 17, 24, 31]).slice(0, ri(1, 2))) { wk.add(d); if (d < 31 && rnd() < .45) wk.add(d + 1); }
+  }
+  const kk = st.filter(v => v === "W").length;
+  return { oncall, st, wk, s, k: kk, nightOn: Array(NW).fill(false), newcomer: rnd() < .09 ? Math.min(kk, ri(1, 6)) : 0 };
+}
+const RAW = shuffle([...bandList(BANDS_PERM).map(b => genPerson(false, b)), ...bandList(BANDS_OC).map(b => genPerson(true, b))]);
+// nights: few people carry most of them
+[10, 9, 7, 7, 6, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1].forEach((nt) => {
+  let c = RAW.filter(p => p.k >= nt && !p.hasNights);
+  if (nt >= 5) { const tight = c.filter(p => p.k <= nt * 2); if (tight.length) c = tight; }
+  const p = pick(c); p.hasNights = true;
+  const slots = []; p.st.forEach((v, t) => { if (v === "W") slots.push(t); });
+  shuffle(slots).slice(0, nt).forEach(t => { p.nightOn[t] = true; });
+});
+function flagsOf(p) {
+  const f = [];
+  if (p.run && p.run.len >= 7) f.push({ key: "run", level: p.run.len >= 10 ? "bad" : "warn" });
+  if (p.nights >= 5 && p.nightShare >= 50) f.push({ key: "nights", level: "warn" });
+  if (p.leaveShare > 30) f.push({ key: "leave", level: "bad" });
+  if (p.oncall && p.calledIn === 0 && p.available > 0) f.push({ key: "never", level: "warn" });
+  if (p.newcomer > 0) f.push({ key: "newcomer", level: "warn" });
+  return f;
+}
+const PEOPLE = RAW.map((r, i) => {
+  const working = NW - r.s;
+  const worked = r.k, leave = r.st.filter(v => v && v !== "W" && v !== "S").length, sick = r.st.filter(v => v === "sick").length;
+  const nights = r.nightOn.filter(Boolean).length;
+  const streak = {}; let cur = 0, best = null;
+  for (const c of CAL) {
+    const w = c.working ? r.st[T[c.d]] === "W" : (!c.hol && r.wk.has(c.d));
+    cur = w ? cur + 1 : 0; streak[c.d] = cur;
+    if (w && (!best || cur > best.len)) best = { len: cur, end: c.d };
+  }
+  const run = best ? { len: best.len, start: best.end - best.len + 1, end: best.end, ongoing: best.end === 31 } : null;
+  const p = { id: i, name: nameFor(i), oncall: r.oncall, st: r.st, nightOn: r.nightOn, newcomer: r.newcomer,
+    working, worked, leave, sick, nights, run, streakAt: WDAYS.map(c => streak[c.d]),
+    workedShare: working ? worked / working * 100 : 0, leaveShare: working ? leave / working * 100 : 0,
+    nightShare: worked ? nights / worked * 100 : 0, available: working - leave };
+  p.calledIn = r.oncall ? worked : null;
+  p.callShare = r.oncall && p.available > 0 ? worked / p.available * 100 : 0;
+  p.other = Math.max(0, working - worked - leave);
+  p.flags = flagsOf(p);
+  return p;
+}).filter(p => p.working > 0);
+/*DATA-END*/
+
+/* ---------- helpers ---------- */
+const enc = encodeURIComponent;
+const fmt1 = (x) => (Math.round(x * 10) / 10).toFixed(1);
+const dayName = (t) => { const c = WDAYS[t]; return `${DOWN[c.dow]} ${c.d} Oct`; };
+const median = (arr) => { const a = arr.slice().sort((x, y) => x - y), m = a.length >> 1; return !a.length ? 0 : a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+const whoFn = (w) => (p) => w === "all" || (w === "oncall") === p.oncall;
+const leaveType = (v) => (v && v !== "W" && v !== "S" ? v : null);
+const perDay = (rows, fn) => WDAYS.map((_, t) => rows.reduce((a, p) => a + (fn(p, t) ? 1 : 0), 0));
+const mean1 = (v) => fmt1(sum(v) / (v.length || 1));
+
+/* ---------- bands: one definition per spread ---------- */
+const BANDF = {
+  workload: (p) => Math.min(9, Math.floor(p.worked * 10 / p.working)),
+  leave: (p) => { const s = p.leaveShare; return s === 0 ? -1 : s <= 10 ? 0 : s <= 20 ? 1 : s <= 30 ? 2 : s <= 50 ? 3 : 4; },
+  nights: (p) => (p.nights === 0 ? -1 : p.nights <= 2 ? 0 : p.nights <= 4 ? 1 : p.nights <= 6 ? 2 : p.nights <= 9 ? 3 : 4),
+  oncall: (p) => (p.calledIn === 0 ? 0 : Math.min(10, 1 + Math.floor(p.callShare / 10))),
+};
+const SPREAD = {
+  workload: { n: 10, axis: (i) => `${i * 10}${i === 9 ? "+" : ""}`, name: (i) => (i === 9 ? "90–100%" : `${i * 10}–${i * 10 + 9}%`), tone: () => "", what: "of working days on a mission", filt: "Share worked", unit: "people", hasMedian: true },
+  leave: { n: 5, axis: (i) => ["≤10%", "10–20%", "20–30%", "30–50%", ">50%"][i], name: (i) => ["up to 10%", "10–20%", "20–30%", "30–50%", "over 50%"][i], tone: (i) => (i === 2 ? "warn" : i >= 3 ? "bad" : ""), what: "of working days on leave", filt: "Leave share", unit: "people" },
+  nights: { n: 5, axis: (i) => ["1–2", "3–4", "5–6", "7–9", "10+"][i], name: (i) => ["1–2 nights", "3–4 nights", "5–6 nights", "7–9 nights", "10 or more nights"][i], tone: () => "", what: "worked", filt: "Nights", unit: "people" },
+  oncall: { n: 11, axis: (i) => (i === 0 ? "0" : i === 1 ? "<10" : `${(i - 1) * 10}${i === 10 ? "+" : ""}`), name: (i) => (i === 0 ? "never called in" : i === 1 ? "under 10% of available days" : i === 10 ? "90–100% of available days" : `${(i - 1) * 10}–${(i - 1) * 10 + 9}% of available days`), tone: (i) => (i === 0 ? "bad" : ""), what: "called in", filt: "Share called in", unit: "people", hasMedian: true },
+};
+const bandCounts = (chip, rows) => { const c = Array(SPREAD[chip].n).fill(0); rows.forEach(p => { const b = BANDF[chip](p); if (b >= 0) c[b]++; }); return c; };
+
+/* a smooth path through points (the app's spreadCurve: a monotone cubic) */
+function curvePath(pts) {
+  const n = pts.length;
+  if (n < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : "";
+  const dx = [], sl = [];
+  for (let i = 0; i < n - 1; i++) { dx.push(pts[i + 1][0] - pts[i][0]); sl.push((pts[i + 1][1] - pts[i][1]) / dx[i]); }
+  const t = [sl[0]];
+  for (let i = 1; i < n - 1; i++) t.push(sl[i - 1] * sl[i] <= 0 ? 0 : (sl[i - 1] + sl[i]) / 2);
+  t.push(sl[n - 2]);
+  for (let i = 0; i < n - 1; i++) {
+    if (sl[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / sl[i], b = t[i + 1] / sl[i], h = Math.hypot(a, b);
+    if (h > 3) { t[i] = (3 * a / h) * sl[i]; t[i + 1] = (3 * b / h) * sl[i]; }
+  }
+  const f = (v) => +v.toFixed(2);
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+  for (let i = 0; i < n - 1; i++) { const w = dx[i] / 3; d += ` C${f(pts[i][0] + w)},${f(pts[i][1] + t[i] * w)} ${f(pts[i + 1][0] - w)},${f(pts[i + 1][1] - t[i + 1] * w)} ${f(pts[i + 1][0])},${f(pts[i + 1][1])}`; }
+  return d;
+}
+
+function spreadHTML(S, chip, rows) {
+  const sp = SPREAD[chip], counts = bandCounts(chip, rows), max = Math.max(1, ...counts);
+  const yOf = (n) => 82 - (n / max) * 74;
+  const curve = curvePath(counts.map((n, i) => [(i + .5) * 100 / sp.n, yOf(n)]));
+  const x0 = (.5 * 100 / sp.n), x1 = ((sp.n - .5) * 100 / sp.n);
+  let medBand = -1;
+  if (sp.hasMedian && rows.length) medBand = chip === "oncall" ? BANDF.oncall({ calledIn: 1, callShare: median(rows.map(p => p.callShare)) }) : Math.min(9, Math.floor(median(rows.map(p => p.workedShare)) / 10));
+  const btns = counts.map((n, i) => {
+    const on = S.sel && S.sel.k === "band" && S.sel.i === i;
+    const tip = `<b>${n} ${n === 1 ? "person" : "people"}</b>${chip === "leave" ? "Leave: " : chip === "nights" ? "" : ""}${sp.name(i)}${chip === "workload" || chip === "leave" ? " " + sp.what : chip === "nights" ? " " + sp.what : ""}${i === medBand ? " · median" : ""}`;
+    return `<button type="button" class="ov-band chart-mark tone-${sp.tone(i) || "none"}${i === medBand ? " ov-band-median" : ""}" data-act="band" data-i="${i}" aria-pressed="${on}" data-tip="${enc(tip)}" aria-label="${sp.name(i)}: ${n} ${n === 1 ? "person" : "people"}">
+      <span class="ov-band-n">${n || ""}</span><span class="ov-band-pt"><i style="bottom:${((n / max) * 74).toFixed(1)}px"></i></span><span class="ov-band-l">${sp.axis(i)}</span></button>`;
+  }).join("");
+  return `<div class="ov-bands-wrap"><svg class="ov-curve" viewBox="0 0 100 86" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line class="ov-curve-base" x1="0" y1="82" x2="100" y2="82"/><path class="ov-curve-area" d="${curve} L${x1},82 L${x0},82 Z"/><path class="ov-curve-line" d="${curve}"/></svg>
+    <div class="ov-bands" style="grid-template-columns:repeat(${sp.n},minmax(0,1fr))">${btns}</div></div>`;
+}
+
+/* ---------- columns per day (the app's column chart, on one scale) ---------- */
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))); for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw) return m * p; return 10 * p; }
+function colsSVG(W, o) {
+  const h = o.h || 200, padL = 34, padR = 58, padT = 14, padB = 22, ih = h - padT - padB, N = NW;
+  const tot = Array.from({ length: N }, (_, i) => sum(o.stacks.map(s => s.vals[i])));
+  const top = Math.max(1, ...tot, ...(o.ghost || []));
+  const step = niceStep(top / 4), yMax = step * Math.ceil(top / step - 1e-9);
+  const band = (W - padL - padR) / N, bw = Math.max(4, band * .62), y = (v) => padT + ih * (1 - v / yMax);
+  const every = band < 22 ? 2 : 1;
+  let s = "";
+  for (let v = 0; v <= yMax + 1e-9; v += step) s += `<line x1="${padL}" x2="${W - padR + 4}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end">${+v.toFixed(1)}</text>`;
+  WDAYS.forEach((c, i) => {
+    const xb = padL + i * band, x = xb + (band - bw) / 2;
+    if (o.sel === i) s += `<rect x="${xb}" y="${padT}" width="${band}" height="${ih}" rx="4" fill="var(--hover-tint)" stroke="var(--primary-text)" stroke-width="1.5"/>`;
+    if (o.ghost) s += `<rect x="${x}" y="${y(o.ghost[i])}" width="${bw}" height="${y(0) - y(o.ghost[i])}" rx="2" fill="${o.ghostColor || "var(--oncall-ghost)"}"/>`;
+    let acc = 0;
+    for (const st of o.stacks) { const v = st.vals[i]; if (!v) continue; s += `<rect x="${x}" y="${y(acc + v)}" width="${bw}" height="${y(acc) - y(acc + v)}" fill="${st.color}" stroke="#fff" stroke-width=".8"/>`; acc += v; }
+    if (i % every === 0) s += `<text x="${x + bw / 2}" y="${h - 6}" text-anchor="middle">${c.d}</text>`;
+    s += `<rect x="${xb}" y="${padT}" width="${band}" height="${ih}" fill="transparent" tabindex="0" role="button" aria-label="${dayName(i)}" data-act="day" data-t="${i}" data-tip="${enc(o.tip(i))}"/>`;
+  });
+  if (o.avg != null) s += `<line x1="${padL}" x2="${W - padR + 4}" y1="${y(o.avg)}" y2="${y(o.avg)}" stroke="var(--muted)" stroke-dasharray="4 3"/><text x="${W - padR + 8}" y="${y(o.avg) + 4}" style="fill:var(--text);font-weight:600">avg ${fmt1(o.avg)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${h}" height="${h}" role="group" aria-label="${o.label}">${s}</svg>`;
+}
+const tipL = (title, rows) => `<b>${title}</b>` + rows.map(([k, v, c]) => `${c ? `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;background:${c}"></span>` : ""}${k}: ${v}`).join("<br>");
+
+/* ---------- the leave calendar (the History one, for the people in scope) ---------- */
+function calHTML(S, rows) {
+  const counts = perDay(rows, (p, t) => leaveType(p.st[t]));
+  const mx = Math.max(1, ...counts);
+  const lead = (new Date(Date.UTC(2026, 9, 1)).getUTCDay() + 6) % 7;
+  let h = `<div class="ov-cal-wrap"><div class="ov-cal-month"><div class="ov-cal-title">October 2026</div><div class="ov-cal">${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => `<div class="ov-cal-dow">${d}</div>`).join("")}`;
+  for (let i = 0; i < lead; i++) h += `<div class="ov-cal-cell ov-cal-blank"></div>`;
+  for (const c of CAL) {
+    if (!c.working) { h += `<div class="ov-cal-cell ov-cal-off"><span class="ov-cal-d">${c.d}</span>${c.hol ? `<span class="ov-cal-why">${c.hol}</span>` : ""}</div>`; continue; }
+    const t = T[c.d], n = counts[t], lvl = n ? Math.min(4, Math.ceil(n / mx * 4)) : 0;
+    const on = S.sel && S.sel.k === "day" && S.sel.t === t;
+    const parts = LT.map(z => [z.label, rows.filter(p => p.st[t] === z.key).length, z.color]).filter(x => x[1]);
+    h += `<button type="button" class="ov-cal-cell ov-cal-l${lvl}" aria-pressed="${on}" data-act="day" data-t="${t}" data-tip="${enc(tipL(`${dayName(t)} · ${n} on leave`, parts))}" aria-label="${dayName(t)}: ${n} on leave"><span class="ov-cal-d">${c.d}</span><span class="ov-cal-n">${n}</span></button>`;
+  }
+  return h + `</div></div><div class="ov-cal-key"><span>Fewer</span>${[0, 1, 2, 3, 4].map(l => `<i class="ov-cal-l${l}"></i>`).join("")}<span>More on leave</span></div></div>`;
+}
+
+/* ---------- alerts: one row per flag ---------- */
+const FLAGS = [
+  { key: "run", label: "7+ days in a row", pill: (p) => `${p.run.len} in a row${p.run.ongoing ? " · still going" : ""}`, tip: "Calendar days, weekends and holidays included. Red from 10." },
+  { key: "nights", label: "Mostly nights", pill: () => "mostly nights", tip: "5+ nights and at least half of the days worked." },
+  { key: "leave", label: "Leave above 30%", pill: () => "leave > 30%", tip: "Leave share above 30% of working days." },
+  { key: "never", label: "Never called in", pill: () => "never called in", tip: "On-call, on the roster, not called in once." },
+  { key: "newcomer", label: "Newcomer-only mission", pill: () => "newcomer-only mission", tip: "On a mission where everyone had under 1 year of service." },
+];
+function flagRows(rows) {
+  return FLAGS.map(f => {
+    const have = rows.filter(p => p.flags.some(x => x.key === f.key));
+    const bad = have.filter(p => p.flags.find(x => x.key === f.key).level === "bad").length;
+    return { ...f, n: have.length, bad, warn: have.length - bad };
+  });
+}
+function flagsHTML(S, rows) {
+  const fr = flagRows(rows), max = Math.max(1, ...fr.map(f => f.n));
+  return `<div class="ov-flagrows">${fr.map(f => {
+    const on = S.sel && S.sel.k === "flag" && S.sel.key === f.key;
+    return `<button type="button" class="ov-flagrow" data-act="flag" data-key="${f.key}" aria-pressed="${on}" data-tip="${enc(`<b>${f.n} ${f.n === 1 ? "person" : "people"}</b>${f.tip}`)}">
+      <b>${f.label}</b><span class="ov-flagbar" aria-hidden="true"><i style="width:${f.warn / max * 100}%;background:var(--leave-annual)"></i><i style="width:${f.bad / max * 100}%;background:var(--chart-standby)"></i></span>
+      <span><span class="n">${f.n}</span><small>${f.bad ? `${f.warn} amber · ${f.bad} red` : f.n ? "amber" : "none"}</small></span></button>`;
+  }).join("")}</div>`;
+}
+
+/* ---------- what each (chip, view) shows ---------- */
+const CHIPS = [["workload", "Workload"], ["leave", "Leave"], ["nights", "Nights"], ["oncall", "On-call"], ["alerts", "Alerts only"]];
+const VIEWS = { // columns, default sort and the row filter: the app's own quick views
+  workload: { sort: ["wshare", -1], cols: ["name", "working", "worked", "wshare", "nights", "run", "flags"] },
+  leave: { sort: ["share", -1], cols: ["name", "working", "worked", "leave", "ratio", "share", "sick", "split"] },
+  nights: { sort: ["nights", -1], cols: ["name", "worked", "nights", "nshare", "flags"] },
+  oncall: { sort: ["cshare", 1], cols: ["name", "working", "leave", "called", "cshare", "flags"] },
+  alerts: { sort: ["flags", -1], cols: ["name", "worked", "share", "nights", "run", "flags"] },
+};
+const SPREAD_LABEL = { workload: "Spread", leave: "Spread", nights: "Spread", oncall: "Spread", alerts: "By flag" };
+function spreadStats(chip, rows) {
+  const total = rows.length;
+  if (chip === "workload") {
+    const m = median(rows.map(p => p.workedShare));
+    return `Median ${fmt1(m)}% · ${rows.filter(p => p.worked * 10 >= p.working * 9).length} at 90% or more · ${rows.filter(p => p.worked * 2 < p.working).length} under 50%`;
+  }
+  if (chip === "leave") {
+    const took = rows.filter(p => p.leave > 0);
+    return `${total - took.length} took no leave · ${took.length} did · ${rows.filter(p => p.leaveShare > 20).length} above 20% · ${rows.filter(p => p.leaveShare > 30).length} above 30%`;
+  }
+  if (chip === "nights") {
+    const w = rows.filter(p => p.nights > 0).sort((a, b) => b.nights - a.nights), tot = sum(w.map(p => p.nights));
+    if (!tot) return "Nobody worked a night in this range";
+    return `${w.length} people share the ${tot} nights · the top 3 worked ${Math.round(sum(w.slice(0, 3).map(p => p.nights)) / tot * 100)}% of them · ${total - w.length} worked none`;
+  }
+  if (chip === "oncall") {
+    const never = rows.filter(p => p.calledIn === 0).length, d = rows.map(p => p.calledIn).sort((a, b) => a - b);
+    return `Median ${fmt1(median(rows.map(p => p.callShare)))}% of available days called in · ${never ? `${never} never called in` : "everyone was called in"} · ${d[0]}–${d[d.length - 1]} days called in`;
+  }
+  const fl = rows.filter(p => p.flags.length);
+  return `${fl.length} ${fl.length === 1 ? "person has" : "people have"} a flag · ${rows.filter(p => p.flags.length > 1).length} have two or more`;
+}
+function timeStats(chip, rows) {
+  if (chip === "workload") { const w = perDay(rows, (p, t) => p.st[t] === "W"), r = perDay(rows, (p, t) => p.st[t] !== null); return `${mean1(w)} of ${mean1(r)} people on a mission each day`; }
+  if (chip === "leave") {
+    const c = perDay(rows, (p, t) => leaveType(p.st[t])), pk = c.indexOf(Math.max(...c)), days = sum(c), ppl = rows.filter(p => p.leave > 0).length;
+    return `${days} leave days · ${ppl} of ${rows.length} people took leave · busiest ${dayName(pk)} (${c[pk]})`;
+  }
+  if (chip === "nights") { const c = perDay(rows, (p, t) => p.nightOn[t]), pk = c.indexOf(Math.max(...c)); return `${mean1(c)} people on nights a day · busiest ${dayName(pk)} (${c[pk]})`; }
+  if (chip === "oncall") {
+    const called = perDay(rows, (p, t) => p.st[t] === "W"), avail = perDay(rows, (p, t) => p.st[t] === "W" || p.st[t] === "S");
+    const allDays = sum(PEOPLE.map(p => p.worked));
+    return `Called in on ${Math.round(sum(called) / sum(avail) * 100)}% of the available on-call days · ${Math.round(sum(called) / allDays * 100)}% of the person-days on missions`;
+  }
+  const c = perDay(rows, (p, t) => p.streakAt[t] >= 7), pk = c.indexOf(Math.max(...c)); return `Most on a run of 7+ days: ${c[pk]} on ${dayName(pk)}`;
+}
+
+/* a chart panel: heading, headline, the drawing, a note. `draws` collects what needs the container's width */
+function chartPanel(S, chip, view, rows, uid, draws, h) {
+  let title, sub, headline, body = "", note = "", legend = "";
+  const box = (cls) => `<div class="ov-chart" id="${uid}"></div>`;
+  if (view === "spread") {
+    if (chip === "alerts") { title = "Alerts by flag"; sub = "people with each flag"; headline = spreadStats(chip, rows); body = flagsHTML(S, rows); note = "A flag is amber until it passes its red limit. Click a flag to filter the table."; }
+    else {
+      const sp = SPREAD[chip];
+      title = { workload: "Workload spread", leave: "Leave spread", nights: "Nights spread", oncall: "Call-in spread" }[chip];
+      sub = { workload: "people by share of working days on a mission", leave: "people by share of working days on leave", nights: "people by nights worked", oncall: "on-call people by share of available days called in" }[chip];
+      headline = spreadStats(chip, rows); body = spreadHTML(S, chip, rows);
+      note = { workload: "Share of working days on a mission, %.", leave: "Share of working days on leave, for the people who took any. Amber above 20%, red above 30%.", nights: "Nights worked, for the people who worked any.", oncall: "Share of available days (working days less leave) called in, %. 0 is never called in." }[chip] + " Click a band to filter the table.";
+    }
+  } else if (view === "cal") {
+    title = "People on leave, by day"; sub = "darker means more people on leave"; headline = timeStats("leave", rows); body = calHTML(S, rows); note = "Weekends and holidays are greyed. Click a day to filter the table.";
+  } else { // time
+    title = { workload: "People on a mission, per day", leave: "People on leave, per day", nights: "People on nights, per day", oncall: "On-call called in, per day", alerts: "People on a run of 7+ days, per day" }[chip];
+    sub = chip === "workload" ? "the pale bar is everyone on the roster" : chip === "oncall" ? "the pale bar is on-call people available" : chip === "leave" ? "by leave type" : "";
+    headline = timeStats(chip, rows); body = box();
+    note = "Working days of October 2026. Weekends and holidays are left off. Click a day to filter the table.";
+    const selT = S.sel && S.sel.k === "day" ? S.sel.t : -1;
+    if (chip === "leave") {
+      const stacks = LT.map(z => ({ label: z.label, color: z.color, vals: perDay(rows, (p, t) => p.st[t] === z.key) }));
+      legend = `<div class="ov-legend">${stacks.map(s => `<span class="ov-lv-chip"><i style="background:${s.color}"></i>${s.label} <small>${mean1(s.vals)} / day</small></span>`).join("")}</div>`;
+      const totals = WDAYS.map((_, t) => sum(stacks.map(s => s.vals[t])));
+      draws.push(() => { const e = document.getElementById(uid); e.innerHTML = colsSVG(e.clientWidth || 600, { h, label: title, stacks, avg: sum(totals) / NW, sel: selT,
+        tip: (t) => tipL(`${dayName(t)} · ${totals[t]} on leave`, stacks.map(s => [s.label, s.vals[t], s.color])) }); });
+    } else if (chip === "oncall") {
+      const called = perDay(rows, (p, t) => p.st[t] === "W"), avail = perDay(rows, (p, t) => p.st[t] === "W" || p.st[t] === "S");
+      legend = `<div class="ov-legend"><span class="ov-lv-chip"><i style="background:var(--chart-oncall)"></i>Called in <small>${mean1(called)} / day</small></span><span class="ov-lv-chip"><i style="background:var(--oncall-ghost)"></i>Available, not called <small>${fmt1(sum(avail) / NW - sum(called) / NW)} / day</small></span></div>`;
+      draws.push(() => { const e = document.getElementById(uid); e.innerHTML = colsSVG(e.clientWidth || 600, { h, label: title, stacks: [{ color: "var(--chart-oncall)", vals: called }], ghost: avail, avg: sum(called) / NW, sel: selT,
+        tip: (t) => tipL(dayName(t), [["Called in", called[t], "#eb6834"], ["Available, not called", avail[t] - called[t], "#fbe1d5"]]) }); });
+    } else {
+      const col = chip === "workload" ? "var(--chart-assigned)" : chip === "nights" ? "var(--primary-text)" : "var(--chart-standby)";
+      const vals = chip === "workload" ? perDay(rows, (p, t) => p.st[t] === "W") : chip === "nights" ? perDay(rows, (p, t) => p.nightOn[t]) : perDay(rows, (p, t) => p.streakAt[t] >= 7);
+      const ghost = chip === "workload" ? perDay(rows, (p, t) => p.st[t] !== null) : null;
+      const nm = { workload: "On a mission", nights: "On nights", alerts: "On a run of 7+ days" }[chip];
+      draws.push(() => { const e = document.getElementById(uid); e.innerHTML = colsSVG(e.clientWidth || 600, { h, label: title, stacks: [{ color: col, vals }], ghost, ghostColor: "#d6e6fa", avg: sum(vals) / NW, sel: selT,
+        tip: (t) => tipL(dayName(t), [[nm, vals[t], col]].concat(ghost ? [["On the roster", ghost[t]]] : [])) }); });
+    }
+  }
+  return { title, sub, headline, body, note, legend };
+}
+function panelHTML(sp, switcher) {
+  return `<div class="ov-hchart"><div class="ov-hchart-head ov-hchart-head-row"><span><b>${sp.title}</b> <span class="ov-muted">${sp.sub}</span></span>${switcher || ""}</div>
+    <p class="ov-spread-sum">${sp.headline}</p>${sp.legend || ""}${sp.body}<p class="ov-spread-axis ov-muted">${sp.note}</p></div>`;
+}
+const btnGroup = (label, items, cur, act) => `<div class="ov-trend-btns" role="group" aria-label="${label}">${items.map(([k, l]) => `<button type="button" class="btn${cur === k ? " active" : ""}" data-act="${act}" data-v="${k}" aria-pressed="${cur === k}">${l}</button>`).join("")}</div>`;
+
+/* ---------- which views a layout offers per chip ---------- */
+const VIEWSET = {
+  A: { workload: ["spread"], leave: ["time", "cal", "spread"], nights: ["spread"], oncall: ["spread", "time"], alerts: ["spread"] },
+  B: { workload: ["spread", "time"], leave: ["time", "cal", "spread"], nights: ["spread", "time"], oncall: ["spread", "time"], alerts: ["spread", "time"] },
+};
+const viewLabel = (chip, v) => (v === "spread" ? SPREAD_LABEL[chip] : v === "time" ? "Over time" : v === "cal" ? "Calendar" : v);
+const switchFor = (dir, chip, cur) => { const vs = VIEWSET[dir][chip]; return vs.length > 1 ? btnGroup("Chart view", vs.map(v => [v, v === "time" && dir === "A" && chip === "leave" ? "Over time" : viewLabel(chip, v)]), cur, "view") : ""; };
+
+/* ---------- the table ---------- */
+const COLS = { name: ["Name", ""], working: ["Working days", "r"], worked: ["Worked", "r"], wshare: ["Share worked", "r"], leave: ["Leave", "r"], ratio: ["Worked : Leave", "r"], share: ["Leave share", ""], sick: ["Sick", "r"], nights: ["Nights", "r"], nshare: ["Night share", "r"], run: ["Days in a row", "r"], called: ["Called in", "r"], cshare: ["Share called in", "r"], split: ["Split of working days", ""], flags: ["Flags", ""] };
+const sortVal = (p, k) => ({ wshare: p.workedShare, share: p.leaveShare, nights: p.nights, cshare: p.oncall && p.available > 0 ? p.calledIn / p.available : -1, flags: p.flags.length })[k];
+const pill = (p, f) => { const d = FLAGS.find(x => x.key === f.key); return `<span class="ov-flag ov-flag-${f.level === "bad" ? "bad" : "warn"}" title="${d.tip}">${d.pill(p)}</span>`; };
+function cellHTML(k, p) {
+  const pct = (x) => (p.working ? x / p.working * 100 : 0).toFixed(1);
+  return ({
+    name: `<td><button type="button" class="ov-person-link" data-no-i18n>${p.name}</button>${p.oncall ? ' <span class="ov-oc-tag">OC</span>' : ""}</td>`,
+    working: `<td class="r">${p.working}</td>`, worked: `<td class="r">${p.worked}</td>`, wshare: `<td class="r">${fmt1(p.workedShare)}%</td>`, leave: `<td class="r">${p.leave}</td>`,
+    ratio: `<td class="r">${p.worked} : ${p.leave}${p.leave ? ` <span class="ov-muted">(${fmt1(p.worked / p.leave)} : 1)</span>` : ""}</td>`,
+    share: `<td><span class="ov-share ov-share-${p.leaveShare > 30 ? "bad" : p.leaveShare > 20 ? "warn" : "ok"}">${fmt1(p.leaveShare)}%</span></td>`,
+    sick: `<td class="r">${p.sick || "—"}</td>`, nights: `<td class="r">${p.nights}</td>`, nshare: `<td class="r">${p.worked ? Math.round(p.nightShare) + "%" : "—"}</td>`,
+    run: `<td class="r">${p.run ? p.run.len + (p.run.ongoing ? ' <span class="ov-muted">still going</span>' : "") : "—"}</td>`,
+    called: `<td class="r">${p.oncall ? p.calledIn : "—"}</td>`, cshare: `<td class="r">${p.oncall && p.available > 0 ? Math.round(p.calledIn / p.available * 100) + "%" : "—"}</td>`,
+    split: `<td><span class="ov-split" title="Worked ${p.worked} · Leave ${p.leave} · ${p.other} ${p.oncall ? "not called" : "standby"}"><i style="width:${pct(p.worked)}%;background:var(--chart-assigned)"></i><i style="width:${pct(p.leave)}%;background:var(--leave-annual)"></i><i style="width:${pct(p.other)}%;background:var(--border)"></i></span></td>`,
+    flags: `<td class="ov-flags">${p.flags.length ? p.flags.map(f => pill(p, f)).join(" ") : '<span class="ov-muted">—</span>'}</td>`,
+  })[k];
+}
+const DAYWHAT = { workload: "On a mission", leave: "On leave", nights: "On nights", oncall: "Called in", alerts: "On a run of 7+ days" };
+function selMatch(S, p) {
+  const s = S.sel;
+  if (s.k === "flag") return p.flags.some(f => f.key === s.key);
+  if (s.k === "band") return BANDF[S.chip] && BANDF[S.chip](p) === s.i;
+  const t = s.t;
+  return S.chip === "leave" ? !!leaveType(p.st[t]) : S.chip === "nights" ? p.nightOn[t] : S.chip === "alerts" ? p.streakAt[t] >= 7 : p.st[t] === "W";
+}
+function filterText(S) {
+  const s = S.sel;
+  if (s.k === "flag") return FLAGS.find(f => f.key === s.key).label;
+  if (s.k === "band") { const sp = SPREAD[S.chip]; return `${sp.filt}: ${sp.name(s.i)}`; }
+  return `${DAYWHAT[S.chip]} on ${dayName(s.t)}`;
+}
+function tableHTML(S) {
+  const v = VIEWS[S.chip];
+  let rs = PEOPLE.filter(whoFn(S.who));
+  if (S.sel) rs = rs.filter(p => selMatch(S, p));
+  if (S.chip === "alerts") rs = rs.filter(p => p.flags.length);
+  if (S.chip === "leave" && !S.sel) rs = rs.filter(p => p.leave > 0);
+  const [sk, dir] = v.sort;
+  rs.sort((a, b) => ((sortVal(a, sk) - sortVal(b, sk)) * dir) || (sk === "share" ? b.leave - a.leave : 0) || (sk === "cshare" ? b.available - a.available : 0) || a.name.localeCompare(b.name, "th"));
+  let out = "";
+  if (S.sel) out += `<p class="ov-band-chip"><span>${filterText(S)}</span><button type="button" class="ov-linkbtn" data-act="clear">Clear</button>${S.sel.k === "day" ? `<button type="button" class="ov-linkbtn" data-act="noop">Open that day's board →</button>` : ""}<span class="ov-muted" style="background:none;font-weight:400;padding:0">${rs.length} ${rs.length === 1 ? "person" : "people"}</span></p>`;
+  if (!rs.length) return out + `<p class="ov-empty">${S.chip === "alerts" ? "No flags in this range." : "Nobody matches."}</p>`;
+  const vis = S.all ? rs : rs.slice(0, 10);
+  out += `<div class="ov-table-wrap"><table class="ov-table"><thead><tr>${v.cols.map(k => `<th class="${COLS[k][1]}">${COLS[k][0]}${k === sk ? (dir < 0 ? " ↓" : " ↑") : ""}</th>`).join("")}</tr></thead><tbody>${vis.map(p => `<tr>${v.cols.map(k => cellHTML(k, p)).join("")}</tr>`).join("")}</tbody></table></div>`;
+  if (rs.length > 10) out += `<button type="button" class="btn ov-wl-more" data-act="more">${S.all ? "Show fewer" : `Show all ${rs.length}`}</button>`;
+  return out;
+}
+
+/* ---------- a mockup ---------- */
+function render(root) {
+  const S = root._S, rows = PEOPLE.filter(whoFn(S.who)), draws = [], uid = (n) => `${root.id}-ch${n}`;
+  const act = document.activeElement && root.contains(document.activeElement) ? document.activeElement : null;
+  const key = act && act.dataset && act.dataset.act ? ["act", "v", "i", "t", "key"].map(k => act.dataset[k] || "").join("|") : null;
+  let h = `<h3>People</h3><p class="ov-section-sub">Workload, leave, nights and on-call for each person over the range, on planned working days. A name opens their profile.</p>
+    <div class="ov-people-bar">${btnGroup("People view", CHIPS, S.chip, "chip")}${S.chip === "oncall" ? `<span class="ov-locked">On-call people only</span>` : btnGroup("Who", [["all", "Everyone"], ["permanent", "Permanent"], ["oncall", "On-call"]], S.who, "who")}</div>`;
+  if (S.dir === "C") {
+    const left = chartPanel(S, S.chip, "spread", rows, uid(1), draws, 190);
+    const rv = S.chip === "leave" ? (S.rview === "cal" ? "cal" : "time") : "time";
+    const right = chartPanel(S, S.chip, rv, rows, uid(2), draws, 190);
+    const sw = S.chip === "leave" ? btnGroup("Leave view", [["time", "Chart"], ["cal", "Calendar"]], rv, "rview") : "";
+    h += `<div class="dual"><div>${panelHTML(left)}</div><div>${panelHTML(right, sw)}</div></div>`;
+  } else {
+    const vs = VIEWSET[S.dir][S.chip], view = vs.includes(S.view) ? S.view : vs[0];
+    h += panelHTML(chartPanel(S, S.chip, view, rows, uid(1), draws, 210), switchFor(S.dir, S.chip, view));
+  }
+  h += tableHTML(S);
+  h += `<p class="ov-people-help">Flags: 7+ in a row (red from 10), mostly nights (5+ nights, half of the days worked or more), leave above 30%, never called in, newcomer-only mission. Leave share above 20% is amber, above 30% red. Sample data.</p>`;
+  root.innerHTML = h;
+  draws.forEach(f => f());
+  if (key) { const el = [...root.querySelectorAll("[data-act]")].find(e => ["act", "v", "i", "t", "key"].map(k => e.dataset[k] || "").join("|") === key); if (el) el.focus({ preventScroll: true }); }
+}
+const sameSel = (a, b) => a && b && a.k === b.k && a.i === b.i && a.t === b.t && a.key === b.key;
+function doAct(S, d) {
+  const reset = () => { S.sel = null; S.all = false; };
+  if (d.act === "chip") { S.chip = d.v; S.who = d.v === "oncall" ? "oncall" : "all"; S.view = VIEWSET[S.dir] ? VIEWSET[S.dir][d.v][0] : "spread"; S.rview = "time"; reset(); }
+  else if (d.act === "who") { S.who = d.v; reset(); }
+  else if (d.act === "view") { S.view = d.v; reset(); }
+  else if (d.act === "rview") { S.rview = d.v; reset(); }
+  else if (d.act === "clear") reset();
+  else if (d.act === "more") S.all = !S.all;
+  else if (d.act === "band" || d.act === "day" || d.act === "flag") {
+    const n = d.act === "band" ? { k: "band", i: +d.i } : d.act === "day" ? { k: "day", t: +d.t } : { k: "flag", key: d.key };
+    S.sel = sameSel(S.sel, n) ? null : n; S.all = false;
+  }
+}
+const MOCKS = [];
+function mount(id, dir, chip) {
+  const root = document.getElementById(id);
+  root._S = { dir, chip, who: chip === "oncall" ? "oncall" : "all", view: VIEWSET[dir] ? VIEWSET[dir][chip][0] : "spread", rview: "time", sel: null, all: false };
+  root.addEventListener("click", (e) => { const t = e.target.closest("[data-act]"); if (!t || !root.contains(t)) return; doAct(root._S, t.dataset); render(root); });
+  root.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches("rect[data-act]")) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); } });
+  MOCKS.push(root); render(root);
+}
+
+/* ---------- the proposal table, filled from the same numbers ---------- */
+function specTable() {
+  const all = PEOPLE, oc = PEOPLE.filter(p => p.oncall);
+  const rowsFor = (chip) => (chip === "oncall" ? oc : all);
+  const sw = (c) => `<span class="sw" style="background:${c}"></span>`;
+  const R = [
+    ["Workload", "Is the work shared evenly? Who is overworked or barely used?", "<b>Workload spread</b>: people by share of working days on a mission, as today.", "<b>Over time</b> (B and C): people on a mission each day, against the roster. History already has Deployed / day.", "workload", "spread", "A band shows those people."],
+    ["Leave", "How much leave, when, and who took most?", `<b>People on leave per day</b>, stacked by type (${LT.map(z => sw(z.color) + z.label).join(" ")}), with an average line.`, "<b>Calendar</b>: one cell per day, darker is more leave. <b>Spread</b>: people who took leave, by leave share, amber above 20%, red above 30%.", "leave", "time", "A day (bar or calendar cell) shows who was on leave that day. A band shows people with that leave share."],
+    ["Nights", "Who carries the nights? Are they concentrated?", "<b>Nights spread</b>: people by nights worked (1–2, 3–4, 5–6, 7–9, 10+). People with no nights are counted in the headline.", "<b>Over time</b> (B and C): people on nights each day.", "nights", "spread", "A band shows those people. A day shows who worked that night."],
+    ["On-call", "Is call-in shared fairly? Is anyone never used?", "<b>Call-in spread</b>: on-call people by share of available days called in. People never called in are their own red bar (0).", "<b>Per day</b>: called in against available, the view History already has.", "oncall", "spread", "A band shows those people. A day shows who was called in."],
+    ["Alerts only", "What needs attention, and what kind?", "<b>Alerts by flag</b>: people per flag, split amber and red.", "<b>Over time</b> (B and C): people on a run of 7+ days each day.", "alerts", "spread", "A flag shows those people."],
+  ];
+  return `<thead><tr><th>Chip</th><th>Question it answers</th><th>Chart it opens on</th><th>Second view</th><th>Headline above the chart</th><th>A click</th></tr></thead><tbody>${R.map(([chip, q, c1, c2, key, view, click]) => `<tr><td>${chip}</td><td>${q}</td><td>${c1}</td><td>${c2}</td><td>${(view === "time" ? timeStats : spreadStats)(key, rowsFor(key))}</td><td>${click}</td></tr>`).join("")}</tbody>`;
+}
+
+/* ---------- tooltip ---------- */
+const tipEl = document.getElementById("tip");
+document.addEventListener("pointermove", (e) => {
+  const t = e.target.closest && e.target.closest("[data-tip]");
+  if (!t) { tipEl.hidden = true; return; }
+  tipEl.innerHTML = decodeURIComponent(t.getAttribute("data-tip"));
+  tipEl.hidden = false;
+  const r = tipEl.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tipEl.style.left = Math.max(8, x) + "px"; tipEl.style.top = y + "px";
+});
+document.addEventListener("focusin", (e) => { const t = e.target.closest && e.target.closest("[data-tip]"); if (!t) return; tipEl.innerHTML = decodeURIComponent(t.getAttribute("data-tip")); tipEl.hidden = false; const b = t.getBoundingClientRect(); tipEl.style.left = Math.max(8, Math.min(b.left, innerWidth - 270)) + "px"; tipEl.style.top = (b.bottom + 6) + "px"; });
+document.addEventListener("focusout", () => { tipEl.hidden = true; });
+
+document.getElementById("spec-table").innerHTML = specTable();
+mount("mock-a", "A", "leave");
+mount("mock-b", "B", "oncall");
+mount("mock-c", "C", "nights");
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => MOCKS.forEach(render), 120); });
+</script>
