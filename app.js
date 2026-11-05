@@ -540,6 +540,7 @@ const state = {
     baView: "board",              // Boards & areas: "board" | "area"
     baLoansOpen: false,           // Boards & areas: the from → to loan table is open
     wfWindow: "12",               // Workforce: "12" (the last 12 months) | "range" (History's range)
+    wfHidden: [],                 // Workforce: years-of-service groups switched off (WF_BANDS keys)
     pplView: "workload",          // People quick view: workload | leave | nights | oncall | alerts
     pplWho: "all",                // People table: all | permanent | oncall
     pplSpread: "permanent",       // the spread chart's group: permanent | oncall
@@ -6253,24 +6254,54 @@ function workforceSection(boards) {
   const names = (list) => list.map(e => e.name).join(", ");
   const box = document.createElement("div");
   box.className = "ov-wf-chart";   // not .ov-hchart: History's own tests count the charts under that class
-  box.appendChild(ovLegend([...WF_BANDS.map(b => ({ label: b.label, color: b.color })),
-    { label: "Joiners (above the bar)", color: "#1f8a4c" }, { label: "Leavers, resigned (under the bar)", color: "#b42318" },
+  // One chip per years-of-service group (the bar's stacks): shows / hides it in the chart, never all off.
+  // The number on a chip is how many people are in that group now, at the end of the window. The total
+  // above each bar is the sum of the groups that are shown, so it follows the chips.
+  const hidden = new Set(ov.wfHidden || []);
+  const shownBands = () => WF_BANDS.filter(b => !hidden.has(b.key));
+  const chips = document.createElement("div");
+  chips.className = "ov-wf-chips";
+  for (const b of WF_BANDS) {
+    const c = document.createElement("button");
+    c.type = "button";
+    c.className = "ov-wf-chip";   // looks like the Leave chips; its own class so tests and styles can tell them apart
+    c.dataset.band = b.key;
+    c.setAttribute("aria-pressed", String(!hidden.has(b.key)));
+    c.innerHTML = `<i style="background:${escapeHtml(b.color)}"></i><span>${escapeHtml(b.label)}</span> <small>${now[b.key]}</small>`;
+    c.title = `Show or hide ${b.label}`;
+    c.onclick = () => {
+      if (hidden.has(b.key)) hidden.delete(b.key);
+      else if (shownBands().length > 1) hidden.add(b.key);
+      else return;
+      ov.wfHidden = [...hidden];
+      c.setAttribute("aria-pressed", String(!hidden.has(b.key)));
+      draw();   // only the chart changes, so the page keeps its scroll position
+    };
+    chips.appendChild(c);
+  }
+  box.appendChild(chips);
+  box.appendChild(ovLegend([{ label: "Joiners (above the bar)", color: "#1f8a4c" }, { label: "Leavers, resigned (under the bar)", color: "#b42318" },
     { label: "Inactive for now, not leavers", color: "var(--muted)" }]));
   const wrap = document.createElement("div");
   wrap.className = "ov-trend-chart";
   box.appendChild(wrap);
   sec.appendChild(box);
-  const totals = months.map(m => m.hc.total);
-  const pending = () => fillColumnChart(wrap, {
-    stacks: WF_BANDS.map(b => ({ label: b.label, color: b.color, values: months.map(m => m.hc[b.key]) })),
-    notes: [{ values: months.map(m => m.joiners.length), color: "#1f8a4c", text: "+", pos: "above" }, { values: months.map(m => m.leavers.length), color: "#b42318", text: "−", pos: "below" }],
-    line: { label: "", color: "var(--muted)", values: months.map(m => m.pausers.length) },   // the legend names it
-    xLabels: months.map(m => MON[Number(m.month.slice(5, 7)) - 1]),
-    dayTotals: months.map(m => [`${MONFULL[Number(m.month.slice(5, 7)) - 1]} ${m.month.slice(0, 4)}`, `${m.hc.total} people`,
-      m.joiners.length ? `joined ${names(m.joiners)}` : "", m.leavers.length ? `resigned ${names(m.leavers)}` : "", m.pausers.length ? `inactive for now ${names(m.pausers)}` : ""].filter(Boolean).join(" · ")),
-    yMax: Charts.niceMax([Math.max(...totals) * 1.1, ...months.map(m => m.pausers.length)]), height: 240,
-  });
-  sec._fill = pending;
+  const draw = () => {
+    const on = shownBands();
+    const all = on.length === WF_BANDS.length;
+    const totals = months.map(m => on.reduce((a, b) => a + m.hc[b.key], 0));   // the figure above each bar
+    fillColumnChart(wrap, {
+      stacks: on.map(b => ({ label: b.label, color: b.color, values: months.map(m => m.hc[b.key]) })),
+      totals,
+      notes: [{ values: months.map(m => m.joiners.length), color: "#1f8a4c", text: "+", pos: "above" }, { values: months.map(m => m.leavers.length), color: "#b42318", text: "−", pos: "below" }],
+      line: { label: "", color: "var(--muted)", values: months.map(m => m.pausers.length) },   // the legend names it
+      xLabels: months.map(m => MON[Number(m.month.slice(5, 7)) - 1]),
+      dayTotals: months.map((m, i) => [`${MONFULL[Number(m.month.slice(5, 7)) - 1]} ${m.month.slice(0, 4)}`, all ? `${m.hc.total} people` : `${totals[i]} of ${m.hc.total} people`,
+        m.joiners.length ? `joined ${names(m.joiners)}` : "", m.leavers.length ? `resigned ${names(m.leavers)}` : "", m.pausers.length ? `inactive for now ${names(m.pausers)}` : ""].filter(Boolean).join(" · ")),
+      yMax: Charts.niceMax([Math.max(...totals) * 1.1, ...months.map(m => m.pausers.length)]), height: 260,
+    });
+  };
+  sec._fill = draw;
   return sec;
 }
 

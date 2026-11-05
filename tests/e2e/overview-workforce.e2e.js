@@ -173,6 +173,30 @@ async function step(name, fn) {
       assert.equal(bands, 2, "the under-1-year band is drawn in the two months Person C (started last month) is counted");
     });
 
+    await step("B2: each bar shows its total; a chip per years-of-service group hides it and the totals follow", async () => {
+      const totalsOf = () => read(".ov-wf-chart .chart-total");
+      const t0 = await totalsOf();
+      assert.equal(t0.length, 12, "one total per month, above its bar");
+      assert.deepEqual(t0.slice(-3), ["9", "8", "8"], "two months ago, last month, now: the same heads the tooltips and the tile count");
+      assert.equal(await p.locator(".ov-wf-chart .chart-note").count(), 3, "the joiner and leaver notes are still there beside the totals");
+      assert.deepEqual(await read(".ov-wf-chips .ov-wf-chip"), ["Under 1 year 1", "1 to 3 years 1", "3 years or more 1", "No start date 5"],"one chip per group, with how many people are in it now");
+      await p.locator(".ov-wf-chips .ov-wf-chip", { hasText: "Under 1 year" }).click();
+      assert.equal(await p.locator('.ov-wf-chips .ov-wf-chip[data-band=u1]').getAttribute("aria-pressed"), "false");
+      const t1 = await totalsOf();
+      assert.deepEqual(t1.slice(-3), ["9", "7", "7"], "Person C (under 1 year) is left out of last month and now");
+      const left = await p.evaluate(() => [...document.querySelectorAll(".ov-wf-chart rect.chart-mark")].filter((r) => /^Under 1 year/.test(r.getAttribute("data-tip-label"))).length);
+      assert.equal(left, 0, "the hidden group is not drawn");
+      const tip = await p.evaluate(() => [...document.querySelectorAll(".ov-wf-chart rect.chart-mark")].map((r) => r.getAttribute("data-tip-label")).find((x) => /joined Person C/.test(x)));
+      assert.match(tip, /7 of 8 people/, "the tooltip says how much of the month is shown");
+      await p.locator(".ov-wf-chips .ov-wf-chip", { hasText: "Under 1 year" }).click();
+      assert.deepEqual((await totalsOf()).slice(-3), ["9", "8", "8"], "back to the full headcount");
+      // the last group on can't be switched off
+      for (const k of ["u1", "y13", "y3", "unk"]) await p.locator(`.ov-wf-chips .ov-wf-chip[data-band=${k}]`).click();
+      assert.equal(await p.locator('.ov-wf-chips .ov-wf-chip[aria-pressed=true]').count(), 1, "one group always stays on");
+      await p.evaluate(() => { state.overview.wfHidden = []; });
+      await showOverview();
+    });
+
     await step("B2: History range window, and the board selector", async () => {
       await p.locator(".ov-wf-bar .btn", { hasText: "History range" }).click();
       assert.deepEqual((await read(".ov-wf-tiles .ov-htile-value")).slice(0, 3), ["8", "2", "1"], "range = two months ago to today");
