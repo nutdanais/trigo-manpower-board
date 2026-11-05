@@ -313,7 +313,15 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   <div class="part-head">
     <div class="eyebrow">Meeting guide · 41 columns</div>
     <h2>Column-by-column checklist</h2>
-    <p class="muted">Use this table as the meeting checklist: go row by row, tick ✓ when a column has been discussed and set the <b>Team decision</b>. <b>Suggested</b> is my recommendation: <span class="sugg s-in">Already in app</span>, <span class="sugg s-keep">Keep · add</span>, <span class="sugg s-auto">Drop: automatic</span>, <span class="sugg s-drop">Drop: use default</span> or <span class="sugg s-ask">Ask in meeting</span>. <b>Status</b> says how the column relates to the app today. <b>Entry</b> is one of the six ways above, and <b>Owner</b> is who fills it in. <b>Flag</b> marks columns that need a <span class="flag special">Special</span> way of entering or editing them, <span class="flag attn">Attention</span> for a data problem the file shows, or <span class="flag ask">Ask</span> when only the admins know the answer. <b>Copy meeting decisions</b> gives me the result. Your ticks and choices are remembered in this browser.</p>
+    <p class="muted">Use this table as the meeting checklist: go row by row, tick ✓ when a column has been discussed and set the <b>Team decision</b>. <b>Suggested</b> is my recommendation. <b>None of the suggestions removes a column from view or from the Excel export.</b> They only change who enters the value:</p>
+    <ul class="small muted" style="margin-top:2px">
+      <li><span class="sugg s-in">Already in app</span> The app has this field today. It's kept and shown as now.</li>
+      <li><span class="sugg s-keep">Keep · add</span> A new field in the app, typed or picked by the owner shown.</li>
+      <li><span class="sugg s-auto">Automatic · still shown</span> Nobody types it any more. The app fills it in, but it's still shown on the mission, searchable and in the export.</li>
+      <li><span class="sugg s-drop">Pre-filled default</span> The field stays, already filled with the value used almost every time. Change it only when it's different. Still shown and exported.</li>
+      <li><span class="sugg s-ask">Ask in meeting</span> Its meaning isn't clear from the file.</li>
+    </ul>
+    <p class="muted"><b>Drop</b> in the <b>Team decision</b> column is the only choice that really removes a column: it's left out of the app and the export. <b>Status</b> says how the column relates to the app today. <b>Entry</b> is one of the six ways above, and <b>Owner</b> is who fills it in. <b>Flag</b> marks columns that need a <span class="flag special">Special</span> way of entering or editing them, <span class="flag attn">Attention</span> for a data problem the file shows, or <span class="flag ask">Ask</span> when only the admins know the answer. <b>Copy meeting decisions</b> gives me the result. Your ticks and choices are remembered in this browser.</p>
   </div>
   <div class="filters" role="group" aria-label="Filter columns">
     <span class="lbl">Show</span>
@@ -324,7 +332,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     <button type="button" data-f="keep">Suggested keep</button>
     <button type="button" data-f="inapp">Already in the app</button>
     <button type="button" data-f="auto">Automatic</button>
-    <button type="button" data-f="drop">Suggested drop</button>
+    <button type="button" data-f="drop">Automatic or default</button>
     <button type="button" data-f="open">Not discussed yet</button>
     <button type="button" data-f="admin">Admin only</button>
   </div>
@@ -402,7 +410,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
      flag: special | attn | ask | "" */
   const S = {
     inapp: ["In the app", "ok"], new: ["New · mission", "info"], newp: ["New · per suffix", "teal"],
-    auto: ["Automatic", "violet"], drop: ["Drop / default", "bad"], host: ["Move to Host list", "warn"], ask: ["Ask", "violet"], cust: ["New Customer list", "warn"]
+    auto: ["Automatic", "violet"], drop: ["Default value", "bad"], host: ["Move to Host list", "warn"], ask: ["Ask", "violet"], cust: ["New Customer list", "warn"]
   };
   const G = [
     ["Mission identity", [
@@ -457,13 +465,13 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       ["AJ", "Rate Profile in ETRAQ", "", "new", "C", "A", "", "Dropdown from the category sheet.", "2 of the 7+ profiles used."],
     ]],
     ["Other", [
-      ["AL", "Risk Analysis", "", "drop", "C", "A", "", "Default “Yes: 1 audit per shift per day”. Hidden unless changed.", "The same value in 338 / 338."],
+      ["AL", "Risk Analysis", "", "drop", "C", "A", "", "Pre-filled with “Yes: 1 audit per shift per day”. Still shown and exported; change it only for a mission that differs.", "The same value in 338 / 338."],
       ["AM", "Remark", "", "new", "E", "A", "special", "A running notes log per mission (who, when), like employee notes. The two standard phrases become an Invoice timing dropdown.", "100 filled, 97 of them two standard phrases."],
     ]],
   ];
   const SG = {
     inapp: ["Already in app", "s-in"], new: ["Keep · add", "s-keep"], newp: ["Keep · add per suffix", "s-keep"], cust: ["Keep · Customer list", "s-keep"],
-    host: ["Keep · Host list", "s-keep"], auto: ["Drop: automatic", "s-auto"], drop: ["Drop: use default", "s-drop"], ask: ["Ask in meeting", "s-ask"]
+    host: ["Keep · Host list", "s-keep"], auto: ["Automatic · still shown", "s-auto"], drop: ["Pre-filled default", "s-drop"], ask: ["Ask in meeting", "s-ask"]
   };
   const IN = { A: "Automatic", B: "Pick a record", C: "Dropdown", D: "Value with rules", E: "Free text", F: "Contacts" };
   const ALL = G.flatMap((g) => g[1].map((r) => r));
@@ -492,7 +500,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
         <td class="how">${esc(how)}</td>
         <td class="ev small">${esc(ev)}</td>
         <td><select aria-label="Meeting decision for column ${col}" id="dec-${col}">
-          <option value="">—</option><option value="keep"${d === "keep" ? " selected" : ""}>Keep</option><option value="drop"${d === "drop" ? " selected" : ""}>Drop</option><option value="discuss"${d === "discuss" ? " selected" : ""}>Discuss again</option>
+          <option value="">—</option><option value="keep"${d === "keep" ? " selected" : ""}>Keep</option><option value="drop"${d === "drop" ? " selected" : ""}>Drop (remove)</option><option value="discuss"${d === "discuss" ? " selected" : ""}>Discuss again</option>
         </select></td></tr>`;
     }
   }
