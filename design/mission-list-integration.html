@@ -176,7 +176,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   </div>
   <div class="panel" style="gap:0">
     <div class="finding"><span class="n">96 / 160</span><div><b>Most missions never get a second suffix.</b> <span class="muted small">27 have two, and the longest-running have 8–10. So the monthly copy concerns the long jobs. Bangna's sheet has 24–41 rows a month.</span></div></div>
-    <div class="finding"><span class="n">24</span><div><b>Times a mission got two suffixes in the same month.</b> <span class="muted small">10 of them came with a new PO number, one with a new breakpoint and two with a new start date. In 11 of the 24 nothing else in the row changed at all. So a suffix doesn't only mean "a new month". It's a new ERP billing period, which a new PO can also start. This is the first question for the meeting.</span></div></div>
+    <div class="finding"><span class="n">24</span><div><b>Times a mission got two suffixes in the same month.</b> <span class="muted small">10 of them came with a new PO number, one with a new breakpoint and two with a new start date. In 11 of the 24 nothing else in the row changed at all. So a suffix doesn't only mean "a new month". It's a new Etraq billing period, which a new PO can also start. This is the first question for the meeting.</span></div></div>
     <div class="finding"><span class="n">176 / 178</span><div><b>Older suffix rows still say "Running"</b> <span class="muted small">after the next suffix replaced them. Only the newest row is kept up to date, so a filter on Status = Running counts the same mission several times.</span></div></div>
     <div class="finding"><span class="n">74</span><div><b>Missions whose newest row says Running.</b> <span class="muted small">37 were last copied in October. 34 were last copied in July–September and never got a later suffix or a Finish date. Either they ended and nobody closed them, or they are still running and missed their monthly copy. The app can show this as a "no suffix this month" list.</span></div></div>
     <div class="finding"><span class="n">1</span><div><b>November row on 4 Nov.</b> <span class="muted small">The November copy hadn't been done yet for the October missions. This is exactly the manual step the app can prepare automatically.</span></div></div>
@@ -201,7 +201,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     </div>
     <div class="box rec">
       <h3>B · The app replaces it <span class="tag ok">Recommended</span></h3>
-      <p class="small">The Missions tab holds every column worth keeping. <b>Export</b> produces the same sheet layout for the ERP double-check.</p>
+      <p class="small">The Missions tab holds every column worth keeping. <b>Export</b> produces the same sheet layout for the Etraq double-check.</p>
       <ul class="small"><li>One record per mission, with its suffixes underneath</li><li>The monthly suffix is prepared by the app, so nobody copies rows</li><li>Real dropdowns, so no typos</li><li>Commercial columns visible only to admins</li></ul>
     </div>
     <div class="box">
@@ -215,7 +215,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     <ol class="small">
       <li><b>Import once.</b> Upload this workbook. The app groups the 338 rows into 160 missions, makes each row a suffix period and keeps the "last year" numbers as links. A preview lists what doesn't match the app before anything is saved: unknown hosts, engineer names, a code with two names.</li>
       <li><b>Run side by side for one month.</b> The admins keep their file and check the app's monthly suffix list and Export against it.</li>
-      <li><b>Switch.</b> The workbook becomes read-only history. The export is always available for the ERP check.</li>
+      <li><b>Switch.</b> The workbook becomes read-only history. The export is always available for the Etraq check.</li>
     </ol>
   </div>
 </section>
@@ -225,7 +225,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   <div class="part-head">
     <div class="eyebrow">Question 3 · The monthly suffix</div>
     <h2>Keep one mission, and record its suffixes and yearly numbers under it</h2>
-    <p class="muted">Yes, there's a better way than copying rows. The app keeps a single record for the job and treats each suffix as a <b>period</b> of that record, with its own start and end date and PO number. The yearly new number is one more link in the same chain. The ERP still gets its suffix. People stop copying rows to create it.</p>
+    <p class="muted">Yes, there's a better way than copying rows. The app keeps a single record for the job and treats each suffix as a <b>period</b> of that record, with its own start and end date and PO number. The yearly new number is one more link in the same chain. The Etraq still gets its suffix. People stop copying rows to create it.</p>
   </div>
 
   <div class="panel">
@@ -239,7 +239,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       <div class="seg"><b>.AE</b><span>Mar</span></div>
       <div class="seg"><b>…</b><span>&nbsp;</span></div>
       <div class="seg now"><b>.AJ</b><span>Nov · now</span></div>
-      <div class="seg year"><b>.27.0zzz.AA</b><span>Jan 2027 · new number from ERP</span></div>
+      <div class="seg year"><b>.27.0zzz.AA</b><span>Jan 2027 · new number from Etraq</span></div>
     </div>
     <div class="legend-row"><span>Each box is one row of today's sheet.</span><span>Green edge: a new yearly number (column B "last year" is filled in automatically).</span><span>An example, with numbers shortened. The full form is BANGN.26.0yyy.AJ.</span></div>
     <div class="cols2">
@@ -249,7 +249,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       </div>
       <div class="box">
         <h3>Stored on each suffix</h3>
-        <p class="small">Suffix, month, period start and end, <b>PO number</b>, and possibly breakpoint, MO/PO/QT status and "Created in ERP". Whether the last three belong here is a meeting question. A suffix is never retyped. It's the next code after the last one (AA → AB … AZ → BA).</p>
+        <p class="small">Suffix, month, period start and end, <b>PO number</b>, and possibly breakpoint, MO/PO/QT status and "Created in Etraq". Whether the last three belong here is a meeting question. A suffix is never retyped. It's the next code after the last one (AA → AB … AZ → BA).</p>
       </div>
     </div>
   </div>
@@ -257,7 +257,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   <div class="mock" aria-label="Mockup: the monthly suffix screen">
     <div class="mock-tools"><b>Monthly suffix · December 2026 · Bangna</b><span class="sp"></span><span class="tag warn">Due 1 Dec</span><span class="cap">example rows</span></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Mission</th><th>November</th><th>December</th><th>PO number</th><th>Continue?</th><th>Created in ERP</th></tr></thead>
+      <thead><tr><th>Mission</th><th>November</th><th>December</th><th>PO number</th><th>Continue?</th><th>Created in Etraq</th></tr></thead>
       <tbody>
         <tr><td class="num">BANGN.26.0xx1</td><td class="num">.AJ</td><td><span class="to mono">.AK</span></td><td>same as .AJ</td><td>Continue</td><td>☑</td></tr>
         <tr><td class="num">BANGN.26.0xx2</td><td class="num">.AJ</td><td><span class="to mono">.AK</span></td><td><span class="tag warn">Waiting PO</span></td><td>Continue</td><td>☐</td></tr>
@@ -265,7 +265,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
         <tr><td class="num">BANGN.26.0xx4</td><td class="num">.AA</td><td><span class="to mono">.AB</span></td><td>new: <span class="mono">4505xxxx</span></td><td>Continue</td><td>☐</td></tr>
       </tbody>
     </table></div>
-    <div class="mock-foot"><span>3 to create in ERP · 1 closing · <b>Export for ERP</b> lists the new suffixes to key in</span><span class="sp"></span><span class="btn">Export</span><span class="btn fill">Start December suffixes</span></div>
+    <div class="mock-foot"><span>3 to create in Etraq · 1 closing · <b>Export for Etraq</b> lists the new suffixes to key in</span><span class="sp"></span><span class="btn">Export</span><span class="btn fill">Start December suffixes</span></div>
   </div>
 
   <div class="cols2">
@@ -274,15 +274,15 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       <ol class="small">
         <li>From the last working days of the month, the Missions tab shows <b>Monthly suffix due</b>.</li>
         <li>The screen lists every open mission with its next suffix already worked out, and carries the PO number over unless someone types a new one.</li>
-        <li>For each mission the admin chooses <b>Continue</b> or <b>Close at month end</b> (today's "Able to close" column), and ticks <b>Created in ERP</b> once it's keyed in.</li>
-        <li><b>Start December suffixes</b> opens the new periods on the 1st. Missions not yet ticked stay on a "Not in ERP yet" list, so nothing is forgotten.</li>
+        <li>For each mission the admin chooses <b>Continue</b> or <b>Close at month end</b> (today's "Able to close" column), and ticks <b>Created in Etraq</b> once it's keyed in.</li>
+        <li><b>Start December suffixes</b> opens the new periods on the 1st. Missions not yet ticked stay on a "Not in Etraq yet" list, so nothing is forgotten.</li>
         <li><b>New suffix now</b> on a single mission handles the mid-month case (a new PO, a new breakpoint), with the reason noted.</li>
       </ol>
     </div>
     <div class="box">
       <h3>How it fits the year end</h3>
       <ul class="small">
-        <li>The December → January routine also asks for the <b>new yearly number</b>, typed from the ERP. It's the same screen and the same check as the year-end renumber in the spec, so the admins learn one routine.</li>
+        <li>The December → January routine also asks for the <b>new yearly number</b>, typed from the Etraq. It's the same screen and the same check as the year-end renumber in the spec, so the admins learn one routine.</li>
         <li>A mission continuing into 2027 starts again at <b>.AA</b> under its new number, and its 2026 number fills "Mission No. (Last year)" automatically.</li>
         <li>Days, crew and the Host Record keep the number and suffix that were in force on each day, so history reads as it did.</li>
         <li>Searching either the old or the new number finds the whole chain.</li>
@@ -351,14 +351,14 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   <div class="panel">
     <h3>1 · How they work today (10 min)</h3>
     <ul class="check" data-list="m1">
-      <li><input type="checkbox" id="m1a"><label for="m1a"><b>Walk through one day and one month-start.</b><span>Who opens the file, when, what they check against the ERP, and how long the monthly copy takes.</span></label></li>
+      <li><input type="checkbox" id="m1a"><label for="m1a"><b>Walk through one day and one month-start.</b><span>Who opens the file, when, what they check against the Etraq, and how long the monthly copy takes.</span></label></li>
       <li><input type="checkbox" id="m1b"><label for="m1b"><b>Who else reads the file?</b><span>Finance, engineers, the site manager. Each reader needs the export, or access to the app.</span></label></li>
       <li><input type="checkbox" id="m1c"><label for="m1c"><b>Is there one workbook per site?</b><span>BANGN = Bangna. Do the other boards keep their own, with the same columns?</span></label></li>
     </ul>
     <h3>2 · The suffix (15 min)</h3>
     <ul class="check" data-list="m2">
       <li><input type="checkbox" id="m2a"><label for="m2a"><b>What starts a new suffix?</b><span>The month only, or also a new PO, breakpoint or rate? The file has 24 same-month pairs, 11 of them with nothing else changed.</span></label></li>
-      <li><input type="checkbox" id="m2b"><label for="m2b"><b>Who creates the suffix in the ERP, and is it ever skipped?</b><span>5 missions skip a month and then continue. Does the ERP require a suffix for every month the mission is open?</span></label></li>
+      <li><input type="checkbox" id="m2b"><label for="m2b"><b>Who creates the suffix in the Etraq, and is it ever skipped?</b><span>5 missions skip a month and then continue. Does the Etraq require a suffix for every month the mission is open?</span></label></li>
       <li><input type="checkbox" id="m2c"><label for="m2c"><b>Which number does the crew see?</b><span>On the board card, the worksheet and LINE messages: the full number with suffix, or the mission number only?</span></label></li>
       <li><input type="checkbox" id="m2d"><label for="m2d"><b>The 34 missions last copied before October</b><span>Ended or still running? Sorting this out once gives a clean import.</span></label></li>
       <li><input type="checkbox" id="m2e"><label for="m2e"><b>Which columns change per suffix?</b><span>Confirm the "per suffix" rows in the guide: PO number, breakpoint, MO/PO/QT status, documents.</span></label></li>
@@ -374,7 +374,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     <h3>4 · Switching over (10 min)</h3>
     <ul class="check" data-list="m4">
       <li><input type="checkbox" id="m4a"><label for="m4a"><b>Import date and the side-by-side month</b><span>Suggest: import mid-December, check January's suffixes and the year-end numbers both ways, switch in February.</span></label></li>
-      <li><input type="checkbox" id="m4b"><label for="m4b"><b>Export layout</b><span>Same column order as today, so their ERP check keeps working? Thai or English headers?</span></label></li>
+      <li><input type="checkbox" id="m4b"><label for="m4b"><b>Export layout</b><span>Same column order as today, so their Etraq check keeps working? Thai or English headers?</span></label></li>
       <li><input type="checkbox" id="m4c"><label for="m4c"><b>Name one admin owner</b><span>To try the screens before release and sign off the import preview.</span></label></li>
     </ul>
   </div>
@@ -408,7 +408,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     ["Mission identity", [
       ["A", "Month", "", "auto", "A", "-", "", "Comes from the suffix period, so nobody picks it.", "Always filled. 11 months used."],
       ["B", "Mission No. (Last year)", "", "auto", "A", "-", "", "Filled by the year-end step from the previous number.", "54 rows, 16 missions continued from 2025."],
-      ["C", "Mission No. (Current year)", "with suffix", "inapp", "D", "A", "special", "The yearly number is typed once from the ERP and checked against PREFIX.YY.NNNN. The suffix is generated by the monthly routine, never typed.", "338 distinct values, 160 missions, up to .AJ."],
+      ["C", "Mission No. (Current year)", "with suffix", "inapp", "D", "A", "special", "The yearly number is typed once from the Etraq and checked against PREFIX.YY.NNNN. The suffix is generated by the monthly routine, never typed.", "338 distinct values, 160 missions, up to .AJ."],
       ["D", "DATA ENTRY", "Status", "ask", "C", "A", "ask", "Unclear. The header says Data Entry, but the Rule sheet calls it Customer Type.", "IN USED 64 · UNUSED 274."],
     ]],
     ["Customer and job", [
