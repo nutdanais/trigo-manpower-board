@@ -2632,3 +2632,11 @@ I18N.add({
   "Your role cannot open employee profiles.": "บทบาทของคุณไม่สามารถเปิดโปรไฟล์พนักงานได้",
 });
 
+/* Day / Night lines ("Day: 3 missions · 4 crew") on the Overview card and the Present Today slide.
+   The mission count sits in a text node of its own that ends in " ·"; "{a} mission{b}" took "3 missions ·"
+   whole and dropped the dot (only 1 and 2 had a word of their own), so the Thai ran the count into the crew.
+   {num} makes these the longer pattern, which is tried first. */
+I18N.add({}, {
+  "{num} mission ·": "{num} มิชชั่น ·",
+  "{num} missions ·": "{num} มิชชั่น ·",
+});
