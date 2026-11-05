@@ -2091,6 +2091,7 @@ I18N.add({
   "Chart style": "รูปแบบกราฟ",
   "Line": "เส้น",
   "Bars": "แท่ง",
+  "Stacked": "แท่งซ้อน",
   "Free": "ว่าง",
   "Permanent deployed / day": "ประจำที่ปฏิบัติงาน / วัน",
   "Deployed by service area": "ปฏิบัติงานตามพื้นที่บริการ",

@@ -304,7 +304,8 @@ const Charts = (() => {
       for (let i = 0; i < n; i++) {
         const t = totals[i];
         if (!t) continue;   // an empty column (or a null day) gets no "0"
-        const top = stacks.reduce((a, st) => a + (st.values[i] || 0), 0);
+        // above the column, or above the pale `ghost` bar behind it when that reaches higher (a part of a total)
+        const top = Math.max(stacks.reduce((a, st) => a + (st.values[i] || 0), 0), ghost && ghost.values[i] != null ? ghost.values[i] : 0);
         marks += `<text x="${xAt(i).toFixed(1)}" y="${(yAt(top) - 5).toFixed(1)}" class="chart-total" text-anchor="middle">${esc(t)}</text>`;
       }
     }

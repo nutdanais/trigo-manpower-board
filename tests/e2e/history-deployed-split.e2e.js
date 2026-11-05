@@ -1,7 +1,8 @@
 /* Acceptance run for Overview → History: Deployed / day split, and On-call free.
      - Deployed / day: chips for Total, Permanent and On-call (each shows or hides, never all off), each with its
        average a day; Total alone is the plain line it always was; any other pick draws one line a series, or
-       bars side by side with one colour a series (Line | Bars);
+       bars side by side with one colour a series, or Stacked: Permanent and On-call piled in one bar a day
+       with the day's total above it (Line | Bars | Stacked);
      - Split by Service area: a stacked column a day, one colour per area, each day's total above it, a chip per
        area (with its average) that shows or hides it, counted by the person's OWN area (not the host's);
      - both follow Side by side (one small chart a board on one scale);
@@ -76,14 +77,16 @@ async function step(name, fn) {
     const title = () => read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head b");
     const dots = () => p.evaluate(() => [...document.querySelectorAll(".chart-line-chart circle.chart-dot")].map((c) => c.dataset.tipLabel.split(" — ")[0] + "=" + c.dataset.tipValue));
     // every column segment of the chart: "Series — day · total" → value
-    const marks = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart rect.chart-mark")].map((r) => ({ label: r.dataset.tipLabel, value: r.dataset.tipValue, fill: r.getAttribute("fill"), x: Number(r.getAttribute("x")) })));
+    const marks = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart rect.chart-mark")].map((r) => ({ label: r.dataset.tipLabel, value: r.dataset.tipValue, fill: r.getAttribute("fill"), x: Number(r.getAttribute("x")), y: Number(r.getAttribute("y")), h: Number(r.getAttribute("height")) })));
+    const totalsText = () => read(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart .chart-total");
+    const totalsY = () => p.evaluate(() => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart .chart-total")].map((t) => Number(t.getAttribute("y"))));
 
     await step("Total alone is the plain line: chips with their averages, Split by and Line | Bars", async () => {
       assert.deepEqual(await title(), ["Deployed / day, day by day"]);
       assert.deepEqual(await chips(), ["Total 3.4 / day", "Permanent 2.6 / day", "On-call 0.8 / day"], "17, 13 and 4 person-days over 5 working days");
       assert.deepEqual(await pressed(), ["true", "false", "false"]);
       assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .ov-htool .btn"), ["Permanent / on-call", "Service area"]);
-      assert.deepEqual(await read(".ov-dep-chips .ov-htool .btn"), ["Line", "Bars"]);
+      assert.deepEqual(await read(".ov-dep-chips .ov-htool .btn"), ["Line", "Bars", "Stacked"]);
       assert.equal(await p.locator(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-line-chart polyline").count(), 1, "the one line");
       assert.ok((await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-line-chart text.chart-axis-label")).includes("avg"), "and its average rule");
       assert.equal(await p.locator(".ov-hchart:not(.ov-eng):not(.ov-spread) .chart-column-chart").count(), 0);
@@ -128,6 +131,47 @@ async function step(name, fn) {
       assert.deepEqual(await pressed(), ["false", "false", "true"], "On-call, the last one on, stays on");
       assert.equal((await marks()).length, 3, "On-call bars: Mon 1, Tue 1, Thu 2");
       await chip("Total");
+    });
+
+    await step("Stacked: Permanent and On-call piled in one bar a day, the day's total behind and above it", async () => {
+      await p.evaluate(() => { state.overview.historyDeployedShow = ["total", "perm", "oncall"]; state.overview.historyDeployedStyle = "line"; render(); });
+      await p.waitForTimeout(200);
+      await seg("Stacked");
+      assert.equal(await p.evaluate(() => state.overview.historyDeployedStyle), "stacked");
+      let m = await marks();
+      const of = (name) => m.filter((x) => x.label.startsWith(name + " — "));
+      const mon = (name) => of(name).find((x) => dayOf(x) === MON);
+      assert.deepEqual(of("Permanent").map((x) => x.value), ["4", "3", "4", "1", "1"]);
+      assert.deepEqual(of("On-call").map((x) => x.value), ["1", "1", "2"], "Mon, Tue, Thu");
+      assert.deepEqual(of("Total").map((x) => x.value), ["5", "4", "4", "3", "1"], "the pale bar behind each stack is the day's total");
+      assert.equal(mon("Permanent").x, mon("On-call").x, "one bar: the same place, not side by side");
+      assert.ok(Math.abs(mon("Permanent").y - (mon("On-call").y + mon("On-call").h)) < 0.3, "On-call sits on top of Permanent");
+      assert.ok(Math.abs(mon("Total").y - mon("On-call").y) < 0.3, "the stack reaches the total");
+      assert.deepEqual([mon("Permanent").fill, mon("On-call").fill, mon("Total").fill], ["var(--chart-cat-3)", "var(--chart-oncall)", "var(--chart-assigned-ghost)"]);
+      assert.equal(mon("Permanent").label, `Permanent — ${MON} · 5 deployed`, "the total in the tooltip");
+      assert.deepEqual(await totalsText(), ["5", "4", "4", "3", "1"], "the day's total above each bar");
+
+      await chip("Total");   // off: just the two parts
+      m = await marks();
+      assert.equal(of("Total").length, 0, "no pale bar");
+      assert.equal(m.length, 8, "5 Permanent + 3 On-call");
+      assert.deepEqual(await totalsText(), [], "no totals above the bars");
+      assert.equal(of("Permanent")[0].label, `Permanent — ${MON}`, "no total in the tooltip either");
+
+      await chip("Total"); await chip("On-call");   // Total on, On-call off: Permanent is a share of the total
+      m = await marks();
+      assert.equal(of("On-call").length, 0);
+      assert.deepEqual(of("Total").map((x) => x.value), ["5", "4", "4", "3", "1"]);
+      assert.ok(mon("Total").y < mon("Permanent").y - 1, "the pale total bar stands above the Permanent bar");
+      assert.deepEqual(await totalsText(), ["5", "4", "4", "3", "1"], "the total, not the Permanent figure");
+      assert.ok((await totalsY())[0] < mon("Total").y, "and the figure sits above the pale bar");
+
+      await chip("Permanent");   // only Total on: it is the bar
+      m = await marks();
+      assert.deepEqual(m.map((x) => [x.label.split(" — ")[0], x.value, x.fill]), ["5", "4", "4", "3", "1"].map((v) => ["Total", v, "var(--chart-assigned)"]));
+      assert.deepEqual(await totalsText(), []);
+      await chip("Permanent"); await chip("On-call");
+      assert.deepEqual(await pressed(), ["true", "true", "true"]);
     });
 
     await step("Split by Service area: a stacked column a day, an area per colour, the day's total above it", async () => {
@@ -184,6 +228,10 @@ async function step(name, fn) {
       await p.waitForTimeout(300);
       assert.deepEqual(await read(".ov-small-head .ov-muted"), ["Total 3.0", "Permanent 2.2", "Total 2.0", "Permanent 2.0"]);
       assert.equal(await p.locator(".ov-small .chart-column-chart").count(), 2);
+      await p.evaluate(() => { state.overview.historyDeployedStyle = "stacked"; render(); });
+      await p.waitForTimeout(300);
+      assert.equal(await p.locator(".ov-small .chart-column-chart").count(), 2, "Stacked follows Side by side too");
+      assert.deepEqual(await read(".ov-small-head .ov-muted"), ["Total 3.0", "Permanent 2.2", "Total 2.0", "Permanent 2.0"]);
     });
 
     await step("A vs B: one series as a line is two lines, a board each", async () => {
@@ -245,6 +293,9 @@ async function step(name, fn) {
       await p.evaluate(() => { state.overview.historyDeployedShow = ["total", "perm", "oncall"]; state.overview.historyDeployedStyle = "bars"; state.overview.historyDeployedBy = "contract"; render(); });
       await p.waitForTimeout(250);
       assert.deepEqual(english(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head, .ov-dep-chips")), [], "Bars in Thai");
+      await p.evaluate(() => { state.overview.historyDeployedStyle = "stacked"; render(); });
+      await p.waitForTimeout(250);
+      assert.deepEqual(english(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head, .ov-dep-chips")), [], "Stacked in Thai");
       await p.evaluate(() => { state.overview.historyDeployedBy = "area"; render(); });
       await p.waitForTimeout(250);
       assert.deepEqual(english(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head, .ov-dep-chips, .ov-dep-note")), [], "by service area in Thai");
@@ -257,10 +308,11 @@ async function step(name, fn) {
       await p.evaluate(() => I18N.setLang("en"));
     });
 
-    await step("on a phone (400 px) the chips, Bars, the area stack and Free fit the page", async () => {
+    await step("on a phone (400 px) the chips, Bars, Stacked, the area stack and Free fit the page", async () => {
       await p.setViewportSize({ width: 400, height: 800 });
       for (const more of [
         { historyDeployedShow: ["total", "perm", "oncall"], historyDeployedStyle: "bars" },
+        { historyDeployedShow: ["total", "perm", "oncall"], historyDeployedStyle: "stacked" },
         { historyDeployedBy: "area" },
         { historyMeasure: "oncall", historyOncallMode: "free" },
       ]) {

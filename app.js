@@ -545,7 +545,7 @@ const state = {
     historyOncallMode: "count",   // the On-call view: "count" | "share" | "free" (on-call available and not on a mission)
     historyDeployedBy: "contract",   // the Deployed view's split: "contract" (Total / Permanent / On-call) | "area" (service area)
     historyDeployedShow: ["total"],  // Deployed by contract: the series drawn (OV_DEPLOYED_SERIES keys); Total alone is the plain line
-    historyDeployedStyle: "line",    // Deployed by contract: "line" | "bars" (side by side, one colour a series)
+    historyDeployedStyle: "line",    // Deployed by contract: "line" | "bars" (side by side, one colour a series) | "stacked" (Permanent + On-call piled up)
     historyAreaHidden: [],           // Deployed by service area: areas switched off ("" is No area)
     historyLY: null,              // getUtilizationRange over the range moved back 364 days; fetched only when "ly" is chosen
     historyLYKey: null,
@@ -4697,7 +4697,7 @@ function historyDeployedContractView(m, ctx, pendingCharts, tools) {
   const picked = new Set(ov.historyDeployedShow || []);
   let shown = OV_DEPLOYED_SERIES.filter(s => picked.has(s.key));
   if (!shown.length) shown = [OV_DEPLOYED_SERIES[0]];
-  const style = ov.historyDeployedStyle === "bars" ? "bars" : "line";
+  const style = ov.historyDeployedStyle === "bars" ? "bars" : ov.historyDeployedStyle === "stacked" ? "stacked" : "line";
   const on = new Set(shown.map(s => s.key));
   for (const s of OV_DEPLOYED_SERIES) {
     tools.below.appendChild(historyDeployedChip({ color: s.color, label: s.label, avg: historyMean(ctx.recs.map(r => (r ? s.value(r) : null))), pressed: on.has(s.key),
@@ -4709,7 +4709,7 @@ function historyDeployedContractView(m, ctx, pendingCharts, tools) {
         render();
       } }));
   }
-  tools.below.appendChild(ovSegEl("Style", "Chart style", [["line", "Line"], ["bars", "Bars"]], style, (k) => { ov.historyDeployedStyle = k; }));
+  tools.below.appendChild(ovSegEl("Style", "Chart style", [["line", "Line"], ["bars", "Bars"], ["stacked", "Stacked"]], style, (k) => { ov.historyDeployedStyle = k; }));
   // one series as a line is the tile's own chart: its comparison, average, A vs B and Side by side all stay
   if (shown.length === 1 && style === "line") {
     const s = shown[0];
@@ -4724,9 +4724,22 @@ function historyDeployedContractView(m, ctx, pendingCharts, tools) {
     box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-dep-note", textContent: "The comparison is drawn when one series is shown as a line." }));
   }
   const rowsOf = (arr) => shown.map(s => ({ s, vals: ctx.mean(arr, s.value) }));
+  const perDay = ctx.group === "day" ? "" : " / day";
+  // the tallest each bucket gets, for the axis: the biggest series, or (Stacked) the parts piled up, or the total if that is higher
+  const topsOf = (rows) => (style !== "stacked" ? rows.flatMap(x => x.vals).filter(v => v != null)
+    : ctx.buckets.map((_, i) => Math.max(rows.reduce((a, x) => a + (x.s.key === "total" ? 0 : x.vals[i] || 0), 0), ...rows.filter(x => x.s.key === "total").map(x => x.vals[i] || 0))));
   const draw = (wrap, arr, yMax, h) => {
     const rows = rowsOf(arr);
-    if (style === "bars") {
+    if (style === "stacked") {
+      // Permanent at the bottom, On-call on top: one bar a day. Total is not a part but the whole: a pale bar behind the
+      // stack and its figure above it (with one part hidden, the part reads as a share of that whole). With no part on, Total is the bar.
+      const parts = rows.filter(({ s }) => s.key !== "total"), total = rows.find(({ s }) => s.key === "total");
+      const whole = total && parts.length ? total.vals : null;
+      fillColumnChart(wrap, { stacks: (parts.length ? parts : rows).map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
+        ghost: whole ? { label: "Total", color: "var(--chart-assigned-ghost)", values: whole } : null, totals: whole,
+        dayTotals: whole ? whole.map(v => (v == null ? null : `${v} deployed${perDay}`)) : null,
+        xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
+    } else if (style === "bars") {
       fillColumnChart(wrap, { grouped: true, stacks: rows.map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
         xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
     } else {
@@ -4737,7 +4750,7 @@ function historyDeployedContractView(m, ctx, pendingCharts, tools) {
   if (ctx.side) {
     historySideBySide(box, ctx, pendingCharts, (bs) => {
       const arr = ctx.recsOf(bs), rows = rowsOf(arr);
-      return { vals: rows[0].vals, yVals: rows.flatMap(x => x.vals), cmp: null, suffix: "",
+      return { vals: rows[0].vals, yVals: topsOf(rows), cmp: null, suffix: "",
         notes: rows.map(({ s, vals }) => { const mean = historyMean(vals.filter(v => v != null)); return `${s.label} ${mean == null ? "—" : fmt1(mean)}`; }),
         draw: (wrap, yMax) => draw(wrap, arr, yMax, 130) };
     });
@@ -4745,7 +4758,7 @@ function historyDeployedContractView(m, ctx, pendingCharts, tools) {
     const wrap = document.createElement("div");
     wrap.className = "ov-trend-chart";
     box.appendChild(wrap);
-    pendingCharts.push(() => draw(wrap, ctx.recs, Charts.niceMax(rowsOf(ctx.recs).flatMap(x => x.vals).filter(v => v != null)), 220));
+    pendingCharts.push(() => draw(wrap, ctx.recs, Charts.niceMax(topsOf(rowsOf(ctx.recs))), 220));
   }
   return box;
 }

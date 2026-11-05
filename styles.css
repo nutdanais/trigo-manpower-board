@@ -90,6 +90,7 @@
   --leave-unpaid: #7b8794;
   --leave-exchange: #1baf7a;
   --oncall-ghost: #fbe1d5;
+  --chart-assigned-ghost: rgba(42,120,214,.2);   /* Deployed / day, Stacked: the pale Total bar behind the Permanent and On-call parts */
   --oncall-free: #f2a07b;   /* On-call free columns: the on-call orange, lighter (between --oncall-ghost and --chart-oncall) */
   --chart-cat-1: #2a78d6;
   --chart-cat-2: #eb6834;
