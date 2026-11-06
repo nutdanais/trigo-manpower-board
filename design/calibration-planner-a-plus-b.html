@@ -204,6 +204,8 @@ table.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
 .steps div{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
 .steps b{display:block;margin-bottom:2px}
 .steps p{font-size:13px;color:#44536C}
+.rl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;font-weight:600;margin-top:4px}
+.rl select{padding:3px 8px;font-size:13px}
 </style>
 
 <!--/head-->
@@ -251,8 +253,9 @@ table.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
       <div class="panel">
         <div class="rules">
           <div class="rule"><label for="s-win">Pull forward at most <output id="s-win-o">13 weeks · about 3 mo</output></label><input type="range" id="s-win" min="1" max="13" value="13"></div>
-          <div class="rule"><label class="chk"><input type="checkbox" id="s-type" checked> Spread each tool type too</label><label class="chk"><input type="checkbox" id="s-inh"> Only move in-house tools</label></div>
-          <p class="small mut" style="flex:2 1 280px">Each tool goes to the nearest earlier week at or below the target, and two of the same type avoid the same week where they can. Nothing moves past its due date. Tools already planned or placed by hand stay where they are.</p>
+          <div class="rule"><label class="rl" for="s-keep">Keep at least <select id="s-keep"><option>0</option><option selected>1</option><option>2</option><option>3</option></select> of each type in service</label>
+            <label class="rl" for="s-scope">Count tools <select id="s-scope"><option value="site" selected>at each site</option><option value="all">across all sites</option></select></label><label class="chk"><input type="checkbox" id="s-inh"> Only move in-house tools</label></div>
+          <p class="small mut" style="flex:2 1 280px">Each tool goes to the nearest earlier week at or below the target that keeps its type in service. Nothing moves past its due date. Tools already planned or placed by hand stay where they are.</p>
         </div>
       </div>
     </div>
@@ -287,11 +290,12 @@ table.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
     </ul></div>
     <div class="panel"><h3>Decided</h3><ul>
       <li>No lab limit. The weekly target only keeps tools evenly available to engineers.</li>
+      <li>Keep at least one tool of each type in service. The mockup counts this at each site, and can count across all sites.</li>
       <li>A tool may be calibrated up to 3 months early, as a one-time spread.</li>
       <li>After that, each tool's next due date follows its new calibration date.</li>
     </ul></div>
     <div class="panel"><h3>Still to confirm</h3><ul>
-      <li>Should the assistant keep at least one tool of each type in service? The "Spread each tool type" option is a first version of that.</li>
+      <li>Is "in service" counted at each site, or across all sites? The mockup defaults to each site.</li>
       <li>Who is allowed to plan moves, and who approves them?</li>
       <li>Are any tools left out of spreading, such as critical ones?</li>
     </ul></div>
@@ -425,40 +429,54 @@ function statusHTML(){
 /* ---------- state: one planner, two modes ---------- */
 const HZ={'13w':13,'6m':26,'12m':52,'all':MAXW};
 const K={hz:'6m'}, KH={'13w':13,'6m':26,'12m':52};
-const S={tools:makeTools(),hz:'12m',prevHz:'12m',cap:4,mode:'list',week:null,cat:'',lab:'',q:'',menu:null,note:null,win:13,inh:false,type:true,off:new Set(),manual:new Map(),undo:null};
+const S={tools:makeTools(),hz:'12m',prevHz:'12m',cap:4,mode:'list',week:null,cat:'',lab:'',q:'',menu:null,note:null,win:13,inh:false,keep:1,scope:'site',off:new Set(),manual:new Map(),undo:null};
 const pTool=id=>S.tools.find(t=>t.id===id);
 const pFixed=t=>S.manual.has(t.id)||!!t.plan;
 
 /* ---------- spread rules (mode B) ---------- */
+function groupInfo(){
+  const gk=t=>S.scope==='site'?t.site+'|'+t.cat:t.cat;
+  const gsize={};S.tools.forEach(t=>{const k=gk(t);gsize[k]=(gsize[k]||0)+1;});
+  const maxOut=t=>{if(!S.keep)return Infinity;const n=gsize[gk(t)];return n<=S.keep?Infinity:n-S.keep;};
+  const keys=Object.keys(gsize);
+  return {gk,gsize,maxOut,total:keys.length,singles:S.keep?keys.filter(k=>gsize[k]<=S.keep).length:0};
+}
 function sPropose(){
+  const G=groupInfo();
   const byW=Array.from({length:MAXW},()=>[]);
   S.tools.forEach(t=>byW[S.manual.has(t.id)?S.manual.get(t.id):calWeek(t)].push(t));
-  const cur=countsOf(S.tools),moves=[],stuck=[];
+  const cur=countsOf(S.tools),moves=[],stuck=[],stuckG=[];
+  const room=(tw,t)=>byW[tw].length<S.cap&&byW[tw].filter(x=>G.gk(x)===G.gk(t)).length<G.maxOut(t);
+  const relocate=(t,w)=>{
+    for(let tw=w-1;tw>=Math.max(1,w-S.win);tw--){
+      if(!room(tw,t))continue;
+      const plan=addDays(t.due,-7*(w-tw));
+      if(dIn(plan)<1)continue;
+      byW[w]=byW[w].filter(x=>x!==t);byW[tw].push(t);
+      moves.push({t,from:w,to:tw,plan});return true;
+    }
+    return false;
+  };
+  const movable=t=>!pFixed(t)&&(!S.inh||t.lab==='In-house');
+  const order=(a,b)=>(a.lab==='In-house'?0:1)-(b.lab==='In-house'?0:1)||b.due-a.due;
   for(let w=0;w<MAXW;w++){
+    /* 1) a type with too few tools left in service this week */
+    const groups={};byW[w].forEach(t=>{(groups[G.gk(t)]=groups[G.gk(t)]||[]).push(t);});
+    Object.keys(groups).forEach(k=>{
+      const arr=groups[k];let ex=arr.length-G.maxOut(arr[0]);
+      if(!(ex>0))return;
+      for(const t of arr.filter(movable).sort(order)){if(ex<=0)break;if(relocate(t,w))ex--;}
+      if(ex>0)stuckG.push({w,key:k,over:ex});
+    });
+    /* 2) more than the weekly target */
     let over=byW[w].length-S.cap;
     if(over<=0)continue;
-    const same=t=>byW[w].filter(x=>x.cat===t.cat).length;
-    const cand=byW[w].filter(t=>!pFixed(t)&&(!S.inh||t.lab==='In-house')).sort((a,b)=>(S.type?same(b)-same(a):0)||(a.lab==='In-house'?0:1)-(b.lab==='In-house'?0:1)||b.due-a.due);
-    for(const t of cand){
-      if(over<=0)break;
-      const tryMove=strict=>{
-        for(let tw=w-1;tw>=Math.max(1,w-S.win);tw--){
-          if(byW[tw].length>=S.cap)continue;
-          if(strict&&byW[tw].some(x=>x.cat===t.cat))continue;
-          const plan=addDays(t.due,-7*(w-tw));
-          if(dIn(plan)<1)continue;
-          byW[w]=byW[w].filter(x=>x!==t);byW[tw].push(t);
-          moves.push({t,from:w,to:tw,plan});return true;
-        }
-        return false;
-      };
-      if((S.type&&tryMove(true))||tryMove(false))over--;
-    }
+    for(const t of byW[w].filter(movable).sort(order)){if(over<=0)break;if(relocate(t,w))over--;}
     if(over>0)stuck.push({w,over});
   }
   S.manual.forEach((to,id)=>{const t=pTool(id),from=weekOf(t.due);moves.push({t,from,to,plan:to>=from?t.due:addDays(t.due,-7*(from-to)),manual:true});});
   moves.sort((a,b)=>a.from-b.from||(a.manual?1:0)-(b.manual?1:0)||a.t.due-b.t.due||a.t.code.localeCompare(b.t.code));
-  return {cur,moves,stuck};
+  return {cur,moves,stuck,stuckG,G};
 }
 const sActive=mv=>mv.manual||!S.off.has(mv.t.id);
 function sFinal(p){
@@ -491,7 +509,8 @@ function spreadHTML(p,fin,after){
   const on=p.moves.filter(mv=>sActive(mv)&&mv.to!==calWeek(mv.t)),nMan=S.manual.size;
   const overB=p.cur.filter(c=>c>S.cap).length,overA=after.filter(c=>c>S.cap).length;
   const avg=on.length?on.reduce((a,m)=>a+(weekOf(m.t.due)-m.to),0)/on.length:0,mx=Math.max(0,...on.map(m=>weekOf(m.t.due)-m.to));
-  const clash=f=>{const k={};S.tools.forEach(t=>{const key=f(t)+'|'+t.cat;k[key]=(k[key]||0)+1;});return Object.values(k).filter(v=>v>1).length;};
+  const G=p.G;
+  const clash=f=>{const k={};S.tools.forEach(t=>{const key=f(t)+'#'+G.gk(t);(k[key]=k[key]||{n:0,t}).n++;});return Object.values(k).filter(v=>v.n>G.maxOut(v.t)).length;};
   const clB=clash(t=>calWeek(t)),clA=clash(t=>fin.get(t.id));
   const low=lowestTarget();
   let h=`<div class="small mut" style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">Lowest target that works with these rules: <b style="color:var(--ink)">${low===null?'none up to 10':low+' per week'}</b>${low!==null&&low!==S.cap?`<button class="btn sm" data-act="p:lowest" data-v="${low}">Use ${low}</button>`:''}</div>
@@ -499,9 +518,11 @@ function spreadHTML(p,fin,after){
     <div class="kpi"><small>Weeks above target</small><b>${overB}<i>→</i>${overA}</b></div>
     <div class="kpi"><small>Tools to move</small><b>${on.length}</b>${nMan?`<small style="margin-top:2px">${nMan} by hand</small>`:''}</div>
     <div class="kpi"><small>Pulled forward, average</small><b>${avg.toFixed(1)} wk</b><small style="margin-top:2px">longest ${mx} wk</small></div>
-    <div class="kpi"><small>Same type twice in a week</small><b>${clB}<i>→</i>${clA}</b></div></div>`;
+    <div class="kpi"><small>Type short in a week</small><b>${clB}<i>→</i>${clA}</b><small style="margin-top:2px">${S.keep?`needs ${S.keep} in service`:'rule is off'}</small></div></div>`;
+  if(G.singles)h+=`<div class="small mut" style="margin-top:8px">${G.singles} of ${G.total} ${S.scope==='site'?'site and type groups have':'types have'} ${S.keep} ${plural(S.keep,'tool','tools')} or fewer, so they cannot keep ${S.keep} in service and are left out of this rule.</div>`;
   h+=sWeekPanel(after,fin);
   if(p.stuck.length)h+=`<div class="note warn" style="margin-top:12px">Still above the target: ${p.stuck.map(s=>`week of ${fmt(wStart(s.w))} (${s.over})`).join(', ')}. Raise the target${S.inh?', allow outside-lab tools':''}, or move tools by hand.</div>`;
+  if(p.stuckG.length)h+=`<div class="note warn" style="margin-top:12px">Still short in service: ${p.stuckG.map(s=>`${s.key.replace('|',' · ')}, week of ${fmt(wStart(s.w))}`).join('; ')}. Allow outside-lab tools, widen the window, or move tools by hand.</div>`;
   if(nMan)h+=`<div class="note" style="margin-top:12px;background:#E6EDF7;color:var(--navy)">${nMan} ${plural(nMan,'tool is','tools are')} placed by hand. The rules keep them where you put them and rebalance the others around them.<button class="btn sm" data-act="p:clearmanual">Clear manual changes</button></div>`;
   if(on.length)h+=`<div class="bar-row" style="margin:12px 0 0"><button class="btn pri" data-act="p:apply">Plan ${on.length} calibrations</button><span class="small mut">Sets a planned date on each tool. Due dates stay until the calibration is done.</span></div>`;
   else h+=`<div class="note ok" style="margin-top:12px">Nothing to move. Every week is at or below the target.</div>`;
@@ -665,7 +686,8 @@ $('#p-q').addEventListener('input',e=>{S.q=e.target.value;render();});
 $('#p-cat').addEventListener('change',e=>{S.cat=e.target.value;render();});
 $('#p-lab').addEventListener('change',e=>{S.lab=e.target.value;render();});
 $('#s-win').addEventListener('input',e=>{S.win=+e.target.value;$('#s-win-o').textContent=winLabel();resetSpread();render();});
-$('#s-type').addEventListener('change',e=>{S.type=e.target.checked;resetSpread();render();});
+$('#s-keep').addEventListener('change',e=>{S.keep=+e.target.value;resetSpread();render();});
+$('#s-scope').addEventListener('change',e=>{S.scope=e.target.value;resetSpread();render();});
 $('#s-inh').addEventListener('change',e=>{S.inh=e.target.checked;resetSpread();render();});
 render();
 
