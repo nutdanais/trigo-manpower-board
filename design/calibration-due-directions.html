@@ -50,7 +50,7 @@ button{font:inherit}
 .how p{font-size:13px;color:#44536C;margin-top:4px}
 
 /* buttons, pills, controls */
-.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;font-weight:600;color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.btn{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;font-weight:600;color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:13px}
 .btn:hover{background:#F1F5FA}
 .btn.pri{background:var(--green-d);border-color:var(--green-d);color:#fff}
 .btn.pri:hover{background:#086847}
@@ -165,8 +165,11 @@ input[type=search]{flex:1 1 180px}
 .kpi b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
 .kpi b i{font-style:normal;color:var(--mut);font-weight:600;margin:0 4px}
 .mv{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:10px}
-.mvr{display:grid;grid-template-columns:28px minmax(130px,1.2fr) minmax(150px,1.4fr) 80px 100px;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px;min-width:560px}
-.mvr.off{opacity:.45}
+.mvr{display:grid;grid-template-columns:28px minmax(120px,1.1fr) minmax(130px,1.2fr) minmax(170px,1.3fr) 90px 116px;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px;min-width:700px}
+.mvr.off,.wkr.off{opacity:.5}
+.wkr{display:grid;grid-template-columns:minmax(130px,1.2fr) 100px minmax(220px,1.6fr) 90px 80px;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px;min-width:660px}
+.pill.navy{background:#DCE6F4;color:var(--navy)}
+.slot.full{border-color:#E9C877;background:var(--amber-bg)}
 .mvr input{accent-color:var(--green-d);width:16px;height:16px}
 
 /* C board */
@@ -279,7 +282,7 @@ table.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
 </section>
 
 <section id="option-b">
-  <div class="sec-h"><span class="badge">B</span><div><h2>Spread assistant</h2><p>Set a limit per week and how early a tool may be pulled. The assistant proposes every move, shows before and after on the chart, and you untick what you disagree with.</p></div><span class="pill">Build: medium</span></div>
+  <div class="sec-h"><span class="badge">B</span><div><h2>Spread assistant</h2><p>Set a limit per week and how early a tool may be pulled. The assistant proposes every move and shows before and after on the chart. Untick moves you disagree with, or move any tool by hand and the rules rebalance the others around it.</p></div><span class="pill">Build: medium</span></div>
   <div class="frame" id="b-root">
     <div class="appbar">Dashboard › Tools › Calibration planner › <b>Spread assistant</b></div>
     <div class="b-grid">
@@ -295,10 +298,10 @@ table.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
       <div id="b-out" style="min-width:0"></div>
     </div>
   </div>
-  <p class="try"><b>Try it:</b> lower the limit to 3 or the window to 2 weeks and watch what can no longer be placed. Then untick a few moves and apply.</p>
+  <p class="try"><b>Try it:</b> lower the limit to 3 or the window to 2 weeks and watch what can no longer be placed. Then click a bar (try the week of 29 Mar), press Move… on a tool and pick a week by hand. Pick a full (amber) week and watch the rules move other tools out of it.</p>
   <div class="gw">
-    <div class="panel"><h3>Good</h3><ul><li>Fixes a whole fleet in one go, and shows the effect first.</li><li>The dashed bars show where each week was before.</li><li>Rules are visible, so the result is easy to explain to a lab.</li></ul></div>
-    <div class="panel"><h3>Watch</h3><ul><li>Less control over which tool goes where.</li><li>A good result depends on the limit being right. It needs a setting for lab capacity.</li></ul></div>
+    <div class="panel"><h3>Good</h3><ul><li>Fixes a whole fleet in one go, and shows the effect first.</li><li>The dashed bars show where each week was before.</li><li>Rules are visible, so the result is easy to explain to a lab.</li><li>Override anything: change a proposed week, or move a tool the rules left alone.</li></ul></div>
+    <div class="panel"><h3>Watch</h3><ul><li>Hand moves are fixed points: the rules rebalance the other tools around them, and a full week you choose is only flagged over the limit if the rules can't make room.</li><li>A good result depends on the limit being right. It needs a setting for lab capacity.</li></ul></div>
   </div>
 </section>
 
@@ -334,7 +337,7 @@ table.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
     <table class="cmp">
       <tr><th></th><th>See beyond 13 weeks</th><th>Spread the load</th><th>Control</th><th>Build</th></tr>
       <tr><td><b>A</b> Planner page</td><td>Full timeline and every tool in a list</td><td>By hand, one tool at a time, with free weeks suggested</td><td>High</td><td>Medium: a page and one new date field</td></tr>
-      <tr><td><b>B</b> Spread assistant</td><td>Timeline only, plus the list of moves</td><td>Automatic for the whole fleet, with a preview</td><td>Medium: tick or untick each move</td><td>Medium: needs the date field and the move rules</td></tr>
+      <tr><td><b>B</b> Spread assistant</td><td>Timeline only, plus the list of moves</td><td>Automatic for the whole fleet, with a preview</td><td>Medium to high: tick moves, change a week, or move any tool by hand</td><td>Medium: needs the date field and the move rules</td></tr>
       <tr><td><b>C</b> Week board</td><td>One week at a time, strip to jump</td><td>By dragging, fast for clusters</td><td>High and visual</td><td>Large: drag and drop, touch fallback</td></tr>
     </table>
   </div>
@@ -566,15 +569,15 @@ function renderA(){
 const aTool=id=>A.tools.find(t=>t.id===id);
 
 /* ---------- B: spread assistant ---------- */
-const B={tools:makeTools(),limit:5,win:10,inh:false,off:new Set(),applied:false};
+const B={tools:makeTools(),limit:5,win:10,inh:false,off:new Set(),manual:new Map(),applied:false,week:null,menu:null};
 function bPropose(){
   const byW=Array.from({length:MAXW},()=>[]);
-  B.tools.forEach(t=>byW[weekOf(t.due)].push(t));
-  const base=byW.map(a=>a.length),moves=[],stuck=[];
+  B.tools.forEach(t=>byW[B.manual.has(t.id)?B.manual.get(t.id):weekOf(t.due)].push(t));
+  const base=dueCounts(B.tools),moves=[],stuck=[];
   for(let w=0;w<MAXW;w++){
     let over=byW[w].length-B.limit;
     if(over<=0)continue;
-    const cand=byW[w].slice().filter(t=>!B.inh||t.lab==='In-house').sort((a,b)=>(a.lab==='In-house'?0:1)-(b.lab==='In-house'?0:1)||b.due-a.due);
+    const cand=byW[w].filter(t=>!B.manual.has(t.id)&&(!B.inh||t.lab==='In-house')).sort((a,b)=>(a.lab==='In-house'?0:1)-(b.lab==='In-house'?0:1)||b.due-a.due);
     for(const t of cand){
       if(over<=0)break;
       for(let tw=w-1;tw>=Math.max(1,w-B.win);tw--){
@@ -587,38 +590,71 @@ function bPropose(){
     }
     if(over>0)stuck.push({w,over});
   }
+  B.manual.forEach((to,id)=>{const t=B.tools.find(x=>x.id===id),from=weekOf(t.due);moves.push({t,from,to,plan:to>=from?t.due:addDays(t.due,-7*(from-to)),manual:true});});
+  moves.sort((a,b)=>a.from-b.from||(a.manual?1:0)-(b.manual?1:0)||a.t.due-b.t.due||a.t.code.localeCompare(b.t.code));
   return {base,moves,stuck};
 }
+const bActive=mv=>mv.manual||!B.off.has(mv.t.id);
+function bFinal(p){
+  const m=new Map();B.tools.forEach(t=>m.set(t.id,weekOf(t.due)));
+  p.moves.forEach(mv=>{if(bActive(mv))m.set(mv.t.id,mv.to);});
+  return m;
+}
+function bSlotsHTML(t,after,fin){
+  const dw=weekOf(t.due),my=fin.get(t.id),opts=[];
+  for(let w=dw-1;w>=Math.max(1,dw-B.win);w--){
+    const plan=addDays(t.due,-7*(dw-w));if(dIn(plan)<1)continue;
+    const used=after[w]-(w===my?1:0),full=used>=B.limit;
+    opts.push(`<button class="slot${full?' full':''}" data-act="b:slot" data-id="${t.id}" data-w="${w}">${fmt(plan)}<small>wk of ${fmt(wStart(w))} · ${used}/${B.limit} used · ${dw-w} wk early${full?' · over limit':''}</small></button>`);
+  }
+  return `<div class="slots"><div class="sl-t">Choose the week for ${t.code} (due ${fmt(t.due)}). A full week is allowed: the rules then move other tools out of it.</div>${opts.join('')}<button class="slot" data-act="b:slot" data-id="${t.id}" data-w="${dw}">Stay on due date<small>${fmt(t.due)}</small></button>${B.manual.has(t.id)?`<button class="slot" data-act="b:unmanual" data-id="${t.id}">Back to the suggestion<small>Let the rules decide</small></button>`:''}</div>`;
+}
+function bWeekPanel(after,fin){
+  const w=B.week;if(w===null)return '';
+  const rows=B.tools.filter(t=>weekOf(t.due)===w||fin.get(t.id)===w).sort((a,b)=>a.due-b.due||a.code.localeCompare(b.code));
+  let h=`<div class="panel" style="margin-top:12px"><div class="bar-row" style="margin-bottom:8px"><b>Week of ${fmt(wStart(w))}</b><span class="pill${after[w]>B.limit?' amber':''}">${after[w]} of ${B.limit}</span><span class="small mut">Move any tool by hand, whether or not the rules suggested it.</span><span class="grow"></span><button class="btn sm" data-act="b:closeweek">Close</button></div><div class="mv" style="margin-top:0">`;
+  rows.forEach(t=>{
+    const f=fin.get(t.id),dw=weekOf(t.due),man=B.manual.has(t.id);
+    const chip=f===w&&dw===w?'<span class="pill">Due this week</span>':f===w?`<span class="pill green">Pulled from ${fmt(wStart(dw))}</span>`:`<span class="pill green">Moving to ${fmt(wStart(f))}</span>`;
+    h+=`<div class="wkr${f!==w?' off':''}"><span><b>${t.code}</b> <span class="mut">${t.cat}</span></span><span>due ${fmt(t.due)}</span><span>${chip}${man?' <span class="pill navy">Manual</span>':''}</span><span class="mut">${t.lab}</span><button class="btn sm" data-act="b:menu" data-id="${t.id}">Move…</button></div>`;
+    if(B.menu===t.id)h+=bSlotsHTML(t,after,fin);
+  });
+  return h+'</div></div>';
+}
 function renderB(){
-  const p=bPropose(),on=p.moves.filter(m=>!B.off.has(m.t.id));
-  const after=p.base.slice();on.forEach(m=>{after[m.from]--;after[m.to]++;});
+  const p=bPropose(),fin=bFinal(p);
+  const on=p.moves.filter(mv=>bActive(mv)&&mv.to!==mv.from),nMan=B.manual.size;
+  const after=new Array(MAXW).fill(0);fin.forEach(w=>after[w]++);
   const overB=p.base.filter(c=>c>B.limit).length,overA=after.filter(c=>c>B.limit).length;
   const avg=on.length?on.reduce((a,m)=>a+(m.from-m.to),0)/on.length:0,mx=Math.max(0,...on.map(m=>m.from-m.to));
   const stuckN=p.stuck.reduce((a,s)=>a+s.over,0);
   let h=`<div class="kpis">
     <div class="kpi"><small>Weeks over limit</small><b>${overB}<i>→</i>${overA}</b></div>
-    <div class="kpi"><small>Tools moved</small><b>${on.length}</b></div>
+    <div class="kpi"><small>Tools moved</small><b>${on.length}</b>${nMan?`<small style="margin-top:2px">${nMan} by hand</small>`:''}</div>
     <div class="kpi"><small>Average pulled forward</small><b>${avg.toFixed(1)} wk</b></div>
     <div class="kpi"><small>Longest pulled forward</small><b>${mx} wk</b></div></div>
-    <div class="panel"><div class="bar-row" style="margin-bottom:8px"><b style="font-size:13px">Calibrations per week, before and after</b><span class="grow"></span>${legendHTML(B.limit,true)}</div>
-    <div class="chartwrap">${chartHTML({counts:after,ghost:p.base,from:0,to:MAXW,cap:B.limit,h:150,cid:'b'})}</div></div>`;
-  if(p.stuck.length)h+=`<div class="note warn" style="margin-top:12px">${stuckN} ${plural(stuckN,'tool','tools')} could not be placed: ${p.stuck.map(s=>`week of ${fmt(wStart(s.w))} (${s.over})`).join(', ')}. Raise the window or the limit${B.inh?', or allow outside-lab tools':''}.</div>`;
+    <div class="panel"><div class="bar-row" style="margin-bottom:8px"><b style="font-size:13px">Calibrations per week, before and after</b><span class="small mut">Click a bar to see its tools and move one by hand.</span><span class="grow"></span>${legendHTML(B.limit,true)}</div>
+    <div class="chartwrap">${chartHTML({counts:after,ghost:p.base,from:0,to:MAXW,cap:B.limit,sel:B.week,h:150,cid:'b'})}</div></div>`;
+  h+=bWeekPanel(after,fin);
+  if(p.stuck.length)h+=`<div class="note warn" style="margin-top:12px">Still over the limit: ${p.stuck.map(s=>`week of ${fmt(wStart(s.w))} (${s.over})`).join(', ')}. Raise the window or the limit${B.inh?', allow outside-lab tools':''}, or move tools by hand.</div>`;
+  if(nMan)h+=`<div class="note" style="margin-top:12px;background:#E6EDF7;color:var(--navy)">${nMan} ${plural(nMan,'tool is','tools are')} placed by hand. The rules keep them where you put them and rebalance the others around them.<button class="btn sm" data-act="b:clearmanual">Clear manual changes</button></div>`;
   if(B.applied)h+=`<div class="note ok" style="margin-top:12px">✓ ${on.length} calibrations planned. They now show as planned dates on the dashboard chart and in the planner.<button class="btn sm" data-act="b:undo">Undo</button></div>`;
   else if(on.length)h+=`<div class="bar-row" style="margin:12px 0 0"><button class="btn pri" data-act="b:apply">Plan ${on.length} calibrations</button><span class="small mut">Sets a planned date on each tool. Due dates stay until the calibration is done.</span></div>`;
   else h+=`<div class="note ok" style="margin-top:12px">Nothing to move. Every week is within the limit.</div>`;
   if(p.moves.length){
-    h+=`<div class="bar-row" style="margin:14px 0 0"><b style="font-size:13px">Proposed moves</b><span class="grow"></span><button class="btn sm" data-act="b:all" data-v="1">Select all</button><button class="btn sm" data-act="b:all" data-v="0">Select none</button></div><div class="mv">`;
+    h+=`<div class="bar-row" style="margin:14px 0 0"><b style="font-size:13px">Planned moves</b><span class="grow"></span><button class="btn sm" data-act="b:all" data-v="1">Select all</button><button class="btn sm" data-act="b:all" data-v="0">Select none</button></div><div class="mv">`;
     let cur=-1;
     p.moves.forEach(m=>{
       if(m.from!==cur){cur=m.from;h+=`<div class="gh2" style="top:0"><b>From week of ${fmt(wStart(m.from))}</b><span class="mut">${p.base[m.from]} due, limit ${B.limit}</span></div>`;}
-      const off=B.off.has(m.t.id);
-      h+=`<div class="mvr${off?' off':''}"><input type="checkbox" data-act="b:tog" data-id="${m.t.id}" ${off?'':'checked'} aria-label="Move ${m.t.code}"><span><b>${m.t.code}</b> <span class="mut">${m.t.cat}</span></span><span>${fmt(m.t.due)} → <b>${fmt(m.plan)}</b></span><span class="pill green">${m.from-m.to} wk early</span><span class="mut">${m.t.lab}</span></div>`;
+      const off=!m.manual&&B.off.has(m.t.id),stay=m.to===m.from;
+      h+=`<div class="mvr${off?' off':''}">${m.manual?'<span title="Placed by hand" style="text-align:center">✎</span>':`<input type="checkbox" data-act="b:tog" data-id="${m.t.id}" ${off?'':'checked'} aria-label="Move ${m.t.code}">`}<span><b>${m.t.code}</b> <span class="mut">${m.t.cat}</span></span><span>${stay?`Stays ${fmt(m.t.due)}`:`${fmt(m.t.due)} → <b>${fmt(m.plan)}</b>`}</span><span>${stay?'<span class="pill">Due date</span>':`<span class="pill green">${m.from-m.to} wk early</span>`}${m.manual?' <span class="pill navy">Manual</span>':''}</span><span class="mut">${m.t.lab}</span><button class="btn sm" data-act="b:menu" data-id="${m.t.id}">${m.manual?'Change':'Change week'}</button></div>`;
+      if(B.menu===m.t.id)h+=bSlotsHTML(m.t,after,fin);
     });
     h+='</div>';
   }
   $('#b-out').innerHTML=h;
 }
-function bReset(){B.off=new Set();B.applied=false;}
+function bReset(){B.off=new Set();B.applied=false;B.menu=null;}
 
 /* ---------- C: week board ---------- */
 const C={tools:makeTools(),start:15,cols:8,menu:null,drag:null,note:null};
@@ -661,6 +697,7 @@ function cMove(t,w){
 const CH={
   k:w=>{K.hint=`→ Planner opens on the week of ${fmt(wStart(w))} (${countsOf(BASE)[w]} ${plural(countsOf(BASE)[w],'tool','tools')})`;renderCards();},
   a:w=>{A.week=A.week===w?null:w;A.menu=null;renderA();},
+  b:w=>{B.week=B.week===w?null:w;B.menu=null;renderB();},
   cnav:w=>{C.start=Math.max(0,Math.min(MAXW-C.cols,w-3));renderC();}
 };
 const ACT={
@@ -673,7 +710,12 @@ const ACT={
     A.note={id:t.id,text:t.plan?`${t.code} planned for ${fmt(t.plan)}, ${weekOf(t.due)-calWeek(t)} wk before it is due. After that, the next due date is ${fmtY(nextDue(t))}.`:`${t.code} is back on its due date.`};renderA();},
   'a:undo':d=>{aTool(d.id).plan=null;A.note=null;renderA();},
   'b:tog':d=>{B.off.has(d.id)?B.off.delete(d.id):B.off.add(d.id);B.applied=false;renderB();},
-  'b:all':d=>{const p=bPropose();B.off=d.v==='1'?new Set():new Set(p.moves.map(m=>m.t.id));B.applied=false;renderB();},
+  'b:all':d=>{const p=bPropose();B.off=d.v==='1'?new Set():new Set(p.moves.filter(m=>!m.manual).map(m=>m.t.id));B.applied=false;renderB();},
+  'b:menu':d=>{B.menu=B.menu===d.id?null:d.id;renderB();},
+  'b:slot':d=>{B.manual.set(d.id,+d.w);B.off.delete(d.id);B.menu=null;B.applied=false;renderB();},
+  'b:unmanual':d=>{B.manual.delete(d.id);B.menu=null;B.applied=false;renderB();},
+  'b:closeweek':()=>{B.week=null;B.menu=null;renderB();},
+  'b:clearmanual':()=>{B.manual=new Map();B.menu=null;B.applied=false;renderB();},
   'b:apply':()=>{B.applied=true;renderB();},
   'b:undo':()=>{B.applied=false;renderB();},
   'c:chip':d=>{C.menu=C.menu===d.id?null:d.id;renderC();},
