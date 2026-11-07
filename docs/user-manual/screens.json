@@ -1,0 +1,410 @@
+{
+  "empty": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 1208.1875,
+        "y": 63,
+        "w": 113.78125,
+        "h": 32
+      }
+    ],
+    "file": "screens/empty.png"
+  },
+  "board": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 14,
+        "y": 63,
+        "w": 210,
+        "h": 32
+      },
+      {
+        "x": 890.90625,
+        "y": 13.5,
+        "w": 81.3125,
+        "h": 26
+      },
+      {
+        "x": 1067.21875,
+        "y": 9.5,
+        "w": 162,
+        "h": 34
+      }
+    ],
+    "file": "screens/board.png"
+  },
+  "board-menu": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 14,
+        "y": 103,
+        "w": 240,
+        "h": 133
+      }
+    ],
+    "file": "screens/board-menu.png"
+  },
+  "filter": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 628.546875,
+        "y": 103,
+        "w": 280,
+        "h": 254
+      }
+    ],
+    "file": "screens/filter.png"
+  },
+  "mission": {
+    "w": 499.99993896484375,
+    "h": 900,
+    "marks": [
+      {
+        "x": 22,
+        "y": 421.125,
+        "w": 499.99993896484375,
+        "h": 16
+      },
+      {
+        "x": 387.99993896484375,
+        "y": 856,
+        "w": 90,
+        "h": 32
+      }
+    ],
+    "file": "screens/mission.png"
+  },
+  "mission-edit": {
+    "w": 500,
+    "h": 900,
+    "marks": [
+      {
+        "x": 96.9151611328125,
+        "y": 856,
+        "w": 78.765625,
+        "h": 32
+      },
+      {
+        "x": 21.88385009765625,
+        "y": 856,
+        "w": 67.03131103515625,
+        "h": 32
+      }
+    ],
+    "file": "screens/mission-edit.png"
+  },
+  "hide": {
+    "w": 920,
+    "h": 774,
+    "marks": [
+      {
+        "x": 20,
+        "y": 735.5,
+        "w": 89.890625,
+        "h": 19
+      }
+    ],
+    "file": "screens/hide.png"
+  },
+  "assign": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 900,
+        "y": 260,
+        "w": 200,
+        "h": 180
+      }
+    ],
+    "file": "screens/assign.png"
+  },
+  "leave": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 14,
+        "y": 213.4375,
+        "w": 1148,
+        "h": 32
+      }
+    ],
+    "file": "screens/leave.png"
+  },
+  "employee": {
+    "w": 500,
+    "h": 900,
+    "marks": [
+      {
+        "x": 22,
+        "y": 319,
+        "w": 456,
+        "h": 36
+      }
+    ],
+    "file": "screens/employee.png"
+  },
+  "manpower": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 14,
+        "y": 167.4375,
+        "w": 1412,
+        "h": 24
+      }
+    ],
+    "file": "screens/manpower.png"
+  },
+  "bulk": {
+    "w": 780,
+    "h": 440,
+    "marks": [],
+    "file": "screens/bulk.png"
+  },
+  "hosts": {
+    "w": 1440,
+    "h": 900,
+    "marks": [],
+    "file": "screens/hosts.png"
+  },
+  "overview": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 14,
+        "y": 63,
+        "w": 210,
+        "h": 32
+      }
+    ],
+    "file": "screens/overview.png"
+  },
+  "overview-history": {
+    "w": 1440,
+    "h": 900,
+    "marks": [],
+    "file": "screens/overview-history.png"
+  },
+  "orgchart": {
+    "w": 1440,
+    "h": 900,
+    "marks": [],
+    "file": "screens/orgchart.png"
+  },
+  "orgchart-export": {
+    "w": 500,
+    "h": 900,
+    "marks": [],
+    "file": "screens/orgchart-export.png"
+  },
+  "locked": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 817.21875,
+        "y": 13.5,
+        "w": 155,
+        "h": 26
+      },
+      {
+        "x": 982.21875,
+        "y": 9.5,
+        "w": 38,
+        "h": 34
+      }
+    ],
+    "file": "screens/locked.png"
+  },
+  "forecast": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 946.671875,
+        "y": 13.5,
+        "w": 71.546875,
+        "h": 26
+      },
+      {
+        "x": 1245.953125,
+        "y": 63,
+        "w": 134.046875,
+        "h": 32
+      }
+    ],
+    "file": "screens/forecast.png"
+  },
+  "merge": {
+    "w": 1080,
+    "h": 792,
+    "marks": [],
+    "file": "screens/merge.png"
+  },
+  "capacity": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 285.234375,
+        "y": 64,
+        "w": 117,
+        "h": 30
+      }
+    ],
+    "file": "screens/capacity.png"
+  },
+  "capacity-details": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 208,
+        "y": 455,
+        "w": 250,
+        "h": 218
+      }
+    ],
+    "file": "screens/capacity-details.png"
+  },
+  "export-pdf": {
+    "w": 500,
+    "h": 900,
+    "marks": [],
+    "file": "screens/export-pdf.png"
+  },
+  "export-excel": {
+    "w": 500,
+    "h": 900,
+    "marks": [],
+    "file": "screens/export-excel.png"
+  },
+  "settings": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 0,
+        "y": 138,
+        "w": 209,
+        "h": 360
+      },
+      {
+        "x": 1063.9375,
+        "y": 206.59375,
+        "w": 135.046875,
+        "h": 26
+      }
+    ],
+    "file": "screens/settings.png"
+  },
+  "settings-draft": {
+    "w": 1440,
+    "h": 900,
+    "marks": [
+      {
+        "x": 1294.1875,
+        "y": 857,
+        "w": 117.8125,
+        "h": 32
+      },
+      {
+        "x": 1210.421875,
+        "y": 857,
+        "w": 73.765625,
+        "h": 32
+      }
+    ],
+    "file": "screens/settings-draft.png"
+  },
+  "settings-boards": {
+    "w": 1440,
+    "h": 900,
+    "marks": [],
+    "file": "screens/settings-boards.png"
+  },
+  "settings-users": {
+    "w": 1440,
+    "h": 900,
+    "marks": [],
+    "file": "screens/settings-users.png"
+  },
+  "settings-roles": {
+    "w": 1440,
+    "h": 900,
+    "marks": [],
+    "file": "screens/settings-roles.png"
+  },
+  "login": {
+    "w": 340,
+    "h": 503,
+    "marks": [],
+    "file": "screens/login.png"
+  },
+  "request": {
+    "w": 340,
+    "h": 567,
+    "marks": [],
+    "file": "screens/request.png"
+  },
+  "phone-board": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-board.png"
+  },
+  "phone-more": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-more.png"
+  },
+  "phone-me": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-me.png"
+  },
+  "phone-drawer": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-drawer.png"
+  },
+  "phone-target": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-target.png"
+  },
+  "phone-manpower": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-manpower.png"
+  },
+  "phone-manpower-detail": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-manpower-detail.png"
+  },
+  "phone-capacity": {
+    "w": 390,
+    "h": 844,
+    "marks": [],
+    "file": "screens/phone-capacity.png"
+  }
+}
