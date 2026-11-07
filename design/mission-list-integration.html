@@ -1,0 +1,643 @@
+<title>Mission List Integration</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: a review of the admins' Mission List workbook (Bangna, 2026 sheet),
+   a recommendation for bringing it into the Missions module, the monthly suffix model, and a
+   column-by-column meeting guide. Tokens copied from styles.css. Light only, like the app.
+   Layout: one reading column; findings, recommendation, suffix model, then the 41-column guide as a filterable table. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --brand-green: #a8c855; --hover-tint: #eef3fb; --grid: #e6e9ee;
+  --ok: #1f8a4c; --ok-bg: #e6f4ec; --warn: #a15c00; --warn-bg: #fdf0d9; --bad: #b42318; --bad-bg: #fde8e7;
+  --info-bg: #e8eff6; --violet: #4a3aa7; --violet-bg: #ecebf8; --teal: #0f6f6a; --teal-bg: #e2f3f1;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 28px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 34px; }
+h1 { font-size: 28px; letter-spacing: -.5px; text-wrap: balance; line-height: 1.2; }
+h2 { font-size: 21px; letter-spacing: -.3px; text-wrap: balance; }
+h3 { font-size: 15px; letter-spacing: -.1px; }
+p, li { max-width: 76ch; }
+ul, ol { padding-left: 20px; display: grid; gap: 4px; }
+.lede { color: var(--muted); font-size: 15px; margin-top: 8px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.mono, code { font-family: var(--font-mono); font-size: 12.5px; }
+code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+.eyebrow::before { content: ""; width: 4px; height: 14px; background: var(--brand-green); border-radius: 1px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.part { display: grid; gap: 16px; scroll-margin-top: 16px; }
+.part-head { display: grid; gap: 6px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+nav.toc a { font-size: 12.5px; font-weight: 600; color: var(--primary); text-decoration: none; border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 4px 12px; }
+nav.toc a:hover { background: var(--hover-tint); }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #e3e8ee; color: var(--muted); white-space: nowrap; }
+.tag.ok { background: var(--ok-bg); color: var(--ok); }
+.tag.warn { background: var(--warn-bg); color: var(--warn); }
+.tag.bad { background: var(--bad-bg); color: var(--bad); }
+.tag.info { background: var(--info-bg); color: var(--primary); }
+.tag.violet { background: var(--violet-bg); color: var(--violet); }
+.tag.teal { background: var(--teal-bg); color: var(--teal); }
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 820px) { .cols2, .cols3 { grid-template-columns: 1fr; } }
+.box { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; background: #fff; }
+.box.rec { border-color: var(--brand-green); box-shadow: inset 0 3px 0 var(--brand-green); }
+.box h3 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* facts */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 820px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fact { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: grid; gap: 2px; }
+.fact b { font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; color: var(--primary); }
+.fact span { font-size: 12.5px; color: var(--muted); }
+.finding { display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--grid); align-items: start; }
+.finding:first-child { border-top: 0; }
+.finding .n { font-family: var(--font-mono); font-weight: 600; font-size: 13px; min-width: 64px; color: var(--primary); font-variant-numeric: tabular-nums; }
+
+/* tables */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { text-align: left; font-weight: 600; color: var(--muted); background: #f5f7f9; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; position: sticky; top: 0; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; font-variant-numeric: tabular-nums; }
+td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--primary); white-space: nowrap; }
+
+/* mock */
+.mock { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); min-width: 0; }
+.mock-tools { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.mock-tools .sp { flex: 1; }
+.mock-foot { padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #f7f8fa; border-top: 1px solid var(--border); font-size: 12.5px; }
+.mock-foot .sp { flex: 1; }
+.btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 6px; border: 1px solid var(--border); background: #fff; color: var(--primary); white-space: nowrap; }
+.btn.fill { background: var(--primary); color: #fff; border-color: var(--primary); }
+.cap { font-size: 12.5px; color: var(--muted); }
+.arrow { color: var(--muted); padding: 0 4px; }
+.to { color: var(--ok); font-weight: 600; }
+
+/* suffix timeline */
+.chain { display: flex; gap: 0; overflow-x: auto; padding: 4px 2px 10px; }
+.seg { flex: 0 0 auto; min-width: 92px; border: 1px solid var(--border); border-left: 0; padding: 8px 10px; background: #fff; display: grid; gap: 2px; font-size: 11.5px; }
+.seg:first-child { border-left: 1px solid var(--border); border-radius: 8px 0 0 8px; }
+.seg:last-child { border-radius: 0 8px 8px 0; }
+.seg b { font-family: var(--font-mono); font-size: 13px; color: var(--primary); }
+.seg.now { background: var(--hover-tint); border-color: #b9cce0; }
+.seg.year { border-left: 3px solid var(--brand-green); }
+.seg.last { background: #f7f8fa; color: var(--muted); }
+.seg.last b { color: var(--muted); }
+.legend-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+
+/* column guide */
+.filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.filters button { font: inherit; font-size: 12.5px; border: 1px solid var(--border); background: #fff; color: var(--muted); border-radius: 999px; padding: 4px 11px; cursor: pointer; transition: background .15s, border-color .15s; }
+.filters button[aria-pressed="true"] { background: var(--hover-tint); color: var(--primary); border-color: #b9cce0; font-weight: 600; }
+.filters button:active { transform: translateY(1px); }
+.filters .lbl { font-size: 12px; color: var(--muted); font-weight: 600; margin-right: 2px; }
+.guide td:first-child { white-space: nowrap; }
+.guide .colname { font-weight: 600; }
+.guide .colname small { display: block; font-weight: 400; color: var(--muted); font-size: 11.5px; }
+.guide td.ev { color: var(--muted); max-width: 260px; }
+.guide td.how { max-width: 260px; }
+.flag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.flag.special { background: var(--bad-bg); color: var(--bad); }
+.flag.attn { background: var(--warn-bg); color: var(--warn); }
+.flag.ask { background: var(--violet-bg); color: var(--violet); }
+.guide select { font: inherit; font-size: 12.5px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text); }
+.guide tr.d-keep td:last-child select { border-color: var(--ok); color: var(--ok); }
+.guide tr.d-drop td:last-child select { border-color: var(--bad); color: var(--bad); }
+.guide tr.d-discuss td:last-child select { border-color: var(--warn); color: var(--warn); }
+.sugg { display: inline-block; font-size: 12px; font-weight: 700; white-space: nowrap; padding: 2px 8px; border-radius: 4px; border: 1px solid; }
+.sugg.s-in { color: var(--ok); border-color: #b5dcc4; background: var(--ok-bg); }
+.sugg.s-keep { color: var(--primary); border-color: #b9cce0; background: var(--info-bg); }
+.sugg.s-auto { color: var(--violet); border-color: #cfcbef; background: var(--violet-bg); }
+.sugg.s-drop { color: var(--bad); border-color: #f2c3bf; background: var(--bad-bg); }
+.sugg.s-ask { color: var(--warn); border-color: #f0d49a; background: var(--warn-bg); }
+.guide input.disc { width: 16px; height: 16px; accent-color: var(--primary); }
+.guide tr.main-row:has(input.disc:checked) td, .guide tr.main-row:has(input.disc:checked) + tr.fb-row td { background: #fbfcf7; }
+.guide textarea.fb { font: inherit; font-size: 12.5px; flex: 1 1 260px; min-width: 0; width: 100%; min-height: 32px; resize: vertical; border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; color: var(--text); background: #fff; }
+.guide textarea.fb:focus { border-color: var(--primary); }
+.guide tr.fb-row.has-fb textarea.fb { border-color: #f0d49a; background: #fffbf2; }
+.fb-state { font-size: 11px; white-space: nowrap; }
+.guide tr.main-row td { border-bottom: 0; padding-bottom: 4px; }
+.guide tr.fb-row td { padding-top: 0; padding-bottom: 10px; }
+.fb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.fb-lbl { font-size: 11.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.guide tr.fb-row.d-keep select { border-color: var(--ok); color: var(--ok); }
+.guide tr.fb-row.d-drop select { border-color: var(--bad); color: var(--bad); }
+.guide tr.fb-row.d-discuss select { border-color: var(--warn); color: var(--warn); }
+.fb-note { font-size: 12.5px; padding: 8px 12px; border-radius: 8px; background: var(--info-bg); color: var(--primary); }
+.fb-note.local { background: var(--warn-bg); color: var(--warn); }
+.group-row td { background: #f5f7f9; font-weight: 700; color: var(--primary); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
+
+/* methods */
+.methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .methods { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .methods { grid-template-columns: 1fr; } }
+.method { border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: grid; gap: 6px; align-content: start; background: #fff; }
+.method h3 { font-size: 13.5px; display: flex; gap: 8px; align-items: center; }
+.method .k { font-family: var(--font-mono); font-size: 12px; font-weight: 600; width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; background: var(--info-bg); color: var(--primary); }
+.method p { font-size: 12.5px; color: var(--muted); }
+.method .cols { font-size: 12px; }
+
+/* checklist */
+.check { list-style: none; padding: 0; display: grid; gap: 0; }
+.check li { display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--grid); max-width: none; }
+.check li:first-child { border-top: 0; }
+.check input { margin-top: 4px; accent-color: var(--primary); width: 16px; height: 16px; }
+.check b { font-size: 13.5px; }
+.check span { display: block; font-size: 12.5px; color: var(--muted); }
+.copybar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.copybar button { font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 6px; padding: 7px 14px; background: var(--primary); color: #fff; cursor: pointer; }
+.copybar button:active { transform: translateY(1px); }
+.copybar textarea { width: 100%; font-family: var(--font-mono); font-size: 12px; border-radius: 6px; border: 1px solid var(--border); padding: 8px; min-height: 120px; }
+.phase { display: grid; grid-template-columns: 110px 1fr; gap: 6px 14px; padding: 12px 0; border-top: 1px solid var(--grid); }
+.phase:first-of-type { border-top: 0; }
+.phase .pn { font-weight: 700; color: var(--primary); }
+@media (max-width: 560px) { .phase { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Review · Bangna Mission List · file updated 4 Nov 2026</div>
+  <h1 style="margin-top:8px">Bringing the admins' Mission List into the Missions module</h1>
+  <p class="lede">This page reviews the 2026 sheet of <span class="mono">2026_BANGN_Mission_List</span> (338 rows, 41 columns, plus the lookup sheets and the Rule sheet). It recommends making the Missions module the one place the list lives, proposes how the app keeps the monthly suffix and the yearly new number, and gives a column-by-column guide for your meeting with the admin team. Each column shows how it would be entered and who fills it in, and a flag marks every column that needs a special way of entering or editing it. You can mark Keep, Drop or Discuss on each row during the meeting and copy the result back to me.</p>
+  <nav class="toc" aria-label="Sections">
+    <a href="#findings">What the file shows</a><a href="#recommend">Recommendation</a><a href="#suffix">Monthly suffix</a><a href="#methods">Input methods</a><a href="#guide">Column guide</a><a href="#meeting">Meeting checklist</a><a href="#plan">Effect on the plan</a>
+  </nav>
+</header>
+
+<!-- ============ FINDINGS ============ -->
+<section class="part" id="findings">
+  <div class="part-head">
+    <div class="eyebrow">What the file shows</div>
+    <h2>One row per suffix, so one mission takes many rows</h2>
+    <p class="muted">Counted from the 2026 sheet. Customer names, contacts and rates are left out of this page on purpose.</p>
+  </div>
+  <div class="facts">
+    <div class="fact"><b>338</b><span>rows (mission + suffix)</span></div>
+    <div class="fact"><b>160</b><span>missions behind them</span></div>
+    <div class="fact"><b>41</b><span>columns, in 3 header bands</span></div>
+    <div class="fact"><b>AJ</b><span>highest suffix this year (10 suffixes). 2025 went up to 19 for one mission</span></div>
+  </div>
+  <div class="panel" style="gap:0">
+    <div class="finding"><span class="n">96 / 160</span><div><b>Most missions never get a second suffix.</b> <span class="muted small">27 have two, and the longest-running have 8–10. So the monthly copy concerns the long jobs. Bangna's sheet has 24–41 rows a month.</span></div></div>
+    <div class="finding"><span class="n">24</span><div><b>Times a mission got two suffixes in the same month.</b> <span class="muted small">10 of them came with a new PO number, one with a new breakpoint and two with a new start date. In 11 of the 24 nothing else in the row changed at all. So a suffix doesn't only mean "a new month". It's a new Etraq billing period, which a new PO can also start. This is the first question for the meeting.</span></div></div>
+    <div class="finding"><span class="n">176 / 178</span><div><b>Older suffix rows still say "Running"</b> <span class="muted small">after the next suffix replaced them. Only the newest row is kept up to date, so a filter on Status = Running counts the same mission several times.</span></div></div>
+    <div class="finding"><span class="n">74</span><div><b>Missions whose newest row says Running.</b> <span class="muted small">37 were last copied in October. 34 were last copied in July–September and never got a later suffix or a Finish date. Either they ended and nobody closed them, or they are still running and missed their monthly copy. The app can show this as a "no suffix this month" list.</span></div></div>
+    <div class="finding"><span class="n">1</span><div><b>November row on 4 Nov.</b> <span class="muted small">The November copy hadn't been done yet for the October missions. This is exactly the manual step the app can prepare automatically.</span></div></div>
+    <div class="finding"><span class="n">4</span><div><b>Columns are almost always the same value.</b> <span class="muted small">Risk Analysis is identical in 338 of 338 rows, Work Instruction status in 337, Work Instruction Rev. in 335 and Mission Type in 333. They can become defaults the form fills in for you.</span></div></div>
+    <div class="finding"><span class="n">3</span><div><b>Real dropdowns in the sheet.</b> <span class="muted small">The Rule sheet says about 15 columns should use a dropdown, but only 3 have one. That's why the file has typed spellings such as "Recived", "Transpotation" and "Management Free". In the app every list column becomes a real dropdown.</span></div></div>
+    <div class="finding"><span class="n">57 / 63</span><div><b>Customer codes against customer names.</b> <span class="muted small">Some codes appear with more than one spelling of the name. The Prescriber is the same as the Customer in 236 rows. Both point to a Customer list with a code and a name, kept once, the way the Host list works.</span></div></div>
+  </div>
+</section>
+
+<!-- ============ RECOMMENDATION ============ -->
+<section class="part" id="recommend">
+  <div class="part-head">
+    <div class="eyebrow">Question 1 · Can we integrate it?</div>
+    <h2>Yes. The Missions tab becomes the Mission List, and Excel becomes an export</h2>
+    <p class="muted">The Mission Register in the spec already holds a mission's number, host, customer, engineer, status, opening and closing date. The Mission List is that same record with more detail (part, defect, documents, invoicing) and a history of suffixes. It belongs in the same place.</p>
+  </div>
+  <div class="cols3">
+    <div class="box">
+      <h3>A · Keep Excel, import it</h3>
+      <p class="small">The admins keep the workbook. The app reads it with Bulk edit.</p>
+      <ul class="small"><li>Least change for the admins</li><li>The monthly copy and paste stays</li><li>Two places to keep in step, and the stale "Running" rows remain</li></ul>
+    </div>
+    <div class="box rec">
+      <h3>B · The app replaces it <span class="tag ok">Recommended</span></h3>
+      <p class="small">The Missions tab holds every column worth keeping. <b>Export</b> produces the same sheet layout for the Etraq double-check.</p>
+      <ul class="small"><li>One record per mission, with its suffixes underneath</li><li>The monthly suffix is prepared by the app, so nobody copies rows</li><li>Real dropdowns, so no typos</li><li>Commercial columns visible only to admins</li></ul>
+    </div>
+    <div class="box">
+      <h3>C · Split</h3>
+      <p class="small">The app holds the operational columns and the suffixes. Excel keeps the commercial columns.</p>
+      <ul class="small"><li>Smaller first build</li><li>Two files still need the same mission number</li><li>Fine as a stepping stone to B</li></ul>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>How B would be rolled out</h3>
+    <ol class="small">
+      <li><b>Import once.</b> Upload this workbook. The app groups the 338 rows into 160 missions, makes each row a suffix period and keeps the "last year" numbers as links. A preview lists what doesn't match the app before anything is saved: unknown hosts, engineer names, a code with two names.</li>
+      <li><b>Run side by side for one month.</b> The admins keep their file and check the app's monthly suffix list and Export against it.</li>
+      <li><b>Switch.</b> The workbook becomes read-only history. The export is always available for the Etraq check.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ SUFFIX ============ -->
+<section class="part" id="suffix">
+  <div class="part-head">
+    <div class="eyebrow">Question 3 · The monthly suffix</div>
+    <h2>Keep one mission, and record its suffixes and yearly numbers under it</h2>
+    <p class="muted">Yes, there's a better way than copying rows. The app keeps a single record for the job and treats each suffix as a <b>period</b> of that record, with its own start and end date and PO number. The yearly new number is one more link in the same chain. The Etraq still gets its suffix. People stop copying rows to create it.</p>
+  </div>
+
+  <div class="panel">
+    <h3>One mission, as the app would store it</h3>
+    <div class="chain" aria-label="Example: a mission's suffix chain across a year end">
+      <div class="seg last"><b>.25.0xxx.AM</b><span>2025 · last suffix</span></div>
+      <div class="seg year"><b>.26.0yyy.AA</b><span>Jan · PO A</span></div>
+      <div class="seg"><b>.AB</b><span>Jan · same</span></div>
+      <div class="seg"><b>.AC</b><span>Feb</span></div>
+      <div class="seg"><b>.AD</b><span>Feb · new PO</span></div>
+      <div class="seg"><b>.AE</b><span>Mar</span></div>
+      <div class="seg"><b>…</b><span>&nbsp;</span></div>
+      <div class="seg now"><b>.AJ</b><span>Nov · now</span></div>
+      <div class="seg year"><b>.27.0zzz.AA</b><span>Jan 2027 · new number from Etraq</span></div>
+    </div>
+    <div class="legend-row"><span>Each box is one row of today's sheet.</span><span>Green edge: a new yearly number (column B "last year" is filled in automatically).</span><span>An example, with numbers shortened. The full form is BANGN.26.0yyy.AJ.</span></div>
+    <div class="cols2">
+      <div class="box">
+        <h3>Stored once on the mission</h3>
+        <p class="small">Customer, prescriber, part, problem, defect, system, type, host, engineer, contacts, rates, invoicing type, documents. Changing one of these changes it for every later suffix and asks "from which suffix?" (D2 in the spec).</p>
+      </div>
+      <div class="box">
+        <h3>Stored on each suffix</h3>
+        <p class="small">Suffix, month, period start and end, <b>PO number</b>, and possibly breakpoint, MO/PO/QT status and "Created in Etraq". Whether the last three belong here is a meeting question. A suffix is never retyped. It's the next code after the last one (AA → AB … AZ → BA).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mock" aria-label="Mockup: the monthly suffix screen">
+    <div class="mock-tools"><b>Monthly suffix · December 2026 · Bangna</b><span class="sp"></span><span class="tag warn">Due 1 Dec</span><span class="cap">example rows</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Mission</th><th>November</th><th>December</th><th>PO number</th><th>Continue?</th><th>Created in Etraq</th></tr></thead>
+      <tbody>
+        <tr><td class="num">BANGN.26.0xx1</td><td class="num">.AJ</td><td><span class="to mono">.AK</span></td><td>same as .AJ</td><td>Continue</td><td>☑</td></tr>
+        <tr><td class="num">BANGN.26.0xx2</td><td class="num">.AJ</td><td><span class="to mono">.AK</span></td><td><span class="tag warn">Waiting PO</span></td><td>Continue</td><td>☐</td></tr>
+        <tr><td class="num">BANGN.26.0xx3</td><td class="num">.AC</td><td class="muted">—</td><td class="muted">—</td><td><span class="tag">Close 30 Nov</span></td><td class="muted">n/a</td></tr>
+        <tr><td class="num">BANGN.26.0xx4</td><td class="num">.AA</td><td><span class="to mono">.AB</span></td><td>new: <span class="mono">4505xxxx</span></td><td>Continue</td><td>☐</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mock-foot"><span>3 to create in Etraq · 1 closing · <b>Export for Etraq</b> lists the new suffixes to key in</span><span class="sp"></span><span class="btn">Export</span><span class="btn fill">Start December suffixes</span></div>
+  </div>
+
+  <div class="cols2">
+    <div class="box">
+      <h3>The monthly routine in the app</h3>
+      <ol class="small">
+        <li>From the last working days of the month, the Missions tab shows <b>Monthly suffix due</b>.</li>
+        <li>The screen lists every open mission with its next suffix already worked out, and carries the PO number over unless someone types a new one.</li>
+        <li>For each mission the admin chooses <b>Continue</b> or <b>Close at month end</b> (today's "Able to close" column), and ticks <b>Created in Etraq</b> once it's keyed in.</li>
+        <li><b>Start December suffixes</b> opens the new periods on the 1st. Missions not yet ticked stay on a "Not in Etraq yet" list, so nothing is forgotten.</li>
+        <li><b>New suffix now</b> on a single mission handles the mid-month case (a new PO, a new breakpoint), with the reason noted.</li>
+      </ol>
+    </div>
+    <div class="box">
+      <h3>How it fits the year end</h3>
+      <ul class="small">
+        <li>The December → January routine also asks for the <b>new yearly number</b>, typed from the Etraq. It's the same screen and the same check as the year-end renumber in the spec, so the admins learn one routine.</li>
+        <li>A mission continuing into 2027 starts again at <b>.AA</b> under its new number, and its 2026 number fills "Mission No. (Last year)" automatically.</li>
+        <li>Days, crew and the Host Record keep the number and suffix that were in force on each day, so history reads as it did.</li>
+        <li>Searching either the old or the new number finds the whole chain.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ METHODS ============ -->
+<section class="part" id="methods">
+  <div class="part-head">
+    <div class="eyebrow">Question 2 · How each column is entered</div>
+    <h2>Six ways of entering a value</h2>
+    <p class="muted">Every column in the guide below is given one of these. The aim is that the admins type only what nobody else knows, and the app either fills in or offers a list for the rest.</p>
+  </div>
+  <div class="methods">
+    <div class="method"><h3><span class="k">A</span>Automatic</h3><p>Nobody types it. The app fills it from the suffix routine, Close or the year end.</p><div class="cols muted">Month, Last-year number, Suffix, Status, Finish date</div></div>
+    <div class="method"><h3><span class="k">B</span>Pick a record</h3><p>Chosen from a list the app already keeps (Host list, users) or a new Customer list. One spelling, everywhere.</p><div class="cols muted">Host, Trigo responsible, Customer code + name, Prescriber</div></div>
+    <div class="method"><h3><span class="k">C</span>Dropdown</h3><p>A fixed list kept in Settings by an admin, like today's lookup sheets. It can have a default.</p><div class="cols muted">Mission type, Operation, Defect, System → Sub-system, MO/PO/QT, WI, Invoicing, fees, ETRAQ profile, Risk, PO status</div></div>
+    <div class="method"><h3><span class="k">D</span>Value with rules</h3><p>A number, amount or code the app checks: unit, currency, format, or "TBC" / "Waiting".</p><div class="cols muted">Mission number, Breakpoint, Pace, Rate, Rate/price lines, PO number</div></div>
+    <div class="method"><h3><span class="k">E</span>Free text</h3><p>Written in a box, searchable, with no checks.</p><div class="cols muted">Part number, Part name, Problem, Transport cost, Remark (as notes)</div></div>
+    <div class="method"><h3><span class="k">F</span>Contacts</h3><p>Names and emails kept on the customer or host they belong to, entered once and reused by every mission there.</p><div class="cols muted">Customer contact, Host contact</div></div>
+  </div>
+</section>
+
+<!-- ============ GUIDE ============ -->
+<section class="part" id="guide">
+  <div class="part-head">
+    <div class="eyebrow">Meeting guide · 41 columns</div>
+    <h2>Column-by-column checklist</h2>
+    <p class="muted">Use this table as the meeting checklist: go row by row, tick ✓ when a column has been discussed and set the <b>Team decision</b>. <b>Suggested</b> is my recommendation. <b>None of the suggestions removes a column from view or from the Excel export.</b> They only change who enters the value:</p>
+    <ul class="small muted" style="margin-top:2px">
+      <li><span class="sugg s-in">Already in app</span> The app has this field today. It's kept and shown as now.</li>
+      <li><span class="sugg s-keep">Keep · add</span> A new field in the app, typed or picked by the owner shown.</li>
+      <li><span class="sugg s-auto">Automatic · still shown</span> Nobody types it any more. The app fills it in, but it's still shown on the mission, searchable and in the export.</li>
+      <li><span class="sugg s-drop">Pre-filled default</span> The field stays, already filled with the value used almost every time. Change it only when it's different. Still shown and exported.</li>
+      <li><span class="sugg s-ask">Ask in meeting</span> Its meaning isn't clear from the file.</li>
+    </ul>
+    <p class="muted"><b>Drop</b> in the <b>Team decision</b> column is the only choice that really removes a column: it's left out of the app and the export. <b>Status</b> says how the column relates to the app today. <b>Entry</b> is one of the six ways above, and <b>Owner</b> is who fills it in. <b>Flag</b> marks columns that need a <span class="flag special">Special</span> way of entering or editing them, <span class="flag attn">Attention</span> for a data problem the file shows, or <span class="flag ask">Ask</span> when only the admins know the answer. Write anything you want me to change for a column in <b>Remark / feedback for Claude</b>. <b>Copy meeting decisions</b> gives me the result. Your ticks and choices are remembered in this browser.</p>
+  </div>
+  <div class="filters" role="group" aria-label="Filter columns">
+    <span class="lbl">Show</span>
+    <button type="button" data-f="all" aria-pressed="true">All 41</button>
+    <button type="button" data-f="flag">Flagged only</button>
+    <button type="button" data-f="special">Special input</button>
+    <button type="button" data-f="ask">Ask the admins</button>
+    <button type="button" data-f="keep">Suggested keep</button>
+    <button type="button" data-f="inapp">Already in the app</button>
+    <button type="button" data-f="auto">Automatic</button>
+    <button type="button" data-f="drop">Automatic or default</button>
+    <button type="button" data-f="open">Not discussed yet</button>
+    <button type="button" data-f="fb">With a remark</button>
+    <button type="button" data-f="admin">Admin only</button>
+  </div>
+  <div class="panel tbl-wrap" style="padding:0">
+    <table class="guide" id="guide-table">
+      <thead><tr><th>✓</th><th>Col</th><th>Column in the file</th><th>Suggested</th><th>Status</th><th>Entry</th><th>Owner</th><th>Flag</th><th>How the app handles it</th><th>Evidence from the file</th></tr></thead>
+      <tbody id="guide-body"></tbody>
+    </table>
+  </div>
+  <div class="fb-note" id="fb-note">Remarks are loading…</div>
+  <div class="copybar">
+    <button type="button" id="copy-guide">Copy meeting decisions</button>
+    <span class="small muted" id="guide-count"></span>
+    <textarea id="guide-out" hidden readonly aria-label="Meeting decisions as text"></textarea>
+  </div>
+</section>
+
+<!-- ============ MEETING ============ -->
+<section class="part" id="meeting">
+  <div class="part-head">
+    <div class="eyebrow">Meeting checklist</div>
+    <h2>What to settle with the admin team</h2>
+    <p class="muted">About an hour, in this order. Bring the workbook and this page. The ticks are remembered in this browser.</p>
+  </div>
+  <div class="panel">
+    <h3>1 · How they work today (10 min)</h3>
+    <ul class="check" data-list="m1">
+      <li><input type="checkbox" id="m1a"><label for="m1a"><b>Walk through one day and one month-start.</b><span>Who opens the file, when, what they check against the Etraq, and how long the monthly copy takes.</span></label></li>
+      <li><input type="checkbox" id="m1b"><label for="m1b"><b>Who else reads the file?</b><span>Finance, engineers, the site manager. Each reader needs the export, or access to the app.</span></label></li>
+      <li><input type="checkbox" id="m1c"><label for="m1c"><b>Is there one workbook per site?</b><span>BANGN = Bangna. Do the other boards keep their own, with the same columns?</span></label></li>
+    </ul>
+    <h3>2 · The suffix (15 min)</h3>
+    <ul class="check" data-list="m2">
+      <li><input type="checkbox" id="m2a"><label for="m2a"><b>What starts a new suffix?</b><span>The month only, or also a new PO, breakpoint or rate? The file has 24 same-month pairs, 11 of them with nothing else changed.</span></label></li>
+      <li><input type="checkbox" id="m2b"><label for="m2b"><b>Who creates the suffix in the Etraq, and is it ever skipped?</b><span>5 missions skip a month and then continue. Does the Etraq require a suffix for every month the mission is open?</span></label></li>
+      <li><input type="checkbox" id="m2c"><label for="m2c"><b>Which number does the crew see?</b><span>On the board card, the worksheet and LINE messages: the full number with suffix, or the mission number only?</span></label></li>
+      <li><input type="checkbox" id="m2d"><label for="m2d"><b>The 34 missions last copied before October</b><span>Ended or still running? Sorting this out once gives a clean import.</span></label></li>
+      <li><input type="checkbox" id="m2e"><label for="m2e"><b>Which columns change per suffix?</b><span>Confirm the "per suffix" rows in the guide: PO number, breakpoint, MO/PO/QT status, documents.</span></label></li>
+    </ul>
+    <h3>3 · Columns (25 min)</h3>
+    <ul class="check" data-list="m3">
+      <li><input type="checkbox" id="m3a"><label for="m3a"><b>Go through "Flagged only" in the guide</b><span>Mark Keep / Drop / Discuss on each row, then the unflagged rows quickly.</span></label></li>
+      <li><input type="checkbox" id="m3b"><label for="m3b"><b>DATA ENTRY: IN USED / UNUSED</b><span>The Rule sheet calls this "Customer Type". What does it mean today?</span></label></li>
+      <li><input type="checkbox" id="m3c"><label for="m3c"><b>Who fills what</b><span>The engineer at mission start (part, problem, breakpoint, pace) or the admin afterwards (codes, documents, invoicing). Missing admin fields would show as "Admin to complete".</span></label></li>
+      <li><input type="checkbox" id="m3d"><label for="m3d"><b>Who may see rates and contacts</b><span>Suggest: Admin and Manager only. Engineers see the operational fields.</span></label></li>
+      <li><input type="checkbox" id="m3e"><label for="m3e"><b>The lookup lists</b><span>Defect category, System / Sub-system, ETRAQ profile, fees: who keeps them up to date in Settings?</span></label></li>
+    </ul>
+    <h3>4 · Switching over (10 min)</h3>
+    <ul class="check" data-list="m4">
+      <li><input type="checkbox" id="m4a"><label for="m4a"><b>Import date and the side-by-side month</b><span>Suggest: import mid-December, check January's suffixes and the year-end numbers both ways, switch in February.</span></label></li>
+      <li><input type="checkbox" id="m4b"><label for="m4b"><b>Export layout</b><span>Same column order as today, so their Etraq check keeps working? Thai or English headers?</span></label></li>
+      <li><input type="checkbox" id="m4c"><label for="m4c"><b>Name one admin owner</b><span>To try the screens before release and sign off the import preview.</span></label></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ PLAN ============ -->
+<section class="part" id="plan">
+  <div class="part-head">
+    <div class="eyebrow">Effect on the plan</div>
+    <h2>What changes in the Mission Register spec</h2>
+  </div>
+  <div class="panel" style="gap:0">
+    <div class="phase"><span class="pn">Number</span><div><p class="small">A mission number becomes <span class="mono">PREFIX.YY.NNNN</span> plus a suffix <span class="mono">.AA</span>–<span class="mono">.ZZ</span> (Q3). The register's identity is the yearly number. The suffix belongs to the period, and the board and history store the full number in force on each day.</p></div></div>
+    <div class="phase"><span class="pn">Release 1</span><div><p class="small">Register + Close, as planned, with room for suffix periods in the table from the start, so nothing is migrated twice.</p></div></div>
+    <div class="phase"><span class="pn">Release 2</span><div><p class="small">The year-end renumber becomes the <b>monthly suffix routine</b>, with the January run also asking for new yearly numbers. It's still needed before 1 December if we want December's suffixes made by the app, or before 1 January at the latest.</p></div></div>
+    <div class="phase"><span class="pn">Release 3</span><div><p class="small">Mission List columns (after the meeting), the Customer list, the lookup lists in Settings, admin-only commercial fields, the one-off import of this workbook and the Export in its layout.</p></div></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function () {
+  /* status: inapp | new | newp (per suffix) | auto | drop | host | ask ; who: E (engineer) A (admin) - (app)
+     flag: special | attn | ask | "" */
+  const S = {
+    inapp: ["In the app", "ok"], new: ["New · mission", "info"], newp: ["New · per suffix", "teal"],
+    auto: ["Automatic", "violet"], drop: ["Default value", "bad"], host: ["Move to Host list", "warn"], ask: ["Ask", "violet"], cust: ["New Customer list", "warn"]
+  };
+  const G = [
+    ["Mission identity", [
+      ["A", "Month", "", "auto", "A", "-", "", "Comes from the suffix period, so nobody picks it.", "Always filled. 11 months used."],
+      ["B", "Mission No. (Last year)", "", "auto", "A", "-", "", "Filled by the year-end step from the previous number.", "54 rows, 16 missions continued from 2025."],
+      ["C", "Mission No. (Current year)", "with suffix", "inapp", "D", "A", "special", "The yearly number is typed once from the Etraq and checked against PREFIX.YY.NNNN. The suffix is generated by the monthly routine, never typed.", "338 distinct values, 160 missions, up to .AJ."],
+      ["D", "DATA ENTRY", "Status", "ask", "C", "A", "ask", "Unclear. The header says Data Entry, but the Rule sheet calls it Customer Type.", "IN USED 64 · UNUSED 274."],
+    ]],
+    ["Customer and job", [
+      ["E", "Customer Code", "from ETRAQ", "cust", "B", "A", "attn", "Kept on a new Customer list together with the name. A mission picks the customer, and the code comes with it.", "57 codes in two formats (6 digits, or P + 9 digits)."],
+      ["F", "Customer Name", "", "inapp", "B", "E", "attn", "The app's Customer field, picked from the Customer list instead of typed.", "63 names for 57 codes, so some codes have two spellings."],
+      ["J", "Prescriber", "", "new", "B", "E", "", "Picked from the Customer list, defaulting to the Customer.", "The same as the Customer in 236 / 338 rows."],
+      ["G", "Part Number", "", "new", "E", "E", "special", "A list of part numbers, one per line, each with an optional note (“Waiting for material”), so a single part can be searched.", "135 distinct. Many cells hold several parts and notes."],
+      ["H", "Part Name", "", "new", "E", "E", "", "Free text next to each part.", "132 distinct. 11 say N/A."],
+      ["I", "Problem/Activity description", "", "new", "E", "E", "", "Long text. Could also go on the board card's PPE / remark line.", "Always filled."],
+      ["K", "Defect category", "", "new", "C", "E", "attn", "Dropdown from the Defect category sheet (60 items), moved to Settings.", "Only 47 / 338 filled. Required or optional?"],
+      ["L", "System", "", "new", "C", "E", "", "Dropdown from the System sheet.", "312 / 338 filled, 10 used."],
+      ["M", "Sub-system", "", "new", "C", "E", "special", "A dropdown that depends on System: picking a System shows only its sub-systems.", "70 pairs on the System & Sub-System sheet."],
+      ["N", "Mission Type", "", "new", "C", "E", "", "Dropdown with “INSPECTION – corrective sorting…” as the default.", "The same value in 333 / 338."],
+      ["P", "Types of Operation", "", "new", "C", "E", "", "Dropdown: Sort, Rework, Sort & Rework, Other. The note says Reflash counts as Rework.", "Sort 262 · Sort&Rework 40 · Rework 34."],
+      ["O", "Breakpoint", "", "newp", "D", "E", "special", "A quantity with a unit, or TBC. It can change with a new suffix, so it's kept per period.", "TBC in 179. Mixes 99,554 Pcs., 7,000 pcs and codes such as PM12/24."],
+      ["Z", "Sorting speed", "Agreed pace", "new", "D", "E", "special", "A number in pcs/hr per inspector, or N/A. Some cells hold two paces (“800 / 270”), so allow one per part or per step.", "324 filled. 55 say N/A."],
+      ["AA", "Sorting speed", "Wished pace", "new", "D", "E", "special", "As Agreed pace. 2025 also had an Actual pace column, dropped in 2026.", "324 filled."],
+    ]],
+    ["Where and who", [
+      ["Q", "Host / Location", "", "inapp", "B", "E", "attn", "Picked from the Host list, as New Mission does today. The import matches the 51 names to hosts first.", "51 distinct. Several are the customer's name with a branch."],
+      ["AD", "Trigo responsible", "", "inapp", "B", "-", "attn", "The mission's Engineer, picked from users. The import maps each first name to the user's account.", "6 people, typed in capitals (first name only)."],
+      ["AB", "Customer contact", "", "cust", "F", "A", "special", "Contacts (name + email) kept on the customer and ticked per mission. Not retyped on every suffix row.", "326 filled, the same block repeated on every row."],
+      ["AC", "Host contact", "", "host", "F", "A", "", "Contacts kept on the Host list record, shared by every mission at that host.", "75 / 338 filled."],
+    ]],
+    ["Dates and status", [
+      ["R", "Start date", "", "inapp", "A", "-", "", "Set when the mission first goes on the board (or typed for an import). Each suffix also has its own start.", "Repeated unchanged on most suffix rows."],
+      ["S", "Finish date", "", "auto", "A", "-", "", "Set by Close (the last working day).", "86 / 338 filled."],
+      ["T", "Mission status", "Status", "auto", "A", "-", "attn", "Open / Closed on the mission. An old suffix is simply “ended”, never left Running.", "176 of 178 older rows still say Running."],
+      ["U", "Mission status", "Able to close (if non-continue)", "auto", "C", "A", "special", "Becomes the Continue / Close at month end choice in the monthly suffix routine.", "Continue 317 · Non-continue 21."],
+    ]],
+    ["Documents (admin)", [
+      ["V", "MO/PO/QT", "Status", "newp", "C", "A", "ask", "Dropdown: Received / Waiting. Per suffix, or once per mission?", "Received 329 · Waiting 9."],
+      ["W", "MO/PO/QT", "Type", "new", "C", "A", "", "Dropdown: MO, QT, Cost estimate, PO.", "MO 255 · QT 44 · Cost estimate 31 · PO 5."],
+      ["X", "Work Instruction", "Status", "drop", "C", "A", "", "Dropdown with “Received” as the default. Spelling fixed.", "“Recived” in 337 / 338."],
+      ["Y", "Work Instruction", "Rev.", "drop", "C", "A", "", "Dropdown, default Rev.00.", "Rev.00 in 335 / 338."],
+      ["AK", "Document sent to finance", "", "new", "C", "A", "special", "Tick boxes (MO signed, PO, QT, Cost estimate), since several are often sent together.", "7 combinations such as “1. MO (sign) 2. PO”."],
+      ["AN", "PO Status", "", "new", "C", "A", "", "Dropdown: Normal method / PO needed.", "Normal 189 · PO needed 149."],
+      ["AO", "PO Number", "", "newp", "D", "A", "special", "Per suffix. Carried to the next suffix unless replaced. “Waiting PO” is a state with a reminder, not a number.", "148 filled, 36 of them “Waiting PO”. Changes on most suffix changes."],
+    ]],
+    ["Invoicing (admin, restricted)", [
+      ["AE", "Rate for Customer", "rate/hour", "new", "D", "A", "special", "An amount and a currency (THB, USD, EUR, CNY, RMB). Admin and Manager only.", "38 distinct, mixed currencies."],
+      ["AF", "Invoicing type", "", "new", "C", "A", "", "Dropdown: Hourly, Piece price, Credit hours, Not to be invoiced.", "Hourly 285 · Piece 52."],
+      ["AG", "Rate/price", "", "new", "D", "A", "special", "Rate lines (role, amount, unit), for example Inspector 210 THB/hour and OT 1.5 THB/pc. Asked for only with Piece price or several roles.", "96 / 338 filled, free text."],
+      ["AH", "Management Fee / Day", "", "new", "C", "A", "", "Dropdown from the category sheet. Spelling “Free” fixed to “Fee”.", "5 values. N/A in 102."],
+      ["AI", "Transportation and additional cost", "", "new", "E", "A", "", "Free text, or an amount + description if finance needs a figure.", "195 N/A."],
+      ["AJ", "Rate Profile in ETRAQ", "", "new", "C", "A", "", "Dropdown from the category sheet.", "2 of the 7+ profiles used."],
+    ]],
+    ["Other", [
+      ["AL", "Risk Analysis", "", "drop", "C", "A", "", "Pre-filled with “Yes: 1 audit per shift per day”. Still shown and exported; change it only for a mission that differs.", "The same value in 338 / 338."],
+      ["AM", "Remark", "", "new", "E", "A", "special", "A running notes log per mission (who, when), like employee notes. The two standard phrases become an Invoice timing dropdown.", "100 filled, 97 of them two standard phrases."],
+    ]],
+  ];
+  const SG = {
+    inapp: ["Already in app", "s-in"], new: ["Keep · add", "s-keep"], newp: ["Keep · add per suffix", "s-keep"], cust: ["Keep · Customer list", "s-keep"],
+    host: ["Keep · Host list", "s-keep"], auto: ["Automatic · still shown", "s-auto"], drop: ["Pre-filled default", "s-drop"], ask: ["Ask in meeting", "s-ask"]
+  };
+  const IN = { A: "Automatic", B: "Pick a record", C: "Dropdown", D: "Value with rules", E: "Free text", F: "Contacts" };
+  const ALL = G.flatMap((g) => g[1].map((r) => r));
+  const KEY = "mission-list-meeting-v1";
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+  const body = document.getElementById("guide-body");
+  const FL = { special: "Special", attn: "Attention", ask: "Ask" };
+  const who = { E: "Engineer", A: "Admin", "-": "App" };
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  let html = "";
+  for (const [gname, rows] of G) {
+    html += `<tr class="group-row" data-group><td colspan="10">${esc(gname)}</td></tr>`;
+    for (const [col, name, subname, st, inp, w, flag, how, ev] of rows) {
+      const [sl, sc] = S[st];
+      const d = saved[col] || "";
+      const admin = /admin/i.test(gname) || st === "cust";
+      html += `<tr data-col="${col}" data-st="${st}" data-flag="${flag}" data-admin="${admin ? 1 : 0}" class="main-row">
+        <td><input type="checkbox" class="disc" id="disc-${col}" aria-label="Column ${col} discussed"${saved["_d" + col] ? " checked" : ""}></td>
+        <td class="num">${col}</td>
+        <td class="colname">${esc(name)}${subname ? `<small>${esc(subname)}</small>` : ""}</td>
+        <td><span class="sugg ${SG[st][1]}">${SG[st][0]}</span></td>
+        <td><span class="tag ${sc}">${sl}</span></td>
+        <td><span class="mono">${inp}</span> <span class="small muted">${IN[inp]}</span></td>
+        <td>${who[w]}</td>
+        <td>${flag ? `<span class="flag ${flag}">${FL[flag]}</span>` : ""}</td>
+        <td class="how">${esc(how)}</td>
+        <td class="ev small">${esc(ev)}</td></tr>
+        <tr class="fb-row${d ? " d-" + d : ""}" data-for="${col}"><td></td><td colspan="9"><div class="fb-line">
+        <label class="fb-lbl" for="dec-${col}">Team decision</label>
+        <select aria-label="Meeting decision for column ${col}" id="dec-${col}">
+          <option value="">—</option><option value="keep"${d === "keep" ? " selected" : ""}>Keep</option><option value="drop"${d === "drop" ? " selected" : ""}>Drop (remove)</option><option value="discuss"${d === "discuss" ? " selected" : ""}>Discuss again</option>
+        </select>
+        <label class="fb-lbl" for="fb-${col}">Remark for Claude</label>
+        <textarea class="fb" id="fb-${col}" rows="1" aria-label="Remark or feedback for column ${col}" placeholder="Write a remark or a change you want for column ${col}…"></textarea>
+        <span class="fb-state small muted" id="fbs-${col}"></span></div></td></tr>`;
+    }
+  }
+  body.innerHTML = html;
+  const count = () => {
+    const vals = ALL.map((r) => saved[r[0]]).filter(Boolean);
+    const disc = ALL.filter((r) => saved["_d" + r[0]]).length;
+    document.getElementById("guide-count").textContent =
+      `${disc} of ${ALL.length} discussed · ${vals.length} decided · keep ${vals.filter((v) => v === "keep").length} · drop ${vals.filter((v) => v === "drop").length} · discuss ${vals.filter((v) => v === "discuss").length}`;
+  };
+  body.addEventListener("change", (e) => {
+    if (e.target.classList.contains("disc")) {
+      const c = e.target.closest("tr").dataset.col;
+      if (e.target.checked) saved["_d" + c] = 1; else delete saved["_d" + c];
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (err) {}
+      count(); return;
+    }
+    const sel = e.target.closest("select"); if (!sel) return;
+    const tr = sel.closest("tr"); const col = tr.dataset.for;
+    if (sel.value) saved[col] = sel.value; else delete saved[col];
+    tr.className = "fb-row" + (sel.value ? " d-" + sel.value : "") + (tr.classList.contains("has-fb") ? " has-fb" : "");
+    try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (err) {}
+    count();
+  });
+  count();
+  /* filters */
+  const tests = {
+    all: () => true, flag: (t) => !!t.dataset.flag, special: (t) => t.dataset.flag === "special", ask: (t) => t.dataset.flag === "ask" || t.dataset.st === "ask",
+    inapp: (t) => t.dataset.st === "inapp", auto: (t) => t.dataset.st === "auto", drop: (t) => t.dataset.st === "drop" || t.dataset.st === "auto",
+    keep: (t) => ["new", "newp", "cust", "host"].includes(t.dataset.st), fb: (t) => !!fbText(t.dataset.col), open: (t) => !t.querySelector(".disc").checked, admin: (t) => t.dataset.admin === "1",
+  };
+  document.querySelector(".filters").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-f]"); if (!b) return;
+    document.querySelectorAll(".filters button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    const f = tests[b.dataset.f];
+    let groupRow = null, any = false;
+    const rows = [...body.rows];
+    rows.forEach((tr, i) => {
+      if (tr.hasAttribute("data-group")) {
+        if (groupRow) groupRow.hidden = !any;
+        groupRow = tr; any = false; return;
+      }
+      if (tr.classList.contains("fb-row")) { tr.hidden = tr.previousElementSibling.hidden; return; }
+      const show = f(tr); tr.hidden = !show; if (show) any = true;
+    });
+    if (groupRow) groupRow.hidden = !any;
+  });
+  /* checklist ticks */
+  const CK = "mission-list-meeting-checks-v1";
+  let ticks = {}; try { ticks = JSON.parse(localStorage.getItem(CK) || "{}"); } catch (e) {}
+  document.querySelectorAll(".check input").forEach((cb) => {
+    cb.checked = !!ticks[cb.id];
+    cb.addEventListener("change", () => { ticks[cb.id] = cb.checked; try { localStorage.setItem(CK, JSON.stringify(ticks)); } catch (e) {} });
+  });
+  /* remarks: shared through the artifact's db when available (the team and Claude
+     see them); otherwise kept in this browser and carried by Copy. */
+  const FBK = "mission-list-feedback-v1";
+  let fbLocal = {}; try { fbLocal = JSON.parse(localStorage.getItem(FBK) || "{}"); } catch (e) {}
+  const fbBox = (c) => document.getElementById("fb-" + c);
+  function fbText(c) { const el = fbBox(c); return el ? el.value.trim() : ""; }
+  function markRow(c) { const el = fbBox(c); if (el) el.closest("tr").classList.toggle("has-fb", !!el.value.trim()); }
+  const note = document.getElementById("fb-note");
+  let shared = null, myId = null; const lastShared = {};
+  for (const r of ALL) { const el = fbBox(r[0]); if (fbLocal[r[0]]) { el.value = fbLocal[r[0]]; markRow(r[0]); } }
+  function setNote(mode) {
+    if (mode === "shared") { note.className = "fb-note"; note.textContent = "Remarks are shared: everyone who opens this page sees them, and Claude can read them directly. They save when you click outside the box."; }
+    else { note.className = "fb-note local"; note.textContent = "Remarks are saved in this browser only. Use Copy meeting decisions to send them to Claude."; }
+  }
+  const fallback = setTimeout(() => { if (!shared) setNote("local"); }, 10000);
+  (async () => {
+    try {
+      const db = await window.claude?.use?.("db");
+      if (!db) { clearTimeout(fallback); setNote("local"); return; }
+      const user = await window.claude.use("user");
+      try { myId = user ? await user.id() : null; } catch (e) {}
+      shared = db; clearTimeout(fallback); setNote("shared");
+      db.collection("feedback").onSnapshot((snap) => {
+        const present = new Set(snap.docs.map((d) => d.id));
+        for (const r of ALL) {
+          const el = fbBox(r[0]);
+          if (!present.has(r[0]) && document.activeElement !== el) { lastShared[r[0]] = ""; el.value = ""; markRow(r[0]); document.getElementById("fbs-" + r[0]).textContent = ""; }
+        }
+        for (const d of snap.docs) {
+          const el = fbBox(d.id); if (!el) continue;
+          const v = d.data(); const t = v && typeof v.text === "string" ? v.text : ""; lastShared[d.id] = t;
+          if (document.activeElement !== el) { el.value = t; markRow(d.id); }
+          const at = v && typeof v.at === "number" ? new Date(v.at) : null;
+          document.getElementById("fbs-" + d.id).textContent = t && at ? "saved " + at.toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "";
+        }
+      }, () => setNote("local"));
+    } catch (e) { clearTimeout(fallback); setNote("local"); }
+  })();
+  body.addEventListener("focusout", async (e) => {
+    const el = e.target.closest("textarea.fb"); if (!el) return;
+    const c = el.closest("tr").dataset.for; const t = el.value.trim(); markRow(c);
+    const before = shared ? (lastShared[c] || "") : (fbLocal[c] || "");
+    if (before === t) return;
+    if (t) fbLocal[c] = t; else delete fbLocal[c];
+    try { localStorage.setItem(FBK, JSON.stringify(fbLocal)); } catch (err) {}
+    if (!shared) return;
+    const st = document.getElementById("fbs-" + c);
+    st.textContent = "saving…";
+    try {
+      if (t) await shared.collection("feedback").doc(c).set({ text: t.slice(0, 2000), by: myId, at: Date.now() });
+      else await shared.collection("feedback").doc(c).delete();
+      lastShared[c] = t; st.textContent = t ? "saved" : "";
+    } catch (err) { st.textContent = "not saved: kept in this browser"; }
+  });
+  /* copy */
+  document.getElementById("copy-guide").addEventListener("click", () => {
+    const lines = ALL.map((r) => `${r[0]} ${r[1]}${r[2] ? " (" + r[2] + ")" : ""} | suggested: ${SG[r[3]][0]} | team: ${saved[r[0]] ? saved[r[0]].toUpperCase() : "-"}${saved["_d" + r[0]] ? " | discussed" : ""}${fbText(r[0]) ? " | remark: " + fbText(r[0]).replace(/\s+/g, " ") : ""}`);
+    const t = "Mission List meeting decisions\n" + lines.join("\n");
+    const out = document.getElementById("guide-out"); const btn = document.getElementById("copy-guide");
+    out.value = t;
+    const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy meeting decisions"), 1600); };
+    const fallback = () => { out.hidden = false; out.focus(); out.select(); btn.textContent = "Select and copy the text"; };
+    try { navigator.clipboard.writeText(t).then(done, fallback); } catch (e) { fallback(); }
+  });
+})();
+</script>

@@ -1,0 +1,649 @@
+<title>Mission Register Proposal</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: a proposal for a Mission Register (bulk-loaded
+   starting data for a new board), closing a mission, and the year-end renumber.
+   Tokens copied from styles.css so the mockups read like the app. Light only, like the app.
+   Layout: one reading column; each part = the problem, a mockup in app chrome, then decisions. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --brand-green: #a8c855; --hover-tint: #eef3fb; --grid: #e6e9ee;
+  --ok: #1f8a4c; --ok-bg: #e6f4ec; --warn: #a15c00; --warn-bg: #fdf0d9; --bad: #b42318; --bad-bg: #fde8e7;
+  --info-bg: #e8eff6; --night: #2b2d5c; --night-bg: #e7e7f4;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1100px; margin: 0 auto; padding-block: 28px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 34px; }
+h1 { font-size: 28px; letter-spacing: -.5px; text-wrap: balance; line-height: 1.2; }
+h2 { font-size: 21px; letter-spacing: -.3px; text-wrap: balance; }
+h3 { font-size: 15px; letter-spacing: -.1px; }
+p, li { max-width: 74ch; }
+ul, ol { padding-left: 20px; display: grid; gap: 4px; }
+.lede { color: var(--muted); font-size: 15px; margin-top: 8px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.mono, code { font-family: var(--font-mono); font-size: 12.5px; }
+code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+.eyebrow::before { content: ""; width: 4px; height: 14px; background: var(--brand-green); border-radius: 1px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.part { display: grid; gap: 16px; scroll-margin-top: 16px; }
+.part-head { display: grid; gap: 6px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+nav.toc a { font-size: 12.5px; font-weight: 600; color: var(--primary); text-decoration: none; border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 4px 12px; }
+nav.toc a:hover { background: var(--hover-tint); }
+nav.toc a:focus-visible, button:focus-visible, label.opt:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #e3e8ee; color: var(--muted); white-space: nowrap; }
+.tag.ok { background: var(--ok-bg); color: var(--ok); }
+.tag.warn { background: var(--warn-bg); color: var(--warn); }
+.tag.bad { background: var(--bad-bg); color: var(--bad); }
+.tag.info { background: var(--info-bg); color: var(--primary); }
+.tag.night { background: var(--night-bg); color: var(--night); }
+
+/* the big idea */
+.idea { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: center; }
+@media (max-width: 760px) { .idea { grid-template-columns: 1fr; } }
+.diagram { overflow-x: auto; }
+.diagram svg { display: block; min-width: 460px; width: 100%; height: auto; }
+
+/* compare today vs proposed */
+.cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 700px) { .cols2 { grid-template-columns: 1fr; } }
+.box { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.box.now { background: #f7f8fa; }
+.box h3 { display: flex; gap: 8px; align-items: center; }
+
+/* app-styled mockups */
+.mock { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); min-width: 0; }
+.mock-bar { background: var(--primary); color: #fff; padding: 9px 14px; display: flex; gap: 10px; align-items: center; font-size: 13px; flex-wrap: wrap; }
+.mock-bar .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.mock-bar .tabs span { padding: 3px 10px; border-radius: 6px; color: #c9d6e3; }
+.mock-bar .tabs span.on { background: #fff; color: var(--primary); font-weight: 600; }
+.mock-tools { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.mock-tools .sp { flex: 1; }
+.btn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 6px; border: 1px solid var(--border); background: #fff; color: var(--primary); white-space: nowrap; cursor: default; }
+.btn.fill { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn.danger { color: var(--bad); }
+.btn.green { background: var(--ok); border-color: var(--ok); color: #fff; }
+.chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); background: #fff; white-space: nowrap; }
+.chip.on { background: var(--hover-tint); color: var(--primary); border-color: #b9cce0; font-weight: 600; }
+.search { border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; color: var(--muted); font-size: 12.5px; min-width: 180px; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { text-align: left; font-weight: 600; color: var(--muted); background: #f5f7f9; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 7px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
+tr.dim td { color: var(--muted); }
+tr.dim td.num { text-decoration: line-through; text-decoration-color: #b8bec7; }
+td.num { font-family: var(--font-mono); font-weight: 500; color: var(--primary); }
+.was { display: block; font-size: 11px; color: var(--muted); font-family: var(--font-mono); font-weight: 400; }
+.arrow { color: var(--muted); padding: 0 4px; }
+.from { color: var(--bad); text-decoration: line-through; text-decoration-color: rgba(180,35,24,.45); }
+.to { color: var(--ok); font-weight: 600; }
+.mock-foot { padding: 10px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #f7f8fa; border-top: 1px solid var(--border); font-size: 12.5px; }
+.mock-foot .sp { flex: 1; }
+.cap { font-size: 12.5px; color: var(--muted); }
+
+/* preview counters */
+.counters { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.counter { border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; display: grid; min-width: 96px; }
+.counter b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.counter span { font-size: 11.5px; color: var(--muted); }
+.counter.on { border-color: #b9cce0; background: var(--hover-tint); }
+.counter.bad b { color: var(--bad); }
+
+/* steps */
+.steps { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; counter-reset: s; }
+@media (max-width: 860px) { .steps { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .steps { grid-template-columns: 1fr; } }
+.steps li { counter-increment: s; border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: grid; gap: 4px; align-content: start; background: #fff; }
+.steps li::before { content: "Step " counter(s); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.steps li.new { border-color: var(--brand-green); box-shadow: inset 0 3px 0 var(--brand-green); }
+.steps b { font-size: 13.5px; }
+.steps span { font-size: 12.5px; color: var(--muted); }
+
+/* timeline */
+.timeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; position: relative; }
+@media (max-width: 760px) { .timeline { grid-template-columns: 1fr; gap: 10px; } }
+.tl { padding: 12px 14px 12px 0; display: grid; gap: 4px; align-content: start; border-top: 3px solid var(--border); position: relative; }
+.tl::before { content: ""; position: absolute; top: -8px; left: 0; width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 3px solid var(--primary); }
+.tl.key { border-top-color: var(--brand-green); }
+.tl .when { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--primary); margin-top: 6px; }
+.tl b { font-size: 13.5px; }
+.tl span { font-size: 12.5px; color: var(--muted); }
+@media (max-width: 760px) { .tl { border-top: none; border-left: 3px solid var(--border); padding: 4px 0 4px 16px; } .tl::before { top: 6px; left: -8px; } .tl.key { border-left-color: var(--brand-green); } }
+
+/* three actions */
+.acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .acts { grid-template-columns: 1fr; } }
+.act { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+.act.new { border-color: var(--brand-green); box-shadow: inset 0 3px 0 var(--brand-green); }
+.act h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.act dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12.5px; }
+.act dt { color: var(--muted); }
+.th { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+/* close dialog mock */
+.dialog { max-width: 520px; border: 1px solid var(--border); border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgba(0,58,102,.14); overflow: hidden; }
+.dialog .dh { padding: 14px 18px; border-bottom: 1px solid var(--border); display: grid; gap: 2px; }
+.dialog .db { padding: 16px 18px; display: grid; gap: 12px; font-size: 13px; }
+.dialog .df { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; background: #f7f8fa; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.input { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+.note { border-radius: 8px; padding: 9px 12px; font-size: 12.5px; background: var(--warn-bg); color: var(--warn); }
+.note.info { background: var(--info-bg); color: var(--primary); }
+.radio-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; }
+.radio-row span::before { content: "○ "; color: var(--muted); }
+.radio-row span.on::before { content: "● "; color: var(--primary); }
+
+/* mission card mock */
+.card { width: 250px; max-width: 100%; border: 2px solid #2a78d6; border-radius: 8px; overflow: hidden; background: #fff; font-size: 12px; }
+.card .ch { background: #e8f0fb; padding: 7px 10px; display: grid; gap: 2px; }
+.card .ch .top { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
+.card .ch .n { font-family: var(--font-mono); font-weight: 600; color: var(--primary); font-size: 12.5px; }
+.card .cb { padding: 7px 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+.card .p { background: #f1f3f6; border-radius: 5px; padding: 2px 7px; }
+
+/* decisions */
+.decision { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); padding: 16px 18px; display: grid; gap: 10px; }
+.decision > .q { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.decision > .q b { font-size: 14.5px; }
+.decision .id { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+label.opt { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; cursor: pointer; transition: border-color .15s, background .15s; }
+label.opt:hover { border-color: #b9cce0; }
+label.opt input { grid-row: span 2; margin-top: 3px; accent-color: var(--primary); }
+label.opt b { font-size: 13px; }
+label.opt span { font-size: 12.5px; color: var(--muted); grid-column: 2; }
+label.opt:has(input:checked) { border-color: var(--primary); background: var(--hover-tint); }
+label.opt:has(input:checked) b::after { content: "Chosen"; font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ok); margin-left: 8px; }
+label.opt:not(:has(input:checked)) { opacity: .55; cursor: default; }
+label.opt { cursor: default; }
+table.dec td { white-space: normal; vertical-align: top; }
+table.dec td:first-child { white-space: nowrap; }
+.chosen { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ok); margin-left: 6px; }
+
+/* summary */
+.summary { position: sticky; bottom: 0; background: var(--primary); color: #fff; border-radius: 10px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 -4px 16px rgba(0,58,102,.18); }
+.summary .sp { flex: 1; min-width: 160px; font-size: 13px; }
+.summary button { font: inherit; font-size: 13px; font-weight: 600; border: 0; border-radius: 6px; padding: 7px 14px; background: var(--brand-green); color: #13290a; cursor: pointer; transition: transform .1s; }
+.summary button:active { transform: translateY(1px); }
+.summary textarea { width: 100%; font-family: var(--font-mono); font-size: 12px; border-radius: 6px; border: 0; padding: 8px; min-height: 110px; color: var(--text); background: #fff; }
+.phase { display: grid; grid-template-columns: 110px 1fr; gap: 6px 14px; padding: 12px 0; border-top: 1px solid var(--grid); }
+.phase:first-of-type { border-top: 0; }
+.phase .pn { font-weight: 700; color: var(--primary); }
+@media (max-width: 560px) { .phase { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Final spec · Manpower Board · decided 4 Nov 2026</div>
+  <h1 style="margin-top:8px">Mission Register: starting data, closing missions and the year-end renumber</h1>
+  <p class="lede">You asked three questions. All three have the same root cause. Today a mission exists only as a copy on each day's plan, so the app has no single place that knows which missions a board has, which are still running and what each one is called. This spec adds that place, a <b>Mission Register</b> for each board, and shows how it answers each question. Every decision below is settled. The options you didn't pick stay greyed out so the reasoning is still visible. Nothing has been built yet.</p>
+  <nav class="toc" aria-label="Sections">
+    <a href="#idea">The idea</a><a href="#p1">1 · Starting data</a><a href="#p2">2 · Close a mission</a><a href="#p3">3 · Year-end renumber</a><a href="#decided">Decisions</a><a href="#open">Your answers</a><a href="#plan">Build order</a>
+  </nav>
+</header>
+
+
+<section class="part" id="decided">
+  <div class="part-head">
+    <div class="eyebrow">Decisions</div>
+    <h2>What was decided</h2>
+  </div>
+  <div class="panel tbl-wrap" style="padding:0">
+    <table class="dec">
+      <thead><tr><th>#</th><th>Topic</th><th>Decision</th><th>What it means for the build</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">D1</td><td>Where the register lives</td><td><b>A new Missions tab</b> next to Host</td><td>Same toolbar, filters, Bulk edit and Export as Manpower and Host.</td></tr>
+        <tr><td class="mono">D2</td><td>Editing a mission on the board</td><td><b>Ask each time</b>: this day only, or from this day on</td><td>"From this day on" updates the register and the days already planned after it.</td></tr>
+        <tr><td class="mono">D3</td><td>Wording</td><td><b>Hide · Close · Delete</b></td><td>Close (ปิดมิชชั่น) is new. Delete asks "Close instead?" when the mission has earlier days.</td></tr>
+        <tr><td class="mono">D4</td><td>Entering the new numbers</td><td><b>Excel, New number column empty</b></td><td>Changed from "prefilled" because of Q4: Finance, ERP or the customer issue the numbers, so a guess could be uploaded unchecked. The upload validates every row instead.</td></tr>
+        <tr><td class="mono">D5</td><td>Switch date</td><td><b>Each board's first working day</b> of the new year, editable</td><td>Uses the board's weekend and holidays, e.g. Mon 4 Jan 2027.</td></tr>
+        <tr><td class="mono">Q1</td><td>Uniqueness</td><td><b>Unique company-wide</b>, except one mission running on several boards</td><td>Typing a number open on another board asks "Same mission at another location?" Yes links the entries. No refuses it as a duplicate.</td></tr>
+        <tr><td class="mono">Q2</td><td>Day and Night</td><td><b>Same number</b> for both shifts</td><td>Two register rows, one number. They are renumbered together, and closing one asks about the other.</td></tr>
+        <tr><td class="mono">Q3</td><td>Number format</td><td><b>Always PREFIX.YY.NNNN</b>, validated</td><td>For example LCBTH.27.0001. A 2027 renumber must say <span class="mono">.27.</span></td></tr>
+        <tr><td class="mono">Q4</td><td>Who issues numbers</td><td><b>Finance, ERP or the customer</b></td><td>No suggestions (see D4).</td></tr>
+        <tr><td class="mono">Q5</td><td>Permissions</td><td><b>Close: Engineer and up · Reopen and renumber: Manager / Admin</b></td><td>Enforced in the database, like the other roles.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ THE IDEA ============ -->
+<section class="part" id="idea">
+  <div class="part-head">
+    <div class="eyebrow">The idea</div>
+    <h2>One list of missions per board, separate from any date</h2>
+  </div>
+  <div class="cols2">
+    <div class="box now">
+      <h3>Today <span class="tag">how the code works</span></h3>
+      <ul class="small">
+        <li>A mission is a row in <code>missions</code> for <b>one board + one date</b>. <b>Carry over</b> copies the last working day's rows onto the next day.</li>
+        <li>There is no list of "our missions" anywhere else, so a new board can only be set up one <b>New Mission</b> form at a time.</li>
+        <li><b>Hide</b> pauses a mission. It carries forward hidden until somebody unhides it.</li>
+        <li>A mission ends when someone <b>deletes</b> it. That removes only that day's row. Earlier days keep it, but nothing records that the job is finished.</li>
+        <li>The mission number is plain text on every day's row. A renumber means editing it on the right day and hoping every later day was carried from that one.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3>Proposed <span class="tag ok">new</span></h3>
+      <ul class="small">
+        <li>A <b>Mission Register</b> for each board: one row per mission number + shift, with its host, customer, hours, engineer, PPE and a status of <b>Open</b> or <b>Closed</b>.</li>
+        <li>The daily board still has its own rows (so a past day stays exactly as it was), but each row points to its register entry.</li>
+        <li><b>Carry over</b> and <b>Start from register</b> bring in <b>open</b> missions only.</li>
+        <li>The register is where <b>Bulk edit by file</b>, <b>Close</b> and the <b>Year-end renumber</b> happen, the same way Manpower and Host already work.</li>
+        <li>Existing boards get a register automatically, built from each board's latest working day, so nobody has to re-enter anything.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="panel diagram" aria-label="Diagram: the register feeds each day's plan">
+    <svg viewBox="0 0 900 230" role="img" aria-labelledby="dg-t">
+      <title id="dg-t">The Mission Register holds one row per mission. Carry over and Start from register copy open missions onto each day's plan. Closed missions stop. A renumber changes the number from a chosen date.</title>
+      <rect x="10" y="40" width="260" height="150" rx="10" fill="#ffffff" stroke="#003a66" stroke-width="2"/>
+      <text x="26" y="66" font-family="Geist, Arial" font-size="14" font-weight="700" fill="#003a66">Mission Register · LCB Port</text>
+      <g font-family="Geist Mono, monospace" font-size="12.5" fill="#1f2937">
+        <text x="26" y="94">LCBTH.26.0005  Day</text><text x="200" y="94" font-family="Geist, Arial" font-size="11.5" fill="#1f8a4c">Open</text>
+        <text x="26" y="118">LCBTH.26.0011  Night</text><text x="200" y="118" font-family="Geist, Arial" font-size="11.5" fill="#1f8a4c">Open</text>
+        <text x="26" y="142">LCBTH.26.0014  Day</text><text x="200" y="142" font-family="Geist, Arial" font-size="11.5" fill="#1f8a4c">Open</text>
+        <text x="26" y="166" fill="#6b7280">LCBTH.26.0002  Day</text><text x="200" y="166" font-family="Geist, Arial" font-size="11.5" fill="#6b7280">Closed</text>
+      </g>
+      <g font-family="Geist, Arial" font-size="12" fill="#6b7280">
+        <line x1="270" y1="110" x2="372" y2="110" stroke="#a8c855" stroke-width="3"/>
+        <polygon points="372,104 384,110 372,116" fill="#a8c855"/>
+        <text x="282" y="98">open only</text>
+      </g>
+      <g font-family="Geist, Arial">
+        <rect x="390" y="30" width="150" height="170" rx="8" fill="#f5f7f9" stroke="#d8dde4"/>
+        <text x="404" y="54" font-size="12.5" font-weight="700" fill="#1f2937">Thu 31 Dec</text>
+        <rect x="404" y="66" width="122" height="26" rx="5" fill="#e8f0fb"/><text x="412" y="83" font-size="11.5" font-family="Geist Mono, monospace" fill="#003a66">LCBTH.26.0005</text>
+        <rect x="404" y="98" width="122" height="26" rx="5" fill="#e7e7f4"/><text x="412" y="115" font-size="11.5" font-family="Geist Mono, monospace" fill="#2b2d5c">LCBTH.26.0011</text>
+        <rect x="404" y="130" width="122" height="26" rx="5" fill="#e8f0fb"/><text x="412" y="147" font-size="11.5" font-family="Geist Mono, monospace" fill="#003a66">LCBTH.26.0014</text>
+        <text x="404" y="184" font-size="11" fill="#6b7280">old numbers stay here</text>
+      </g>
+      <g font-family="Geist, Arial">
+        <line x1="540" y1="110" x2="612" y2="110" stroke="#003a66" stroke-width="2" stroke-dasharray="5 4"/>
+        <polygon points="612,104 624,110 612,116" fill="#003a66"/>
+        <text x="548" y="98" font-size="12" fill="#6b7280">carry over</text>
+      </g>
+      <g font-family="Geist, Arial">
+        <rect x="630" y="30" width="170" height="170" rx="8" fill="#ffffff" stroke="#a8c855" stroke-width="2"/>
+        <text x="644" y="54" font-size="12.5" font-weight="700" fill="#1f2937">Mon 4 Jan 2027</text>
+        <rect x="644" y="66" width="142" height="26" rx="5" fill="#e8f0fb"/><text x="652" y="83" font-size="11.5" font-family="Geist Mono, monospace" fill="#003a66">LCBTH.27.0001</text>
+        <rect x="644" y="98" width="142" height="26" rx="5" fill="#e7e7f4"/><text x="652" y="115" font-size="11.5" font-family="Geist Mono, monospace" fill="#2b2d5c">LCBTH.27.0002</text>
+        <rect x="644" y="130" width="142" height="26" rx="5" fill="#e8f0fb"/><text x="652" y="147" font-size="11.5" font-family="Geist Mono, monospace" fill="#003a66">LCBTH.27.0003</text>
+        <text x="644" y="184" font-size="11" fill="#6b7280">new numbers from the switch date</text>
+      </g>
+      <text x="820" y="114" font-family="Geist, Arial" font-size="12" fill="#6b7280">…</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ============ PART 1 ============ -->
+<section class="part" id="p1">
+  <div class="part-head">
+    <div class="eyebrow">Question 1</div>
+    <h2>Load a new board's missions from a file</h2>
+    <p class="muted">The same three-step <b>Bulk edit</b> you already use on Manpower and Host: download the template, fill it in, upload it, and check a preview before anything is saved. The difference is that it fills the register, not a date. A new board's first day then starts from the register with one click.</p>
+  </div>
+
+  <div class="panel">
+    <h3>Onboarding a new team, end to end</h3>
+    <ol class="steps">
+      <li><b>Create the board</b><span>Settings → Boards, or + Board. Set its weekend and holidays.</span></li>
+      <li><b>Hosts</b><span>Host tab → Bulk edit. New sites with location and service area. <i>Exists today.</i></span></li>
+      <li><b>Manpower</b><span>Manpower tab → Bulk edit, with the Board column set to the new board. <i>Exists today.</i></span></li>
+      <li class="new"><b>Missions</b><span>Missions tab → Bulk edit. One row per mission number + shift. <i>New.</i></span></li>
+      <li class="new"><b>First day</b><span>Open the board's first working day → <b>Start from register</b>. Missions appear with no crew, ready to drag people on. <i>New.</i></span></li>
+    </ol>
+    <p class="small muted">Hosts come before missions on purpose: the mission file checks every host against the Host list, the same rule New Mission uses, so "Fortune" and "Frotune" never become two sites.</p>
+  </div>
+
+  <div class="mock" aria-label="Mockup: the Missions tab">
+    <div class="mock-bar">
+      <b>TRIGO</b>
+      <div class="tabs"><span>Board</span><span>Overview</span><span>Manpower</span><span>Host</span><span class="on">Missions</span></div>
+    </div>
+    <div class="mock-tools">
+      <span class="chip on">LCB Port</span><span class="chip">Rayong</span>
+      <span class="search">Search number, host, customer…</span>
+      <span class="chip on">Open 14</span><span class="chip">Closed 37</span><span class="chip">Day</span><span class="chip">Night</span>
+      <span class="sp"></span>
+      <span class="btn">Bulk edit</span><span class="btn">Year-end renumber</span><span class="btn">Export</span><span class="btn fill">+ New mission</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Mission number</th><th>Shift</th><th>Host</th><th>Customer</th><th>Hours</th><th>Engineer</th><th>Opened</th><th>Status</th><th>On the board</th></tr></thead>
+        <tbody>
+          <tr><td class="num">LCBTH.26.0005</td><td><span class="tag info">Day</span></td><td>Hino Motors Bangna</td><td>Denso Thailand</td><td>08:00–17:00</td><td>Kittipong S.</td><td>12 Feb 2026</td><td><span class="tag ok">Open</span></td><td>6 crew today</td></tr>
+          <tr><td class="num">LCBTH.26.0011</td><td><span class="tag night">Night</span></td><td>AAT Rayong</td><td>Siam Furukawa</td><td>20:00–05:00</td><td>Warisa P.</td><td>3 Apr 2026</td><td><span class="tag ok">Open</span></td><td>4 crew today</td></tr>
+          <tr><td class="num">LCBTH.26.0014</td><td><span class="tag info">Day</span></td><td>Laem Chabang Port B5</td><td>Aisin Takaoka</td><td>07:30–16:30</td><td>Kittipong S.</td><td>18 May 2026</td><td><span class="tag ok">Open</span></td><td><span class="tag">Hidden</span></td></tr>
+          <tr><td class="num">LCBTH.26.0019</td><td><span class="tag info">Day</span></td><td>TS Tech Prachinburi</td><td>Honda Automobile</td><td>08:00–17:00</td><td>Napat W.</td><td>2 Sep 2026</td><td><span class="tag ok">Open</span></td><td><span class="tag warn">No crew yet</span></td></tr>
+          <tr class="dim"><td class="num">LCBTH.26.0002</td><td>Day</td><td>Hino Motors Bangna</td><td>Toyota Auto Body</td><td>08:00–17:00</td><td>Warisa P.</td><td>8 Jan 2026</td><td><span class="tag">Closed 30 Sep</span></td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="mock-foot"><span>14 open · 37 closed · LCB Port</span><span class="sp"></span><span class="cap">Click a row to edit, close or reopen it. Its history (days, crew, Host Record) is kept.</span></div>
+  </div>
+
+  <div class="cols2">
+    <div class="box">
+      <h3>Template columns</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Column</th><th>Rule</th></tr></thead>
+        <tbody>
+          <tr><td>ID</td><td>Grey, filled by the app. Leave empty for new missions.</td></tr>
+          <tr><td>Board *</td><td>Dropdown of boards</td></tr>
+          <tr><td>Mission number *</td><td>PREFIX.YY.NNNN, unique company-wide (linked missions excepted)</td></tr>
+          <tr><td>Shift *</td><td>Day / Night</td></tr>
+          <tr><td>Host *</td><td>Must be in the Host list</td></tr>
+          <tr><td>Customer *</td><td>Free text</td></tr>
+          <tr><td>Start / End</td><td>Time cells, defaults 08:00–17:00</td></tr>
+          <tr><td>Engineer</td><td>Dropdown of display names</td></tr>
+          <tr><td>PPE, Remark</td><td>Optional. A blank cell clears it.</td></tr>
+          <tr><td>Status</td><td>Open / Closed</td></tr>
+          <tr><td>Closed on</td><td>Date, only when Closed</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="box">
+      <h3>Rules, the same as Manpower and Host</h3>
+      <ul class="small">
+        <li>Rows are matched on <b>ID</b> first, then on <b>board + number + shift</b>. A typo never quietly becomes a second mission.</li>
+        <li>Only the columns in the file are changed. A missing column is left alone.</li>
+        <li>A mission missing from the file is <b>never closed or deleted</b>. Closing is always a choice you make on purpose.</li>
+        <li>New missions are held back until you tick them in the preview, as new people are today.</li>
+        <li>A row with a problem (unknown host, duplicate number, end before start) is skipped with its row number. The rest can still be applied, and uploading the corrected file only changes what still differs.</li>
+        <li>The register changes straight away. A change reaches the board from the <b>next day that is carried over or started from the register</b>. Days already planned are left alone unless you tick <b>Also update days already planned from…</b> in the preview.</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <div class="cols2" style="align-items:start">
+    <div class="dialog" aria-label="Mockup: same mission at another location">
+      <div class="dh"><b>LCBTH.26.0005 is already open on LCB Port</b><span class="small muted">Hino Motors Bangna → Denso Thailand · Day</span></div>
+      <div class="db">
+        <p>Mission numbers are unique across the company. Is this the same mission running at another location?</p>
+        <div class="note info">If you say yes, both boards share the number. A renumber or a close on either board offers to do the same on the other.</div>
+      </div>
+      <div class="df"><span class="btn">No, use another number</span><span class="btn fill">Yes, same mission on Rayong</span></div>
+    </div>
+    <div class="box">
+      <h3>One number, more than one board (Q1)</h3>
+      <ul class="small">
+        <li>A number belongs to one <b>mission</b>, and a mission can be open on several boards. The register links those rows together.</li>
+        <li>The Missions tab shows <span class="tag info">Also on Rayong</span> next to a linked row.</li>
+        <li>A number typed on a second board is never accepted silently. The New Mission form, Bulk edit and the renumber file all ask or refuse.</li>
+        <li>Day and Night with the same number (Q2) are the same mission too, so they move together the same way.</li>
+        <li>The database checks it as well: every register row with the same number must belong to the same linked mission.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mock" aria-label="Mockup: bulk edit preview">
+    <div class="mock-tools"><b>Bulk edit missions · preview</b><span class="sp"></span><span class="cap">missions_LCB-Port_2026-11-04.xlsx</span></div>
+    <div class="counters">
+      <div class="counter on"><b>9</b><span>New</span></div>
+      <div class="counter"><b>2</b><span>To update</span></div>
+      <div class="counter"><b>3</b><span>Unchanged</span></div>
+      <div class="counter bad"><b>1</b><span>Problems</span></div>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th></th><th>Row</th><th>Mission</th><th>What changes</th></tr></thead>
+      <tbody>
+        <tr><td>☑</td><td>4</td><td class="num">LCBTH.26.0021 · Day</td><td><span class="tag ok">New</span> Hino Motors Bangna → Denso Thailand · 08:00–17:00 · Kittipong S.</td></tr>
+        <tr><td>☑</td><td>5</td><td class="num">LCBTH.26.0022 · Night</td><td><span class="tag ok">New</span> AAT Rayong → Siam Furukawa · 20:00–05:00</td></tr>
+        <tr><td></td><td>8</td><td class="num">LCBTH.26.0011 · Night</td><td>Engineer: <span class="from">Warisa P.</span><span class="arrow">→</span><span class="to">Napat W.</span></td></tr>
+        <tr><td></td><td>14</td><td class="num">LCBTH.26.0025 · Day</td><td><span class="tag bad">Problem</span> Host "Hino Bangna" is not in the Host list. Add it on the Host tab, or use "Hino Motors Bangna".</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mock-foot"><span>☐ Also update days already planned from <b>Thu 5 Nov</b></span><span class="sp"></span><span class="btn">Download backup</span><span class="btn fill">Apply 11 changes</span></div>
+  </div>
+
+  <div class="decision" data-q="D1">
+    <div class="q"><span class="id">D1</span><b>Where does the Mission Register live?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="D1" value="A new Missions tab next to Host" checked><b>A new Missions tab</b><span>Next to Manpower and Host, with the same toolbar, filters, Bulk edit and Export. Engineers can view it. Managers and Admins can edit.</span></label>
+      <label class="opt"><input type="radio" name="D1" value="Inside Settings → Boards"><b>Inside Settings → Boards</b><span>Opened per board. Out of the way, but planners would have to go into Settings to see what's open.</span></label>
+      <label class="opt"><input type="radio" name="D1" value="A side panel on the Board tab"><b>A panel on the Board tab</b><span>Opened from the toolbar, like Hide/Unhide. Close to the work, but crowds an already busy toolbar.</span></label>
+    </div>
+  </div>
+
+  <div class="decision" data-q="D2">
+    <div class="q"><span class="id">D2</span><b>When someone edits a mission on the board (new engineer, new hours), what happens to the register?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="D2" value="Ask: this day only, or from this day on" checked><b>Ask each time</b><span>Save offers "This day only" or "From this day on". "From this day on" updates the register and the days already planned after it. That's the honest version of what Carry over does today.</span></label>
+      <label class="opt"><input type="radio" name="D2" value="Always update the register"><b>Always update the register</b><span>Simplest. A one-off change (an engineer covering for a day) would then stick for later days unless someone changes it back.</span></label>
+      <label class="opt"><input type="radio" name="D2" value="Never; the register is edited only on its own tab"><b>Never</b><span>The register changes only on its own tab. Clean, but it drifts from what the board actually shows.</span></label>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section class="part" id="p2">
+  <div class="part-head">
+    <div class="eyebrow">Question 2</div>
+    <h2>Close a mission when the job ends</h2>
+    <p class="muted">You're right that the app is missing a word. Today the team <b>deletes</b> a finished mission. That works on the board, but it throws away the fact that the job ended and when it ended. My recommendation is to <b>keep Hide and Delete and add Close</b>, giving each one a single meaning. It's the same split the Host list already uses: <b>Archive</b> for a site you no longer serve, <b>Merge</b> for a duplicate.</p>
+  </div>
+
+  <div class="acts">
+    <div class="act">
+      <h3>Hide <span class="th">ซ่อนมิชชั่น · exists</span></h3>
+      <p class="small">The job is <b>paused</b> and will come back.</p>
+      <dl><dt>Board</dt><dd>Off the board from today, crew back to Standby</dd><dt>Carry over</dt><dd>Carried forward, still hidden</dd><dt>Register</dt><dd>Open (shown as Hidden)</dd><dt>Undo</dt><dd>Unhide</dd></dl>
+    </div>
+    <div class="act new">
+      <h3>Close <span class="tag ok">new</span> <span class="th">ปิดมิชชั่น</span></h3>
+      <p class="small">The job is <b>finished</b>. The number is done and won't be used again.</p>
+      <dl><dt>Board</dt><dd>Stays on the closing day, gone from the next day</dd><dt>Carry over</dt><dd>Never carried again</dd><dt>Register</dt><dd>Closed, with the date and who closed it</dd><dt>History</dt><dd>Every past day, Host Record and report kept</dd><dt>Undo</dt><dd>Reopen (Manager / Admin)</dd></dl>
+    </div>
+    <div class="act">
+      <h3>Delete <span class="th">ลบมิชชั่น · exists</span></h3>
+      <p class="small">A <b>mistake</b>: a wrong number, a duplicate, a test.</p>
+      <dl><dt>Board</dt><dd>Removed from this day</dd><dt>Change</dt><dd>When the mission has earlier days, Delete first asks <i>"Is this job finished? Close it instead"</i>, so a finished job isn't deleted by habit.</dd></dl>
+    </div>
+  </div>
+
+  <div class="cols2" style="align-items:start">
+    <div class="dialog" aria-label="Mockup: Close mission dialog">
+      <div class="dh"><b>Close mission LCBTH.26.0014 · Day</b><span class="small muted">Laem Chabang Port B5 → Aisin Takaoka · LCB Port</span></div>
+      <div class="db">
+        <div class="field"><label for="m-last">Last working day</label><div class="input" id="m-last">Fri 6 Nov 2026</div></div>
+        <div class="note">From <b>Mon 9 Nov</b> this mission comes off the board. 2 planned days and 1 forecast day are affected, and their <b>5 crew go back to Standby</b>. Kittipong S. (forecast) gets an alert.</div>
+        <div class="field"><label for="m-why">Reason (optional)</label><div class="input" id="m-why">Contract ended</div></div>
+        <div class="note info">Its 214 days, crew and Host Record stay as they are. You can reopen it from the Missions tab.</div>
+      </div>
+      <div class="df"><span class="btn">Cancel</span><span class="btn green">Close mission</span></div>
+    </div>
+    <div class="box">
+      <h3>Where Close appears</h3>
+      <ul class="small">
+        <li>The mission's right-click <b>quick panel</b>: Hide mission, <b>Close mission…</b>, Delete mission.</li>
+        <li>Edit Mission, next to Delete.</li>
+        <li>The Missions tab: one row, or several ticked at once.</li>
+        <li>Bulk edit: Status = Closed plus a Closed on date.</li>
+        <li>Year-end renumber: a <b>Close at year end</b> choice per mission.</li>
+      </ul>
+      <h3 style="margin-top:6px">Rules</h3>
+      <ul class="small">
+        <li>The closing date can be today or a later day, and it can be up to 10 days back for a day that wasn't locked. Locked days are never changed.</li>
+        <li>A closed number can't be reused on that board for the same shift. The New Mission form says it was closed on 6 Nov and offers <b>Reopen</b>.</li>
+        <li>Overview can later count opened and closed missions per month, a figure management can't get today.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="decision" data-q="D3">
+    <div class="q"><span class="id">D3</span><b>Which words do we use?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="D3" value="Keep Hide + add Close + keep Delete" checked><b>Hide · Close · Delete</b><span>Keeps the word your team already knows for a pause. Adds Close for the end of a job. Delete stays for mistakes.</span></label>
+      <label class="opt"><input type="radio" name="D3" value="Rename Hide to Pause + add Close + keep Delete"><b>Pause · Close · Delete</b><span>"Pause" says what Hide is used for, but everyone has to learn a new word, and "Hidden 3" on the toolbar becomes "Paused 3".</span></label>
+      <label class="opt"><input type="radio" name="D3" value="Replace Hide with Close"><b>Close only</b><span>Turns Hide into Close. Fewer buttons, but you lose the pause, which you use today.</span></label>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section class="part" id="p3">
+  <div class="part-head">
+    <div class="eyebrow">Question 3</div>
+    <h2>Give every open mission its new-year number</h2>
+    <p class="muted">This follows your idea: the Administrator downloads the open missions, types in the new number Finance, ERP or the customer issued for each one, and uploads the file. The column starts <b>empty</b> (no guesses), every row is <b>validated</b>, and the switch is <b>scheduled for a date</b>. Old days keep the old number, and days from the switch date on carry the new one, including days already carried over or forecast.</p>
+  </div>
+
+  <div class="timeline">
+    <div class="tl"><span class="when">Early December</span><b>Download</b><span>Missions tab → Year-end renumber → download every open mission (one board or all boards).</span></div>
+    <div class="tl"><span class="when">December</span><b>Fill in</b><span>Type the issued <b>New number</b> in each row, or choose <b>Close at year end</b> for a job that won't continue. Linked missions and Day / Night pairs share one row.</span></div>
+    <div class="tl"><span class="when">Before the switch</span><b>Upload + schedule</b><span>The preview checks the format (PREFIX.27.NNNN), duplicates across all boards, numbers already in use and rows left empty. You pick the switch date.</span></div>
+    <div class="tl key"><span class="when">Switch date · e.g. Mon 4 Jan</span><b>Automatic</b><span>The register shows the new number. Days from the switch date (planned or forecast) are renamed. Earlier days stay as they were.</span></div>
+  </div>
+
+  <div class="mock" aria-label="Mockup: year-end renumber file">
+    <div class="mock-tools"><b>Year-end renumber · 2026 → 2027</b><span class="sp"></span><span class="cap">renumber_2027_all-boards.xlsx (Excel, Sheet 1)</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>ID</th><th>Board</th><th>Current number</th><th>Shifts</th><th>Host</th><th>Customer</th><th>Boards</th><th style="background:#eef6e0;color:#3b5a12">New number for 2027 ✎</th><th style="background:#eef6e0;color:#3b5a12">Action ✎</th></tr></thead>
+      <tbody>
+        <tr><td class="muted">a81f…</td><td>LCB Port</td><td class="num">LCBTH.26.0005</td><td>Day + Night</td><td>Hino Motors Bangna</td><td>Denso Thailand</td><td>LCB Port, Rayong</td><td class="num">LCBTH.27.0012</td><td>Renumber</td></tr>
+        <tr><td class="muted">c3e0…</td><td>LCB Port</td><td class="num">LCBTH.26.0011</td><td>Night</td><td>AAT Rayong</td><td>Siam Furukawa</td><td>LCB Port</td><td class="num">LCBTH.27.0040</td><td>Renumber</td></tr>
+        <tr><td class="muted">0b9d…</td><td>LCB Port</td><td class="num">LCBTH.26.0014</td><td>Day</td><td>Laem Chabang Port B5</td><td>Aisin Takaoka</td><td>LCB Port</td><td class="muted">—</td><td>Close at year end</td></tr>
+        <tr><td class="muted">7f42…</td><td>LCB Port</td><td class="num">LCBTH.26.0019</td><td>Day</td><td>TS Tech Prachinburi</td><td>Honda Automobile</td><td>LCB Port</td><td style="background:#fff8e6"></td><td></td></tr>
+        <tr><td class="muted">e5a7…</td><td>Rayong</td><td class="num">RYGTH.26.0031</td><td>Day</td><td>AAT Rayong</td><td>Ford Thailand</td><td>Rayong</td><td class="num">RYGTH.27.0003</td><td>Renumber</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mock-foot"><span class="cap">The New number column starts empty, with one row per mission (its shifts and boards together). Green columns are the only ones to edit. Action is a dropdown: Renumber · Keep number · Close at year end. An empty row is reported, never guessed.</span></div>
+  </div>
+
+  <div class="cols2" style="align-items:start">
+    <div class="mock" aria-label="Mockup: renumber preview">
+      <div class="mock-tools"><b>Preview</b><span class="sp"></span></div>
+      <div class="counters">
+        <div class="counter on"><b>41</b><span>Renumber</span></div>
+        <div class="counter"><b>3</b><span>Close at year end</span></div>
+        <div class="counter"><b>0</b><span>Keep</span></div>
+        <div class="counter bad"><b>3</b><span>Problems</span></div>
+      </div>
+      <div class="tbl-wrap"><table><tbody>
+        <tr><td class="num">LCBTH.26.0005</td><td><span class="from">LCBTH.26.0005</span><span class="arrow">→</span><span class="to">LCBTH.27.0012</span> · Day + Night · LCB Port, Rayong</td></tr>
+        <tr><td class="num">LCBTH.26.0031</td><td><span class="tag bad">Problem</span> "LCBTH.26.0044" is not a 2027 number (expected LCBTH.27.NNNN)</td></tr>
+        <tr><td class="num">LCBTH.26.0022</td><td><span class="tag bad">Problem</span> LCBTH.27.0004 is used twice (row 6 on LCB Port, row 19 on Rayong) and they are not linked</td></tr>
+        <tr><td class="num">LCBTH.26.0019</td><td><span class="tag bad">Problem</span> Row 5 is empty: type the issued number, or choose Keep number or Close at year end</td></tr>
+      </tbody></table></div>
+      <div class="mock-foot">
+        <span>Switch on <b>Mon 4 Jan 2027</b> (LCB Port's first working day)</span><span class="sp"></span><span class="btn fill">Schedule 44 changes</span>
+      </div>
+    </div>
+    <div class="box">
+      <h3>On the board, the first weeks after the switch</h3>
+      <div class="card" aria-label="Mockup: mission card after renumber">
+        <div class="ch">
+          <div class="top"><span class="n">LCBTH.27.0012</span><span class="tag info">Day · East</span></div>
+          <span class="was">was LCBTH.26.0005</span>
+          <span>Hino Motors Bangna 📍 → Denso Thailand</span>
+        </div>
+        <div class="cb"><span class="p">Somchai</span><span class="p">Anucha</span><span class="p">Preecha</span><span class="p">+3</span></div>
+      </div>
+      <ul class="small">
+        <li>A small <b>was LCBTH.26.0005</b> line for the first 4 weeks, so the crew aren't confused. It's left out of the printed PDF.</li>
+        <li>Searching the board, the Missions tab or the Host Record for <b>either</b> number finds the mission. That comes free: the old and the new number are two names for the same register row.</li>
+        <li>Days before the switch keep the old number everywhere (board, Host Record, exports, reports). They were true when they happened.</li>
+        <li>Until the switch date nothing changes, and a Manager or Admin can edit or cancel a scheduled renumber (Q5).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="decision" data-q="D4">
+    <div class="q"><span class="id">D4</span><b>How should the Administrator enter the new numbers?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="D4" value="Excel file with suggested numbers prefilled"><b>Excel with suggestions</b><span>First picked, then dropped because of Q4: when the numbers come from Finance, ERP or the customer, a suggestion would often be wrong and could be uploaded unchecked.</span></label>
+      <label class="opt"><input type="radio" name="D4" value="Excel file with the New number column empty" checked><b>Excel, column empty</b><span>Best if the new numbers come from the customer or finance and never follow a pattern. A suggestion would only invite mistakes.</span></label>
+      <label class="opt"><input type="radio" name="D4" value="In-app table, no file"><b>In the app, no file</b><span>The same columns as a table on the Missions tab. Fine for 10–20 missions, slower for a hundred.</span></label>
+    </div>
+  </div>
+
+  <div class="decision" data-q="D5">
+    <div class="q"><span class="id">D5</span><b>When does the new number start?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="D5" value="Each board's first working day of the new year, editable" checked><b>Each board's first working day</b><span>Uses the board's weekend and holidays (e.g. Mon 4 Jan 2027). The Administrator can change it for the whole renumber.</span></label>
+      <label class="opt"><input type="radio" name="D5" value="Always 1 January"><b>Always 1 January</b><span>Simplest. A mission planned on a 1 January holiday would already show the new number.</span></label>
+      <label class="opt"><input type="radio" name="D5" value="A date per row"><b>A date per row</b><span>Most flexible, for customers whose numbers change at different times. One more column to fill in.</span></label>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPEN QUESTIONS ============ -->
+<section class="part" id="open">
+  <div class="part-head">
+    <div class="eyebrow">Your answers</div>
+    <h2>The five questions, answered</h2>
+  </div>
+  <div class="decision" data-q="Q1">
+    <div class="q"><span class="id">Q1</span><b>Is a mission number unique across the whole company, or only within one board?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="Q1" value="Unique company-wide" checked><b>Company-wide, except a mission running on several boards</b><span>LCBTH.27.0001 is one mission. It may be open on two boards (two locations) only when someone has linked them.</span></label>
+      <label class="opt"><input type="radio" name="Q1" value="Unique per board (prefix = board)"><b>Per board</b><span>The prefix (LCBTH, RYGTH…) belongs to a board. Today's database rule is per board + date + shift.</span></label>
+      <label class="opt"><input type="radio" name="Q1" value="Not sure"><b>Not sure</b><span>I'll check per board and warn across boards.</span></label>
+    </div>
+  </div>
+  <div class="decision" data-q="Q2">
+    <div class="q"><span class="id">Q2</span><b>When one job runs Day and Night, does it have one number or two?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="Q2" value="Same number for Day and Night" checked><b>One number, both shifts</b><span>Two register rows that share a number. They get renumbered and closed together.</span></label>
+      <label class="opt"><input type="radio" name="Q2" value="Different numbers per shift"><b>A number per shift</b><span>Each shift is its own mission everywhere.</span></label>
+      <label class="opt"><input type="radio" name="Q2" value="Both happen"><b>Both happen</b><span>Each row is handled on its own. Closing one asks about its twin.</span></label>
+    </div>
+  </div>
+  <div class="decision" data-q="Q3">
+    <div class="q"><span class="id">Q3</span><b>Do all numbers follow PREFIX.YY.NNNN (e.g. LCBTH.26.0005)?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="Q3" value="Always this format; validate it" checked><b>Always</b><span>The app checks the format and the year (a 2027 renumber must say .27.).</span></label>
+      <label class="opt"><input type="radio" name="Q3" value="Mostly; warn only"><b>Mostly</b><span>Warn on an odd number, never block it.</span></label>
+      <label class="opt"><input type="radio" name="Q3" value="No fixed format"><b>No fixed format</b><span>No checks beyond duplicates. No suggestions either.</span></label>
+    </div>
+  </div>
+  <div class="decision" data-q="Q4">
+    <div class="q"><span class="id">Q4</span><b>Who issues the new numbers?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="Q4" value="We number them ourselves in sequence"><b>We do, in sequence</b><span>A suggestion is usually right.</span></label>
+      <label class="opt"><input type="radio" name="Q4" value="Finance / ERP / customer issues them" checked><b>Finance, ERP or customer</b><span>Numbers arrive from outside. An empty column is safer (D4).</span></label>
+    </div>
+  </div>
+  <div class="decision" data-q="Q5">
+    <div class="q"><span class="id">Q5</span><b>Who may close, reopen and renumber?</b></div>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="Q5" value="Close: Engineer and up · Reopen + renumber: Manager/Admin" checked><b>Split</b><span>Engineers close their own finished jobs. Managers and Admins reopen and renumber.</span></label>
+      <label class="opt"><input type="radio" name="Q5" value="Manager/Admin only for all three"><b>Managers and Admins only</b><span>Engineers keep Hide and ask for a close.</span></label>
+      <label class="opt"><input type="radio" name="Q5" value="Set in Roles & permissions (new Missions area)"><b>A new permission area</b><span>"Missions" in Settings → Roles, view / edit like the others.</span></label>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PLAN ============ -->
+<section class="part" id="plan">
+  <div class="part-head">
+    <div class="eyebrow">Build order</div>
+    <h2>Three releases, with the renumber ready before 31 December</h2>
+    <p class="muted">The year end is about eight weeks away, so the order puts the register and the renumber first. The bulk upload for new boards reuses most of what Manpower and Host already have.</p>
+  </div>
+  <div class="panel" style="gap:0">
+    <div class="phase"><span class="pn">Release 1</span><div><b>Register + Close</b> <span class="tag">~2 weeks</span><p class="small muted">A <code>mission_register</code> table (one row per board + number + shift, with a shared mission id for linked boards and Day / Night pairs), plus a link from each day's mission. A migration builds each board's register from its latest working day, safe to re-run like the others, and lists any number it finds on two boards for you to link or fix. The Missions tab (view, edit, close, reopen), the company-wide number check and the PREFIX.YY.NNNN format check, "This day only / From this day on" on Edit Mission, and permissions (Close: Engineer and up; Reopen: Manager / Admin). Carry over and Start from register skip closed missions. Delete asks "Close instead?". All of it in Thai.</p></div></div>
+    <div class="phase"><span class="pn">Release 2</span><div><b>Year-end renumber</b> <span class="tag warn">needed by mid-December</span><p class="small muted">Download (New number column empty), fill in, upload, validate (format, year, company-wide duplicates, empty rows) and schedule per board, Manager / Admin only. A register number history, renaming days from the switch date (linked boards and both shifts together), "was …" on the card, search by either number. Tests for planned days, forecast days and locked days.</p></div></div>
+    <div class="phase"><span class="pn">Release 3</span><div><b>Bulk edit missions</b> <span class="tag">~1 week</span><p class="small muted">The template, upload and preview, reusing <code>bulk-edit.js</code>. Start from register on an empty first day. A short "Set up a new board" checklist in Settings.</p></div></div>
+  </div>
+</section>
+
+
+
+</div>
+
+<script>document.querySelectorAll('.decision input[type="radio"]').forEach((el) => { el.disabled = true; });</script>
