@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Non-Rayong Overview Blue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&display=block">
+<style>
+
+/* Layout: "Airy" (Soft Fade D1 with light blue glows). A stacked review view (chrome follows the viewer's theme)
+   and a Present mode that shows one 16:9 slide fitted to the screen. Slides use container units. */
+:root{
+  /* slide artwork, fixed in both themes */
+  --navy:#062A44; --navy-2:#0B3A5C; --sky:#2E7FB8; --green:#97C21D;
+  --mut:#5A6E7E; --hair:rgba(6,42,68,.10); --accent:#2E7FB8;
+  --em:linear-gradient(95deg,#0B3A5C 0%,#2E7FB8 48%,#7FA81A 100%);
+
+  /* page chrome */
+  --bg:#F3F6F9; --surface:#FFFFFF; --fg:#13222F; --fg-mut:#55697A; --rule:#D8E0E7; --btn:#0B3A5C; --btn-fg:#FFFFFF; --stage:#E9EEF3;
+
+  --f:"Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"Instrument Sans", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#0B151D; --surface:#121F2A; --fg:#E4ECF2; --fg-mut:#93A6B5; --rule:#22384A; --btn:#9CC3E4; --btn-fg:#0B151D; color-scheme:dark }
+}
+:root[data-theme="dark"]{ --bg:#0B151D; --surface:#121F2A; --fg:#E4ECF2; --fg-mut:#93A6B5; --rule:#22384A; --btn:#9CC3E4; --btn-fg:#0B151D; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 var(--f);
+  padding:0 max(16px, env(safe-area-inset-right, 0px)) 64px max(16px, env(safe-area-inset-left, 0px))}
+.wrap{max-width:1180px; margin:0 auto}
+.ms{font-family:"Material Symbols Rounded"; font-weight:normal; font-style:normal; line-height:1; display:inline-block; white-space:nowrap; font-feature-settings:"liga"; -webkit-font-smoothing:antialiased; font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24}
+
+/* ---------- review view ---------- */
+.top{padding:36px 0 24px; display:flex; flex-wrap:wrap; gap:16px 24px; align-items:end; justify-content:space-between}
+.top div{display:grid; gap:8px; min-width:0; max-width:72ch}
+.top h1{margin:0; font-size:clamp(24px,3.4vw,34px); font-weight:650; line-height:1.15; letter-spacing:-.02em}
+.top p{margin:0; color:var(--fg-mut)}
+.btn{display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:999px; border:0; background:var(--btn); color:var(--btn-fg); font:600 15px/1 var(--f); cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:2px solid var(--sky); outline-offset:3px}
+.btn .ms{font-size:20px}
+.deck{display:grid; gap:32px}
+.item{display:grid; gap:10px}
+.meta{display:flex; flex-wrap:wrap; gap:4px 14px; align-items:baseline}
+.meta b{font-size:14px; font-weight:600}
+.meta span{font-size:13.5px; color:var(--fg-mut); max-width:90ch}
+
+/* ---------- slide base ---------- */
+/* ---------- slides: Blue statement. Deep navy, bright blue and sky blue; Instrument Sans. Sizes in cqw. ---------- */
+.slide{position:relative; width:100%; aspect-ratio:16/9; container-type:inline-size; overflow:hidden; border-radius:12px;
+  font-family:var(--f); color:#071A33; background:#F0F6FF; box-shadow:0 1px 2px rgba(0,0,0,.06), 0 12px 32px rgba(7,26,51,.12)}
+.slide.lt{background:#fff}
+.slide.dk{background:#061225; color:#fff}
+.slide.gr{background:#1F6FEB; color:#fff}
+.slide *{margin:0}
+.slide img{display:block}
+.bg{position:absolute; inset:0}
+.bg.glow{background:radial-gradient(50cqw 40cqw at 85% 55%, rgba(31,111,235,.5), transparent 70%), radial-gradient(34cqw 26cqw at 0% 100%, rgba(11,79,191,.3), transparent 70%)}
+.bg.grad{background:linear-gradient(135deg,#0B4FBF 0%,#1F6FEB 50%,#52AEFF 100%)}
+.blob{position:absolute; left:52cqw; top:6cqw; width:42cqw; height:42cqw; border-radius:50%; background:linear-gradient(135deg,#0B4FBF,#52AEFF); opacity:.16}
+.mir .blob{left:6cqw}
+.logo{position:absolute; left:5cqw; top:3.4cqw; height:4.4cqw; width:auto; z-index:3}
+.eyebrow{display:inline-flex; align-items:center; width:fit-content; padding:.5cqw 1.1cqw; border-radius:5cqw; background:#E1EEFF; color:#0B4FBF; font-size:1cqw; font-weight:600; line-height:1.2}
+.dk .eyebrow,.gr .eyebrow{background:rgba(255,255,255,.12); box-shadow:inset 0 0 0 1px rgba(255,255,255,.22); color:#E4F0FF; font-weight:500}
+h1.h,h2.h{font-weight:600; letter-spacing:-.05em; line-height:1.03; text-wrap:balance; color:#071A33}
+.dk h1.h,.dk h2.h,.gr h1.h,.gr h2.h{color:#fff}
+em{font-style:normal}
+.lede{font-size:1.5cqw; line-height:1.5; color:#4D6585; text-wrap:pretty}
+.dk .lede{color:#9DB6D4}
+.copy{position:absolute; z-index:2; display:grid; align-content:start; gap:1.6cqw}
+.tx{display:block}
+.win{position:absolute; border-radius:1.2cqw; overflow:hidden; background:#fff; z-index:1;
+  box-shadow:0 0 0 1px rgba(30,90,200,.12), 0 .3cqw .6cqw rgba(30,90,200,.06), 0 2cqw 5cqw rgba(30,90,200,.2)}
+.win .bar{height:1.9cqw; display:flex; align-items:center; gap:.5cqw; padding-left:1.1cqw; background:#F4F7FA; border-bottom:1px solid rgba(7,26,51,.1)}
+.win .bar i{width:.62cqw; height:.62cqw; border-radius:50%; background:#D3DCE4}
+.win img{width:100%; height:auto}
+.win.back{filter:saturate(.92) brightness(.985)}
+.win.front{z-index:2; box-shadow:0 0 0 .5cqw #fff, 0 0 0 calc(.5cqw + 1px) rgba(30,90,200,.14), 0 1cqw 2cqw rgba(30,90,200,.14), 0 3.4cqw 7cqw rgba(7,26,51,.3)}
+.phone{position:absolute; aspect-ratio:390/844; border-radius:2.6cqw; padding:.45cqw; background:linear-gradient(160deg,#1B3448,#0A1C2A); z-index:4;
+  box-shadow:0 0 0 1px rgba(255,255,255,.4) inset, 0 2.4cqw 5cqw rgba(7,26,51,.3)}
+.phone img{width:100%; height:100%; object-fit:cover; object-position:top; border-radius:2.2cqw}
+.chips{display:flex; flex-wrap:wrap; gap:.8cqw}
+.chips > span{display:inline-flex; align-items:center; gap:.6cqw; padding:.7cqw 1.15cqw; border-radius:5cqw; font-size:1.1cqw; font-weight:500; color:#071A33; background:#fff; box-shadow:0 0 0 1px rgba(30,90,200,.16)}
+.dk .chips > span{background:rgba(255,255,255,.1); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); color:#fff}
+.chips .ms{font-size:1.4cqw; color:#1F6FEB}
+.dk .chips .ms{color:#7DB9FF}
+.chips .dot{width:1cqw; height:1cqw; border-radius:50%; display:inline-block}
+.ms{font-family:"Material Symbols Rounded"; font-weight:normal; font-style:normal; line-height:1; display:inline-block; white-space:nowrap; font-feature-settings:"liga"; -webkit-font-smoothing:antialiased; font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24}
+.feat{list-style:none; padding:0; display:grid; gap:1.25cqw; margin-top:.4cqw}
+.feat li{display:grid; grid-template-columns:3.4cqw 1fr; gap:1.2cqw; align-items:center}
+.feat .ms,.feat .n{width:3.4cqw; height:3.4cqw; display:grid; place-items:center; border-radius:1cqw; color:#0B4FBF; font-size:1.8cqw; background:#fff; box-shadow:0 .4cqw 1.2cqw rgba(30,90,200,.16)}
+.feat .n{font:600 1.35cqw/1 var(--f)}
+.feat b{display:block; font-size:1.38cqw; font-weight:600; letter-spacing:-.01em; color:#071A33; line-height:1.3}
+.feat li > div > span{display:block; font-size:1.13cqw; color:#4D6585; line-height:1.4}
+.who{position:absolute; display:grid; grid-template-columns:1fr 1fr; gap:2.2cqw; z-index:2}
+.who div{padding-top:1cqw; border-top:1px solid #C9DCF5; position:relative}
+.who div::before{content:""; position:absolute; left:0; top:-1px; width:4cqw; height:.22cqw; border-radius:1cqw; background:#1F6FEB}
+.who h3{font-size:.95cqw; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0B4FBF; margin-bottom:.6cqw}
+.who p{font-size:1.15cqw; line-height:1.5; color:#4D6585}
+
+/* ---------- app slides 13 to 20 ---------- */
+.s1 .copy{left:5cqw; top:13cqw; width:42cqw; gap:2cqw}
+.s1 h1.h{font-size:5.2cqw}
+.s1 .lede{max-width:38cqw}
+.s1 .d1{left:50cqw; top:12.5cqw; width:41cqw}
+.s1 .d2{left:58.5cqw; top:30cqw; width:36.5cqw}
+.s2 .copy{left:5cqw; top:12.5cqw; width:31cqw}
+.s2 h2.h{font-size:3.7cqw}
+.s2 .lede{font-size:1.3cqw}
+.s2 .d1{left:48cqw; top:13.5cqw; width:47cqw}
+.s2 .phone{left:41cqw; top:21cqw; width:13cqw}
+.s3 .copy{left:5cqw; top:12.5cqw; width:37cqw}
+.s3 h2.h{font-size:3.6cqw}
+.s3 .d1{left:48cqw; top:12.5cqw; width:47cqw}
+.s3 .who{left:48cqw; width:47cqw; top:45cqw}
+.s4 .copy{left:5cqw; top:12.5cqw; width:33cqw}
+.s4 h2.h{font-size:3.6cqw}
+.s4 .d1{left:43cqw; top:13cqw; width:52cqw}
+.s5 .d1{left:5cqw; top:13cqw; width:46cqw}
+.s5 .phone{left:43cqw; top:19.5cqw; width:13cqw}
+.s5 .copy{left:60cqw; top:12.5cqw; width:35cqw}
+.s5 h2.h{font-size:3.5cqw}
+.s6 .copy{left:5cqw; top:12.5cqw; width:34cqw}
+.s6 h2.h{font-size:3.6cqw}
+.s6 .d1{left:49cqw; top:13.5cqw; width:46cqw}
+.s6 .phone{left:43cqw; top:21cqw; width:13cqw}
+.s9 .d1{left:5cqw; top:15cqw; width:47cqw}
+.s9 .d1 img{aspect-ratio:1440/640; object-fit:cover; object-position:top left}
+.s9 .phone{left:44cqw; top:20cqw; width:13cqw}
+.s9 .copy{left:60cqw; top:12.5cqw; width:35cqw}
+.s9 h2.h{font-size:3.5cqw}
+.s7 .copy{left:5cqw; top:12.5cqw; width:36cqw}
+.s7 h2.h{font-size:3.5cqw}
+.s7 .d1{left:46cqw; top:12.5cqw; width:47cqw}
+.s7 .d2{left:52cqw; top:33cqw; width:43cqw}
+.s8 .copy{left:5cqw; top:12.5cqw; width:35cqw; gap:1.8cqw}
+.s8 h2.h{font-size:4.4cqw}
+.steps{display:grid; gap:1.4cqw; margin-top:.4cqw}
+.step{display:grid; grid-template-columns:3.4cqw 1fr; gap:1.1cqw; align-items:baseline}
+.step i{font-size:1.9cqw; line-height:1; font-style:normal; font-weight:700; letter-spacing:-.03em; color:#1A62D6}
+.step p{font-size:1.2cqw; line-height:1.45; color:#4D6585}
+.step b{color:#071A33; font-weight:600}
+.apps{position:absolute; left:44cqw; top:12.5cqw; width:51cqw; display:grid; grid-template-columns:1fr 1fr; gap:2.2cqw; z-index:2}
+.app{display:grid; justify-items:center; gap:1.3cqw; padding:2.2cqw 1.6cqw 2cqw; border-radius:2cqw; background:#fff; box-shadow:0 0 0 1px #D6E6FA, 0 2cqw 5cqw rgba(30,90,200,.12)}
+.app-head{display:grid; justify-items:center; gap:.9cqw}
+.app-icon{width:4.8cqw; height:4.8cqw; border-radius:1.15cqw; box-shadow:0 .6cqw 1.4cqw rgba(30,90,200,.18)}
+.app h3{font-size:1.7cqw; font-weight:600; letter-spacing:-.025em; color:#071A33; white-space:nowrap}
+.qr{width:15.5cqw; padding:1.2cqw; border-radius:1.3cqw; background:#fff; box-shadow:0 0 0 1px #D6E6FA}
+.qr img{width:100%; height:auto}
+.url{font-size:1cqw; font-weight:500; line-height:1; color:#0B4FBF; white-space:nowrap; padding:.75cqw 1.1cqw; border-radius:5cqw; background:#E8F2FF}
+.s8 .chips{position:absolute; left:44cqw; width:51cqw; top:48cqw; justify-content:center; z-index:2}
+
+/* ---------- overview slides 1 to 11 ---------- */
+.rib{position:absolute; inset:0; width:100%; height:100%}
+.cv .copy{left:5cqw; top:16cqw; width:44cqw; gap:1.8cqw}
+.cv h1.h{font-size:6.2cqw}
+.cv .lede{font-size:1.25cqw; line-height:1.6; width:34cqw}
+.cv .ft{position:absolute; left:5cqw; bottom:3.4cqw; font-size:.9cqw; color:#6F8FB5; letter-spacing:.04em}
+.cv .chips{position:absolute; left:5cqw; top:44cqw}
+.ghost{position:absolute; inset:0; width:100%; height:100%}
+.ghost text{font-family:"Instrument Sans",sans-serif}
+.dv .dt{position:absolute; left:5cqw; bottom:6cqw; display:grid; gap:1.2cqw; width:40cqw}
+.dv h2.h{font-size:4.4cqw; max-width:34cqw}
+.dv .lede{color:rgba(255,255,255,.85); font-size:1.2cqw; width:30cqw}
+.hd{position:absolute; left:5cqw; top:10.5cqw; width:90cqw; display:grid; gap:1cqw; justify-items:start; z-index:2}
+.hd h2.h{font-size:3.3cqw}
+.hd .lede{font-size:1.3cqw; margin-top:-.2cqw}
+.card{background:#F0F6FF; box-shadow:0 0 0 1px #D6E6FA; border-radius:1.8cqw; position:absolute; z-index:2}
+.cht{padding:1.6cqw 1.8cqw}
+.ch{display:flex; justify-content:space-between; align-items:center; gap:1cqw; margin-bottom:.8cqw}
+.ch > .tx{font-size:1.15cqw; font-weight:600; color:#071A33}
+.legend{display:flex; gap:1.3cqw; flex-wrap:wrap}
+.legend span{display:inline-flex; align-items:center; gap:.5cqw; font-size:1cqw; color:#4D6585}
+.legend i{width:1cqw; height:1cqw; border-radius:.3cqw; display:inline-block}
+.chart{display:block; width:100%; height:auto}
+.chart text{font-family:"Instrument Sans",sans-serif}
+.chart .ax{font-size:10.5px; fill:#5F7691}
+.chart .vl{font-size:10.5px; fill:#26405F}
+.chart .b{font-weight:600; fill:#071A33}
+.foot{font-size:.9cqw; color:#5F7691; margin-top:.4cqw}
+.src{position:absolute; left:5cqw; bottom:2.6cqw; font-size:.85cqw; color:#5F7691; z-index:2}
+.sg{position:absolute; display:grid; gap:1.2cqw; z-index:2}
+.st{border-radius:1.6cqw; padding:1.2cqw 1.8cqw; background:#E8F2FF; box-shadow:0 0 0 1px #D6E6FA}
+.st b{display:block; font-size:3.6cqw; font-weight:700; letter-spacing:-.05em; line-height:1; margin-bottom:.5cqw; color:#1A62D6}
+.st .tx.d{font-size:1cqw; line-height:1.35; color:#4D6585}
+.st.dk2{background:#071A33; box-shadow:none}
+.st.dk2 b{color:#9CCBFF}
+.st.dk2 .tx.d{color:#9DB6D4}
+.p2 .cht{left:5cqw; top:19.5cqw; width:56cqw}
+.p2 .sg{left:63cqw; top:19.5cqw; width:32cqw}
+.qb{display:grid; gap:.6cqw; margin-top:.4cqw}
+.qb div{display:grid; grid-template-columns:2.4cqw 1fr 6cqw; align-items:center; gap:.8cqw; font-size:1cqw; color:#4D6585}
+.qb i{display:block; height:1.3cqw; border-radius:.3cqw; background:#BCD8F7}
+.qb .hi i{background:#1F6FEB}
+.qb .hi span.tx{color:#071A33; font-weight:600}
+.p3 .dn{left:5cqw; top:19.5cqw; width:21cqw; height:34cqw; padding:1.8cqw; display:grid; align-content:start; justify-items:center; gap:1.4cqw}
+.donut{width:100%; height:auto; display:block}
+.dwrap{position:relative; width:100%}
+.dc{position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center}
+.dc b{display:block; font-size:2.6cqw; font-weight:700; letter-spacing:-.04em; line-height:1; color:#071A33}
+.dc span.tx{font-size:1cqw; color:#4D6585}
+.dl{display:grid; gap:.7cqw; width:100%}
+.dl div{display:grid; grid-template-columns:1cqw 1fr auto; align-items:center; gap:.7cqw; font-size:1.05cqw; color:#071A33}
+.dl i{width:1cqw; height:1cqw; border-radius:.3cqw; display:block}
+.dl b{font-weight:700}
+.sitegrid{position:absolute; left:28cqw; top:19.5cqw; width:67cqw; display:grid; grid-template-columns:repeat(3,1fr); gap:1.4cqw; z-index:2}
+.site{background:#F0F6FF; box-shadow:0 0 0 1px #D6E6FA; border-radius:1.6cqw; padding:1.3cqw 1.4cqw; display:grid; gap:.15cqw; align-content:start}
+.site-h{display:flex; align-items:center; gap:.7cqw; margin-bottom:.6cqw}
+.site-h i{width:1.3cqw; height:1.3cqw; border-radius:.35cqw; display:block}
+.site-h .tx{font-size:1.25cqw; font-weight:700; letter-spacing:.04em; color:#071A33}
+.kv{display:flex; justify-content:space-between; gap:.6cqw; font-size:.98cqw; padding:.34cqw .5cqw; border-radius:.4cqw; color:#4D6585}
+.kv span.tx{display:inline}
+.kv b{font-weight:700; color:#071A33}
+.kv.hi{background:#D9EAFF}
+.kv.hi b{color:#0B4FBF}
+.take{margin-top:.8cqw; padding-top:.8cqw; border-top:1px solid #C9DCF5; display:grid; gap:.3cqw}
+.take b{font-size:1.02cqw; font-weight:700; color:#071A33}
+.take span.tx{font-size:.92cqw; line-height:1.4; color:#4D6585}
+.p4 .cht{left:5cqw; top:19.5cqw; width:61cqw}
+.p4 .sg{left:68.5cqw; top:19.5cqw; width:26.5cqw}
+.p6 .sup{position:absolute; left:5cqw; top:24cqw; width:30cqw; display:grid; gap:1.4cqw; z-index:2}
+.su{padding:1.3cqw 1.6cqw; display:grid; gap:.4cqw; position:relative}
+.su b{font-size:2.2cqw; font-weight:700; letter-spacing:-.03em; color:#5F7691}
+.su.now b{color:#1A62D6}
+.su .k{font-size:.9cqw; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#5F7691}
+.su.now .k{color:#1A62D6}
+.su .tx.d{font-size:1cqw; color:#4D6585}
+.p6 .cht{left:38.5cqw; top:24cqw; width:56.5cqw}
+.p7 .mixp{left:5cqw; top:24cqw; width:56cqw; padding:1.4cqw 1.8cqw; display:grid; gap:.2cqw}
+.mx{display:grid; grid-template-columns:15cqw 1fr 1fr; gap:1.6cqw; align-items:center; padding:.55cqw 0; border-bottom:1px solid #D6E6FA; font-size:1.1cqw; color:#071A33}
+.mx:last-child{border-bottom:0}
+.mx.mh{font-size:.9cqw; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0B4FBF}
+.mx span.tx{display:inline}
+.mx .new{font-style:normal; font-size:.8cqw; font-weight:700; color:#0B4FBF; background:#D9EAFF; padding:.15cqw .5cqw; border-radius:1cqw; margin-left:.4cqw}
+.bp{display:grid; grid-template-columns:1fr 3.6cqw; align-items:center; gap:.8cqw}
+.bp i{display:block; height:1.3cqw; border-radius:.3cqw; background:#BCD8F7; min-width:1px}
+.bp.now i{background:#1F6FEB}
+.bp span.tx{font-size:1.05cqw; color:#4D6585; text-align:right}
+.bp.now span.tx{color:#071A33; font-weight:600}
+.p7 .c7{left:64cqw; top:24cqw; width:31cqw; padding:1.6cqw 1.8cqw; display:grid; gap:1.2cqw}
+.c7 .k{font-size:.9cqw; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0B4FBF}
+.big b{display:block; font-size:4.6cqw; font-weight:700; letter-spacing:-.05em; line-height:1; color:#071A33}
+.big span.tx{font-size:1.1cqw; color:#4D6585; margin-top:.3cqw}
+.c7 .row{display:grid; grid-template-columns:7cqw 1fr; align-items:center; gap:1cqw; padding-top:1.1cqw; border-top:1px solid #D6E6FA}
+.c7 .row b{font-size:2.4cqw; font-weight:700; letter-spacing:-.04em; color:#1A62D6}
+.c7 .row span.tx{font-size:1cqw; color:#4D6585}
+.note{position:absolute; left:5cqw; top:51.2cqw; width:90cqw; font-size:.85cqw; color:#5F7691; z-index:2}
+.p9 .hd{width:58cqw}
+.p9 .hd .lede{font-size:1.25cqw}
+.speed{position:absolute; left:5cqw; top:28.4cqw; display:flex; align-items:center; gap:2.2cqw; z-index:2}
+.speed b{display:block; font-size:3.4cqw; font-weight:700; letter-spacing:-.04em; line-height:1; color:#5F7691}
+.speed .now b{color:#1A62D6}
+.speed .tx.k{font-size:.9cqw; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#5F7691; margin-top:.5cqw}
+.speed .arr{font-size:3cqw; color:#1F6FEB}
+.speed .cut{margin-left:.8cqw; padding:1cqw 1.6cqw; border-radius:1.4cqw; background:linear-gradient(135deg,#0B4FBF,#2F86F5); box-shadow:0 1.2cqw 2.6cqw rgba(30,90,200,.3)}
+.speed .cut b{color:#fff; font-size:3cqw}
+.speed .cut .tx.k{color:rgba(255,255,255,.9)}
+.p9 .tbl{left:5cqw; top:36.4cqw; width:56cqw; padding:.7cqw 1.6cqw}
+.tr{display:grid; grid-template-columns:13cqw 1fr 6.5cqw 9cqw 7.5cqw; gap:1cqw; padding:.42cqw 0; border-bottom:1px solid #D6E6FA; font-size:1.02cqw; color:#071A33; align-items:center}
+.tr.th{font-size:.85cqw; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#0B4FBF}
+.tr .g{color:#1A62D6; font-weight:700}
+.tr .rd{color:#fff; font-weight:600; background:#1F6FEB; border-radius:1cqw; text-align:center; padding:.1cqw 0}
+.tbl .foot{margin-top:.7cqw}
+.photo{position:absolute; border-radius:2cqw; overflow:hidden; box-shadow:0 0 0 1px #D6E6FA, 0 2.4cqw 5cqw rgba(30,90,200,.18); z-index:1}
+.photo img{width:100%; height:100%; object-fit:cover}
+.p9 .ph{left:66cqw; top:12.6cqw; width:29cqw; height:27.4cqw}
+.p9 .ph img{object-position:50% 30%}
+.serial{position:absolute; left:66cqw; top:42.2cqw; width:18.5cqw; z-index:3; filter:drop-shadow(0 .8cqw 1.4cqw rgba(7,26,51,.25))}
+.cap{position:absolute; left:86cqw; top:43.4cqw; z-index:3; text-align:left; width:9.5cqw; display:grid; gap:.3cqw}
+.cap b{display:block; font-size:1cqw; font-weight:600; color:#071A33}
+.cap span.tx{font-size:.85cqw; color:#4D6585; line-height:1.4}
+.fc{position:absolute; top:27.6cqw; width:15.9cqw; height:13.2cqw; padding:1.4cqw 1.3cqw; display:grid; align-content:start; gap:.35cqw}
+.fc .ms{width:3.4cqw; height:3.4cqw; display:grid; place-items:center; border-radius:1cqw; color:#0B4FBF; font-size:1.9cqw; background:#fff; box-shadow:0 .4cqw 1.2cqw rgba(30,90,200,.16); margin-bottom:.6cqw}
+.fc b{font-size:1.3cqw; font-weight:600; color:#071A33; letter-spacing:-.01em}
+.fc span.tx{font-size:1cqw; color:#4D6585; line-height:1.35}
+.f0{left:5cqw}.f1{left:23.5cqw}.f2{left:42cqw}.f3{left:60.5cqw}.f4{left:79cqw}
+.fa{position:absolute; top:33.2cqw; font-size:1.8cqw; color:#1F6FEB; z-index:2}
+.a0{left:21.15cqw}.a1{left:39.65cqw}.a2{left:58.15cqw}.a3{left:76.65cqw}
+.links{position:absolute; left:0; top:0; width:100cqw; height:56.25cqw; z-index:1}
+.links path{fill:none; stroke:#1F6FEB; stroke-width:.16; stroke-dasharray:.6 .45}
+.fx{position:absolute; left:36cqw; top:45.4cqw; width:28cqw; height:6.4cqw; padding:0 1.4cqw; display:flex; align-items:center; gap:1.1cqw; background:#fff; box-shadow:0 0 0 1px #9CCBFF; border-radius:1.2cqw; z-index:2}
+.fx .ms{font-size:2cqw; color:#0B4FBF}
+.fx b{display:block; font-size:1.2cqw; font-weight:600; color:#071A33}
+.fx span.tx{font-size:.95cqw; color:#4D6585}
+.fxl{position:absolute; left:70cqw; top:46.2cqw; width:16cqw; font-size:.95cqw; color:#4D6585; line-height:1.35; z-index:2}
+.ctls{position:absolute; left:5cqw; top:25.4cqw; width:90cqw; display:grid; grid-template-columns:1fr 1fr; gap:1.6cqw 2cqw; z-index:2}
+.ctl{display:grid; grid-template-columns:4.4cqw 1fr; gap:1.4cqw; align-items:center; padding:1.5cqw 1.8cqw; border-radius:1.4cqw; background:#F0F6FF; box-shadow:0 0 0 1px #D6E6FA}
+.ctl .ms{width:4.4cqw; height:4.4cqw; display:grid; place-items:center; border-radius:1.2cqw; color:#0B4FBF; font-size:2.4cqw; background:#fff; box-shadow:0 .4cqw 1.2cqw rgba(30,90,200,.16)}
+.ctl b{display:block; font-size:1.45cqw; font-weight:600; color:#071A33; letter-spacing:-.01em; margin-bottom:.3cqw}
+.ctl span.tx{font-size:1.1cqw; color:#4D6585; line-height:1.45}
+.strip{position:absolute; left:5cqw; top:47.2cqw; width:90cqw; padding:1cqw 1.6cqw; border-radius:1cqw; background:#E8F2FF; box-shadow:0 0 0 1px #D6E6FA; font-size:1.02cqw; color:#0B4FBF; z-index:2}
+
+.cs .copy{left:5cqw; top:12.5cqw; width:31cqw; gap:1.6cqw}
+.cs h2.h{font-size:3.4cqw}
+.cs .feat .n{background:#52AEFF; color:#071A33; box-shadow:0 0 0 .25cqw #fff, 0 .4cqw 1.2cqw rgba(30,90,200,.25)}
+.cs .cc{position:absolute; left:5cqw; top:49.5cqw; gap:.7cqw; z-index:2}
+.cs .cc > span{font-size:1cqw; padding:.6cqw 1cqw}
+.cs .d1{left:45cqw; top:12.5cqw; width:50cqw}
+.cs .phone{left:38.8cqw; top:28cqw; width:12cqw}
+.p7 .mixp{top:21.5cqw}
+.p7 .mixp .mx{padding:.38cqw 0}
+.p7 .c7{top:21.5cqw; gap:.8cqw; padding:1.3cqw 1.8cqw}
+.p7 .c7 .row{padding-top:.8cqw}
+.p7 .c7 .row b{font-size:2.1cqw}
+.p7 .c7 .row > div{display:grid}
+.p7 .c7 .row span.d{font-size:.9cqw; color:#6C84A3}
+.sumb{position:absolute; left:5cqw; top:44.2cqw; width:90cqw; height:5.6cqw; border-radius:1.4cqw; background:linear-gradient(100deg,#0B4FBF,#1F6FEB 60%,#52AEFF); color:#fff; display:flex; align-items:center; justify-content:space-between; padding:0 2.2cqw; z-index:2}
+.sumb .k{font-size:.95cqw; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.85); width:16cqw}
+.sumb .fl{display:flex; align-items:baseline; gap:1cqw}
+.sumb .fl b{font-size:2.4cqw; font-weight:700; letter-spacing:-.03em}
+.sumb .fl .ar{font-size:1.5cqw; color:rgba(255,255,255,.75); align-self:center}
+.sumb .fl .u{font-size:1cqw; color:rgba(255,255,255,.85)}
+.sumb .pc{display:flex; align-items:baseline; gap:1cqw}
+.sumb .pc b{font-size:3cqw; font-weight:700; letter-spacing:-.04em}
+.sumb .pc span.tx{font-size:1cqw; color:rgba(255,255,255,.9)}
+.s5 .phone{top:25cqw; left:41cqw; width:14cqw}
+.appn{display:flex; align-items:center; gap:1.1cqw}
+.appn img{width:4.6cqw; height:4.6cqw; border-radius:1.1cqw; box-shadow:0 .5cqw 1.4cqw rgba(30,90,200,.25)}
+.appn b{display:block; font-size:1.9cqw; font-weight:700; letter-spacing:-.02em; color:#071A33; line-height:1.15}
+.appn small{display:block; font-size:1cqw; font-weight:500; color:#4D6585; margin-top:.2cqw}
+.s2 .copy{top:11.5cqw}
+.s5 .copy{top:11.5cqw}
+.flow{position:absolute; left:5cqw; top:46.5cqw; display:flex; align-items:center; gap:.7cqw; z-index:2}
+.flow > span:not(.ar){display:inline-flex; align-items:center; gap:.6cqw; padding:.7cqw 1.15cqw; border-radius:5cqw; font-size:1.1cqw; font-weight:600; color:#071A33; background:#fff; box-shadow:0 0 0 1px rgba(30,90,200,.16)}
+.flow .ms{font-size:1.4cqw; color:#1F6FEB}
+.flow .ar{font-size:1.2cqw; color:#52AEFF}
+.pin{position:absolute; width:2cqw; height:2cqw; border-radius:50%; background:#52AEFF; color:#071A33; font-size:1.2cqw; font-weight:700; line-height:1; display:grid; place-items:center; z-index:3; box-shadow:0 0 0 .25cqw #fff, 0 .4cqw 1cqw rgba(7,26,51,.35)}
+
+.p2 .st{padding:1cqw 1.8cqw}
+.p2 .st b{font-size:3cqw}
+.p2 .st.q{display:grid; gap:.6cqw; padding:.9cqw 1.8cqw}
+
+/* ---------- present mode ---------- */
+.stage{position:fixed; inset:0; z-index:10; background:var(--stage); display:grid; place-items:center;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.stage .slide{width:min(100vw, calc(100vh * 16 / 9)); border-radius:0; box-shadow:none}
+.stage-bar{position:fixed; z-index:11; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(14px + env(safe-area-inset-bottom,0px)); display:flex; gap:6px; align-items:center;
+  font:500 13px/1 var(--f-mono); color:#3E5568; background:rgba(255,255,255,.85); box-shadow:0 0 0 1px var(--hair), 0 6px 18px rgba(6,42,68,.12); padding:6px 8px 6px 12px; border-radius:999px; opacity:.35; transition:opacity .2s}
+.stage-bar:hover, .stage-bar:focus-within{opacity:1}
+.stage-bar button{border:0; background:transparent; color:#0B3A5C; cursor:pointer; width:32px; height:32px; border-radius:50%; display:grid; place-items:center}
+.stage-bar button:hover{background:rgba(46,127,184,.12)}
+.stage-bar button:focus-visible{outline:2px solid #2E7FB8}
+.stage-bar .ms{font-size:20px}
+@media (prefers-reduced-motion: reduce){ .stage-bar{transition:none} }
+@media (max-width:640px){ .slide{border-radius:6px} }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Non-Rayong overview 2026, Blue</h1>
+      <p>The same twenty-one slides in the Blue statement style: deep navy, bright blue and sky blue. The three sites are LCBTH (deep blue), BANGN (mid blue) and AMATA (light blue), with a key on every slide that uses them. Talking points sit under each slide.</p>
+    </div>
+    <button class="btn" id="btn-present" type="button"><span class="ms">slideshow</span>Present</button>
+  </header>
+  <main class="deck" id="deck">
+
+    <section class="item">
+      <div class="slide dk cv"><div class="bg glow"></div><svg class="rib" viewBox="0 0 100 56.25" preserveAspectRatio="none" aria-hidden="true"><defs>
+<linearGradient id="rb1" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0B4FBF" stop-opacity="0"/><stop offset=".45" stop-color="#1A62D6"/><stop offset="1" stop-color="#9CCBFF"/></linearGradient>
+<linearGradient id="rb2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#1A62D6" stop-opacity="0"/><stop offset=".5" stop-color="#2B7FF0"/><stop offset="1" stop-color="#C6E0FF"/></linearGradient>
+<linearGradient id="rb3" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#0B4FBF" stop-opacity="0"/><stop offset=".6" stop-color="#2F86F5" stop-opacity=".7"/><stop offset="1" stop-color="#9CCBFF"/></linearGradient></defs>
+<polygon points="46,56.25 54,56.25 100,3 100,-7" fill="url(#rb3)" opacity=".75"/>
+<polygon points="58,56.25 70,56.25 100,22 100,8" fill="url(#rb1)" style="filter:drop-shadow(0 0 1.2px rgba(60,140,255,.9))"/>
+<polygon points="76,56.25 81,56.25 100,34 100,28" fill="url(#rb2)"/>
+<polyline points="70,56.25 100,22" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".18"/>
+</svg><img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO"><div class="copy"><span class="eyebrow">Jan–Sep 2026</span><h1 class="h">Non-Rayong overview 2026.</h1><p class="lede">Service hours, site mix and customers, then cost reduction and operation excellence, across our three non-Rayong sites.</p></div><div class="chips"><span><i class="dot" style="background:#0B3A8F;box-shadow:0 0 0 1px rgba(255,255,255,.55)"></i>LCBTH</span><span><i class="dot" style="background:#2F86F5;box-shadow:0 0 0 1px rgba(255,255,255,.55)"></i>BANGN</span><span><i class="dot" style="background:#8CC4FF;box-shadow:0 0 0 1px rgba(255,255,255,.55)"></i>AMATA</span></div><div class="ft tx">TRIGO Quality Services (Thailand)</div>
+      </div>
+      <div class="meta"><b>1 · Opening</b><span>Non-Rayong overview for January to September 2026: LCBTH, BANGN and AMATA.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p2"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">01 · Performance</span><h2 class="h">September set a record after the April dip.</h2></div>
+  <div class="card cht"><div class="ch"><span class="tx">Monthly service hours by site</span><div class="legend"><span class="tx"><i style="background:#0B3A8F"></i>LCBTH</span><span class="tx"><i style="background:#2F86F5"></i>BANGN</span><span class="tx"><i style="background:#8CC4FF"></i>AMATA</span></div></div><svg viewBox="0 0 580 300" class="chart" role="img" aria-label="Monthly service hours by site, January to September 2026, stacked: LCBTH, BANGN and AMATA"><line x1="44" x2="572" y1="262.0" y2="262.0" stroke="rgba(7,26,51,0.18)"/><text x="36" y="265.5" text-anchor="end" class="ax">0k</text><line x1="44" x2="572" y1="203.0" y2="203.0" stroke="rgba(7,26,51,0.07)"/><text x="36" y="206.5" text-anchor="end" class="ax">10k</text><line x1="44" x2="572" y1="144.0" y2="144.0" stroke="rgba(7,26,51,0.07)"/><text x="36" y="147.5" text-anchor="end" class="ax">20k</text><line x1="44" x2="572" y1="85.0" y2="85.0" stroke="rgba(7,26,51,0.07)"/><text x="36" y="88.5" text-anchor="end" class="ax">30k</text><line x1="44" x2="572" y1="26.0" y2="26.0" stroke="rgba(7,26,51,0.07)"/><text x="36" y="29.5" text-anchor="end" class="ax">40k</text><rect x="55.3" y="148.0" width="36" height="113.0" fill="#0B3A8F"/><rect x="55.3" y="125.7" width="36" height="21.3" fill="#2F86F5"/><rect x="55.3" y="107.4" width="36" height="17.3" fill="#8CC4FF"/><text x="73.3" y="101.4" text-anchor="middle" class="vl">26,207</text><text x="73.3" y="278" text-anchor="middle" class="ax">Jan</text><rect x="114.0" y="122.4" width="36" height="138.6" fill="#0B3A8F"/><rect x="114.0" y="103.7" width="36" height="17.6" fill="#2F86F5"/><rect x="114.0" y="83.0" width="36" height="19.7" fill="#8CC4FF"/><text x="132.0" y="77.0" text-anchor="middle" class="vl">30,333</text><text x="132.0" y="278" text-anchor="middle" class="ax">Feb</text><rect x="172.7" y="129.5" width="36" height="131.5" fill="#0B3A8F"/><rect x="172.7" y="91.1" width="36" height="37.4" fill="#2F86F5"/><rect x="172.7" y="76.4" width="36" height="13.7" fill="#8CC4FF"/><text x="190.7" y="70.4" text-anchor="middle" class="vl">31,463</text><text x="190.7" y="278" text-anchor="middle" class="ax">Mar</text><rect x="231.3" y="167.4" width="36" height="93.6" fill="#0B3A8F"/><rect x="231.3" y="127.9" width="36" height="38.5" fill="#2F86F5"/><rect x="231.3" y="111.9" width="36" height="15.0" fill="#8CC4FF"/><text x="249.3" y="105.9" text-anchor="middle" class="vl b">25,440</text><text x="249.3" y="278" text-anchor="middle" class="ax">Apr</text><rect x="290.0" y="149.6" width="36" height="111.4" fill="#0B3A8F"/><rect x="290.0" y="114.7" width="36" height="33.9" fill="#2F86F5"/><rect x="290.0" y="98.6" width="36" height="15.1" fill="#8CC4FF"/><text x="308.0" y="92.6" text-anchor="middle" class="vl">27,688</text><text x="308.0" y="278" text-anchor="middle" class="ax">May</text><rect x="348.7" y="137.0" width="36" height="124.0" fill="#0B3A8F"/><rect x="348.7" y="101.6" width="36" height="34.4" fill="#2F86F5"/><rect x="348.7" y="87.3" width="36" height="13.3" fill="#8CC4FF"/><text x="366.7" y="81.3" text-anchor="middle" class="vl">29,606</text><text x="366.7" y="278" text-anchor="middle" class="ax">Jun</text><rect x="407.3" y="142.8" width="36" height="118.2" fill="#0B3A8F"/><rect x="407.3" y="101.4" width="36" height="40.4" fill="#2F86F5"/><rect x="407.3" y="78.0" width="36" height="22.4" fill="#8CC4FF"/><text x="425.3" y="72.0" text-anchor="middle" class="vl">31,185</text><text x="425.3" y="278" text-anchor="middle" class="ax">Jul</text><rect x="466.0" y="133.7" width="36" height="127.3" fill="#0B3A8F"/><rect x="466.0" y="87.9" width="36" height="44.8" fill="#2F86F5"/><rect x="466.0" y="66.8" width="36" height="20.1" fill="#8CC4FF"/><text x="484.0" y="60.8" text-anchor="middle" class="vl">33,084</text><text x="484.0" y="278" text-anchor="middle" class="ax">Aug</text><rect x="524.7" y="114.2" width="36" height="146.8" fill="#0B3A8F"/><rect x="524.7" y="70.5" width="36" height="42.7" fill="#2F86F5"/><rect x="524.7" y="45.7" width="36" height="23.7" fill="#8CC4FF"/><text x="542.7" y="39.7" text-anchor="middle" class="vl b">36,653</text><text x="542.7" y="278" text-anchor="middle" class="ax">Sep</text><defs><linearGradient id="g44" gradientUnits="userSpaceOnUse" x1="254.0" y1="0" x2="503.2" y2="0"><stop offset="0" stop-color="#52AEFF" stop-opacity=".45"/><stop offset="1" stop-color="#071A33"/></linearGradient></defs><path d="M254.0 84.9 L503.2 30.4" stroke="url(#g44)" stroke-width="4" stroke-linecap="round" fill="none"/><polygon points="514.0,28.0 504.4,35.8 502.0,25.0" fill="#071A33"/><circle cx="254.0" cy="84.9" r="4" fill="#fff" stroke="#52AEFF" stroke-width="2"/><rect x="274" y="28" width="112" height="24" rx="12" fill="#1F6FEB"/><text x="330" y="44.5" text-anchor="middle" class="vl b" style="fill:#fff;font-size:12.5px">+44% Apr → Sep</text></svg></div>
+  <div class="sg"><div class="st "><b class="tx">−19%</b><span class="tx d">Apr low vs Mar, 25,440 h; LCBTH −29%</span></div><div class="st "><b class="tx">+44%</b><span class="tx d">Apr to Sep: 25,440 h to a record 36,653 h</span></div><div class="st dk2"><b class="tx">176</b><span class="tx d">FTE in Sep vs 141 Jan–Aug avg</span></div>
+    <div class="st q"><span class="tx d">Quarterly service hours</span><div class="qb"><div><span class="tx">Q1</span><i style="width:87.2%"></i><span class="tx">88.0K h</span></div><div><span class="tx">Q2</span><i style="width:82.0%"></i><span class="tx">82.7K h</span></div><div class="hi"><span class="tx">Q3</span><i style="width:100%"></i><span class="tx">100.9K h</span></div></div></div></div>
+      </div>
+      <div class="meta"><b>2 · Performance</b><span>Hours fell 19% in April, then climbed 44% to a record 36,653 h in September. Q3 is the strongest quarter at 100.9K h.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p3"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">01 · Site mix · Jan–Sep 2026</span><h2 class="h">LCBTH leads hours; BANGN leads missions.</h2></div>
+  <div class="card dn"><div class="dwrap"><svg viewBox="0 0 200 200" class="donut" role="img" aria-label="Share of service hours: LCBTH 69.5%, BANGN 20.0%, AMATA 10.6%"><circle cx="100" cy="100" r="74" fill="none" stroke="#0B3A8F" stroke-width="30" stroke-dasharray="320.82 144.13" stroke-dashoffset="0.00" transform="rotate(-90 100 100)"/><circle cx="100" cy="100" r="74" fill="none" stroke="#2F86F5" stroke-width="30" stroke-dasharray="90.90 374.06" stroke-dashoffset="-322.82" transform="rotate(-90 100 100)"/><circle cx="100" cy="100" r="74" fill="none" stroke="#8CC4FF" stroke-width="30" stroke-dasharray="47.24 417.72" stroke-dashoffset="-415.72" transform="rotate(-90 100 100)"/></svg><div class="dc"><b class="tx">271.7k</b><span class="tx">service hrs</span></div></div><div class="dl"><div><i style="background:#0B3A8F"></i><span class="tx">LCBTH</span><b class="tx">69.5%</b></div><div><i style="background:#2F86F5"></i><span class="tx">BANGN</span><b class="tx">20.0%</b></div><div><i style="background:#8CC4FF"></i><span class="tx">AMATA</span><b class="tx">10.6%</b></div></div></div>
+  <div class="sitegrid"><div class="site"><div class="site-h"><i style="background:#0B3A8F"></i><b class="tx">LCBTH</b></div><div class="kv hi"><span class="tx">Service hours</span><b class="tx">188,739</b></div><div class="kv"><span class="tx">Share of hours</span><b class="tx">69.5%</b></div><div class="kv"><span class="tx">Customers</span><b class="tx">20</b></div><div class="kv"><span class="tx">Missions</span><b class="tx">76</b></div><div class="kv"><span class="tx">Hours / mission</span><b class="tx">2,483</b></div><div class="kv"><span class="tx">Mgmt fee days</span><b class="tx">2,004</b></div><div class="kv"><span class="tx">Per-piece units</span><b class="tx">5,985</b></div><div class="kv"><span class="tx">Sep vs Jan hours</span><b class="tx">+30%</b></div><div class="take"><b class="tx">LCBTH = scale</b><span class="tx">Ford + AutoAlliance + Mitsubishi port/plant inspection. ~2,500 hrs per mission; only 10 hosts.</span></div></div><div class="site"><div class="site-h"><i style="background:#2F86F5"></i><b class="tx">BANGN</b></div><div class="kv"><span class="tx">Service hours</span><b class="tx">54,235</b></div><div class="kv"><span class="tx">Share of hours</span><b class="tx">20.0%</b></div><div class="kv"><span class="tx">Customers</span><b class="tx">53</b></div><div class="kv hi"><span class="tx">Missions</span><b class="tx">140</b></div><div class="kv hi"><span class="tx">Hours / mission</span><b class="tx">387</b></div><div class="kv"><span class="tx">Mgmt fee days</span><b class="tx">1,200</b></div><div class="kv"><span class="tx">Per-piece units</span><b class="tx">23,533</b></div><div class="kv hi"><span class="tx">Sep vs Jan hours</span><b class="tx">+96%</b></div><div class="take"><b class="tx">BANGN = breadth</b><span class="tx">140 missions, 53 customers, 70% of per-piece units. Many short sorting jobs (~390 hrs/mission).</span></div></div><div class="site"><div class="site-h"><i style="background:#8CC4FF"></i><b class="tx">AMATA</b></div><div class="kv"><span class="tx">Service hours</span><b class="tx">28,687</b></div><div class="kv"><span class="tx">Share of hours</span><b class="tx">10.6%</b></div><div class="kv"><span class="tx">Customers</span><b class="tx">31</b></div><div class="kv"><span class="tx">Missions</span><b class="tx">45</b></div><div class="kv"><span class="tx">Hours / mission</span><b class="tx">637</b></div><div class="kv"><span class="tx">Mgmt fee days</span><b class="tx">663</b></div><div class="kv"><span class="tx">Per-piece units</span><b class="tx">4,160</b></div><div class="kv"><span class="tx">Sep vs Jan hours</span><b class="tx">+35%</b></div><div class="take"><b class="tx">BANGN = growth</b><span class="tx">Hours up 96% from Jan to Sep, the fastest growth of the three sites.</span></div></div></div>
+      </div>
+      <div class="meta"><b>3 · Site mix</b><span>Hours per mission = billable hours / distinct mission numbers (base number, ignoring monthly extension suffix). Per-piece units are pieces invoiced per unit of work.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p4"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">01 · Customers &amp; hosts</span><h2 class="h">Three major hosts account for 71% of service hours.</h2></div>
+  <div class="card cht"><div class="ch"><span class="tx">Service hours by host and site, Jan–Sep</span><div class="legend"><span class="tx"><i style="background:#0B3A8F"></i>LCBTH</span><span class="tx"><i style="background:#2F86F5"></i>BANGN</span><span class="tx"><i style="background:#8CC4FF"></i>AMATA</span></div></div><svg viewBox="0 0 600 263" class="chart" role="img" aria-label="Service hours by host and site, January to September 2026"><text x="226" y="19.0" text-anchor="end" class="vl b">Ford MVIP Activity</text><rect x="236.0" y="8.5" width="279.9" height="14" rx="1.5" fill="#0B3A8F"/><text x="522.7" y="19.0" class="vl b">138.4K · 50.9%</text><text x="226" y="42.0" text-anchor="end" class="vl b">MMTH Engine<tspan class="ax"> · 14 customers</tspan></text><rect x="236.0" y="31.5" width="76.5" height="14" rx="1.5" fill="#0B3A8F"/><text x="319.3" y="42.0" class="vl b">38.1K · 14.0%</text><text x="226" y="65.0" text-anchor="end" class="vl b">Surtec Kariya</text><rect x="236.0" y="54.5" width="34.2" height="14" rx="1.5" fill="#2F86F5"/><text x="277.0" y="65.0" class="vl b">17.2K · 6.3%</text><line x1="0" x2="600" y1="73.5" y2="73.5" stroke="rgba(7,26,51,.14)" stroke-dasharray="3 3"/><text x="226" y="88.0" text-anchor="end" class="vl">TTK Logistics</text><rect x="236.0" y="77.5" width="16.4" height="14" rx="1.5" fill="#8CC4FF"/><text x="259.2" y="88.0" class="vl">8.5K · 3.1%</text><text x="226" y="111.0" text-anchor="end" class="vl">Yusen Logistic</text><rect x="236.0" y="100.5" width="15.2" height="14" rx="1.5" fill="#0B3A8F"/><text x="258.0" y="111.0" class="vl">7.9K · 2.9%</text><text x="226" y="134.0" text-anchor="end" class="vl">TMBP<tspan class="ax"> · 11 customers</tspan></text><rect x="236.0" y="123.5" width="12.7" height="14" rx="1.5" fill="#2F86F5"/><text x="255.5" y="134.0" class="vl">6.6K · 2.4%</text><text x="226" y="157.0" text-anchor="end" class="vl">DM Casting Technology<tspan class="ax"> · 2 customers</tspan></text><rect x="236.0" y="146.5" width="11.0" height="14" rx="1.5" fill="#2F86F5"/><rect x="247.8" y="146.5" width="1.0" height="14" rx="1.5" fill="#8CC4FF"/><text x="254.0" y="157.0" class="vl">5.9K · 2.2%</text><text x="226" y="180.0" text-anchor="end" class="vl">Trigo Amatanakorn Branch<tspan class="ax"> · 3 customers</tspan></text><rect x="236.0" y="169.5" width="7.1" height="14" rx="1.5" fill="#8CC4FF"/><text x="249.9" y="180.0" class="vl">3.9K · 1.4%</text><text x="226" y="203.0" text-anchor="end" class="vl">New Somthai Motor Work HQ</text><rect x="236.0" y="192.5" width="6.4" height="14" rx="1.5" fill="#2F86F5"/><text x="249.2" y="203.0" class="vl">3.6K · 1.3%</text><text x="226" y="226.0" text-anchor="end" class="vl">Mitsubishi Electric Consumer Products</text><rect x="236.0" y="215.5" width="6.4" height="14" rx="1.5" fill="#8CC4FF"/><text x="249.2" y="226.0" class="vl">3.5K · 1.3%</text><text x="226" y="249.0" text-anchor="end" class="vl">Others (71 hosts)<tspan class="ax"> · 64 customers</tspan></text><rect x="236.0" y="238.5" width="8.1" height="14" rx="1.5" fill="#0B3A8F"/><rect x="244.9" y="238.5" width="41.8" height="14" rx="1.5" fill="#2F86F5"/><rect x="287.4" y="238.5" width="24.9" height="14" rx="1.5" fill="#8CC4FF"/><text x="319.2" y="249.0" class="vl">38.0K · 14.0%</text></svg></div>
+  <div class="sg"><div class="st "><b class="tx">51%</b><span class="tx d">Ford MVIP activity: 138.4K h across the Ford and Auto Alliance plants</span></div><div class="st "><b class="tx">14</b><span class="tx d">Customers at MMTH Engine: largest host, 38.1K h; TMBP serves 11</span></div><div class="st dk2"><b class="tx">4.5×</b><span class="tx d">Yusen Logistic growth: 331 h in Jan → 1,488 h in Sep</span></div></div>
+      </div>
+      <div class="meta"><b>4 · Customers and hosts</b><span>Ford MVIP, MMTH Engine and Surtec Kariya together make up 71% of hours. The other 71 hosts share 14%.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide gr dv"><svg class="bg" viewBox="0 0 100 56.25" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="gd2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B4FBF"/><stop offset=".5" stop-color="#1F6FEB"/><stop offset="1" stop-color="#52AEFF"/></linearGradient></defs><rect width="100" height="56.25" fill="url(#gd2)"/></svg><svg class="ghost" viewBox="0 0 100 56.25" aria-hidden="true"><defs><linearGradient id="gh" x1="0" y1="0" x2="0" y2="1"><stop offset=".15" stop-color="#fff"/><stop offset=".95" stop-color="#fff" stop-opacity=".12"/></linearGradient></defs><text x="96" y="63" text-anchor="end" font-size="47" font-weight="700" letter-spacing="-2.8" fill="url(#gh)">02</text></svg><img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO"><div class="dt"><span class="eyebrow">Non-Rayong overview 2026</span><h2 class="h">Cost reduction.</h2><p class="lede">A new beverage supplier, and a 2026 drink mix that lowers the cost per unit.</p></div>
+      </div>
+      <div class="meta"><b>5 · Section: Cost reduction</b><span>Two slides: the supplier change and the 2026 drink mix.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p6"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">02 · Beverage supplier</span><h2 class="h">Supplier change reduced unit cost by 30%.</h2><p class="lede">Lower purchase cost, with the monthly operating trend kept in view.</p></div>
+  <div class="sup"><div class="card su"><span class="tx k">Previous supplier</span><b class="tx">22.34 THB / unit</b><span class="tx d">Monthly avg. 80,899.75 THB</span></div><div class="card su now"><span class="tx k">Current supplier</span><b class="tx">15.68 THB / unit</b><span class="tx d">Monthly avg. 64,983.03 THB</span></div></div>
+  <div class="card cht"><div class="ch"><span class="tx">Total cost and cost / HC</span><div class="legend"><span class="tx"><i style="background:#B9CCE6"></i>Previous supplier</span><span class="tx"><i style="background:#1F6FEB"></i>Current supplier</span><span class="tx"><i style="background:#071A33"></i>Cost / HC, right</span></div></div><svg viewBox="0 0 600 236" class="chart" role="img" aria-label="Monthly beverage total cost and cost per headcount; the supplier changed from August"><line x1="46" x2="560" y1="204.0" y2="204.0" stroke="rgba(7,26,51,0.18)"/><text x="38" y="207.5" text-anchor="end" class="ax">0k</text><text x="568" y="207.5" class="ax">0</text><line x1="46" x2="560" y1="143.3" y2="143.3" stroke="rgba(7,26,51,0.07)"/><text x="38" y="146.8" text-anchor="end" class="ax">40k</text><text x="568" y="146.8" class="ax">10</text><line x1="46" x2="560" y1="82.7" y2="82.7" stroke="rgba(7,26,51,0.07)"/><text x="38" y="86.2" text-anchor="end" class="ax">80k</text><text x="568" y="86.2" class="ax">20</text><line x1="46" x2="560" y1="22.0" y2="22.0" stroke="rgba(7,26,51,0.07)"/><text x="38" y="25.5" text-anchor="end" class="ax">120k</text><text x="568" y="25.5" class="ax">30</text><rect x="53.1" y="130.4" width="20" height="73.6" rx="2" fill="#B9CCE6"/><text x="63.1" y="220" text-anchor="middle" class="ax">Jan</text><rect x="87.4" y="70.4" width="20" height="133.6" rx="2" fill="#B9CCE6"/><text x="97.4" y="220" text-anchor="middle" class="ax">Feb</text><rect x="121.7" y="62.7" width="20" height="141.3" rx="2" fill="#B9CCE6"/><text x="131.7" y="220" text-anchor="middle" class="ax">Mar</text><rect x="155.9" y="85.9" width="20" height="118.1" rx="2" fill="#B9CCE6"/><text x="165.9" y="220" text-anchor="middle" class="ax">Apr</text><rect x="190.2" y="55.1" width="20" height="148.9" rx="2" fill="#B9CCE6"/><text x="200.2" y="220" text-anchor="middle" class="ax">May</text><rect x="224.5" y="71.0" width="20" height="133.0" rx="2" fill="#B9CCE6"/><text x="234.5" y="220" text-anchor="middle" class="ax">Jun</text><rect x="258.7" y="93.6" width="20" height="110.4" rx="2" fill="#B9CCE6"/><text x="268.7" y="220" text-anchor="middle" class="ax">Jul</text><rect x="293.0" y="86.2" width="20" height="117.8" rx="2" fill="#1F6FEB"/><text x="303.0" y="220" text-anchor="middle" class="ax">Aug</text><rect x="327.3" y="104.9" width="20" height="99.1" rx="2" fill="#1F6FEB"/><text x="337.3" y="220" text-anchor="middle" class="ax">Sep</text><rect x="361.5" y="105.8" width="20" height="98.2" rx="2" fill="#1F6FEB"/><text x="371.5" y="220" text-anchor="middle" class="ax">Oct</text><rect x="395.8" y="105.1" width="20" height="98.9" rx="2" fill="#1F6FEB"/><text x="405.8" y="220" text-anchor="middle" class="ax">Nov</text><rect x="430.1" y="104.1" width="20" height="99.9" rx="2" fill="#1F6FEB"/><text x="440.1" y="220" text-anchor="middle" class="ax">Dec</text><rect x="464.3" y="119.1" width="20" height="84.9" rx="2" fill="#1F6FEB"/><text x="474.3" y="220" text-anchor="middle" class="ax">Jan</text><rect x="498.6" y="111.7" width="20" height="92.3" rx="2" fill="#1F6FEB"/><text x="508.6" y="220" text-anchor="middle" class="ax">Feb</text><rect x="532.9" y="106.6" width="20" height="97.4" rx="2" fill="#1F6FEB"/><text x="542.9" y="220" text-anchor="middle" class="ax">Mar</text><line x1="285.9" x2="285.9" y1="14" y2="204" stroke="#071A33" stroke-dasharray="3 3" stroke-opacity=".5"/><text x="291.9" y="21" class="ax b">Supplier change</text><polyline fill="none" stroke="#071A33" stroke-width="2.2" points="63.1,61.1 97.4,49.5 131.7,57.2 165.9,48.0 200.2,67.9 234.5,85.0 268.7,96.5 303.0,97.4 337.3,105.3 371.5,112.1 405.8,117.9 440.1,107.7 474.3,107.7 508.6,114.7 542.9,107.4"/><circle cx="63.1" cy="61.1" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="97.4" cy="49.5" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="131.7" cy="57.2" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="165.9" cy="48.0" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="200.2" cy="67.9" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="234.5" cy="85.0" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="268.7" cy="96.5" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="303.0" cy="97.4" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="337.3" cy="105.3" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="371.5" cy="112.1" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="405.8" cy="117.9" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="440.1" cy="107.7" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="474.3" cy="107.7" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="508.6" cy="114.7" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/><circle cx="542.9" cy="107.4" r="3" fill="#fff" stroke="#071A33" stroke-width="1.8"/></svg><span class="foot tx">Monthly sequence as supplied · Supplier change from Aug onward</span></div>
+      </div>
+      <div class="meta"><b>6 · Cost reduction: beverage supplier</b><span>Unit cost fell from 22.34 to 15.68 THB, and the monthly average from 80,899.75 to 64,983.03 THB. Cost per headcount trends down from August.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p7"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">02 · Drink mix</span><h2 class="h">2026 drink mix cuts unit cost by a further 25.2%.</h2><p class="lede">Redistribute the beverage mix and introduce herbal drinks and tea.</p></div>
+  <div class="card mixp"><div class="mx mh"><span class="tx">Beverage allocation</span><span class="tx">Y2025</span><span class="tx">Y2026</span></div><div class="mx"><span class="tx">Electrolyte drink</span><div class="bp"><i style="width:39.6%"></i><span class="tx">21%</span></div><div class="bp now"><i style="width:94.3%"></i><span class="tx">50%</span></div></div><div class="mx"><span class="tx">Soft drink</span><div class="bp"><i style="width:100.0%"></i><span class="tx">53%</span></div><div class="bp now"><i style="width:26.4%"></i><span class="tx">14%</span></div></div><div class="mx"><span class="tx">Energy drink</span><div class="bp"><i style="width:39.6%"></i><span class="tx">21%</span></div><div class="bp now"><i style="width:28.3%"></i><span class="tx">15%</span></div></div><div class="mx"><span class="tx">Ready to drink coffee</span><div class="bp"><i style="width:15.1%"></i><span class="tx">8%</span></div><div class="bp now"><i style="width:13.2%"></i><span class="tx">7%</span></div></div><div class="mx"><span class="tx">Herbal drink <em class="new">New</em></span><div class="bp"><i style="width:0.0%"></i><span class="tx">-</span></div><div class="bp now"><i style="width:13.2%"></i><span class="tx">7%</span></div></div><div class="mx"><span class="tx">Tea <em class="new">New</em></span><div class="bp"><i style="width:0.0%"></i><span class="tx">-</span></div><div class="bp now"><i style="width:13.2%"></i><span class="tx">7%</span></div></div></div>
+  <div class="card c7"><span class="tx k">Expected cost / unit</span><div class="big"><b class="tx">11.73</b><span class="tx">THB / unit</span></div><div class="row"><b class="tx">3.95</b><div><span class="tx">THB saved per unit</span><span class="tx d">15.68 − 11.73 = 3.95</span></div></div><div class="row"><b class="tx">25.2%</b><div><span class="tx">below current supplier</span><span class="tx d">3.95 ÷ 15.68</span></div></div></div>
+  <div class="sumb"><span class="tx k">Together: supplier change + drink mix</span><div class="fl"><b class="tx">22.34</b><span class="ms ar">arrow_forward</span><b class="tx">15.68</b><span class="ms ar">arrow_forward</span><b class="tx">11.73</b><span class="tx u">THB / unit</span></div><div class="pc"><b class="tx">−47.5%</b><span class="tx">from 2025 (−10.61 THB per unit)</span></div></div>
+  <div class="note"><span class="tx">Source check required: 2025 electrolyte allocation is 21% in the table but 18% in the source pie. 2025 table totals 103%; all supplied allocations are retained pending confirmation.</span></div>
+      </div>
+      <div class="meta"><b>7 · Cost reduction: drink mix</b><span>Moving the mix toward electrolyte drinks, and adding herbal drinks and tea, targets 11.73 THB per unit. Against the current supplier's 15.68 THB, that saves 3.95 THB per unit, 25.2%. Together with the supplier change (22.34 to 15.68 THB), the unit cost falls from 22.34 to 11.73 THB, which is 10.61 THB or 47.5% below 2025. The 2025 figures still need a source check.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide gr dv"><svg class="bg" viewBox="0 0 100 56.25" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="gd3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B4FBF"/><stop offset=".5" stop-color="#1F6FEB"/><stop offset="1" stop-color="#52AEFF"/></linearGradient></defs><rect width="100" height="56.25" fill="url(#gd3)"/></svg><svg class="ghost" viewBox="0 0 100 56.25" aria-hidden="true"><defs><linearGradient id="gh" x1="0" y1="0" x2="0" y2="1"><stop offset=".15" stop-color="#fff"/><stop offset=".95" stop-color="#fff" stop-opacity=".12"/></linearGradient></defs><text x="96" y="63" text-anchor="end" font-size="47" font-weight="700" letter-spacing="-2.8" fill="url(#gh)">03</text></svg><img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO"><div class="dt"><span class="eyebrow">Non-Rayong overview 2026</span><h2 class="h">Operation excellence.</h2><p class="lede">Handheld OCR, a hybrid online and offline workflow, and four poka-yoke controls.</p></div>
+      </div>
+      <div class="meta"><b>8 · Section: Operation excellence</b><span>Three slides: handheld OCR, the hybrid workflow and the poka-yoke controls.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p9"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">03 · Handheld OCR</span><h2 class="h">Handheld OCR replaces manual serial-number recording.</h2><p class="lede">Read part serials with handheld OCR and automatically record inspection data in Google Sheets.</p></div>
+  <div class="speed"><div><b class="tx">8–10 sec</b><span class="tx k">Manual</span></div><span class="ms arr">arrow_forward</span><div class="now"><b class="tx">1 sec</b><span class="tx k">OCR + auto record</span></div><div class="cut"><b class="tx">−90%</b><span class="tx k">Time per serial</span></div></div>
+  <div class="card tbl"><div class="tr th"><span class="tx">Mission</span><span class="tx">Marking</span><span class="tx">Manual</span><span class="tx">OCR + auto record</span><span class="tx">Time saved</span></div><div class="tr"><span class="tx">LCBTH.26.0005</span><span class="tx">Dot peen</span><span class="tx">8 sec</span><span class="tx g">1 sec</span><span class="tx rd">−87.5%</span></div><div class="tr"><span class="tx">LCBTH.26.0002</span><span class="tx">Dot peen</span><span class="tx">8 sec</span><span class="tx g">1 sec</span><span class="tx rd">−87.5%</span></div><div class="tr"><span class="tx">LCBTH.26.0027</span><span class="tx">Stamped</span><span class="tx">10 sec</span><span class="tx g">1 sec</span><span class="tx rd">−90%</span></div><div class="tr"><span class="tx">LCBTH.26.0007</span><span class="tx">Embossed</span><span class="tx">9 sec</span><span class="tx g">1 sec</span><span class="tx rd">−88.9%</span></div><span class="foot tx">Dot peen / stamped / embossed · Barcode / Data Matrix · Internal configuration; supplied mission comparisons.</span></div>
+  <div class="photo ph"><img src="img/out-ocr-shopfloor.jpg" alt="Handheld OCR reader scanning a part on the shopfloor"></div>
+  <img class="serial" src="img/out-ocr-serial.png" alt="Stamped serial number 2610815 read by OCR">
+  <div class="cap"><b class="tx">Shopfloor OCR in use</b><span class="tx">KEYENCE BT-A1000 · LCBTH.26.0005</span></div>
+      </div>
+      <div class="meta"><b>9 · Operation excellence: handheld OCR</b><span>Source: supplied shopfloor OCR example and mission inspection-time comparisons. Reading a serial drops from 8 to 10 seconds by hand to 1 second.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p10"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">03 · Hybrid workflow</span><h2 class="h">A hybrid workflow connects shopfloor capture to customer reports.</h2><p class="lede">Online cloud records + offline Excel support → administrator review → customer report.</p></div>
+  <div class="card fc f0"><span class="ms">barcode_reader</span><b class="tx">Shopfloor</b><span class="tx">Handheld OCR / QR</span><span class="tx">Serial + Good / NG</span></div><span class="ms fa a0">arrow_forward</span><div class="card fc f1"><span class="ms">table_view</span><b class="tx">Google Sheets</b><span class="tx">Auto-record data</span><span class="tx">Real-time access</span></div><span class="ms fa a1">arrow_forward</span><div class="card fc f2"><span class="ms">cloud</span><b class="tx">Google Drive</b><span class="tx">Shared online files</span><span class="tx">Supervisor access</span></div><span class="ms fa a2">arrow_forward</span><div class="card fc f3"><span class="ms">manage_accounts</span><b class="tx">Administrator</b><span class="tx">Review online data</span><span class="tx">Reconcile Excel</span></div><span class="ms fa a3">arrow_forward</span><div class="card fc f4"><span class="ms">assignment_turned_in</span><b class="tx">Customer report</b><span class="tx">Reviewed results</span><span class="tx">Submit final report</span></div>
+  <svg class="links" viewBox="0 0 100 56.25" aria-hidden="true"><path d="M12.95 40.8 V48.6 H36" /><path d="M64 48.6 H68.45 V41.4" /><path d="M67.45 42.6 L68.45 41.2 L69.45 42.6" /></svg>
+  <div class="fx"><span class="ms">table_chart</span><div><b class="tx">Excel offline</b><span class="tx">Local serial + status record</span></div></div>
+  <span class="fxl tx">Reconcile offline and online records</span>
+  <span class="src tx">Source: supplied OCR capture and MMTH hybrid workflow. Generic icons denote functions, not product logos.</span>
+      </div>
+      <div class="meta"><b>10 · Operation excellence: hybrid workflow</b><span>Data captured on the shopfloor lands in Google Sheets and Drive. An offline Excel record covers gaps, and the administrator reconciles both before the customer report.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide lt p11"><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO"><div class="hd"><span class="eyebrow">03 · Poka-yoke</span><h2 class="h">Four controls protect every inspection record.</h2><p class="lede">Visual + voice guidance at capture. Administrator review before customer reporting.</p></div>
+  <div class="ctls"><div class="ctl"><span class="ms">rule</span><div><b class="tx">Wrong part / serial</b><span class="tx">Validate against customer list / production plan. Warn on mismatch.</span></div></div><div class="ctl"><span class="ms">content_copy</span><div><b class="tx">Duplicate scan</b><span class="tx">Lock out repeated scans. Prevent duplicate counting.</span></div></div><div class="ctl"><span class="ms">inventory_2</span><div><b class="tx">Full box</b><span class="tx">Voice + popup notification when target quantity is reached.</span></div></div><div class="ctl"><span class="ms">verified_user</span><div><b class="tx">Review &amp; release</b><span class="tx">Administrator checks offline + online records before submitting the customer report.</span></div></div></div>
+  <div class="strip"><span class="tx">Linked data: Customer • Material • Batch • Order  |  Missions 04, 29, 31 · Internal configuration + Text-to-Speech support shopfloor use.</span></div>
+  <span class="src tx">Source: supplied error-prevention workflow. Next: two web apps supporting Non-Rayong operations.</span>
+      </div>
+      <div class="meta"><b>11 · Operation excellence: poka-yoke</b><span>Two controls stop bad data at capture, one tells the operator when a box is full, and the administrator reviews before release. Next: the two web apps.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide gr dv"><svg class="bg" viewBox="0 0 100 56.25" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="gd4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0B4FBF"/><stop offset=".5" stop-color="#1F6FEB"/><stop offset="1" stop-color="#52AEFF"/></linearGradient></defs><rect width="100" height="56.25" fill="url(#gd4)"/></svg><svg class="ghost" viewBox="0 0 100 56.25" aria-hidden="true"><defs><linearGradient id="gh" x1="0" y1="0" x2="0" y2="1"><stop offset=".15" stop-color="#fff"/><stop offset=".95" stop-color="#fff" stop-opacity=".12"/></linearGradient></defs><text x="96" y="63" text-anchor="end" font-size="47" font-weight="700" letter-spacing="-2.8" fill="url(#gh)">04</text></svg><img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO"><div class="dt"><span class="eyebrow">Non-Rayong overview 2026</span><h2 class="h">The two apps.</h2><p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables.</p></div>
+      </div>
+      <div class="meta"><b>12 · Section: The two apps</b><span>The last section moves from the numbers to the tools behind them. Two web apps support the Non-Rayong sites: the Manpower Board for planning people and missions, and the Inventory and Quality System for tools, parts and consumables. Both run in the browser and on a phone. First the Manpower Board, then Inventory.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide dk s1"><div class="bg glow"></div><img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO">
+  <div class="copy"><span class="eyebrow">04 · The two apps</span><h1 class="h">Two apps for the work we do every day.</h1><p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables. Both run in the browser and on your phone.</p>
+    <div class="chips"><span><span class="ms">groups</span>Manpower Board</span><span><span class="ms">inventory_2</span>Inventory &amp; Quality</span><span><span class="ms">smartphone</span>On your phone</span></div></div>
+  <div class="win d1 back"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div><div class="win d2 front"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board for one day"></div>
+      </div>
+      <div class="meta"><b>13 · The two apps</b><span>Two internal tools, built for our sites. Same sign-in domain, same look, both installable on a phone.</span></div>
+    </section><section class="item">
+      <div class="slide s2"><div class="blob"></div>
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <div class="appn"><img src="img/icon-manpower.png" alt="Manpower Board app icon"><div><b>Manpower Board</b><small>04 &middot; App 1 of 2</small></div></div>
+          <h2 class="h">Tomorrow's crew, planned on <em>one board.</em></h2>
+          <p class="lede">The magnet board, made digital. Drag people onto missions, leave or standby, and everyone sees the same plan, live.</p>
+          <ul class="feat">
+            <li><span class="ms">drag_pan</span><div><b>Drag and drop planning</b><span>One board per site, one card per person</span></div></li>
+            <li><span class="ms">location_on</span><div><b>Where to go, what to wear</b><span>The host name opens Google Maps; PPE is on the card</span></div></li>
+            <li><span class="ms">lock</span><div><b>Lock a finished plan</b><span>Nobody bumps it by accident</span></div></li>
+          </ul>
+        </div>
+        <div class="win d1"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board with missions, leave and the standby pool"></div>
+        <div class="phone"><img src="img/mp-merge-phone.jpg" alt="Merging a forecast day on a phone, one clash at a time"></div>
+      </div>
+      <div class="meta"><b>14 · Manpower: the daily board</b><span>Each card is a person, each column a mission with host, customer, shift and engineer. The tiles on top always add up: assigned plus leave plus standby equals total. The phone shows a forecast day being merged, one clash at a time: keep the carried-over plan or use the forecast.</span></div>
+    </section><section class="item">
+      <div class="slide s3"><div class="blob"></div>
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <span class="eyebrow">04 · Manpower Board</span>
+          <h2 class="h">Plan weeks ahead, <em>not just tomorrow.</em></h2>
+          <ul class="feat">
+            <li><span class="ms">redo</span><div><b>Carry over the last working day</b><span>One click, then change only what moved</span></div></li>
+            <li><span class="ms">event_upcoming</span><div><b>Forecast days</b><span>Tentative plans kept apart, merged with a side-by-side review</span></div></li>
+            <li><span class="ms">back_hand</span><div><b>Holds</b><span>Take someone another engineer planned and they are told</span></div></li>
+            <li><span class="ms">ios_share</span><div><b>Export</b><span>JPG, PDF and Excel, plus the org chart as PowerPoint</span></div></li>
+          </ul>
+        </div>
+        <div class="win d1"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-capacity.jpg" alt="Capacity grid showing demand against available people, with two short days"></div>
+        <div class="who">
+          <div><h3>For engineers</h3><p>Enter the people each host needs per day. The grid shows every short day as you type.</p></div>
+          <div><h3>For management</h3><p>Short days show in red weeks before they happen, with the worst day and peak demand on top.</p></div>
+        </div>
+      </div>
+      <div class="meta"><b>15 · Manpower: planning ahead</b><span>Capacity compares demand per host with the people available. In the example, Wednesday 21/10 needs 40 against 36, so it shows 4 short.</span></div>
+    </section><section class="item">
+      <div class="slide s4"><div class="blob"></div>
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <span class="eyebrow">04 · Manpower Board</span>
+          <h2 class="h">The whole crew in <em>one view.</em></h2>
+          <ul class="feat">
+            <li><span class="ms">speed</span><div><b>Utilization you can trust</b><span>On-call staff who were not called stay out of the figure</span></div></li>
+            <li><span class="ms">person_alert</span><div><b>Idle staff named</b><span>Permanent staff with no mission, listed by board</span></div></li>
+            <li><span class="ms">table_rows</span><div><b>By board</b><span>Missions, headcount, leave and idle side by side</span></div></li>
+            <li><span class="ms">trending_up</span><div><b>History and workload</b><span>Utilization over time and missions per engineer</span></div></li>
+          </ul>
+        </div>
+        <div class="win d1"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-overview.jpg" alt="Overview dashboard with utilization, deployment and by-board table"></div>
+      </div>
+      <div class="meta"><b>16 · Manpower: what managers see</b><span>Overview answers "is everyone placed?" first, then the numbers. Every chart has the exact figures on hover.</span></div>
+    </section><section class="item">
+      <div class="slide s5 mir"><div class="blob"></div>
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="win d1"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div>
+        <div class="phone"><img src="img/inv-cart-items-phone.jpg" alt="The cart on a phone with the consumables listed, ready to check out"></div>
+        <div class="flow"><span><span class="ms">touch_app</span>Pick items</span><span class="ms ar">arrow_forward</span><span><span class="ms">shopping_cart</span>Add to cart</span><span class="ms ar">arrow_forward</span><span><span class="ms">shopping_cart_checkout</span>Check out</span></div><div class="copy">
+          <div class="appn"><img src="img/icon-inventory.png" alt="Inventory and Quality app icon"><div><b>Inventory &amp; Quality System</b><small>04 &middot; App 2 of 2</small></div></div>
+          <h2 class="h">Every tool, part and consumable, <em>accounted for.</em></h2>
+          <ul class="feat">
+            <li><span class="ms">inventory_2</span><div><b>Consumables</b><span>Stock per warehouse against its safety level</span></div></li>
+            <li><span class="ms">straighten</span><div><b>Tools &amp; Calibration</b><span>Borrow, return and calibration due dates</span></div></li>
+            <li><span class="ms">fact_check</span><div><b>Customer Parts</b><span>OK, NG, Sorting and Hold per lot</span></div></li>
+            <li><span class="ms">task_alt</span><div><b>To-Do and Audit Trail</b><span>Approvals in one queue, every change on record</span></div></li>
+          </ul>
+        </div>
+      </div>
+      <div class="meta"><b>17 · Inventory: the system</b><span>Rayong and Amata warehouses, one at a time or both. The dashboard opens on what needs attention: out of stock, calibration overdue, returns late, parts aged over 60 days.</span></div>
+    </section>
+    <section class="item">
+      <div class="slide cs"><div class="blob"></div><img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy"><span class="eyebrow">04 · Consumables</span><h2 class="h">Stay above safety stock in every warehouse.</h2><ul class="feat"><li><span class="n">1</span><div><b>Safety stock per warehouse</b><span>On hand against the safety level, with a gauge</span></div></li><li><span class="n">2</span><div><b>Clear stock status</b><span>Out of stock, Low or In stock, warehouse named</span></div></li><li><span class="n">3</span><div><b>Predicted run-out and spikes</b><span>Days left and demand spikes, before it hurts</span></div></li><li><span class="n">4</span><div><b>Cart for every issue</b><span>Add items; nothing is sent until you check out</span></div></li></ul></div>
+        <div class="chips cc"><span><span class="ms">local_shipping</span>Receive delivery</span><span><span class="ms">fact_check</span>Count stock</span><span><span class="ms">filter_alt</span>Stock filters</span></div>
+        <div class="win d1"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-consumables-app.jpg" alt="Consumables table with on hand against safety stock per warehouse, status, predicted run-out and a cart button on every row"><span class="pin" style="left:23.65cqw; top:8.30cqw">1</span><span class="pin" style="left:31.75cqw; top:8.30cqw">2</span><span class="pin" style="left:39.30cqw; top:8.30cqw">3</span><span class="pin" style="left:44.45cqw; top:8.30cqw">4</span></div>
+        <div class="phone"><img src="img/inv-cart-phone.jpg" alt="The cart on a phone, with consumables ready to issue"></div>
+      </div>
+      <div class="meta"><b>18 · Inventory: consumables</b><span>Each item shows what is on hand against its safety stock, one gauge per warehouse, so the short warehouse is named instead of hidden in a total. Predicted run-out and spike flags come from the last 30 days: a spike means at least 1.5 times the usual rate, and the filter shows items that run out within 14 days. Every row has an Add to cart button, and nothing is submitted until check-out. Deliveries are received and counts recorded from the buttons at the top.</span></div>
+    </section><section class="item">
+      <div class="slide s6"><div class="blob"></div>
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <span class="eyebrow">04 · Inventory &amp; Quality</span>
+          <h2 class="h">Borrow a tool <em>in a minute.</em></h2>
+          <ul class="feat">
+            <li><span class="n">1</span><div><b>Find it</b><span>Search, or scan the barcode with your phone camera</span></div></li>
+            <li><span class="n">2</span><div><b>Check it</b><span>Calibration valid-to date and usable range on every tool</span></div></li>
+            <li><span class="n">3</span><div><b>Request it</b><span>Add to the cart and send one request</span></div></li>
+            <li><span class="n">4</span><div><b>Return it</b><span>Overdue returns are flagged, so nothing goes missing</span></div></li>
+          </ul>
+        </div>
+        <div class="win d1"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-tools-desktop.jpg" alt="Tools and Calibration list with availability and calibration status"></div>
+        <div class="phone"><img src="img/inv-tools-phone.jpg" alt="Tools list on a phone"></div>
+      </div>
+      <div class="meta"><b>19 · Inventory: the engineer's day</b><span>The same flow works for consumables (issue from stock) and customer parts (deliveries in and out). Camera scanning works in Chrome and Edge; a handheld scanner works everywhere.</span></div>
+    </section><section class="item">
+      <div class="slide s9 mir"><div class="blob"></div>
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="win d1"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-parts-app.jpg" alt="Customer Parts list with OK, NG, Sorting and Hold per part"></div>
+        <div class="phone"><img src="img/inv-todo-phone.jpg" alt="An inbound delivery waiting to be confirmed, on a phone"></div>
+        <div class="copy">
+          <span class="eyebrow">04 · Inventory &amp; Quality</span>
+          <h2 class="h">Customer parts, <em>lot by lot.</em></h2>
+          <ul class="feat">
+            <li><span class="ms">fact_check</span><div><b>Inspection status per lot</b><span>OK, NG, Sorting and Hold, with the total and the lots</span></div></li>
+            <li><span class="ms">hourglass_bottom</span><div><b>Aged parts flagged</b><span>Amber past the aged threshold, red past twice it</span></div></li>
+            <li><span class="ms">local_shipping</span><div><b>Deliveries in and out</b><span>Several parts on one Asset In-Out Form; booked stock is reserved</span></div></li>
+            <li><span class="ms">done_all</span><div><b>Confirm what really arrived</b><span>Actual quantities per line; any difference goes in the log</span></div></li>
+          </ul>
+        </div>
+      </div>
+      <div class="meta"><b>20 · Inventory: customer parts</b><span>Parts are tracked by the customer's part number, mission number and responsible engineer. A delivery due today shows on the To-Do list and in the bell until someone confirms it.</span></div>
+    </section><section class="item">
+      <div class="slide s8"><div class="blob"></div>
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <span class="eyebrow">04 · On your phone</span>
+          <h2 class="h">Both apps fit in <em>your pocket.</em></h2>
+          <p class="lede">Each app has its own phone layout and installs from the browser like a native app. No app store needed.</p>
+          <div class="steps">
+            <div class="step"><i>01</i><p><b>Scan</b> the code and sign in with your @trigo-group.com email.</p></div>
+            <div class="step"><i>02</i><p><b>iPhone:</b> in Safari tap Share, then Add to Home Screen.</p></div>
+            <div class="step"><i>03</i><p><b>Android:</b> in Chrome tap the menu, then Install app.</p></div>
+          </div>
+        </div>
+        <div class="apps">
+          <div class="app">
+            <div class="app-head"><img class="app-icon" src="img/icon-manpower.png" alt="Manpower Board app icon"><h3>Manpower Board</h3></div>
+            <div class="qr"><img src="img/qr-manpower.svg" alt="QR code for the Manpower Board"></div>
+            <div class="url">trigoth-manpowerboard.netlify.app</div>
+          </div>
+          <div class="app">
+            <div class="app-head"><img class="app-icon" src="img/icon-inventory.png" alt="Inventory and Quality app icon"><h3>Inventory &amp; Quality</h3></div>
+            <div class="qr"><img src="img/qr-inventory.svg" alt="QR code for the Inventory and Quality System"></div>
+            <div class="url">trigoth-inventory.pages.dev</div>
+          </div>
+        </div>
+        <div class="chips"><span><span class="ms">install_mobile</span>Installable app (PWA)</span><span><span class="ms">smartphone</span>Phone layout</span></div>
+      </div>
+      <div class="meta"><b>21 · On your phone</b><span>New accounts are approved once by an admin. After installing, the app opens full screen from the home screen.</span></div>
+    </section>
+  </main>
+</div>
+<div class="stage" id="stage" hidden></div>
+<div class="stage-bar" id="stage-bar" hidden>
+  <span id="stage-count">1 / 21</span>
+  <button type="button" id="st-prev" aria-label="Previous slide"><span class="ms">chevron_left</span></button>
+  <button type="button" id="st-next" aria-label="Next slide"><span class="ms">chevron_right</span></button>
+  <button type="button" id="st-exit" aria-label="Exit presentation"><span class="ms">close</span></button>
+</div>
+<script>
+(() => {
+  const slides = [...document.querySelectorAll("#deck .slide")];
+  const stage = document.getElementById("stage");
+  const bar = document.getElementById("stage-bar");
+  const count = document.getElementById("stage-count");
+  let i = 0, on = false;
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    stage.replaceChildren(slides[i].cloneNode(true));
+    count.textContent = (i + 1) + " / " + slides.length;
+  }
+  function start(n) {
+    on = true; show(n); stage.hidden = false; bar.hidden = false;
+    document.body.style.overflow = "hidden";
+    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+  }
+  function stop() {
+    on = false; stage.hidden = true; bar.hidden = true; document.body.style.overflow = "";
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    slides[i].scrollIntoView({ block: "center" });
+  }
+  document.getElementById("btn-present").addEventListener("click", () => start(0));
+  slides.forEach((s, n) => s.addEventListener("dblclick", () => start(n)));
+  document.getElementById("st-prev").addEventListener("click", () => show(i - 1));
+  document.getElementById("st-next").addEventListener("click", () => show(i + 1));
+  document.getElementById("st-exit").addEventListener("click", stop);
+  stage.addEventListener("click", (e) => { const r = stage.getBoundingClientRect(); show(e.clientX < r.left + r.width / 3 ? i - 1 : i + 1); });
+  document.addEventListener("keydown", (e) => {
+    if (!on) return;
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+    else if (e.key === "Escape") stop();
+  });
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && on) stop(); });
+})();
+</script>
+</body>
+</html>
