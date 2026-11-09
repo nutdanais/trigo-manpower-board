@@ -12683,7 +12683,7 @@ function placeBoardRow1Tools(board) {
   placeBoardPicker();
   const end = $("#row1-end"), right = $("#toolbar-right");
   const names = $("#card-names"), seg = names._seg, exp = $("#btn-export");
-  const bulk = [$("#btn-emplist-bulk"), $("#btn-hostlist-bulk")];
+  const bulk = [$("#btn-emplist-bulk"), $("#btn-hostlist-bulk"), $("#btn-missions-bulk")];
   const wide = ROW1_TOOLS_MQ.matches;
   // layout A: row 1 ends with the tab's tools and Export, on every tab
   if (board && wide) {

@@ -5558,9 +5558,9 @@ body.settings-open #sticky-header #update-banner { margin-right: 0; }
 body.board-view #toolbar-row2 { border-bottom: 1px solid var(--border); }
 
 /* Thai | English toggle (a select[data-seg] drawn as two buttons) */
-#card-names + .seg-pick, #emplist-name-view + .seg-pick, #emplist-period + .seg-pick { margin: 0; align-self: center; }
+#card-names + .seg-pick, #emplist-name-view + .seg-pick, #emplist-period + .seg-pick, #missions-status + .seg-pick { margin: 0; align-self: center; }
 select.hidden + .seg-pick { display: none; }
-#card-names + .seg-pick button, #emplist-name-view + .seg-pick button, #emplist-period + .seg-pick button { flex: none; height: 28px; padding: 0 12px; font-size: 12.5px; }
+#card-names + .seg-pick button, #emplist-name-view + .seg-pick button, #emplist-period + .seg-pick button, #missions-status + .seg-pick button { flex: none; height: 28px; padding: 0 12px; font-size: 12.5px; }
 #sticky-header { z-index: 60; }   /* above the people panel, so the banner menus open over it */
 
 /* phone: the banner wraps into the brand + board pill, the scrolling module tabs, then the date row */
@@ -5675,7 +5675,7 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   :is(#emplist-table, #hostlist-table, #missions-table) .el-util-val { font-weight: 600; color: var(--muted); }
   #hostlist-table .hl-empty { display: none; }
 }
-@media (min-width: 641px) { #emplist-search { min-width: 330px; } }
+@media (min-width: 641px) { #emplist-search, #missions-search { min-width: 330px; } }
 @media (min-width: 641px) { #hostlist-table td, #missions-table td { vertical-align: middle; } }
 @media (min-width: 641px) { :is(#emplist-table, #hostlist-table, #missions-table) td.q-dash { color: transparent; user-select: none; } }
 
@@ -7344,9 +7344,9 @@ label > .pk { margin-top: 5px; }
 #missions-toolbar { display: contents; }
 #missions-search {
   padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
-  background: var(--panel); color: var(--text); font-size: 13px; min-width: 220px;
+  background: var(--panel); color: var(--text); font-size: 13px; min-width: 330px;
 }
-#missions-board { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 13px; }
+#missions-board { height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 13px; }
 #missions-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 #missions-panel { display: flex; flex-direction: column; gap: 10px; }
 #missions-panel.hidden { display: none; }
