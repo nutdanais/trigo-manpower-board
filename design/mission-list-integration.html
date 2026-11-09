@@ -133,6 +133,21 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
 .guide tr.fb-row.d-discuss select { border-color: var(--warn); color: var(--warn); }
 .fb-note { font-size: 12.5px; padding: 8px 12px; border-radius: 8px; background: var(--info-bg); color: var(--primary); }
 .fb-note.local { background: var(--warn-bg); color: var(--warn); }
+.ph { display: block; width: fit-content; margin-top: 4px; font-family: var(--font-ui); font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+.ph1 { background: var(--brand-green); color: #13290a; }
+.ph2 { background: var(--info-bg); color: var(--primary); }
+.ph3 { background: #e3e8ee; color: var(--muted); }
+.pcard { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; background: #fff; min-width: 0; }
+.pcard.now { border-color: var(--brand-green); box-shadow: inset 0 3px 0 var(--brand-green); }
+.pcard h3 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pcard ul { list-style: none; padding: 0; gap: 3px; }
+.pcard li { font-size: 12.5px; display: grid; grid-template-columns: 30px 1fr; gap: 6px; max-width: none; }
+.pcard li .c { font-family: var(--font-mono); color: var(--primary); font-weight: 600; }
+.pcard li .m { color: var(--muted); }
+.dec { list-style: none; padding: 0; display: grid; gap: 0; }
+.dec li { padding: 10px 0; border-top: 1px solid var(--grid); display: grid; gap: 2px; max-width: none; }
+.dec li:first-child { border-top: 0; }
+.dec .rec { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ok); }
 .group-row td { background: #f5f7f9; font-weight: 700; color: var(--primary); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
 
 /* methods */
@@ -170,9 +185,79 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   <h1 style="margin-top:8px">Bringing the admins' Mission List into the Missions module</h1>
   <p class="lede">This page reviews the 2026 sheet of <span class="mono">2026_BANGN_Mission_List</span> (338 rows, 41 columns, plus the lookup sheets and the Rule sheet). It recommends making the Missions module the one place the list lives, proposes how the app keeps the monthly suffix and the yearly new number, and gives a column-by-column guide for your meeting with the admin team. Each column shows how it would be entered and who fills it in, and a flag marks every column that needs a special way of entering or editing it. You can mark Keep, Drop or Discuss on each row during the meeting and copy the result back to me.</p>
   <nav class="toc" aria-label="Sections">
-    <a href="#findings">What the file shows</a><a href="#recommend">Recommendation</a><a href="#suffix">Monthly suffix</a><a href="#methods">Input methods</a><a href="#guide">Column guide</a><a href="#meeting">Meeting checklist</a><a href="#plan">Effect on the plan</a>
+    <a href="#phase1">Phase 1</a><a href="#findings">What the file shows</a><a href="#recommend">Recommendation</a><a href="#suffix">Monthly suffix</a><a href="#methods">Input methods</a><a href="#guide">Column guide</a><a href="#meeting">Meeting checklist</a><a href="#plan">Effect on the plan</a>
   </nav>
 </header>
+
+
+<!-- ============ PHASE 1 ============ -->
+<section class="part" id="phase1">
+  <div class="part-head">
+    <div class="eyebrow">After the meeting · 9 Nov</div>
+    <h2>Phase 1: start the Missions module with 10 columns</h2>
+    <p class="muted">The team chose to start with only the columns the app needs now. Phase 1 holds what the app has to know to run the register, <b>Close</b>, the <b>monthly suffix</b> and the <b>year-end number</b>. The other 31 columns stay in the admins' workbook for now. They can come in later without rework, because the mission record they belong to exists from Phase 1. The column guide below marks every row P1, P2 or P3, and the team's remarks are applied.</p>
+  </div>
+  <div class="cols3">
+    <div class="pcard now">
+      <h3><span class="ph ph1" style="margin:0">P1</span> Now · 10 columns</h3>
+      <ul>
+        <li><span class="c">C</span><span>Mission number + suffix <span class="m">· typed once from Etraq, suffix made by the app</span></span></li>
+        <li><span class="c">A</span><span>Month <span class="m">· from the suffix</span></span></li>
+        <li><span class="c">B</span><span>Mission No. (Last year) <span class="m">· from the year-end step</span></span></li>
+        <li><span class="c">F</span><span>Customer name <span class="m">· in the app today</span></span></li>
+        <li><span class="c">Q</span><span>Host / Location <span class="m">· Host list, in the app today</span></span></li>
+        <li><span class="c">AD</span><span>Trigo responsible <span class="m">· Engineer, in the app today</span></span></li>
+        <li><span class="c">R</span><span>Start date <span class="m">· first day on the board</span></span></li>
+        <li><span class="c">S</span><span>Finish date <span class="m">· set by Close</span></span></li>
+        <li><span class="c">T</span><span>Status <span class="m">· Open / Closed, automatic</span></span></li>
+        <li><span class="c">U</span><span>Continue / Close at month end <span class="m">· in the monthly routine</span></span></li>
+      </ul>
+      <p class="small muted">Plus what the board already keeps (shift, hours, PPE, remark, highlight) and one new tick per suffix: <b>Created in Etraq</b>.</p>
+    </div>
+    <div class="pcard">
+      <h3><span class="ph ph2" style="margin:0">P2</span> Next · job details · 17</h3>
+      <p class="small">What the engineer knows at mission start: customer code, prescriber, part number and name, problem, defect, system and sub-system, mission type, type of operation, breakpoint, agreed and wished pace, customer and host contacts, work instruction status and Rev.</p>
+      <p class="small muted">Mostly the engineer's input. Engineers or admins enter contacts and the work instruction (team remark). Comes once Phase 1 is in daily use.</p>
+    </div>
+    <div class="pcard">
+      <h3><span class="ph ph3" style="margin:0">P3</span> Later · admin and invoicing · 14</h3>
+      <p class="small">Documents and money: MO/PO/QT status and type, document sent to finance, PO status and PO number, rates, invoicing type, rate/price, management fee, transport cost, Etraq rate profile, risk analysis, remark, and DATA ENTRY (meaning still to confirm).</p>
+      <p class="small muted">Admin only and restricted. Comes when the workbook is retired. Until then it stays in Excel.</p>
+    </div>
+  </div>
+
+  <div class="mock" aria-label="Mockup: the Phase 1 Missions tab">
+    <div class="mock-tools"><b>Missions · Bangna</b><span class="tag ok">Open 74</span><span class="tag">Closed 86</span><span class="sp"></span><span class="tag warn">December suffixes due</span><span class="btn">Monthly suffix</span><span class="btn">Export</span><span class="btn fill">+ New mission</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Mission No.</th><th>Month</th><th>Last year</th><th>Customer</th><th>Host</th><th>Trigo responsible</th><th>Start</th><th>Status</th><th>Next month</th><th>In Etraq</th></tr></thead>
+      <tbody>
+        <tr><td class="num">BANGN.26.0xx1.AJ</td><td>Nov</td><td class="num">BANGN.25.0xxx</td><td>Customer A</td><td>Host A</td><td>Engineer 1</td><td>5 Jan</td><td><span class="tag ok">Open</span></td><td>Continue</td><td>☑</td></tr>
+        <tr><td class="num">BANGN.26.0xx2.AC</td><td>Nov</td><td class="muted">—</td><td>Customer B</td><td>Host B</td><td>Engineer 2</td><td>9 Sep</td><td><span class="tag ok">Open</span></td><td><span class="tag">Close 30 Nov</span></td><td>☑</td></tr>
+        <tr><td class="num">BANGN.26.0xx3.AA</td><td>Oct</td><td class="muted">—</td><td>Customer C</td><td>Host C</td><td>Engineer 1</td><td>2 Oct</td><td><span class="tag">Closed 24 Oct</span></td><td class="muted">—</td><td>☑</td></tr>
+      </tbody>
+    </table></div>
+    <div class="mock-foot"><span class="cap">Example rows. Export gives these 10 columns in the workbook's order, so admins can match them against the Excel sheet by mission number.</span></div>
+  </div>
+
+  <div class="cols2" style="align-items:start">
+    <div class="box">
+      <h3>What changes for the admins in Phase 1</h3>
+      <ul class="small">
+        <li>The mission number, suffix, status and dates come from the app. Nobody needs to work out the next suffix or update "Running" by hand.</li>
+        <li>The workbook still holds the Phase 2 and 3 columns, so each month admins still add rows to it. The app's <b>Monthly suffix</b> list tells them exactly which rows to add and which to close, and Export gives those rows ready to paste.</li>
+        <li>That copying ends in Phase 2, when the job details move into the app.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3>Three choices before I build Phase 1</h3>
+      <ol class="dec">
+        <li><b>Is the monthly suffix routine in Phase 1?</b><span class="small muted">If not, Phase 1 is only the register and Close, and the suffix stays manual until Phase 2.</span><span class="rec">Recommended: yes, because the January run also gives the year-end numbers</span></li>
+        <li><b>Customer code in Phase 1?</b><span class="small muted">The mission number already matches Etraq, so the code isn't needed to link the two.</span><span class="rec">Recommended: Phase 2</span></li>
+        <li><b>Who may run the monthly routine?</b><span class="small muted">Admin only, or engineers too for their own missions.</span><span class="rec">Recommended: Admin and Manager, with engineers able to choose Continue / Close for their own missions</span></li>
+      </ol>
+    </div>
+  </div>
+</section>
 
 <!-- ============ FINDINGS ============ -->
 <section class="part" id="findings">
@@ -195,7 +280,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     <div class="finding"><span class="n">1</span><div><b>November row on 4 Nov.</b> <span class="muted small">The November copy hadn't been done yet for the October missions. This is exactly the manual step the app can prepare automatically.</span></div></div>
     <div class="finding"><span class="n">4</span><div><b>Columns are almost always the same value.</b> <span class="muted small">Risk Analysis is identical in 338 of 338 rows, Work Instruction status in 337, Work Instruction Rev. in 335 and Mission Type in 333. They can become defaults the form fills in for you.</span></div></div>
     <div class="finding"><span class="n">3</span><div><b>Real dropdowns in the sheet.</b> <span class="muted small">The Rule sheet says about 15 columns should use a dropdown, but only 3 have one. That's why the file has typed spellings such as "Recived", "Transpotation" and "Management Free". In the app every list column becomes a real dropdown.</span></div></div>
-    <div class="finding"><span class="n">57 / 63</span><div><b>Customer codes against customer names.</b> <span class="muted small">Some codes appear with more than one spelling of the name. The Prescriber is the same as the Customer in 236 rows. Both point to a Customer list with a code and a name, kept once, the way the Host list works.</span></div></div>
+    <div class="finding"><span class="n">57 / 63</span><div><b>Customer codes against customer names.</b> <span class="muted small">Some codes appear with more than one spelling of the name. The Prescriber is the same as the Customer in 236 rows. The team decided not to keep a Customer list in the app, because Etraq already controls customer codes.</span></div></div>
   </div>
 </section>
 
@@ -313,10 +398,10 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   </div>
   <div class="methods">
     <div class="method"><h3><span class="k">A</span>Automatic</h3><p>Nobody types it. The app fills it from the suffix routine, Close or the year end.</p><div class="cols muted">Month, Last-year number, Suffix, Status, Finish date</div></div>
-    <div class="method"><h3><span class="k">B</span>Pick a record</h3><p>Chosen from a list the app already keeps (Host list, users) or a new Customer list. One spelling, everywhere.</p><div class="cols muted">Host, Trigo responsible, Customer code + name, Prescriber</div></div>
+    <div class="method"><h3><span class="k">B</span>Pick a record</h3><p>Chosen from a list the app already keeps (Host list, users). One spelling, everywhere.</p><div class="cols muted">Host, Trigo responsible</div></div>
     <div class="method"><h3><span class="k">C</span>Dropdown</h3><p>A fixed list kept in Settings by an admin, like today's lookup sheets. It can have a default.</p><div class="cols muted">Mission type, Operation, Defect, System → Sub-system, MO/PO/QT, WI, Invoicing, fees, ETRAQ profile, Risk, PO status</div></div>
-    <div class="method"><h3><span class="k">D</span>Value with rules</h3><p>A number, amount or code the app checks: unit, currency, format, or "TBC" / "Waiting".</p><div class="cols muted">Mission number, Breakpoint, Pace, Rate, Rate/price lines, PO number</div></div>
-    <div class="method"><h3><span class="k">E</span>Free text</h3><p>Written in a box, searchable, with no checks.</p><div class="cols muted">Part number, Part name, Problem, Transport cost, Remark (as notes)</div></div>
+    <div class="method"><h3><span class="k">D</span>Value with rules</h3><p>A number, amount or code the app checks: unit, currency, format, or "TBC" / "Waiting".</p><div class="cols muted">Mission number, Customer code, Breakpoint, Pace, Rate, Rate/price lines, PO number</div></div>
+    <div class="method"><h3><span class="k">E</span>Free text</h3><p>Written in a box, searchable, with no checks.</p><div class="cols muted">Customer name, Prescriber, Part number, Part name, Problem, Transport cost, Remark (as notes)</div></div>
     <div class="method"><h3><span class="k">F</span>Contacts</h3><p>Names and emails kept on the customer or host they belong to, entered once and reused by every mission there.</p><div class="cols muted">Customer contact, Host contact</div></div>
   </div>
 </section>
@@ -339,6 +424,9 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   <div class="filters" role="group" aria-label="Filter columns">
     <span class="lbl">Show</span>
     <button type="button" data-f="all" aria-pressed="true">All 41</button>
+    <button type="button" data-f="p1">Phase 1</button>
+    <button type="button" data-f="p2">Phase 2</button>
+    <button type="button" data-f="p3">Phase 3</button>
     <button type="button" data-f="flag">Flagged only</button>
     <button type="button" data-f="special">Special input</button>
     <button type="button" data-f="ask">Ask the admins</button>
@@ -411,9 +499,9 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   </div>
   <div class="panel" style="gap:0">
     <div class="phase"><span class="pn">Number</span><div><p class="small">A mission number becomes <span class="mono">PREFIX.YY.NNNN</span> plus a suffix <span class="mono">.AA</span>–<span class="mono">.ZZ</span> (Q3). The register's identity is the yearly number. The suffix belongs to the period, and the board and history store the full number in force on each day.</p></div></div>
-    <div class="phase"><span class="pn">Release 1</span><div><p class="small">Register + Close, as planned, with room for suffix periods in the table from the start, so nothing is migrated twice.</p></div></div>
+    <div class="phase"><span class="pn">Release 1</span><div><p class="small"><b>Phase 1:</b> the register with its 10 columns, Close, and room for suffix periods in the table from the start, so nothing is migrated twice.</p></div></div>
     <div class="phase"><span class="pn">Release 2</span><div><p class="small">The year-end renumber becomes the <b>monthly suffix routine</b>, with the January run also asking for new yearly numbers. It's still needed before 1 December if we want December's suffixes made by the app, or before 1 January at the latest.</p></div></div>
-    <div class="phase"><span class="pn">Release 3</span><div><p class="small">Mission List columns (after the meeting), the Customer list, the lookup lists in Settings, admin-only commercial fields, the one-off import of this workbook and the Export in its layout.</p></div></div>
+    <div class="phase"><span class="pn">Release 3</span><div><p class="small"><b>Phase 2</b> job details (17 columns, with the lookup lists in Settings), then <b>Phase 3</b> admin and invoicing (14 columns, admin only), the one-off import of this workbook and the Export in its full layout. There is no Customer list (team decision).</p></div></div>
   </div>
 </section>
 
@@ -435,9 +523,9 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       ["D", "DATA ENTRY", "Status", "ask", "C", "A", "ask", "Unclear. The header says Data Entry, but the Rule sheet calls it Customer Type.", "IN USED 64 · UNUSED 274."],
     ]],
     ["Customer and job", [
-      ["E", "Customer Code", "from ETRAQ", "cust", "B", "A", "attn", "Kept on a new Customer list together with the name. A mission picks the customer, and the code comes with it.", "57 codes in two formats (6 digits, or P + 9 digits)."],
-      ["F", "Customer Name", "", "inapp", "B", "E", "attn", "The app's Customer field, picked from the Customer list instead of typed.", "63 names for 57 codes, so some codes have two spellings."],
-      ["J", "Prescriber", "", "new", "B", "E", "", "Picked from the Customer list, defaulting to the Customer.", "The same as the Customer in 236 / 338 rows."],
+      ["E", "Customer Code", "from ETRAQ", "new", "D", "A", "", "Typed as it is in Etraq. No Customer list in the app, since Etraq already controls customer codes (team remark). The format is checked: 6 digits, or P + 9 digits.", "57 codes in two formats (6 digits, or P + 9 digits)."],
+      ["F", "Customer Name", "", "inapp", "E", "E", "attn", "The app's Customer field, typed as today. It suggests names already used, so the same customer keeps one spelling.", "63 names for 57 codes, so some codes have two spellings."],
+      ["J", "Prescriber", "", "new", "E", "E", "", "Typed, filled in with the Customer to begin with.", "The same as the Customer in 236 / 338 rows."],
       ["G", "Part Number", "", "new", "E", "E", "special", "A list of part numbers, one per line, each with an optional note (“Waiting for material”), so a single part can be searched.", "135 distinct. Many cells hold several parts and notes."],
       ["H", "Part Name", "", "new", "E", "E", "", "Free text next to each part.", "132 distinct. 11 say N/A."],
       ["I", "Problem/Activity description", "", "new", "E", "E", "", "Long text. Could also go on the board card's PPE / remark line.", "Always filled."],
@@ -453,8 +541,8 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     ["Where and who", [
       ["Q", "Host / Location", "", "inapp", "B", "E", "attn", "Picked from the Host list, as New Mission does today. The import matches the 51 names to hosts first.", "51 distinct. Several are the customer's name with a branch."],
       ["AD", "Trigo responsible", "", "inapp", "B", "-", "attn", "The mission's Engineer, picked from users. The import maps each first name to the user's account.", "6 people, typed in capitals (first name only)."],
-      ["AB", "Customer contact", "", "cust", "F", "A", "special", "Contacts (name + email) kept on the customer and ticked per mission. Not retyped on every suffix row.", "326 filled, the same block repeated on every row."],
-      ["AC", "Host contact", "", "host", "F", "A", "", "Contacts kept on the Host list record, shared by every mission at that host.", "75 / 338 filled."],
+      ["AB", "Customer contact", "", "new", "F", "EA", "special", "Names and emails on the mission, entered by the engineer or the admin (team remark). Carried to the next suffix and year automatically, never retyped.", "326 filled, the same block repeated on every row."],
+      ["AC", "Host contact", "", "host", "F", "EA", "", "Contacts kept on the Host list record, shared by every mission at that host.", "75 / 338 filled."],
     ]],
     ["Dates and status", [
       ["R", "Start date", "", "inapp", "A", "-", "", "Set when the mission first goes on the board (or typed for an import). Each suffix also has its own start.", "Repeated unchanged on most suffix rows."],
@@ -465,8 +553,8 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     ["Documents (admin)", [
       ["V", "MO/PO/QT", "Status", "newp", "C", "A", "ask", "Dropdown: Received / Waiting. Per suffix, or once per mission?", "Received 329 · Waiting 9."],
       ["W", "MO/PO/QT", "Type", "new", "C", "A", "", "Dropdown: MO, QT, Cost estimate, PO.", "MO 255 · QT 44 · Cost estimate 31 · PO 5."],
-      ["X", "Work Instruction", "Status", "drop", "C", "A", "", "Dropdown with “Received” as the default. Spelling fixed.", "“Recived” in 337 / 338."],
-      ["Y", "Work Instruction", "Rev.", "drop", "C", "A", "", "Dropdown, default Rev.00.", "Rev.00 in 335 / 338."],
+      ["X", "Work Instruction", "Status", "drop", "C", "EA", "", "Dropdown with “Received” as the default. Spelling fixed.", "“Recived” in 337 / 338."],
+      ["Y", "Work Instruction", "Rev.", "drop", "C", "EA", "", "Dropdown, default Rev.00.", "Rev.00 in 335 / 338."],
       ["AK", "Document sent to finance", "", "new", "C", "A", "special", "Tick boxes (MO signed, PO, QT, Cost estimate), since several are often sent together.", "7 combinations such as “1. MO (sign) 2. PO”."],
       ["AN", "PO Status", "", "new", "C", "A", "", "Dropdown: Normal method / PO needed.", "Normal 189 · PO needed 149."],
       ["AO", "PO Number", "", "newp", "D", "A", "special", "Per suffix. Carried to the next suffix unless replaced. “Waiting PO” is a state with a reminder, not a number.", "148 filled, 36 of them “Waiting PO”. Changes on most suffix changes."],
@@ -489,12 +577,16 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     host: ["Keep · Host list", "s-keep"], auto: ["Automatic · still shown", "s-auto"], drop: ["Pre-filled default", "s-drop"], ask: ["Ask in meeting", "s-ask"]
   };
   const IN = { A: "Automatic", B: "Pick a record", C: "Dropdown", D: "Value with rules", E: "Free text", F: "Contacts" };
+  const PH = {};
+  "A B C F Q AD R S T U".split(" ").forEach((c) => (PH[c] = 1));
+  "E J G H I K L M N P O Z AA AB AC X Y".split(" ").forEach((c) => (PH[c] = 2));
+  "D V W AK AN AO AE AF AG AH AI AJ AL AM".split(" ").forEach((c) => (PH[c] = 3));
   const ALL = G.flatMap((g) => g[1].map((r) => r));
   const KEY = "mission-list-meeting-v1";
   let saved = {}; try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
   const body = document.getElementById("guide-body");
   const FL = { special: "Special", attn: "Attention", ask: "Ask" };
-  const who = { E: "Engineer", A: "Admin", "-": "App" };
+  const who = { E: "Engineer", A: "Admin", EA: "Engineer or Admin", "-": "App" };
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
   let html = "";
   for (const [gname, rows] of G) {
@@ -503,9 +595,9 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
       const [sl, sc] = S[st];
       const d = saved[col] || "";
       const admin = /admin/i.test(gname) || st === "cust";
-      html += `<tr data-col="${col}" data-st="${st}" data-flag="${flag}" data-admin="${admin ? 1 : 0}" class="main-row">
+      html += `<tr data-col="${col}" data-st="${st}" data-flag="${flag}" data-admin="${admin ? 1 : 0}" class="main-row" data-ph="${PH[col]}">
         <td><input type="checkbox" class="disc" id="disc-${col}" aria-label="Column ${col} discussed"${saved["_d" + col] ? " checked" : ""}></td>
-        <td class="num">${col}</td>
+        <td class="num">${col}<span class="ph ph${PH[col]}" title="Phase ${PH[col]}">P${PH[col]}</span></td>
         <td class="colname">${esc(name)}${subname ? `<small>${esc(subname)}</small>` : ""}</td>
         <td><span class="sugg ${SG[st][1]}">${SG[st][0]}</span></td>
         <td><span class="tag ${sc}">${sl}</span></td>
@@ -550,7 +642,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   const tests = {
     all: () => true, flag: (t) => !!t.dataset.flag, special: (t) => t.dataset.flag === "special", ask: (t) => t.dataset.flag === "ask" || t.dataset.st === "ask",
     inapp: (t) => t.dataset.st === "inapp", auto: (t) => t.dataset.st === "auto", drop: (t) => t.dataset.st === "drop" || t.dataset.st === "auto",
-    keep: (t) => ["new", "newp", "cust", "host"].includes(t.dataset.st), fb: (t) => !!fbText(t.dataset.col), open: (t) => !t.querySelector(".disc").checked, admin: (t) => t.dataset.admin === "1",
+    keep: (t) => ["new", "newp", "cust", "host"].includes(t.dataset.st), fb: (t) => !!fbText(t.dataset.col), open: (t) => !t.querySelector(".disc").checked, admin: (t) => t.dataset.admin === "1", p1: (t) => t.dataset.ph === "1", p2: (t) => t.dataset.ph === "2", p3: (t) => t.dataset.ph === "3",
   };
   document.querySelector(".filters").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-f]"); if (!b) return;
@@ -631,7 +723,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   });
   /* copy */
   document.getElementById("copy-guide").addEventListener("click", () => {
-    const lines = ALL.map((r) => `${r[0]} ${r[1]}${r[2] ? " (" + r[2] + ")" : ""} | suggested: ${SG[r[3]][0]} | team: ${saved[r[0]] ? saved[r[0]].toUpperCase() : "-"}${saved["_d" + r[0]] ? " | discussed" : ""}${fbText(r[0]) ? " | remark: " + fbText(r[0]).replace(/\s+/g, " ") : ""}`);
+    const lines = ALL.map((r) => `P${PH[r[0]]} ${r[0]} ${r[1]}${r[2] ? " (" + r[2] + ")" : ""} | suggested: ${SG[r[3]][0]} | team: ${saved[r[0]] ? saved[r[0]].toUpperCase() : "-"}${saved["_d" + r[0]] ? " | discussed" : ""}${fbText(r[0]) ? " | remark: " + fbText(r[0]).replace(/\s+/g, " ") : ""}`);
     const t = "Mission List meeting decisions\n" + lines.join("\n");
     const out = document.getElementById("guide-out"); const btn = document.getElementById("copy-guide");
     out.value = t;
