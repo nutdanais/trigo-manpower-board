@@ -83,7 +83,10 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, missions: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, missions: false, appSettings: false },
+          /* shared settings (migration-2026-11-09b, table app_settings): { hostExperiencedDays }.
+             A setting nobody has changed is absent here, and app.js uses its own default. */
+          settings: {},
           /* the Mission register (migration-2026-11-09): one row per board + number + shift
              (see loadMissionRegister), and every new-year number entered */
           register: [],
@@ -316,6 +319,7 @@ const cloud = {
     if (this.data.features.forecast) await this.loadHoldEvents();
     await this._loadLoans();
     await this.loadMissionRegister();
+    await this._loadSettings();
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
   },
@@ -348,7 +352,9 @@ const cloud = {
     const exitReason = await probe("employees", "exit_reason");
     // the Missions tab: the register, its number history and the Site Admin role (migration-2026-11-09)
     const missions = (await probe("mission_register", "id")) && (await probe("mission_number_history", "id"));
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions };
+    // shared settings, e.g. the days that make someone experienced at a host (migration-2026-11-09b)
+    const appSettings = await probe("app_settings", "key");
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions, appSettings };
   },
 
   async _loadAreas() {
@@ -2639,6 +2645,31 @@ const cloud = {
       source: r.source || "board", updatedAt: r.updated_at || null,
     };
   },
+  /* ---------- shared settings (migration-2026-11-09b) ----------
+     One row per setting in app_settings. Only the settings the app knows are read, and a value
+     that is not a whole number of days in range is ignored, so a hand-edited row cannot make
+     every host "experienced" or nobody. Without the table the settings stay empty and the app
+     keeps its defaults. */
+  async _loadSettings() {
+    if (!this.data.features.appSettings) { this.data.settings = {}; return; }
+    const { data, error } = await sb.from("app_settings").select("key,value");
+    if (error) throw error;
+    const out = {};
+    for (const r of data || []) {
+      if (r.key === "host_experienced_days" && Number.isInteger(r.value) && r.value >= 1 && r.value <= 365) out.hostExperiencedDays = r.value;
+    }
+    this.data.settings = out;
+  },
+  /* days at a host that make someone experienced there, for everyone. Needs Edit on Settings. */
+  async saveHostExperiencedDays(days) {
+    if (!this.data.features.appSettings) throw new Error("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
+    if (!Number.isInteger(days) || days < 1 || days > 365) throw new Error("Days must be a whole number from 1 to 365.");
+    const { error } = await sb.from("app_settings").upsert(
+      { key: "host_experienced_days", value: days, updated_at: new Date().toISOString(), updated_by: await this._currentEmail() },
+      { onConflict: "key" });
+    if (error) throw error;
+    await this._loadSettings();
+  },
   async loadMissionRegister() {
     if (!this.data.features.missions) { this.data.register = []; this.data.numberHistory = []; return; }
     const [reg, hist] = await Promise.all([
@@ -2823,6 +2854,10 @@ const cloud = {
     if (this.data.features.missions) {
       // the Missions tab, and which missions carry over
       ch.on("postgres_changes", { event: "*", schema: "public", table: "mission_register" }, async () => { await this.loadMissionRegister(); this.notify({ register: true }); });
+    }
+    if (this.data.features.appSettings) {
+      // a changed rule redraws the Host tab, Overview and the report for everybody
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, async () => { await this._loadSettings(); this.notify({ settings: true }); });
     }
     if (this.data.features.capacity) {
       ch.on("postgres_changes", { event: "*", schema: "public", table: "capacity_demand" }, async () => {

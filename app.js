@@ -317,20 +317,29 @@ const OV_WL_SHOWN = 10;                          // People rows before "Show all
    leave share, never called in, a mission with only newcomers */
 const OV_RUN_AMBER = 7, OV_RUN_RED = 10, OV_NIGHT_MIN = 5, OV_NIGHT_SHARE = 50;
 const OV_NEWCOMER_YEARS = 1;          // under this many years of service = a newcomer
-const HOST_EXPERIENCED_DAYS = 5;      // experienced at a host after this many days there (deployment_history, all time)
+/* Experienced at a host after this many days there (deployment_history, all time). 5 until somebody
+   changes it in Settings -> Host experience; that one value is shared by everyone (app_settings) and
+   read through hostExperiencedDays(), never from this constant directly. */
+const HOST_EXPERIENCED_DAYS_DEFAULT = 5;
+const HOST_EXPERIENCED_DAYS_MIN = 1, HOST_EXPERIENCED_DAYS_MAX = 365;
 const HOSTLIST_VIEW_KEY = "manpower.hostView";
 const HOST_AT_RISK_MAX = 2;           // a host is at risk when at most this many ACTIVE people are experienced there
+/* the days at a host that make someone experienced there: the Settings value, else the default */
+function hostExperiencedDays() {
+  const n = (D().settings || {}).hostExperiencedDays;
+  return Number.isInteger(n) && n >= HOST_EXPERIENCED_DAYS_MIN && n <= HOST_EXPERIENCED_DAYS_MAX ? n : HOST_EXPERIENCED_DAYS_DEFAULT;
+}
 /* The one "experienced" rule, shared by Overview's Host coverage and the Host tab's skills matrix.
-   `days` is { employeeId: days worked at the host }. A person is experienced at HOST_EXPERIENCED_DAYS
+   `days` is { employeeId: days worked at the host }. A person is experienced at hostExperiencedDays()
    days or more; a host is at risk when HOST_AT_RISK_MAX or fewer of the experienced people are
    active (on the roster on `date`: not deactivated or resigned yet). Someone whose record no longer
    exists is not counted. Returns { experienced: [ids], active: [ids], atRisk } */
 function hostExperience(days, date = todayStr()) {
   const emps = new Map(D().employees.map(e => [e.id, e]));
-  const experienced = [], active = [];
+  const experienced = [], active = [], need = hostExperiencedDays();
   for (const id in days || {}) {
     const e = emps.get(id);
-    if (!e || days[id] < HOST_EXPERIENCED_DAYS) continue;
+    if (!e || days[id] < need) continue;
     experienced.push(id);
     if (cloud.rosterOn(e, date)) active.push(id);
   }
@@ -460,7 +469,7 @@ const state = {
   settingsReturn: null,       // {scrollY} of the page underneath, put back on "Back to board"
   settingsStale: false,       // a live update arrived while a field had focus: redraw once it leaves
   settingsSave: { phase: "clean" },   // clean | dirty | saving | saved | error, per the open section
-  settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, roles: {} },   // staged edits, by section
+  settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, hostexp: {}, roles: {} },   // staged edits, by section
   rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
   svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
@@ -6319,7 +6328,8 @@ function renderProfile() {
     body.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Loading…" }));
   }
 
-  // hosts worked, all time (deployment_history), experienced at HOST_EXPERIENCED_DAYS days
+  // hosts worked, all time (deployment_history), experienced at hostExperiencedDays() days
+  const needDays = hostExperiencedDays();
   const hostDays = new Map();
   for (const r of pr.hosts || []) {
     const h = hostDays.get(r.host) || hostDays.set(r.host, { host: r.host, dates: new Set(), last: "" }).get(r.host);
@@ -6330,7 +6340,7 @@ function renderProfile() {
     .sort((a, b) => b.days - a.days || b.last.localeCompare(a.last) || a.host.localeCompare(b.host));
   const hostBox = document.createElement("div");
   hostBox.className = "ov-prof-block";
-  hostBox.innerHTML = `<div class="ov-eng-foot-h">Hosts worked, all time <span class="ov-muted">${hosts.filter(h => h.days >= HOST_EXPERIENCED_DAYS).length} experienced (${HOST_EXPERIENCED_DAYS}+ days) of ${hosts.length}</span></div>`;
+  hostBox.innerHTML = `<div class="ov-eng-foot-h">Hosts worked, all time <span class="ov-muted">${hosts.filter(h => h.days >= needDays).length} experienced (${needDays}+ days) of ${hosts.length}</span></div>`;
   if (!hosts.length) hostBox.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "No mission history yet." }));
   else {
     const shownHosts = pr.hostsAll ? hosts : hosts.slice(0, OV_WL_SHOWN);
@@ -6338,7 +6348,7 @@ function renderProfile() {
     wrap.className = "ov-table-wrap";
     wrap.innerHTML = `<table class="ov-table ov-prof-hosts"><thead><tr><th>Host</th><th class="r">Days</th><th>Last worked</th><th></th></tr></thead><tbody>${
       shownHosts.map(h => `<tr><td>${sc(h.host)}</td><td class="r">${h.days}</td><td>${escapeHtml(fmtDate(h.last))}</td>
-        <td>${h.days >= HOST_EXPERIENCED_DAYS ? `<span class="ov-flag ov-flag-ok" title="${HOST_EXPERIENCED_DAYS} or more days at this host">experienced</span>` : ""}</td></tr>`).join("")}</tbody></table>`;
+        <td>${h.days >= needDays ? `<span class="ov-flag ov-flag-ok" title="${needDays} or more days at this host">experienced</span>` : ""}</td></tr>`).join("")}</tbody></table>`;
     hostBox.appendChild(wrap);
     if (hosts.length > OV_WL_SHOWN) {
       const more = document.createElement("button");
@@ -7422,7 +7432,7 @@ function renderOverview() {
      A host only one or two people have ever worked (deployment_history, up to
      the date on screen) is only at risk when those people are away — so each
      one is listed with where they are today, read from every board's plan. */
-  const hostSec = ovSection("Host coverage", `Today's hosts where ${HOST_AT_RISK_MAX} or fewer people on the roster are experienced (${HOST_EXPERIENCED_DAYS}+ days there), and where those people are today.`);
+  const hostSec = ovSection("Host coverage", `Today's hosts where ${HOST_AT_RISK_MAX} or fewer people on the roster are experienced (${hostExperiencedDays()}+ days there), and where those people are today.`);
   {
     const cov = state.overview.hostCoverage || {};
     const empById = new Map(D().employees.map(e => [e.id, e]));
@@ -7439,7 +7449,7 @@ function renderOverview() {
       if (isNonWorkingDate(state.date, boardOf(e))) return { away: false, text: "day off" };
       return { away: false, text: e.contract === "oncall" ? "on-call, free today" : "free today" };
     };
-    // the shared rule (hostExperience): experienced = HOST_EXPERIENCED_DAYS+ days there, at risk = 2 or fewer of them active
+    // the shared rule (hostExperience): experienced = hostExperiencedDays()+ days there, at risk = 2 or fewer of them active
     const rated = todaysHosts.map(h => ({ host: h, ...hostExperience((cov[h] || {}).days, state.date) }));
     const thin = rated.filter(r => r.atRisk)
       .map(r => ({ ...r, people: r.experienced.map(id => ({ id, name: (empById.get(id) || {}).name || "Unknown", ...statusOf(id) })) }))
@@ -7458,7 +7468,7 @@ function renderOverview() {
         ? "Nobody on the roster is experienced at this site."
         : r.away
           ? (avail.length ? `If ${avail.join(" and ")} ${avail.length === 1 ? "is" : "are"} off, nobody else on the roster is experienced here.` : "Nobody experienced here is available today.")
-          : `Only ${r.active.length === 1 ? "one person is" : `${r.active.length} people are`} experienced here (${HOST_EXPERIENCED_DAYS}+ days).`;
+          : `Only ${r.active.length === 1 ? "one person is" : `${r.active.length} people are`} experienced here (${hostExperiencedDays()}+ days).`;
       el.innerHTML = `<div class="ov-host-head"><span class="ov-host-name"></span><span class="ov-tag ${r.away || none ? "bad" : "warn"}">${none ? "no one experienced" : r.away ? `${r.away} of ${r.active.length} away today` : "at risk"}</span></div>
         <div class="ov-chips">${r.people.map(p => `<span class="ov-person"><span class="ov-table-dot" style="background:${p.away ? "var(--chart-leave)" : "var(--chart-assigned)"}"></span>${escapeHtml(p.name)} <small>${escapeHtml(p.text)}</small></span>`).join("")}</div>
         <p class="ov-host-note">${escapeHtml(note)}</p>`;
@@ -8802,7 +8812,7 @@ function renderHostRows() {
 /* ---------- Host tab: List | Skills matrix ----------
    The matrix reads the same rows as the list (allHostRows, the same search and filters) and
    judges them by the one shared rule (hostExperience): a person is experienced at a host after
-   HOST_EXPERIENCED_DAYS days there, and a host is at risk when HOST_AT_RISK_MAX or fewer ACTIVE
+   hostExperiencedDays() days there (Settings -> Host experience), and a host is at risk when HOST_AT_RISK_MAX or fewer ACTIVE
    people are experienced. Inactive and Resigned people stay in the lists, greyed, but do not
    count. Picking a person (the Person box, which is the Filter popover's Inspector filter) shows
    only the hosts they have worked, with their own days and last date. */
@@ -8867,7 +8877,7 @@ function renderHostView() {
   const cols = ["host", "people", "exp", "last", "risk"];
   const person = picked ? D().employees.find(e => e.id === picked) : null;
   const statusTag = (e) => { const st = e ? empStatus(e) : "inactive"; return st === "active" ? "" : ` <span class="mx-tag">${EMP_STATUS_LABEL[st]}</span>`; };
-  const today = todayStr();
+  const today = todayStr(), needDays = hostExperiencedDays();
   let html = `<table class="mx-table"><thead><tr>${cols.map(k => `<th class="${k === "host" ? "" : "r"}"><button type="button" class="ov-sort" data-k="${k}" aria-sort="${(hl.mxSort || {}).key === k ? (sort.dir < 0 ? "descending" : "ascending") : "none"}">${MX_COLS[k]}</button></th>`).join("")}${person ? "<th class=\"r\">Their days</th><th class=\"r\">Their last day</th>" : ""}</tr></thead><tbody>`;
   if (!dir) html += `<tr><td colspan="${person ? 7 : 5}" class="ov-muted">…</td></tr>`;
   else if (!rows.length) html += `<tr><td colspan="${person ? 7 : 5}" class="ov-muted">No hosts match the current filters.</td></tr>`;
@@ -8879,13 +8889,13 @@ function renderHostView() {
       <td class="r">${r.inspectors.length} <span class="ov-muted">· ${totalDays} days</span></td>
       <td class="r"><b>${x.experienced.length}</b>${x.experienced.length !== x.active.length ? ` <span class="ov-muted">· ${x.active.length} active</span>` : ""}</td>
       <td class="r">${r.lastWorked ? escapeHtml(fmtDate(r.lastWorked)) : "—"}</td>
-      <td class="r">${x.atRisk ? `<span class="ov-flag ov-flag-bad" title="${HOST_AT_RISK_MAX} or fewer active people are experienced here (${HOST_EXPERIENCED_DAYS}+ days)">at risk</span>` : "—"}</td>
+      <td class="r">${x.atRisk ? `<span class="ov-flag ov-flag-bad" title="${HOST_AT_RISK_MAX} or fewer active people are experienced here (${needDays}+ days)">at risk</span>` : "—"}</td>
       ${person ? `<td class="r">${m.mine ? m.mine.days : 0}</td><td class="r">${m.mine && m.mine.last ? escapeHtml(fmtDate(m.mine.last)) : "—"}</td>` : ""}</tr>`;
     if (open) {
       html += `<tr class="mx-detail"><td colspan="${person ? 7 : 5}">${r.inspectors.length ? `<table class="mx-people"><thead><tr><th>Name</th><th class="r">Days</th><th>Last worked</th><th></th></tr></thead><tbody>${
         r.inspectors.map(i => { const e = D().employees.find(z => z.id === i.id); const on = e && cloud.rosterOn(e, today);
           return `<tr class="${on ? "" : "is-off"}"><td><span data-no-i18n>${escapeHtml(i.name)}</span>${on ? "" : statusTag(e)}</td><td class="r">${i.days}</td><td>${i.last ? escapeHtml(fmtDate(i.last)) : "—"}</td>
-            <td>${i.days >= HOST_EXPERIENCED_DAYS ? `<span class="ov-flag ov-flag-ok" title="${HOST_EXPERIENCED_DAYS} or more days at this host">experienced</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`
+            <td>${i.days >= needDays ? `<span class="ov-flag ov-flag-ok" title="${needDays} or more days at this host">experienced</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`
         : '<span class="ov-muted">No one deployed yet</span>'}</td></tr>`;
     }
   }
@@ -10837,6 +10847,7 @@ const SETTINGS_SECTIONS = {
   engineers: { label: "Engineers",           group: "Board setup",    hint: "Who can run a mission, and the colour of their mission cards." },
   areas:     { label: "Service areas",       group: "Board setup",    hint: "Labels used across people, missions and hosts." },
   boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and working days." },
+  hostexp:   { label: "Host experience",     group: "Board setup",    hint: "How many days at a host make someone experienced there." },
   users:     { label: "Users",               group: "Administration", hint: "Accounts, access requests and status." },
   roles:     { label: "Roles & permissions", group: "Administration", hint: "Review what each role can see and change." },
 };
@@ -11010,6 +11021,7 @@ function applySettingsTab() {
   if (state.settingsTab === "account") renderAccountPane();
   if (state.settingsTab === "users") renderUsersPane();
   if (state.settingsTab === "roles") renderRolesPane();
+  if (state.settingsTab === "hostexp") renderHostExpPane();
   renderRailMeta();
   renderSettingsFooter();
 }
@@ -11131,6 +11143,7 @@ function svHomeMeta(tab) {
   if (tab === "engineers") return { count: engineerPaneRows().length, sub: n("person", "people", engineerPaneRows().length) };
   if (tab === "areas") return { count: D().areas.length, sub: n("area", "areas", D().areas.length) };
   if (tab === "boards") return { count: D().boards.length, sub: n("board", "boards", D().boards.length) };
+  if (tab === "hostexp") return { sub: `${hostExperiencedDays()}+ ${hostExperiencedDays() === 1 ? "day" : "days"} at a host` };
   if (tab === "users") {
     const all = D().users || [];
     const waiting = all.filter(u => u.status === "pending").length;
@@ -11325,6 +11338,13 @@ function settingsSaveOps(section) {
         ops.push({ keys: ["weekend|" + b.id], label: `${b.name}: non-working days`, run: () => cloud.saveBoardWeekendDays(b.id, days) });
       }
     }
+  }
+
+  if (section === "hostexp" && d.days) {
+    const days = parseExperiencedDays(d.days.after);
+    if (days === null) errors.push(`Days must be a whole number from ${HOST_EXPERIENCED_DAYS_MIN} to ${HOST_EXPERIENCED_DAYS_MAX}.`);
+    else if (!cloud.data.features.appSettings) errors.push("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
+    else ops.push({ keys: ["days"], label: "Days to count as experienced", run: () => cloud.saveHostExperiencedDays(days) });
   }
   return { ops, errors };
 }
@@ -16813,6 +16833,42 @@ function userLockReason(u) {
 }
 
 /* ---------- My account ---------- */
+/* ----- Settings -> Host experience: the days at a host that make someone experienced there ----- */
+/* what was typed -> a whole number in range, or null. The box is a draft (its text, not a number), so
+   "", "5.5", "-1" and "1e2" are all caught here rather than by the browser's number parsing. */
+function parseExperiencedDays(raw) {
+  const t = String(raw == null ? "" : raw).trim();
+  if (!/^\d{1,3}$/.test(t)) return null;
+  const n = Number(t);
+  return n >= HOST_EXPERIENCED_DAYS_MIN && n <= HOST_EXPERIENCED_DAYS_MAX ? n : null;
+}
+function renderHostExpPane() {
+  const input = $("#hostexp-days");
+  if (!input) return;
+  const saved = String(hostExperiencedDays());
+  const shown = sdVal("hostexp", "days", saved);
+  // what the user has typed wins over what is saved, so a live update cannot overwrite a half-typed value
+  if (input.value !== String(shown)) input.value = shown;
+  const ready = !!cloud.data.features.appSettings;
+  input.disabled = !ready;
+  $("#hostexp-migrate").classList.toggle("hidden", ready);
+  const n = parseExperiencedDays(shown);
+  input.setAttribute("aria-invalid", n === null ? "true" : "false");
+  $("#hostexp-note").textContent = n === null
+    ? `Enter a whole number from ${HOST_EXPERIENCED_DAYS_MIN} to ${HOST_EXPERIENCED_DAYS_MAX}.`
+    : `Someone is tagged experienced at a host once they have worked ${n} or more ${n === 1 ? "day" : "days"} there.`;
+}
+function wireHostExpPane() {
+  const input = $("#hostexp-days");
+  if (!input) return;
+  input.oninput = () => {
+    sdSet("hostexp", "days", input.value, "Days to count as experienced", () => String(hostExperiencedDays()));
+    renderHostExpPane();
+  };
+  // Enter saves, like the profile fields
+  input.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); saveSettingsSection(); } };
+}
+
 function renderAccountPane() {
   const me = D().me;
   const box = $("#account-identity");
@@ -17473,6 +17529,7 @@ function wireUserManagement() {
     };
   }
   wireAccountPane();
+  wireHostExpPane();
 }
 
 /* ---------- login ---------- */

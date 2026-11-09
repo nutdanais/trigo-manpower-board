@@ -3814,6 +3814,13 @@ body.settings-open #btn-avatar { box-shadow: 0 0 0 2px var(--on-navy-line-strong
 }
 .sv-field input[type="text"], .sv-field select:not(.pk-source), #settings-view .account-form input { width: 100%; }
 .sv-field .pk { display: block; }
+.sv-field input[type="number"] {
+  width: 110px; min-height: 36px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text);
+  font-size: 13px; font-family: inherit;
+}
+.sv-field input[type="number"][aria-invalid="true"] { border-color: var(--danger-line); }
+.sv-unit { margin-left: 8px; font-size: 13px; color: var(--muted); }
 .sv-edit-foot > .grow, .sv-line > .grow { flex: 1; min-width: 0; }
 #users-search { width: 280px; max-width: 100%; }
 .sv-static { min-height: 36px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; }

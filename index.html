@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-09c">
+<link rel="stylesheet" href="styles.css?v=2026-11-09d">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-09c"></script>
+<script src="version.js?v=2026-11-09d"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -285,6 +285,7 @@
       <button type="button" class="settings-tab" data-tab="engineers" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"></use></svg><span>Engineers</span><span class="st-n"></span></button>
       <button type="button" class="settings-tab" data-tab="areas" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-area"></use></svg><span>Service areas</span><span class="st-n"></span></button>
       <button type="button" class="settings-tab" data-tab="boards" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-board"></use></svg><span>Boards</span><span class="st-n"></span></button>
+      <button type="button" class="settings-tab" data-tab="hostexp" data-area="settings" data-group="board"><svg class="ic" aria-hidden="true"><use href="#i-site"></use></svg><span>Host experience</span><span class="st-n"></span></button>
       <div class="settings-group" data-group="admin">Administration</div>
       <button type="button" class="settings-tab" data-tab="users" data-area="users" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg><span>Users</span><span class="st-n"></span></button>
       <button type="button" class="settings-tab" data-tab="roles" data-area="users-edit" data-group="admin"><svg class="ic" aria-hidden="true"><use href="#i-shield"></use></svg><span>Roles &amp; permissions</span></button>
@@ -383,6 +384,25 @@
           <p class="settings-hint">Highlighted days are the days the board works. The greyed days are its weekend: they drive the holiday toggle, the weekend “Copy from weekday”, the date picker's highlighting and both Overview trend charts.</p>
           <div id="settings-boards" class="sv-list"></div>
           <p class="settings-count" id="boards-count"></p>
+        </div>
+      </div>
+
+      <!-- Host experience: the one number behind "experienced" and "at risk" on the Host tab, Overview and the report.
+           Shared by everyone (app_settings), so it is a draft like every other field here and is written by Save changes. -->
+      <div class="settings-pane" data-pane="hostexp">
+        <div class="sv-wrap">
+          <section class="sv-card">
+            <div class="sv-fields sv-fields-1">
+              <div class="sv-field">
+                <label class="sv-field-label" for="hostexp-days">Days at a host to count as experienced</label>
+                <div><input id="hostexp-days" type="number" inputmode="numeric" min="1" max="365" step="1" autocomplete="off" aria-describedby="hostexp-note"><span class="sv-unit">days</span></div>
+                <p class="import-note" id="hostexp-note"></p>
+              </div>
+            </div>
+          </section>
+          <p class="import-note">One value for everyone. It decides who is tagged experienced in the Host tab's Skills matrix and in a person's host list, and which hosts are at risk in Overview's Host coverage and the report's Skills risks.</p>
+          <p class="import-note">Days are counted from the Host Record, all time: one day for each date someone was on a mission at that host.</p>
+          <p id="hostexp-migrate" class="import-note settings-error hidden">The database needs a one-time update before this can be changed: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor. Until then the default of 5 days is used.</p>
         </div>
       </div>
 
@@ -789,7 +809,7 @@
       <button type="button" class="btn btn-small" id="btn-hostlist-dups">Review duplicates</button>
     </div>
     <!-- List | Skills matrix: the same hosts, filtered by the same search and Filter popover. The matrix says,
-         for each host, who has worked there, who is experienced (5+ days) and when the site is at risk. -->
+         for each host, who has worked there, who is experienced (Settings → Host experience, 5 days until changed) and when the site is at risk. -->
     <div id="hostlist-viewbar">
       <div class="ov-trend-btns" id="hostlist-views" role="group" aria-label="Host view"></div>
       <label id="hostlist-person-wrap" class="hidden">Person
@@ -1633,21 +1653,21 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-09c"></script>
-<script src="i18n-th.js?v=2026-11-09c"></script>
-<script src="planning.js?v=2026-11-09c"></script>
-<script src="employee-id.js?v=2026-11-09c"></script>
-<script src="mission-number.js?v=2026-11-09c"></script>
+<script src="i18n.js?v=2026-11-09d"></script>
+<script src="i18n-th.js?v=2026-11-09d"></script>
+<script src="planning.js?v=2026-11-09d"></script>
+<script src="employee-id.js?v=2026-11-09d"></script>
+<script src="mission-number.js?v=2026-11-09d"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-09c"></script>
-<script src="cloud.js?v=2026-11-09c"></script>
-<script src="charts.js?v=2026-11-09c"></script>
-<script src="xlsx-export.js?v=2026-11-09c"></script>
-<script src="orgchart-pptx.js?v=2026-11-09c"></script>
-<script src="bulk-edit.js?v=2026-11-09c"></script>
-<script src="app.js?v=2026-11-09c"></script>
-<script src="report.js?v=2026-11-09c"></script>
-<script src="present.js?v=2026-11-09c"></script>
+<script src="demo/demo-gate.js?v=2026-11-09d"></script>
+<script src="cloud.js?v=2026-11-09d"></script>
+<script src="charts.js?v=2026-11-09d"></script>
+<script src="xlsx-export.js?v=2026-11-09d"></script>
+<script src="orgchart-pptx.js?v=2026-11-09d"></script>
+<script src="bulk-edit.js?v=2026-11-09d"></script>
+<script src="app.js?v=2026-11-09d"></script>
+<script src="report.js?v=2026-11-09d"></script>
+<script src="present.js?v=2026-11-09d"></script>
 </body>
 </html>
