@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-09h">
+<link rel="stylesheet" href="styles.css?v=2026-11-09i">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-09h"></script>
+<script src="version.js?v=2026-11-09i"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -923,7 +923,10 @@
 <div id="modal-backdrop" class="hidden">
 
   <div class="modal modal-side hidden" id="modal-mission">
-    <h3><span id="mission-modal-title">New Mission</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <h3><span id="mission-modal-title">New Mission</span><small id="mission-modal-sub" class="h3-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <!-- An existing mission opens here first, read-first like the Manpower profile (renderMissionDetail in
+         app.js); Edit details swaps in the form below, a new or duplicated mission goes straight to the form. -->
+    <div id="mission-detail" class="profile-body hidden"></div>
     <form id="form-mission">
       <div class="form-group">Where</div>
       <!-- only when the form is opened from the Missions tab: which board, and on which day -->
@@ -961,9 +964,9 @@
       <label>Remark <textarea name="remark" rows="2" placeholder="Optional notes"></textarea></label>
       <div class="modal-actions">
         <button type="button" class="btn btn-danger hidden" id="btn-delete-mission">Delete</button>
-        <button type="button" class="btn hidden" id="btn-hide-mission" title="Take this mission off the board without deleting it"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"></use></svg> Hide</button>
+        <button type="button" class="btn hidden" id="btn-hide-mission" title="Take this mission off the board without deleting it"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"></use></svg> <span id="hide-mission-label">Hide</span></button>
         <span class="toolbar-spacer"></span>
-        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="button" class="btn" id="btn-mission-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
@@ -1658,22 +1661,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-09h"></script>
-<script src="i18n-th.js?v=2026-11-09h"></script>
-<script src="planning.js?v=2026-11-09h"></script>
-<script src="employee-id.js?v=2026-11-09h"></script>
-<script src="mission-number.js?v=2026-11-09h"></script>
-<script src="mission-activity.js?v=2026-11-09h"></script>
+<script src="i18n.js?v=2026-11-09i"></script>
+<script src="i18n-th.js?v=2026-11-09i"></script>
+<script src="planning.js?v=2026-11-09i"></script>
+<script src="employee-id.js?v=2026-11-09i"></script>
+<script src="mission-number.js?v=2026-11-09i"></script>
+<script src="mission-activity.js?v=2026-11-09i"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-09h"></script>
-<script src="cloud.js?v=2026-11-09h"></script>
-<script src="charts.js?v=2026-11-09h"></script>
-<script src="xlsx-export.js?v=2026-11-09h"></script>
-<script src="orgchart-pptx.js?v=2026-11-09h"></script>
-<script src="bulk-edit.js?v=2026-11-09h"></script>
-<script src="app.js?v=2026-11-09h"></script>
-<script src="report.js?v=2026-11-09h"></script>
-<script src="present.js?v=2026-11-09h"></script>
+<script src="demo/demo-gate.js?v=2026-11-09i"></script>
+<script src="cloud.js?v=2026-11-09i"></script>
+<script src="charts.js?v=2026-11-09i"></script>
+<script src="xlsx-export.js?v=2026-11-09i"></script>
+<script src="orgchart-pptx.js?v=2026-11-09i"></script>
+<script src="bulk-edit.js?v=2026-11-09i"></script>
+<script src="app.js?v=2026-11-09i"></script>
+<script src="report.js?v=2026-11-09i"></script>
+<script src="present.js?v=2026-11-09i"></script>
 </body>
 </html>

@@ -2986,6 +2986,10 @@ I18N.add({
 /* Missions tab: the crew, status and alert columns, the Host link, and the filters for them */
 I18N.add({
   "Avg crew / week": "ทีมงานเฉลี่ย / สัปดาห์",
+  "Unhide": "แสดงอีกครั้ง",
+  "Put this mission back on the board": "นำมิชชั่นนี้กลับขึ้นบอร์ด",
+  "Open this mission's details. Double-clicking the row does the same.": "เปิดรายละเอียดมิชชั่น ดับเบิลคลิกที่แถวก็ได้เช่นกัน",
+  "Open mission details": "เปิดรายละเอียดมิชชั่น",
   "Add a mission to a board, on the day shown at the top": "เพิ่มมิชชั่นลงบอร์ด ในวันที่แสดงด้านบน",
   "Add a board first.": "เพิ่มบอร์ดก่อน",
   "The start and end time from the mission's latest day on the board.": "เวลาเริ่มและสิ้นสุดจากวันล่าสุดของมิชชั่นบนบอร์ด",
@@ -3028,4 +3032,31 @@ I18N.add({
   "{a} was last on the board on {b}. Close it if the job has ended, or add it back with Add to board.": "{a} อยู่บนบอร์ดครั้งล่าสุดเมื่อ {b} ปิดมิชชั่นหากงานจบแล้ว หรือเพิ่มกลับด้วย เพิ่มลงบอร์ด",
   "{a} is not in the Host list.": "{a} ไม่อยู่ในรายชื่อโฮสต์",
   "It is added on {a}, the day shown at the top.": "จะเพิ่มในวัน {a} ซึ่งเป็นวันที่แสดงด้านบน",
+  "Changes apply to {a} only, the day shown at the top.": "การแก้ไขมีผลกับวัน {a} เท่านั้น ซึ่งเป็นวันที่แสดงด้านบน",
+  "It is not on its board on the day shown at the top. This is its latest day, {a}. Changes apply to that day only.": "มิชชั่นนี้ไม่ได้อยู่บนบอร์ดในวันที่แสดงด้านบน นี่คือวันล่าสุดของมิชชั่น คือ {a} การแก้ไขมีผลกับวันนั้นเท่านั้น",
+  "{a} is not on {b} on {c}.": "{a} ไม่ได้อยู่บน {b} ในวันที่ {c}",
+});
+
+/* Mission detail panel (the Manpower profile's idea) */
+I18N.add({
+  "First day on board": "วันแรกบนบอร์ด",
+  "Earlier numbers": "เลขก่อนหน้า",
+  "None right now": "ตอนนี้ไม่มี",
+  "Crew on this day": "ทีมงานในวันนี้",
+  "Days on board": "วันที่อยู่บนบอร์ด",
+  "No crew in a row": "ไม่มีทีมงานติดต่อกัน",
+  "per working day, last 4 weeks": "ต่อวันทำงาน ใน 4 สัปดาห์ที่ผ่านมา",
+  "working days, up to the latest": "วันทำงาน จนถึงวันล่าสุด",
+  "Crew per working day": "ทีมงานต่อวันทำงาน",
+  "Crew per working day, last 6 weeks": "ทีมงานต่อวันทำงาน 6 สัปดาห์ที่ผ่านมา",
+  "last 6 weeks": "6 สัปดาห์ที่ผ่านมา",
+  "Nobody is on this mission on this day.": "วันนี้ไม่มีใครอยู่ในมิชชั่นนี้",
+  "Mission details": "รายละเอียดมิชชั่น",
+}, {
+  "of {a} working days in 6 weeks": "จาก {a} วันทำงานใน 6 สัปดาห์",
+  "Crew on {a}": "ทีมงานวันที่ {a}",
+  "Crew {a} on {b}": "ทีมงาน {a} คน ในวันที่ {b}",
+  "most {a}": "สูงสุด {a}",
+  "Not on the board on {a}": "ไม่ได้อยู่บนบอร์ดในวันที่ {a}",
+  "Hidden on {a}": "ซ่อนอยู่ในวันที่ {a}",
 });

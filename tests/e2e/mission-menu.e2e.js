@@ -97,7 +97,7 @@ async function step(name, fn) {
     await step("right-click on a mission opens its quick panel", async () => {
       await rightClick("101");
       assert.match(await menu.locator(".ctx-title").innerText(), /101 · Day · 2 crew/);
-      assert.deepEqual(await menuLabels(), ["Edit mission", "Duplicate mission", "Move or copy to board", "Crew",
+      assert.deepEqual(await menuLabels(), ["Mission details", "Edit mission", "Duplicate mission", "Move or copy to board", "Crew",
         "Highlight", "Copy as text", "Open host location", "Hide mission", "Hide/Unhide missions…", "Delete mission"]);
       await p.keyboard.press("Escape");
     });
@@ -265,8 +265,11 @@ async function step(name, fn) {
     });
 
     await step("the mission form's own Delete and Hide still work", async () => {
-      await card("103").locator(".mission-header .m-line2").click();
+      await card("103").locator(".mission-header .m-line2").dblclick();
       await p.locator("#modal-mission:not(.hidden)").waitFor();
+      await p.click("#btn-md-edit");
+      if (await p.locator("#modal-confirm:not(.hidden)").waitFor({ timeout: 1500 }).then(() => true, () => false)) await p.click("#btn-confirm-yes");
+      await p.locator("#form-mission").waitFor();
       await p.click("#btn-hide-mission");
       await p.click("#btn-confirm-yes");
       await card("103").waitFor({ state: "detached" });
@@ -277,7 +280,7 @@ async function step(name, fn) {
       await openDay(FC);
       await rightClick("901");
       const labels = await menuLabels();
-      assert.deepEqual(labels, ["Edit mission", "Duplicate mission", "Copy as text", "Open host location", "Delete mission"]);
+      assert.deepEqual(labels, ["Mission details", "Edit mission", "Duplicate mission", "Copy as text", "Open host location", "Delete mission"]);
       await p.keyboard.press("Escape");
       await openDay(SRC);
     });
@@ -288,7 +291,7 @@ async function step(name, fn) {
       await v.page.evaluate((d) => { state.date = d; D().activeBoardId = "b2"; return refreshAndRender(); }, SRC);
       await v.page.locator("#missions-grid .mission-card", { hasText: "201" }).first().locator(".mission-header .m-line2").click({ button: "right" });
       const labels = (await v.page.locator("#context-menu .ctx-item").allInnerTexts()).map((s) => s.trim());
-      assert.deepEqual(labels, ["Copy as text", "Open host location"]);
+      assert.deepEqual(labels, ["Mission details", "Copy as text", "Open host location"]);
       assert.deepEqual(v.errors, []);
       await v.close();
     });
@@ -296,10 +299,11 @@ async function step(name, fn) {
     await step("on a phone, holding the mission header opens the panel", async () => {
       const ph = await env.openAs(db, h.USERS.a, { viewport: { width: 390, height: 844 }, touch: true });
       await ph.page.evaluate((d) => { state.date = d; state.unlockedDates.add(d); D().activeBoardId = "b2"; return refreshAndRender(); }, SRC);
+      await ph.page.waitForSelector("#splash", { state: "detached" });   // the loading screen catches a touch while it fades
       const head = ph.page.locator("#missions-grid .mission-card", { hasText: "201" }).first().locator(".mission-header");
       await head.scrollIntoViewIfNeeded();
       const box = await head.boundingBox();
-      const x = box.x + 20, y = box.y + box.height - 8;
+      const x = box.x + 8, y = box.y + box.height / 2;   // the middle of the header: Chrome nudges a touch near its edge to the nearest clickable element
       const cdp = await ph.ctx.newCDPSession(ph.page);
       await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
       await ph.page.waitForTimeout(700);

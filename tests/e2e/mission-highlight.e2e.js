@@ -143,11 +143,15 @@ async function step(name, fn) {
     });
 
     await step("editing the mission keeps its highlight", async () => {
-      await card("101").locator(".mission-header .m-line2").click();
+      await card("101").locator(".mission-header .m-line2").dblclick();
       await p.locator("#modal-mission:not(.hidden)").waitFor();
+      await p.click("#btn-md-edit");
+      if (await p.locator("#modal-confirm:not(.hidden)").waitFor({ timeout: 1500 }).then(() => true, () => false)) await p.click("#btn-confirm-yes");
+      await p.locator("#form-mission").waitFor();
       await p.fill("#form-mission [name=ppe]", "Hard hat");
       await p.click("#form-mission button[type=submit]");
-      await p.locator("#modal-mission").waitFor({ state: "hidden" });
+      await p.locator("#mission-detail:not(.hidden)").waitFor();   // Save comes back to the detail
+      await p.evaluate(() => closeModal());
       await card("101").locator(".m-ppe").waitFor();
       assert.equal(row("s101").highlight, "focus");
       assert.equal(await tag("101").innerText(), "Focus activity");
@@ -178,7 +182,7 @@ async function step(name, fn) {
       assert.equal(await tag("102", v.page).innerText(), "VIP visit");
       await card("101", v.page).locator(".mission-header .m-line2").click({ button: "right" });
       const labels = (await v.page.locator("#context-menu .ctx-item").allInnerTexts()).map((s) => s.trim());
-      assert.deepEqual(labels, ["Copy as text", "Open host location"]);
+      assert.deepEqual(labels, ["Mission details", "Copy as text", "Open host location"]);   // anyone may look at a mission
       assert.deepEqual(v.errors, []);
       await v.close();
     });

@@ -3066,6 +3066,7 @@ body.exporting #app-root { margin-right: 0; }
 #hostlist-table tr:hover .hl-edit, .hl-edit:focus-visible { opacity: 1; }
 .hl-edit:hover { color: var(--primary-text); }
 body.touch-mode .hl-edit { opacity: 1; }
+#missions-table tbody tr { cursor: default; }
 
 .hl-map { color: var(--primary-text); text-decoration: none; border-bottom: 1px dotted currentColor; }
 .hl-map:hover { border-bottom-style: solid; }
@@ -7534,3 +7535,23 @@ body.presenting #toast-stack, body.presenting #modal-backdrop { display: none !i
 body.presenting-board.pres-hide-names .emp-name, body.presenting-board.pres-hide-names .emp-surname { font-size: 0 !important; }
 body.presenting-board.pres-hide-names .emp-name::before { content: "•••"; font-size: 13px; letter-spacing: .15em; }
 @media (prefers-reduced-motion: reduce) { .pr-hover, .pr-hover .pr-tgb, .pr-hover .pr-tgb::after, .pr-note { transition: none; } }
+
+
+/* ===== Mission detail: read first, like the Manpower profile (renderMissionDetail in app.js) ===== */
+#modal-mission.modal-side.md-detail { width: min(880px, 100vw); }
+.md-facts { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.md-facts b { font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+.md-facts small { font-weight: 400; }
+.md-facts .wide { grid-column: 1 / -1; }
+@media (max-width: 640px) { .md-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .md-facts b { font-size: 13.5px; } }
+/* a pill or a tag inside a fact keeps its own width (the facts grid makes every span a block) */
+.md-facts b span, .md-facts b .ml-tag, .md-facts b .area-pill { display: inline-block; }
+.md-facts .ml-tag { font-size: 12px; }
+.md-crew { display: flex; flex-wrap: wrap; gap: 6px; }
+.md-bars { display: flex; align-items: flex-end; gap: 3px; height: 88px; border-bottom: 1px solid var(--border); }
+.md-bar { flex: 1 1 0; min-width: 4px; height: max(var(--h), 3px); border-radius: 2px 2px 0 0; background: var(--stat-asg); }
+.md-bar.zero { height: 4px; background: var(--stat-leave); }
+.md-bar.none { height: 2px; background: var(--border); }
+.md-bar.hid { height: 28%; background: repeating-linear-gradient(135deg, var(--border) 0 3px, transparent 3px 6px); }
+.md-bar.on { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+.md-axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }

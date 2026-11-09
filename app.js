@@ -2818,8 +2818,9 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       () => assignEmployeesTo(crew.map(e => e.id), null))), null, "return");
   } else {
     addTitle(`${m.number} · ${m.shift === "night" ? "Night" : "Day"} · ${crew.length} crew`);
+    addItem("Mission details", () => openMissionModal(m.id), null, "clipboard");
     if (canEdit) {
-      addItem("Edit mission", () => guardEdit(() => openMissionModal(m.id)), null, "edit");
+      addItem("Edit mission", () => guardEdit(() => openMissionModal(m.id, { edit: true })), null, "edit");
       addItem("Duplicate mission", () => guardEdit(() => openMissionModal(null, { from: m })), null, "copy");
       if (!fc && otherBoards.length) addSub("Move or copy to board", "move", "swap");
       if (sel.length) addItem(`Place ${sel.length} selected here`, () => guardEdit(() => assignEmployeesTo(sel, { missionId: m.id })), null, "plus");
@@ -3258,7 +3259,9 @@ function renderMissions() {
         <span class="m-count">${memberEmps.length}</span>
       </div>
       ${ppeLine}`;
-    header.onclick = () => guardEdit(() => openMissionModal(m.id));
+    // double-click, like a person's card, a Manpower row, a Host row and a Missions row; a long press (or a
+    // right-click) opens the quick panel, whose first item is Edit mission, so a touch screen has it too
+    header.ondblclick = () => openMissionModal(m.id);
     // the quick panel: right-click anywhere on the card (a person's card inside
     // it keeps its own menu), or hold the header on a phone
     card.addEventListener("contextmenu", (ev) => {
@@ -10799,19 +10802,49 @@ function updateMissionEngineerNote() {
 /* "+ Mission" on the Missions tab: the board's own New Mission form, with a Board box. The form works on
    the active board and the day on screen, so the chosen board is made the active one while the form is
    open (enterMissionListBoard) and the Missions tab is put back when it closes (leaveMissionListBoard). */
-let missionFromList = { open: false, swapped: false };
+let missionFromList = { open: false, swapped: false, date: null, prevDate: null };
 function enterMissionListBoard() {
   if (!missionFromList.open || missionFromList.swapped || !isMissionList()) return;
   const id = $("#mission-board").value;
   if (!id) return;
   D().activeBoardId = id;
+  // opening an existing mission may need a day other than the one on screen: that day is used while the form is open
+  if (missionFromList.date && missionFromList.date !== state.date) { missionFromList.prevDate = state.date; state.date = missionFromList.date; }
   missionFromList.swapped = true;
 }
 function leaveMissionListBoard() {
   if (!missionFromList.swapped) return;
   D().activeBoardId = MISSIONS_ID;
+  if (missionFromList.prevDate) { state.date = missionFromList.prevDate; missionFromList.prevDate = null; }
   missionFromList.swapped = false;
+  state.missions.activityKey = null;   // the crew and the status may have changed
   render();
+}
+/* Double-click on a Missions row (or its pencil): the same Edit Mission form as the board's card. It edits
+   the mission's row on the day on screen, or on its latest day when it is not on its board that day (the form
+   says which). A mission registered in Bulk edit that has no day yet opens as a New Mission, filled in. */
+function openMissionFromList(r) {
+  if (!r) return;
+  const days = missionDays(r) || {};
+  let day = days[state.date] ? state.date : (Object.keys(days).sort().pop() || r.lastOn || null);
+  const sel = $("#mission-board");
+  sel.innerHTML = D().boards.map(b => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`).join("");
+  sel.value = r.boardId;
+  missionFromList = { open: true, swapped: false, date: day && day !== state.date ? day : null, prevDate: null };
+  safely(async () => {
+    enterMissionListBoard();
+    let m = null;
+    if (day) {
+      await cloud.ensurePlanLoaded(r.boardId, day);
+      const chain = cloud.numberChain(r.number);
+      m = getPlan().missions.find(x => chain.includes(x.number) && x.shift === r.shift) || null;
+    }
+    if (day && !m) { toast(`${r.number} is not on ${boardNameOf(r.boardId)} on ${fmtDate(day)}.`, "warn"); leaveMissionListBoard(); return; }
+    if (m) openMissionModal(m.id);
+    else guardEdit(() => openMissionModal(null, { number: r.number, from: {
+      host: r.host, customer: r.customer, ppe: r.ppe, shift: r.shift, startTime: r.startTime || "08:00", endTime: r.endTime || "17:00", engineerId: r.engineerId, remark: r.remark } }));
+    if (document.querySelectorAll(".modal:not(.hidden)").length === 0) leaveMissionListBoard();
+  });
 }
 function openNewMissionFromList() {
   if (!can("board", "edit")) { toast("Your role can view the board but not change it.", "info"); return; }
@@ -10834,8 +10867,6 @@ function openNewMissionFromList() {
 function openMissionModal(missionId, opts = {}) {
   enterMissionListBoard();   // a no-op unless the form was asked for on the Missions tab
   state.editingMissionId = missionId || null;
-  const form = $("#form-mission");
-  form.reset();
   renderMissionHostOptions();
   renderMissionEngineerOptions();
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
@@ -10843,29 +10874,201 @@ function openMissionModal(missionId, opts = {}) {
   $("#btn-hide-mission").classList.toggle("hidden", !missionId || isForecastView());
   $("#mission-modal-title").textContent = (missionId ? "Edit" : "New") + (isForecastView() ? " Forecast Mission" : " Mission");
   const src = missionId ? getPlan().missions.find(x => x.id === missionId) : opts.from;
+  fillMissionForm(src, missionId, opts);
+  const isHidden = !!(missionId && src && src.hidden);
+  $("#hide-mission-label").textContent = isHidden ? "Unhide" : "Hide";
+  $("#btn-hide-mission use").setAttribute("href", isHidden ? "#i-eye" : "#i-eye-off");
+  $("#btn-hide-mission").title = isHidden ? "Put this mission back on the board" : "Take this mission off the board without deleting it";
+  // from the Missions tab: a new mission also asks which board; any mission says which day it is on
+  const fromList = missionFromList.swapped;
+  $("#mission-board-row").classList.toggle("hidden", !(fromList && !missionId));
+  $("#mission-day-note").classList.toggle("hidden", !fromList);
+  if (fromList) {
+    $("#mission-board").value = D().activeBoardId;
+    const day = `${fmtDow(state.date)} ${fmtDate(state.date)}`;
+    $("#mission-day-note").textContent = !missionId ? `It is added on ${day}, the day shown at the top.`
+      : missionFromList.prevDate ? `It is not on its board on the day shown at the top. This is its latest day, ${day}. Changes apply to that day only.`
+      : `Changes apply to ${day} only, the day shown at the top.`;
+  }
+  // an existing mission on the confirmed board opens read-first (the Manpower profile's idea); the card's
+  // "Edit mission" and everything new, duplicated or on a forecast day go straight to the form
+  const detailView = !!missionId && !opts.edit && !isForecastView();
+  mdState = { fromDetail: detailView };
+  setMissionView(detailView ? "detail" : "form");
+  openModal("#modal-mission");
+  if (detailView) renderMissionDetail();
+}
+
+/* ---------- Mission detail: read first, like the Manpower profile ----------
+   A double click on a mission (a board card, a Missions row) opens this panel: the mission's facts, what
+   needs a look, how it has been staffed and who is on it that day. Hide and Close mission sit in the
+   Details header; Edit details swaps the form in, and Save or Cancel come back here. */
+let mdState = { fromDetail: false };
+function setMissionView(view) {
+  const detail = view === "detail";
+  $("#mission-detail").classList.toggle("hidden", !detail);
+  $("#form-mission").classList.toggle("hidden", detail);
+  $("#modal-mission").classList.toggle("md-detail", detail);
+  if (!detail) $("#mission-modal-sub").classList.add("hidden");
+}
+function fillMissionForm(src, missionId, opts = {}) {
+  const form = $("#form-mission");
+  form.reset();
   if (src) {
-    const m = src;
-    form.number.value = missionId ? m.number : "";
-    form.host.value = m.host;
-    form.customer.value = m.customer;
-    form.ppe.value = m.ppe || "";
-    form.shift.value = m.shift;
-    form.startTime.value = m.startTime;
-    form.endTime.value = m.endTime;
-    form.engineer.value = engineerLabelFor(m.engineerId);
-    form.remark.value = m.remark || "";
+    form.number.value = missionId ? src.number : (opts.number || "");
+    form.host.value = src.host;
+    form.customer.value = src.customer;
+    form.ppe.value = src.ppe || "";
+    form.shift.value = src.shift;
+    form.startTime.value = src.startTime;
+    form.endTime.value = src.endTime;
+    form.engineer.value = engineerLabelFor(src.engineerId);
+    form.remark.value = src.remark || "";
   }
   updateMissionHostNote();
   updateMissionEngineerNote();
-  // from the Missions tab the form also asks which board; the day is the one shown at the top
-  const listMode = missionFromList.swapped && !missionId;
-  $("#mission-board-row").classList.toggle("hidden", !listMode);
-  $("#mission-day-note").classList.toggle("hidden", !listMode);
-  if (listMode) {
-    $("#mission-board").value = D().activeBoardId;
-    $("#mission-day-note").textContent = `It is added on ${fmtDow(state.date)} ${fmtDate(state.date)}, the day shown at the top.`;
-  }
+}
+function editMissionDetails() {
+  // "Edit today's board?" and the like are confirms that close the panel (and, from the Missions tab, leave the
+  // board it borrowed): come back to both before the form is shown
+  enterMissionListBoard();
   openModal("#modal-mission");
+  const m = getPlan().missions.find(x => x.id === state.editingMissionId);
+  if (!m) return;
+  fillMissionForm(m, m.id);
+  setMissionView("form");
+  $("#mission-modal-title").textContent = "Edit Mission";
+  $("#form-mission").number.focus();
+}
+const mdFact = (label, value, cls = "") => `<div${cls ? ` class="${cls}"` : ""}><span>${label}</span> <b>${value}</b></div>`;
+async function renderMissionDetail() {
+  const id = state.editingMissionId;
+  const m = getPlan().missions.find(x => x.id === id);
+  const body = $("#mission-detail");
+  if (!m) return;
+  const boardId = D().activeBoardId, board = D().boards.find(b => b.id === boardId);
+  const forecast = isForecastView();
+  const reg = !forecast && missionsOn() ? cloud.registerFor(boardId, m.number, m.shift) : null;
+  const area = hostAreaOf(m.host);
+  const eng = D().engineers.find(e => e.id === m.engineerId);
+  const crew = missionCrew(m);
+  const night = m.shift === "night";
+  $("#mission-modal-title").textContent = m.number;
+  const sub = $("#mission-modal-sub");
+  sub.textContent = [board && board.name, night ? "Night" : "Day", area && area.name].filter(Boolean).join(" · ");
+  sub.classList.remove("hidden");
+  if (reg) await ensureMissionActivityLoaded();
+  // closed, or another mission opened, while the crew facts were being read
+  if (state.editingMissionId !== id || $("#modal-mission").classList.contains("hidden") || $("#mission-detail").classList.contains("hidden")) return;
+
+  const box = document.createElement("div");
+  box.className = "ov-prof-block ov-prof-details";
+  const head = document.createElement("div");
+  head.className = "ov-prof-details-head";
+  head.innerHTML = `<div class="ov-eng-foot-h">Details</div>`;
+  const acts = document.createElement("div");
+  acts.className = "ov-prof-details-acts";
+  const act = (btnId, cls, ic, label, fn) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = btnId; b.className = cls;
+    b.innerHTML = `${icon(ic)} ${label}`;
+    b.onclick = fn;
+    acts.appendChild(b);
+  };
+  const canPlan = forecast ? can("forecast", "edit") : can("board", "edit");
+  if (canPlan) act("btn-md-edit", "btn btn-small", "edit", "Edit details", () => guardEdit(editMissionDetails));
+  if (canPlan && !forecast) act("btn-md-hide", "btn btn-small", m.hidden ? "eye" : "eye-off", m.hidden ? "Unhide" : "Hide", () => guardEdit(() => { enterMissionListBoard(); hideMission(m.id); }));
+  if (reg && reg.status === "open" && can("missions", "edit")) act("btn-md-close", "btn btn-small btn-danger", "check", "Close mission…", () => openCloseMissionModal(reg, state.date));
+  head.appendChild(acts);
+  box.appendChild(head);
+
+  const hostLink = m.host && can("hostlist") ? `<button type="button" class="ml-host-link" id="btn-md-host">${escapeHtml(m.host)}</button>` : escapeHtml(m.host || "-");
+  const dayNote = missionFromList.prevDate ? ` <small class="ov-muted">its latest day on the board</small>` : "";
+  const earlier = reg ? cloud.numberChain(m.number).slice(0, -1) : [];
+  const grid = document.createElement("div");
+  grid.className = "ov-eng-facts ov-prof-id md-facts";
+  grid.innerHTML = [
+    mdFact("Board", escapeHtml(board ? board.name : "-")),
+    mdFact("Day", `${escapeHtml(fmtDow(state.date))} ${escapeHtml(fmtDate(state.date))}${dayNote}`),
+    mdFact("Shift", `${night ? "Night" : "Day"} <small class="ov-muted">${escapeHtml(m.startTime)}-${escapeHtml(m.endTime)}</small>`),
+    mdFact("Host", hostLink),
+    mdFact("Service area", area ? areaPillHtml(area, "area-pill") : "-"),
+    mdFact("Customer", escapeHtml(m.customer || "-")),
+    mdFact("Trigo responsible", eng ? `${escapeHtml(eng.name)}${eng.phone ? " " + telLink(eng.phone) : ""}` : "-"),
+    mdFact("Status", reg ? missionStatusHtml(reg) : (m.hidden ? "Hidden" : "On board")),
+    ...(reg ? [
+      mdFact("First day on board", reg.openedOn ? escapeHtml(fmtDate(reg.openedOn)) : "-"),
+      mdFact("Last on board", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : "-"),
+    ] : []),
+    ...(earlier.length ? [mdFact("Earlier numbers", escapeHtml(earlier.join(", ")))] : []),
+    mdFact("PPE", m.ppe ? escapeHtml(m.ppe) : "-", (m.ppe || "").length > 36 ? "wide" : ""),
+    mdFact("Remark", m.remark ? escapeHtml(m.remark) : "-", (m.remark || "").length > 36 ? "wide" : ""),
+  ].join("");
+  box.appendChild(grid);
+  const hostBtn = grid.querySelector("#btn-md-host");
+  if (hostBtn) hostBtn.onclick = () => { closeModal(); openHostFromMission({ host: m.host }); };
+  body.replaceChildren(box);
+
+  // the crew facts need the mission register and the last six weeks of days (not on a forecast day)
+  const actv = state.missions.activity;
+  if (!reg || !actv) return;
+  const days = missionDays(reg) || {};
+  const summary = missionActivityOf(reg);
+  const working = actv.working[boardId] || [];
+  const dayText = `${fmtDow(state.date)} ${fmtDate(state.date)}`;
+
+  const flags = document.createElement("div");
+  flags.className = "ov-prof-flags";
+  const alerts = missionAlerts(reg, missionPlacement(reg));
+  flags.innerHTML = `<b>Flags</b> ${alerts.length
+    ? alerts.map(x => `<span class="ml-tag ${x.level === 2 ? "ml-late" : x.level === 1 ? "ml-warn" : "ml-wait"}" title="${escapeHtml(x.title)}">${escapeHtml(x.text)}</span>`).join(" ")
+    : '<span class="ov-muted">None right now</span>'}`;
+  body.appendChild(flags);
+
+  const tiles = document.createElement("div");
+  tiles.className = "ov-htiles ov-prof-tiles";
+  const tile = (t) => { const d = document.createElement("div"); d.className = "ov-htile ov-htile-static"; d.innerHTML = ovTileInner(t); tiles.appendChild(d); };
+  const onBoardDays = working.filter(d => days[d] && !days[d].hidden).length;
+  tile({ label: "Crew on this day", value: crew.length, sub: escapeHtml(dayText) });
+  tile({ label: "Avg crew / week", value: summary && summary.avgCrew != null ? summary.avgCrew.toFixed(1) : "-", sub: "per working day, last 4 weeks" });
+  tile({ label: "Days on board", value: onBoardDays, sub: `of ${working.length} working days in 6 weeks` });
+  tile({ label: "No crew in a row", value: summary ? summary.noCrewDays + (summary.noCrewCapped ? "+" : "") : 0, sub: "working days, up to the latest" });
+  body.appendChild(tiles);
+
+  const crewBox = document.createElement("div");
+  crewBox.className = "ov-prof-block";
+  crewBox.innerHTML = `<div class="ov-eng-foot-h">Crew on ${escapeHtml(dayText)} <span class="ov-muted">${crew.length}</span></div>`;
+  if (!crew.length) crewBox.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Nobody is on this mission on this day." }));
+  else {
+    const row = document.createElement("div");
+    row.className = "md-crew";
+    for (const e of sortEmployeesDisplay(crew)) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn btn-small"; b.textContent = e.name; b.dataset.noI18n = "";
+      b.onclick = () => openProfile(e.id);
+      row.appendChild(b);
+    }
+    crewBox.appendChild(row);
+  }
+  body.appendChild(crewBox);
+
+  // crew per working day: a bar each, amber when nobody was on it, hatched when it was hidden, a gap when it was not on the board
+  const dates = working.slice();
+  if (state.date > todayStr() && days[state.date]) dates.push(state.date);
+  const maxCrew = Math.max(1, ...dates.map(d => (days[d] && !days[d].hidden ? days[d].crew : 0)));
+  const bars = dates.map(d => {
+    const c = days[d];
+    const cls = !c ? "none" : c.hidden ? "hid" : c.crew ? "" : "zero";
+    const when = `${fmtDow(d)} ${fmtDate(d)}`;
+    const tip = !c ? `Not on the board on ${when}` : c.hidden ? `Hidden on ${when}` : `Crew ${c.crew} on ${when}`;
+    return `<i class="md-bar ${cls}${d === state.date ? " on" : ""}" style="--h:${c && !c.hidden ? Math.round(c.crew / maxCrew * 100) : 0}%" title="${escapeHtml(tip)}"></i>`;
+  }).join("");
+  const chart = document.createElement("div");
+  chart.className = "ov-prof-block";
+  chart.innerHTML = `<div class="ov-eng-foot-h">Crew per working day <span class="ov-muted">last 6 weeks</span></div>
+    <div class="md-bars" role="img" aria-label="${escapeHtml(window.I18N ? I18N.t("Crew per working day, last 6 weeks") : "Crew per working day, last 6 weeks")}">${bars}</div>
+    <div class="md-axis"><span>${escapeHtml(dates.length ? fmtDayMon(dates[0]) : "")}</span><span>most ${maxCrew}</span><span>${escapeHtml(dates.length ? fmtDayMon(dates[dates.length - 1]) : "")}</span></div>`;
+  body.appendChild(chart);
 }
 
 function saveMission(ev) {
@@ -10936,6 +11139,16 @@ function saveMission(ev) {
     vals.engineerId = eng.engineerId || await cloud.ensureEngineerForProfile(eng.profileId);
     if (forecast) await cloud.saveForecastMission(boardId, state.date, editingId, vals);
     else await cloud.saveMission(boardId, state.date, editingId, vals);
+    if (editingId && mdState.fromDetail && !forecast) {
+      // opened from the detail: back to the detail with what was saved (a confirm in between may have closed the panel)
+      await refreshAndRender();
+      state.editingMissionId = editingId;
+      openModal("#modal-mission");
+      await cloud.ensurePlanLoaded(boardId, state.date);
+      setMissionView("detail");
+      await renderMissionDetail();
+      return;
+    }
     closeModal();
     await refreshAndRender();
   });
@@ -10978,6 +11191,10 @@ function deleteMission(missionId = state.editingMissionId) {
 function hideMission(missionId = state.editingMissionId) {
   const m = getPlan().missions.find(x => x.id === missionId);
   if (!m) return;
+  if (m.hidden) {   // the form's button reads Unhide on a hidden mission
+    safely(async () => { await cloud.setMissionsHidden([missionId], false); closeModal(); await refreshAndRender(); });
+    return;
+  }
   const doHide = () => safely(async () => {
     await cloud.setMissionsHidden([missionId], true);
     closeModal();
@@ -18233,6 +18450,13 @@ function wireApp() {
     else if (b.dataset.act === "reopen") reopenMissionRow(r);
     else if (b.dataset.act === "add") openMissionAddModal(r);
   });
+  $("#missions-body").addEventListener("dblclick", (e) => {
+    if (e.target.closest("button, a, input, select")) return;
+    const r = missionFromRow(e.target);
+    if (!r) return;
+    if (window.getSelection) window.getSelection().removeAllRanges();   // the double click selected a word
+    openMissionFromList(r);
+  });
   $("#form-close-mission").onsubmit = submitCloseMission;
   $("#close-mission-date").addEventListener("input", updateCloseMissionEffect);
   $("#form-mission-add").onsubmit = submitMissionAdd;
@@ -18334,6 +18558,11 @@ function wireApp() {
   $("#btn-hostlist-export-go").onclick = () => safely(async () => { await exportHostlistXlsx(); closeModal(); });
   $("#btn-add-host").onclick = () => openHostModal(null);
   $("#btn-add-mission-list").onclick = openNewMissionFromList;
+  $("#btn-mission-cancel").onclick = () => {
+    // Edit details, then Cancel: back to the detail; a new mission just closes
+    if (mdState.fromDetail && state.editingMissionId) { setMissionView("detail"); renderMissionDetail(); }
+    else closeModal();
+  };
   $("#mission-board").onchange = () => safely(async () => {
     D().activeBoardId = $("#mission-board").value;
     await cloud.ensurePlanLoaded(D().activeBoardId, state.date);

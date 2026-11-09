@@ -282,6 +282,79 @@ async function step(name, fn) {
       await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister().then(refreshAndRender); });
     });
 
+    await step("double-clicking a Missions row opens the mission's detail, read first, with Edit details, Hide and Close mission inside; the board needs a double click too", async () => {
+      await goMissions(p);
+      const dateBefore = await p.evaluate(() => state.date);
+      const sure = async () => { const c = p.locator("#modal-confirm:not(.hidden)"); if (await c.waitFor({ timeout: 2000 }).then(() => true, () => false)) { assert.match(await p.locator("#confirm-title").innerText(), /Edit today's board/); await p.click("#btn-confirm-yes"); } };
+      const open = async (num) => { await row(p, num).locator("td").first().dblclick(); await p.locator("#mission-detail:not(.hidden)").waitFor(); await p.locator("#btn-md-edit").waitFor(); };
+      // no Edit button on the row, as on Manpower and Host
+      assert.equal(await row(p, M7).locator("[data-act=edit], .ml-edit").count(), 0);
+      // the detail: facts, flags, tiles, crew, a chart
+      await open(M7);
+      assert.equal(await p.locator("#form-mission").isVisible(), false, "read first, the form is behind Edit details");
+      assert.equal((await p.locator("#mission-modal-title").innerText()).trim(), M7);
+      const text = await p.locator("#mission-detail").innerText();
+      assert.match(text, /Host Beta/);
+      assert.match(text, /Cust Seven/);
+      assert.match(text, /No crew/, "the flags say nobody is on it");
+      assert.equal(await p.locator("#mission-detail .ov-htile").count(), 4);
+      assert.equal(await p.locator("#mission-detail .md-bar").count() > 0, true, "crew per working day");
+      assert.equal(await p.locator("#btn-md-hide").isVisible(), true);
+      assert.equal(await p.locator("#btn-md-close").isVisible(), true);
+      // Close mission… opens the last-working-day dialog for this mission, and closing it comes back to the list
+      await p.click("#btn-md-close");
+      await p.locator("#modal-close-mission:not(.hidden)").waitFor();
+      assert.match(await p.locator("#close-mission-title").innerText(), new RegExp("Close mission " + M7.replace(/\./g, "\\.")));
+      await p.evaluate(() => closeModal());
+      assert.equal(await p.evaluate(() => isMissionList()), true, "back on the Missions tab");
+      assert.equal(await p.evaluate(() => state.date), dateBefore, "the day on screen is back too");
+      // Hide takes it off the board; the list says so, and the detail then offers Unhide
+      await open(M7);
+      await p.click("#btn-md-hide");
+      await sure();
+      await p.waitForFunction(() => document.querySelector("#modal-mission").classList.contains("hidden") && document.querySelector("#modal-confirm").classList.contains("hidden"));
+      assert.equal(db.t("missions").find((m) => m.id === "s7").hidden, true);
+      await p.waitForFunction((n) => [...document.querySelectorAll("#missions-body tr")].some((tr) => tr.querySelector(".ml-num").textContent === n && /Hidden/.test(tr.innerText)), M7);
+      await open(M7);
+      assert.match(await p.locator("#btn-md-hide").innerText(), /Unhide/);
+      await p.click("#btn-md-hide");
+      await sure();
+      await p.waitForFunction(() => document.querySelector("#modal-mission").classList.contains("hidden") && document.querySelector("#modal-confirm").classList.contains("hidden"));
+      assert.equal(db.t("missions").find((m) => m.id === "s7").hidden, false);
+      // Edit details swaps the form in; Cancel comes back to the detail; Save saves and comes back too
+      await open(M7);
+      await p.click("#btn-md-edit");
+      await sure();
+      await p.locator("#form-mission").waitFor();
+      assert.equal(await p.locator("#form-mission").isVisible(), true);
+      assert.equal(await p.inputValue("#form-mission [name=number]"), M7);
+      assert.match(await p.locator("#mission-modal-title").innerText(), /Edit Mission/);
+      await p.click("#btn-mission-cancel");
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.click("#btn-md-edit");
+      await sure();
+      await p.locator("#form-mission").waitFor();
+      await p.fill("#form-mission [name=ppe]", "H-2");
+      await p.click("#form-mission button[type=submit]");
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.waitForFunction(() => /H-2/.test(document.querySelector("#mission-detail").innerText));
+      assert.equal(db.t("missions").find((m) => m.id === "s7").ppe, "H-2");
+      await p.evaluate(() => closeModal());
+      // a mission registered in Bulk edit with no day yet opens as a New Mission, filled in
+      db.seed("mission_register", [{ board_id: "b1", number: `TSTTH.${YY}.0888`, shift: "day", source: "list", status: "open", host: "Host Beta", customer: "Cust Registered", engineer_id: "eng-2" }]);
+      await p.evaluate(() => cloud.loadMissionRegister().then(refreshAndRender));
+      await row(p, `TSTTH.${YY}.0888`).locator("td").first().dblclick();
+      await p.locator("#modal-mission:not(.hidden)").waitFor();
+      assert.match(await p.locator("#mission-modal-title").innerText(), /New Mission/);
+      assert.equal(await p.inputValue("#form-mission [name=number]"), `TSTTH.${YY}.0888`);
+      assert.equal(await p.inputValue("#form-mission [name=customer]"), "Cust Registered");
+      assert.equal(await p.locator("#mission-board").inputValue(), "b1");
+      await p.evaluate(() => closeModal());
+      db.t("mission_register").splice(db.t("mission_register").findIndex((x) => x.number === `TSTTH.${YY}.0888`), 1);
+      await p.evaluate(() => cloud.loadMissionRegister().then(refreshAndRender));
+      await goMissions(p);
+    });
+
     await step("an engineer closes a mission: the days after lose it and carry over skips it", async () => {
       db.seed("missions", [{ id: "n102", board_id: "b1", plan_date: NEXT, number: "102", host: "Host Beta", customer: "Cust Beta", shift: "day", engineer_id: "eng-2" }]);
       db.seed("assignments", [{ employee_id: "e3", plan_date: NEXT, mission_id: "n102", zone: null }]);
@@ -314,6 +387,14 @@ async function step(name, fn) {
     await step("the mission card's quick panel offers Close mission…", async () => {
       await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, NEXT);
       const card = p.locator("#missions-grid .mission-card", { has: p.locator(".m-number", { hasText: /^101$/ }) });
+      // on the board a single click opens nothing; a double click opens the same detail as a Missions row
+      await card.locator(".mission-header .m-line2").click();
+      await p.waitForTimeout(400);
+      assert.equal(await p.locator("#modal-mission:not(.hidden)").count(), 0, "one click opens nothing");
+      await card.locator(".mission-header .m-line2").dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      assert.equal((await p.locator("#mission-modal-title").innerText()).trim(), "101");
+      await p.evaluate(() => closeModal());
       await card.locator(".mission-header .m-line2").click({ button: "right" });
       await p.locator("#context-menu:not(.hidden)").waitFor();
       await p.locator("#context-menu .ctx-item", { hasText: "Close mission…" }).click();
