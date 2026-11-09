@@ -148,6 +148,15 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
 .dec li { padding: 10px 0; border-top: 1px solid var(--grid); display: grid; gap: 2px; max-width: none; }
 .dec li:first-child { border-top: 0; }
 .dec .rec { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--ok); }
+.timeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
+@media (max-width: 760px) { .timeline { grid-template-columns: 1fr; gap: 10px; } }
+.tl { padding: 12px 14px 12px 0; display: grid; gap: 4px; align-content: start; border-top: 3px solid var(--border); position: relative; }
+.tl::before { content: ""; position: absolute; top: -8px; left: 0; width: 13px; height: 13px; border-radius: 50%; background: #fff; border: 3px solid var(--primary); }
+.tl.key { border-top-color: var(--brand-green); }
+.tl .when { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--primary); margin-top: 6px; }
+.tl b { font-size: 13.5px; }
+.tl span { font-size: 12.5px; color: var(--muted); }
+@media (max-width: 760px) { .tl { border-top: none; border-left: 3px solid var(--border); padding: 4px 0 4px 16px; } .tl::before { top: 6px; left: -8px; } .tl.key { border-left-color: var(--brand-green); } }
 .group-row td { background: #f5f7f9; font-weight: 700; color: var(--primary); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
 
 /* methods */
@@ -193,69 +202,107 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
 <!-- ============ PHASE 1 ============ -->
 <section class="part" id="phase1">
   <div class="part-head">
-    <div class="eyebrow">After the meeting · 9 Nov</div>
-    <h2>Phase 1: start the Missions module with 10 columns</h2>
-    <p class="muted">The team chose to start with only the columns the app needs now. Phase 1 holds what the app has to know to run the register, <b>Close</b>, the <b>monthly suffix</b> and the <b>year-end number</b>. The other 31 columns stay in the admins' workbook for now. They can come in later without rework, because the mission record they belong to exists from Phase 1. The column guide below marks every row P1, P2 or P3, and the team's remarks are applied.</p>
+    <div class="eyebrow">Phase 1 · decided 9 Nov</div>
+    <h2>Phase 1: missions without the suffix, and the new-year number</h2>
+    <p class="muted">The team decided Phase 1 has <b>no monthly suffix</b>, <b>no monthly routine</b> and <b>no customer code</b>. A mission is its yearly number (<span class="mono">BANGN.26.0005</span>). The app still follows it from one year to the next (<span class="mono">BANGN.26.0005 → BANGN.27.0001</span>). A new <b>Site Admin</b> role enters the new-year numbers. Until they do, the board keeps running on last year's number. The suffix and the monthly copy stay in the admins' workbook for now.</p>
   </div>
   <div class="cols3">
     <div class="pcard now">
-      <h3><span class="ph ph1" style="margin:0">P1</span> Now · 10 columns</h3>
+      <h3><span class="ph ph1" style="margin:0">P1</span> Now · 8 columns</h3>
       <ul>
-        <li><span class="c">C</span><span>Mission number + suffix <span class="m">· typed once from Etraq, suffix made by the app</span></span></li>
-        <li><span class="c">A</span><span>Month <span class="m">· from the suffix</span></span></li>
-        <li><span class="c">B</span><span>Mission No. (Last year) <span class="m">· from the year-end step</span></span></li>
-        <li><span class="c">F</span><span>Customer name <span class="m">· in the app today</span></span></li>
+        <li><span class="c">C</span><span>Mission number <span class="m">· from Etraq, without the suffix (PREFIX.YY.NNNN)</span></span></li>
+        <li><span class="c">B</span><span>Mission No. (Last year) <span class="m">· set when the new-year number is entered</span></span></li>
+        <li><span class="c">F</span><span>Customer <span class="m">· company name, as engineers type it today</span></span></li>
         <li><span class="c">Q</span><span>Host / Location <span class="m">· Host list, in the app today</span></span></li>
         <li><span class="c">AD</span><span>Trigo responsible <span class="m">· Engineer, in the app today</span></span></li>
         <li><span class="c">R</span><span>Start date <span class="m">· first day on the board</span></span></li>
         <li><span class="c">S</span><span>Finish date <span class="m">· set by Close</span></span></li>
-        <li><span class="c">T</span><span>Status <span class="m">· Open / Closed, automatic</span></span></li>
-        <li><span class="c">U</span><span>Continue / Close at month end <span class="m">· in the monthly routine</span></span></li>
+        <li><span class="c">T</span><span>Status <span class="m">· Open / Closed</span></span></li>
       </ul>
-      <p class="small muted">Plus what the board already keeps (shift, hours, PPE, remark, highlight) and one new tick per suffix: <b>Created in Etraq</b>.</p>
+      <p class="small muted">Plus what the board already keeps: shift, hours, PPE, remark and highlight.</p>
     </div>
     <div class="pcard">
       <h3><span class="ph ph2" style="margin:0">P2</span> Next · job details · 17</h3>
       <p class="small">What the engineer knows at mission start: customer code, prescriber, part number and name, problem, defect, system and sub-system, mission type, type of operation, breakpoint, agreed and wished pace, customer and host contacts, work instruction status and Rev.</p>
-      <p class="small muted">Mostly the engineer's input. Engineers or admins enter contacts and the work instruction (team remark). Comes once Phase 1 is in daily use.</p>
+      <p class="small muted">Comes once Phase 1 is in daily use.</p>
     </div>
     <div class="pcard">
-      <h3><span class="ph ph3" style="margin:0">P3</span> Later · admin and invoicing · 14</h3>
-      <p class="small">Documents and money: MO/PO/QT status and type, document sent to finance, PO status and PO number, rates, invoicing type, rate/price, management fee, transport cost, Etraq rate profile, risk analysis, remark, and DATA ENTRY (meaning still to confirm).</p>
-      <p class="small muted">Admin only and restricted. Comes when the workbook is retired. Until then it stays in Excel.</p>
+      <h3><span class="ph ph3" style="margin:0">P3</span> Later · admin, invoicing, suffix · 16</h3>
+      <p class="small">Documents and money (MO/PO/QT, PO, rates, fees, Etraq rate profile, risk, remark, DATA ENTRY), plus the <b>monthly suffix</b>, Month and Continue / Close at month end, if the suffix ever moves into the app.</p>
+      <p class="small muted">Until then the suffix and the monthly copy stay in the workbook.</p>
     </div>
   </div>
 
-  <div class="mock" aria-label="Mockup: the Phase 1 Missions tab">
-    <div class="mock-tools"><b>Missions · Bangna</b><span class="tag ok">Open 74</span><span class="tag">Closed 86</span><span class="sp"></span><span class="tag warn">December suffixes due</span><span class="btn">Monthly suffix</span><span class="btn">Export</span><span class="btn fill">+ New mission</span></div>
+  <div class="panel">
+    <h3>Over the new year: the board never waits for Etraq</h3>
+    <div class="timeline">
+      <div class="tl"><span class="when">31 Dec → 1 Jan</span><b>Nothing changes on the board</b><span>Carry over works as usual. Open missions keep <span class="mono">BANGN.26.xxxx</span>. Nothing blocks a 2026 number in January.</span></div>
+      <div class="tl"><span class="when">First days of January</span><b>Waiting for the 2027 number</b><span>The Missions tab marks each open mission still on a 2026 number with a quiet grey <i>Waiting for 2027 number</i> tag. No alert yet: the Site Admin is registering them in Etraq.</span></div>
+      <div class="tl key"><span class="when">When Etraq gives the numbers</span><b>Site Admin enters them</b><span>Missions tab → <b>New-year numbers</b>: one box per open mission. Type the numbers, or paste a column from Excel. The app checks each one, then saves.</span></div>
+      <div class="tl"><span class="when">From 8 Jan</span><b>Alert</b><span>Any mission still on a 2026 number after more than a week turns red. The admins get an alert until the last one is done.</span></div>
+    </div>
+  </div>
+
+  <div class="mock" aria-label="Mockup: New-year numbers in the Missions tab">
+    <div class="mock-tools"><b>New-year numbers · 2026 → 2027 · Bangna</b><span class="sp"></span><span class="tag bad">3 waiting more than a week</span><span class="cap">41 open missions · 38 done</span></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>Mission No.</th><th>Month</th><th>Last year</th><th>Customer</th><th>Host</th><th>Trigo responsible</th><th>Start</th><th>Status</th><th>Next month</th><th>In Etraq</th></tr></thead>
+      <thead><tr><th>2026 number</th><th>Customer</th><th>Host</th><th>Trigo responsible</th><th>Waiting</th><th>2027 number</th><th></th></tr></thead>
       <tbody>
-        <tr><td class="num">BANGN.26.0xx1.AJ</td><td>Nov</td><td class="num">BANGN.25.0xxx</td><td>Customer A</td><td>Host A</td><td>Engineer 1</td><td>5 Jan</td><td><span class="tag ok">Open</span></td><td>Continue</td><td>☑</td></tr>
-        <tr><td class="num">BANGN.26.0xx2.AC</td><td>Nov</td><td class="muted">—</td><td>Customer B</td><td>Host B</td><td>Engineer 2</td><td>9 Sep</td><td><span class="tag ok">Open</span></td><td><span class="tag">Close 30 Nov</span></td><td>☑</td></tr>
-        <tr><td class="num">BANGN.26.0xx3.AA</td><td>Oct</td><td class="muted">—</td><td>Customer C</td><td>Host C</td><td>Engineer 1</td><td>2 Oct</td><td><span class="tag">Closed 24 Oct</span></td><td class="muted">—</td><td>☑</td></tr>
+        <tr><td class="num">BANGN.26.0xx1</td><td>Customer A</td><td>Host A</td><td>Engineer 1</td><td class="muted">—</td><td class="num">BANGN.27.0001</td><td><span class="tag ok">Saved 3 Jan</span></td></tr>
+        <tr><td class="num">BANGN.26.0xx2</td><td>Customer B</td><td>Host B</td><td>Engineer 2</td><td><span class="tag bad">9 days</span></td><td><span class="search" style="min-width:150px">BANGN.27.____</span></td><td><span class="btn">Close instead</span></td></tr>
+        <tr><td class="num">BANGN.26.0xx3</td><td>Customer C</td><td>Host C</td><td>Engineer 1</td><td><span class="tag bad">9 days</span></td><td><span class="search" style="min-width:150px">BANGN.27.0004</span></td><td><span class="tag bad">Already used by row 1 on Rayong</span></td></tr>
       </tbody>
     </table></div>
-    <div class="mock-foot"><span class="cap">Example rows. Export gives these 10 columns in the workbook's order, so admins can match them against the Excel sheet by mission number.</span></div>
+    <div class="mock-foot"><span class="cap">Example rows. Paste a column of numbers from Excel into the boxes in order, or type them one by one. Linked boards and Day / Night of the same mission take the number together.</span><span class="sp"></span><span class="btn fill">Save 1 number</span></div>
   </div>
 
   <div class="cols2" style="align-items:start">
     <div class="box">
-      <h3>What changes for the admins in Phase 1</h3>
+      <h3>The alert after a week</h3>
       <ul class="small">
-        <li>The mission number, suffix, status and dates come from the app. Nobody needs to work out the next suffix or update "Running" by hand.</li>
-        <li>The workbook still holds the Phase 2 and 3 columns, so each month admins still add rows to it. The app's <b>Monthly suffix</b> list tells them exactly which rows to add and which to close, and Export gives those rows ready to paste.</li>
-        <li>That copying ends in Phase 2, when the job details move into the app.</li>
+        <li><b>Who sees it:</b> Site Admin, Admin and Manager.</li>
+        <li><b>Where:</b> a red count on the Missions tab, a banner at the top of the Missions tab (<i>3 missions still on a 2026 number after 9 days</i>, with a button to the list), and one line in Overview's attention card.</li>
+        <li><b>On the board:</b> nothing changes for the crew. Planners with edit rights see a small <i>2026 number</i> chip on the card, which is left out of the JPG, the PDF and LINE text.</li>
+        <li><b>It ends</b> when every open mission has a 2027 number or is closed.</li>
+        <li><b>Rules:</b> "more than a week" counts from 1 January, so the alert starts on 8 January. A mission that started in late December is included.</li>
       </ul>
     </div>
     <div class="box">
-      <h3>Three choices before I build Phase 1</h3>
-      <ol class="dec">
-        <li><b>Is the monthly suffix routine in Phase 1?</b><span class="small muted">If not, Phase 1 is only the register and Close, and the suffix stays manual until Phase 2.</span><span class="rec">Recommended: yes, because the January run also gives the year-end numbers</span></li>
-        <li><b>Customer code in Phase 1?</b><span class="small muted">The mission number already matches Etraq, so the code isn't needed to link the two.</span><span class="rec">Recommended: Phase 2</span></li>
-        <li><b>Who may run the monthly routine?</b><span class="small muted">Admin only, or engineers too for their own missions.</span><span class="rec">Recommended: Admin and Manager, with engineers able to choose Continue / Close for their own missions</span></li>
-      </ol>
+      <h3>Following a mission across years</h3>
+      <ul class="small">
+        <li>A mission keeps one record. Its numbers form a short history: <span class="mono">BANGN.25.0201 → BANGN.26.0005 → BANGN.27.0001</span>.</li>
+        <li><b>Mission No. (Last year)</b> fills itself from that history.</li>
+        <li>Searching any of the numbers finds the mission, on the Missions tab and in the Host Record.</li>
+        <li>Past days keep the number they had. Export shows both numbers side by side.</li>
+        <li>Numbers are checked against <span class="mono">PREFIX.YY.NNNN</span>. A number typed with a suffix (<span class="mono">.AA</span>) is refused with a note to leave the suffix off. A 2026 number is still accepted in January, so nothing breaks before the new numbers arrive.</li>
+      </ul>
     </div>
+  </div>
+
+  <div class="panel">
+    <h3>New role: Site Admin</h3>
+    <p class="small muted">The site's administrator. They keep mission numbers in step with Etraq, but they don't plan crews. Their rank sits between Engineer and Viewer, so they don't appear in the Engineer picker on New Mission. As with every role, an Admin can change these defaults in Settings → Roles &amp; permissions.</p>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Area</th><th>Admin</th><th>Manager</th><th>Engineer</th><th><b>Site Admin</b> (new)</th><th>Viewer</th></tr></thead>
+      <tbody>
+        <tr><td>Missions tab: view, new mission, edit</td><td>edit</td><td>edit</td><td>edit</td><td><b>edit</b></td><td>view</td></tr>
+        <tr><td>Close a mission</td><td>✓</td><td>✓</td><td>✓</td><td><b>✓</b></td><td>—</td></tr>
+        <tr><td>Reopen a mission</td><td>✓</td><td>✓</td><td>—</td><td><b>✓</b></td><td>—</td></tr>
+        <tr><td>New-year numbers (new area)</td><td>edit</td><td>edit</td><td>—</td><td><b>edit</b></td><td>—</td></tr>
+        <tr><td>New-year alert</td><td>✓</td><td>✓</td><td>—</td><td><b>✓</b></td><td>—</td></tr>
+        <tr><td>Board (crew planning)</td><td>edit</td><td>edit</td><td>edit</td><td><b>view</b></td><td>view</td></tr>
+        <tr><td>Overview, Manpower, Host</td><td>as today</td><td>as today</td><td>as today</td><td><b>view</b></td><td>as today</td></tr>
+        <tr><td>Settings → Users and Roles</td><td>edit</td><td>—</td><td>—</td><td><b>—</b></td><td>—</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="box">
+    <h3>Two choices left before I build Phase 1</h3>
+    <ol class="dec">
+      <li><b>From which day does a 2027 number apply?</b><span class="small muted">A: from 1 January, so every 2027 day on the board, in reports and in the Host Record shows the 2027 number, even days already planned or locked (only the label changes, never the crew). B: only from the day the Site Admin enters it, so the first days of January keep the 2026 number.</span><span class="rec">Recommended: A, so a year's figures never mix two numbers for one mission</span></li>
+      <li><b>Excel upload for the new-year numbers?</b><span class="small muted">Earlier (D4) you chose an Excel file. With a Site Admin typing or pasting into the list above, Excel isn't needed in Phase 1.</span><span class="rec">Recommended: the in-app list with paste in Phase 1, Excel upload later if it's missed</span></li>
+    </ol>
   </div>
 </section>
 
@@ -499,9 +546,9 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   </div>
   <div class="panel" style="gap:0">
     <div class="phase"><span class="pn">Number</span><div><p class="small">A mission number becomes <span class="mono">PREFIX.YY.NNNN</span> plus a suffix <span class="mono">.AA</span>–<span class="mono">.ZZ</span> (Q3). The register's identity is the yearly number. The suffix belongs to the period, and the board and history store the full number in force on each day.</p></div></div>
-    <div class="phase"><span class="pn">Release 1</span><div><p class="small"><b>Phase 1:</b> the register with its 10 columns, Close, and room for suffix periods in the table from the start, so nothing is migrated twice.</p></div></div>
-    <div class="phase"><span class="pn">Release 2</span><div><p class="small">The year-end renumber becomes the <b>monthly suffix routine</b>, with the January run also asking for new yearly numbers. It's still needed before 1 December if we want December's suffixes made by the app, or before 1 January at the latest.</p></div></div>
-    <div class="phase"><span class="pn">Release 3</span><div><p class="small"><b>Phase 2</b> job details (17 columns, with the lookup lists in Settings), then <b>Phase 3</b> admin and invoicing (14 columns, admin only), the one-off import of this workbook and the Export in its full layout. There is no Customer list (team decision).</p></div></div>
+    <div class="phase"><span class="pn">Release 1</span><div><p class="small"><b>Phase 1:</b> the register with its 8 columns, Close and Reopen, the Site Admin role, the new-year numbers list with its alert after a week, and the number history across years. No suffix and no monthly routine.</p></div></div>
+    <div class="phase"><span class="pn">Release 2</span><div><p class="small"><b>Phase 2</b> job details. The monthly suffix routine moves to Phase 3, and only if the team wants it in the app.</p></div></div>
+    <div class="phase"><span class="pn">Release 3</span><div><p class="small"><b>Phase 3</b> admin and invoicing (16 columns, admin only, including the suffix if wanted), the one-off import of this workbook and the Export in its full layout. There is no Customer list (team decision).</p></div></div>
   </div>
 </section>
 
@@ -519,7 +566,7 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
     ["Mission identity", [
       ["A", "Month", "", "auto", "A", "-", "", "Comes from the suffix period, so nobody picks it.", "Always filled. 11 months used."],
       ["B", "Mission No. (Last year)", "", "auto", "A", "-", "", "Filled by the year-end step from the previous number.", "54 rows, 16 missions continued from 2025."],
-      ["C", "Mission No. (Current year)", "with suffix", "inapp", "D", "A", "special", "The yearly number is typed once from the Etraq and checked against PREFIX.YY.NNNN. The suffix is generated by the monthly routine, never typed.", "338 distinct values, 160 missions, up to .AJ."],
+      ["C", "Mission No. (Current year)", "with suffix", "inapp", "D", "A", "special", "Phase 1: the yearly number only, typed from Etraq and checked against PREFIX.YY.NNNN, with the suffix left off. A Site Admin enters the next year's number, and the app keeps both. The suffix stays in the workbook (Phase 3).", "338 distinct values, 160 missions, up to .AJ."],
       ["D", "DATA ENTRY", "Status", "ask", "C", "A", "ask", "Unclear. The header says Data Entry, but the Rule sheet calls it Customer Type.", "IN USED 64 · UNUSED 274."],
     ]],
     ["Customer and job", [
@@ -578,9 +625,9 @@ td.num, .num { font-family: var(--font-mono); font-weight: 500; color: var(--pri
   };
   const IN = { A: "Automatic", B: "Pick a record", C: "Dropdown", D: "Value with rules", E: "Free text", F: "Contacts" };
   const PH = {};
-  "A B C F Q AD R S T U".split(" ").forEach((c) => (PH[c] = 1));
+  "B C F Q AD R S T".split(" ").forEach((c) => (PH[c] = 1));
   "E J G H I K L M N P O Z AA AB AC X Y".split(" ").forEach((c) => (PH[c] = 2));
-  "D V W AK AN AO AE AF AG AH AI AJ AL AM".split(" ").forEach((c) => (PH[c] = 3));
+  "A U D V W AK AN AO AE AF AG AH AI AJ AL AM".split(" ").forEach((c) => (PH[c] = 3));
   const ALL = G.flatMap((g) => g[1].map((r) => r));
   const KEY = "mission-list-meeting-v1";
   let saved = {}; try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
