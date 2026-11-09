@@ -519,12 +519,18 @@ const state = {
     search: "",
     boardId: "",               // "" = all boards
     status: "open",            // "open" | "closed" | "all"
+    filters: { areaId: [], shift: [], engineerId: [], customer: [], host: [], placement: [], alerts: [] },   // behind the Filters button, like Host's; areaId is the host's service area, also the By area chips
     sort: { key: "number", dir: 1 },
+    hiddenCols: [],            // the columns the Columns button has switched off (kept on this device)
+    activity: null,            // cloud.getMissionActivity(): how each mission was staffed in the last six weeks
+    activityKey: null,         // what it was read for; cleared by every realtime change, like the Host directory
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
     filters: { areaId: [], boardId: [], empId: [], location: [], status: [] },
     dupOnly: false,      // "Review duplicates" — show only names that look like duplicates of each other
+    focus: null,         // a host name to mark and scroll to (the Missions tab's Host link); cleared after a few seconds
+    focusScroll: false,  // scroll to it once, on the next draw
     sortKey: "name",
     sortDir: 1,
     dir: null,           // cloud.getHostDirectory() result; null = not fetched yet
@@ -1018,6 +1024,23 @@ async function ensureHostDirectoryLoaded() {
   state.hostlist.dirCacheKey = cacheKey;
 }
 
+/* The Missions tab's crew facts (average crew, "no crew for N days", on the board / hidden / off it):
+   one read of the last six weeks of missions and assignments, cached across redraws like the Host
+   directory and cleared by every realtime change. */
+let missionActivitySeq = 0;
+async function ensureMissionActivityLoaded() {
+  const key = todayStr() + "|" + state.date + "|" + (D().register || []).length + "|" + D().boards.length + "|" + D().employees.length;
+  const st = state.missions;
+  if (st.activityKey === key && st.activity) return;
+  const seq = ++missionActivitySeq;
+  let result = null;
+  try { result = await cloud.getMissionActivity(todayStr(), 42, state.date); }
+  catch (e) { console.warn("Mission activity could not be read; the Missions tab shows the register only:", e && e.message || e); }
+  if (seq !== missionActivitySeq) return;   // a newer request has since superseded this one
+  st.activity = result;
+  st.activityKey = result ? key : null;
+}
+
 /* Overview's "Host coverage risk" module: for every host with a mission on
    the date on screen, how many distinct employees have ever been deployed
    there (across all history, not just this window). Refetches only when the
@@ -1072,6 +1095,7 @@ async function refreshData() {
   } else if (isMissionList()) {
     // the register is kept warm by Realtime; one fresh read whenever the tab is opened or redrawn on demand
     await cloud.loadMissionRegister();
+    await ensureMissionActivityLoaded();
   } else if (D().activeBoardId) {
     const boardId = D().activeBoardId, date = state.date;
     if (isForecastView()) {
@@ -1248,6 +1272,7 @@ function render() {
   // refuse the write anyway, so hiding them is about not offering a dead end.
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
   $("#btn-add-host").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
+  $("#btn-add-mission-list").classList.toggle("hidden", !msl || !can("board", "edit"));
   // One Export button on every tab (the file type is picked in its dialog).
   // A forecast is never exported: the JPG and the PDF are what goes to LINE,
   // and a tentative plan must not reach it (exportBoard refuses as well).
@@ -2244,7 +2269,7 @@ function buildLangRow(onPick) {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-missions-filter-pop", "#missions-filter-pop"], ["#btn-missions-cols", "#missions-cols-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2504,7 +2529,7 @@ function clearSelection() {
 }
 
 function closeFilterPops() {
-  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop")) p.classList.add("hidden");
+  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop, #missions-filters .ms-pop")) p.classList.add("hidden");
 }
 
 /* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
@@ -2658,7 +2683,8 @@ function renderCtxMenu(view) {
     menu.appendChild(it);
   };
 
-  if (ctxMenu.mission) renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep, addOff });
+  if (ctxMenu.row) renderMissionRowMenu({ addTitle, addItem });
+  else if (ctxMenu.mission) renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep, addOff });
   else renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep });
 
   menu.classList.remove("hidden");
@@ -2811,8 +2837,9 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       () => assignEmployeesTo(crew.map(e => e.id), null))), null, "return");
   } else {
     addTitle(`${m.number} · ${m.shift === "night" ? "Night" : "Day"} · ${crew.length} crew`);
+    addItem("Mission details", () => openMissionModal(m.id), null, "clipboard");
     if (canEdit) {
-      addItem("Edit mission", () => guardEdit(() => openMissionModal(m.id)), null, "edit");
+      addItem("Edit mission", () => guardEdit(() => openMissionModal(m.id, { edit: true })), null, "edit");
       addItem("Duplicate mission", () => guardEdit(() => openMissionModal(null, { from: m })), null, "copy");
       if (!fc && otherBoards.length) addSub("Move or copy to board", "move", "swap");
       if (sel.length) addItem(`Place ${sel.length} selected here`, () => guardEdit(() => assignEmployeesTo(sel, { missionId: m.id })), null, "plus");
@@ -3251,7 +3278,9 @@ function renderMissions() {
         <span class="m-count">${memberEmps.length}</span>
       </div>
       ${ppeLine}`;
-    header.onclick = () => guardEdit(() => openMissionModal(m.id));
+    // double-click, like a person's card, a Manpower row, a Host row and a Missions row; a long press (or a
+    // right-click) opens the quick panel, whose first item is Edit mission, so a touch screen has it too
+    header.ondblclick = () => openMissionModal(m.id);
     // the quick panel: right-click anywhere on the card (a person's card inside
     // it keeps its own menu), or hold the header on a phone
     card.addEventListener("contextmenu", (ev) => {
@@ -3645,18 +3674,25 @@ function renderStats() {
 /* Manpower and Host: the "By area" chips double as a one-click area filter.
    A click shows only that area (the same filter as Filters → Service area);
    clicking the chip that is on again shows every area. "__none__" is No area. */
-function areaFilterChip(key, name, n, color, picked) {
-  const on = picked.length === 1 && picked[0] === key;
+function areaFilterChip(key, name, n, color, picked, multi = false) {
+  const on = multi ? picked.includes(key) : picked.length === 1 && picked[0] === key;
   const dot = /^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)";
   return `<button type="button" class="area-chip ac-btn${on ? " ac-on" : ""}" data-area="${escapeHtml(name)}" data-area-key="${escapeHtml(key)}" aria-pressed="${on}"` +
-    ` title="${on ? "Click again to show every area" : `Show only ${escapeHtml(name)}`}"><i class="ac-dot" style="background:${dot}"></i>${escapeHtml(name)} <b>${n}</b></button>`;
+    ` title="${multi ? (on ? `Click to remove ${escapeHtml(name)} from the areas shown` : `Add ${escapeHtml(name)} to the areas shown`)
+      : on ? "Click again to show every area" : `Show only ${escapeHtml(name)}`}"><i class="ac-dot" style="background:${dot}"></i>${escapeHtml(name)} <b>${n}</b></button>`;
 }
-function wireAreaFilterChips(barEl, filters, redraw) {
+function wireAreaFilterChips(barEl, filters, redraw, multi = false) {
   for (const b of barEl.querySelectorAll(".ac-btn")) b.onclick = () => {
     const key = b.dataset.areaKey;
-    filters.areaId = filters.areaId.length === 1 && filters.areaId[0] === key ? [] : [key];
+    // one area at a time (Manpower, Host), or each click adds or removes one (Missions)
+    filters.areaId = multi ? (filters.areaId.includes(key) ? filters.areaId.filter(k => k !== key) : [...filters.areaId, key])
+      : filters.areaId.length === 1 && filters.areaId[0] === key ? [] : [key];
     redraw();
   };
+}
+/* the board's name as the one chip Host, Missions and Manpower share */
+function boardChipHtml(name, title) {
+  return `<span class="hl-board"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(name)}</span>`;
 }
 
 /* Phone header (styles.css, Phone header): the same numbers as the tiles above,
@@ -3801,6 +3837,7 @@ function buildPhoneMoreMenu() {
     }
     if (shown("#btn-emplist-bulk") && isEmployeeList()) item("Bulk edit", "edit", click("#btn-emplist-bulk"));
     if (shown("#btn-hostlist-bulk") && isHostList()) item("Bulk edit", "edit", click("#btn-hostlist-bulk"));
+    if (shown("#btn-add-mission-list") && isMissionList()) item("New mission", "plus", click("#btn-add-mission-list"), "tb-item-pri");
     if (shown("#btn-missions-newyear") && isMissionList()) item("New-year numbers", "calendar", click("#btn-missions-newyear"), "tb-item-pri");
     if (shown("#btn-missions-bulk") && isMissionList()) item("Bulk edit", "edit", click("#btn-missions-bulk"));
     if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
@@ -3887,7 +3924,7 @@ function phoneSheetChrome() {
   } else if (box.lastElementChild !== box.querySelector(":scope > .m-sheet-foot")) {
     box.append(box.querySelector(":scope > .m-sheet-foot"));
   }
-  head.querySelector(".m-sheet-title").textContent = isOrgChart() || isEmployeeList() || isHostList() ? "Filter" : "Filter & sort";
+  head.querySelector(".m-sheet-title").textContent = isOrgChart() || isEmployeeList() || isHostList() || isMissionList() ? "Filter" : "Filter & sort";
   head.querySelector(".m-sheet-clear").onclick = (e) => { e.stopPropagation(); clearViewFilters(); };
 }
 /* Clear all, in the phone Filter sheet: every filter (and the search) of the tab on screen */
@@ -3907,6 +3944,9 @@ function clearViewFilters() {
     empty(state.hostlist.filters); state.hostlist.search = "";
     const q = $("#hostlist-search"); if (q) q.value = "";
     renderHostlistFilterOptions(); renderHostRows(); renderStats();
+  } else if (isMissionList()) {
+    empty(state.missions.filters); state.missions.search = ""; state.missions.boardId = "";
+    render();
   } else {
     empty(state.filters);
     renderFilterOptions(); renderMissions();
@@ -8198,7 +8238,7 @@ function renderEmployeeRows() {
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
       <td data-label="Years of service" class="m-x el-wrap el-svc">${e.startDate ? serviceCellHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
-      <td data-label="Current board" class="el-board">${board ? escapeHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
+      <td data-label="Current board" class="el-board">${board ? boardChipHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
       <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" class="el-util">${utilCell(util)}</td>${emplistShowsWl() ? emplistWlCells(e) : ""}
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
@@ -8275,7 +8315,7 @@ function quietTable(sel) {
     for (const pill of r.querySelectorAll(".area-pill")) pill.style.setProperty("--ac", pill.style.backgroundColor || "#999");
   }
   if (rows.length) ths.forEach((th, i) => {
-    if (th.classList.contains("el-check")) return;
+    if (th.classList.contains("el-check") || th.hasAttribute("data-keep")) return;
     if (!rows.every(r => quietCellEmpty(r.children[i]))) return;
     th.classList.add("col-off");
     for (const r of rows) r.children[i].classList.add("col-off");
@@ -8712,6 +8752,40 @@ function hostBoardCell(r) {
     + `${escapeHtml(b.name)}</span>`).join("") + `</span>`;
 }
 
+/* The Missions tab's Host link lands here: the host's row is marked and scrolled to the middle once, and
+   the mark fades after a few seconds so it does not sit there for good. */
+let hostFocusTimer = 0;
+function showFocusedHost(body) {
+  const hl = state.hostlist;
+  if (!hl.focus || !hl.focusScroll) return;
+  hl.focusScroll = false;
+  const row = body.querySelector("tr.row-focus");
+  if (!row) { toast(`${hl.focus} is not in the Host list.`, "info"); hl.focus = null; return; }
+  requestAnimationFrame(() => row.scrollIntoView({ block: "center" }));
+  clearTimeout(hostFocusTimer);
+  hostFocusTimer = setTimeout(() => {
+    hl.focus = null;
+    for (const x of $$("#hostlist-body tr.row-focus")) x.classList.remove("row-focus");
+  }, 8000);
+}
+/* The Host column of the Missions tab: open the Host tab with that host's row marked. The search and
+   filters are cleared so the row is on the list. */
+function openHostFromMission(r) {
+  const name = missionText(r.host);
+  if (!name) return;
+  if (!can("hostlist")) { toast("Your role cannot open the Host tab.", "info"); return; }
+  clearSelection();
+  const hl = state.hostlist;
+  hl.search = "";
+  for (const k of Object.keys(hl.filters)) hl.filters[k] = [];
+  hl.dupOnly = false;
+  hl.view = "list";
+  hl.focus = name;
+  hl.focusScroll = true;
+  D().activeBoardId = HOSTLIST_ID;
+  refreshAndRender();
+}
+
 /* redraws just the table body + count — cheap enough for every keystroke,
    filter tick, sort click or "+N more" toggle */
 function renderHostRows() {
@@ -8724,6 +8798,7 @@ function renderHostRows() {
     const tr = document.createElement("tr");
     tr.dataset.host = r.name;
     if (r.archived) tr.classList.add("row-archived");
+    if (state.hostlist.focus === r.name) tr.classList.add("row-focus");
     // data-label feeds the phone breakpoint's ::before, same responsive-table
     // pattern the Manpower List uses (see renderEmployeeRows)
     tr.innerHTML = `
@@ -8788,6 +8863,7 @@ function renderHostRows() {
     tr.addEventListener("dblclick", () => openHostModal(r.name));
     body.appendChild(tr);
   }
+  showFocusedHost(body);
   const noLoc = rows.filter(r => !r.location && !r.mapUrl).length;
   const archived = rows.filter(r => r.archived).length;
   $("#hostlist-count").textContent = `${rows.length} of ${all.length}`
@@ -8958,31 +9034,225 @@ function newYearAlertCount() {
   if (MissionNumber.daysWaiting(todayStr()) <= MissionNumber.ALERT_AFTER_DAYS) return 0;
   return newYearWaiting().length;
 }
-function missionStatusHtml(r) {
-  if (r.status === "closed") {
+/* What each mission's recent days say about it (mission-activity.js, read by
+   cloud.getMissionActivity): where it is now, how many people it has had, and what needs a look. */
+function missionDays(r) {
+  const act = state.missions.activity;
+  if (!act) return null;
+  // days under last year's number are the same mission's days
+  const days = {};
+  for (const n of cloud.numberChain(r.number)) Object.assign(days, act.rows[`${r.boardId}|${n}|${r.shift}`] || {});
+  return days;
+}
+function missionActivityOf(r) {
+  const days = missionDays(r);
+  if (!days) return null;
+  return MissionActivity.summarise({ days, working: state.missions.activity.working[r.boardId] || [], today: todayStr() });
+}
+/* the mission's row on the day on screen: { crew, hidden }, or null when it is not on its board that day */
+function missionDayCell(r) {
+  const days = r.status === "closed" ? null : missionDays(r);
+  return (days && days[state.date]) || null;
+}
+/* where a mission is now: closed, on its board, hidden there, off it (it had days and has none now),
+   or not started (registered, or starting later, with no day on a board yet) */
+function missionPlacement(r) {
+  if (r.status === "closed") return { kind: "closed", a: null };
+  const today = todayStr();
+  if (r.openedOn && r.openedOn > today) return { kind: "notstarted", a: null, startsOn: r.openedOn };
+  const a = missionActivityOf(r);
+  if (!a) return { kind: r.lastOn && r.lastOn >= today ? "on" : r.lastOn ? "off" : "notstarted", a };
+  if (a.placement === "on" || a.placement === "hidden") return { kind: a.placement, a };
+  return { kind: r.lastOn ? "off" : "notstarted", a };
+}
+const MISSION_PLACEMENT_RANK = { on: 0, hidden: 1, off: 2, notstarted: 3, closed: 4 };
+/* the pills in the Alerts column, worst first: { kinds (what the Alerts filter matches), level
+   (2 red, 1 amber, 0 grey), text, title, close (offers Close…) } */
+function missionAlerts(r, p) {
+  if (r.status === "closed") return [];
+  const out = [];
+  const today = todayStr(), a = p.a, limit = MissionActivity.NO_CREW_ALERT_AFTER;
+  const days = (n, capped) => `${n}${capped ? "+" : ""} ${n === 1 && !capped ? "day" : "days"}`;
+  const count = (n, capped) => `${n}${capped ? "+" : ""}`;
+  if (p.kind === "on" && a && a.noCrewDays > 0) {
+    const long = a.noCrewDays > limit, d = days(a.noCrewDays, a.noCrewCapped), n = count(a.noCrewDays, a.noCrewCapped);
+    out.push({
+      kinds: long ? ["noCrew", "noCrewLong"] : ["noCrew"], level: long ? 2 : 1, close: long, text: `No crew · ${d}`,
+      title: long ? `Nobody has been on ${r.number} for more than 5 working days in a row (${n}). If the job has ended, close it.`
+        : `Nobody is on ${r.number}. Working days in a row: ${n}.`,
+    });
+  }
+  if (p.kind === "hidden" && a && a.hiddenDays > limit) {
+    const d = days(a.hiddenDays, a.hiddenCapped), n = count(a.hiddenDays, a.hiddenCapped);
+    out.push({ kinds: ["hidden"], level: 1, close: true, text: `Hidden · ${d}`,
+      title: `${r.number} has been hidden on its board for more than 5 working days in a row (${n}). If the job has ended, close it; otherwise unhide it from the board's Hide/Unhide.` });
+  }
+  if (p.kind === "off" && r.lastOn) {
+    const gap = MissionActivity.workingDaysBetween(r.lastOn, today, (d) => isNonWorkingDate(d, r.boardId));
+    if (gap > limit) {
+      out.push({ kinds: ["offBoard"], level: 1, close: true, text: `Off the board · ${gap} days`,
+        title: `${r.number} was last on the board on ${fmtDate(r.lastOn)}. Close it if the job has ended, or add it back with Add to board.` });
+    }
+  }
+  if (MissionNumber.needsNewYearNumber(r.number, today)) {
+    const year = today.slice(0, 4), d = MissionNumber.daysWaiting(today);
+    const late = d > MissionNumber.ALERT_AFTER_DAYS;
+    out.push({ kinds: ["number"], level: late ? 2 : 0, close: false,
+      text: late ? `No ${year} number · ${d} days` : `Waiting for ${year} number`,
+      title: late ? `Still on last year's number after ${d} days` : "The board keeps running on last year's number until the new one is entered" });
+  }
+  if (!r.engineerId) out.push({ kinds: ["noEngineer"], level: 1, close: false, text: "No Trigo responsible", title: "Nobody is named as this mission's Trigo responsible" });
+  return out.sort((x, y) => y.level - x.level);
+}
+/* everything the table, its sort and its filters ask about one row */
+function missionInfo(r) {
+  const p = missionPlacement(r);
+  const alerts = missionAlerts(r, p);
+  return { p, alerts, avg: p.a ? p.a.avgCrew : null, day: missionDayCell(r), worst: alerts.length ? alerts[0].level : -1 };
+}
+/* a long text (PPE, remark) keeps to two lines in the table; the whole text is its tooltip */
+function missionTextCell(text) {
+  const t = missionText(text);
+  return t ? `<span class="ml-clamp" title="${escapeHtml(t)}">${escapeHtml(t)}</span>` : "—";
+}
+function missionStatusHtml(r, p = missionPlacement(r)) {
+  if (p.kind === "closed") {
     const t = `Closed${r.closedBy ? " by " + r.closedBy : ""}${r.closeNote ? ": " + r.closeNote : ""}`;
     return `<span class="ml-tag ml-closed" title="${escapeHtml(t)}">Closed ${escapeHtml(r.closedOn ? fmtDate(r.closedOn) : "")}</span>`;
   }
-  const today = todayStr();
-  if (MissionNumber.needsNewYearNumber(r.number, today)) {
-    const year = today.slice(0, 4), days = MissionNumber.daysWaiting(today);
-    const late = days > MissionNumber.ALERT_AFTER_DAYS;
-    return `<span class="ml-tag ${late ? "ml-late" : "ml-wait"}" title="${late ? `Still on last year's number after ${days} days` : "The board keeps running on last year's number until the new one is entered"}">${late ? `No ${year} number · ${days} days` : `Waiting for ${year} number`}</span>`;
+  const board = boardNameOf(r.boardId);
+  if (p.kind === "on") return `<span class="ml-tag ml-open" title="${escapeHtml(`On the ${board} board today`)}">On board</span>`;
+  if (p.kind === "hidden") return `<span class="ml-tag ml-hidden" title="${escapeHtml(`Open, but hidden on the ${board} board`)}">Hidden</span>`;
+  if (p.kind === "off") return `<span class="ml-tag ml-off" title="${escapeHtml(`It was on the ${board} board until ${r.lastOn ? fmtDate(r.lastOn) : "earlier"} and is not there now`)}">Off the board</span>`;
+  return `<span class="ml-tag ml-wait" title="${escapeHtml(p.startsOn ? `It starts on ${fmtDate(p.startsOn)}` : "Registered, with no day on a board yet")}">Not started</span>`;
+}
+/* the gold highlight a mission has on the board on the day on screen (the card's Highlight), as a chip; what was
+   typed for "Other" is data and is not translated */
+function missionHighlightChip(day) {
+  if (!day || !day.highlight) return "";
+  const label = highlightLabel({ highlight: day.highlight, highlightNote: day.note });
+  const typed = day.highlight === "other" && day.note;
+  return `<span class="ml-tag ml-hl" title="${escapeHtml(window.I18N ? I18N.t("Highlighted on the board") : "Highlighted on the board")}">${icon("star")}<span${typed ? " data-no-i18n" : ""}>${escapeHtml(label)}</span></span>`;
+}
+function missionAlertsHtml(r, info, canClose) {
+  return info.alerts.map((x) => {
+    const cls = `ml-tag ${x.level === 2 ? "ml-late" : x.level === 1 ? "ml-warn" : "ml-wait"}`;
+    if (x.close && canClose) return `<button type="button" class="${cls} ml-pill-btn" data-act="suggest-close" title="${escapeHtml(x.title)}">${escapeHtml(x.text)} · Close?</button>`;
+    return `<span class="${cls}" title="${escapeHtml(x.title)}">${escapeHtml(x.text)}</span>`;
+  }).join("");
+}
+/* The Filters button on the Missions tab (the same pattern as Host's): Shift, Trigo responsible,
+   Customer, Host and "On the board". The Board picker and Open / Closed / All stay beside the
+   search, so a filter's choices are built from the rows they leave on screen. */
+const MISSION_FILTER_LABELS = { areaId: "Service area", shift: "Shift", engineerId: "Trigo responsible", customer: "Customer", host: "Host", placement: "Board status", alerts: "Alerts" };
+const MISSION_NONE = "__none__";
+const missionText = (s) => String(s || "").trim();
+function missionScopeRows() {
+  const st = state.missions;
+  return (D().register || []).filter(r => (!st.boardId || r.boardId === st.boardId) && (st.status === "all" || r.status === st.status));
+}
+/* the service area of a mission's host, as a filter key ("__none__" for a host with no area) */
+function missionAreaKey(r) {
+  const a = hostAreaOf(r.host);
+  return a ? a.id : MISSION_NONE;
+}
+function missionRowMatchesFilters(r, f) {
+  if (f.areaId.length && !f.areaId.includes(missionAreaKey(r))) return false;
+  if (f.shift.length && !f.shift.includes(r.shift)) return false;
+  if (f.engineerId.length && !f.engineerId.includes(r.engineerId || MISSION_NONE)) return false;
+  if (f.customer.length && !f.customer.includes(missionText(r.customer) || MISSION_NONE)) return false;
+  if (f.host.length && !f.host.includes(missionText(r.host) || MISSION_NONE)) return false;
+  if (f.placement.length || f.alerts.length) {
+    const info = missionInfo(r);
+    if (f.placement.length && !f.placement.includes(info.p.kind)) return false;
+    if (f.alerts.length && !info.alerts.some(a => a.kinds.some(k => f.alerts.includes(k)))
+      && !(f.alerts.includes("highlighted") && info.day && info.day.highlight && r.status !== "closed")) return false;
   }
-  return `<span class="ml-tag ml-open">Open</span>`;
+  return true;
+}
+function missionFilterOptions(key) {
+  if (key === "areaId") return [...D().areas.map(a => ({ value: a.id, label: a.name })), { value: MISSION_NONE, label: "— none —" }];
+  if (key === "shift") return [{ value: "day", label: "Day" }, { value: "night", label: "Night" }];
+  if (key === "placement") return [{ value: "on", label: "On board" }, { value: "hidden", label: "Hidden" }, { value: "off", label: "Off the board" }, { value: "notstarted", label: "Not started" }];
+  if (key === "alerts") return [
+    { value: "noCrew", label: "No crew" }, { value: "noCrewLong", label: "No crew for over 5 working days" },
+    { value: "hidden", label: "Hidden for over 5 working days" }, { value: "offBoard", label: "Off the board for over 5 working days" },
+    { value: "number", label: "New-year number" }, { value: "noEngineer", label: "No Trigo responsible" },
+    { value: "highlighted", label: "Highlighted on the board" },
+  ];
+  const rows = missionScopeRows();
+  const chosen = state.missions.filters[key];
+  const get = key === "engineerId" ? (r) => r.engineerId || "" : (r) => missionText(r[key]);
+  const label = key === "engineerId" ? (v) => engineerLabelFor(v) : (v) => v;
+  const values = new Set(rows.map(get).filter(Boolean));
+  for (const v of chosen) if (v !== MISSION_NONE) values.add(v);   // a ticked choice stays listed
+  const out = [...values].map(v => ({ value: v, label: label(v) })).sort((a, b) => a.label.localeCompare(b.label));
+  if (rows.some(r => !get(r)) || chosen.includes(MISSION_NONE)) out.push({ value: MISSION_NONE, label: "— none —" });
+  return out;
+}
+function missionMsLabel(key) {
+  const sel = state.missions.filters[key];
+  return `${MISSION_FILTER_LABELS[key]}: ${sel.length ? sel.length + " selected" : "All"}`;
+}
+function missionFilterCount() {
+  return Object.values(state.missions.filters).filter(v => v && v.length).length;
+}
+/* The options are rebuilt only when the choices change (a new board or status, new data), never on
+   a tick, which would close the list mid-use; the ticks, labels and count are synced every time. */
+let _missionFilterSig = "";
+function renderMissionFilterOptions() {
+  const st = state.missions;
+  const sig = JSON.stringify(Object.keys(st.filters).map(missionFilterOptions));
+  const rebuild = sig !== _missionFilterSig;
+  _missionFilterSig = sig;
+  for (const ms of $$("#missions-filters .ms")) {
+    const key = ms.dataset.filter;
+    const pop = ms.querySelector(".ms-pop");
+    if (rebuild) {
+      pop.innerHTML = "";
+      const clear = document.createElement("div");
+      clear.className = "ms-clear";
+      clear.textContent = "Clear";
+      clear.onclick = () => { st.filters[key] = []; renderMissionList(); renderStats(); };
+      pop.appendChild(clear);
+      for (const o of missionFilterOptions(key)) {
+        const row = document.createElement("label");
+        row.className = "ms-opt";
+        row.innerHTML = `<input type="checkbox" value="${escapeHtml(o.value)}"><span>${escapeHtml(o.label)}</span>`;
+        row.querySelector("input").onchange = (e) => {
+          const set = new Set(st.filters[key]);
+          e.target.checked ? set.add(o.value) : set.delete(o.value);
+          st.filters[key] = [...set];
+          renderMissionList(); renderStats();
+        };
+        pop.appendChild(row);
+      }
+    }
+    for (const box of pop.querySelectorAll("input[type=checkbox]")) box.checked = st.filters[key].includes(box.value);
+    ms.querySelector(".ms-btn").textContent = missionMsLabel(key);
+  }
+  const on = missionFilterCount();
+  $("#missions-filter-count").textContent = on;
+  $("#missions-filter-count").classList.toggle("hidden", !on);
+  $("#btn-missions-filter-pop").classList.toggle("ms-active", on > 0);
 }
 function missionRows() {
   const st = state.missions;
   const q = st.search.trim().toLowerCase();
-  let rows = (D().register || []).filter(r => !st.boardId || r.boardId === st.boardId);
-  if (st.status !== "all") rows = rows.filter(r => r.status === st.status);
+  let rows = missionScopeRows().filter(r => missionRowMatchesFilters(r, st.filters));
   if (q) {
-    rows = rows.filter(r => [...cloud.numberChain(r.number), r.customer, r.host, engineerLabelFor(r.engineerId), boardNameOf(r.boardId)]
+    rows = rows.filter(r => [...cloud.numberChain(r.number), r.customer, r.host, r.ppe, r.remark, engineerLabelFor(r.engineerId), boardNameOf(r.boardId)]
       .some(x => String(x || "").toLowerCase().includes(q)));
   }
   const key = st.sort.key, dir = st.sort.dir;
+  // the crew and alert columns sort as zero-padded text, so a number sorts as a number
+  const info = (r) => missionInfo(r);
   const val = (r) => key === "board" ? boardNameOf(r.boardId) : key === "engineer" ? engineerLabelFor(r.engineerId)
-    : key === "status" ? (r.status === "closed" ? "1" + (r.closedOn || "") : "0") : (r[key] || "");
+    : key === "status" ? String(MISSION_PLACEMENT_RANK[info(r).p.kind]) + String(3 - (info(r).worst + 1)) + (r.status === "closed" ? (r.closedOn || "") : "")
+    : key === "avgCrew" ? (info(r).avg == null ? "" : String(Math.round(info(r).avg * 100)).padStart(6, "0"))
+    : key === "crew" ? (info(r).day ? String(info(r).day.hidden ? 0 : info(r).day.crew + 1).padStart(4, "0") : "")
+    : key === "alerts" ? String(info(r).worst + 1) + String(info(r).alerts.length).padStart(2, "0")
+    : (r[key] || "");
   return rows.slice().sort((a, b) => String(val(a)).localeCompare(String(val(b))) * dir || a.number.localeCompare(b.number) || a.shift.localeCompare(b.shift));
 }
 function renderMissionStats(bar) {
@@ -8991,19 +9261,35 @@ function renderMissionStats(bar) {
   const closed = all.length - open;
   const waiting = newYearWaiting().filter(w => w.rows.some(r => !state.missions.boardId || r.boardId === state.missions.boardId)).length;
   const late = MissionNumber.daysWaiting(todayStr()) > MissionNumber.ALERT_AFTER_DAYS;
+  // By area: the service area of each mission's host, counted over what the Board picker and Open / Closed / All leave
+  const areaBar = $("#area-bar");
+  const scope = missionScopeRows();
+  const areaChip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.missions.filters.areaId, true);
+  let areaHtml = "";
+  for (const a of D().areas) { const n = scope.filter(r => missionAreaKey(r) === a.id).length; if (n) areaHtml += areaChip(a.id, a.name, n, a.color); }
+  const noArea = scope.filter(r => missionAreaKey(r) === MISSION_NONE).length;
+  if (noArea) areaHtml += areaChip(MISSION_NONE, "No area", noArea, "");
+  areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+  wireAreaFilterChips(areaBar, state.missions.filters, () => { renderMissionList(); renderStats(); }, true);
+  // open missions on their board with nobody on them
+  const noCrew = all.filter(r => r.status === "open" && missionInfo(r).alerts.some(a => a.kinds.includes("noCrew"))).length;
   const tile = (label, n, kind) =>
     `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
   bar.classList.add("stats-tiles");
   bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${all.length}</b></div>` +
-    tile("Open", open, "assigned") + tile("Closed", closed, "holiday") + (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "");
+    tile("Open", open, "perm") + tile("Closed", closed, "inactive") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
+    (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "") +
+    // the proportion bar under the tiles, as on Manpower and Host: open and closed missions
+    `<div class="st-split" aria-hidden="true">${[["perm", open], ["inactive", closed]].filter(([, n]) => n > 0)
+      .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
   renderPhoneViewCard({
     head: `<b>${open}</b><span class="ms-w"> open</span>`,
     label: `${all.length} missions: ${open} open, ${closed} closed`,
-    keys: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
-    bar: [["assigned", open], ["holiday", closed]],
-    tiles: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
-    areaHtml: "",
-    filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0),
+    keys: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    bar: [["perm", open], ["inactive", closed]],
+    tiles: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    areaHtml,
+    filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0) + missionFilterCount(),
   });
 }
 function renderMissionList() {
@@ -9020,6 +9306,7 @@ function renderMissionList() {
   $("#missions-status").value = st.status;
   syncSegmented(document);
   if ($("#missions-search").value !== st.search) $("#missions-search").value = st.search;
+  renderMissionFilterOptions();
   // the new-year banner
   const waiting = newYearWaiting();
   const alertBox = $("#missions-alert");
@@ -9051,28 +9338,50 @@ function renderMissionList() {
     th.classList.toggle("sorted", th.dataset.sort === st.sort.key);
     th.setAttribute("aria-sort", th.dataset.sort === st.sort.key ? (st.sort.dir > 0 ? "ascending" : "descending") : "none");
   }
-  const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit");
+  const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit"), canHost = can("hostlist");
   const body = $("#missions-body");
   const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);   // an attribute the translator does not walk
   body.innerHTML = rows.map(r => {
     const prev = cloud.previousNumber(r.number);
+    const info = missionInfo(r);
+    // quiet until the row is hovered or focused (always there on a phone and on a touch screen): Close…, Reopen and the ⋯ menu
     const acts = [];
-    if (r.status === "open" && canAdd) acts.push(`<button type="button" class="btn btn-small" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
-    if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
-    if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small" data-act="reopen">Reopen</button>`);
+    if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small ml-hov" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
+    if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small ml-hov" data-act="reopen">Reopen</button>`);
+    acts.push(`<button type="button" class="btn btn-small ml-hov ml-more" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`);
+    // Add to board sits on the state it fixes: a mission that is not on its board (registered with no day, or off it)
+    const addBtn = r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")
+      ? `<button type="button" class="ml-tag ml-wait ml-pill-btn" data-act="add" title="Put this mission on a day of its board">Add to board</button>` : "";
+    const host = r.host ? (canHost
+      ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Show this host in the Host tab") : "Show this host in the Host tab")}">${escapeHtml(r.host)}</button>`
+      : escapeHtml(r.host)) : "—";
+    const avg = info.avg == null || r.status === "closed" ? "—"
+      : `<span title="${escapeHtml(`Average number of people on it each working day over the last 4 weeks (${info.p.a.avgDays} days)`)}">${info.avg.toFixed(1)}</span>`;
+    // the crew on the day on screen, from the mission's own board
+    const dayTitle = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);
+    const crew = r.status === "closed" ? "—" : !info.day ? `<span title="${dayTitle("Not on its board that day")}">—</span>`
+      : info.day.hidden ? `<span class="ml-muted" title="${dayTitle("Hidden on its board that day")}">${dayTitle("Hidden")}</span>`
+      : info.day.crew ? `<b>${info.day.crew}</b>` : `<span class="ml-zero" title="${dayTitle("Nobody is on it that day")}">0</span>`;
     // data-label: the phone shows each row as a card with these as its field names
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
-      <td class="ml-first"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
-      <td data-label="${lbl("Board")}">${escapeHtml(boardNameOf(r.boardId))}</td>
-      <td data-label="${lbl("Shift")}"><span class="ml-tag ml-shift ml-${r.shift}">${r.shift === "night" ? "Night" : "Day"}</span></td>
-      <td data-label="${lbl("Customer")}">${escapeHtml(r.customer || "—")}</td>
-      <td data-label="${lbl("Host")}">${escapeHtml(r.host || "—")}</td>
-      <td data-label="${lbl("Trigo responsible")}">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
-      <td data-label="${lbl("Start date")}" class="ml-date">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
-      <td data-label="${lbl("Last on board")}" class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
-      <td data-label="${lbl("Status")}">${missionStatusHtml(r)}</td>
+      <td class="ml-first mcol-number"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
+      <td data-label="${lbl("Board and status")}" class="ml-status mcol-status"><span class="ml-stack"><span class="ml-board-line">${boardChipHtml(boardNameOf(r.boardId))}</span><span class="ml-chips">${missionStatusHtml(r, info.p)}${addBtn}${r.status === "closed" ? "" : missionHighlightChip(info.day)}<span class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</span></span></span></td>
+      <td data-label="${lbl("Shift")}" class="mcol-shift">${r.shift === "night" ? `<span class="ml-night">${icon("moon")}Night</span>` : "Day"}</td>
+      <td data-label="${lbl("Time")}" class="ml-time mcol-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : "—"}</td>
+      <td data-label="${lbl("Customer")}" class="mcol-customer">${escapeHtml(r.customer || "—")}</td>
+      <td data-label="${lbl("Host")}" class="ml-host-cell mcol-host">${host}</td>
+      <td data-label="${lbl("Trigo responsible")}" class="mcol-engineer">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
+      <td data-label="${lbl("Start date")}" class="ml-date mcol-openedOn">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
+      <td data-label="${lbl("Last on board")}" class="ml-date mcol-lastOn">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
+      <td data-label="${lbl("Crew")}" class="ml-crew num mcol-crew">${crew}</td>
+      <td data-label="${lbl("Avg crew / week")}" class="ml-avg num mcol-avgCrew">${avg}</td>
+      <td data-label="${lbl("PPE")}" class="ml-text mcol-ppe">${missionTextCell(r.ppe)}</td>
+      <td data-label="${lbl("Remark")}" class="ml-text mcol-remark">${missionTextCell(r.remark)}</td>
       <td class="ml-actions">${acts.join("")}</td></tr>`;
   }).join("");
+  $("#missions-crew-date").textContent = fmtDayMon(state.date);
+  renderMissionColumns();
+  quietTable("#missions-table");
   const empty = $("#missions-empty");
   const none = !(D().register || []).length;
   empty.classList.toggle("hidden", rows.length > 0);
@@ -9080,6 +9389,72 @@ function renderMissionList() {
     ? "No missions yet. A mission appears here as soon as it is on a board, or add many at once with Bulk edit."
     : st.status === "closed" ? "No closed missions match." : "No missions match.";
   $("#missions-list-wrap").classList.toggle("hidden", !rows.length);
+}
+/* Columns: which of the table's columns show. The mission number and "Board and status" always do; the rest
+   can be switched off, and the choice is kept on this device. A phone's cards show every field. */
+const MISSION_COLUMNS = [["shift", "Shift"], ["time", "Time"], ["customer", "Customer"], ["host", "Host"], ["engineer", "Trigo responsible"], ["openedOn", "Start date"], ["lastOn", "Last on board"], ["crew", "Crew"], ["avgCrew", "Avg crew / week"], ["ppe", "PPE"], ["remark", "Remark"]];
+const MISSION_COLS_KEY = "manpower.missionsHiddenCols";
+function loadMissionColumns() {
+  try {
+    const v = JSON.parse(localStorage.getItem(MISSION_COLS_KEY) || "[]");
+    state.missions.hiddenCols = Array.isArray(v) ? v.filter(k => MISSION_COLUMNS.some(c => c[0] === k)) : [];
+  } catch (e) { state.missions.hiddenCols = []; }
+}
+function saveMissionColumns() {
+  try { localStorage.setItem(MISSION_COLS_KEY, JSON.stringify(state.missions.hiddenCols)); } catch (e) { /* remembering is a courtesy */ }
+}
+function renderMissionColumns() {
+  const hidden = state.missions.hiddenCols;
+  const table = $("#missions-table");
+  table.dataset.hide = hidden.join(" ");
+  const n = hidden.length;
+  $("#missions-cols-count").textContent = n;
+  $("#missions-cols-count").classList.toggle("hidden", !n);
+  $("#btn-missions-cols").classList.toggle("ms-active", n > 0);
+  const pop = $("#missions-cols-pop");
+  if (pop.dataset.built !== String(MISSION_COLUMNS.length)) {
+    pop.dataset.built = String(MISSION_COLUMNS.length);
+    pop.innerHTML = MISSION_COLUMNS.map(([k, label]) =>
+      `<label class="ms-opt"><input type="checkbox" data-col="${k}"> <span>${escapeHtml(label)}</span></label>`).join("")
+      + `<button type="button" class="btn btn-small" id="btn-missions-cols-reset">Show all columns</button>`;
+    pop.addEventListener("change", (e) => {
+      const box = e.target.closest("input[data-col]");
+      if (!box) return;
+      const set = new Set(state.missions.hiddenCols);
+      box.checked ? set.delete(box.dataset.col) : set.add(box.dataset.col);
+      state.missions.hiddenCols = MISSION_COLUMNS.map(c => c[0]).filter(k => set.has(k));
+      saveMissionColumns();
+      renderMissionList();
+    });
+    pop.addEventListener("click", (e) => {
+      if (!e.target.closest("#btn-missions-cols-reset")) return;
+      state.missions.hiddenCols = [];
+      saveMissionColumns();
+      renderMissionList();
+    });
+  }
+  for (const box of pop.querySelectorAll("input[data-col]")) box.checked = !hidden.includes(box.dataset.col);
+}
+/* the ⋯ menu on a row: the actions of the mission's panel, which opens (the board it borrows is the same one
+   the double click uses) and runs the one chosen, so the board's own checks and dialogs apply */
+function openMissionRowMenu(r, btn) {
+  const rect = btn.getBoundingClientRect();
+  ctxMenu = { row: r, x: rect.right, y: rect.bottom + 4 };
+  renderCtxMenu("root");
+}
+function renderMissionRowMenu({ addTitle, addItem }) {
+  const r = ctxMenu.row;
+  const p = missionPlacement(r);
+  const canPlan = can("board", "edit");
+  const onBoard = r.status === "open" && (p.kind === "on" || p.kind === "hidden");
+  const hasDay = r.status === "open" && p.kind !== "notstarted";
+  addTitle(`${r.number} · ${r.shift === "night" ? "Night" : "Day"}`);
+  addItem("Mission details", () => openMissionFromList(r), null, "clipboard");
+  if (canPlan && onBoard && feat().highlight) addItem("Highlight…", () => openMissionFromList(r, { then: "btn-md-hl" }), null, "star");
+  if (canPlan && hasDay) addItem("Duplicate", () => openMissionFromList(r, { then: "btn-md-dup" }), null, "copy");
+  if (canPlan && hasDay && D().boards.length > 1) addItem("Move or copy…", () => openMissionFromList(r, { then: "btn-md-move" }), null, "swap");
+  if (canPlan && onBoard) addItem(p.kind === "hidden" ? "Unhide" : "Hide", () => openMissionFromList(r, { then: "btn-md-hide" }), null, p.kind === "hidden" ? "eye" : "eye-off");
+  if (r.status === "closed" && can("missionadmin", "edit")) addItem("Reopen", () => reopenMissionRow(r), null, "undo");
 }
 function missionFromRow(el) {
   const tr = el.closest("tr[data-id]");
@@ -9686,6 +10061,7 @@ function openModal(id) {
   backdrop.classList.remove("hidden");
   for (const m of $$(".modal")) m.classList.add("hidden");
   $(id).classList.remove("hidden");
+  if (id === "#modal-mission") enterMissionListBoard();   // coming back to the form after creating a host
   syncSegmented($(id));
   pickerClose();
   // long help text in a record panel folds to one line, after the content is
@@ -10298,6 +10674,7 @@ function closeModal() {
   const pw = $("#form-account-password");
   if (pw) pw.reset();
   if (_confirmCancel) { const c = _confirmCancel; _confirmCancel = null; c(); }
+  if (missionFromList.swapped && document.querySelectorAll(".modal:not(.hidden)").length === 0) leaveMissionListBoard();   // the Missions tab again
   if (_modalReturnFocus && backdrop.classList.contains("hidden")) {
     const back = _modalReturnFocus;
     _modalReturnFocus = null;
@@ -10547,10 +10924,76 @@ function updateMissionEngineerNote() {
 
 /* opts.from: a mission to start a NEW one from (the quick panel's Duplicate) —
    every field but the number, which has to be new anyway on the same shift */
+/* "+ Mission" on the Missions tab: the board's own New Mission form, with a Board box. The form works on
+   the active board and the day on screen, so the chosen board is made the active one while the form is
+   open (enterMissionListBoard) and the Missions tab is put back when it closes (leaveMissionListBoard). */
+let missionFromList = { open: false, swapped: false, date: null, prevDate: null };
+function enterMissionListBoard() {
+  if (!missionFromList.open || missionFromList.swapped || !isMissionList()) return;
+  const id = $("#mission-board").value;
+  if (!id) return;
+  D().activeBoardId = id;
+  // opening an existing mission may need a day other than the one on screen: that day is used while the form is open
+  if (missionFromList.date && missionFromList.date !== state.date) { missionFromList.prevDate = state.date; state.date = missionFromList.date; }
+  missionFromList.swapped = true;
+}
+function leaveMissionListBoard() {
+  if (!missionFromList.swapped) return;
+  D().activeBoardId = MISSIONS_ID;
+  if (missionFromList.prevDate) { state.date = missionFromList.prevDate; missionFromList.prevDate = null; }
+  missionFromList.swapped = false;
+  state.missions.activityKey = null;   // the crew and the status may have changed
+  render();
+}
+/* Double-click on a Missions row (or its pencil): the same Edit Mission form as the board's card. It edits
+   the mission's row on the day on screen, or on its latest day when it is not on its board that day (the form
+   says which). A mission registered in Bulk edit that has no day yet opens as a New Mission, filled in. */
+let missionPanelThen = null;   // a panel button to press once the panel has drawn (the ⋯ menu on a row)
+function openMissionFromList(r, opts = {}) {
+  if (!r) return;
+  missionPanelThen = opts.then || null;
+  const days = missionDays(r) || {};
+  let day = days[state.date] ? state.date : (Object.keys(days).sort().pop() || r.lastOn || null);
+  const sel = $("#mission-board");
+  sel.innerHTML = D().boards.map(b => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`).join("");
+  sel.value = r.boardId;
+  missionFromList = { open: true, swapped: false, date: day && day !== state.date ? day : null, prevDate: null };
+  safely(async () => {
+    enterMissionListBoard();
+    let m = null;
+    if (day) {
+      await cloud.ensurePlanLoaded(r.boardId, day);
+      const chain = cloud.numberChain(r.number);
+      m = getPlan().missions.find(x => chain.includes(x.number) && x.shift === r.shift) || null;
+    }
+    if (day && !m) { toast(`${r.number} is not on ${boardNameOf(r.boardId)} on ${fmtDate(day)}.`, "warn"); leaveMissionListBoard(); return; }
+    if (m) openMissionModal(m.id);
+    else guardEdit(() => openMissionModal(null, { number: r.number, from: {
+      host: r.host, customer: r.customer, ppe: r.ppe, shift: r.shift, startTime: r.startTime || "08:00", endTime: r.endTime || "17:00", engineerId: r.engineerId, remark: r.remark } }));
+    if (document.querySelectorAll(".modal:not(.hidden)").length === 0) leaveMissionListBoard();
+  });
+}
+function openNewMissionFromList() {
+  if (!can("board", "edit")) { toast("Your role can view the board but not change it.", "info"); return; }
+  const boards = D().boards;
+  if (!boards.length) { toast("Add a board first.", "info"); return; }
+  const first = boards.find(b => b.id === state.missions.boardId) || boards[0];
+  const sel = $("#mission-board");
+  sel.innerHTML = boards.map(b => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`).join("");
+  sel.value = first.id;
+  missionFromList = { open: true, swapped: false };
+  safely(async () => {
+    await cloud.ensurePlanLoaded(first.id, state.date);
+    enterMissionListBoard();
+    guardEdit(() => openMissionModal(null));
+    // a refused guard (no permission) opens no form: back to the list
+    if (document.querySelectorAll(".modal:not(.hidden)").length === 0) leaveMissionListBoard();
+  });
+}
+
 function openMissionModal(missionId, opts = {}) {
+  enterMissionListBoard();   // a no-op unless the form was asked for on the Missions tab
   state.editingMissionId = missionId || null;
-  const form = $("#form-mission");
-  form.reset();
   renderMissionHostOptions();
   renderMissionEngineerOptions();
   $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
@@ -10558,21 +11001,252 @@ function openMissionModal(missionId, opts = {}) {
   $("#btn-hide-mission").classList.toggle("hidden", !missionId || isForecastView());
   $("#mission-modal-title").textContent = (missionId ? "Edit" : "New") + (isForecastView() ? " Forecast Mission" : " Mission");
   const src = missionId ? getPlan().missions.find(x => x.id === missionId) : opts.from;
+  fillMissionForm(src, missionId, opts);
+  const isHidden = !!(missionId && src && src.hidden);
+  $("#hide-mission-label").textContent = isHidden ? "Unhide" : "Hide";
+  $("#btn-hide-mission use").setAttribute("href", isHidden ? "#i-eye" : "#i-eye-off");
+  $("#btn-hide-mission").title = isHidden ? "Put this mission back on the board" : "Take this mission off the board without deleting it";
+  // from the Missions tab: a new mission also asks which board; any mission says which day it is on
+  const fromList = missionFromList.swapped;
+  $("#mission-board-row").classList.toggle("hidden", !(fromList && !missionId));
+  $("#mission-day-note").classList.toggle("hidden", !fromList);
+  if (fromList) {
+    $("#mission-board").value = D().activeBoardId;
+    const day = `${fmtDow(state.date)} ${fmtDate(state.date)}`;
+    $("#mission-day-note").textContent = !missionId ? `It is added on ${day}, the day shown at the top.`
+      : missionFromList.prevDate ? `It is not on its board on the day shown at the top. This is its latest day, ${day}. Changes apply to that day only.`
+      : `Changes apply to ${day} only, the day shown at the top.`;
+  }
+  // an existing mission on the confirmed board opens read-first (the Manpower profile's idea); the card's
+  // "Edit mission" and everything new, duplicated or on a forecast day go straight to the form
+  const detailView = !!missionId && !opts.edit && !isForecastView();
+  mdState = { fromDetail: detailView };
+  setMissionView(detailView ? "detail" : "form");
+  openModal("#modal-mission");
+  if (detailView) renderMissionDetail();
+}
+
+/* ---------- Mission detail: read first, like the Manpower profile ----------
+   A double click on a mission (a board card, a Missions row) opens this panel: the mission's facts, what
+   needs a look, how it has been staffed and who is on it that day. Hide and Close mission sit in the
+   Details header; Edit details swaps the form in, and Save or Cancel come back here. */
+let mdState = { fromDetail: false };
+function setMissionView(view) {
+  const detail = view === "detail";
+  $("#mission-detail").classList.toggle("hidden", !detail);
+  $("#form-mission").classList.toggle("hidden", detail);
+  $("#modal-mission").classList.toggle("md-detail", detail);
+  if (!detail) $("#mission-modal-sub").classList.add("hidden");
+}
+function fillMissionForm(src, missionId, opts = {}) {
+  const form = $("#form-mission");
+  form.reset();
   if (src) {
-    const m = src;
-    form.number.value = missionId ? m.number : "";
-    form.host.value = m.host;
-    form.customer.value = m.customer;
-    form.ppe.value = m.ppe || "";
-    form.shift.value = m.shift;
-    form.startTime.value = m.startTime;
-    form.endTime.value = m.endTime;
-    form.engineer.value = engineerLabelFor(m.engineerId);
-    form.remark.value = m.remark || "";
+    form.number.value = missionId ? src.number : (opts.number || "");
+    form.host.value = src.host;
+    form.customer.value = src.customer;
+    form.ppe.value = src.ppe || "";
+    form.shift.value = src.shift;
+    form.startTime.value = src.startTime;
+    form.endTime.value = src.endTime;
+    form.engineer.value = engineerLabelFor(src.engineerId);
+    form.remark.value = src.remark || "";
   }
   updateMissionHostNote();
   updateMissionEngineerNote();
+}
+function editMissionDetails() {
+  // "Edit today's board?" and the like are confirms that close the panel (and, from the Missions tab, leave the
+  // board it borrowed): come back to both before the form is shown
+  enterMissionListBoard();
   openModal("#modal-mission");
+  const m = getPlan().missions.find(x => x.id === state.editingMissionId);
+  if (!m) return;
+  fillMissionForm(m, m.id);
+  setMissionView("form");
+  $("#mission-modal-title").textContent = "Edit Mission";
+  $("#form-mission").number.focus();
+}
+const MISSION_PEOPLE_CAP = 12;   // names shown before "+N more", as on the Host tab
+const mdFact = (label, value, cls = "") => `<div${cls ? ` class="${cls}"` : ""}><span>${label}</span> <b>${value}</b></div>`;
+async function renderMissionDetail() {
+  const id = state.editingMissionId;
+  const m = getPlan().missions.find(x => x.id === id);
+  const body = $("#mission-detail");
+  if (!m) return;
+  const boardId = D().activeBoardId, board = D().boards.find(b => b.id === boardId);
+  const forecast = isForecastView();
+  const reg = !forecast && missionsOn() ? cloud.registerFor(boardId, m.number, m.shift) : null;
+  const area = hostAreaOf(m.host);
+  const eng = D().engineers.find(e => e.id === m.engineerId);
+  const crew = missionCrew(m);
+  const night = m.shift === "night";
+  $("#mission-modal-title").textContent = m.number;
+  const sub = $("#mission-modal-sub");
+  sub.textContent = [board && board.name, night ? "Night" : "Day", area && area.name].filter(Boolean).join(" · ");
+  sub.classList.remove("hidden");
+  if (reg) await ensureMissionActivityLoaded();
+  // closed, or another mission opened, while the crew facts were being read
+  if (state.editingMissionId !== id || $("#modal-mission").classList.contains("hidden") || $("#mission-detail").classList.contains("hidden")) return;
+
+  const box = document.createElement("div");
+  box.className = "ov-prof-block ov-prof-details";
+  const head = document.createElement("div");
+  head.className = "ov-prof-details-head";
+  head.innerHTML = `<div class="ov-eng-foot-h">Details</div>`;
+  const acts = document.createElement("div");
+  acts.className = "ov-prof-details-acts";
+  const act = (btnId, cls, ic, label, fn) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.id = btnId; b.className = cls;
+    b.innerHTML = `${icon(ic)} ${label}`;
+    b.onclick = fn;
+    acts.appendChild(b);
+  };
+  const canPlan = forecast ? can("forecast", "edit") : can("board", "edit");
+  if (canPlan) act("btn-md-edit", "btn btn-small", "edit", "Edit details", () => guardEdit(editMissionDetails));
+  if (canPlan) act("btn-md-dup", "btn btn-small", "copy", "Duplicate", () => guardEdit(() => { enterMissionListBoard(); openMissionModal(null, { from: m }); }));
+  // the card menu's own Move or copy list (it says why a board cannot take the mission)
+  if (canPlan && !forecast && feat().highlight) act("btn-md-hl", "btn btn-small", "star", "Highlight", (ev) => {
+    ev.stopPropagation();   // the click would otherwise reach the page's outside-click handler and close the menu it opens
+    const r = ev.currentTarget.getBoundingClientRect();
+    ctxMenu = { mission: m, x: r.left, y: r.bottom + 4 };
+    renderCtxMenu("highlight");
+  });
+  if (canPlan && !forecast && D().boards.length > 1) act("btn-md-move", "btn btn-small", "swap", "Move or copy…", (ev) => {
+    ev.stopPropagation();   // the click would otherwise reach the page's outside-click handler and close the menu it opens
+    const r = ev.currentTarget.getBoundingClientRect();
+    ctxMenu = { mission: m, x: r.left, y: r.bottom + 4 };
+    renderCtxMenu("move");
+  });
+  if (canPlan && !forecast) act("btn-md-hide", "btn btn-small", m.hidden ? "eye" : "eye-off", m.hidden ? "Unhide" : "Hide", () => guardEdit(() => { enterMissionListBoard(); hideMission(m.id); }));
+  if (reg && reg.status === "open" && can("missions", "edit")) act("btn-md-close", "btn btn-small btn-danger", "check", "Close mission…", () => openCloseMissionModal(reg, state.date));
+  head.appendChild(acts);
+  box.appendChild(head);
+  const then = missionPanelThen;
+  missionPanelThen = null;
+  if (then) setTimeout(() => { const b = document.getElementById(then); if (b && !$("#mission-detail").classList.contains("hidden")) b.click(); }, 0);
+
+  const hostLink = m.host && can("hostlist") ? `<button type="button" class="ml-host-link" id="btn-md-host">${escapeHtml(m.host)}</button>` : escapeHtml(m.host || "-");
+  const dayNote = missionFromList.prevDate ? ` <small class="ov-muted">its latest day on the board</small>` : "";
+  const earlier = reg ? cloud.numberChain(m.number).slice(0, -1) : [];
+  const grid = document.createElement("div");
+  grid.className = "ov-eng-facts ov-prof-id md-facts";
+  grid.innerHTML = [
+    mdFact("Board", escapeHtml(board ? board.name : "-")),
+    mdFact("Day", `${escapeHtml(fmtDow(state.date))} ${escapeHtml(fmtDate(state.date))}${dayNote}`),
+    mdFact("Shift", `${night ? "Night" : "Day"} <small class="ov-muted">${escapeHtml(m.startTime)}-${escapeHtml(m.endTime)}</small>`),
+    mdFact("Host", hostLink),
+    mdFact("Service area", area ? areaPillHtml(area, "area-pill") : "-"),
+    mdFact("Customer", escapeHtml(m.customer || "-")),
+    mdFact("Trigo responsible", eng ? `${escapeHtml(eng.name)}${eng.phone ? " " + telLink(eng.phone) : ""}` : "-"),
+    mdFact("Status", reg ? missionStatusHtml(reg) : (m.hidden ? "Hidden" : "On board")),
+    ...(!forecast && feat().highlight ? [mdFact("Highlight", m.highlight ? `<span${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span>` : "-")] : []),
+    ...(reg ? [
+      mdFact("First day on board", reg.openedOn ? escapeHtml(fmtDate(reg.openedOn)) : "-"),
+      mdFact("Last on board", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : "-"),
+    ] : []),
+    ...(earlier.length ? [mdFact("Earlier numbers", escapeHtml(earlier.join(", ")))] : []),
+    ...(m.updatedBy || m.updatedAt ? [mdFact("Last edited", `${escapeHtml(who(m.updatedBy))}${m.updatedAt ? ` <small class="ov-muted">${escapeHtml(fmtStamp(m.updatedAt))}</small>` : ""}`)] : []),
+    mdFact("PPE", m.ppe ? escapeHtml(m.ppe) : "-", (m.ppe || "").length > 36 ? "wide" : ""),
+    mdFact("Remark", m.remark ? escapeHtml(m.remark) : "-", (m.remark || "").length > 36 ? "wide" : ""),
+  ].join("");
+  box.appendChild(grid);
+  const hostBtn = grid.querySelector("#btn-md-host");
+  if (hostBtn) hostBtn.onclick = () => { closeModal(); openHostFromMission({ host: m.host }); };
+  body.replaceChildren(box);
+
+  // who has worked on it, all time, with the days (the Host tab's "Inspectors deployed", for one mission)
+  const addPeople = () => {
+    if (forecast) return;
+    const box = document.createElement("div");
+    box.className = "ov-prof-block";
+    box.innerHTML = `<div class="ov-eng-foot-h">People who have worked on it <span class="ov-muted">days on this mission, all time</span></div><p class="ov-muted">Loading…</p>`;
+    body.appendChild(box);
+    const onNow = new Set(crew.map(e => e.id));
+    cloud.getMissionPeople(boardId, cloud.numberChain(m.number)).then(list => {
+      if (state.editingMissionId !== id || $("#mission-detail").classList.contains("hidden")) return;
+      const people = list.map(x => ({ ...x, emp: D().employees.find(e => e.id === x.employeeId) })).filter(x => x.emp);
+      const draw = (all) => {
+        const shown = all ? people : people.slice(0, MISSION_PEOPLE_CAP);
+        const chips = shown.map(x => `<button type="button" class="hl-insp md-person${onNow.has(x.employeeId) ? " now" : ""}" data-emp="${escapeHtml(x.employeeId)}" data-no-i18n`
+          + ` title="${escapeHtml(`${x.emp.name}: ${x.days} ${x.days === 1 ? "day" : "days"} on ${m.number}, last ${fmtDate(x.last)}`)}">${escapeHtml(x.emp.name)}<b>${x.days}d</b></button>`).join("");
+        const rest = people.length - shown.length;
+        const more = rest > 0 ? `<button type="button" class="hl-more" data-more="1">+${rest} more</button>`
+          : (all && people.length > MISSION_PEOPLE_CAP ? `<button type="button" class="hl-more" data-more="0">Show less</button>` : "");
+        box.querySelector("p, .hl-chips") && box.querySelector("p, .hl-chips").remove();
+        box.insertAdjacentHTML("beforeend", people.length
+          ? `<div class="hl-chips"><span class="hl-count" title="${people.length} ${people.length === 1 ? "person" : "people"} have worked on this mission">${people.length}</span>${chips}${more}</div>`
+          : `<p class="ov-muted">Nobody has been placed on this mission yet.</p>`);
+        for (const b of box.querySelectorAll(".md-person")) b.onclick = () => openProfile(b.dataset.emp);
+        const mb = box.querySelector("[data-more]");
+        if (mb) mb.onclick = () => draw(mb.dataset.more === "1");
+      };
+      draw(false);
+    }).catch(() => { const p = box.querySelector("p"); if (p) p.textContent = "The people list could not be read."; });
+  };
+
+  // the crew facts need the mission register and the last six weeks of days (not on a forecast day)
+  const actv = state.missions.activity;
+  if (!reg || !actv) { addPeople(); return; }
+  const days = missionDays(reg) || {};
+  const summary = missionActivityOf(reg);
+  const working = actv.working[boardId] || [];
+  const dayText = `${fmtDow(state.date)} ${fmtDate(state.date)}`;
+
+  const flags = document.createElement("div");
+  flags.className = "ov-prof-flags";
+  const alerts = missionAlerts(reg, missionPlacement(reg));
+  flags.innerHTML = `<b>Flags</b> ${alerts.length
+    ? alerts.map(x => `<span class="ml-tag ${x.level === 2 ? "ml-late" : x.level === 1 ? "ml-warn" : "ml-wait"}" title="${escapeHtml(x.title)}">${escapeHtml(x.text)}</span>`).join(" ")
+    : '<span class="ov-muted">None right now</span>'}`;
+  body.appendChild(flags);
+
+  const tiles = document.createElement("div");
+  tiles.className = "ov-htiles ov-prof-tiles";
+  const tile = (t) => { const d = document.createElement("div"); d.className = "ov-htile ov-htile-static"; d.innerHTML = ovTileInner(t); tiles.appendChild(d); };
+  const onBoardDays = working.filter(d => days[d] && !days[d].hidden).length;
+  tile({ label: "Crew on this day", value: crew.length, sub: escapeHtml(dayText) });
+  tile({ label: "Avg crew / week", value: summary && summary.avgCrew != null ? summary.avgCrew.toFixed(1) : "-", sub: "per working day, last 4 weeks" });
+  tile({ label: "Days on board", value: onBoardDays, sub: `of ${working.length} working days in 6 weeks` });
+  tile({ label: "No crew in a row", value: summary ? summary.noCrewDays + (summary.noCrewCapped ? "+" : "") : 0, sub: "working days, up to the latest" });
+  body.appendChild(tiles);
+
+  const crewBox = document.createElement("div");
+  crewBox.className = "ov-prof-block";
+  crewBox.innerHTML = `<div class="ov-eng-foot-h">Crew on ${escapeHtml(dayText)} <span class="ov-muted">${crew.length}</span></div>`;
+  if (!crew.length) crewBox.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Nobody is on this mission on this day." }));
+  else {
+    const row = document.createElement("div");
+    row.className = "md-crew";
+    for (const e of sortEmployeesDisplay(crew)) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "btn btn-small"; b.textContent = e.name; b.dataset.noI18n = "";
+      b.onclick = () => openProfile(e.id);
+      row.appendChild(b);
+    }
+    crewBox.appendChild(row);
+  }
+  body.appendChild(crewBox);
+
+  // crew per working day: a bar each, amber when nobody was on it, hatched when it was hidden, a gap when it was not on the board
+  const dates = working.slice();
+  if (state.date > todayStr() && days[state.date]) dates.push(state.date);
+  const maxCrew = Math.max(1, ...dates.map(d => (days[d] && !days[d].hidden ? days[d].crew : 0)));
+  const bars = dates.map(d => {
+    const c = days[d];
+    const cls = !c ? "none" : c.hidden ? "hid" : c.crew ? "" : "zero";
+    const when = `${fmtDow(d)} ${fmtDate(d)}`;
+    const tip = !c ? `Not on the board on ${when}` : c.hidden ? `Hidden on ${when}` : `Crew ${c.crew} on ${when}`;
+    return `<i class="md-bar ${cls}${d === state.date ? " on" : ""}" style="--h:${c && !c.hidden ? Math.round(c.crew / maxCrew * 100) : 0}%" title="${escapeHtml(tip)}"></i>`;
+  }).join("");
+  const chart = document.createElement("div");
+  chart.className = "ov-prof-block";
+  chart.innerHTML = `<div class="ov-eng-foot-h">Crew per working day <span class="ov-muted">last 6 weeks</span></div>
+    <div class="md-bars" role="img" aria-label="${escapeHtml(window.I18N ? I18N.t("Crew per working day, last 6 weeks") : "Crew per working day, last 6 weeks")}">${bars}</div>
+    <div class="md-axis"><span>${escapeHtml(dates.length ? fmtDayMon(dates[0]) : "")}</span><span>most ${maxCrew}</span><span>${escapeHtml(dates.length ? fmtDayMon(dates[dates.length - 1]) : "")}</span></div>`;
+  body.appendChild(chart);
+  addPeople();
 }
 
 function saveMission(ev) {
@@ -10636,12 +11310,23 @@ function saveMission(ev) {
     return;
   }
   const editingId = state.editingMissionId;   // a confirm in between must not lose which mission this is
+  const boardId = D().activeBoardId, forecast = isForecastView();   // nor the board and the kind of day (a confirm closes the form)
   const save = () => safely(async () => {
     // the first time somebody is picked they have no engineer record yet, so
     // one is made here — that is where their mission colour lives
     vals.engineerId = eng.engineerId || await cloud.ensureEngineerForProfile(eng.profileId);
-    if (isForecastView()) await cloud.saveForecastMission(D().activeBoardId, state.date, editingId, vals);
-    else await cloud.saveMission(D().activeBoardId, state.date, editingId, vals);
+    if (forecast) await cloud.saveForecastMission(boardId, state.date, editingId, vals);
+    else await cloud.saveMission(boardId, state.date, editingId, vals);
+    if (editingId && mdState.fromDetail && !forecast) {
+      // opened from the detail: back to the detail with what was saved (a confirm in between may have closed the panel)
+      await refreshAndRender();
+      state.editingMissionId = editingId;
+      openModal("#modal-mission");
+      await cloud.ensurePlanLoaded(boardId, state.date);
+      setMissionView("detail");
+      await renderMissionDetail();
+      return;
+    }
     closeModal();
     await refreshAndRender();
   });
@@ -10684,6 +11369,10 @@ function deleteMission(missionId = state.editingMissionId) {
 function hideMission(missionId = state.editingMissionId) {
   const m = getPlan().missions.find(x => x.id === missionId);
   if (!m) return;
+  if (m.hidden) {   // the form's button reads Unhide on a hidden mission
+    safely(async () => { await cloud.setMissionsHidden([missionId], false); closeModal(); await refreshAndRender(); });
+    return;
+  }
   const doHide = () => safely(async () => {
     await cloud.setMissionsHidden([missionId], true);
     closeModal();
@@ -10702,7 +11391,10 @@ function hideMission(missionId = state.editingMissionId) {
 function setMissionHighlight(m, highlight, note) {
   return safely(async () => {
     await cloud.setMissionHighlight(m.id, highlight, note);
+    state.missions.activityKey = null;   // the Missions tab reads the highlight with the crew facts
     await refreshAndRender();
+    // set from the mission panel: the panel shows the new state
+    if (state.editingMissionId === m.id && !$("#modal-mission").classList.contains("hidden") && !$("#mission-detail").classList.contains("hidden")) await renderMissionDetail();
   });
 }
 /* Highlight › Other…: the reason in the engineer's own words, shown on the card */
@@ -12459,7 +13151,7 @@ function placeBoardRow1Tools(board) {
   placeBoardPicker();
   const end = $("#row1-end"), right = $("#toolbar-right");
   const names = $("#card-names"), seg = names._seg, exp = $("#btn-export");
-  const bulk = [$("#btn-emplist-bulk"), $("#btn-hostlist-bulk")];
+  const bulk = [$("#btn-emplist-bulk"), $("#btn-hostlist-bulk"), $("#btn-missions-bulk")];
   const wide = ROW1_TOOLS_MQ.matches;
   // layout A: row 1 ends with the tab's tools and Export, on every tab
   if (board && wide) {
@@ -14745,7 +15437,7 @@ function mergePersonCard(card) {
       cl.appendChild(mkEl("span", null, side === "carry" ? "Crew if kept" : "Crew if used"));
       cl.appendChild(mkEl("b", null, String(crew.length)));
       more.appendChild(cl);
-      const cr = mkEl("div", "mc-crew");
+      const cr = mkEl("div", "mcol-crew");
       for (const id of crew) cr.appendChild(mergeCrewChip(id, id === it.empId));
       more.appendChild(cr);
       b.appendChild(more);
@@ -14826,7 +15518,7 @@ function mergeFieldsCard(card) {
   cl.appendChild(mkEl("span", null, `People on ${bm.number}`));
   cl.appendChild(mkEl("b", null, String(crew.length)));
   el.appendChild(cl);
-  const cr = mkEl("div", "mc-crew");
+  const cr = mkEl("div", "mcol-crew");
   for (const id of crew) cr.appendChild(mergeCrewChip(id));
   el.appendChild(cr);
   // an engineer who would run two missions in the same shift
@@ -14856,7 +15548,7 @@ function mergeRemoveCard(card) {
   const opts = mkEl("div", "mc-opts");
   opts.appendChild(mergeOption("carry", `Keep ${bm.number}`, "1 · ←", d === "carry", (b) => {
     const cl = mkEl("div", "mc-crewl"); cl.appendChild(mkEl("span", null, "Crew stays")); cl.appendChild(mkEl("b", null, String(crew.length))); b.appendChild(cl);
-    const cr = mkEl("div", "mc-crew"); for (const id of crew) cr.appendChild(mergeCrewChip(id)); b.appendChild(cr);
+    const cr = mkEl("div", "mcol-crew"); for (const id of crew) cr.appendChild(mergeCrewChip(id)); b.appendChild(cr);
   }));
   opts.appendChild(mergeOption("forecast", `Remove ${bm.number} · as the forecast`, "2 · →", d === "forecast", (b) => {
     b.appendChild(mkEl("div", "mc-crewl", "Where the crew goes"));
@@ -17850,7 +18542,7 @@ function wireApp() {
   };
 
   // multi-select filter dropdowns: toggle open on button click
-  for (const ms of $$("#filters .ms, #emplist-filters .ms, #hostlist-filters .ms")) {
+  for (const ms of $$("#filters .ms, #emplist-filters .ms, #hostlist-filters .ms, #missions-filters .ms")) {
     ms.querySelector(".ms-btn").onclick = (ev) => {
       ev.stopPropagation();
       const pop = ms.querySelector(".ms-pop");
@@ -17981,6 +18673,7 @@ function wireApp() {
   $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
   $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
   // Missions tab (migration-2026-11-09)
+  loadMissionColumns();
   $("#missions-search").addEventListener("input", (e) => { state.missions.search = e.target.value; renderMissionList(); renderStats(); });
   $("#missions-board").addEventListener("change", (e) => { state.missions.boardId = e.target.value; render(); });
   $("#missions-status").addEventListener("change", (e) => { state.missions.status = e.target.value; render(); });
@@ -17997,9 +18690,18 @@ function wireApp() {
     const b = e.target.closest("button[data-act]");
     const r = b && missionFromRow(b);
     if (!r) return;
-    if (b.dataset.act === "close") openCloseMissionModal(r);
+    if (b.dataset.act === "more") { e.stopPropagation(); closeTopbarMenus(); openMissionRowMenu(r, b); }
+    else if (b.dataset.act === "close" || b.dataset.act === "suggest-close") openCloseMissionModal(r);
+    else if (b.dataset.act === "host") openHostFromMission(r);
     else if (b.dataset.act === "reopen") reopenMissionRow(r);
     else if (b.dataset.act === "add") openMissionAddModal(r);
+  });
+  $("#missions-body").addEventListener("dblclick", (e) => {
+    if (e.target.closest("button, a, input, select")) return;
+    const r = missionFromRow(e.target);
+    if (!r) return;
+    if (window.getSelection) window.getSelection().removeAllRanges();   // the double click selected a word
+    openMissionFromList(r);
   });
   $("#form-close-mission").onsubmit = submitCloseMission;
   $("#close-mission-date").addEventListener("input", updateCloseMissionEffect);
@@ -18101,6 +18803,17 @@ function wireApp() {
   // ---------- Host List tab ----------
   $("#btn-hostlist-export-go").onclick = () => safely(async () => { await exportHostlistXlsx(); closeModal(); });
   $("#btn-add-host").onclick = () => openHostModal(null);
+  $("#btn-add-mission-list").onclick = openNewMissionFromList;
+  $("#btn-mission-cancel").onclick = () => {
+    // Edit details, then Cancel: back to the detail; a new mission just closes
+    if (mdState.fromDetail && state.editingMissionId) { setMissionView("detail"); renderMissionDetail(); }
+    else closeModal();
+  };
+  $("#mission-board").onchange = () => safely(async () => {
+    D().activeBoardId = $("#mission-board").value;
+    await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
+    $("#mission-modal-title").textContent = "New" + (isForecastView() ? " Forecast Mission" : " Mission");
+  });
   $("#hostlist-search").addEventListener("input", (e) => { state.hostlist.search = e.target.value; renderHostRows(); });
   for (const th of $$("#hostlist-table th[data-sort]")) {
     th.onclick = () => {
@@ -18146,7 +18859,7 @@ function wireApp() {
     if (!ev.target.closest("#context-menu")) hideContextMenu();
     if (!ev.target.closest("#datepicker-pop") && !ev.target.closest("#btn-date")) hideDatePicker();
     if (!ev.target.closest("#filters .ms") && !ev.target.closest("#emplist-filters .ms")
-        && !ev.target.closest("#hostlist-filters .ms")) closeFilterPops();
+        && !ev.target.closest("#hostlist-filters .ms") && !ev.target.closest("#missions-filters .ms")) closeFilterPops();
     if (!ev.target.closest("#toolbar-more")) hideToolbarMore();
     if (!ev.target.closest(".cap-pop")) capClosePop();
   });
@@ -18325,6 +19038,7 @@ async function boot() {
     // a mission or an assignment anywhere can change who has worked where —
     // refreshData only re-reads the directory when the Host List is on screen
     state.hostlist.dirCacheKey = null;
+    state.missions.activityKey = null;   // so does who is on which mission
     // {boardId, planDate, updatedBy} from a missions/assignments write (see
     // cloud.js's _attributionFromPayload) — undefined for every other kind of
     // change, and for a write from before the updated-by migration was run.

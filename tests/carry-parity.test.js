@@ -112,7 +112,7 @@ test("the carry preview is exactly what a real carry into an empty day produces"
   await x.cloud.applyCarry(B1, SRC, DEST);
   const real = await x.cloud.ensurePlanLoaded(B1, DEST, { force: true });
   const shape = (p) => ({
-    missions: p.missions.map(({ id, members, ...m }) => ({ ...m, members: [...members].sort() })).sort((a, b) => (a.number + a.shift).localeCompare(b.number + b.shift)),
+    missions: p.missions.map(({ id, members, updatedBy, updatedAt, ...m }) => ({ ...m, members: [...members].sort() })).sort((a, b) => (a.number + a.shift).localeCompare(b.number + b.shift)),
     zones: Object.fromEntries(Object.entries(p.zones).map(([k, v]) => [k, [...v].sort()])),
   });
   assert.deepEqual(shape(preview), shape(real));

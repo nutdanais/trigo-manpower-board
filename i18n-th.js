@@ -598,6 +598,7 @@ I18N.add({
   "Next week": "สัปดาห์หน้า",
   "Night": "กะกลางคืน",
   "Night:": "กะกลางคืน:",
+  "Not on the board now": "ไม่ได้อยู่บนบอร์ดตอนนี้",
   "No": "ไม่",
   "No area": "ไม่มีพื้นที่",
   "No area set": "ยังไม่ได้ตั้งพื้นที่",
@@ -673,6 +674,8 @@ I18N.add({
   "On the board from": "อยู่บนบอร์ดตั้งแต่",
   "On the board from (optional)": "อยู่บนบอร์ดตั้งแต่ (ไม่บังคับ)",
   "On the board from:": "อยู่บนบอร์ดตั้งแต่:",
+  "On the board now": "อยู่บนบอร์ดตอนนี้",
+  "On the board: All": "อยู่บนบอร์ด: ทั้งหมด",
   "On the confirmed board": "บนบอร์ดที่ยืนยันแล้ว",
   "On-call": "ออนคอล",
   "On-call crew": "ทีมงานออนคอล",
@@ -1590,6 +1593,7 @@ I18N.add({
   "{a}. {b} arrow opens the board itself.": "{a} ลูกศร {b} เปิดตัวบอร์ดเอง",
   "{a}/{b}/{c} is not a real date": "{a}/{b}/{c} ไม่ใช่วันที่ที่มีอยู่จริง",
   "{a}: All": "{a}: ทั้งหมด",
+  "{a}: {b} selected": "{a}: เลือกแล้ว {b}",
   "{a}: account": "{a}: บัญชี",
   "{a}: colour": "{a}: สี",
   "{a}: day crew": "{a}: ทีมกะกลางวัน",
@@ -2693,6 +2697,7 @@ I18N.add({
   "Site Admin": "ผู้ดูแลไซต์",
   "Mission No.": "เลขมิชชั่น",
   "Trigo responsible": "ผู้รับผิดชอบ TRIGO",
+  "Trigo responsible: All": "ผู้รับผิดชอบ TRIGO: ทั้งหมด",
   "Last on board": "วันสุดท้ายบนบอร์ด",
   "The first day this mission was on the board": "วันแรกที่มิชชั่นนี้อยู่บนบอร์ด",
   "The latest day this mission is on the board": "วันล่าสุดที่มิชชั่นนี้อยู่บนบอร์ด",
@@ -2996,4 +3001,121 @@ I18N.add({
   "{num}+ day at a host · at risk at {a} or fewer": "{num} วันขึ้นไปที่โฮสต์ · เสี่ยงเมื่อ {a} คนหรือน้อยกว่า",
   "Hosts where {num} or fewer active people are experienced": "โฮสต์ที่มีผู้ชำนาญที่ยังใช้งาน {num} คนหรือน้อยกว่า",
   "No host has {num} or fewer active experienced people.": "ไม่มีโฮสต์ที่มีผู้ชำนาญที่ยังใช้งาน {num} คนหรือน้อยกว่า",
+});
+
+/* Missions tab: the crew, status and alert columns, the Host link, and the filters for them */
+I18N.add({
+  "Avg crew / week": "ทีมงานเฉลี่ย / สัปดาห์",
+  "Unhide": "แสดงอีกครั้ง",
+  "Put this mission back on the board": "นำมิชชั่นนี้กลับขึ้นบอร์ด",
+  "Open this mission's details. Double-clicking the row does the same.": "เปิดรายละเอียดมิชชั่น ดับเบิลคลิกที่แถวก็ได้เช่นกัน",
+  "Open mission details": "เปิดรายละเอียดมิชชั่น",
+  "Add a mission to a board, on the day shown at the top": "เพิ่มมิชชั่นลงบอร์ด ในวันที่แสดงด้านบน",
+  "Add a board first.": "เพิ่มบอร์ดก่อน",
+  "The start and end time from the mission's latest day on the board.": "เวลาเริ่มและสิ้นสุดจากวันล่าสุดของมิชชั่นบนบอร์ด",
+  "The protective equipment the mission asks for, from its latest day on the board.": "อุปกรณ์ป้องกันที่มิชชั่นต้องใช้ จากวันล่าสุดบนบอร์ด",
+  "The mission's remark, from its latest day on the board.": "หมายเหตุของมิชชั่น จากวันล่าสุดบนบอร์ด",
+  "Not on its board that day": "ไม่ได้อยู่บนบอร์ดของมิชชั่นในวันนั้น",
+  "Hidden on its board that day": "ซ่อนอยู่บนบอร์ดในวันนั้น",
+  "Nobody is on it that day": "วันนั้นไม่มีใครอยู่ในมิชชั่น",
+  "The number of people on the mission on the day shown at the top, from its own board.": "จำนวนคนในมิชชั่นในวันที่แสดงด้านบน จากบอร์ดของมิชชั่นเอง",
+  "Alerts": "การแจ้งเตือน",
+  "Alerts: All": "การแจ้งเตือน: ทั้งหมด",
+  "Board status": "สถานะบนบอร์ด",
+  "Board status: All": "สถานะบนบอร์ด: ทั้งหมด",
+  "On board": "อยู่บนบอร์ด",
+  "Off the board": "ไม่ได้อยู่บนบอร์ด",
+  "Not started": "ยังไม่เริ่ม",
+  "Close?": "ปิด?",
+  "No Trigo responsible": "ไม่มีผู้รับผิดชอบ TRIGO",
+  "Nobody is named as this mission's Trigo responsible": "ยังไม่ได้ระบุผู้รับผิดชอบ TRIGO ของมิชชั่นนี้",
+  "Show this host in the Host tab": "แสดงโฮสต์นี้ในแท็บโฮสต์",
+  "Your role cannot open the Host tab.": "บทบาทของคุณเปิดแท็บโฮสต์ไม่ได้",
+  "Registered, with no day on a board yet": "ลงทะเบียนแล้ว แต่ยังไม่มีวันบนบอร์ด",
+  "No crew for over 5 working days": "ไม่มีทีมงานเกิน 5 วันทำงาน",
+  "Hidden for over 5 working days": "ซ่อนเกิน 5 วันทำงาน",
+  "Off the board for over 5 working days": "ไม่ได้อยู่บนบอร์ดเกิน 5 วันทำงาน",
+  "New-year number": "เลขปีใหม่",
+  "The average number of people on the mission each working day, over the last 4 weeks. Days it was hidden or not on the board do not count.": "จำนวนคนเฉลี่ยในมิชชั่นต่อวันทำงาน ในช่วง 4 สัปดาห์ที่ผ่านมา วันที่ซ่อนหรือไม่ได้อยู่บนบอร์ดไม่นับ",
+  "Where the mission is now: on its board, hidden there, off the board, not started, or closed.": "มิชชั่นอยู่ที่ไหนตอนนี้: บนบอร์ด ซ่อนอยู่ ไม่ได้อยู่บนบอร์ด ยังไม่เริ่ม หรือปิดแล้ว",
+  "What needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.": "สิ่งที่ต้องดู: ไม่มีทีมงาน ซ่อนหรือไม่ได้อยู่บนบอร์ดเกิน 5 วันทำงาน (ปิดมิชชั่นหากงานจบแล้ว) ยังไม่มีเลขปีใหม่ ไม่มีผู้รับผิดชอบ TRIGO",
+}, {
+  "{a}+ days": "{a}+ วัน",
+  "On the {a} board today": "วันนี้อยู่บนบอร์ด {a}",
+  "Open, but hidden on the {a} board": "เปิดอยู่ แต่ซ่อนบนบอร์ด {a}",
+  "It was on the {a} board until {b} and is not there now": "อยู่บนบอร์ด {a} จนถึง {b} และตอนนี้ไม่ได้อยู่แล้ว",
+  "It starts on {a}": "เริ่มวันที่ {a}",
+  "Average number of people on it each working day over the last 4 weeks ({a} days)": "จำนวนคนเฉลี่ยต่อวันทำงาน ในช่วง 4 สัปดาห์ที่ผ่านมา ({a} วัน)",
+  "Nobody has been on {a} for more than 5 working days in a row ({b}). If the job has ended, close it.": "ไม่มีใครอยู่ใน {a} เกิน 5 วันทำงานติดต่อกัน ({b}) หากงานจบแล้วให้ปิดมิชชั่น",
+  "Nobody is on {a}. Working days in a row: {b}.": "ไม่มีใครอยู่ใน {a} วันทำงานติดต่อกัน: {b}",
+  "{a} has been hidden on its board for more than 5 working days in a row ({b}). If the job has ended, close it; otherwise unhide it from the board's Hide/Unhide.": "{a} ถูกซ่อนบนบอร์ดเกิน 5 วันทำงานติดต่อกัน ({b}) หากงานจบแล้วให้ปิดมิชชั่น ไม่เช่นนั้นให้แสดงอีกครั้งจาก ซ่อน/แสดง ของบอร์ด",
+  "{a} was last on the board on {b}. Close it if the job has ended, or add it back with Add to board.": "{a} อยู่บนบอร์ดครั้งล่าสุดเมื่อ {b} ปิดมิชชั่นหากงานจบแล้ว หรือเพิ่มกลับด้วย เพิ่มลงบอร์ด",
+  "{a} is not in the Host list.": "{a} ไม่อยู่ในรายชื่อโฮสต์",
+  "It is added on {a}, the day shown at the top.": "จะเพิ่มในวัน {a} ซึ่งเป็นวันที่แสดงด้านบน",
+  "Changes apply to {a} only, the day shown at the top.": "การแก้ไขมีผลกับวัน {a} เท่านั้น ซึ่งเป็นวันที่แสดงด้านบน",
+  "It is not on its board on the day shown at the top. This is its latest day, {a}. Changes apply to that day only.": "มิชชั่นนี้ไม่ได้อยู่บนบอร์ดในวันที่แสดงด้านบน นี่คือวันล่าสุดของมิชชั่น คือ {a} การแก้ไขมีผลกับวันนั้นเท่านั้น",
+  "{a} is not on {b} on {c}.": "{a} ไม่ได้อยู่บน {b} ในวันที่ {c}",
+});
+
+/* Mission detail panel (the Manpower profile's idea) */
+I18N.add({
+  "First day on board": "วันแรกบนบอร์ด",
+  "Earlier numbers": "เลขก่อนหน้า",
+  "None right now": "ตอนนี้ไม่มี",
+  "Crew on this day": "ทีมงานในวันนี้",
+  "Days on board": "วันที่อยู่บนบอร์ด",
+  "No crew in a row": "ไม่มีทีมงานติดต่อกัน",
+  "per working day, last 4 weeks": "ต่อวันทำงาน ใน 4 สัปดาห์ที่ผ่านมา",
+  "working days, up to the latest": "วันทำงาน จนถึงวันล่าสุด",
+  "Crew per working day": "ทีมงานต่อวันทำงาน",
+  "Crew per working day, last 6 weeks": "ทีมงานต่อวันทำงาน 6 สัปดาห์ที่ผ่านมา",
+  "last 6 weeks": "6 สัปดาห์ที่ผ่านมา",
+  "Nobody is on this mission on this day.": "วันนี้ไม่มีใครอยู่ในมิชชั่นนี้",
+  "Mission details": "รายละเอียดมิชชั่น",
+}, {
+  "of {a} working days in 6 weeks": "จาก {a} วันทำงานใน 6 สัปดาห์",
+  "Crew on {a}": "ทีมงานวันที่ {a}",
+  "Crew {a} on {b}": "ทีมงาน {a} คน ในวันที่ {b}",
+  "most {a}": "สูงสุด {a}",
+  "Not on the board on {a}": "ไม่ได้อยู่บนบอร์ดในวันที่ {a}",
+  "Hidden on {a}": "ซ่อนอยู่ในวันที่ {a}",
+});
+
+/* Missions tab: one Status column, By area, and the detail panel's last edit, Duplicate, Move and people list */
+I18N.add({
+  "someone": "ใครบางคน",
+  "Status and alerts": "สถานะและการแจ้งเตือน",
+  "Duplicate": "ทำซ้ำ",
+  "Move or copy…": "ย้ายหรือคัดลอก…",
+  "Last edited": "แก้ไขล่าสุด",
+  "People who have worked on it": "คนที่เคยทำงานในมิชชั่นนี้",
+  "days on this mission, all time": "จำนวนวันในมิชชั่นนี้ ตลอดเวลา",
+  "Nobody has been placed on this mission yet.": "ยังไม่มีใครถูกจัดลงมิชชั่นนี้",
+  "The people list could not be read.": "อ่านรายชื่อไม่ได้",
+  "Where the mission is now (on its board, hidden there, off the board, not started or closed), then what needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.": "มิชชั่นอยู่ที่ไหนตอนนี้ (บนบอร์ด ซ่อนอยู่ ไม่ได้อยู่บนบอร์ด ยังไม่เริ่ม หรือปิดแล้ว) ตามด้วยสิ่งที่ต้องดู: ไม่มีทีมงาน ซ่อนหรือไม่ได้อยู่บนบอร์ดเกิน 5 วันทำงาน (ปิดมิชชั่นหากงานจบแล้ว) ยังไม่มีเลขปีใหม่ ไม่มีผู้รับผิดชอบ TRIGO",
+}, {
+  "{a} people have worked on this mission": "{a} คน เคยทำงานในมิชชั่นนี้",
+  "{a} person has worked on this mission": "{a} คน เคยทำงานในมิชชั่นนี้",
+  "{a}: {b} days on {c}, last {d}": "{a}: {b} วันใน {c} ล่าสุด {d}",
+  "{a}: {b} day on {c}, last {d}": "{a}: {b} วันใน {c} ล่าสุด {d}",
+});
+
+/* Missions tab: the highlight chip and the panel's Highlight */
+I18N.add({
+  "Highlighted on the board": "ไฮไลต์บนบอร์ด",
+});
+
+/* Missions tab: Board and status in one column, the Columns list, the ⋯ menu on a row, several areas at once */
+I18N.add({
+  "Board and status": "บอร์ดและสถานะ",
+  "Which board the mission is on and where it is now (on its board, hidden there, off the board, not started or closed), then what needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.": "มิชชั่นอยู่บอร์ดไหนและตอนนี้อยู่ในสถานะใด (บนบอร์ด ซ่อนอยู่ ออกจากบอร์ด ยังไม่เริ่ม หรือปิดแล้ว) ตามด้วยสิ่งที่ควรดู: ไม่มีทีมงาน ซ่อนหรือออกจากบอร์ดเกิน 5 วันทำงาน (ปิดมิชชั่นหากงานจบแล้ว) ไม่มีเลขมิชชั่นปีใหม่ ไม่มีผู้รับผิดชอบ TRIGO",
+  "Columns": "คอลัมน์",
+  "Choose which columns the table shows": "เลือกคอลัมน์ที่ตารางแสดง",
+  "Show all columns": "แสดงทุกคอลัมน์",
+  "Highlight…": "ไฮไลต์…",
+});
+
+I18N.add({}, {
+  "Add {a} to the areas shown": "เพิ่ม {a} ในพื้นที่ที่แสดง",
+  "Click to remove {a} from the areas shown": "คลิกเพื่อเอา {a} ออกจากพื้นที่ที่แสดง",
 });
