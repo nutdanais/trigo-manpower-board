@@ -1,0 +1,787 @@
+<title>Calibration Planner Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: one long review page. Findings, how spreading works, the dashboard card before/after, then three live mockups
+   (A planner page, B spread assistant, C week board) in app-style frames, then a comparison and a recommendation.
+   Light mode only, like the app. Palette follows the dashboard card in the screenshot. */
+:root{
+  --bg:#EEF2F7; --card:#FFFFFF; --ink:#1B2740; --mut:#66758D; --line:#DCE3EC; --track:#E7ECF3; --soft:#F6F8FB;
+  --bar:#7F95B2; --bar-e:#E3E9F1; --navy:#1E3A5F; --grey:#8E9BB0;
+  --green:#00B67A; --green-d:#0A7D53; --green-bg:#E3F6EE;
+  --red:#E0323C; --red-bg:#FCE6E7; --red-tx:#8E1F27;
+  --amber-bar:#E08E00; --amber-d:#B26F00; --amber-bg:#FFF3D6; --amber-tx:#7A5200;
+  --font:'Plus Jakarta Sans','Noto Sans',system-ui,sans-serif;
+  --shadow:0 1px 2px rgba(27,39,64,.06),0 8px 24px rgba(27,39,64,.07);
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font);
+  padding-block:32px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3,h4,p{margin:0}
+h1{font-size:34px;line-height:1.12;font-weight:800;letter-spacing:-.02em;text-wrap:balance;max-width:20ch}
+h2{font-size:22px;line-height:1.25;font-weight:800;letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:14px;font-weight:700}
+h4{font-size:13px;font-weight:700}
+.eyebrow{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);font-weight:700}
+.lede{font-size:16px;color:#33425C;max-width:68ch;margin-top:12px}
+.mut{color:var(--mut)} .small{font-size:12.5px}
+section{margin-top:56px}
+.sec-h{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px}
+.sec-h>div{flex:1 1 320px;min-width:0}
+.sec-h p{margin-top:4px;color:#44536C;max-width:70ch}
+.badge{flex:none;width:34px;height:34px;border-radius:10px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:800;font-size:16px}
+a{color:var(--green-d);font-weight:600}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+
+/* findings */
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:20px}
+.find{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.find b{display:block;margin-bottom:2px}
+.find span.k{font-size:11px;font-weight:800;color:var(--amber-d);letter-spacing:.06em}
+.find p{color:#44536C;font-size:13px}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px}
+.how div{background:var(--card);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+.how .yes{border-top:3px solid var(--green)} .how .no{border-top:3px solid var(--red)} .how .chk2{border-top:3px solid var(--amber-bar)}
+.how p{font-size:13px;color:#44536C;margin-top:4px}
+
+/* buttons, pills, controls */
+.btn{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 12px;font-weight:600;color:var(--ink);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:13px}
+.btn:hover{background:#F1F5FA}
+.btn.pri{background:var(--green-d);border-color:var(--green-d);color:#fff}
+.btn.pri:hover{background:#086847}
+.btn.sm{padding:4px 10px;font-size:12.5px}
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;background:var(--track);color:var(--ink);white-space:nowrap}
+.pill.amber{background:var(--amber-bg);color:var(--amber-tx)}
+.pill.green{background:var(--green-bg);color:var(--green-d)}
+.pill.red{background:var(--red-bg);color:var(--red-tx)}
+.seg{display:inline-flex;background:var(--track);border-radius:10px;padding:2px}
+.seg button{border:0;background:transparent;padding:4px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer}
+.seg button[aria-pressed=true]{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.step{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mut);font-weight:600}
+.step button{width:24px;height:24px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:700;color:var(--ink);line-height:1}
+.step b{color:var(--ink);min-width:1.2em;text-align:center;font-variant-numeric:tabular-nums}
+input[type=search],select{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:#fff;color:var(--ink);min-width:0}
+input[type=search]{flex:1 1 180px}
+
+/* chart */
+.chartwrap{overflow-x:auto;padding-bottom:2px}
+.chart{min-width:calc(var(--n)*8px + 40px);padding-top:9px}
+.plot{display:grid;grid-template-columns:34px minmax(0,1fr);height:var(--h)}
+.chart.noax .plot,.chart.noax .xrow{grid-template-columns:0 minmax(0,1fr)}
+.yax,.area{position:relative}
+.area{border-bottom:1px solid var(--line)}
+.gl{position:absolute;left:0;right:0;height:1px;background:var(--line);opacity:.7}
+.yt{position:absolute;right:7px;transform:translateY(50%);font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+.yt.cl{color:var(--amber-tx);font-weight:800}
+.capline{position:absolute;left:0;right:0;border-top:1.5px dashed var(--amber-bar);z-index:3;pointer-events:none}
+.cols{position:absolute;inset:0;display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}
+.col{position:relative;display:flex;align-items:flex-end;justify-content:center;cursor:pointer;border-radius:4px}
+.col:hover{background:rgba(30,58,95,.07)}
+.col .bar{position:relative;z-index:1;display:block;width:100%;max-width:28px;background:var(--bar);border-radius:4px 4px 0 0}
+.col .bar.e{height:3px;background:var(--bar-e);border-radius:2px}
+.col.over .bar{background:var(--amber-bar)}
+.col.sel{background:rgba(30,58,95,.10)}
+.col.sel .bar{background:var(--navy)}
+.col.inwin{background:rgba(0,182,122,.12)}
+.ghost{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:28px;border:1.5px dashed var(--grey);border-bottom:0;border-radius:4px 4px 0 0;z-index:0}
+.xrow{display:grid;grid-template-columns:34px minmax(0,1fr);margin-top:6px}
+.xg{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}
+.xl{font-size:11px;color:var(--mut);white-space:nowrap;min-width:0;justify-self:center;font-weight:600;height:14px}
+.xl.l{justify-self:start} .xl.r{justify-self:end}
+.lg{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:12px;color:var(--mut);align-items:center}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.sw.dash{background:none;border-top:2px dashed var(--amber-bar);height:0;width:14px;border-radius:0;vertical-align:3px}
+.sw.gh{background:none;border:1.5px dashed var(--grey)}
+#tip{position:fixed;z-index:60;background:#1B2740;color:#fff;font-size:12px;line-height:1.4;padding:6px 10px;border-radius:8px;pointer-events:none;white-space:pre-line;max-width:240px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+
+/* dashboard cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:20px;align-items:start}
+.cap-t{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;color:var(--mut)}
+.kcard{background:#fff;border-radius:22px;box-shadow:var(--shadow);padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.kh{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.kt{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:700}
+.kt svg{width:20px;height:20px;stroke:#5FA11E;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.kall{display:inline-flex;align-items:center;gap:3px;font-weight:700;color:var(--ink);text-decoration:none;font-size:14px}
+.ksub{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--mut);font-weight:600;align-items:center;flex-wrap:wrap}
+.kst{font-size:13px;color:var(--mut);font-weight:700}
+.krow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0}
+.krow .kn{min-width:0;font-size:15px}
+.krow .kn b{font-weight:600} .krow .kn span{color:var(--mut);font-size:13px}
+.kpill{display:inline-flex;align-items:center;gap:5px;background:#EEF1F6;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700;white-space:nowrap}
+.kpill svg{width:14px;height:14px;stroke:var(--mut);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.kbar{display:flex;height:11px;border-radius:99px;overflow:hidden;background:var(--track)}
+.kbar i{display:block;height:100%}
+.klg{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--mut);margin-top:2px}
+.klg b{color:var(--ink)} .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.kalert{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--amber-bg);color:var(--amber-tx);border-radius:12px;padding:9px 12px;font-size:13px;font-weight:600}
+.kalert svg{width:16px;height:16px;stroke:var(--amber-d);fill:none;stroke-width:2;flex:none;stroke-linecap:round;stroke-linejoin:round}
+.kalert .btn{border-color:#E9C877;background:#fff}
+.khint{font-size:12.5px;color:var(--green-d);font-weight:700;min-height:18px}
+.chg{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px}
+
+/* frames */
+.frame{background:var(--soft);border:1px solid var(--line);border-radius:16px;padding:0 0 18px;overflow:hidden;box-shadow:var(--shadow)}
+.appbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px;font-size:13px;color:var(--mut)}
+.appbar b{color:var(--ink)} .appbar .sp{flex:1}
+.pad{padding:16px 16px 0}
+.panel{background:#fff;border-radius:14px;box-shadow:var(--shadow);padding:14px 16px}
+.bar-row{display:flex;gap:12px 18px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.bar-row .grow{flex:1}
+.note{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-radius:12px;padding:9px 12px;font-size:13px;font-weight:600;margin-bottom:10px}
+.note.ok{background:var(--green-bg);color:#0A5A3C} .note.warn{background:var(--amber-bg);color:var(--amber-tx)} .note.no{background:var(--red-bg);color:var(--red-tx)}
+.note button{margin-left:auto}
+
+/* planner list */
+.a-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:14px 16px 10px}
+.tblwrap{margin:0 16px;background:#fff;border-radius:14px;box-shadow:var(--shadow);overflow:auto;max-height:470px}
+.tbl{min-width:860px;--cols:minmax(170px,1.4fr) 92px 104px 100px 150px 150px 120px}
+.tr{display:grid;grid-template-columns:var(--cols);gap:8px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13px}
+.tr.th{position:sticky;top:0;z-index:2;background:#fff;font-size:11.5px;font-weight:700;color:var(--mut);letter-spacing:.04em;text-transform:uppercase}
+.tr b{font-weight:700} .tr .c{color:var(--mut)}
+.gh2{display:flex;gap:10px;align-items:center;background:var(--soft);padding:7px 14px;border-bottom:1px solid var(--line);font-size:13px;position:sticky;top:34px;z-index:1}
+.gh2 b{font-weight:800}
+.slots{padding:10px 14px 12px;background:#F2FAF6;border-bottom:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+.slots .sl-t{flex:1 0 100%;font-size:12.5px;color:#0A5A3C;font-weight:600}
+.slot{border:1px solid #BFE3D0;background:#fff;border-radius:10px;padding:6px 10px;cursor:pointer;text-align:left;font-weight:700;font-size:13px;color:var(--ink)}
+.slot:hover{border-color:var(--green)} .slot small{display:block;font-weight:500;color:var(--mut);font-size:11.5px}
+.empty{padding:22px;text-align:center;color:var(--mut)}
+
+/* B assistant */
+.b-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;padding:16px 16px 0}
+@media(max-width:820px){.b-grid{grid-template-columns:1fr}}
+.b-set{display:flex;flex-direction:column;gap:6px;align-self:start}
+.b-set label{display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:8px}
+.b-set output{color:var(--green-d)}
+.b-set input[type=range]{width:100%;accent-color:var(--green-d)}
+.chk{display:flex;gap:8px;align-items:center;justify-content:flex-start!important;font-weight:600!important}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:#fff;border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
+.kpi small{display:block;color:var(--mut);font-size:11.5px;font-weight:700}
+.kpi b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.kpi b i{font-style:normal;color:var(--mut);font-weight:600;margin:0 4px}
+.mv{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:10px}
+.mvr{display:grid;grid-template-columns:28px minmax(120px,1.1fr) minmax(130px,1.2fr) minmax(170px,1.3fr) 90px 116px;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px;min-width:700px}
+.mvr.off,.wkr.off{opacity:.5}
+.wkr{display:grid;grid-template-columns:minmax(130px,1.2fr) 100px minmax(220px,1.6fr) 90px 80px;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px;min-width:660px}
+.pill.navy{background:#DCE6F4;color:var(--navy)}
+.slot.full{border-color:#E9C877;background:var(--amber-bg)}
+.mvr input{accent-color:var(--green-d);width:16px;height:16px}
+
+/* C board */
+.navrow{display:flex;gap:12px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(188px,1fr);gap:10px;overflow-x:auto;padding:6px 16px 4px}
+.bcol{background:#fff;border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-height:260px;transition:opacity .15s}
+.bch{padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+.bch .r1{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.bch .wk{display:block;font-size:11px;color:var(--mut);font-weight:600;line-height:1.1}
+.bch b{font-size:13px;font-weight:800}
+.meter{height:5px;border-radius:9px;background:var(--track);margin-top:8px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--bar)}
+.meter.over i{background:var(--amber-bar)}
+.bcb{padding:8px;display:flex;flex-direction:column;gap:5px;overflow-y:auto;max-height:430px;flex:1}
+.chip2{border:1px solid var(--line);border-radius:9px;padding:6px 9px;background:var(--soft);cursor:grab;display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-size:12.5px;user-select:none}
+.chip2:hover{border-color:var(--bar)}
+.chip2 b{font-weight:700} .chip2 .cn{min-width:0} .chip2 .cn span{display:block;color:var(--mut);font-size:11.5px}
+.chip2 .cd{color:var(--mut);font-size:11.5px;white-space:nowrap}
+.chip2.moved{background:var(--green-bg);border-color:#BFE3D0} .chip2.moved .cd{color:var(--green-d);font-weight:700}
+.chip2.dragging{opacity:.4}
+.chipwrap{display:flex;flex-direction:column;gap:4px}
+.chipwrap .slots{border:1px solid #BFE3D0;border-radius:9px;padding:7px}
+.chipwrap .slot{font-size:12px;padding:4px 8px}
+.bcol.ok{outline:2px dashed var(--green);outline-offset:-2px}
+.bcol.full{outline:2px dashed var(--amber-bar);outline-offset:-2px}
+.bcol.no{opacity:.4}
+.bcol.hot{background:var(--green-bg)}
+.bempty{color:var(--mut);font-size:12px;text-align:center;padding:18px 6px}
+
+/* pros / cons / compare */
+.gw{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:16px}
+.gw ul{margin:6px 0 0;padding-left:18px;color:#33425C;font-size:13px}
+.gw li{margin:2px 0}
+.try{margin-top:12px;font-size:13px;color:#33425C}
+.tw{overflow-x:auto;background:#fff;border-radius:14px;box-shadow:var(--shadow)}
+table.cmp{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
+.cmp th,.cmp td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+.cmp th{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+.cmp tr:last-child td{border-bottom:0}
+.rec{background:var(--navy);color:#fff;border-radius:18px;padding:22px 24px;margin-top:16px}
+.rec h3{font-size:18px;font-weight:800;margin-bottom:8px}
+.rec ol{margin:8px 0 0;padding-left:20px} .rec li{margin:6px 0;color:#DDE6F2}
+.rec b{color:#fff}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px}
+.two .panel ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:#33425C}
+.two li{margin:3px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<!--/head-->
+<div id="tip"></div>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Tools · Calibration · design directions</div>
+  <h1>See every calibration due, and spread the pile-ups</h1>
+  <p class="lede">The dashboard card stops at 13 weeks and offers nothing to click. Below: a stronger card, then three ways to see the whole timeline and even it out. Every mockup is live and works on the same sample fleet.</p>
+  <p class="small mut" style="margin-top:8px">Built from your screenshot. The repo has no Tools module, so the data here is sample data. Only the first 13 weeks match your card (10 tools, 3 Routers on 22 Dec). The numbers after that are made up to show what a pile-up looks like.</p>
+</header>
+
+<section style="margin-top:36px">
+  <h2>What the card can't do today</h2>
+  <div class="fgrid">
+    <div class="find"><span class="k">F1</span><b>It stops at 13 weeks</b><p><span id="f1"></span> of the 114 valid tools fall after the window, including the biggest cluster.</p></div>
+    <div class="find"><span class="k">F2</span><b>A pile-up looks like any bar</b><p>Week of 21 Dec has <span id="f2"></span> of the card's 10 tools. Nothing marks it as too many for one week.</p></div>
+    <div class="find"><span class="k">F3</span><b>Nothing opens</b><p>Bars are not clickable and Next due shows three rows, all Routers, all on 22 Dec.</p></div>
+    <div class="find"><span class="k">F4</span><b>Only one date per tool</b><p>A tool has a due date but no planned date, so there is no way to say "do this one early".</p></div>
+  </div>
+</section>
+
+<section style="margin-top:36px">
+  <h2>How spreading works</h2>
+  <div class="how">
+    <div class="yes"><h3>Move earlier: yes</h3><p>Calibrate a tool before its due date. The next due date becomes the calibration date plus its interval, so the pile-up breaks up for good.</p></div>
+    <div class="no"><h3>Move later: no</h3><p>Past the due date a tool is overdue. None of the options pushes a date back.</p></div>
+    <div class="chk2"><h3>The cost</h3><p>A tool loses the weeks it was pulled forward, once. Every option caps this (default 10 weeks). Please check this against your quality procedure.</p></div>
+  </div>
+</section>
+
+<section id="card">
+  <div class="sec-h"><span class="badge">0</span><div><h2>The card itself</h2><p>Same card, three changes: a longer view you can switch, a limit line that turns busy weeks amber, and a way into the planner. Click a bar or switch the range.</p></div></div>
+  <div class="cards">
+    <div><div class="cap-t">Today</div><div id="card-now"></div></div>
+    <div><div class="cap-t">Proposed</div><div id="card-new"></div></div>
+  </div>
+  <div class="chg">
+    <span class="pill">Range switch: 13 weeks, 6 months, 12 months</span>
+    <span class="pill">Dashed limit line, amber bars over it</span>
+    <span class="pill">Bars open the planner on that week</span>
+    <span class="pill">Same-day tools grouped in Next due</span>
+  </div>
+</section>
+
+<section id="option-a">
+  <div class="sec-h"><span class="badge">A</span><div><h2>Planner page</h2><p>"All ›" opens a page with the full timeline and every tool in a list, grouped by week. Each row can be moved earlier, with the free weeks suggested.</p></div><span class="pill">Build: medium</span></div>
+  <div class="frame" id="a-root">
+    <div class="appbar">Dashboard › Tools › <b>Calibration planner</b><span class="sp"></span><a class="btn sm" href="#option-b">Spread…</a></div>
+    <div class="pad"><div class="panel" id="a-top"></div></div>
+    <div class="a-filters">
+      <input type="search" id="a-q" placeholder="Search tool or category" aria-label="Search tools">
+      <select id="a-cat" aria-label="Category"><option value="">All categories</option></select>
+      <select id="a-lab" aria-label="Lab"><option value="">All labs</option></select>
+    </div>
+    <div id="a-list"></div>
+  </div>
+  <p class="try"><b>Try it:</b> switch to 12 months, click the tall bar, then press Move earlier on a row.</p>
+  <div class="gw">
+    <div class="panel"><h3>Good</h3><ul><li>Answers "see in detail" directly, with every tool and date.</li><li>Familiar: it is the card, bigger.</li><li>Works on a phone as a list, with the chart on top.</li></ul></div>
+    <div class="panel"><h3>Watch</h3><ul><li>Spreading is one tool at a time, slow for a 21-tool week.</li><li>Needs a new "planned date" field on each tool.</li></ul></div>
+  </div>
+</section>
+
+<section id="option-b">
+  <div class="sec-h"><span class="badge">B</span><div><h2>Spread assistant</h2><p>Set a limit per week and how early a tool may be pulled. The assistant proposes every move and shows before and after on the chart. Untick moves you disagree with, or move any tool by hand and the rules rebalance the others around it.</p></div><span class="pill">Build: medium</span></div>
+  <div class="frame" id="b-root">
+    <div class="appbar">Dashboard › Tools › Calibration planner › <b>Spread assistant</b></div>
+    <div class="b-grid">
+      <div class="panel b-set">
+        <h4>Rules</h4>
+        <label for="b-limit">Limit per week <output id="b-limit-o">5</output></label>
+        <input type="range" id="b-limit" min="2" max="10" value="5">
+        <label for="b-win">Pull forward at most <output id="b-win-o">10 weeks</output></label>
+        <input type="range" id="b-win" min="1" max="14" value="10">
+        <label class="chk"><input type="checkbox" id="b-inh"> Only move in-house tools</label>
+        <p class="small mut" style="margin-top:8px">Each tool goes to the nearest earlier week with room, so it loses as little of its cycle as possible. In-house tools move first. Nothing moves past its due date.</p>
+      </div>
+      <div id="b-out" style="min-width:0"></div>
+    </div>
+  </div>
+  <p class="try"><b>Try it:</b> lower the limit to 3 or the window to 2 weeks and watch what can no longer be placed. Then click a bar (try the week of 29 Mar), press Move… on a tool and pick a week by hand. Pick a full (amber) week and watch the rules move other tools out of it.</p>
+  <div class="gw">
+    <div class="panel"><h3>Good</h3><ul><li>Fixes a whole fleet in one go, and shows the effect first.</li><li>The dashed bars show where each week was before.</li><li>Rules are visible, so the result is easy to explain to a lab.</li><li>Override anything: change a proposed week, or move a tool the rules left alone.</li></ul></div>
+    <div class="panel"><h3>Watch</h3><ul><li>Hand moves are fixed points: the rules rebalance the other tools around them, and a full week you choose is only flagged over the limit if the rules can't make room.</li><li>A good result depends on the limit being right. It needs a setting for lab capacity.</li></ul></div>
+  </div>
+</section>
+
+<section id="option-c">
+  <div class="sec-h"><span class="badge">C</span><div><h2>Week board</h2><p>One column per week with the tools as cards, like the magnet board the app already uses. Drag a card to an earlier week. The strip on top jumps to any week of the next 18 months.</p></div><span class="pill">Build: large</span></div>
+  <div class="frame" id="c-root">
+    <div class="appbar">Dashboard › Tools › Calibration planner › <b>Week board</b></div>
+    <div class="pad">
+      <div class="panel">
+        <div class="navrow">
+          <b>Jump to a week</b>
+          <span class="lg"><span><i class="sw" style="background:rgba(0,182,122,.35)"></i>On the board</span><span><i class="sw" style="background:var(--amber-bar)"></i>Over limit</span></span>
+          <span style="flex:1"></span>
+          <button class="btn sm" data-act="c:prev">‹ Earlier</button>
+          <button class="btn sm" data-act="c:next">Later ›</button>
+        </div>
+        <div id="c-nav" class="chartwrap"></div>
+      </div>
+      <div id="c-note" style="margin-top:12px"></div>
+    </div>
+    <div id="c-board" style="margin-top:10px"></div>
+  </div>
+  <p class="try"><b>Try it:</b> drag a card from the week of 29 Mar (21 tools) to an empty week on its left. A week after the due date refuses the drop. On a touch screen, tap a card and pick a week from the list.</p>
+  <div class="gw">
+    <div class="panel"><h3>Good</h3><ul><li>Fastest way to arrange a cluster by hand, and easy to read.</li><li>Matches how people already think about the board.</li></ul></div>
+    <div class="panel"><h3>Watch</h3><ul><li>Biggest build: drag and drop plus a touch fallback.</li><li>A 21-card column is tall, so columns scroll.</li><li>Less useful for reading the data, better for changing it.</li></ul></div>
+  </div>
+</section>
+
+<section>
+  <h2>Comparing the three</h2>
+  <div class="tw" style="margin-top:14px">
+    <table class="cmp">
+      <tr><th></th><th>See beyond 13 weeks</th><th>Spread the load</th><th>Control</th><th>Build</th></tr>
+      <tr><td><b>A</b> Planner page</td><td>Full timeline and every tool in a list</td><td>By hand, one tool at a time, with free weeks suggested</td><td>High</td><td>Medium: a page and one new date field</td></tr>
+      <tr><td><b>B</b> Spread assistant</td><td>Timeline only, plus the list of moves</td><td>Automatic for the whole fleet, with a preview</td><td>Medium to high: tick moves, change a week, or move any tool by hand</td><td>Medium: needs the date field and the move rules</td></tr>
+      <tr><td><b>C</b> Week board</td><td>One week at a time, strip to jump</td><td>By dragging, fast for clusters</td><td>High and visual</td><td>Large: drag and drop, touch fallback</td></tr>
+    </table>
+  </div>
+  <div class="rec">
+    <h3>Recommendation: A first, then B inside it</h3>
+    <ol>
+      <li><b>Ship the card changes and A.</b> This is the smallest set that answers "see in detail" and lets you act.</li>
+      <li><b>Add B as a "Spread…" button in A's toolbar.</b> It reuses A's planned date, so it is mostly the move rules and one screen.</li>
+      <li><b>Leave C for later.</b> B and C both edit the same planned date, so C can be added if people want to arrange weeks by hand.</li>
+    </ol>
+  </div>
+  <div class="two">
+    <div class="panel"><h3>What the data needs</h3><ul>
+      <li>A <b>planned calibration date</b> on each tool, separate from the due date.</li>
+      <li>A <b>limit per week</b> setting, one number to start, per lab later.</li>
+      <li>A short <b>log of moves</b>: who moved what, from which week.</li>
+      <li>After a calibration: next due = date done + interval.</li>
+    </ul></div>
+    <div class="panel"><h3>Questions for you</h3><ul>
+      <li>Is there a real limit on calibrations per week, and is it per lab or per site?</li>
+      <li>Is calibrating early allowed, and how early at most?</li>
+      <li>Who calibrates: in-house, outside labs, or both? Should the plan treat them separately?</li>
+      <li>Should the dashboard chart show planned dates once they exist? (The mockups do.)</li>
+    </ul></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+/* ---------- dates & helpers ---------- */
+const DAY=864e5, MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const TODAY=new Date(2026,10,6), W0=new Date(2026,10,2), MAXW=72, WINDOW=10;
+const U=d=>Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
+const addDays=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+const addMonths=(d,m)=>new Date(d.getFullYear(),d.getMonth()+m,d.getDate());
+const weekOf=d=>Math.floor((U(d)-U(W0))/(7*DAY));
+const wStart=w=>addDays(W0,w*7);
+const fmt=d=>d.getDate()+' '+MON[d.getMonth()];
+const fmtY=d=>fmt(d)+' '+d.getFullYear();
+const dIn=d=>Math.round((U(d)-U(TODAY))/DAY);
+const calDate=t=>t.plan||t.due;
+const calWeek=t=>weekOf(calDate(t));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=(s,r=document)=>r.querySelector(s);
+const plural=(n,a,b)=>n===1?a:b;
+
+/* ---------- sample fleet: 114 valid tools, due dates clustered on purpose ---------- */
+const COUNTS={7:8,12:2,13:1,15:2,16:3,17:1,19:4,20:6,21:21,22:9,23:3,24:1,26:2,27:1,30:2,31:1,34:3,35:2,36:1,39:1,40:12,41:5,42:1,45:1,46:2,47:3,48:1,50:2,52:4,56:3,60:2,70:4};
+const CATS=[['Router',1],['Caliper',3],['Micrometer',2],['Torque wrench',3],['Multimeter',2],['Pressure gauge',2],['Thermometer',2],['Height gauge',1],['Dial indicator',1]];
+const PFX={'Router':'Router','Caliper':'Caliper','Micrometer':'Micro','Torque wrench':'Torque','Multimeter':'Multi','Pressure gauge':'Gauge','Thermometer':'Thermo','Height gauge':'Height','Dial indicator':'Dial'};
+const LABS=[['In-house',11],['ThaiCal Lab',5],['Metrolab BKK',4]], SITES=[['Rayong',4],['Map Ta Phut',3],['Chonburi',2],['Bangkok',2]];
+const FIX7=[['Router',1,'Router13'],['Router',1,'Router14'],['Router',1,'Router15'],['Caliper',2],['Caliper',2],['Micrometer',3],['Torque wrench',3],['Torque wrench',4]];
+function makeTools(){
+  let s=20261106;
+  const rnd=()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+  const pick=l=>{const tot=l.reduce((a,x)=>a+x[1],0);let r=rnd()*tot;for(const x of l){if((r-=x[1])<0)return x[0];}return l[0][0];};
+  const list=[];
+  Object.keys(COUNTS).map(Number).sort((a,b)=>a-b).forEach(w=>{
+    for(let i=0;i<COUNTS[w];i++){
+      let cat,day,code=null;
+      if(w===7){const f=FIX7[i];cat=f[0];day=f[1];code=f[2]||null;}
+      else{cat=pick(CATS);day=Math.floor(rnd()*5);}
+      list.push({cat,code,due:addDays(wStart(w),day),lab:pick(LABS),site:pick(SITES)});
+    }
+  });
+  list.sort((a,b)=>a.due-b.due);
+  const n={};
+  list.forEach((t,i)=>{
+    if(!t.code){let k=(n[t.cat]||0)+1;if(t.cat==='Router'&&k>=13&&k<=15)k=16;n[t.cat]=k;t.code=PFX[t.cat]+k;}
+    const mu=(t.due-TODAY)/(30.44*DAY);
+    t.interval=pick([[6,2],[12,6],[24,2]].filter(o=>o[0]>=mu));
+    while(addMonths(t.due,-t.interval)>TODAY)t.interval=t.interval===6?12:24;
+    t.last=addMonths(t.due,-t.interval);t.id='T'+(i+1);t.plan=null;
+  });
+  return list;
+}
+const BASE=makeTools();
+const countsOf=ts=>{const a=new Array(MAXW).fill(0);ts.forEach(t=>{const w=calWeek(t);if(w>=0&&w<MAXW)a[w]++;});return a;};
+const dueCounts=ts=>{const a=new Array(MAXW).fill(0);ts.forEach(t=>{a[weekOf(t.due)]++;});return a;};
+const nextDue=t=>addMonths(calDate(t),t.interval);
+
+/* free weeks before the due date for one tool */
+function slotsFor(t,counts,cap,back=WINDOW){
+  const dw=weekOf(t.due),cw=calWeek(t),out=[];
+  for(let w=dw-1;w>=Math.max(1,dw-back);w--){
+    if(w===cw)continue;
+    const plan=addDays(t.due,-7*(dw-w));
+    if(dIn(plan)<1)continue;
+    out.push({w,plan,used:counts[w],early:dw-w,free:counts[w]<cap});
+  }
+  return out;
+}
+function setWeek(t,w){const dw=weekOf(t.due);t.plan=w>=dw?null:addDays(t.due,-7*(dw-w));}
+function slotBtns(act,t,counts,cap){
+  const sl=slotsFor(t,counts,cap).filter(s=>s.free).slice(0,6);
+  let h=`<div class="sl-t">Calibrate before ${fmt(t.due)}. After that, the next due date is the calibration date plus ${t.interval} months.</div>`;
+  h+=sl.length?sl.map(s=>`<button class="slot" data-act="${act}" data-id="${t.id}" data-w="${s.w}">${fmt(s.plan)}<small>wk of ${fmt(wStart(s.w))} · ${s.used}/${cap} used · ${s.early} wk early</small></button>`).join(''):`<span class="small mut">No week within ${WINDOW} weeks has room. Raise the limit.</span>`;
+  if(t.plan)h+=`<button class="slot" data-act="${act}" data-id="${t.id}" data-w="${weekOf(t.due)}">Back to due date<small>${fmt(t.due)}</small></button>`;
+  return h;
+}
+
+/* ---------- chart (HTML bars, so labels stay sharp at any width) ---------- */
+function chartHTML(o){
+  const {counts,from=0,to,cap=0,sel=null,ghost=null,h=150,axis=true,label='month',win=null,cid}=o;
+  const n=to-from,vals=[];for(let w=from;w<to;w++)vals.push(counts[w]||0);
+  const gv=ghost?ghost.slice(from,to):[];
+  const mx=Math.max(cap,1,...vals,...gv);
+  const step=mx<=5?1:mx<=10?2:mx<=25?5:10,top=Math.ceil(mx/step)*step;
+  let yt='',gl='';
+  if(axis)for(let v=0;v<=top;v+=step){const b=v/top*100;gl+=`<i class="gl" style="bottom:${b}%"></i>`;if(v!==cap)yt+=`<span class="yt" style="bottom:${b}%">${v}</span>`;}
+  const cb=cap?cap/top*100:0;
+  const capEl=cap?`<i class="capline" style="bottom:${cb}%"></i>`:'';
+  const capLb=cap&&axis?`<span class="yt cl" style="bottom:${cb}%">${cap}</span>`:'';
+  let cols='',xl='';
+  for(let w=from;w<to;w++){
+    const c=counts[w]||0,g=ghost?ghost[w]:null;
+    let tip=`Week of ${fmt(wStart(w))}\n${c} ${plural(c,'tool','tools')} to calibrate`;
+    if(cap&&c>cap)tip+=` · ${c-cap} over the limit`;
+    if(g!=null&&g!==c)tip+=`\nBefore: ${g}`;
+    const inw=win&&w>=win[0]&&w<win[1];
+    cols+=`<div class="col${w===sel?' sel':''}${cap&&c>cap?' over':''}${inw?' inwin':''}" data-w="${w}" data-tip="${esc(tip)}">`+
+      (g!=null&&g!==c?`<i class="ghost" style="height:${g/top*100}%"></i>`:'')+
+      `<i class="bar${c?'':' e'}"${c?` style="height:${c/top*100}%"`:''}></i></div>`;
+    let t='',cls='xl';
+    if(label==='rel'){
+      if(w===0){t='This week';cls+=' l';}
+      else if(w%4===0){t='+'+w+(w===to-1?' weeks':'');if(w===to-1)cls+=' r';}
+    }else{
+      const m=wStart(w).getMonth();
+      if(w===0){t='Now';cls+=' l';}
+      else if(w===from||m!==wStart(w-1).getMonth())t=MON[m]+(m===0?" '"+String(wStart(w).getFullYear()).slice(2):'');
+    }
+    xl+=`<span class="${cls}">${t}</span>`;
+  }
+  return `<div class="chart${axis?'':' noax'}" data-cid="${cid}" style="--n:${n};--h:${h}px"><div class="plot"><div class="yax">${yt}${capLb}</div><div class="area">${gl}${capEl}<div class="cols">${cols}</div></div></div><div class="xrow"><span></span><div class="xg">${xl}</div></div></div>`;
+}
+const legendHTML=(cap,ghost)=>`<div class="lg"><span><i class="sw" style="background:var(--bar)"></i>Within limit</span><span><i class="sw" style="background:var(--amber-bar)"></i>Over limit</span><span><i class="sw dash"></i>Limit ${cap} per week</span>${ghost?'<span><i class="sw gh"></i>Before</span>':''}</div>`;
+
+/* ---------- dashboard cards ---------- */
+const IC={
+  wrench:'<svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  cal:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18M12 14v3l2 1"/></svg>',
+  warn:'<svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3zM12 10v4M12 17h.01"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>'
+};
+const K={hz:'6m',hint:''}, KCAP=5;
+const KH={'13w':13,'6m':26,'12m':52};
+const sortedBase=[...BASE].sort((a,b)=>a.due-b.due||a.code.localeCompare(b.code));
+function statusHTML(){
+  return `<div><div class="ksub" style="margin-bottom:8px"><b class="kst" style="color:var(--ink)">Calibration status</b><span>117</span></div>
+  <div class="kbar"><i style="width:${114/117*100}%;background:var(--green)"></i><i style="width:${3/117*100}%;background:var(--grey);margin-left:2px"></i></div>
+  <div class="klg"><span><i class="dot" style="background:var(--green)"></i>Valid <b>114</b></span><span><i class="dot" style="background:var(--red)"></i>Overdue <b>0</b></span><span><i class="dot" style="background:var(--grey)"></i>Not required <b>3</b></span></div></div>`;
+}
+function cardNow(){
+  const counts=countsOf(BASE),n=counts.slice(0,13).reduce((a,b)=>a+b,0);
+  const rows=sortedBase.slice(0,3).map(t=>`<div class="krow"><div class="kn"><b>${t.cat}</b> <span>· ${t.code}</span></div><span class="kpill">${IC.cal}In ${dIn(t.due)} d</span></div>`).join('');
+  return `<div class="kcard"><div class="kh"><span class="kt">${IC.wrench}Tools · Calibration ahead</span><span class="kall">All ${IC.chev}</span></div>
+  <div><div class="ksub"><span>Due per week, next 13 weeks</span><span>${n} tools</span></div>
+  <div class="chartwrap" style="margin-top:8px">${chartHTML({counts,from:0,to:13,h:112,axis:false,label:'rel',cid:'now'})}</div></div>
+  <div><div class="kst" style="margin-bottom:4px">Next due</div>${rows}</div>${statusHTML()}</div>`;
+}
+function groupedNext(){
+  const g=[];
+  [...BASE].sort((a,b)=>a.due-b.due||a.cat.localeCompare(b.cat)||a.code.localeCompare(b.code)).forEach(t=>{
+    const l=g[g.length-1];
+    if(l&&l.cat===t.cat&&U(l.due)===U(t.due))l.codes.push(t.code);else g.push({cat:t.cat,due:t.due,codes:[t.code]});
+  });
+  return g.slice(0,3);
+}
+function cardNew(){
+  const to=KH[K.hz],counts=countsOf(BASE),over=[];
+  for(let w=0;w<to;w++)if(counts[w]>KCAP)over.push(w);
+  const worst=over.reduce((b,w)=>b===null||counts[w]>counts[b]?w:b,null);
+  const n=counts.slice(0,to).reduce((a,b)=>a+b,0);
+  const rows=groupedNext().map(g=>{
+    const nums=g.codes.map(c=>parseInt(c.replace(/\D+/g,''),10));
+    const seq=g.codes.length>1&&nums.every((x,i)=>i===0||x===nums[i-1]+1);
+    const sub=g.codes.length===1?g.codes[0]:seq?g.codes[0]+'–'+nums[nums.length-1]:g.codes.join(', ');
+    return `<div class="krow"><div class="kn"><b>${g.codes.length>1?g.codes.length+' × ':''}${g.cat}</b> <span>· ${sub}</span></div><span class="kpill">${IC.cal}${fmt(g.due)} · In ${dIn(g.due)} d</span></div>`;
+  }).join('');
+  const lbl={'13w':'13 weeks','6m':'6 months','12m':'12 months'}[K.hz];
+  return `<div class="kcard"><div class="kh"><span class="kt">${IC.wrench}Tools · Calibration ahead</span><a class="kall" href="#option-a">All ${IC.chev}</a></div>
+  <div><div class="ksub"><span>Due per week, next ${lbl} · ${n} tools</span>
+    <div class="seg" role="group" aria-label="Range">${[['13w','13 wk'],['6m','6 mo'],['12m','12 mo']].map(([k,l])=>`<button data-act="k:hz" data-v="${k}" aria-pressed="${K.hz===k}">${l}</button>`).join('')}</div></div>
+  <div class="chartwrap" style="margin-top:8px">${chartHTML({counts,from:0,to,cap:KCAP,h:112,axis:false,label:'month',cid:'k'})}</div>
+  <div class="lg" style="margin-top:6px"><span><i class="sw" style="background:var(--bar)"></i>Within limit</span><span><i class="sw" style="background:var(--amber-bar)"></i>Over limit</span><span><i class="sw dash"></i>Limit ${KCAP} per week</span></div>
+  <div class="khint">${K.hint}</div></div>
+  ${over.length?`<div class="kalert"><span style="display:flex;gap:8px;align-items:center">${IC.warn}<span>${over.length} ${plural(over.length,'week is','weeks are')} over the limit. Busiest: week of ${fmt(wStart(worst))} with ${counts[worst]} tools.</span></span><a class="btn sm" href="#option-b">Spread…</a></div>`:`<div class="kalert" style="background:var(--green-bg);color:#0A5A3C"><span>No week over the limit in this range.</span></div>`}
+  <div><div class="kst" style="margin-bottom:4px">Next due</div>${rows}</div>${statusHTML()}</div>`;
+}
+const renderCards=()=>{$('#card-now').innerHTML=cardNow();$('#card-new').innerHTML=cardNew();};
+
+/* ---------- A: planner page ---------- */
+const HZ={'13w':13,'6m':26,'12m':52,'all':MAXW};
+const A={tools:makeTools(),hz:'12m',cap:5,week:null,cat:'',lab:'',q:'',menu:null,note:null};
+function renderA(){
+  const counts=countsOf(A.tools),to=HZ[A.hz];
+  const over=counts.slice(0,to).filter(c=>c>A.cap).length,n=counts.slice(0,to).reduce((a,b)=>a+b,0);
+  $('#a-top').innerHTML=`<div class="bar-row">
+    <div class="seg" role="group" aria-label="Range">${[['13w','13 weeks'],['6m','6 months'],['12m','12 months'],['all','All']].map(([k,l])=>`<button data-act="a:hz" data-v="${k}" aria-pressed="${A.hz===k}">${l}</button>`).join('')}</div>
+    <span class="step">Limit <button data-act="a:cap" data-d="-1" aria-label="Lower the limit">−</button><b>${A.cap}</b><button data-act="a:cap" data-d="1" aria-label="Raise the limit">+</button> per week</span>
+    <span class="grow"></span>
+    <span class="pill">${n} tools</span>${over?`<span class="pill amber">${over} ${plural(over,'week','weeks')} over limit</span>`:'<span class="pill green">No week over limit</span>'}</div>
+    <div class="bar-row" style="margin-bottom:8px"><b style="font-size:13px">Calibrations per week</b><span class="small mut">Planned date, otherwise due date. Click a bar to filter the list.</span><span class="grow"></span>${legendHTML(A.cap)}</div>
+    <div class="chartwrap">${chartHTML({counts,from:0,to,cap:A.cap,sel:A.week,h:150,cid:'a'})}</div>`;
+  const q=A.q.trim().toLowerCase();
+  const rows=A.tools.filter(t=>{const w=calWeek(t);return w<to&&(A.week===null||w===A.week)&&(!A.cat||t.cat===A.cat)&&(!A.lab||t.lab===A.lab)&&(!q||(t.code+' '+t.cat).toLowerCase().includes(q));})
+    .sort((a,b)=>calDate(a)-calDate(b)||a.code.localeCompare(b.code));
+  let h='';
+  if(A.note)h+=`<div class="note ok" style="margin:0 16px 10px">${A.note.text}<button class="btn sm" data-act="a:undo" data-id="${A.note.id}">Undo</button></div>`;
+  if(A.week!==null)h+=`<div style="margin:0 16px 10px"><button class="btn sm" data-act="a:clearweek">Week of ${fmt(wStart(A.week))} ✕</button></div>`;
+  h+=`<div class="tblwrap"><div class="tbl"><div class="tr th"><span>Tool</span><span>Site</span><span>Lab</span><span>Last done</span><span>Due</span><span>Planned</span><span></span></div>`;
+  if(!rows.length)h+='<div class="empty">No tools match.</div>';
+  let cur=-1;
+  rows.forEach(t=>{
+    const w=calWeek(t);
+    if(w!==cur){cur=w;const c=counts[w];h+=`<div class="gh2"><b>Week of ${fmt(wStart(w))}</b><span class="mut">${c} ${plural(c,'tool','tools')}</span>${c>A.cap?`<span class="pill amber">${c-A.cap} over limit of ${A.cap}</span>`:''}</div>`;}
+    const early=weekOf(t.due)-calWeek(t);
+    h+=`<div class="tr"><span><b>${t.code}</b> <span class="c">${t.cat}</span></span><span class="c">${t.site}</span><span class="c">${t.lab}</span><span class="c">${fmt(t.last)} ${String(t.last.getFullYear()).slice(2)}</span>
+      <span>${fmt(t.due)} <span class="pill" style="margin-left:4px">In ${dIn(t.due)} d</span></span>
+      <span>${t.plan?`<span class="pill green">${fmt(t.plan)} · ${early} wk early</span>`:'<span class="c">—</span>'}</span>
+      <span>${t.plan?`<button class="btn sm" data-act="a:undo" data-id="${t.id}">Undo</button>`:`<button class="btn sm" data-act="a:move" data-id="${t.id}">Move earlier</button>`}</span></div>`;
+    if(A.menu===t.id)h+=`<div class="slots">${slotBtns('a:slot',t,counts,A.cap)}</div>`;
+  });
+  h+='</div></div>';
+  $('#a-list').innerHTML=h;
+}
+const aTool=id=>A.tools.find(t=>t.id===id);
+
+/* ---------- B: spread assistant ---------- */
+const B={tools:makeTools(),limit:5,win:10,inh:false,off:new Set(),manual:new Map(),applied:false,week:null,menu:null};
+function bPropose(){
+  const byW=Array.from({length:MAXW},()=>[]);
+  B.tools.forEach(t=>byW[B.manual.has(t.id)?B.manual.get(t.id):weekOf(t.due)].push(t));
+  const base=dueCounts(B.tools),moves=[],stuck=[];
+  for(let w=0;w<MAXW;w++){
+    let over=byW[w].length-B.limit;
+    if(over<=0)continue;
+    const cand=byW[w].filter(t=>!B.manual.has(t.id)&&(!B.inh||t.lab==='In-house')).sort((a,b)=>(a.lab==='In-house'?0:1)-(b.lab==='In-house'?0:1)||b.due-a.due);
+    for(const t of cand){
+      if(over<=0)break;
+      for(let tw=w-1;tw>=Math.max(1,w-B.win);tw--){
+        if(byW[tw].length>=B.limit)continue;
+        const plan=addDays(t.due,-7*(w-tw));
+        if(dIn(plan)<1)continue;
+        byW[w]=byW[w].filter(x=>x!==t);byW[tw].push(t);
+        moves.push({t,from:w,to:tw,plan});over--;break;
+      }
+    }
+    if(over>0)stuck.push({w,over});
+  }
+  B.manual.forEach((to,id)=>{const t=B.tools.find(x=>x.id===id),from=weekOf(t.due);moves.push({t,from,to,plan:to>=from?t.due:addDays(t.due,-7*(from-to)),manual:true});});
+  moves.sort((a,b)=>a.from-b.from||(a.manual?1:0)-(b.manual?1:0)||a.t.due-b.t.due||a.t.code.localeCompare(b.t.code));
+  return {base,moves,stuck};
+}
+const bActive=mv=>mv.manual||!B.off.has(mv.t.id);
+function bFinal(p){
+  const m=new Map();B.tools.forEach(t=>m.set(t.id,weekOf(t.due)));
+  p.moves.forEach(mv=>{if(bActive(mv))m.set(mv.t.id,mv.to);});
+  return m;
+}
+function bSlotsHTML(t,after,fin){
+  const dw=weekOf(t.due),my=fin.get(t.id),opts=[];
+  for(let w=dw-1;w>=Math.max(1,dw-B.win);w--){
+    const plan=addDays(t.due,-7*(dw-w));if(dIn(plan)<1)continue;
+    const used=after[w]-(w===my?1:0),full=used>=B.limit;
+    opts.push(`<button class="slot${full?' full':''}" data-act="b:slot" data-id="${t.id}" data-w="${w}">${fmt(plan)}<small>wk of ${fmt(wStart(w))} · ${used}/${B.limit} used · ${dw-w} wk early${full?' · over limit':''}</small></button>`);
+  }
+  return `<div class="slots"><div class="sl-t">Choose the week for ${t.code} (due ${fmt(t.due)}). A full week is allowed: the rules then move other tools out of it.</div>${opts.join('')}<button class="slot" data-act="b:slot" data-id="${t.id}" data-w="${dw}">Stay on due date<small>${fmt(t.due)}</small></button>${B.manual.has(t.id)?`<button class="slot" data-act="b:unmanual" data-id="${t.id}">Back to the suggestion<small>Let the rules decide</small></button>`:''}</div>`;
+}
+function bWeekPanel(after,fin){
+  const w=B.week;if(w===null)return '';
+  const rows=B.tools.filter(t=>weekOf(t.due)===w||fin.get(t.id)===w).sort((a,b)=>a.due-b.due||a.code.localeCompare(b.code));
+  let h=`<div class="panel" style="margin-top:12px"><div class="bar-row" style="margin-bottom:8px"><b>Week of ${fmt(wStart(w))}</b><span class="pill${after[w]>B.limit?' amber':''}">${after[w]} of ${B.limit}</span><span class="small mut">Move any tool by hand, whether or not the rules suggested it.</span><span class="grow"></span><button class="btn sm" data-act="b:closeweek">Close</button></div><div class="mv" style="margin-top:0">`;
+  rows.forEach(t=>{
+    const f=fin.get(t.id),dw=weekOf(t.due),man=B.manual.has(t.id);
+    const chip=f===w&&dw===w?'<span class="pill">Due this week</span>':f===w?`<span class="pill green">Pulled from ${fmt(wStart(dw))}</span>`:`<span class="pill green">Moving to ${fmt(wStart(f))}</span>`;
+    h+=`<div class="wkr${f!==w?' off':''}"><span><b>${t.code}</b> <span class="mut">${t.cat}</span></span><span>due ${fmt(t.due)}</span><span>${chip}${man?' <span class="pill navy">Manual</span>':''}</span><span class="mut">${t.lab}</span><button class="btn sm" data-act="b:menu" data-id="${t.id}">Move…</button></div>`;
+    if(B.menu===t.id)h+=bSlotsHTML(t,after,fin);
+  });
+  return h+'</div></div>';
+}
+function renderB(){
+  const p=bPropose(),fin=bFinal(p);
+  const on=p.moves.filter(mv=>bActive(mv)&&mv.to!==mv.from),nMan=B.manual.size;
+  const after=new Array(MAXW).fill(0);fin.forEach(w=>after[w]++);
+  const overB=p.base.filter(c=>c>B.limit).length,overA=after.filter(c=>c>B.limit).length;
+  const avg=on.length?on.reduce((a,m)=>a+(m.from-m.to),0)/on.length:0,mx=Math.max(0,...on.map(m=>m.from-m.to));
+  const stuckN=p.stuck.reduce((a,s)=>a+s.over,0);
+  let h=`<div class="kpis">
+    <div class="kpi"><small>Weeks over limit</small><b>${overB}<i>→</i>${overA}</b></div>
+    <div class="kpi"><small>Tools moved</small><b>${on.length}</b>${nMan?`<small style="margin-top:2px">${nMan} by hand</small>`:''}</div>
+    <div class="kpi"><small>Average pulled forward</small><b>${avg.toFixed(1)} wk</b></div>
+    <div class="kpi"><small>Longest pulled forward</small><b>${mx} wk</b></div></div>
+    <div class="panel"><div class="bar-row" style="margin-bottom:8px"><b style="font-size:13px">Calibrations per week, before and after</b><span class="small mut">Click a bar to see its tools and move one by hand.</span><span class="grow"></span>${legendHTML(B.limit,true)}</div>
+    <div class="chartwrap">${chartHTML({counts:after,ghost:p.base,from:0,to:MAXW,cap:B.limit,sel:B.week,h:150,cid:'b'})}</div></div>`;
+  h+=bWeekPanel(after,fin);
+  if(p.stuck.length)h+=`<div class="note warn" style="margin-top:12px">Still over the limit: ${p.stuck.map(s=>`week of ${fmt(wStart(s.w))} (${s.over})`).join(', ')}. Raise the window or the limit${B.inh?', allow outside-lab tools':''}, or move tools by hand.</div>`;
+  if(nMan)h+=`<div class="note" style="margin-top:12px;background:#E6EDF7;color:var(--navy)">${nMan} ${plural(nMan,'tool is','tools are')} placed by hand. The rules keep them where you put them and rebalance the others around them.<button class="btn sm" data-act="b:clearmanual">Clear manual changes</button></div>`;
+  if(B.applied)h+=`<div class="note ok" style="margin-top:12px">✓ ${on.length} calibrations planned. They now show as planned dates on the dashboard chart and in the planner.<button class="btn sm" data-act="b:undo">Undo</button></div>`;
+  else if(on.length)h+=`<div class="bar-row" style="margin:12px 0 0"><button class="btn pri" data-act="b:apply">Plan ${on.length} calibrations</button><span class="small mut">Sets a planned date on each tool. Due dates stay until the calibration is done.</span></div>`;
+  else h+=`<div class="note ok" style="margin-top:12px">Nothing to move. Every week is within the limit.</div>`;
+  if(p.moves.length){
+    h+=`<div class="bar-row" style="margin:14px 0 0"><b style="font-size:13px">Planned moves</b><span class="grow"></span><button class="btn sm" data-act="b:all" data-v="1">Select all</button><button class="btn sm" data-act="b:all" data-v="0">Select none</button></div><div class="mv">`;
+    let cur=-1;
+    p.moves.forEach(m=>{
+      if(m.from!==cur){cur=m.from;h+=`<div class="gh2" style="top:0"><b>From week of ${fmt(wStart(m.from))}</b><span class="mut">${p.base[m.from]} due, limit ${B.limit}</span></div>`;}
+      const off=!m.manual&&B.off.has(m.t.id),stay=m.to===m.from;
+      h+=`<div class="mvr${off?' off':''}">${m.manual?'<span title="Placed by hand" style="text-align:center">✎</span>':`<input type="checkbox" data-act="b:tog" data-id="${m.t.id}" ${off?'':'checked'} aria-label="Move ${m.t.code}">`}<span><b>${m.t.code}</b> <span class="mut">${m.t.cat}</span></span><span>${stay?`Stays ${fmt(m.t.due)}`:`${fmt(m.t.due)} → <b>${fmt(m.plan)}</b>`}</span><span>${stay?'<span class="pill">Due date</span>':`<span class="pill green">${m.from-m.to} wk early</span>`}${m.manual?' <span class="pill navy">Manual</span>':''}</span><span class="mut">${m.t.lab}</span><button class="btn sm" data-act="b:menu" data-id="${m.t.id}">${m.manual?'Change':'Change week'}</button></div>`;
+      if(B.menu===m.t.id)h+=bSlotsHTML(m.t,after,fin);
+    });
+    h+='</div>';
+  }
+  $('#b-out').innerHTML=h;
+}
+function bReset(){B.off=new Set();B.applied=false;B.menu=null;}
+
+/* ---------- C: week board ---------- */
+const C={tools:makeTools(),start:15,cols:8,menu:null,drag:null,note:null};
+const CCAP=5;
+function renderC(){
+  const counts=countsOf(C.tools),end=Math.min(C.start+C.cols,MAXW);
+  $('#c-nav').innerHTML=chartHTML({counts,from:0,to:MAXW,cap:CCAP,win:[C.start,end],axis:false,h:56,cid:'cnav'});
+  $('#c-note').innerHTML=C.note?`<div class="note ${C.note.kind}" style="margin:0">${C.note.text}</div>`:'';
+  let h='<div class="board">';
+  for(let w=C.start;w<end;w++){
+    const ts=C.tools.filter(t=>calWeek(t)===w).sort((a,b)=>calDate(a)-calDate(b)||a.code.localeCompare(b.code));
+    const over=ts.length>CCAP;
+    h+=`<div class="bcol" data-w="${w}"><div class="bch"><div class="r1"><span><span class="wk">Week of</span><b>${fmt(wStart(w))}</b></span><span class="pill${over?' amber':''}">${ts.length} / ${CCAP}</span></div><div class="meter${over?' over':''}"><i style="width:${Math.min(100,ts.length/CCAP*100)}%"></i></div></div><div class="bcb">`;
+    if(!ts.length)h+='<div class="bempty">Free. Drop a tool here.</div>';
+    ts.forEach(t=>{
+      const early=weekOf(t.due)-w;
+      h+=`<div class="chipwrap"><div class="chip2${t.plan?' moved':''}" draggable="true" data-id="${t.id}" data-act="c:chip" title="Due ${fmt(t.due)}${t.plan?' · planned '+fmt(t.plan):''}"><span class="cn"><b>${t.code}</b><span>${t.cat}</span></span><span class="cd">${t.plan?'−'+early+' wk':'due '+fmt(t.due)}</span></div>`;
+      if(C.menu===t.id)h+=`<div class="slots">${slotBtns('c:slot',t,t.plan?countsOf(C.tools):counts,CCAP)}</div>`;
+      h+='</div>';
+    });
+    h+='</div></div>';
+  }
+  $('#c-board').innerHTML=h+'</div>';
+}
+const cTool=id=>C.tools.find(t=>t.id===id);
+function cMove(t,w){
+  const dw=weekOf(t.due);
+  if(w>dw){C.note={kind:'no',text:`Not allowed. ${t.code} is due ${fmt(t.due)}, so it can't be calibrated in the week of ${fmt(wStart(w))}.`};return;}
+  if(w===calWeek(t))return;
+  const used=countsOf(C.tools)[w];
+  setWeek(t,w);
+  if(t.plan&&dIn(t.plan)<1){t.plan=null;C.note={kind:'no',text:'That week has already started.'};return;}
+  const when=t.plan?fmt(t.plan):fmt(t.due);
+  C.note=used>=CCAP
+    ?{kind:'warn',text:`${t.code} planned for ${when}. Week of ${fmt(wStart(w))} is now over the limit (${used+1} of ${CCAP}).`}
+    :{kind:'ok',text:`${t.code} planned for ${when}${t.plan?`, ${dw-w} wk before it is due`:' (its due date)'}. After that, the next due date is ${fmtY(nextDue(t))}.`};
+}
+
+/* ---------- events ---------- */
+const CH={
+  k:w=>{K.hint=`→ Planner opens on the week of ${fmt(wStart(w))} (${countsOf(BASE)[w]} ${plural(countsOf(BASE)[w],'tool','tools')})`;renderCards();},
+  a:w=>{A.week=A.week===w?null:w;A.menu=null;renderA();},
+  b:w=>{B.week=B.week===w?null:w;B.menu=null;renderB();},
+  cnav:w=>{C.start=Math.max(0,Math.min(MAXW-C.cols,w-3));renderC();}
+};
+const ACT={
+  'k:hz':d=>{K.hz=d.v;K.hint='';renderCards();},
+  'a:hz':d=>{A.hz=d.v;A.week=null;A.menu=null;renderA();},
+  'a:cap':d=>{A.cap=Math.max(2,Math.min(10,A.cap+ +d.d));renderA();},
+  'a:clearweek':()=>{A.week=null;renderA();},
+  'a:move':d=>{A.menu=A.menu===d.id?null:d.id;renderA();},
+  'a:slot':d=>{const t=aTool(d.id);setWeek(t,+d.w);A.menu=null;
+    A.note={id:t.id,text:t.plan?`${t.code} planned for ${fmt(t.plan)}, ${weekOf(t.due)-calWeek(t)} wk before it is due. After that, the next due date is ${fmtY(nextDue(t))}.`:`${t.code} is back on its due date.`};renderA();},
+  'a:undo':d=>{aTool(d.id).plan=null;A.note=null;renderA();},
+  'b:tog':d=>{B.off.has(d.id)?B.off.delete(d.id):B.off.add(d.id);B.applied=false;renderB();},
+  'b:all':d=>{const p=bPropose();B.off=d.v==='1'?new Set():new Set(p.moves.filter(m=>!m.manual).map(m=>m.t.id));B.applied=false;renderB();},
+  'b:menu':d=>{B.menu=B.menu===d.id?null:d.id;renderB();},
+  'b:slot':d=>{B.manual.set(d.id,+d.w);B.off.delete(d.id);B.menu=null;B.applied=false;renderB();},
+  'b:unmanual':d=>{B.manual.delete(d.id);B.menu=null;B.applied=false;renderB();},
+  'b:closeweek':()=>{B.week=null;B.menu=null;renderB();},
+  'b:clearmanual':()=>{B.manual=new Map();B.menu=null;B.applied=false;renderB();},
+  'b:apply':()=>{B.applied=true;renderB();},
+  'b:undo':()=>{B.applied=false;renderB();},
+  'c:chip':d=>{C.menu=C.menu===d.id?null:d.id;renderC();},
+  'c:slot':d=>{C.menu=null;cMove(cTool(d.id),+d.w);renderC();},
+  'c:prev':()=>{C.start=Math.max(0,C.start-C.cols);renderC();},
+  'c:next':()=>{C.start=Math.min(MAXW-C.cols,C.start+C.cols);renderC();}
+};
+document.addEventListener('click',e=>{
+  const col=e.target.closest('.col');
+  if(col){const ch=col.closest('.chart');const f=ch&&CH[ch.dataset.cid];if(f)f(+col.dataset.w);return;}
+  const el=e.target.closest('[data-act]');
+  if(!el||el.tagName==='INPUT')return;
+  const f=ACT[el.dataset.act];if(f)f(el.dataset);
+});
+document.addEventListener('change',e=>{const el=e.target.closest&&e.target.closest('input[data-act]');if(el){const f=ACT[el.dataset.act];if(f)f(el.dataset);}});
+
+/* tooltip */
+const tip=$('#tip');
+document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.col[data-tip]');if(c){tip.textContent=c.dataset.tip;tip.style.display='block';}else tip.style.display='none';});
+document.addEventListener('mousemove',e=>{if(tip.style.display==='block'){tip.style.left=Math.max(8,Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8))+'px';tip.style.top=(e.clientY+16)+'px';}});
+document.addEventListener('mouseleave',()=>{tip.style.display='none';});
+
+/* drag and drop for the board */
+function markCols(on){
+  document.querySelectorAll('#c-root .bcol').forEach(col=>{
+    col.classList.remove('ok','full','no','hot');
+    if(!on)return;
+    const t=cTool(C.drag),w=+col.dataset.w;
+    if(w>weekOf(t.due))col.classList.add('no');
+    else if(w!==calWeek(t))col.classList.add(countsOf(C.tools)[w]>=CCAP?'full':'ok');
+  });
+}
+document.addEventListener('dragstart',e=>{
+  const c=e.target.closest&&e.target.closest('#c-root .chip2');if(!c)return;
+  C.drag=c.dataset.id;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',C.drag);
+  c.classList.add('dragging');markCols(true);
+});
+document.addEventListener('dragover',e=>{
+  const col=e.target.closest&&e.target.closest('#c-root .bcol');
+  if(!col||!C.drag)return;
+  e.preventDefault();e.dataTransfer.dropEffect='move';if(!col.classList.contains('no'))col.classList.add('hot');
+});
+document.addEventListener('dragleave',e=>{const col=e.target.closest&&e.target.closest('#c-root .bcol');if(col&&!col.contains(e.relatedTarget))col.classList.remove('hot');});
+document.addEventListener('drop',e=>{
+  const col=e.target.closest&&e.target.closest('#c-root .bcol');
+  if(!col||!C.drag)return;
+  e.preventDefault();
+  const t=cTool(C.drag);C.drag=null;C.menu=null;
+  cMove(t,+col.dataset.w);renderC();
+});
+document.addEventListener('dragend',()=>{if(C.drag){C.drag=null;markCols(false);document.querySelectorAll('#c-root .dragging').forEach(x=>x.classList.remove('dragging'));}});
+
+/* static controls */
+const cats=[...new Set(BASE.map(t=>t.cat))].sort(),labs=[...new Set(BASE.map(t=>t.lab))].sort();
+$('#a-cat').innerHTML+=cats.map(c=>`<option>${c}</option>`).join('');
+$('#a-lab').innerHTML+=labs.map(c=>`<option>${c}</option>`).join('');
+$('#a-q').addEventListener('input',e=>{A.q=e.target.value;renderA();});
+$('#a-cat').addEventListener('change',e=>{A.cat=e.target.value;renderA();});
+$('#a-lab').addEventListener('change',e=>{A.lab=e.target.value;renderA();});
+$('#b-limit').addEventListener('input',e=>{B.limit=+e.target.value;$('#b-limit-o').textContent=B.limit;bReset();renderB();});
+$('#b-win').addEventListener('input',e=>{B.win=+e.target.value;$('#b-win-o').textContent=B.win+(B.win===1?' week':' weeks');bReset();renderB();});
+$('#b-inh').addEventListener('change',e=>{B.inh=e.target.checked;bReset();renderB();});
+
+/* findings, filled from the data so the numbers always match */
+const _c=countsOf(BASE);
+$('#f1').textContent=_c.slice(13).reduce((a,b)=>a+b,0);
+$('#f2').textContent=_c[7];
+renderCards();renderA();renderB();renderC();
+</script>

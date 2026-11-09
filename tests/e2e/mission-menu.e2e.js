@@ -81,7 +81,7 @@ async function step(name, fn) {
       await emp("e6").click();
     });
 
-    await step("double-click still opens Edit Employee, and its second click doesn't unselect", async () => {
+    await step("double-click opens the Profile, and its second click doesn't unselect", async () => {
       await p.evaluate(() => clearSelection());
       await emp("e6").click();
       assert.deepEqual(await selected(), ["e6"]);
@@ -89,7 +89,7 @@ async function step(name, fn) {
       await emp("e6").evaluate((el) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 2 })));
       assert.deepEqual(await selected(), ["e6"]);
       await emp("e6").dispatchEvent("dblclick");
-      await p.locator("#modal-employee:not(.hidden)").waitFor();
+      await p.locator("#modal-profile:not(.hidden)").waitFor();
       await p.keyboard.press("Escape");
       await p.evaluate(() => clearSelection());
     });

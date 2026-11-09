@@ -299,6 +299,14 @@ const OV_HISTORY_MEASURES = [
   { key: "oncall",   label: "On-call deployed / day", suffix: "", value: (r) => r.oncallAssigned,
     help: "On-call people (the dashed OC cards) on a mission each working day, averaged over the range. The pale bar behind each day is the on-call people available that day: the on-call roster minus those on leave." },
 ];
+/* Deployed / day can be split by contract: Total is the blue every other "deployed" uses, On-call the orange of
+   every contract split, and Permanent takes a categorical slot (the permanent split had no colour of its own
+   before). Permanent + On-call = Total, so a person is counted once, in the one they belong to. */
+const OV_DEPLOYED_SERIES = [
+  { key: "total",  label: "Total",     title: "Deployed / day",           color: "var(--chart-assigned)", value: (r) => r.assigned },
+  { key: "perm",   label: "Permanent", title: "Permanent deployed / day", color: "var(--chart-cat-3)",    value: (r) => r.assigned - r.oncallAssigned },
+  { key: "oncall", label: "On-call",   title: "On-call deployed / day",   color: "var(--chart-oncall)",   value: (r) => r.oncallAssigned },
+];
 /* History's Leave view: one colour per leave type (the board itself has one leave colour) */
 const OV_LEAVE_COLORS = { annual: "var(--leave-annual)", sick: "var(--leave-sick)", business: "var(--leave-business)", unpaid: "var(--leave-unpaid)", exchange: "var(--leave-exchange)" };
 /* the four leave types History counts as leave; Exchange Working Day is worked back, so it is not leave */
@@ -442,7 +450,6 @@ const state = {
   sort: "number",                // default: sort by mission number on every board
   unlockedDates: new Set(),   // past/today dates the user confirmed they want to edit
   editingMissionId: null,
-  editingEmployeeId: null,
   selectedEmps: new Set(),    // multi-select of employee ids (Ctrl-click); drag/click assigns the whole set
   empSearch: "",              // name filter for the floating available panel
   poolAreas: new Set(),       // service-area filter for the floating panel; empty = all
@@ -456,7 +463,6 @@ const state = {
   settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, roles: {} },   // staged edits, by section
   rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
   svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
-  employeeTab: "edit",        // Employee modal: "edit" or "hosts" (Host Record) — reset on every open
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
@@ -478,6 +484,11 @@ const state = {
     notes: null,              // getEmployeeNotes rows
     seq: 0,                   // out-of-order guard for the loads
     hostsAll: false,          // "Show all" in the host table
+    leaveAll: false,          // "Show all" in the leave record
+    editing: false,           // Details is the edit form
+    focus: null,              // the input to focus when it opens in the edit form
+    detailsEl: null,          // the Details block, kept between redraws so typed values survive a period switch
+    noteDraft: "",            // a note being typed
   },
   users: {                    // Settings > Users: search/filter/sort over the people list
     search: "",
@@ -527,24 +538,31 @@ const state = {
     historyPreset: "thisMonth",   // thisMonth | lastMonth | last30 | last90 | ytd | custom
     historyFrom: null,            // resolved by resolveHistoryRange() on first render
     historyTo: null,
-    boardId: ovBoardSaved(),      // the board selector at the top: "" = all boards; otherwise one
-                                  // board id. Scopes EVERY section, History included (ovScopeBoards)
+    boardIds: ovBoardSaved(),     // the page's board selector: [] = all boards; otherwise the picked
+                                  // board ids (any 1 to N). Scopes the day sections (ovScopeBoards);
+                                  // the Period group follows it until it is unlinked (ovPeriodBoards)
     historyMeasure: "util",       // the History tile charted day by day (OV_HISTORY_MEASURES key)
     historyLeaveView: "chart",    // the Leave tile's view: "chart" (columns by type) | "calendar"
     historyLeaveHidden: [],       // leave types switched off in the Leave chart and calendar
     historyGroup: "day",          // History's Group by: "day" | "week" | "month"
-    historyBoards: "together",    // History's Boards: "together" | "side" (one small chart per board)
+    period: ovPeriodSaved(),      // the Period group's own boards: { linked, ids, view }. Linked = it follows the
+                                  // page selector; otherwise ids. view: "together" | "side" | "vs" (A vs B, exactly 2)
     historyCompare: "prev",       // Compare with (every section of the Period group): "prev" | "ly" (same period last year)
-    historyOncallMode: "count",   // the On-call view: "count" | "share"
+    historyOncallMode: "count",   // the On-call view: "count" | "share" | "free" (on-call available and not on a mission)
+    historyDeployedBy: "contract",   // the Deployed view's split: "contract" (Total / Permanent / On-call) | "area" (service area)
+    historyDeployedShow: ["total"],  // Deployed by contract: the series drawn (OV_DEPLOYED_SERIES keys); Total alone is the plain line
+    historyDeployedStyle: "line",    // Deployed by contract: "line" | "bars" (side by side, one colour a series) | "stacked" (Permanent + On-call piled up)
+    historyAreaHidden: [],           // Deployed by service area: areas switched off ("" is No area)
     historyLY: null,              // getUtilizationRange over the range moved back 364 days; fetched only when "ly" is chosen
     historyLYKey: null,
     baView: "board",              // Boards & areas: "board" | "area"
     baLoansOpen: false,           // Boards & areas: the from → to loan table is open
     wfWindow: "12",               // Workforce: "12" (the last 12 months) | "range" (History's range)
+    wfHidden: [],                 // Workforce: years-of-service groups switched off (WF_BANDS keys)
     pplView: "workload",          // People quick view: workload | leave | nights | oncall | alerts
-    pplWho: "all",                // People table: all | permanent | oncall
-    pplSpread: "permanent",       // the spread chart's group: permanent | oncall
-    pplBand: null,                // a 10% band picked in the spread chart (0..9): filters the table
+    pplWho: "all",                // People: the one Who for the chart and the table: all | permanent | oncall
+    pplChart: "spread",           // People chart: spread | time | cal (a view offers some of them; see PPL_VIEWS)
+    pplPick: null,                // what is picked on the chart, filtering the table: { k: "band", i } | { k: "day", date } | { k: "flag", key }
     pplSort: null,                // { key, dir }, or null for the view's own order
     pplAll: false,                // "Show all" past OV_WL_SHOWN rows
     history: null,                // cloud.getUtilizationRange() over the History range
@@ -1220,6 +1238,8 @@ function render() {
   $("#btn-export").classList.toggle("hidden", fc);
   // the monthly report: Overview, for roles that can see its History (OvReport in report.js)
   $("#btn-report").classList.toggle("hidden", !(isOverview() && can("ov.history")));
+  // Present: Overview slides, or a board on a confirmed day (Present in present.js). Not on the other tabs.
+  $("#btn-present").classList.toggle("hidden", !(typeof Present !== "undefined" && (ov || board) && Present.canPresent()));
   // the phone's "More" dropdown only holds other tabs' controls — on Overview it
   // would open empty, and so would it on Capacity (whose own ⋯ holds its actions)
   $("#btn-toolbar-more").classList.toggle("hidden", ov || isCapacity());
@@ -1275,6 +1295,7 @@ function render() {
   updateUndoButton();
   applySearchHighlight();
   fitTopbar();
+  if (typeof Present !== "undefined") Present.redraw();   // a screen being presented follows the data
 }
 
 /* The top bar never hides a module tab. #board-tabs scrolls rather than run under
@@ -2309,6 +2330,13 @@ function cardNamesSaved() {   // also called while `state` is built, so the key 
   try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 
+/* the Manpower List's Years of service: each "7 years" stays on one line, so a cell that has to wrap reads
+   "7 years 8 months / 4 days" (the spaces stay plain, for copying and for tools) */
+function serviceCellHtml(text) {
+  if (!text) return "\u2014";
+  return text.split(/ (?=\d)/).map(part => `<span class="el-nw">${escapeHtml(part)}</span>`).join(" ");
+}
+
 /* the Manpower List's board cell: "→ Rayong until Fri 24 Oct" while someone is
    lent out on the date on screen (their own board stays in front of it) */
 function loanCellHtml(e) {
@@ -2403,7 +2431,7 @@ function empCard(emp, opts = {}) {
     for (const c of $$(".emp-card.selected")) c.classList.add("dragging");
   });
   card.addEventListener("dragend", () => { for (const c of $$(".emp-card.dragging")) c.classList.remove("dragging"); });
-  card.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(emp.id)));
+  card.addEventListener("dblclick", () => openEmployeeModal(emp.id));
   card.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(emp, ev.clientX, ev.clientY); });
   attachLongPress(card, (x, y) => openEmpMenu(emp, x, y));
   return card;
@@ -2644,18 +2672,16 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
   // a lent-out card on its own board: only what concerns the loan
   if (!isNonBoardView() && menuBoardId !== D().activeBoardId) {
     addTitle(emp.name);
-    addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
+    addItem("Profile", () => openEmployeeModal(emp.id), null, "person");
     if (loan) {
       addItem(`End loan (back to ${homeName})`, () => guardEdit(() => endLoanFor(emp)), null, "return");
       addItem("Change loan dates…", () => guardEdit(() => openLendModal([emp.id], { loan })), null, "calendar");
     }
     return;
   }
-  // Placing someone needs the plan they would land in. On a forecast date that
-  // is the forecast — which only the board itself has loaded — so from the
-  // Manpower List the placement items are left out there rather than
-  // writing a confirmed assignment onto a forecast date.
-  const placeable = sameBoard && !(isNonBoardView() && isForecastDateFor(menuBoardId, state.date));
+  // Placing someone (a mission, leave, back to Standby) is the board's work: the
+  // Manpower List's menu is about the person, so it leaves those items out.
+  const placeable = sameBoard && !isNonBoardView();
   const plan = placeable ? peekPlan(menuBoardId) : null;
   const current = placeable && !many ? currentAssignmentOfIn(plan, emp.id) : null;
   // already-there targets are dropped: assigning someone to where they already
@@ -2686,9 +2712,8 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
     }
   } else {
     addTitle(many ? `${ids.length} employees selected` : emp.name);
-    if (!many) addItem("Edit employee", () => guardEdit(() => openEmployeeModal(emp.id)), null, "edit");
-    // the Manpower List's menu: the employee profile (read-only, so no guardEdit)
-    if (!many && isEmployeeList() && can("emplist")) addItem("Profile", () => openProfile(emp.id, state.emplist.period || "30"), null, "person");
+    // the person's Profile: everything about them, and where they are edited (roster data, so no day lock)
+    if (!many) addItem("Profile", () => openEmployeeModal(emp.id), null, "person");
     if (lending) addItem("Lend to board…", () => guardEdit(() => openLendModal(ids)), null, "swap");
     else if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
     if (loan) {
@@ -3762,6 +3787,7 @@ function buildPhoneMoreMenu() {
     if (shown("#btn-missions-newyear") && isMissionList()) item("New-year numbers", "calendar", click("#btn-missions-newyear"), "tb-item-pri");
     if (shown("#btn-missions-bulk") && isMissionList()) item("Bulk edit", "edit", click("#btn-missions-bulk"));
     if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+    if (shown("#btn-present")) item("Present", "present", click("#btn-present"));
     if (shown("#btn-report")) item("Report", "clipboard", click("#btn-report"));
     if (!menu.children.length) menu.innerHTML = `<div class="tb-item tb-item-static">Nothing to do here</div>`;
     return;
@@ -3797,6 +3823,7 @@ function buildPhoneMoreMenu() {
   if (shown("#btn-hide-missions")) item("Hide / unhide missions", "eye-off", click("#btn-hide-missions"));
   if (shown("#btn-forecast-copy")) item("Copy forecast forward", "arrow-right", click("#btn-forecast-copy"));
   if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
+  if (shown("#btn-present")) item("Present", "present", click("#btn-present"));
   if (shown("#btn-report")) item("Report", "clipboard", click("#btn-report"));
   sep();
   if (shown("#btn-undo")) item("Undo last change", "undo", click("#btn-undo"), "", $("#btn-undo").disabled);
@@ -4013,53 +4040,202 @@ function trendWindowDelta(series) {
 
 
 /* ---------- Overview board scope (the selector at the top of the tab) ----------
-   "" = every board summed. A board id that no longer exists (deleted in
-   another tab mid-session, or remembered from an older session) falls back
-   to all boards rather than an empty dashboard. Remembered per device. */
+   state.overview.boardIds: [] = every board summed; otherwise the ticked boards, in any
+   number. A board id that no longer exists (deleted in another tab mid-session, or
+   remembered from an older session) is dropped, and nothing left means all boards
+   rather than an empty dashboard. Remembered per device as a comma list in
+   "manpower.ovBoard" (an older single id reads as a list of one). */
 function ovBoardSaved() {   // also called while `state` is built, so the key is spelled out here
-  try { return localStorage.getItem("manpower.ovBoard") || ""; } catch (e) { return ""; }
+  try { return (localStorage.getItem("manpower.ovBoard") || "").split(",").filter(Boolean); } catch (e) { return []; }
 }
-function setOvBoard(id) {
-  state.overview.boardId = id;
-  try { localStorage.setItem("manpower.ovBoard", id); } catch (e) { /* storage unavailable — just don't remember it */ }
+/* pick: "" or [] = all boards; one id; or a list of ids */
+function setOvBoard(pick) {
+  const all = D().boards.map(b => b.id);
+  let ids = Array.isArray(pick) ? pick : pick ? [pick] : [];
+  ids = all.filter(id => ids.includes(id));   // keep the boards' own order, drop the ones that are gone
+  if (ids.length === all.length) ids = [];    // every board ticked is "All boards"
+  state.overview.boardIds = ids;
+  try { localStorage.setItem("manpower.ovBoard", ids.join(",")); } catch (e) { /* storage unavailable — just don't remember it */ }
   render();
 }
 function ovScopeBoards() {
   const boards = D().boards;
-  const pick = state.overview.boardId;
-  if (!pick) return boards;
-  const one = boards.filter(b => b.id === pick);
-  return one.length ? one : boards;
+  const ids = state.overview.boardIds || [];
+  if (!ids.length) return boards;
+  const some = boards.filter(b => ids.includes(b.id));
+  return some.length ? some : boards;
 }
-const ovScopeName = (boards) => boards.length === 1 && D().boards.length > 1 ? boards[0].name : "all boards";
+/* "all boards", a board's name, "Board One + Board Three", or "3 of 4 boards" */
+function ovScopeName(boards) {
+  const total = D().boards.length;
+  if (boards.length === total) return "all boards";
+  if (boards.length <= 2) return boards.map(b => b.name).join(" + ");
+  return `${boards.length} of ${total} boards`;
+}
+const ovScopeLabel = (boards) => (boards.length === D().boards.length ? "All boards" : ovScopeName(boards));
 
-/* The toolbar's board dropdown on Overview: "All boards" and each board, with its
-   roster count for the date on screen. It lives in toolbar row 1, which stays in
-   view while the dashboard scrolls, so the board being shown is always visible. */
+/* The toolbar's board picker on Overview: a tick list. "All boards" at the top, then each board with
+   its roster count for the date on screen and an "Only" shortcut. The menu stays open while you tick.
+   It lives in toolbar row 1, which stays in view while the dashboard scrolls, so the boards being
+   shown are always visible. At least one board stays ticked. */
 function fillOvBoardSelect(scope) {
-  // the same button + menu as the banner's Boards picker and the Filters popover
-  const current = scope.length === 1 && D().boards.length > 1 ? scope[0].id : "";
+  const total = D().boards.length;
+  const ids = scope.length === total ? [] : scope.map(b => b.id);   // [] = all boards
   const btn = $("#btn-ov-board"), menu = $("#ov-board-menu");
   const all = D().employees.filter(onRoster).length;
-  const pickedBoard = D().boards.find(b => b.id === current);
+  const shown = ids.length ? scope.reduce((n, b) => n + rosterEmployees(b.id).length, 0) : all;
   const label = btn.querySelector(".ovb-label");
-  label.textContent = pickedBoard ? pickedBoard.name : "All boards";   // textContent: board names are user data
-  btn.querySelector(".ovb-count").textContent = pickedBoard ? rosterEmployees(pickedBoard.id).length : all;
+  label.textContent = ovScopeLabel(scope);   // textContent: board names are user data
+  label.toggleAttribute("data-no-i18n", ids.length > 0 && scope.length <= 2);
+  btn.querySelector(".ovb-count").textContent = shown;
+  // keep the keyboard where it was when the menu is rebuilt after a tick
+  const focused = menu.contains(document.activeElement) ? document.activeElement.dataset.key : null;
   menu.innerHTML = "";
-  // the same rows as the Board tab's picker: name and headcount, no colour key
-  const item = (id, name, count) => {
+  const mk = (cls, text, attrs = {}) => Object.assign(document.createElement("span"), { className: cls, textContent: text }, attrs);
+  const row = (key, name, count, ticked, mixed, onToggle, onOnly) => {
+    const r = document.createElement("div");
+    r.className = "tb-item ovb-row" + (ticked ? " is-current" : "");
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "tb-item" + (id === current ? " is-current" : "");
-    b.setAttribute("aria-current", id === current ? "true" : "false");
-    b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-name", textContent: name }));
-    b.appendChild(Object.assign(document.createElement("span"), { className: "ovb-count", textContent: String(count) }));
-    b.onclick = () => { closeTopbarMenus(); if (id !== current) setOvBoard(id); };
-    menu.appendChild(b);
+    b.className = "ovb-check";
+    b.dataset.key = key;
+    b.setAttribute("role", "menuitemcheckbox");
+    b.setAttribute("aria-checked", mixed ? "mixed" : String(ticked));
+    const box = mk("ovb-box");
+    box.dataset.state = mixed ? "mixed" : ticked ? "on" : "off";
+    b.appendChild(box);
+    const nm = mk("ovb-name", name);
+    if (key !== "all") nm.setAttribute("data-no-i18n", "");   // a board's name is data
+    b.appendChild(nm);
+    b.appendChild(mk("ovb-count", String(count)));
+    b.onclick = (ev) => { ev.stopPropagation(); onToggle(); };   // stays open: the document click would close it
+    r.appendChild(b);
+    if (onOnly) {
+      const o = document.createElement("button");
+      o.type = "button";
+      o.className = "ovb-only";
+      o.dataset.key = key + ":only";
+      o.textContent = "Only";
+      o.setAttribute("aria-label", `Only ${name}`);
+      o.onclick = (ev) => { ev.stopPropagation(); onOnly(); };
+      r.appendChild(o);
+    }
+    menu.appendChild(r);
   };
-  item("", "All boards", all);
-  for (const b of D().boards) item(b.id, b.name, rosterEmployees(b.id).length);
+  const note = mk("ovb-note", "Tick any boards. At least one stays ticked.");
+  note.setAttribute("role", "status");
+  row("all", "All boards", all, ids.length === 0, ids.length > 0, () => { closeTopbarMenus(); setOvBoard(""); }, null);
+  menu.appendChild(Object.assign(document.createElement("div"), { className: "ovb-sep" }));
+  for (const b of D().boards) {
+    const on = ids.length === 0 || ids.includes(b.id);
+    row(b.id, b.name, rosterEmployees(b.id).length, on, false, () => {
+      const next = ids.length === 0 ? D().boards.map(x => x.id) : ids.slice();
+      const at = next.indexOf(b.id);
+      if (at > -1) {
+        if (next.length === 1) { note.textContent = "At least one board stays ticked."; note.classList.add("warn"); return; }
+        next.splice(at, 1);
+      } else next.push(b.id);
+      setOvBoard(next);
+    }, () => { closeTopbarMenus(); setOvBoard(b.id); });
+  }
+  menu.appendChild(note);
+  if (focused) { const f = [...menu.querySelectorAll("button")].find(x => x.dataset.key === focused); if (f) f.focus(); }
 }
+
+/* ---------- The Period group's own board scope ----------
+   History, People, Engineer workload, Workforce and Boards & areas read ovPeriodBoards(). It starts
+   LINKED to the page selector, so most people never see a second choice; unlink it to pick other
+   boards. view: Combined (summed), Side by side (one chart per board) or A vs B (exactly two boards,
+   overlaid with a difference; it turns Compare with off, so one comparison runs at a time).
+   Remembered per device in "manpower.ovPeriod". */
+const OV_PERIOD_KEY = "manpower.ovPeriod";
+function ovPeriodSaved() {   // also called while `state` is built, so it only touches localStorage
+  let v = {};
+  try { v = JSON.parse(localStorage.getItem("manpower.ovPeriod") || "{}") || {}; } catch (e) { v = {}; }
+  return { linked: v.linked !== false, ids: Array.isArray(v.ids) ? v.ids.filter(x => typeof x === "string") : [],
+    view: v.view === "side" || v.view === "vs" ? v.view : "together" };
+}
+function setOvPeriod(patch) {
+  const p = Object.assign(state.overview.period, patch);
+  const all = D().boards.map(b => b.id);
+  p.ids = all.filter(id => p.ids.includes(id));
+  if (!p.linked && !p.ids.length) p.ids = ovScopeBoards().map(b => b.id);
+  try { localStorage.setItem(OV_PERIOD_KEY, JSON.stringify(p)); } catch (e) { /* not remembered */ }
+  render();
+}
+function ovPeriodBoards() {
+  const p = state.overview.period;
+  if (p.linked) return ovScopeBoards();
+  const some = D().boards.filter(b => p.ids.includes(b.id));
+  return some.length ? some : ovScopeBoards();
+}
+/* the view that applies to these boards: Side by side needs two or more, A vs B exactly two */
+function ovPeriodView(boards = ovPeriodBoards()) {
+  const v = state.overview.period.view;
+  if (v === "side" && boards.length > 1) return "side";
+  if (v === "vs" && boards.length === 2) return "vs";
+  return "together";
+}
+/* "Show only this board" from a Period chart or row: the page selector while the Period follows it,
+   otherwise the Period's own boards */
+function ovPeriodOnly(id) {
+  if (state.overview.period.linked) setOvBoard(id); else setOvPeriod({ ids: [id], view: "together" });
+}
+/* opts.viewOnly: just the View switch (Combined, Side by side, A vs B), for Present's period strip, where the
+   stage's board chips already choose the boards */
+function periodScopeControls(opts = {}) {
+  const ov = state.overview, p = ov.period, all = D().boards;
+  if (all.length < 2) return null;
+  const boards = ovPeriodBoards(), view = ovPeriodView(boards);
+  const wrap = document.createElement("div");
+  wrap.className = "ov-period-scope";
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", "Period boards");
+  const lab = (t) => Object.assign(document.createElement("span"), { className: "ov-muted", textContent: t });
+  const btn = (text, active, onclick, extra = {}) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (active ? " active" : "");
+    b.setAttribute("aria-pressed", String(!!active));
+    b.textContent = text;
+    if (extra.disabled) { b.disabled = true; }
+    if (extra.title) b.title = extra.title;
+    if (extra.noI18n) b.setAttribute("data-no-i18n", "");
+    if (extra.id) b.dataset.id = extra.id;
+    b.onclick = onclick;
+    return b;
+  };
+  if (!opts.viewOnly) {
+    wrap.appendChild(lab("Boards"));
+    wrap.appendChild(btn(p.linked ? "Linked to page" : "Own boards · relink", p.linked,
+      () => setOvPeriod(p.linked ? { linked: false, ids: ovScopeBoards().map(b => b.id) } : { linked: true }),
+      { title: p.linked ? "Following the page's boards. Unlink to pick other boards for the Period." : "Follow the page's boards again" }));
+    const chips = document.createElement("div");
+    chips.className = "ov-trend-btns ov-period-boards";
+    for (const b of all) {
+      const on = boards.some(x => x.id === b.id);
+      chips.appendChild(btn(b.name, on, () => {
+        const ids = boards.map(x => x.id), at = ids.indexOf(b.id);
+        if (at > -1) { if (ids.length === 1) return; ids.splice(at, 1); } else ids.push(b.id);
+        setOvPeriod({ ids });
+      }, { disabled: p.linked, noI18n: true, id: b.id }));
+    }
+    wrap.appendChild(chips);
+  }
+  wrap.appendChild(lab("View"));
+  const seg = document.createElement("div");
+  seg.className = "ov-trend-btns";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", "Period board view");
+  seg.appendChild(btn("Combined", view === "together", () => setOvPeriod({ view: "together" })));
+  seg.appendChild(btn("Side by side", view === "side", () => setOvPeriod({ view: "side" }), { disabled: boards.length < 2 }));
+  seg.appendChild(btn("A vs B", view === "vs", () => setOvPeriod({ view: "vs" }),
+    { disabled: boards.length !== 2, title: boards.length === 2 ? "Compare the two boards" : "A vs B needs exactly 2 boards" }));
+  wrap.appendChild(seg);
+  if (boards.length !== 2) wrap.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted ov-period-hint", textContent: "A vs B needs exactly 2 boards." }));
+  return wrap;
+}
+
 /* Same x-axis rule as Trend (see renderOverview): a date nobody in scope
    works carries no information, so it's dropped from the axis entirely
    rather than plotted as a zero that would drag every average down. */
@@ -4254,9 +4430,11 @@ function historyControls() {
   cmp.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: "Compare with" }));
   const cmpBtns = document.createElement("div");
   cmpBtns.className = "ov-trend-btns";
+  const vsOn = ovPeriodView() === "vs";   // two boards are being compared: one comparison at a time
   for (const [k, l] of [["prev", "Previous period"], ["ly", "Same period last year"]]) {
     const btn = document.createElement("button");
     btn.type = "button";
+    btn.disabled = vsOn;
     btn.className = "btn btn-small" + (ov.historyCompare === k ? " active" : "");
     btn.setAttribute("aria-pressed", String(ov.historyCompare === k));
     btn.textContent = l;
@@ -4269,6 +4447,7 @@ function historyControls() {
     cmpBtns.appendChild(btn);
   }
   cmp.appendChild(cmpBtns);
+  if (vsOn) cmp.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: "Off while two boards are compared." }));
   wrap.appendChild(cmp);
 
   // No board <select> here any more: the board selector at the top of the tab
@@ -4283,7 +4462,7 @@ function historyControls() {
 function historyRangeCaption(dates) {
   const ov = state.overview;
   const span = `${fmtDate(ov.historyFrom)} → ${fmtDate(ov.historyTo)}`;
-  return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${ovScopeName(ovScopeBoards())}`;
+  return `${span} · ${dates.length} working day${dates.length === 1 ? "" : "s"} · ${ovScopeName(ovPeriodBoards())}`;
 }
 
 /* The Period group's heading: the title and what it covers, then the range control, so one
@@ -4293,6 +4472,8 @@ function ovPeriodHead(dates) {
   wrap.className = "ov-period";
   wrap.appendChild(ovGroupHead("Period", historyRangeCaption(dates)));
   wrap.appendChild(historyControls());
+  const scope = periodScopeControls();
+  if (scope) wrap.appendChild(scope);
   wrap.appendChild(Object.assign(document.createElement("p"), { className: "ov-section-sub ov-period-note", textContent: "These dates apply to History, People and Engineer workload below." }));
   return wrap;
 }
@@ -4326,6 +4507,8 @@ function historySection(dates, recs, unplanned, pendingCharts, prevRecs = []) {
   tiles.className = "ov-htiles";
   tiles.setAttribute("role", "group");
   tiles.setAttribute("aria-label", "History measure");
+  const pBoards = ovPeriodBoards(), vsPair = ovPeriodView(pBoards) === "vs" ? pBoards : null;   // A vs B: each tile shows both boards
+  const vsRecs = vsPair ? vsPair.map(b => dates.map(d => historyDayRec(d, [b], ov.history || {}))) : null;
   for (const m of OV_HISTORY_MEASURES) {
     const values = recs.map(r => (r ? m.value(r) : null));
     const mean = historyMean(values);
@@ -4337,6 +4520,14 @@ function historySection(dates, recs, unplanned, pendingCharts, prevRecs = []) {
     btn.type = "button";
     btn.className = "ov-htile";
     btn.setAttribute("aria-pressed", String(ov.historyMeasure === m.key));
+    if (vsPair) {
+      const [ma, mb] = vsRecs.map(rs => historyMean(rs.map(r => (r ? m.value(r) : null))));
+      const d = ma == null || mb == null ? null : Math.round((ma - mb) * 10) / 10;
+      const show = (v) => (v == null ? "—" : v + m.suffix);
+      btn.innerHTML = ovTileInner({ label: m.label, value: `${show(ma)}<small> vs </small>${show(mb)}`,
+        sub: `<span data-no-i18n>${escapeHtml(vsPair[0].name)}</span> vs <span data-no-i18n>${escapeHtml(vsPair[1].name)}</span> · avg`,
+        delta: `<span class="ov-htile-delta">${d == null ? "no data" : d === 0 ? "= level" : `${d > 0 ? "▲" : "▼"} ${Math.abs(d)}${m.suffix === "%" ? " pts" : ""} ${d > 0 ? "first board higher" : "second board higher"}`}</span>` });
+    } else
     btn.innerHTML = ovTileInner({ label: m.label, value: `${mean == null ? "—" : mean + m.suffix}<small> avg</small>`,
       sub: latest == null ? "no data" : `${latestWord} ${latest}${m.suffix}${of}`, delta: historyDelta(m, mean, prevMean) });
     btn.title = m.help;
@@ -4366,12 +4557,13 @@ function historySection(dates, recs, unplanned, pendingCharts, prevRecs = []) {
   }
 
   const m = OV_HISTORY_MEASURES.find(x => x.key === ov.historyMeasure) || OV_HISTORY_MEASURES[0];
-  const boards = ovScopeBoards();
+  const boards = ovPeriodBoards();
   const ctx = historyChartCtx(dates, recs, boards);
   sec.appendChild(historyToolbar(ctx));
   wireHistoryDayClicks(sec);
   if (m.key === "leave") { sec.appendChild(historyLeaveView(dates, recs, pendingCharts, ctx)); return sec; }
   if (m.key === "oncall") { sec.appendChild(historyOncallView(dates, recs, pendingCharts, ctx)); return sec; }
+  if (m.key === "deployed") { sec.appendChild(historyDeployedView(m, ctx, pendingCharts)); return sec; }
   sec.appendChild(historyMeasureView(m, ctx, pendingCharts));
   return sec;
 }
@@ -4384,11 +4576,14 @@ function historyChartCtx(dates, recs, boards) {
   const ov = state.overview;
   const group = ov.historyGroup === "week" || ov.historyGroup === "month" ? ov.historyGroup : "day";
   const cmp = historyCompareInfo();
-  const sideOk = boards.length > 1 && boards.length === D().boards.length;   // "All boards", and more than one
-  const ctx = { dates, recs, boards, group, cmp, buckets: historyBuckets(dates, group), side: ov.historyBoards === "side" && sideOk, sideOk };
+  const view = ovPeriodView(boards);   // Combined, Side by side or A vs B
+  const vs = view === "vs";
+  // A vs B overlays two lines in the measure view; the column views (Leave, On-call) show the two boards
+  // as small charts on one scale, so they read it as Side by side. Compare with is off in A vs B.
+  const ctx = { dates, recs, boards, group, cmp, buckets: historyBuckets(dates, group), side: view === "side" || vs, vs };
   ctx.recsOf = (bs) => (bs === boards ? recs : dates.map(d => historyDayRec(d, bs, ov.history || {})));
-  ctx.cmpRecsOf = (bs) => dates.map(d => (cmp.loading ? null : historyDayRec(cmp.shift(d), bs, cmp.hist)));
-  ctx.hasCmp = (arr) => !cmp.loading && arr.some(Boolean);
+  ctx.cmpRecsOf = (bs) => dates.map(d => (vs || cmp.loading ? null : historyDayRec(cmp.shift(d), bs, cmp.hist)));
+  ctx.hasCmp = (arr) => !vs && !cmp.loading && arr.some(Boolean);
   /* one figure per bucket: the mean of the days plotted in it (a per-day figure, like the tiles' averages) */
   ctx.mean = (arr, fn) => ctx.buckets.map(b => historyMean(b.idx.map(i => (arr[i] ? fn(arr[i]) : null))));
   ctx.labels = ctx.buckets.map(b => historyBucketLabel(b, group));
@@ -4396,46 +4591,68 @@ function historyChartCtx(dates, recs, boards) {
   ctx.per = group === "day" ? "day by day" : group === "week" ? "week by week" : "month by month";
   return ctx;
 }
+/* A label and a row of buttons, one pressed: picking another runs set(key) and redraws. Shared by History's
+   toolbar (Group by) and the Deployed view (Split by, Style). */
+function ovSegEl(label, aria, items, current, set) {
+  const wrap = document.createElement("div");
+  wrap.className = "ov-htool";
+  wrap.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: label }));
+  const g = document.createElement("div");
+  g.className = "ov-trend-btns";
+  g.setAttribute("role", "group");
+  g.setAttribute("aria-label", aria);
+  for (const [k, l] of items) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (current === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(current === k));
+    b.textContent = l;
+    b.onclick = () => { if (current !== k) { set(k); render(); } };
+    g.appendChild(b);
+  }
+  wrap.appendChild(g);
+  return wrap;
+}
 function historyToolbar(ctx) {
   const ov = state.overview;
   const bar = document.createElement("div");
   bar.className = "ov-htoolbar";
-  const seg = (label, aria, items, current, set) => {
-    const wrap = document.createElement("div");
-    wrap.className = "ov-htool";
-    wrap.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: label }));
-    const g = document.createElement("div");
-    g.className = "ov-trend-btns";
-    g.setAttribute("role", "group");
-    g.setAttribute("aria-label", aria);
-    for (const [k, l] of items) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "btn btn-small" + (current === k ? " active" : "");
-      b.setAttribute("aria-pressed", String(current === k));
-      b.textContent = l;
-      b.onclick = () => { if (current !== k) { set(k); render(); } };
-      g.appendChild(b);
-    }
-    wrap.appendChild(g);
-    bar.appendChild(wrap);
-  };
-  seg("Group by", "Group by", [["day", "Day"], ["week", "Week"], ["month", "Month"]], ctx.group, (k) => { ov.historyGroup = k; });
-  if (ctx.sideOk) seg("Boards", "Boards", [["together", "Together"], ["side", "Side by side"]], ctx.side ? "side" : "together", (k) => { ov.historyBoards = k; });
+  bar.appendChild(ovSegEl("Group by", "Group by", [["day", "Day"], ["week", "Week"], ["month", "Month"]], ctx.group, (k) => { ov.historyGroup = k; }));
   return bar;
 }
 /* the dashed grey comparison series of a line chart, named for what it compares with */
 const historyCmpSeriesLabel = () => (state.overview.historyCompare === "ly" ? "Same period last year" : "Previous period");
-function historyMeasureView(m, ctx, pendingCharts) {
+/* `m.color` (default: the assigned blue) is the line's colour; `tools` ({ head, below }, the Deployed view's
+   controls) goes in the title row and under it. */
+function historyMeasureView(m, ctx, pendingCharts, tools = null) {
+  const color = m.color || "var(--chart-assigned)";
   const box = document.createElement("div");
   box.className = "ov-hchart";
-  box.innerHTML = `<div class="ov-hchart-head"><b>${m.label}, ${ctx.per}</b></div>`;
-  const cmpNote = ctx.cmp.loading ? "Loading the same period last year…" : "";
+  box.innerHTML = `<div class="ov-hchart-head${tools ? " ov-hchart-head-row" : ""}"><b>${m.label}, ${ctx.per}</b></div>`;
+  if (tools) { box.firstChild.appendChild(tools.head); box.appendChild(tools.below); }
+  const cmpNote = ctx.cmp.loading && !ctx.vs ? "Loading the same period last year…" : "";
   if (cmpNote) box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-loading", textContent: cmpNote }));
+  if (ctx.vs) {
+    // A vs B: the two boards on one chart, in their own colours, with each one's average and the difference
+    const pair = ctx.boards.map((b) => ({ b, vals: ctx.mean(ctx.recsOf([b]), m.value), color: Charts.catColor(D().boards.indexOf(b)) }));
+    const means = pair.map(x => historyMean(x.vals.filter(v => v != null)));
+    const diff = means[0] == null || means[1] == null ? null : Math.round((means[0] - means[1]) * 10) / 10;
+    box.appendChild(ovLegend(pair.map((x, i) => ({ label: `${x.b.name} · avg ${means[i] == null ? "—" : fmt1(means[i])}${m.suffix}`, color: x.color }))));
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-vs-diff",
+      textContent: diff == null ? "No data to compare in this range." : diff === 0 ? "The two boards average the same." : `${diff > 0 ? pair[0].b.name : pair[1].b.name} averages ${fmt1(Math.abs(diff))}${m.suffix === "%" ? " pts" : ""} higher.` }));
+    const wrap = document.createElement("div");
+    wrap.className = "ov-trend-chart";
+    box.appendChild(wrap);
+    pendingCharts.push(() => fillLineChart(wrap, {
+      series: pair.map((x) => ({ key: x.b.id, label: x.b.name, color: x.color, visible: true, points: x.vals.map(y => ({ y, suffix: m.suffix })) })),
+      xLabels: ctx.labels, yMax: Charts.niceMax(pair.flatMap(x => x.vals).filter(v => v != null)), height: 220,
+      emptyLabel: "No data in this range", dates: ctx.clickDates }));
+    return box;
+  }
   if (ctx.side) { historySideBySide(box, ctx, pendingCharts, (bs) => {
       const vals = ctx.mean(ctx.recsOf(bs), m.value);
       return { vals, cmp: ctx.mean(ctx.cmpRecsOf(bs), m.value), suffix: m.suffix, draw: (wrap, yMax, mean, cmpVals) => fillLineChart(wrap, {
-        series: [{ key: m.key, label: m.label, color: "var(--chart-assigned)", visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
+        series: [{ key: m.key, label: m.label, color, visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
           ...(cmpVals && cmpVals.some(v => v != null) ? [{ key: "cmp", label: historyCmpSeriesLabel(), color: "var(--muted)", visible: true, dashed: true, points: cmpVals.map(y => ({ y, suffix: m.suffix })) }] : [])],
         xLabels: ctx.labels, yMax, height: 130, dates: ctx.clickDates,
         refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: "avg" }] : [], emptyLabel: "No data in this range" }) };
@@ -4444,12 +4661,12 @@ function historyMeasureView(m, ctx, pendingCharts) {
   const cvals = ctx.mean(ctx.cmpRecsOf(ctx.boards), m.value);
   const showCmp = ctx.hasCmp(ctx.cmpRecsOf(ctx.boards)) && cvals.some(v => v != null);
   const mean = historyMean(ctx.recs.map(r => (r ? m.value(r) : null)));
-  box.appendChild(ovLegend([{ label: m.label, color: "var(--chart-assigned)" }, ...(showCmp ? [{ label: historyCmpSeriesLabel(), color: "var(--muted)" }] : [])]));
+  box.appendChild(ovLegend([{ label: m.label, color }, ...(showCmp ? [{ label: historyCmpSeriesLabel(), color: "var(--muted)" }] : [])]));
   const wrap = document.createElement("div");
   wrap.className = "ov-trend-chart";
   box.appendChild(wrap);
   pendingCharts.push(() => fillLineChart(wrap, {
-    series: [{ key: m.key, label: m.label, color: "var(--chart-assigned)", visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
+    series: [{ key: m.key, label: m.label, color, visible: true, points: vals.map(y => ({ y, suffix: m.suffix })) },
       ...(showCmp ? [{ key: "cmp", label: historyCmpSeriesLabel(), color: "var(--muted)", visible: true, dashed: true, points: cvals.map(y => ({ y, suffix: m.suffix })) }] : [])],
     xLabels: ctx.labels, yMax: Charts.niceMax([...vals, ...(showCmp ? cvals : [])].filter(v => v != null)), height: 220,
     refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: "avg" }] : [],
@@ -4459,10 +4676,11 @@ function historyMeasureView(m, ctx, pendingCharts) {
 }
 /* Boards: Side by side: one small chart per board on ONE shared y-scale, each with the board's name
    and average; its name sets the board selector and a day opens that board. `build(boards)` returns
-   { vals, cmp, draw(wrap, yMax, mean, cmpVals) } for one board. */
+   { vals, cmp, draw(wrap, yMax, mean, cmpVals) } for one board. Optional: `yVals` (what sets the shared scale
+   when it is not `vals`, e.g. the tallest of several series) and `notes` (text spans in place of "avg 12.3"). */
 function historySideBySide(box, ctx, pendingCharts, build) {
   const per = ctx.boards.map(b => ({ b, ...build([b]) }));
-  const yMax = Charts.niceMax(per.flatMap(x => [...x.vals, ...(x.cmp || [])]).filter(v => v != null));
+  const yMax = Charts.niceMax(per.flatMap(x => [...(x.yVals || x.vals), ...(x.cmp || [])]).filter(v => v != null));
   const grid = document.createElement("div");
   grid.className = "ov-small-multiples";
   for (const x of per) {
@@ -4478,10 +4696,12 @@ function historySideBySide(box, ctx, pendingCharts, build) {
     name.setAttribute("data-no-i18n", "");
     name.textContent = x.b.name;
     name.title = "Show only this board";
-    name.onclick = () => setOvBoard(x.b.id);
+    name.onclick = () => ovPeriodOnly(x.b.id);
     head.appendChild(name);
-    head.appendChild(document.createTextNode(" "));   // a real space for a screen reader; the flex gap spaces it on screen
-    head.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: `avg ${mean == null ? "—" : fmt1(mean)}${x.suffix || ""}` }));
+    for (const note of x.notes || [`avg ${mean == null ? "—" : fmt1(mean)}${x.suffix || ""}`]) {
+      head.appendChild(document.createTextNode(" "));   // a real space for a screen reader; the flex gap spaces it on screen
+      head.appendChild(Object.assign(document.createElement("span"), { className: "ov-muted", textContent: note }));
+    }
     cell.appendChild(head);
     const wrap = document.createElement("div");
     wrap.className = "ov-trend-chart ov-small-chart";
@@ -4492,11 +4712,190 @@ function historySideBySide(box, ctx, pendingCharts, build) {
   box.appendChild(grid);
 }
 
+/* ---------- History → Deployed / day, split ----------
+   The tile's chart answers "how many were out each day". Two ways to ask "who":
+   - by contract: Total, Permanent and On-call as chips that show or hide each, drawn as lines or as bars side by
+     side, one colour a series. Total alone is the plain line the tile always drew (with the comparison and the
+     average), so nothing changes until a chip is switched on.
+   - by service area: one stacked column a day, one colour (the area's own) a service area, with each day's total
+     above it; a chip per area shows or hides it. Counted by the PERSON's own service area, not the area of the
+     host they were sent to (that is what Boards & areas counts as demand).
+   Both read the same per-day records (assigned, oncallAssigned, workEmp) as the rest of History, so the board
+   selector, the range, Group by and the "not planned" rule apply unchanged. */
+function historyAreaCounter() {
+  // { areaId | "": people deployed } for a day's record, by each person's own area; a person whose area is gone,
+  // or who is no longer in the roster, counts under "" (No area). Memoised per record: several chips ask.
+  const known = new Set(D().areas.map(a => a.id));
+  const areaOf = new Map(D().employees.map(e => [e.id, known.has(e.areaId) ? e.areaId : ""]));
+  const cache = new WeakMap();
+  return (r) => {
+    let c = cache.get(r);
+    if (!c) {
+      c = {};
+      for (const id in (r.workEmp || {})) { const a = areaOf.has(id) ? areaOf.get(id) : ""; c[a] = (c[a] || 0) + 1; }
+      cache.set(r, c);
+    }
+    return c;
+  };
+}
+/* a chip that shows or hides a series: a colour square, its name and its average a day */
+function historyDeployedChip({ color, label, data, avg, pressed, title, onclick }) {
+  const c = document.createElement("button");
+  c.type = "button";
+  c.className = "ov-lv-chip";
+  c.setAttribute("aria-pressed", String(pressed));
+  c.innerHTML = `<i style="background:${escapeHtml(color)}"></i><span${data ? " data-no-i18n" : ""}>${escapeHtml(label)}</span> <small>${avg == null ? "—" : fmt1(avg)} / day</small>`;
+  c.title = title;
+  c.onclick = onclick;
+  return c;
+}
+function historyDeployedView(m, ctx, pendingCharts) {
+  const ov = state.overview;
+  const by = ov.historyDeployedBy === "area" ? "area" : "contract";
+  const tools = {
+    head: ovSegEl("Split by", "Split deployed by", [["contract", "Permanent / on-call"], ["area", "Service area"]], by, (k) => { ov.historyDeployedBy = k; }),
+    below: Object.assign(document.createElement("div"), { className: "ov-lv-chips ov-dep-chips" }),
+  };
+  return by === "area" ? historyDeployedAreaView(ctx, pendingCharts, tools) : historyDeployedContractView(m, ctx, pendingCharts, tools);
+}
+function historyDeployedContractView(m, ctx, pendingCharts, tools) {
+  const ov = state.overview;
+  const picked = new Set(ov.historyDeployedShow || []);
+  let shown = OV_DEPLOYED_SERIES.filter(s => picked.has(s.key));
+  if (!shown.length) shown = [OV_DEPLOYED_SERIES[0]];
+  const style = ov.historyDeployedStyle === "bars" ? "bars" : ov.historyDeployedStyle === "stacked" ? "stacked" : "line";
+  const on = new Set(shown.map(s => s.key));
+  for (const s of OV_DEPLOYED_SERIES) {
+    tools.below.appendChild(historyDeployedChip({ color: s.color, label: s.label, avg: historyMean(ctx.recs.map(r => (r ? s.value(r) : null))), pressed: on.has(s.key),
+      title: `Show or hide ${s.label}`,
+      onclick: () => {
+        // never all off: the last one stays on
+        if (on.has(s.key)) { if (on.size > 1) on.delete(s.key); } else on.add(s.key);
+        ov.historyDeployedShow = OV_DEPLOYED_SERIES.filter(x => on.has(x.key)).map(x => x.key);
+        render();
+      } }));
+  }
+  tools.below.appendChild(ovSegEl("Style", "Chart style", [["line", "Line"], ["bars", "Bars"], ["stacked", "Stacked"]], style, (k) => { ov.historyDeployedStyle = k; }));
+  // one series as a line is the tile's own chart: its comparison, average, A vs B and Side by side all stay
+  if (shown.length === 1 && style === "line") {
+    const s = shown[0];
+    return historyMeasureView({ ...m, label: s.title, value: s.value, color: s.color }, ctx, pendingCharts, tools);
+  }
+  const box = document.createElement("div");
+  box.className = "ov-hchart";
+  box.innerHTML = `<div class="ov-hchart-head ov-hchart-head-row"><b>${m.label}, ${ctx.per}</b></div>`;
+  box.firstChild.appendChild(tools.head);
+  box.appendChild(tools.below);
+  if (ctx.hasCmp(ctx.cmpRecsOf(ctx.boards))) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-dep-note", textContent: "The comparison is drawn when one series is shown as a line." }));
+  }
+  const rowsOf = (arr) => shown.map(s => ({ s, vals: ctx.mean(arr, s.value) }));
+  const perDay = ctx.group === "day" ? "" : " / day";
+  // the tallest each bucket gets, for the axis: the biggest series, or (Stacked) the parts piled up, or the total if that is higher
+  const topsOf = (rows) => (style !== "stacked" ? rows.flatMap(x => x.vals).filter(v => v != null)
+    : ctx.buckets.map((_, i) => Math.max(rows.reduce((a, x) => a + (x.s.key === "total" ? 0 : x.vals[i] || 0), 0), ...rows.filter(x => x.s.key === "total").map(x => x.vals[i] || 0))));
+  const draw = (wrap, arr, yMax, h) => {
+    const rows = rowsOf(arr);
+    if (style === "stacked") {
+      // Permanent at the bottom, On-call on top: one bar a day. Total is not a part but the whole: a pale bar behind the
+      // stack and its figure above it (with one part hidden, the part reads as a share of that whole). With no part on, Total is the bar.
+      const parts = rows.filter(({ s }) => s.key !== "total"), total = rows.find(({ s }) => s.key === "total");
+      const whole = total && parts.length ? total.vals : null;
+      // the figure above each bar is its height: the day's total (behind the stack), else the parts shown added up
+      const sums = ctx.buckets.map((_, i) => (parts.every(({ vals }) => vals[i] == null) ? null : Math.round(parts.reduce((a, { vals }) => a + (vals[i] || 0), 0) * 10) / 10));
+      fillColumnChart(wrap, { stacks: (parts.length ? parts : rows).map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
+        ghost: whole ? { label: "Total", color: "var(--assigned-ghost)", values: whole } : null, totals: whole || (parts.length ? sums : total.vals),
+        dayTotals: whole ? whole.map(v => (v == null ? null : `${v} deployed${perDay}`)) : null,
+        xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
+    } else if (style === "bars") {
+      fillColumnChart(wrap, { grouped: true, barValues: true, stacks: rows.map(({ s, vals }) => ({ label: s.label, color: s.color, values: vals })),
+        xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates });
+    } else {
+      fillLineChart(wrap, { series: rows.map(({ s, vals }) => ({ key: s.key, label: s.label, color: s.color, visible: true, points: vals.map(y => ({ y })) })),
+        xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates, emptyLabel: "No data in this range" });
+    }
+  };
+  if (ctx.side) {
+    historySideBySide(box, ctx, pendingCharts, (bs) => {
+      const arr = ctx.recsOf(bs), rows = rowsOf(arr);
+      return { vals: rows[0].vals, yVals: topsOf(rows), cmp: null, suffix: "",
+        notes: rows.map(({ s, vals }) => { const mean = historyMean(vals.filter(v => v != null)); return `${s.label} ${mean == null ? "—" : fmt1(mean)}`; }),
+        draw: (wrap, yMax) => draw(wrap, arr, yMax, 130) };
+    });
+  } else {
+    const wrap = document.createElement("div");
+    wrap.className = "ov-trend-chart";
+    box.appendChild(wrap);
+    pendingCharts.push(() => draw(wrap, ctx.recs, Charts.niceMax(topsOf(rowsOf(ctx.recs))), 220));
+  }
+  return box;
+}
+function historyDeployedAreaView(ctx, pendingCharts, tools) {
+  const ov = state.overview;
+  const count = historyAreaCounter();
+  const all = [...D().areas.map(a => ({ id: a.id, name: a.name, color: a.color || "var(--muted)", data: true })), { id: "", name: "No area", color: "var(--muted)", data: false }];
+  const rows = all.filter(a => ctx.recs.some(r => r && (count(r)[a.id] || 0) > 0));   // areas somebody deployed from in the range
+  const hidden = new Set(ov.historyAreaHidden || []);
+  let shown = rows.filter(a => !hidden.has(a.id));
+  if (!shown.length) shown = rows;
+  const box = document.createElement("div");
+  box.className = "ov-hchart";
+  box.innerHTML = `<div class="ov-hchart-head ov-hchart-head-row"><b>Deployed by service area, ${ctx.per}</b></div>`;
+  box.firstChild.appendChild(tools.head);
+  box.appendChild(tools.below);
+  if (!rows.length) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Nobody was deployed in this range." }));
+    return box;
+  }
+  const on = new Set(shown.map(a => a.id));
+  for (const a of rows) {
+    tools.below.appendChild(historyDeployedChip({ color: a.color, label: a.name, data: a.data, pressed: on.has(a.id),
+      avg: historyMean(ctx.recs.map(r => (r ? count(r)[a.id] || 0 : null))), title: `Show or hide ${a.name}`,
+      onclick: () => {
+        if (on.has(a.id)) { if (on.size > 1) on.delete(a.id); } else on.add(a.id);
+        ov.historyAreaHidden = rows.filter(x => !on.has(x.id)).map(x => x.id);   // saved as what is OFF, so a new area starts on
+        render();
+      } }));
+  }
+  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-dep-note", textContent: "By each person's own service area, not the area of the host they were sent to." }));
+  const perDay = ctx.group === "day" ? "" : " / day";
+  const sumShown = (r) => shown.reduce((acc, a) => acc + (count(r)[a.id] || 0), 0);
+  const stacksOf = (arr) => shown.map(a => ({ label: a.name, color: a.color, values: ctx.mean(arr, r => count(r)[a.id] || 0) }));
+  // each day's total: the sum of the areas shown (a bucket nobody planned stays empty)
+  const totalsOf = (stacks) => ctx.buckets.map((_, i) => (stacks.every(st => st.values[i] == null) ? null : Math.round(stacks.reduce((acc, st) => acc + (st.values[i] || 0), 0) * 10) / 10));
+  const carr = ctx.cmpRecsOf(ctx.boards);
+  const showCmp = ctx.hasCmp(carr);
+  if (showCmp) box.appendChild(ovLegend([{ label: historyCmpSeriesLabel(), color: "var(--muted)" }]));
+  // no average rule here: the totals sit above the columns and a rule would run through them (the tile has the average)
+  const draw = (wrap, arr, cArr, yMax, h, big) => {
+    const stacks = stacksOf(arr), tot = totalsOf(stacks);
+    const cv = cArr && ctx.hasCmp(cArr) ? ctx.mean(cArr, sumShown) : null;
+    fillColumnChart(wrap, { stacks, xLabels: ctx.labels, yMax, height: h, dates: ctx.clickDates,
+      dayTotals: tot.map(v => (v == null ? null : `${v} deployed${perDay}`)), totals: big ? tot : null,
+      compare: cv ? { label: historyCmpSeriesLabel(), color: "var(--muted)", values: cv } : null });
+  };
+  if (ctx.side) {
+    historySideBySide(box, ctx, pendingCharts, (bs) => {
+      const arr = ctx.recsOf(bs), cArr = ctx.cmpRecsOf(bs);
+      const tot = totalsOf(stacksOf(arr)), ctot = ctx.hasCmp(cArr) ? ctx.mean(cArr, sumShown) : null;
+      return { vals: tot, cmp: ctot, suffix: "", draw: (wrap, yMax) => draw(wrap, arr, cArr, yMax, 130, false) };
+    });
+  } else {
+    const wrap = document.createElement("div");
+    wrap.className = "ov-trend-chart";
+    box.appendChild(wrap);
+    const tot = totalsOf(stacksOf(ctx.recs));
+    const cv = showCmp ? ctx.mean(carr, sumShown) : [];
+    pendingCharts.push(() => draw(wrap, ctx.recs, carr, Charts.niceMax([...tot, ...cv].filter(v => v != null)), 220, true));
+  }
+  return box;
+}
+
 /* Click a day in a History chart (or a calendar cell) to open a board on that date: the one
    board in scope, else the in-scope board with the most people on missions that day (with an
    engineer picked, the board where they ran the most missions, filtered to them). */
 function historyOpenDay(date, engId, boardId) {
-  const boards = boardId ? D().boards.filter(b => b.id === boardId) : ovScopeBoards();
+  const boards = boardId ? D().boards.filter(b => b.id === boardId) : ovPeriodBoards();
   const hist = state.overview.history || {};
   let best = null, bestN = -1;
   for (const b of boards) {
@@ -4696,12 +5095,15 @@ function shownTotalAll(recs) {
 /* The Leave view's calendar: one month grid per month in the range, a cell per
    day coloured by how many were on leave (the types shown), with the on-call
    people deployed that day under it. Days History leaves out (weekends,
-   holidays, boards nobody planned) are plain grey cells. */
-function historyLeaveCalendar(dates, recs, shown) {
+   holidays, boards nobody planned) are plain grey cells.
+   People reuses it for the people in scope: opts.scoped drops the on-call line, opts.count(r, date) and
+   opts.parts(r, date) give that scope's figures, and opts.picked is the day a click picked (a cell is then a
+   button that filters the table instead of opening the board). */
+function historyLeaveCalendar(dates, recs, shown, opts = {}) {
   const ov = state.overview;
   const byDate = new Map(dates.map((d, i) => [d, recs[i]]));
-  const count = (r) => shown.reduce((a, z) => a + (r.leaveBy[z] || 0), 0);
-  const max = Math.max(1, ...recs.filter(Boolean).map(count));
+  const count = (r, d) => (opts.count ? opts.count(r, d) : shown.reduce((a, z) => a + (r.leaveBy[z] || 0), 0));
+  const max = Math.max(1, ...dates.map((d, i) => (recs[i] ? count(recs[i], d) : 0)));
   const wrap = document.createElement("div");
   wrap.className = "ov-cal-wrap";
   let html = "";
@@ -4728,24 +5130,26 @@ function historyLeaveCalendar(dates, recs, shown) {
         html += `<div class="ov-cal-cell ov-cal-off"><span class="ov-cal-d">${day}</span>${why ? `<span class="ov-cal-why">${why}</span>` : ""}</div>`;
         continue;
       }
-      const n = count(r);
+      const n = count(r, d);
       const lvl = n ? Math.min(4, Math.ceil((n / max) * 4)) : 0;
-      const parts = shown.filter(z => r.leaveBy[z]).map(z => `${ZONE_LABELS[z]} ${r.leaveBy[z]}`);
-      const label = `${fmtDow(d)} ${fmtDate(d)}${parts.length ? " — " + parts.join(" · ") : ""} · ${r.oncallAssigned} on-call deployed of ${historyOncallAvail(r)}`;
-      html += `<div class="ov-cal-cell ov-cal-l${lvl} chart-mark" tabindex="0" data-date="${d}" data-tip-value="${n} on leave" data-tip-label="${escapeHtml(label)}">
-        <span class="ov-cal-d">${day}</span><span class="ov-cal-n">${n}</span><span class="ov-cal-oc">${r.oncallAssigned} on-call</span></div>`;
+      const parts = (opts.parts ? opts.parts(r, d) : shown.filter(z => r.leaveBy[z]).map(z => [ZONE_LABELS[z], r.leaveBy[z]])).map(([name, k]) => `${name} ${k}`);
+      const label = `${fmtDow(d)} ${fmtDate(d)}${parts.length ? (opts.scoped ? " · " : " — ") + parts.join(" · ") : ""}${opts.scoped ? "" : ` · ${r.oncallAssigned} on-call deployed of ${historyOncallAvail(r)}`}`;
+      const picked = opts.scoped ? ` role="button" aria-pressed="${opts.picked === d}"` : "";
+      html += `<div class="ov-cal-cell ov-cal-l${lvl} chart-mark${opts.picked === d ? " is-picked" : ""}" tabindex="0" data-date="${d}"${picked} data-tip-value="${n} on leave" data-tip-label="${escapeHtml(label)}">
+        <span class="ov-cal-d">${day}</span><span class="ov-cal-n">${n}</span>${opts.scoped ? "" : `<span class="ov-cal-oc">${r.oncallAssigned} on-call</span>`}</div>`;
     }
     html += `</div></div>`;
   }
   wrap.innerHTML = html
     + `<div class="ov-cal-key"><span>Fewer</span>${[0, 1, 2, 3, 4].map(l => `<i class="ov-cal-l${l}"></i>`).join("")}<span>More on leave</span>
-       <span class="ov-cal-key-oc">N on-call</span><span>on-call people deployed</span></div>`;
+       ${opts.scoped ? "" : `<span class="ov-cal-key-oc">N on-call</span><span>on-call people deployed</span>`}</div>`;
   return wrap;
 }
 
 function historyOncallView(dates, recs, pendingCharts, ctx) {
   const ov = state.overview;
-  const share = ov.historyOncallMode === "share";
+  const mode = ov.historyOncallMode === "share" ? "share" : ov.historyOncallMode === "free" ? "free" : "count";
+  const share = mode === "share", free = mode === "free";
   const called = recs.map(r => (r ? r.oncallAssigned : null));
   const avail = recs.map(r => (r ? historyOncallAvail(r) : null));
   const sumOf = (a) => a.reduce((s, v) => s + (v || 0), 0);
@@ -4753,24 +5157,30 @@ function historyOncallView(dates, recs, pendingCharts, ctx) {
   const rate = sumOf(avail) ? Math.round((sumOf(called) / sumOf(avail)) * 100) : null;
   const crew = sumOf(recs.map(r => (r ? r.assigned : 0)));
   const shareAll = crew ? Math.round((sumOf(called) / crew) * 100) : null;
+  // free: on-call people available that day and not on a mission (the board's On-call free, per day)
+  const freeOf = (r) => historyOncallAvail(r) - r.oncallAssigned;
+  const meanFree = historyMean(recs.map(r => (r ? freeOf(r) : null)));
   const box = document.createElement("div");
   box.className = "ov-hchart";
   const head = document.createElement("div");
   head.className = "ov-hchart-head ov-hchart-head-row";
-  head.innerHTML = `<span><b>${share ? `On-call share, ${ctx.per}` : `On-call deployed, ${ctx.per}`}</b>
+  head.innerHTML = `<span><b>${share ? `On-call share, ${ctx.per}` : free ? `On-call free, ${ctx.per}` : `On-call deployed, ${ctx.per}`}</b>
     <span class="ov-muted">${share
       ? (shareAll == null ? "" : `On-call is ${shareAll}% of the person-days on missions`)
-      : `${rate == null ? "" : `Called in on ${rate}% of the available on-call days`}${shareAll == null ? "" : ` · ${shareAll}% of the people on missions`}`}</span></span>`;
+      : free
+        ? (rate == null ? "" : `Free on ${100 - rate}% of the available on-call days · avg ${fmt1(meanFree)} / day`)
+        : `${rate == null ? "" : `Called in on ${rate}% of the available on-call days`}${shareAll == null ? "" : ` · ${shareAll}% of the people on missions`}`}</span></span>`;
   const seg = document.createElement("div");
   seg.className = "ov-trend-btns";
   seg.setAttribute("role", "group");
   seg.setAttribute("aria-label", "On-call view");
-  for (const [k, l] of [["count", "Count"], ["share", "Share"]]) {
+  for (const [k, l] of [["count", "Count"], ["share", "Share"], ["free", "Free"]]) {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "btn btn-small" + ((share ? "share" : "count") === k ? " active" : "");
-    b.setAttribute("aria-pressed", String((share ? "share" : "count") === k));
+    b.className = "btn btn-small" + (mode === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(mode === k));
     b.textContent = l;
+    b.title = k === "free" ? "On-call people available and not on a mission each day" : k === "share" ? "On-call as a share of everyone on a mission" : "On-call people on a mission, against those available";
     b.onclick = () => { ov.historyOncallMode = k; render(); };
     seg.appendChild(b);
   }
@@ -4804,6 +5214,38 @@ function historyOncallView(dates, recs, pendingCharts, ctx) {
       wrap.className = "ov-trend-chart";
       box.appendChild(wrap);
       pendingCharts.push(() => draw(wrap, x.vals, x.cmp, Math.min(100, Charts.niceMax([...x.vals, ...(x.cmp || [])].filter(v => v != null))), 220, shareAll == null ? null : shareAll));
+    }
+    box.appendChild(peopleLink("oncall"));
+    return box;
+  }
+  if (free) {
+    // Free: one column a day, the on-call people available and not called in. Count's pale bar shows the same
+    // thing as what is left above the called-in part; this puts the number itself on the axis, with the average
+    // and the comparison, so "how much spare on-call did we have" reads straight off.
+    const carr0 = ctx.cmpRecsOf(ctx.boards);
+    box.appendChild(ovLegend([
+      { label: `On-call free · ${meanFree == null ? "—" : fmt1(meanFree)} / day`, color: "var(--oncall-free)" },
+      ...(ctx.hasCmp(carr0) ? [{ label: historyCmpSeriesLabel(), color: "var(--muted)" }] : []),
+    ]));
+    const drawFree = (wrap, arr, carr, yMax, h, m2) => {
+      const f = ctx.mean(arr, freeOf), a2 = ctx.mean(arr, r => historyOncallAvail(r));
+      const cv = carr && ctx.hasCmp(carr) ? ctx.mean(carr, freeOf) : null;
+      fillColumnChart(wrap, {
+        stacks: [{ label: "On-call free", color: "var(--oncall-free)", values: f }],
+        xLabels: ctx.labels, dayTotals: f.map((v, i) => (v == null ? null : `${v} of ${a2[i]} on-call${perDay}${cv && cv[i] != null ? ` · ${cmpName} ${cv[i]}` : ""}`)),
+        yMax, height: h, dates: ctx.clickDates, compare: cv ? { label: historyCmpSeriesLabel(), color: "var(--muted)", values: cv } : null,
+        refLines: m2 != null ? [{ y: m2, color: "var(--muted)", label: `avg ${fmt1(m2)}` }] : [] });
+    };
+    if (ctx.side) {
+      historySideBySide(box, ctx, pendingCharts, (bs) => {
+        const arr = ctx.recsOf(bs), carr = ctx.cmpRecsOf(bs);
+        return { vals: ctx.mean(arr, freeOf), cmp: ctx.hasCmp(carr) ? ctx.mean(carr, freeOf) : null, suffix: "", draw: (wrap, yMax, m2) => drawFree(wrap, arr, carr, yMax, 130, m2) };
+      });
+    } else {
+      const wrap = document.createElement("div");
+      wrap.className = "ov-trend-chart";
+      box.appendChild(wrap);
+      pendingCharts.push(() => drawFree(wrap, recs, carr0, Charts.niceMax([...ctx.mean(recs, freeOf), ...(ctx.hasCmp(carr0) ? ctx.mean(carr0, freeOf) : [])].filter(v => v != null)), 220, meanFree));
     }
     box.appendChild(peopleLink("oncall"));
     return box;
@@ -4986,14 +5428,7 @@ function isNewcomerOn(e, date) {
    fetch covers) to `to`, so a run that began before the range is counted whole. Only runs that
    end inside the range count. Map id -> { len, start, end, ongoing } */
 function personRuns(hist, boards, from, to, lookFrom) {
-  const on = new Map();
-  for (let d = lookFrom; d <= to; d = addDays(d, 1)) {
-    for (const b of boards) {
-      const rec = hist[b.id] && hist[b.id][d];
-      if (!rec) continue;
-      for (const id in (rec.workEmp || {})) (on.get(id) || on.set(id, new Set()).get(id)).add(d);
-    }
-  }
+  const on = workedDatesByPerson(hist, boards, lookFrom, to);
   const out = new Map();
   for (const [id, set] of on) {
     let best = null, start = null, len = 0;
@@ -5056,13 +5491,16 @@ function historyPeopleRows({ dates, recs, hist, boards, from, to, runs = true })
   }).filter(p => p.working > 0);
 }
 
-/* The five quick views: each sets the filter, the sort and the columns */
+/* The five quick views: each sets the filter, the order and the columns, and picks the charts it offers.
+   The chart above the table follows the view: Spread (who) and Over time (when) on every view, Leave also a
+   Calendar. `chart` is the one a view opens on. */
 const PPL_VIEWS = [
-  { key: "workload", label: "Workload", who: "all", sort: { key: "wshare", dir: -1 }, cols: ["name", "working", "worked", "wshare", "nights", "run", "flags"] },
-  { key: "leave", label: "Leave", who: "all", sort: { key: "share", dir: -1 }, cols: ["name", "working", "worked", "leave", "ratio", "share", "sick", "split"] },
-  { key: "nights", label: "Nights", who: "all", sort: { key: "nights", dir: -1 }, cols: ["name", "worked", "nights", "nshare", "flags"] },
-  { key: "oncall", label: "On-call", who: "oncall", sort: { key: "called", dir: -1 }, cols: ["name", "working", "leave", "called", "cshare", "flags"] },
-  { key: "alerts", label: "Alerts only", who: "all", sort: { key: "flags", dir: -1 }, cols: ["name", "worked", "share", "nights", "run", "flags"], flagged: true },
+  { key: "workload", label: "Workload", who: "all", chart: "spread", charts: ["spread", "time"], sort: { key: "wshare", dir: -1 }, cols: ["name", "working", "worked", "wshare", "nights", "run", "flags"] },
+  { key: "leave", label: "Leave", who: "all", chart: "time", charts: ["time", "cal", "spread"], sort: { key: "share", dir: -1 }, cols: ["name", "working", "worked", "leave", "ratio", "share", "sick", "split"] },
+  { key: "nights", label: "Nights", who: "all", chart: "spread", charts: ["spread", "time"], sort: { key: "nights", dir: -1 }, cols: ["name", "worked", "nights", "nshare", "flags"] },
+  // least called in first: the on-call people the roster leans on least lead the table
+  { key: "oncall", label: "On-call", who: "oncall", chart: "spread", charts: ["spread", "time"], sort: { key: "cshare", dir: 1 }, cols: ["name", "working", "leave", "called", "cshare", "flags"] },
+  { key: "alerts", label: "Alerts only", who: "all", chart: "spread", charts: ["spread", "time"], sort: { key: "flags", dir: -1 }, cols: ["name", "worked", "share", "nights", "run", "flags"], flagged: true },
 ];
 const PPL_COLS = {
   name: ["Name", ""], working: ["Working days", "r"], worked: ["Worked", "r"], wshare: ["Share worked", "r"], leave: ["Leave", "r"],
@@ -5077,11 +5515,21 @@ const pplVal = (p, k) => ({
 })[k];
 
 function pplView() { return PPL_VIEWS.find(v => v.key === state.overview.pplView) || PPL_VIEWS[0]; }
-/* picking a view sets its filter and order; the table's Everyone / Permanent / On-call can still change it */
+/* the chart a view is showing: the one picked, if this view offers it, else the view's own */
+function pplChartKey(v) { return v.charts.includes(state.overview.pplChart) ? state.overview.pplChart : v.chart; }
+const pplChartLabel = (v, k) => (k === "spread" && v.key === "alerts" ? "By flag" : { spread: "Spread", time: "Over time", cal: "Calendar" }[k]);
+/* picking a view sets its filter, its order and its chart; the Who switch can still change the filter (not on On-call) */
 function setPeopleView(key) {
   const ov = state.overview, v = PPL_VIEWS.find(x => x.key === key) || PPL_VIEWS[0];
-  ov.pplView = v.key; ov.pplWho = v.who; ov.pplSort = null; ov.pplBand = null; ov.pplAll = false;
-  if (v.key === "oncall") ov.pplSpread = "oncall";
+  ov.pplView = v.key; ov.pplWho = v.who; ov.pplChart = v.chart; ov.pplSort = null; ov.pplPick = null; ov.pplAll = false;
+}
+/* what a click on the chart picks: a band, a day or a flag. It filters the table; the same pick again clears it. */
+function pplPickToggle(next) {
+  const ov = state.overview, p = ov.pplPick;
+  const same = p && p.k === next.k && p.i === next.i && p.date === next.date && p.key === next.key;
+  ov.pplPick = same ? null : next;
+  ov.pplAll = false;
+  render();
 }
 /* "Per person → People" under the Leave and On-call views: opens that quick view */
 function peopleLink(view) {
@@ -5117,19 +5565,337 @@ function pplFlagPill(p, f) {
 }
 function pplFlagsHtml(p) { return p.flags.length ? p.flags.map(f => pplFlagPill(p, f)).join(" ") : '<span class="ov-muted">—</span>'; }
 
-function peopleSection(boards, dates, recs) {
+/* ---- the chart: what each view shows, and what a click on it picks ----
+   Spread: people in bands of the view's measure (workload: share of working days on a mission; leave: share of
+   working days on leave; nights: nights worked; on-call: share of AVAILABLE days called in, with "never" its own band;
+   alerts: one bar per flag). Over time: the same people day by day (History's own column chart); Leave also has a
+   Calendar (History's own). The chart and the table read one scope (the Who switch). */
+const PPL_LEAVE_EDGES = [10, OV_LEAVE_AMBER, OV_LEAVE_RED, 50];    // leave-share bands: ≤10, 10–20, 20–30, 30–50, >50 (amber above 20, red above 30)
+const pplLeaveBand = (p) => {
+  if (p.leave <= 0) return -1;
+  const i = PPL_LEAVE_EDGES.findIndex(e => p.share <= e);
+  return i < 0 ? PPL_LEAVE_EDGES.length : i;
+};
+const pplMedian = (arr) => { const a = arr.slice().sort((x, y) => x - y), m = a.length >> 1; return !a.length ? 0 : a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+const pplNightBand = (p) => (p.nights === 0 ? -1 : p.nights <= 2 ? 0 : p.nights <= 4 ? 1 : p.nights <= 6 ? 2 : p.nights <= 9 ? 3 : 4);
+/* share of available days called in (working days less leave): band 0 = never, 1 = under 10%, 2 = 10–19% … 10 = 90–100% */
+const pplCallBand = (p) => (!p.oncall || p.available <= 0 ? -1 : p.calledIn === 0 ? 0 : Math.min(10, 1 + Math.floor((p.calledIn / p.available) * 10)));
+const pplLeaveShort = (i) => (i === 0 ? `≤${PPL_LEAVE_EDGES[0]}%` : i < PPL_LEAVE_EDGES.length ? `${PPL_LEAVE_EDGES[i - 1]}–${PPL_LEAVE_EDGES[i]}%` : `>${PPL_LEAVE_EDGES[PPL_LEAVE_EDGES.length - 1]}%`);
+const pplCallShort = (i) => (i === 0 ? "never" : i === 1 ? "<10%" : i === 10 ? "90–100%" : `${(i - 1) * 10}–${(i - 1) * 10 + 9}%`);
+const PPL_NIGHT_SHORT = ["1–2", "3–4", "5–6", "7–9", "10+"];
+const PPL_BANDS = {
+  workload: { n: 10, of: pplBandOf, axis: (i) => `${i * 10}${i === 9 ? "+" : ""}`, name: (i) => `${pplBandLabel(i)} of working days on a mission`,
+    chip: (i) => `Share worked ${pplBandLabel(i)}`, tone: () => "", medianBand: (m) => Math.min(9, Math.floor(m / 10)), shareOf: (p) => p.workedShare },
+  leave: { n: PPL_LEAVE_EDGES.length + 1, of: pplLeaveBand, axis: pplLeaveShort, name: (i) => `${pplLeaveShort(i)} of working days on leave`, chip: (i) => `Leave share ${pplLeaveShort(i)}`,
+    tone: (i) => (i >= 1 && PPL_LEAVE_EDGES[i - 1] >= OV_LEAVE_RED ? "bad" : i >= 1 && PPL_LEAVE_EDGES[i - 1] >= OV_LEAVE_AMBER ? "warn" : "") },
+  nights: { n: 5, of: pplNightBand, axis: (i) => PPL_NIGHT_SHORT[i], name: (i) => `${PPL_NIGHT_SHORT[i]} nights`, chip: (i) => `${PPL_NIGHT_SHORT[i]} nights`, tone: () => "" },
+  oncall: { n: 11, of: pplCallBand, axis: (i) => (i === 0 ? "0" : i === 1 ? "<10" : i === 10 ? "90+" : String((i - 1) * 10)),
+    name: (i) => (i === 0 ? "never called in" : `${pplCallShort(i)} of available days called in`), chip: (i) => (i === 0 ? "Never called in" : `Share called in ${pplCallShort(i)}`),
+    tone: (i) => (i === 0 ? "bad" : ""), medianBand: (m) => (m <= 0 ? 0 : Math.min(10, 1 + Math.floor(m / 10))), shareOf: (p) => (p.available > 0 ? (p.calledIn / p.available) * 100 : 0) },
+};
+const PPL_FLAG_LABELS = { run: `${OV_RUN_AMBER}+ days in a row`, nights: "Mostly nights", leave: `Leave above ${OV_LEAVE_RED}%`, never: "Never called in", newcomer: "Newcomer-only mission" };
+const PPL_DAY_WHAT = { workload: "On a mission", leave: "On leave", nights: "On nights", oncall: "Called in", alerts: "On a long run" };
+
+/* one person on one plotted day: "work", a leave type, "exchange", "standby", or null (not on the roster that day).
+   Work wins over leave, the way historyPeopleRows counts it, so the chart and the table agree. */
+function pplDayState(r, id) {
+  if (!r) return null;
+  if (r.workEmp && r.workEmp[id]) return "work";
+  const z = r.leaveEmp && r.leaveEmp[id];
+  if (z) return z;
+  return r.roster && r.roster[id] ? "standby" : null;
+}
+/* the dates each person worked, from `from` to `to` (History's records of the boards in scope) */
+function workedDatesByPerson(hist, boards, from, to) {
+  const on = new Map();
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    for (const b of boards) {
+      const rec = hist[b.id] && hist[b.id][d];
+      if (!rec) continue;
+      for (const id in (rec.workEmp || {})) (on.get(id) || on.set(id, new Set()).get(id)).add(d);
+    }
+  }
+  return on;
+}
+/* per plotted day, for the people in scope: on a mission, on the roster, available (not on leave), on nights, and on leave by type */
+function pplDayData(ctx) {
+  if (ctx._day) return ctx._day;
+  const n = ctx.dates.length, ids = ctx.scope.map(p => p.id);
+  const d = { work: [], roster: [], avail: [], night: [], leave: {}, leaveTotal: [] };
+  for (const z of OV_LEAVE_TYPES) d.leave[z] = [];
+  ctx.dates.forEach((date, i) => {
+    const r = ctx.recs[i];
+    if (!r) { for (const k of ["work", "roster", "avail", "night", "leaveTotal"]) d[k][i] = null; for (const z of OV_LEAVE_TYPES) d.leave[z][i] = null; return; }
+    let w = 0, ro = 0, av = 0, nt = 0, lt = 0;
+    const lv = {};
+    for (const z of OV_LEAVE_TYPES) lv[z] = 0;
+    for (const id of ids) {
+      const s = pplDayState(r, id);
+      if (!s || s === "exchange") continue;
+      ro++;
+      if (s === "work") { w++; av++; if (r.nightEmp && r.nightEmp[id]) nt++; }
+      else if (s === "standby") av++;
+      else if (s in lv) { lv[s]++; lt++; }
+    }
+    d.work[i] = w; d.roster[i] = ro; d.avail[i] = av; d.night[i] = nt; d.leaveTotal[i] = lt;
+    for (const z of OV_LEAVE_TYPES) d.leave[z][i] = lv[z];
+  });
+  return (ctx._day = d);
+}
+/* per plotted day, who is on a run of OV_RUN_AMBER+ days (calendar days, counted from the period before the range) */
+function pplRunSets(ctx) {
+  if (ctx._runs) return ctx._runs;
+  const lookFrom = prevRangeOf(ctx.from, ctx.to)[0], worked = workedDatesByPerson(ctx.hist, ctx.boards, lookFrom, ctx.to);
+  const sets = ctx.dates.map(() => new Set());
+  for (const p of ctx.scope) {
+    const have = worked.get(p.id);
+    if (!have) continue;
+    let run = 0;
+    for (let d = lookFrom; d <= ctx.to; d = addDays(d, 1)) {
+      run = have.has(d) ? run + 1 : 0;
+      if (run >= OV_RUN_AMBER && ctx.dayIdx.has(d)) sets[ctx.dayIdx.get(d)].add(p.id);
+    }
+  }
+  return (ctx._runs = sets);
+}
+/* does a person match what is picked on the chart? */
+function pplPickMatch(ctx, p) {
+  const k = ctx.pick;
+  if (k.k === "flag") return p.flags.some(f => f.key === k.key);
+  if (k.k === "band") return PPL_BANDS[ctx.v.key].of(p) === k.i;
+  const i = ctx.dayIdx.get(k.date), r = ctx.recs[i];
+  if (ctx.v.key === "alerts") return pplRunSets(ctx)[i].has(p.id);
+  const s = pplDayState(r, p.id);
+  if (ctx.v.key === "leave") return !!s && s !== "work" && s !== "standby" && s !== "exchange";
+  if (ctx.v.key === "nights") return s === "work" && !!(r.nightEmp && r.nightEmp[p.id]);
+  return s === "work";   // workload: on a mission that day; on-call: called in that day
+}
+/* a pick only counts while the chart showing it is the chart that can make it (a stale pick is ignored) */
+function pplPickValid(ctx, pick) {
+  if (!pick) return false;
+  if (pick.k === "day") return ctx.dayIdx.has(pick.date) && ctx.chartKey !== "spread";
+  if (ctx.chartKey !== "spread") return false;
+  return pick.k === "flag" ? ctx.v.key === "alerts" : pick.k === "band" && !!PPL_BANDS[ctx.v.key] && pick.i >= 0 && pick.i < PPL_BANDS[ctx.v.key].n;
+}
+function pplPickText(ctx) {
+  const k = ctx.pick;
+  if (k.k === "flag") return PPL_FLAG_LABELS[k.key];
+  if (k.k === "band") return PPL_BANDS[ctx.v.key].chip(k.i);
+  return `${PPL_DAY_WHAT[ctx.v.key]} on ${fmtDow(k.date)} ${fmtDayMon(k.date)}`;
+}
+
+/* a smooth line through ten (or fewer) band counts, the bands still the buttons that carry the number, the dot and the click */
+function pplBandsNode(ctx, key) {
+  const ov = state.overview, spec = PPL_BANDS[key], pick = ctx.pick;
+  const counts = Array(spec.n).fill(0);
+  for (const p of ctx.scope) { const b = spec.of(p); if (b >= 0) counts[b]++; }
+  const max = Math.max(1, ...counts);
+  let medBand = -1;
+  if (spec.medianBand) {
+    const shares = ctx.scope.filter(p => spec.of(p) >= 0).map(spec.shareOf);
+    if (shares.length) medBand = spec.medianBand(pplMedian(shares));
+  }
+  const yOf = (n) => 82 - (n / max) * 74;
+  const curve = spreadCurve(counts.map((n, i) => [((i + .5) * 100) / spec.n, yOf(n)]));
+  const wrap = document.createElement("div");
+  wrap.className = "ov-bands-wrap";
+  wrap.innerHTML = `<svg class="ov-curve" viewBox="0 0 100 86" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line class="ov-curve-base" x1="0" y1="82" x2="100" y2="82"/><path class="ov-curve-area" d="${curve} L${(((spec.n - .5) * 100) / spec.n).toFixed(2)},82 L${((.5 * 100) / spec.n).toFixed(2)},82 Z"/><path class="ov-curve-line" d="${curve}"/></svg>`;
+  const chart = document.createElement("div");
+  chart.className = "ov-bands";
+  chart.style.gridTemplateColumns = `repeat(${spec.n}, minmax(0, 1fr))`;
+  chart.setAttribute("role", "group");
+  chart.setAttribute("aria-label", { workload: "Share of working days on a mission", leave: "Share of working days on leave", nights: "Nights worked", oncall: "Share of available days called in" }[key]);
+  counts.forEach((n, i) => {
+    const b = document.createElement("button");
+    const tone = spec.tone(i);
+    b.type = "button";
+    b.className = "ov-band chart-mark" + (tone ? " ov-band-" + tone : "") + (i === medBand ? " ov-band-median" : "");
+    b.setAttribute("data-band", String(i));
+    b.setAttribute("aria-pressed", String(!!pick && pick.k === "band" && pick.i === i));
+    b.setAttribute("data-tip-value", `${n} ${n === 1 ? "person" : "people"}`);
+    b.setAttribute("data-tip-label", `${spec.name(i)}${i === medBand ? " · median" : ""}`);
+    b.setAttribute("aria-label", `${spec.name(i)}: ${n} ${n === 1 ? "person" : "people"}`);
+    b.innerHTML = `<span class="ov-band-n">${n || ""}</span><span class="ov-band-pt"><i style="bottom:${((n / max) * 74).toFixed(1)}px"></i></span><span class="ov-band-l">${spec.axis(i)}</span>`;
+    b.onclick = () => pplPickToggle({ k: "band", i });
+    chart.appendChild(b);
+  });
+  wrap.appendChild(chart);
+  return wrap;
+}
+/* Alerts, by flag: one bar per flag, split amber and red; a click shows those people */
+function pplFlagsNode(ctx) {
+  const pick = ctx.pick;
+  const rows = Object.keys(PPL_FLAG_LABELS).map(key => {
+    const have = ctx.scope.filter(p => p.flags.some(f => f.key === key));
+    const bad = have.filter(p => p.flags.find(f => f.key === key).level === "bad").length;
+    return { key, n: have.length, bad, warn: have.length - bad };
+  });
+  const max = Math.max(1, ...rows.map(r => r.n));
+  const wrap = document.createElement("div");
+  wrap.className = "ov-flagrows";
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", "Alerts by flag");
+  for (const r of rows) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ov-flagrow chart-mark";
+    b.setAttribute("data-flag", r.key);
+    b.setAttribute("aria-pressed", String(!!pick && pick.k === "flag" && pick.key === r.key));
+    b.setAttribute("data-tip-value", `${r.n} ${r.n === 1 ? "person" : "people"}`);
+    b.setAttribute("data-tip-label", PPL_FLAG_LABELS[r.key]);
+    // the split only when a flag is both: a flag that is all amber or all red just says which (its count is already beside the bar)
+    const parts = r.warn && r.bad ? [`${r.warn} amber`, `${r.bad} red`] : r.warn ? ["amber"] : r.bad ? ["red"] : [];
+    b.innerHTML = `<b>${escapeHtml(PPL_FLAG_LABELS[r.key])}</b><span class="ov-flagbar" aria-hidden="true"><i style="width:${((r.warn / max) * 100).toFixed(1)}%;background:var(--leave-annual)"></i><i style="width:${((r.bad / max) * 100).toFixed(1)}%;background:var(--chart-standby)"></i></span>`
+      + `<span class="ov-flagn"><b>${r.n}</b> <small>${parts.length ? escapeHtml(parts.join(" · ")) : "none"}</small></span>`;
+    b.onclick = () => pplPickToggle({ k: "flag", key: r.key });
+    wrap.appendChild(b);
+  }
+  return wrap;
+}
+/* History's own column chart for the people in scope: a column per plotted day, the average as a dashed line; a day picks it */
+function pplColumns(ctx, box, pendingCharts, { stacks, ghost = null, dayTotals }) {
+  const wrap = document.createElement("div");
+  wrap.className = "ov-trend-chart";
+  box.appendChild(wrap);
+  const totals = ctx.dates.map((_, i) => (stacks.every(s => s.values[i] == null) ? null : stacks.reduce((a, s) => a + (s.values[i] || 0), 0)));
+  const mean = historyMean(totals);
+  const pickDate = ctx.pick && ctx.pick.k === "day" ? ctx.pick.date : null;
+  pendingCharts.push(() => {
+    fillColumnChart(wrap, { stacks, ghost, xLabels: ctx.dates.map(shortDateLabel), dayTotals, height: 220, dates: ctx.dates,
+      yMax: Charts.niceMax([...totals, ...(ghost ? ghost.values : [])].filter(v => v != null)),
+      refLines: mean != null ? [{ y: mean, color: "var(--muted)", label: `avg ${fmt1(mean)}` }] : [] });
+    if (pickDate) wrap.querySelectorAll(`[data-date="${pickDate}"]`).forEach(e => e.classList.add("is-picked"));
+  });
+}
+const pplPeak = (vals) => { let pk = -1; vals.forEach((v, i) => { if (v != null && v > 0 && (pk < 0 || v > vals[pk])) pk = i; }); return pk; };
+
+/* the chart's title, headline numbers, note and drawing for the view and chart picked */
+function pplChartSpec(ctx) {
+  const { v, chartKey: ck, scope } = ctx, key = v.key;
+  const dayName = (i) => `${fmtDow(ctx.dates[i])} ${fmtDayMon(ctx.dates[i])}`;
+  const clickNote = "Click a band to filter the table.";
+  if (ck === "spread" && key === "alerts") {
+    const withFlag = scope.filter(p => p.flags.length).length, multi = scope.filter(p => p.flags.length > 1).length;
+    return { title: "Alerts by flag", sub: "people with each flag",
+      headline: withFlag ? `${withFlag} with a flag · ${multi} with two or more` : "No flags in this range.",
+      note: "A flag is amber until it passes its red limit. Click a flag to filter the table.", body: (box) => box.appendChild(pplFlagsNode(ctx)) };
+  }
+  if (ck === "spread") {
+    let title, sub, headline, note;
+    if (key === "workload") {
+      const st = peopleSpreadStats(scope);
+      title = "Workload spread"; sub = "people by share of working days on a mission";
+      headline = `Median ${fmt1(st.median)}% · ${st.hi} at 90% or more · ${st.lo} under 50%`;
+      note = "Share of working days on a mission, %. " + clickNote;
+    } else if (key === "leave") {
+      const took = scope.filter(p => p.leave > 0).length;
+      title = "Leave spread"; sub = "people who took leave, by share of working days on leave";
+      headline = `${scope.length - took} took no leave · ${took} took leave · ${scope.filter(p => p.share > OV_LEAVE_AMBER).length} above ${OV_LEAVE_AMBER}% · ${scope.filter(p => p.share > OV_LEAVE_RED).length} above ${OV_LEAVE_RED}%`;
+      note = "Share of working days on leave, %, for the people who took any. " + clickNote;
+    } else if (key === "nights") {
+      const w = scope.filter(p => p.nights > 0).sort((a, b) => b.nights - a.nights), total = w.reduce((a, p) => a + p.nights, 0);
+      title = "Nights spread"; sub = "people by nights worked";
+      headline = !total ? "Nobody worked a night in this range."
+        : `${w.length} ${w.length === 1 ? "person shares" : "people share"} the ${total} nights · the top 3 worked ${Math.round((w.slice(0, 3).reduce((a, p) => a + p.nights, 0) / total) * 100)}% of them · ${scope.length - w.length} worked none`;
+      note = "Nights worked, for the people who worked any. " + clickNote;
+    } else {
+      const on = scope.filter(p => PPL_BANDS.oncall.of(p) >= 0), never = on.filter(p => p.calledIn === 0).length, days = on.map(p => p.calledIn).sort((a, b) => a - b);
+      title = "Call-in spread"; sub = "on-call people by share of available days called in";
+      headline = !on.length ? "No on-call people available in this range." : `Median ${fmt1(pplMedian(on.map(PPL_BANDS.oncall.shareOf)))}% called in · ${never ? `${never} never called in` : "everyone was called in"} · ${days[0]}–${days[days.length - 1]} days called in`;
+      note = "Share of the available days (working days less leave) called in, %. 0 is never called in. " + clickNote;
+    }
+    return { title, sub, headline, note, body: (box) => box.appendChild(pplBandsNode(ctx, key)) };
+  }
+  // Over time and Calendar: day by day
+  const dd = pplDayData(ctx), dayNote = "Weekends and holidays are left off. Click a day to filter the table.";
+  const total = (a) => a.reduce((s, x) => s + (x || 0), 0);
+  if (key === "workload") {
+    return { title: "People on a mission, per day", sub: "the pale bar is everyone on the roster",
+      headline: `${fmt1(historyMean(dd.work) || 0)} of ${fmt1(historyMean(dd.roster) || 0)} people on a mission each day`, note: dayNote,
+      body: (box, pc) => pplColumns(ctx, box, pc, { stacks: [{ label: "On a mission", color: "var(--chart-assigned)", values: dd.work }],
+        ghost: { label: "On the roster", color: "var(--assigned-ghost)", values: dd.roster }, dayTotals: dd.work.map((w, i) => (w == null ? null : `${w} of ${dd.roster[i]} on a mission`)) }) };
+  }
+  if (key === "leave") {
+    const days = total(dd.leaveTotal), pk = pplPeak(dd.leaveTotal), took = scope.filter(p => p.leave > 0).length;
+    const headline = !days ? "No leave in this range." : `${days} leave days · ${took} ${took === 1 ? "person" : "people"} took leave · busiest ${dayName(pk)} (${dd.leaveTotal[pk]})`;
+    const legend = ovLegend(OV_LEAVE_TYPES.map(z => ({ label: ZONE_LABELS[z], color: OV_LEAVE_COLORS[z] })));
+    if (ck === "cal") {
+      return { title: "People on leave, by day", sub: "darker means more people on leave", headline, legend, note: "Weekends and holidays are greyed. Click a day to filter the table.",
+        body: (box) => box.appendChild(historyLeaveCalendar(ctx.dates, ctx.recs, OV_LEAVE_TYPES, { scoped: true, picked: ctx.pick && ctx.pick.k === "day" ? ctx.pick.date : "",
+          count: (r, d) => dd.leaveTotal[ctx.dayIdx.get(d)] || 0,
+          parts: (r, d) => OV_LEAVE_TYPES.map(z => [ZONE_LABELS[z], dd.leave[z][ctx.dayIdx.get(d)] || 0]).filter(x => x[1]) })) };
+    }
+    return { title: "People on leave, per day", sub: "by leave type", headline, legend, note: dayNote,
+      body: (box, pc) => pplColumns(ctx, box, pc, { stacks: OV_LEAVE_TYPES.map(z => ({ label: ZONE_LABELS[z], color: OV_LEAVE_COLORS[z], values: dd.leave[z] })),
+        dayTotals: dd.leaveTotal.map(t => (t == null ? null : `${t} on leave`)) }) };
+  }
+  if (key === "nights") {
+    const pk = pplPeak(dd.night), all = total(dd.night);
+    return { title: "People on nights, per day", sub: "", headline: !all ? "Nobody worked a night in this range." : `${fmt1(historyMean(dd.night))} people on nights a day · busiest ${dayName(pk)} (${dd.night[pk]})`, note: dayNote,
+      body: (box, pc) => pplColumns(ctx, box, pc, { stacks: [{ label: "On nights", color: "var(--primary-text)", values: dd.night }], dayTotals: dd.night.map(n => (n == null ? null : `${n} on nights`)) }) };
+  }
+  if (key === "oncall") {
+    const rate = total(dd.avail) ? Math.round((total(dd.work) / total(dd.avail)) * 100) : null;
+    const everyone = scope.length ? total(ctx.recs.map(r => (r ? Object.keys(r.workEmp || {}).length : 0))) : 0;
+    const share = everyone ? Math.round((total(dd.work) / everyone) * 100) : null;
+    return { title: "On-call called in, per day", sub: "the pale bar is on-call people available",
+      headline: rate == null ? "No on-call people available in this range." : `Called in on ${rate}% of the available on-call days${share == null ? "" : ` · ${share}% of the people on missions`}`, note: dayNote,
+      body: (box, pc) => pplColumns(ctx, box, pc, { stacks: [{ label: "Called in", color: "var(--chart-oncall)", values: dd.work }],
+        ghost: { label: "On-call available", color: "var(--oncall-ghost)", values: dd.avail }, dayTotals: dd.work.map((w, i) => (w == null ? null : `${w} of ${dd.avail[i]} on-call`)) }) };
+  }
+  const sets = pplRunSets(ctx), counts = sets.map((s, i) => (ctx.recs[i] ? s.size : null)), pk = pplPeak(counts);
+  return { title: "People on a long run, per day", sub: `${OV_RUN_AMBER} or more days in a row`,
+    headline: pk < 0 ? "Nobody is on a long run in this range." : `Up to ${counts[pk]} on a long run · busiest ${dayName(pk)}`, note: dayNote,
+    body: (box, pc) => pplColumns(ctx, box, pc, { stacks: [{ label: "On a long run", color: "var(--chart-standby)", values: counts }], dayTotals: counts.map(n => (n == null ? null : `${n} on a long run`)) }) };
+}
+function pplChartBox(ctx, pendingCharts) {
+  const ov = state.overview, v = ctx.v, spec = pplChartSpec(ctx);
+  const box = document.createElement("div");
+  box.className = "ov-hchart ov-spread";
+  const head = document.createElement("div");
+  head.className = "ov-hchart-head ov-hchart-head-row";
+  head.innerHTML = `<span><b>${escapeHtml(spec.title)}</b>${spec.sub ? ` <span class="ov-muted">${escapeHtml(spec.sub)}</span>` : ""}</span>`;
+  const seg = document.createElement("div");
+  seg.className = "ov-trend-btns ov-pview";
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", "Chart view");
+  for (const k of v.charts) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn btn-small" + (ctx.chartKey === k ? " active" : "");
+    b.setAttribute("aria-pressed", String(ctx.chartKey === k));
+    b.setAttribute("data-chart", k);
+    b.textContent = pplChartLabel(v, k);
+    b.onclick = () => { if (ctx.chartKey !== k) { ov.pplChart = k; ov.pplPick = null; ov.pplAll = false; render(); } };
+    seg.appendChild(b);
+  }
+  head.appendChild(seg);
+  box.appendChild(head);
+  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-sum", textContent: spec.headline }));
+  if (spec.legend) box.appendChild(spec.legend);
+  spec.body(box, pendingCharts);
+  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-axis ov-muted", textContent: spec.note }));
+  return box;
+}
+
+function peopleSection(boards, dates, recs, pendingCharts) {
   const ov = state.overview;
   const sec = ovSection("People", "Workload, leave, nights and on-call for each person over the range, on planned working days. A name opens their profile.");
   sec.id = "ov-people";
-  const rows = historyPeopleRows({ dates, recs, hist: ov.history || {}, boards, from: ov.historyFrom, to: ov.historyTo });
+  const hist = ov.history || {};
+  const rows = historyPeopleRows({ dates, recs, hist, boards, from: ov.historyFrom, to: ov.historyTo });
   if (!rows.length) {
     sec.appendChild(Object.assign(document.createElement("p"), { className: "import-note", textContent: "Nobody on a planned working day in this range." }));
     return sec;
   }
-  sec.appendChild(peopleSpread(rows));
-
-  // quick views
   const v = pplView();
+  // one Who for the chart and the table; the On-call view is on-call people only
+  const who = v.key === "oncall" ? "oncall" : ov.pplWho;
+  const scope = rows.filter(p => who === "all" || (who === "oncall") === p.oncall);
+  const ctx = { v, who, scope, dates, recs, hist, boards, from: ov.historyFrom, to: ov.historyTo, chartKey: pplChartKey(v), dayIdx: new Map(dates.map((d, i) => [d, i])), pick: null };
+  ctx.pick = pplPickValid(ctx, ov.pplPick) ? ov.pplPick : null;
+
+  // the chips and the one Who switch sit above the chart: they drive the chart and the table together
   const bar = document.createElement("div");
   bar.className = "ov-people-bar";
   const views = document.createElement("div");
@@ -5146,63 +5912,81 @@ function peopleSection(boards, dates, recs) {
     views.appendChild(b);
   }
   bar.appendChild(views);
-  const seg = document.createElement("div");
-  seg.className = "ov-trend-btns";
-  seg.setAttribute("role", "group");
-  seg.setAttribute("aria-label", "Who");
-  for (const [k, l] of [["all", "Everyone"], ["permanent", "Permanent"], ["oncall", "On-call"]]) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "btn btn-small" + (ov.pplWho === k ? " active" : "");
-    b.setAttribute("aria-pressed", String(ov.pplWho === k));
-    b.textContent = l;
-    b.onclick = () => { ov.pplWho = k; ov.pplBand = null; ov.pplAll = false; render(); };
-    seg.appendChild(b);
+  if (v.key === "oncall") {
+    bar.appendChild(Object.assign(document.createElement("span"), { className: "ov-locked", textContent: "On-call people only" }));
+  } else {
+    const seg = document.createElement("div");
+    seg.className = "ov-trend-btns";
+    seg.setAttribute("role", "group");
+    seg.setAttribute("aria-label", "Who");
+    for (const [k, l] of [["all", "Everyone"], ["permanent", "Permanent"], ["oncall", "On-call"]]) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-small" + (who === k ? " active" : "");
+      b.setAttribute("aria-pressed", String(who === k));
+      b.textContent = l;
+      b.onclick = () => { ov.pplWho = k; ov.pplPick = null; ov.pplAll = false; render(); };
+      seg.appendChild(b);
+    }
+    bar.appendChild(seg);
   }
-  bar.appendChild(seg);
   sec.appendChild(bar);
 
-  // the table's rows: who, the picked band, alerts only
-  const group = (p) => (ov.pplWho === "all" ? true : (ov.pplWho === "oncall") === p.oncall);
-  let shown = rows.filter(group);
-  if (ov.pplBand != null) shown = shown.filter(p => pplBandOf(p) === ov.pplBand);
-  if (v.flagged) shown = shown.filter(p => p.flags.length);
-  /* Leave view: with hundreds of people, only those who took leave, the highest leave share first; the rest are a count, not rows */
-  const inGroup = shown.length;
-  if (v.key === "leave") shown = shown.filter(p => p.leave > 0);
-
-  // a summary line for the views that have one
-  const sum = pplSummary(v, rows, shown);
-  if (sum) sec.appendChild(sum);
-  if (v.key === "leave") {
-    const lv = document.createElement("p");
-    lv.className = "ov-people-sum ov-muted ov-leave-sum";
-    [`${shown.length} of ${inGroup} people had leave in this range`, "Highest leave share first"].forEach((t, i) => {
-      if (i) lv.appendChild(document.createTextNode(" · "));
-      lv.appendChild(Object.assign(document.createElement("span"), { textContent: t }));
-    });
-    sec.appendChild(lv);
+  if (!scope.length) {
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-empty", textContent: who === "oncall" ? "No on-call people in this range." : "No permanent people in this range." }));
+    return sec;
   }
-  if (ov.pplBand != null) {
+  sec.appendChild(pplChartBox(ctx, pendingCharts));
+  // a day on a column or a calendar cell filters the table (a band and a flag are buttons that do it themselves)
+  const pickDay = (ev) => {
+    const el = ev.target.closest && ev.target.closest("[data-date]");
+    if (el && sec.contains(el)) pplPickToggle({ k: "day", date: el.getAttribute("data-date") });
+  };
+  sec.addEventListener("click", pickDay);
+  sec.addEventListener("keydown", (ev) => { if ((ev.key === "Enter" || ev.key === " ") && ev.target.closest && ev.target.closest("[data-date]")) { ev.preventDefault(); pickDay(ev); } });
+
+  // the table's rows: the scope, what is picked on the chart, alerts only
+  let shown = scope.slice();
+  if (ctx.pick) shown = shown.filter(p => pplPickMatch(ctx, p));
+  if (v.flagged) shown = shown.filter(p => p.flags.length);
+  /* Leave view: with hundreds of people, only those who took leave, the highest leave share first; the rest are a count (the chart's headline), not rows */
+  if (v.key === "leave" && !ctx.pick) shown = shown.filter(p => p.leave > 0);
+
+  if (ctx.pick) {
     const chip = document.createElement("p");
     chip.className = "ov-band-chip";
-    chip.innerHTML = `<span>Share worked ${escapeHtml(pplBandLabel(ov.pplBand))}</span>`;
+    chip.innerHTML = `<span>${escapeHtml(pplPickText(ctx))}</span>`;
     const x = document.createElement("button");
     x.type = "button";
     x.className = "ov-linkbtn";
     x.textContent = "Clear";
-    x.onclick = () => { ov.pplBand = null; render(); };
+    x.onclick = () => { ov.pplPick = null; render(); };
     chip.appendChild(x);
+    if (ctx.pick.k === "day") {
+      // not a .ov-linkbtn: Present keeps clicks that leave the slide for a board away from a slide
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "ov-open-day";
+      open.textContent = "Open that day's board →";
+      open.onclick = () => historyOpenDay(ctx.pick.date);
+      chip.appendChild(open);
+    }
+    chip.appendChild(Object.assign(document.createElement("small"), { className: "ov-muted", textContent: `${shown.length} ${shown.length === 1 ? "person" : "people"}` }));
     sec.appendChild(chip);
   }
 
   const sort = ov.pplSort || v.sort;
   shown = shown.slice().sort((a, b) => {
     if (sort.key === "name") return a.name.localeCompare(b.name) * sort.dir;
-    return ((pplVal(a, sort.key) - pplVal(b, sort.key)) * sort.dir) || (b.leave - a.leave) * (sort.key === "share" ? 1 : 0) || a.name.localeCompare(b.name);
+    const va = pplVal(a, sort.key), vb = pplVal(b, sort.key);
+    // Called in / Share called in read "—" (-1) for someone not on call: last whichever way it is sorted
+    if (sort.key === "called" || sort.key === "cshare") { const na = va < 0, nb = vb < 0; if (na !== nb) return na ? 1 : -1; }
+    return ((va - vb) * sort.dir) || (b.leave - a.leave) * (sort.key === "share" ? 1 : 0)
+      || (b.available - a.available) * (sort.key === "cshare" ? 1 : 0)   // same share: the one available more days first
+      || a.name.localeCompare(b.name);
   });
   if (!shown.length) {
-    sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: v.flagged ? "No flags in this range." : v.key === "leave" ? "Nobody took leave in this range." : "Nobody matches." }));
+    sec.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted ov-empty", textContent: v.flagged && !ctx.pick ? "No flags in this range." : v.key === "leave" && !ctx.pick ? "Nobody took leave in this range." : "Nobody matches." }));
     return sec;
   }
   const visible = ov.pplAll ? shown : shown.slice(0, OV_WL_SHOWN);
@@ -5269,7 +6053,7 @@ function peopleSection(boards, dates, recs) {
 function pplBandOf(p) { return Math.min(9, Math.floor((p.worked * 10) / p.working)); }
 function pplBandLabel(i) { return i === 9 ? "90–100%" : `${i * 10}–${i * 10 + 9}%`; }
 
-/* the numbers behind the spread chart (and the report's): people per 10% band, the median share, N at 90% or more, N under 50% */
+/* the numbers behind the workload spread (and the report's): people per 10% band, the median share, N at 90% or more, N under 50% */
 function peopleSpreadStats(mine) {
   const bands = Array(10).fill(0);
   for (const p of mine) bands[pplBandOf(p)]++;
@@ -5301,109 +6085,15 @@ function spreadCurve(pts) {
   }
   return d;
 }
-/* The spread: how many people sit in each 10% band of working days on a mission. A band is a
-   button: it filters the table below to that band (and to this chart's group). */
-function peopleSpread(rows) {
-  const ov = state.overview;
-  const grp = ov.pplSpread === "oncall" ? "oncall" : "permanent";
-  const mine = rows.filter(p => (grp === "oncall") === p.oncall);
-  const box = document.createElement("div");
-  box.className = "ov-hchart ov-spread";
-  const head = document.createElement("div");
-  head.className = "ov-hchart-head ov-hchart-head-row";
-  head.innerHTML = `<span><b>Workload spread</b> <span class="ov-muted">people by share of working days on a mission</span></span>`;
-  const seg = document.createElement("div");
-  seg.className = "ov-trend-btns";
-  seg.setAttribute("role", "group");
-  seg.setAttribute("aria-label", "Spread group");
-  for (const [k, l] of [["permanent", "Permanent"], ["oncall", "On-call"]]) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "btn btn-small" + (grp === k ? " active" : "");
-    b.setAttribute("aria-pressed", String(grp === k));
-    b.textContent = l;
-    b.onclick = () => { ov.pplSpread = k; ov.pplBand = null; render(); };
-    seg.appendChild(b);
-  }
-  head.appendChild(seg);
-  box.appendChild(head);
-  if (!mine.length) {
-    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: grp === "oncall" ? "No on-call people in this range." : "No permanent people in this range." }));
-    return box;
-  }
-  const { bands, median, hi, lo } = peopleSpreadStats(mine);
-  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-sum",
-    textContent: `Median ${fmt1(median)}% · ${hi} at 90% or more · ${lo} under 50%` }));
-  const max = Math.max(1, ...bands);
-  const medBand = Math.min(9, Math.floor(median / 10));
-  const chart = document.createElement("div");
-  chart.className = "ov-bands";
-  chart.setAttribute("role", "group");
-  chart.setAttribute("aria-label", "Share of working days on a mission");
-  /* the curve: a smooth line through the ten band counts (monotone, so it never dips below zero or overshoots a count),
-     with the bands still the buttons that carry the number, the dot and the click */
-  const yOf = (n) => 82 - (n / max) * 74;
-  const curve = spreadCurve(bands.map((n, i) => [i * 10 + 5, yOf(n)]));
-  const wrap = document.createElement("div");
-  wrap.className = "ov-bands-wrap";
-  wrap.innerHTML = `<svg class="ov-curve" viewBox="0 0 100 86" preserveAspectRatio="none" aria-hidden="true" focusable="false"><line class="ov-curve-base" x1="0" y1="82" x2="100" y2="82"/><path class="ov-curve-area" d="${curve} L95,82 L5,82 Z"/><path class="ov-curve-line" d="${curve}"/></svg>`;
-  bands.forEach((n, i) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "ov-band chart-mark" + (i === medBand ? " ov-band-median" : "");
-    b.setAttribute("data-band", String(i));
-    b.setAttribute("aria-pressed", String(ov.pplBand === i && ov.pplWho === grp));
-    b.setAttribute("data-tip-value", `${n} ${n === 1 ? "person" : "people"}`);
-    b.setAttribute("data-tip-label", `${pplBandLabel(i)} of working days on a mission${i === medBand ? " · median" : ""}`);
-    b.setAttribute("aria-label", `${pplBandLabel(i)}: ${n} ${n === 1 ? "person" : "people"}`);
-    b.innerHTML = `<span class="ov-band-n">${n || ""}</span><span class="ov-band-pt"><i style="bottom:${((n / max) * 74).toFixed(1)}px"></i></span><span class="ov-band-l">${i * 10}${i === 9 ? "+" : ""}</span>`;
-    b.onclick = () => {
-      const on = ov.pplBand === i && ov.pplWho === grp;
-      ov.pplBand = on ? null : i;
-      ov.pplWho = on ? ov.pplWho : grp;
-      ov.pplAll = false;
-      render();
-    };
-    chart.appendChild(b);
-  });
-  wrap.appendChild(chart);
-  box.appendChild(wrap);
-  box.appendChild(Object.assign(document.createElement("p"), { className: "ov-spread-axis ov-muted", textContent: "Share of working days on a mission, %. Click a band to filter the table." }));
-  return box;
-}
-
-/* On-call: how many days people were called in (idea 6); Nights: how concentrated they are (idea 9) */
-function pplSummary(v, rows, shown) {
-  const el = document.createElement("p");
-  el.className = "ov-people-sum";
-  const names = (list) => list.map(p => `<span data-no-i18n>${escapeHtml(p.name)}</span>`).join(", ");
-  if (v.key === "oncall") {
-    const oc = rows.filter(p => p.oncall);
-    if (!oc.length) return null;
-    const days = oc.map(p => p.calledIn).sort((a, b) => a - b), mid = days.length >> 1;
-    const median = days.length % 2 ? days[mid] : (days[mid - 1] + days[mid]) / 2;
-    const never = oc.filter(p => p.flags.some(f => f.key === "never"));
-    el.innerHTML = `${escapeHtml(`Days called in: median ${fmt1(median)} · ${days[0]}–${days[days.length - 1]}`)}`
-      + (never.length ? ` · <b>${escapeHtml(`Never called in (${never.length})`)}:</b> ${names(never)}` : ` · ${escapeHtml("Everyone on call was called in")}`);
-    return el;
-  }
-  if (v.key === "nights") {
-    const withN = shown.filter(p => p.nights > 0).sort((a, b) => b.nights - a.nights);
-    const total = withN.reduce((a, p) => a + p.nights, 0);
-    if (!total) { el.textContent = "Nobody worked a night in this range."; return el; }
-    const top = withN.slice(0, 3).reduce((a, p) => a + p.nights, 0);
-    el.textContent = `${withN.length} ${withN.length === 1 ? "person shares" : "people share"} the ${total} nights · the top 3 worked ${Math.round((top / total) * 100)}% of them`;
-    return el;
-  }
-  return null;
-}
 
 /* ---------- Employee profile ----------
-   One person on one page: who they are, their figures for a period against the period before,
-   twelve months of worked against leave next to the average of their contract type, their flags,
-   the hosts they have worked, their loans and their notes. Opens from a name in People and from
-   the Manpower List's menu. Anyone who can view Manpower can open it; the figures (and the
-   chart and flags) need the Overview History permission, like History's own per-person numbers.
+   One person on one page, and the one place they are edited: every detail (Edit details), their
+   figures for a period against the period before, their leave record, twelve months of worked
+   against leave next to the average of their contract type, their flags, the hosts they have
+   worked, their loans and their notes (add and delete). Opens from a name in People, from the
+   Manpower List (double-click or its menu) and from a board card. Anyone who can view Manpower
+   can open it and anyone who can edit the roster can change it; the figures (and the chart,
+   flags and leave record) need the Overview History permission, like History's own per-person numbers.
    The figures are History's own: the same fetch (getUtilizationRange over every board), the
    same day records and the same rows (historyPeopleRows), so they match the People row for the
    same range. The layout is the one-engineer view's: tiles, a chart against an average, a foot
@@ -5461,20 +6151,57 @@ function profileMonths(id, hist) {
   });
 }
 
-async function openProfile(id, period) {
-  if (!can("emplist") || !D().employees.some(e => e.id === id)) return;
+async function openProfile(id, period, opts = {}) {
+  if (!D().employees.some(e => e.id === id)) return;
+  if (!can("emplist")) { toast("Your role cannot open employee profiles.", "info"); return; }
   const pr = state.profile;
   pr.id = id;
-  pr.period = period && PROFILE_PERIODS.some(([k]) => k === period) ? period : "range";
-  pr.hosts = null; pr.notes = null; pr.hostsAll = false;
+  const want = period || state.emplist.period || "30";
+  pr.period = PROFILE_PERIODS.some(([k]) => k === want) ? want : "range";
+  pr.hosts = null; pr.notes = null; pr.hostsAll = false; pr.leaveAll = false;
+  pr.cache = null;   // the figures are read fresh: leave and missions may have changed since the last time
+  pr.editing = !!opts.edit && can("emplist", "edit");
+  pr.focus = pr.editing ? opts.focus || null : null;
+  pr.detailsEl = null; pr.noteDraft = "";
   const e = D().employees.find(x => x.id === id);
   $("#profile-title").textContent = e.name;
   $("#profile-sub").textContent = "";
   $("#profile-body").innerHTML = '<p class="ov-muted ov-prof-loading">Loading…</p>';
   openModal("#modal-profile");
+  renderProfile();   // the Details first (or the form, straight away); the figures follow once they are loaded
   await safely(async () => {
     await loadProfile();
     renderProfile();
+  });
+}
+
+/* back to the read-only Details after a save, a deactivation or a cancelled edit */
+function profileShowDetails() {
+  const pr = state.profile;
+  pr.editing = false; pr.focus = null; pr.detailsEl = null;
+  openModal("#modal-profile");   // a confirm in between may have closed it
+  renderProfile();
+}
+function profileDeactivate() {
+  const pr = state.profile, e = D().employees.find(x => x.id === pr.id);
+  if (!e) return;
+  askDeactivate("Deactivate employee?",
+    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
+    (reason) => safely(async () => {
+      await cloud.setEmployeesActive([e.id], false, reason);
+      await refreshAndRender();
+      profileShowDetails();
+    }),
+    () => openModal("#modal-profile"));
+}
+function profileReactivate() {
+  const pr = state.profile, e = D().employees.find(x => x.id === pr.id);
+  if (!e) return;
+  safely(async () => {
+    await cloud.setEmployeesActive([e.id], true);
+    await refreshAndRender();
+    profileShowDetails();
+    toast(`${e.name} is active again — back on today's and future boards.`, "info");
   });
 }
 
@@ -5510,20 +6237,11 @@ function renderProfile() {
   const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
   $("#profile-sub").textContent = [board && board.name, e.contract === "oncall" ? "On-call" : "Permanent", area && area.name].filter(Boolean).join(" · ");
 
-  body.innerHTML = "";
-  const fact = (l, v) => `<div><span>${l}</span> <b>${v}</b></div>`;
-  const head = document.createElement("div");
-  head.className = "ov-eng-facts ov-prof-id";
-  head.innerHTML = [
-    fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : "—"),
-    fact("Contract", e.contract === "oncall" ? "On-call" : "Permanent"),
-    fact("Position", pos ? pos.label : "—"),
-    fact("Service area", area ? sc(area.name) : "—"),
-    fact("Board", (board ? sc(board.name) : "—") + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
-    fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : "—"),
-    fact("Status", e.active === false ? `<span>Inactive</span>${e.deactivatedOn ? ` <small class="ov-muted"><span>since ${escapeHtml(fmtDate(e.deactivatedOn))}</span></small>` : ""}` : "Active"),
-  ].join("");
-  body.appendChild(head);
+  const scrollTop = body.scrollTop;
+  // putting the Details node back into the page drops focus from a field being typed in
+  const typing = pr.detailsEl && pr.detailsEl.contains(document.activeElement) ? document.activeElement : null;
+  body.replaceChildren(profileDetails(e, { board, area, pos, loanNow, loanTo, today }));
+  if (typing && typing.isConnected) typing.focus({ preventScroll: true });
 
   if (!can("ov.history")) {
     body.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help", textContent: "Worked, leave and nights are shown to roles that can see Overview History." }));
@@ -5579,6 +6297,8 @@ function renderProfile() {
     flags.innerHTML = `<b>Flags</b> ${cur.flags.length ? pplFlagsHtml(cur) : '<span class="ov-muted">None in this period</span>'}`;
     body.appendChild(flags);
 
+    body.appendChild(profileLeaveRecord(pr.id, pr.cache.hist, from, to));
+
     // twelve months against the average of their contract type
     const months = profileMonths(pr.id, pr.cache.hist);
     const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -5629,7 +6349,7 @@ function renderProfile() {
       hostBox.appendChild(more);
     }
   }
-  body.appendChild(hostBox);
+  if (pr.hosts) body.appendChild(hostBox);
 
   // loans
   const loans = feat().loans ? (D().loans || []).filter(l => l.employeeId === e.id).sort((a, b) => b.startDate.localeCompare(a.startDate)) : [];
@@ -5642,7 +6362,7 @@ function renderProfile() {
     body.appendChild(box);
   }
 
-  // notes, read-only, for anyone who can edit the roster (as in the Note tab)
+  // notes: for anyone who can edit the roster, who can add one and delete one
   if (can("emplist", "edit") && pr.notes) {
     const box = document.createElement("div");
     box.className = "ov-prof-block";
@@ -5651,14 +6371,164 @@ function renderProfile() {
     for (const n of pr.notes) {
       const p = document.createElement("p");
       p.className = "ov-prof-note";
-      p.innerHTML = `<span data-no-i18n>${escapeHtml(n.note)}</span> <small class="ov-muted"><span data-no-i18n>${escapeHtml(n.createdBy || "")}</span> ${escapeHtml(n.createdAt ? fmtDate(n.createdAt.slice(0, 10)) : "")}</small>`;
+      p.innerHTML = `<span data-no-i18n>${escapeHtml(n.note)}</span> <small class="ov-muted"><span data-no-i18n>${escapeHtml(n.createdBy || "")}</span> ${escapeHtml(n.createdAt ? fmtDate(n.createdAt.slice(0, 10)) : "")}</small> <button type="button" class="note-delete">Delete</button>`;
+      p.querySelector(".note-delete").onclick = () => profileDeleteNote(n.id);
       box.appendChild(p);
     }
+    const form = document.createElement("form");
+    form.className = "ov-prof-note-form";
+    form.innerHTML = `<label>Add a note <textarea name="note" rows="2" required placeholder="e.g. prefers day shifts, needs a safety refresher…"></textarea></label>
+      <button type="submit" class="btn btn-small btn-primary">Add note</button>`;
+    form.note.value = pr.noteDraft;
+    form.note.oninput = () => { pr.noteDraft = form.note.value; };
+    form.onsubmit = (ev) => { ev.preventDefault(); profileAddNote(form.note.value.trim()); };
+    box.appendChild(form);
     body.appendChild(box);
   }
 
   for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(body);
+  body.scrollTop = scrollTop;
+  if (pr.editing && pr.focus) {
+    const f = pr.detailsEl && pr.detailsEl.querySelector("form") && pr.detailsEl.querySelector("form")[pr.focus];
+    pr.focus = null;
+    if (f) requestAnimationFrame(() => { ((f._pk && f._pk.btn) || (f._dp && f._dp.btn) || f).focus(); });
+  }
+}
+
+function profileAddNote(text) {
+  const pr = state.profile, id = pr.id;
+  if (!text) return;
+  safely(async () => {
+    await cloud.addEmployeeNote(id, text);
+    const rows = await cloud.getEmployeeNotes(id);
+    if (pr.id !== id) return;
+    pr.notes = rows; pr.noteDraft = "";
+    renderProfile();
+  });
+}
+function profileDeleteNote(noteId) {
+  const pr = state.profile, id = pr.id;
+  showConfirm("Delete note?", "Remove this note? This can't be undone.", () => safely(async () => {
+    await cloud.deleteEmployeeNote(noteId);
+    const rows = await cloud.getEmployeeNotes(id);
+    openModal("#modal-profile");   // the confirm closed it
+    if (pr.id !== id) return;
+    pr.notes = rows;
+    renderProfile();
+  }), () => openModal("#modal-profile"));
+}
+
+/* Details: every field of the person, and the way to change them. Kept between redraws (pr.detailsEl)
+   so a period switch while the form is open does not wipe what was typed. */
+function profileDetails(e, ctx) {
+  const pr = state.profile;
+  if (pr.detailsEl) return pr.detailsEl;
+  const { board, area, pos, loanNow, loanTo, today } = ctx;
+  const canEdit = can("emplist", "edit");
+  const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
+  const box = document.createElement("div");
+  box.className = "ov-prof-block ov-prof-details";
+  const head = document.createElement("div");
+  head.className = "ov-prof-details-head";
+  head.innerHTML = `<div class="ov-eng-foot-h">${pr.editing ? "Edit details" : "Details"}</div>`;
+  box.appendChild(head);
+  if (pr.editing) {
+    const slot = document.createElement("div");
+    box.appendChild(slot);
+    const form = employeeFormMount(slot, e);
+    const cancel = form.querySelector(".emp-form-cancel");
+    cancel.removeAttribute("data-close");   // leaves the form, not the Profile
+    cancel.onclick = () => profileShowDetails();
+  } else {
+    if (canEdit) {
+      const acts = document.createElement("div");
+      acts.className = "ov-prof-details-acts";
+      const edit = document.createElement("button");
+      edit.type = "button"; edit.id = "btn-profile-edit"; edit.className = "btn btn-small";
+      edit.innerHTML = `${icon("edit")} Edit details`;
+      edit.onclick = () => { pr.editing = true; pr.focus = "name"; pr.detailsEl = null; renderProfile(); };
+      acts.appendChild(edit);
+      const off = e.active === false;
+      const tog = document.createElement("button");
+      tog.type = "button"; tog.id = "btn-profile-active";
+      tog.className = off ? "btn btn-small" : "btn btn-small btn-danger";
+      tog.innerHTML = off ? `${icon("return")} Reactivate` : `${icon("ban")} Deactivate`;
+      tog.onclick = off ? profileReactivate : profileDeactivate;
+      acts.appendChild(tog);
+      head.appendChild(acts);
+    }
+    const fact = (l, v) => `<div><span>${l}</span> <b>${v}</b></div>`;
+    const grid = document.createElement("div");
+    grid.className = "ov-eng-facts ov-prof-id";
+    grid.innerHTML = [
+      fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : "—"),
+      fact("Contract", e.contract === "oncall" ? "On-call" : "Permanent"),
+      fact("Position", pos ? pos.label : "—"),
+      fact("Service area", area ? sc(area.name) : "—"),
+      fact("Board", (board ? sc(board.name) : "—") + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
+      fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : "—"),
+      fact("Status", e.active === false ? `<span>${EMP_STATUS_LABEL[empStatus(e)]}</span>${e.deactivatedOn ? ` <small class="ov-muted"><span>since ${escapeHtml(fmtDate(e.deactivatedOn))}</span></small>` : ""}` : "Active"),
+      fact("English name", e.nameEn ? sc(e.nameEn) : "—"),
+      fact("Mobile number", e.phone ? telLink(e.phone) : "—"),
+      fact("On the board from", e.addedOn ? escapeHtml(fmtDate(e.addedOn)) : "—"),
+    ].join("");
+    box.appendChild(grid);
+  }
+  pr.detailsEl = box;
+  return box;
+}
+
+/* Leave record: each stretch of leave in the period as one line (the type, the dates, the days), and the
+   days by type above. Read from the same day records as the tiles, so it counts what they count: planned
+   working days, a stretch running on across a weekend or a holiday. An Exchange Working Day is listed
+   but is not leave (it is worked back), as in the Leave tile. */
+function profileLeaveStretches(id, hist, from, to) {
+  const boards = D().boards;
+  const dates = historyDates(boards, from, to);
+  const stretches = [], byType = Object.fromEntries(LEAVE_ZONES.map(z => [z, 0]));
+  let cur = null, last = -2;
+  dates.forEach((d, i) => {
+    const rec = historyDayRec(d, boards, hist);
+    const z = rec && rec.leaveEmp ? rec.leaveEmp[id] : null;
+    if (!z || !(z in byType)) { cur = null; return; }
+    byType[z]++;
+    if (cur && cur.zone === z && last === i - 1) { cur.to = d; cur.days++; }
+    else { cur = { zone: z, from: d, to: d, days: 1 }; stretches.push(cur); }
+    last = i;
+  });
+  return { stretches: stretches.reverse(), byType };
+}
+function profileLeaveRecord(id, hist, from, to) {
+  const pr = state.profile;
+  const { stretches, byType } = profileLeaveStretches(id, hist, from, to);
+  const leaveDays = LEAVE_ZONES.filter(z => z !== "exchange").reduce((a, z) => a + byType[z], 0);
+  const box = document.createElement("div");
+  box.className = "ov-prof-block ov-prof-leave";
+  box.innerHTML = `<div class="ov-eng-foot-h">Leave record <span class="ov-muted">${escapeHtml(fmtDate(from))} → ${escapeHtml(fmtDate(to))}</span></div>`;
+  if (!stretches.length) {
+    box.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "No leave in this period." }));
+    return box;
+  }
+  const chips = LEAVE_ZONES.filter(z => byType[z]).map(z =>
+    `<span class="ov-prof-lv"><i style="background:var(--leave-${z})"></i>${escapeHtml(ZONE_LABELS[z])} <b>${byType[z]}</b></span>`).join("");
+  box.insertAdjacentHTML("beforeend", `<p class="ov-prof-lv-sum"><b>${leaveDays}</b> leave ${leaveDays === 1 ? "day" : "days"}</p><div class="ov-prof-lv-chips">${chips}</div>`);
+  const dayText = (s) => (s.from === s.to ? `${fmtDow(s.from)} ${fmtDate(s.from)}` : `${fmtDow(s.from)} ${fmtDate(s.from)} – ${fmtDow(s.to)} ${fmtDate(s.to)}`);
+  const shown = pr.leaveAll ? stretches : stretches.slice(0, OV_WL_SHOWN);
+  const wrap = document.createElement("div");
+  wrap.className = "ov-table-wrap";
+  wrap.innerHTML = `<table class="ov-table ov-prof-leave-table"><thead><tr><th>Leave type</th><th>Dates</th><th class="r">Days</th></tr></thead><tbody>${
+    shown.map(s => `<tr><td><i class="ov-prof-lv-dot" style="background:var(--leave-${s.zone})"></i>${escapeHtml(ZONE_LABELS[s.zone])}${s.zone === "exchange" ? ` <small class="ov-muted">worked back, not leave</small>` : ""}</td><td>${escapeHtml(dayText(s))}</td><td class="r">${s.days}</td></tr>`).join("")}</tbody></table>`;
+  box.appendChild(wrap);
+  if (stretches.length > OV_WL_SHOWN) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "btn btn-small ov-wl-more";
+    more.textContent = pr.leaveAll ? "Show fewer" : `Show all ${stretches.length}`;
+    more.onclick = () => { pr.leaveAll = !pr.leaveAll; renderProfile(); };
+    box.appendChild(more);
+  }
+  return box;
 }
 
 
@@ -5938,24 +6808,54 @@ function workforceSection(boards) {
   const names = (list) => list.map(e => e.name).join(", ");
   const box = document.createElement("div");
   box.className = "ov-wf-chart";   // not .ov-hchart: History's own tests count the charts under that class
-  box.appendChild(ovLegend([...WF_BANDS.map(b => ({ label: b.label, color: b.color })),
-    { label: "Joiners (above the bar)", color: "#1f8a4c" }, { label: "Leavers, resigned (under the bar)", color: "#b42318" },
+  // One chip per years-of-service group (the bar's stacks): shows / hides it in the chart, never all off.
+  // The number on a chip is how many people are in that group now, at the end of the window. The total
+  // above each bar is the sum of the groups that are shown, so it follows the chips.
+  const hidden = new Set(ov.wfHidden || []);
+  const shownBands = () => WF_BANDS.filter(b => !hidden.has(b.key));
+  const chips = document.createElement("div");
+  chips.className = "ov-wf-chips";
+  for (const b of WF_BANDS) {
+    const c = document.createElement("button");
+    c.type = "button";
+    c.className = "ov-wf-chip";   // looks like the Leave chips; its own class so tests and styles can tell them apart
+    c.dataset.band = b.key;
+    c.setAttribute("aria-pressed", String(!hidden.has(b.key)));
+    c.innerHTML = `<i style="background:${escapeHtml(b.color)}"></i><span>${escapeHtml(b.label)}</span> <small>${now[b.key]}</small>`;
+    c.title = `Show or hide ${b.label}`;
+    c.onclick = () => {
+      if (hidden.has(b.key)) hidden.delete(b.key);
+      else if (shownBands().length > 1) hidden.add(b.key);
+      else return;
+      ov.wfHidden = [...hidden];
+      c.setAttribute("aria-pressed", String(!hidden.has(b.key)));
+      draw();   // only the chart changes, so the page keeps its scroll position
+    };
+    chips.appendChild(c);
+  }
+  box.appendChild(chips);
+  box.appendChild(ovLegend([{ label: "Joiners (above the bar)", color: "#1f8a4c" }, { label: "Leavers, resigned (under the bar)", color: "#b42318" },
     { label: "Inactive for now, not leavers", color: "var(--muted)" }]));
   const wrap = document.createElement("div");
   wrap.className = "ov-trend-chart";
   box.appendChild(wrap);
   sec.appendChild(box);
-  const totals = months.map(m => m.hc.total);
-  const pending = () => fillColumnChart(wrap, {
-    stacks: WF_BANDS.map(b => ({ label: b.label, color: b.color, values: months.map(m => m.hc[b.key]) })),
-    notes: [{ values: months.map(m => m.joiners.length), color: "#1f8a4c", text: "+", pos: "above" }, { values: months.map(m => m.leavers.length), color: "#b42318", text: "−", pos: "below" }],
-    line: { label: "", color: "var(--muted)", values: months.map(m => m.pausers.length) },   // the legend names it
-    xLabels: months.map(m => MON[Number(m.month.slice(5, 7)) - 1]),
-    dayTotals: months.map(m => [`${MONFULL[Number(m.month.slice(5, 7)) - 1]} ${m.month.slice(0, 4)}`, `${m.hc.total} people`,
-      m.joiners.length ? `joined ${names(m.joiners)}` : "", m.leavers.length ? `resigned ${names(m.leavers)}` : "", m.pausers.length ? `inactive for now ${names(m.pausers)}` : ""].filter(Boolean).join(" · ")),
-    yMax: Charts.niceMax([Math.max(...totals) * 1.1, ...months.map(m => m.pausers.length)]), height: 240,
-  });
-  sec._fill = pending;
+  const draw = () => {
+    const on = shownBands();
+    const all = on.length === WF_BANDS.length;
+    const totals = months.map(m => on.reduce((a, b) => a + m.hc[b.key], 0));   // the figure above each bar
+    fillColumnChart(wrap, {
+      stacks: on.map(b => ({ label: b.label, color: b.color, values: months.map(m => m.hc[b.key]) })),
+      totals,
+      notes: [{ values: months.map(m => m.joiners.length), color: "#1f8a4c", text: "+", pos: "above" }, { values: months.map(m => m.leavers.length), color: "#b42318", text: "−", pos: "below" }],
+      line: { label: "", color: "var(--muted)", values: months.map(m => m.pausers.length) },   // the legend names it
+      xLabels: months.map(m => MON[Number(m.month.slice(5, 7)) - 1]),
+      dayTotals: months.map((m, i) => [`${MONFULL[Number(m.month.slice(5, 7)) - 1]} ${m.month.slice(0, 4)}`, all ? `${m.hc.total} people` : `${totals[i]} of ${m.hc.total} people`,
+        m.joiners.length ? `joined ${names(m.joiners)}` : "", m.leavers.length ? `resigned ${names(m.leavers)}` : "", m.pausers.length ? `inactive for now ${names(m.pausers)}` : ""].filter(Boolean).join(" · ")),
+      yMax: Charts.niceMax([Math.max(...totals) * 1.1, ...months.map(m => m.pausers.length)]), height: 260,
+    });
+  };
+  sec._fill = draw;
   return sec;
 }
 
@@ -6010,7 +6910,7 @@ function areaPeriodRows(boards, dates, hist) {
 }
 function boardsAreasSection(boards, dates) {
   const ov = state.overview, hist = ov.history || {};
-  const sec = ovSection("Boards & areas", "Each board, or each service area, over the range. Per-day figures are averages over the working days. A board row sets the board selector.");
+  const sec = ovSection("Boards & areas", "Each board, or each service area, over the range. Per-day figures are averages over the working days. A board row shows only that board.");
   sec.id = "ov-boards-areas";
   const bar = document.createElement("div");
   bar.className = "ov-hchart-head ov-hchart-head-row";
@@ -6053,6 +6953,10 @@ function boardsAreasSection(boards, dates) {
   const rows = boards.map(b => ({ b, ...boardPeriodRow([b], dates, hist), net: (loans.borrowed[b.id] || 0) - (loans.lent[b.id] || 0) }));
   const total = boards.length > 1 ? { ...boardPeriodRow(boards, dates, hist), net: null } : null;
   const cell = (v, suffix = "") => (v == null ? "—" : fmt1(v) + suffix);
+  // A vs B: a Difference row (first board less second) stands in for the total
+  const vsOn = ovPeriodView(boards) === "vs" && rows.length === 2;
+  const dcell = (k, suffix = "") => (rows[0][k] == null || rows[1][k] == null ? "—" : `${rows[0][k] - rows[1][k] > 0 ? "+" : ""}${fmt1(rows[0][k] - rows[1][k])}${suffix}`);
+  const diffRow = vsOn ? `<tr class="ov-table-totalrow ov-vs-row"><td><span class="ov-table-label">Difference</span></td><td class="r"><b>${dcell("util", " pts")}</b></td><td class="r">${dcell("deployed")}</td><td class="r">${dcell("idle")}</td><td class="r">${dcell("leave")}</td><td class="r">${dcell("oncall", " pts")}</td><td class="r"></td></tr>` : "";
   const netCell = (r) => (r.net == null ? "" : r.net === 0 ? "0" : `<span class="ov-share ov-share-${r.net > 0 ? "warn" : "ok"}" title="Person-days borrowed less lent">${r.net > 0 ? "+" : "−"}${Math.abs(r.net)}</span>`);
   const wrap = document.createElement("div");
   wrap.className = "ov-table-wrap";
@@ -6060,9 +6964,9 @@ function boardsAreasSection(boards, dates) {
     rows.map((r, i) => `<tr class="${boards.length > 1 ? "ov-row-click" : ""}" data-i="${i}" ${boards.length > 1 ? 'tabindex="0"' : ""}>
       <td><span class="ov-table-label" data-no-i18n>${escapeHtml(r.b.name)}</span></td><td class="r"><b>${cell(r.util, "%")}</b></td><td class="r">${cell(r.deployed)}</td><td class="r">${cell(r.idle)}</td>
       <td class="r">${cell(r.leave)}</td><td class="r">${cell(r.oncall, "%")}</td><td class="r">${netCell(r)}</td></tr>`).join("")
-    + (total ? `<tr class="ov-table-totalrow"><td><span class="ov-table-label">All boards</span></td><td class="r"><b>${cell(total.util, "%")}</b></td><td class="r">${cell(total.deployed)}</td><td class="r">${cell(total.idle)}</td><td class="r">${cell(total.leave)}</td><td class="r">${cell(total.oncall, "%")}</td><td class="r"></td></tr>` : "")}</tbody></table>`;
+    + (vsOn ? diffRow : total ? `<tr class="ov-table-totalrow"><td><span class="ov-table-label"${boards.length === D().boards.length ? "" : " data-no-i18n"}>${escapeHtml(ovScopeLabel(boards))}</span></td><td class="r"><b>${cell(total.util, "%")}</b></td><td class="r">${cell(total.deployed)}</td><td class="r">${cell(total.idle)}</td><td class="r">${cell(total.leave)}</td><td class="r">${cell(total.oncall, "%")}</td><td class="r"></td></tr>` : "")}</tbody></table>`;
   wrap.querySelectorAll("tr[data-i]").forEach(tr => {
-    const go = () => { if (boards.length > 1) setOvBoard(rows[+tr.dataset.i].b.id); };
+    const go = () => { if (boards.length > 1) ovPeriodOnly(rows[+tr.dataset.i].b.id); };
     tr.onclick = go;
     tr.onkeydown = (ev) => { if (ev.key === "Enter") go(); };
   });
@@ -6084,7 +6988,7 @@ function boardsAreasSection(boards, dates) {
       const t = document.createElement("div");
       t.className = "ov-table-wrap";
       t.innerHTML = `<table class="ov-table ov-loans-from-to"><thead><tr><th>From → to</th><th class="r">Person-days</th><th class="r">People</th></tr></thead><tbody>${
-        routes.map(r => `<tr><td><span data-no-i18n>${escapeHtml(boardName(r.from))}</span> → <b data-no-i18n>${escapeHtml(boardName(r.to))}</b></td><td class="r">${r.days}</td><td class="r">${r.people.size}</td></tr>`).join("")}</tbody></table>`;
+        routes.map(r => `<tr><td><span data-no-i18n>${escapeHtml(boardName(r.from))}</span> → <b data-no-i18n>${escapeHtml(boardName(r.to))}</b>${boards.length < D().boards.length && !(boards.some(b => b.id === r.from) && boards.some(b => b.id === r.to)) ? ' <span class="ov-muted">· outside selection</span>' : ""}</td><td class="r">${r.days}</td><td class="r">${r.people.size}</td></tr>`).join("")}</tbody></table>`;
       det.appendChild(t);
     }
     sec.appendChild(det);
@@ -6311,7 +7215,7 @@ function renderOverview() {
     });
     // across boards a loan moves a person, it doesn't add one: the total row only says how many are on loan
     const onLoanN = boards.reduce((n, b) => n + loansBy[b.id].borrowed.length, 0);
-    if (rows.length > 1) rows.push({ b: null, name: "All boards", util: overallUtil, missions: totalMissions, total: totalEmp, assigned: totalAssigned,
+    if (rows.length > 1) rows.push({ b: null, name: ovScopeLabel(boards), util: overallUtil, missions: totalMissions, total: totalEmp, assigned: totalAssigned,
       leave: totalLeave, idle: totalStandby, free: totalOncallFree, perm: totalPerm, oncall: totalOncall, loan: onLoanN ? [`${onLoanN} on loan`] : [] });
     const loanCell = (r) => (r.loan.length ? `<small class="ov-loan">${r.loan.join(" · ")}</small>` : "");
     const mix = (r) => {
@@ -6591,6 +7495,7 @@ function renderOverview() {
     panel.appendChild(ovGroupHead("In detail", `${dayLabel} · ${scopeName}`));
     const grid = document.createElement("div");
     grid.className = "ov-detail-grid";
+    grid.dataset.pslide = "detail";   // Present shows this group as its "In detail" slide (see present.js)
     for (const sec of detail) grid.appendChild(sec);
     panel.appendChild(grid);
   }
@@ -6601,19 +7506,23 @@ function renderOverview() {
      without ov.history. */
   if (can("ov.history")) {
     resolveHistoryRange();   // idempotent; ensureHistoryLoaded skips it when there are no boards
-    const histDates = historyDates(boards);
-    const histRecs = histDates.map(d => historyDayRec(d, boards, state.overview.history || {}));
+    // the Period group reads its own boards: the page's own until someone unlinks them
+    const pboards = ovPeriodBoards();
+    const histDates = historyDates(pboards);
+    const histRecs = histDates.map(d => historyDayRec(d, pboards, state.overview.history || {}));
     panel.appendChild(ovPeriodHead(histDates));
     // what every delta compares with: the period before, or the same period last year (Compare with)
     const cmpInfo = historyCompareInfo();
-    const prevRecs = cmpInfo.loading ? [] : historyDates(boards, cmpInfo.from, cmpInfo.to).map(d => historyDayRec(d, boards, cmpInfo.hist));
-    panel.appendChild(historySection(histDates, histRecs, historyUnplanned(histDates, boards, state.overview.history || {}), pendingCharts, prevRecs));
-    panel.appendChild(peopleSection(boards, histDates, histRecs));
-    panel.appendChild(engineerHistorySection(histDates, histRecs, pendingCharts, prevRecs));
-    const wf = workforceSection(boards);
+    const prevRecs = cmpInfo.loading ? [] : historyDates(pboards, cmpInfo.from, cmpInfo.to).map(d => historyDayRec(d, pboards, cmpInfo.hist));
+    // data-pslide names the Present slide each section is: the one place the page and Present agree on them
+    const slide = (key, sec) => { sec.dataset.pslide = key; return sec; };
+    panel.appendChild(slide("history", historySection(histDates, histRecs, historyUnplanned(histDates, pboards, state.overview.history || {}), pendingCharts, prevRecs)));
+    panel.appendChild(slide("people", peopleSection(pboards, histDates, histRecs, pendingCharts)));
+    panel.appendChild(slide("engineer", engineerHistorySection(histDates, histRecs, pendingCharts, prevRecs)));
+    const wf = slide("workforce", workforceSection(pboards));
     panel.appendChild(wf);
     if (wf._fill) pendingCharts.push(wf._fill);
-    panel.appendChild(boardsAreasSection(boards, histDates));
+    panel.appendChild(slide("areas", boardsAreasSection(pboards, histDates)));
   }
 
   // A role with every section switched off would otherwise get a blank tab with
@@ -6627,6 +7536,8 @@ function renderOverview() {
   // single board, where "All boards" and that board are the same thing.
   if (allBoards.length > 1) fillOvBoardSelect(boards);
 
+  // a screen being presented shows only its own slide, and says which before the charts are measured
+  if (typeof Present !== "undefined") Present.mark(panel);
   // every section is in the document now, so containers have a real width
   for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(panel);
@@ -7264,12 +8175,12 @@ function renderEmployeeRows() {
       <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? " " + add("nameEn", "English name") : ""}</td>
       <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : add("trigoId", "TRIGO ID")}</td>
       <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td data-label="Position" class="m-x">${pos ? pos.label : add("position", "position")}</td>
+      <td data-label="Position" class="m-x el-wrap">${pos ? pos.label : add("position", "position")}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
-      <td data-label="Years of service" class="m-x">${e.startDate ? escapeHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) || "—" : "—"}</td>
+      <td data-label="Years of service" class="m-x el-wrap el-svc">${e.startDate ? serviceCellHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
-      <td data-label="Current board">${board ? escapeHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
+      <td data-label="Current board" class="el-board">${board ? escapeHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
       <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" class="el-util">${utilCell(util)}</td>${emplistShowsWl() ? emplistWlCells(e) : ""}
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
@@ -7303,7 +8214,7 @@ function renderEmployeeRows() {
       $("#emplist-select-all").checked = emps.length > 0 && emps.every(x => state.selectedEmps.has(x.id));
     };
     for (const b of tr.querySelectorAll(".el-fix")) b.onclick = (ev) => { ev.stopPropagation(); openEmployeeModal(e.id, b.dataset.fix); };   // roster master data: no day lock, as with Status
-    tr.addEventListener("dblclick", () => guardEdit(() => openEmployeeModal(e.id)));
+    tr.addEventListener("dblclick", () => openEmployeeModal(e.id));
     tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(e, ev.clientX, ev.clientY); });
     attachLongPress(tr, (x, y) => openEmpMenu(e, x, y));
     body.appendChild(tr);
@@ -7345,14 +8256,31 @@ function quietTable(sel) {
     }
     for (const pill of r.querySelectorAll(".area-pill")) pill.style.setProperty("--ac", pill.style.backgroundColor || "#999");
   }
-  if (!rows.length) return;
-  ths.forEach((th, i) => {
+  if (rows.length) ths.forEach((th, i) => {
     if (th.classList.contains("el-check")) return;
     if (!rows.every(r => quietCellEmpty(r.children[i]))) return;
     th.classList.add("col-off");
     for (const r of rows) r.children[i].classList.add("col-off");
   });
+  fitListTable(table);
 }
+/* On a computer the list's box doesn't scroll, so its headers can stick under the top bar while the page
+   scrolls. If the table still can't fit the window (a narrow one, after long cells and headers have taken
+   a second line), that box scrolls sideways instead (.tw-scroll), so the page never grows wider than the
+   header. */
+function fitListTable(table) {
+  const wrap = table && table.parentElement;
+  if (!wrap || !wrap.classList.contains("table-wrap")) return;
+  wrap.classList.remove("tw-scroll");
+  if (!wrap.clientWidth) return;   // hidden tab: measured again when it is drawn
+  wrap.classList.toggle("tw-scroll", table.offsetWidth > wrap.clientWidth + 1);
+}
+let _fitListQueued = false;
+window.addEventListener("resize", () => {
+  if (_fitListQueued) return;
+  _fitListQueued = true;
+  requestAnimationFrame(() => { _fitListQueued = false; for (const id of ["#emplist-table", "#hostlist-table"]) fitListTable($(id)); });
+});
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
 function renderEmployeeList() {
@@ -9311,8 +10239,8 @@ new MutationObserver((muts) => {
   }
 }).observe(document.documentElement, { childList: true, subtree: true });
 
-function initSegmented() {
-  for (const sel of $$("select[data-seg]")) {
+function initSegmented(root = document) {
+  for (const sel of root.querySelectorAll("select[data-seg]")) {
     if (sel._seg) continue;
     const row = document.createElement("div");
     row.className = "seg-pick";
@@ -9784,92 +10712,92 @@ function saveHighlightNote(ev) {
   setMissionHighlight(m, "other", note);
 }
 
-/* employee modal */
-/* focusField: open straight on the Edit tab with that input focused — the
-   Manpower list's "+ Add TRIGO ID" style buttons land on the one thing missing */
-function openEmployeeModal(empId, focusField) {
-  if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
-  state.editingEmployeeId = empId || null;
-  const form = $("#form-employee");
-  form.reset();
-  // an existing person: their name leads the panel, with board · contract · area under it
-  const who0 = empId ? D().employees.find(e => e.id === empId) : null;
-  $("#employee-modal-title").textContent = who0 ? (who0.name || "Edit employee") : "New employee";
-  const sub = $("#employee-modal-sub");
-  if (who0) {
-    const b = D().boards.find(x => x.id === who0.boardId);
-    const ar = D().areas.find(x => x.id === who0.areaId);
-    sub.textContent = [b && b.name, who0.contract === "oncall" ? "On-call" : "Permanent", ar && ar.name].filter(Boolean).join(" · ");
-  }
-  sub.classList.toggle("hidden", !who0);
-  $("#btn-deactivate-employee").classList.toggle("hidden", !empId);
+/* ---------- employee form ----------
+   One form, drawn from #tpl-employee-form in two places: "New employee" (#modal-employee) and
+   "Edit details" inside the person's Profile (#modal-profile). Only one is ever on the page, so
+   it is always #form-employee. An existing person is opened and edited in their Profile
+   (openEmployeeModal hands them over); their host record and notes live there too. */
+function employeeFormMount(slot, emp) {
+  const old = $("#form-employee");
+  if (old) old.remove();
+  const form = $("#tpl-employee-form").content.firstElementChild.cloneNode(true);
+  slot.appendChild(form);
+  initSegmented(form);   // the slot may not be on the page yet (the Profile builds Details before showing it)
+  initPickers(form);
   form.areaId.innerHTML = D().areas.map(a => `<option value="${a.id}" data-color="${escapeHtml(a.color || "")}">${escapeHtml(a.name)}</option>`).join("");
   form.boardId.innerHTML = D().boards.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join("");
-  if (empId) {
-    const e = D().employees.find(x => x.id === empId);
-    form.name.value = e.name;
-    form.nameEn.value = e.nameEn || "";
-    form.contract.value = e.contract;
-    form.position.value = e.position || "";
-    form.phone.value = e.phone || "";
-    form.trigoId.value = e.trigoId || "";
-    form.startDate.value = e.startDate || "";
-    form.addedOn.value = e.addedOn || "";
-    form.areaId.value = e.areaId;
-    form.boardId.value = e.boardId;
-  } else if (!isNonBoardView()) {
-    form.boardId.value = D().activeBoardId;
+  if (emp) {
+    form.name.value = emp.name;
+    form.nameEn.value = emp.nameEn || "";
+    form.contract.value = emp.contract;
+    form.position.value = emp.position || "";
+    form.phone.value = emp.phone || "";
+    form.trigoId.value = emp.trigoId || "";
+    form.startDate.value = emp.startDate || "";
+    form.addedOn.value = emp.addedOn || "";
+    form.areaId.value = emp.areaId;
+    form.boardId.value = emp.boardId;
   }
-  // Host Record opens first for an existing employee — it's the more common
-  // reason to double-click a card (checking where someone's worked before),
-  // Edit Employee is one tab away. It only makes sense once the employee has
-  // been saved (and thus could actually have an assignment history) though,
-  // so a brand-new employee skips straight to the edit form with no tab strip.
-  state.employeeTab = empId && !focusField ? "hosts" : "edit";
-  $("#employee-tabs").classList.toggle("hidden", !empId);
-  applyEmployeeTab();
-  if (empId) { loadEmployeeHostRecord(empId); loadEmployeeNotes(empId); }
+  syncSegmented(form);
+  form.addEventListener("submit", saveEmployee);
+  return form;
+}
+
+/* A new person gets a small form of their own. An existing one opens their Profile, where every
+   detail is shown and edited: focusField opens it straight on "Edit details" with that input
+   focused — the Manpower list's "+ Add TRIGO ID" style buttons land on the one thing missing. */
+function openEmployeeModal(empId, focusField) {
+  if (empId) { openProfile(empId, null, focusField ? { edit: true, focus: focusField } : {}); return; }
+  if (!can("emplist", "edit")) { toast("Your role can view the roster but not change it.", "info"); return; }
+  $("#employee-modal-title").textContent = "New employee";
+  const form = employeeFormMount($("#employee-form-slot"), null);
+  if (!isNonBoardView()) form.boardId.value = D().activeBoardId;
   openModal("#modal-employee");
-  // a field drawn by an in-app picker focuses its button, not the hidden source
-  if (focusField && form[focusField]) requestAnimationFrame(() => { const f = form[focusField]; ((f._pk && f._pk.btn) || (f._dp && f._dp.btn) || f).focus(); });
 }
 
 function saveEmployee(ev) {
   ev.preventDefault();
-  const form = $("#form-employee");
+  const form = ev.target;
+  const inProfile = !!form.closest("#modal-profile");
+  const editingId = inProfile ? state.profile.id : null;
   const vals = { name: form.name.value.trim(), nameEn: form.nameEn.value.trim(), trigoId: form.trigoId.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
   // instant client-side checks (the same rules cloud.saveEmployee enforces, which is the real
   // guard): the name is the FULL name only, the TRIGO ID is T + digits and unique, and two people
   // may share a name only when both have a TRIGO ID. A short name saved earlier can be left as it is.
-  const editing = state.editingEmployeeId ? D().employees.find(x => x.id === state.editingEmployeeId) : null;
+  const editing = editingId ? D().employees.find(x => x.id === editingId) : null;
   const tid = EmployeeId.normalizeTrigoId(vals.trigoId);
   if (tid === null) { toast("The TRIGO ID must be the letter T and digits, like T329.", "warn"); return; }
   if (!editing || editing.name.trim() !== vals.name) {
     const why = EmployeeId.checkFullName(vals.name);
     if (why) { toast(why, "warn"); return; }
   }
-  if (EmployeeId.nameClash(D().employees, vals.name, tid, state.editingEmployeeId)) {
+  if (EmployeeId.nameClash(D().employees, vals.name, tid, editingId)) {
     toast(`An employee named "${vals.name}" already exists. Give each of them their TRIGO ID to tell them apart.`, "warn");
     return;
   }
-  const idOwner = EmployeeId.idClash(D().employees, tid, state.editingEmployeeId);
+  const idOwner = EmployeeId.idClash(D().employees, tid, editingId);
   if (idOwner) { toast(`The TRIGO ID ${tid} already belongs to ${idOwner.name}.`, "warn"); return; }
   const doSave = () => safely(async () => {
-    if (state.editingEmployeeId) {
-      const emp = D().employees.find(x => x.id === state.editingEmployeeId);
+    if (editingId) {
+      const emp = D().employees.find(x => x.id === editingId);
       if (emp.boardId !== vals.boardId) await cloud.moveEmployeeToBoard(emp.id, vals.boardId, state.date);
-      await cloud.saveEmployee(state.editingEmployeeId, vals);
+      await cloud.saveEmployee(editingId, vals);
     } else {
       await cloud.saveEmployee(null, vals);
     }
-    closeModal();
-    await refreshAndRender();
+    if (inProfile) {
+      await refreshAndRender();
+      profileShowDetails();
+    } else {
+      closeModal();
+      await refreshAndRender();
+    }
   });
   // A name typed into the wrong field: no Thai letters in the Thai name, or Thai letters in the English
   // name. A warning, not a block (a Thai name may be spelled in English for now), and on an edit only
   // for a field that was changed, so a person whose Thai column still holds the English copy from the
   // migration is not nagged every time their phone number is edited.
-  const hasThai = (t) => /[\u0E00-\u0E7F]/.test(t);
+  const hasThai = (t) => /[฀-๿]/.test(t);
   const mixUps = [];
   if (vals.name && !hasThai(vals.name) && (!editing || editing.name !== vals.name)) {
     mixUps.push(`The Thai name "${vals.name}" has no Thai letters. It is the name the app shows by default.`);
@@ -9879,132 +10807,10 @@ function saveEmployee(ev) {
   }
   if (mixUps.length) {
     // Cancel goes back to the form with everything still typed in
-    showConfirm("Check the names", mixUps.join("\n\n") + "\n\nSave anyway?", doSave, () => openModal("#modal-employee"), "Save anyway");
+    showConfirm("Check the names", mixUps.join("\n\n") + "\n\nSave anyway?", doSave, () => openModal(inProfile ? "#modal-profile" : "#modal-employee"), "Save anyway");
     return;
   }
   doSave();
-}
-
-function deactivateEmployee() {
-  const e = D().employees.find(x => x.id === state.editingEmployeeId);
-  askDeactivate("Deactivate employee?",
-    `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`, (reason) => {
-    safely(async () => {
-      await cloud.setEmployeesActive([state.editingEmployeeId], false, reason);
-      closeModal();
-      await refreshAndRender();
-    });
-  });
-}
-
-/* employee modal — Edit Employee / Host Record sub-menu tabs (same pattern as
-   applySettingsTab, scoped to #modal-employee so the two tab strips don't
-   toggle each other's panes) */
-function applyEmployeeTab() {
-  for (const btn of $$("#employee-tabs .settings-tab")) {
-    btn.classList.toggle("active", btn.dataset.tab === state.employeeTab);
-  }
-  for (const pane of $$("#modal-employee .settings-pane")) {
-    pane.classList.toggle("hidden", pane.dataset.pane !== state.employeeTab);
-  }
-}
-
-/* Host Record tab: every host this employee has ever been deployed to, most
-   recent first. `getEmployeeHostHistory` reads deployment_history, which is
-   keyed one row per (employee, plan_date) — upserted, never duplicated, so
-   each row IS one distinct day worked, not one mission. Grouping those rows
-   by host and counting them therefore gives days at that host directly (same
-   figure the Host List's own inspector chips show, just from the other
-   side) — a host visited on ten different days is one line reading "10
-   days", not ten lines. Loaded on modal open (not on first tab click) so
-   switching tabs feels instant; the query is a single indexed read
-   (deployment_history.employee_id) so this is cheap even for someone with a
-   long history. */
-async function loadEmployeeHostRecord(empId) {
-  const box = $("#employee-hosts-list");
-  $("#employee-hosts-intro").classList.remove("hidden");
-  box.innerHTML = '<p class="import-note">Loading…</p>';
-  let rows;
-  try {
-    rows = await cloud.getEmployeeHostHistory(empId);
-  } catch (e) {
-    box.innerHTML = `<p class="import-note">Could not load host record: ${e.message || e}</p>`;
-    return;
-  }
-  // bail if the modal moved on to a different employee (or closed) while this was in flight
-  if (state.editingEmployeeId !== empId) return;
-  if (!rows.length) {
-    // the empty-state block, not a lone grey line; the intro has nothing to introduce
-    const emp = D().employees.find(e => e.id === empId);
-    $("#employee-hosts-intro").classList.add("hidden");
-    box.innerHTML = emptyStateHtml("No deployments yet",
-      `Hosts appear here once ${emp ? emp.name : "this person"} has worked a mission.`, "site");
-    return;
-  }
-  const byHost = new Map();   // host name -> { days, lastDate, lastNumber, lastCustomer }
-  for (const r of rows) {
-    const rec = byHost.get(r.host) || { days: 0, lastDate: r.date, lastNumber: r.number, lastCustomer: r.customer };
-    rec.days++;
-    byHost.set(r.host, rec);
-  }
-  // rows arrive most-recent-first, so the first row seen per host is already its most recent
-  const hosts = [...byHost.entries()].sort((a, b) => b[1].lastDate.localeCompare(a[1].lastDate));
-  box.innerHTML = `<div class="host-list">${hosts.map(([host, rec]) => `
-    <div class="host-row">
-      <div class="host-name">${escapeHtml(host)}</div>
-      <div class="host-meta">${rec.days} day${rec.days === 1 ? "" : "s"} · last ${fmtDate(rec.lastDate)}
-        (${escapeHtml(rec.lastNumber)}${rec.lastCustomer ? " — " + escapeHtml(rec.lastCustomer) : ""})</div>
-    </div>`).join("")}</div>`;
-}
-
-/* Note tab: free-text remarks left about this employee (not tied to any date
-   or assignment), most recent first. Same load-on-modal-open pattern as
-   loadEmployeeHostRecord, backed by its own employee_notes table so a note
-   survives independently of the roster edit form. */
-async function loadEmployeeNotes(empId) {
-  const box = $("#employee-notes-list");
-  box.innerHTML = '<p class="import-note">Loading…</p>';
-  let rows;
-  try {
-    rows = await cloud.getEmployeeNotes(empId);
-  } catch (e) {
-    box.innerHTML = `<p class="import-note">Could not load notes: ${e.message || e}</p>`;
-    return;
-  }
-  // bail if the modal moved on to a different employee (or closed) while this was in flight
-  if (state.editingEmployeeId !== empId) return;
-  if (!rows.length) {
-    box.innerHTML = '<p class="import-note">No notes yet.</p>';
-    return;
-  }
-  box.innerHTML = `<div class="note-list">${rows.map((r) => `
-    <div class="note-row" data-id="${escapeHtml(r.id)}">
-      <div class="note-text">${escapeHtml(r.note)}</div>
-      <div class="note-meta">${escapeHtml(r.createdBy || "unknown")} · ${new Date(r.createdAt).toLocaleString()}
-        <button type="button" class="note-delete">Delete</button></div>
-    </div>`).join("")}</div>`;
-  for (const btn of box.querySelectorAll(".note-delete")) {
-    btn.onclick = () => {
-      const id = btn.closest(".note-row").dataset.id;
-      showConfirm("Delete note?", "Remove this note? This can't be undone.", () => safely(async () => {
-        await cloud.deleteEmployeeNote(id);
-        await loadEmployeeNotes(empId);
-      }));
-    };
-  }
-}
-
-function saveEmployeeNote(ev) {
-  ev.preventDefault();
-  const form = ev.target;
-  const note = form.note.value.trim();
-  if (!note) return;
-  const empId = state.editingEmployeeId;
-  safely(async () => {
-    await cloud.addEmployeeNote(empId, note);
-    form.reset();
-    await loadEmployeeNotes(empId);
-  });
 }
 
 /* ---------- Settings: a full page below the top bar ----------
@@ -11636,6 +12442,7 @@ function placeBoardRow1Tools(board) {
   for (const b of bulk) if (b.parentNode !== home) home.append(b);
   if (home.lastElementChild !== exp) home.append(exp);
   exp.before($("#btn-report"));   // the report sits just left of Export, which keeps the right edge
+  $("#btn-report").before($("#btn-present"));
   // Overview and Org Chart have no row-1 controls but Export: one row, numbers left, Export right
   document.body.classList.toggle("toolbar-one-row", wide && (isOverview() || isOrgChart()));
 }
@@ -16876,8 +17683,6 @@ function wireApp() {
   $("#form-mission").onsubmit = saveMission;
   initSegmented();
   initPickers();
-  $("#form-employee").onsubmit = saveEmployee;
-  $("#form-employee-note").addEventListener("submit", saveEmployeeNote);
   $("#btn-delete-mission").onclick = () => deleteMission();
   $("#btn-hide-mission").onclick = () => hideMission();
   $("#btn-hide-missions").onclick = openHideMissionsModal;
@@ -16887,7 +17692,6 @@ function wireApp() {
   bindLendModal();
   bindImportModal();
   bindRenameBoardModal();
-  $("#btn-deactivate-employee").onclick = deactivateEmployee;
 
   $("#btn-settings").onclick = () => openSettingsView();
   for (const btn of $$("#settings-tabs .settings-tab")) {
@@ -16913,9 +17717,6 @@ function wireApp() {
   window.addEventListener("beforeunload", (ev) => {
     if (state.settingsOpen && anySettingsDirty()) { ev.preventDefault(); ev.returnValue = ""; }
   });
-  for (const btn of $$("#employee-tabs .settings-tab")) {
-    btn.onclick = () => { state.employeeTab = btn.dataset.tab; applyEmployeeTab(); };
-  }
   wireUserManagement();
   $("#btn-add-engineer").onclick = openAddEngineerModal;
   $("#form-add-engineer").onsubmit = addEngineerFromModal;
@@ -16986,6 +17787,8 @@ function wireApp() {
 
   $("#btn-export").onclick = openExportModal;
   $("#btn-report").onclick = () => OvReport.open();
+  $("#btn-present").onclick = () => Present.open();
+  $("#btn-present-go").onclick = () => Present.go();
   $("#btn-report-go").onclick = () => safely(() => OvReport.generate());
   $("#card-names").value = state.cardNames;
   initSegmented();   // draws the Thai | English toggles (the selects stay the source of truth)

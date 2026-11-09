@@ -79,14 +79,14 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     console.log("ok - the ID is saved tidied, and namesakes need a TRIGO ID each");
 
     // a short name saved earlier can still be edited, but not renamed to another short name
-    await p.evaluate(() => { openEmployeeModal("short1"); state.employeeTab = "edit"; applyEmployeeTab(); });
+    await h.editEmployee(p, "short1");
     await p.fill("#form-employee input[name=phone]", "081-222-2222");
     await p.fill("#form-employee input[name=trigoId]", "T555");
     await h.submitEmployeeForm(p);
-    await p.waitForSelector("#modal-employee", { state: "hidden" });
+    await p.waitForSelector("#form-employee", { state: "hidden" });
     const short = db.t("employees").find((e) => e.id === "short1");
     assert.deepEqual([short.name_th, short.phone, short.trigo_id], ["Pichai", "081-222-2222", "T555"]);
-    await p.evaluate(() => { openEmployeeModal("short1"); state.employeeTab = "edit"; applyEmployeeTab(); });
+    await h.editEmployee(p, "short1");
     await p.fill("#form-employee input[name=name]", "Pichai2");
     await h.submitEmployeeForm(p);
     await p.waitForFunction(() => /full name/.test(document.querySelector("#toast-stack").textContent));

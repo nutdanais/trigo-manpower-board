@@ -7,7 +7,7 @@
        loading state, and once;
      - Boards: Together | Side by side, one small chart per board on one shared scale, its name sets
        the board selector, a day opens that board; only offered for All boards with more than one;
-     - the On-call view's Count | Share (on-call person-days ÷ all person-days on missions, pooled);
+     - the On-call view's Count | Share | Free (Free is in history-deployed-split.e2e.js; on-call person-days ÷ all person-days on missions, pooled);
      - Boards & areas: a period table per board with net loans, By service area (demand, supply, gap,
        covered by other areas) and the from → to loan table;
      - Thai and a 400 px phone.
@@ -62,16 +62,17 @@ async function step(name, fn) {
     await p.evaluate(() => { window.__ur = []; window.__slow = false; const o = cloud.getUtilizationRange.bind(cloud); cloud.getUtilizationRange = async (ids, f, t) => { window.__ur.push([f, t]); if (window.__slow) await new Promise((r) => setTimeout(r, 700)); return o(ids, f, t); }; });
     const showOverview = (o = {}) => p.evaluate(async ([day, ov, f, t, opts]) => {
       state.date = day; D().activeBoardId = ov; state.filters.engineer = [];
-      state.overview.boardId = opts.board || "";
+      state.overview.boardIds = opts.board ? [opts.board] : [];
       state.overview.historyPreset = "custom"; state.overview.historyFrom = opts.from || f; state.overview.historyTo = opts.to || t;
       state.overview.historyCacheKey = null; state.overview.historyMeasure = opts.measure || "deployed";
-      state.overview.historyGroup = "day"; state.overview.historyBoards = "together"; state.overview.historyCompare = opts.compare || "prev";
+      state.overview.historyGroup = "day"; state.overview.period.view = "together"; state.overview.historyCompare = opts.compare || "prev";
       state.overview.historyOncallMode = "count"; state.overview.baView = "board"; state.overview.baLoansOpen = false;
       await refreshAndRender();
     }, [d[6], OVERVIEW, d[0], d[6], o]);
     await showOverview();
     const read = (sel) => p.evaluate((s) => [...document.querySelectorAll(s)].map((el) => el.textContent.replace(/\s+/g, " ").trim()), sel);
     const tile = (label) => p.evaluate((l) => { const t = [...document.querySelectorAll(".ov-htiles:not(.ov-eng-tiles) .ov-htile")].find((x) => x.querySelector(".ov-htile-label").textContent === l); return [t.querySelector(".ov-htile-value").textContent, (t.querySelector(".ov-htile-delta") || { textContent: "" }).textContent]; }, label);
+    const periodView = (label) => p.locator('.ov-period-scope [aria-label="Period board view"] .btn', { hasText: label }).first().click();
     const tool = (group, label) => p.locator(`.ov-htoolbar [aria-label="${group}"] .btn`, { hasText: label }).first().click();
     const dots = (prefix) => p.evaluate((pf) => [...document.querySelectorAll(".ov-hchart:not(.ov-eng):not(.ov-spread) circle.chart-dot")].filter((c) => (c.getAttribute("data-tip-label") || "").startsWith(pf)).length, prefix);
     const monthsIn = new Set(d.slice(0, 5).map((x) => x.slice(0, 7))).size;
@@ -117,7 +118,7 @@ async function step(name, fn) {
     });
 
     await step("Boards: Side by side: a small chart per board on one scale, with its name and average; the name sets the selector", async () => {
-      await tool("Boards", "Side by side");
+      await periodView("Side by side");
       assert.equal(await p.locator(".ov-small").count(), 2);
       assert.deepEqual(await read(".ov-small-head"), ["Board One avg 4.6", "Board Two avg 2.0"]);
       const tops = await p.evaluate(() => [...document.querySelectorAll(".ov-small svg")].map((svg) => Math.max(...[...svg.querySelectorAll("text.chart-axis-label")].map((t) => Number(t.textContent)).filter((x) => !Number.isNaN(x)))));
@@ -126,11 +127,11 @@ async function step(name, fn) {
       await p.waitForTimeout(300);
       assert.equal(await p.evaluate(() => D().activeBoardId), "b2", "a day opens that board");
       await showOverview({ compare: "ly" });
-      await tool("Boards", "Side by side");
+      await periodView("Side by side");
       await p.locator(".ov-small-head .ov-linkbtn", { hasText: "Board Two" }).click();
       await p.waitForTimeout(200);
-      assert.equal(await p.evaluate(() => state.overview.boardId), "b2", "the name sets the board selector");
-      assert.equal(await p.locator(".ov-htoolbar [aria-label=Boards]").count(), 0, "Side by side is only offered for All boards");
+      assert.equal(await p.evaluate(() => state.overview.boardIds.join(",")), "b2", "the name sets the board selector");
+      assert.equal(await p.locator('.ov-period-scope [aria-label="Period board view"] .btn', { hasText: "Side by side" }).isDisabled(), true, "Side by side needs two or more boards in the Period scope");
       await showOverview();
     });
 
@@ -146,9 +147,9 @@ async function step(name, fn) {
       assert.deepEqual(await read(".ov-hview .btn"), ["Chart", "Calendar"]);
     });
 
-    await step("On-call: Count | Share; share is on-call person-days ÷ all person-days on missions, pooled over a bucket", async () => {
+    await step("On-call: Count | Share | Free; share is on-call person-days ÷ all person-days on missions, pooled over a bucket", async () => {
       await p.locator(".ov-htiles:not(.ov-eng-tiles) .ov-htile", { hasText: "On-call deployed" }).click();
-      assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .btn").then((x) => x.slice(-2)), ["Count", "Share"]);
+      assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .btn").then((x) => x.slice(-3)), ["Count", "Share", "Free"]);
       await p.locator(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head-row .btn", { hasText: "Share" }).click();
       assert.deepEqual(await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head b"), ["On-call share, day by day"]);
       assert.match((await read(".ov-hchart:not(.ov-eng):not(.ov-spread) .ov-hchart-head .ov-muted"))[0], /On-call is 9% of the person-days on missions/, "3 of 33");
@@ -171,7 +172,7 @@ async function step(name, fn) {
         ["Board Two", "2.0", "0.0", "0.0%", "+2"],
         ["All boards", "6.6", "0.4", "9.1%", ""]], "net loans: F lent to Board Two on Tue and Wed (2 person-days each way)");
       await p.locator(".ov-ba-table tr[data-i='1']").click();
-      assert.equal(await p.evaluate(() => state.overview.boardId), "b2");
+      assert.equal(await p.evaluate(() => state.overview.boardIds.join(",")), "b2");
       await showOverview();
     });
 
@@ -207,7 +208,7 @@ async function step(name, fn) {
       await p.waitForTimeout(300);
       const english = (xs) => xs.filter((x) => /[A-Za-z]{3}/.test(x.replace(/\bOC\b|Person [A-J]|Board (One|Two)|Eng (One|Two)|Host (Alpha|Beta|Gamma)|AREA[12]/g, "")));
       assert.deepEqual(english(await read(".ov-period, .ov-htoolbar, .ov-htile-delta")), [], "Compare with, the toolbar and the deltas in Thai");
-      await p.locator(".ov-htoolbar .ov-htool").nth(1).locator(".btn").nth(1).click();   // Boards: Side by side (the label is Thai now)
+      await p.locator('.ov-period-scope [aria-label="มุมมองบอร์ดของช่วงเวลา"] .btn').nth(1).click();   // View: Side by side (the label is Thai now)
       await p.waitForTimeout(200);
       assert.deepEqual(english(await read(".ov-small-multiples")), [], "side by side in Thai");
       await p.locator(".ov-htiles:not(.ov-eng-tiles) .ov-htile").nth(5).click();
@@ -226,7 +227,7 @@ async function step(name, fn) {
     await step("on a phone (400 px) the toolbar, side by side and Boards & areas fit the page", async () => {
       await p.setViewportSize({ width: 400, height: 800 });
       await showOverview();
-      await tool("Boards", "Side by side");
+      await periodView("Side by side");
       await p.waitForTimeout(300);
       assert.ok(await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth) <= 0, "no sideways page scroll");
     });

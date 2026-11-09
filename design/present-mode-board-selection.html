@@ -1,0 +1,1049 @@
+<title>Present Mode and Board Selection</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not loaded by the app. Light only, like the app.
+   Layout: one reading column. Findings first, then board selection (A-D), then present mode (P1-P4),
+   each option as a live mockup on one sample day (Wed 04-Nov-2026, 4 boards, 106 people), then a
+   comparison, a recommendation and a decision picker. Tokens mirror styles.css. */
+:root {
+  --page: #eef1f4; --surface: #ffffff; --line: #d8dde4; --ink: #1f2937; --mut: #5f6773;
+  --navy: #003a66; --navy-d: #002a4a; --navy-tint: rgba(0,58,102,.07); --navy-line: rgba(0,58,102,.28);
+  --green: #a8c855; --soft: #eef1f5; --hover: #eef3fb;
+  --warn: #f59e0b; --warn-text: #8a4f10; --warn-surface: #fdf8ef; --warn-line: #e0c9a4;
+  --ok-text: #4d6810; --ok-surface: #f7faef; --ok-line: #cfdcae;
+  --bad-text: #a3271f; --bad-surface: #fef2f2; --bad-line: #e6c2be;
+  --night: #1c2430; --bezel: #111418;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", "Noto Sans", sans-serif;
+  --f-body: "Noto Sans", "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 90px; display: flex; flex-direction: column; gap: 64px; }
+h1, h2, h3, h4 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: .1px; }
+h1 { font-size: 42px; line-height: 1.05; }
+h2 { font-size: 30px; line-height: 1.12; }
+h3 { font-size: 22px; line-height: 1.2; }
+h4 { font-size: 16px; font-family: var(--f-body); font-weight: 700; }
+p { margin: 0; text-wrap: pretty; }
+.lede { max-width: 70ch; color: var(--mut); }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--navy); display: flex; align-items: center; gap: 8px; }
+.eyebrow::before { content: ""; width: 4px; height: 14px; border-radius: 1px; background: var(--green); }
+section { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.ic { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+button { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* header */
+.hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.hero-l { display: flex; flex-direction: column; gap: 14px; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.box ol, .box ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.box a { color: var(--navy); font-weight: 600; }
+.assume { background: var(--warn-surface); border-color: var(--warn-line); }
+.assume h4 { color: var(--warn-text); }
+@media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
+
+/* findings */
+.finds { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; }
+.find { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.find b { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--navy); }
+.find code, .rules code, p code, li code { font-size: 12.5px; background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+
+/* option cards */
+.opts { display: flex; flex-direction: column; gap: 26px; }
+.opt { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr); overflow: hidden; }
+.opt-t { padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid var(--line); background: var(--surface); }
+.opt-t .tag { align-self: flex-start; font-family: var(--f-display); font-weight: 700; font-size: 15px; letter-spacing: .04em; color: #fff; background: var(--navy); border-radius: 4px; padding: 1px 9px; }
+.opt-t .tag.recd { background: var(--ok-text); }
+.opt-t p { font-size: 14px; color: var(--mut); }
+.pc { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.pc li { padding-left: 20px; position: relative; }
+.pc li::before { position: absolute; left: 0; top: 0; font-weight: 700; }
+.pc .p::before { content: "+"; color: var(--ok-text); }
+.pc .c::before { content: "−"; color: var(--bad-text); }
+.effort { margin-top: auto; font-size: 12.5px; color: var(--mut); border-top: 1px dashed var(--line); padding-top: 10px; }
+.opt-m { padding: 20px; background: var(--soft); display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.opt-m > .app, .stage-wrap > .app { flex: none; }
+.opt-m .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.cap { font-size: 12.5px; color: var(--mut); }
+@media (max-width: 980px) { .opt { grid-template-columns: 1fr; } .opt-t { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+/* app frame (mock chrome) */
+.app { background: var(--page); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; flex: 1 1 420px; }
+.app-bar { background: var(--surface); border-bottom: 1px solid var(--line); padding: 8px 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; position: relative; }
+.app-bar .mut { color: var(--mut); font-size: 12.5px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; font-size: 13.5px; cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
+.btn:hover { background: var(--hover); border-color: var(--navy-line); }
+.btn:active { transform: translateY(1px); }
+.btn.pri { background: var(--navy); border-color: var(--navy); color: #fff; }
+.btn.pri:hover { background: var(--navy-d); }
+.btn .cap2 { color: var(--mut); font-weight: 500; }
+.btn b { font-weight: 650; }
+.pill { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--soft); color: var(--mut); font-size: 11.5px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.dot { width: 9px; height: 9px; border-radius: 3px; flex: none; display: inline-block; }
+.menu { position: absolute; top: calc(100% - 2px); left: 12px; z-index: 3; min-width: 270px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,42,74,.14); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.mrow { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 6px; background: none; border: 0; text-align: left; cursor: pointer; font-size: 13.5px; width: 100%; }
+.mrow:hover { background: var(--hover); }
+.mrow[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.mrow .nm { flex: 1; min-width: 0; }
+.mrow .only { font-size: 11.5px; color: var(--navy); font-weight: 600; padding: 2px 6px; border-radius: 4px; border: 1px solid transparent; }
+.mrow .only:hover { border-color: var(--navy-line); background: var(--surface); }
+.cb { width: 16px; height: 16px; border: 1.5px solid #8a929c; border-radius: 4px; display: grid; place-items: center; flex: none; background: var(--surface); }
+.cb[data-s="on"], .cb[data-s="mix"] { background: var(--navy); border-color: var(--navy); }
+.cb[data-s="on"]::after { content: ""; width: 8px; height: 4px; border: solid #fff; border-width: 0 0 2px 2px; transform: rotate(-45deg) translate(1px,-1px); }
+.cb[data-s="mix"]::after { content: ""; width: 8px; height: 2px; background: #fff; }
+.rd { width: 16px; height: 16px; border: 1.5px solid #8a929c; border-radius: 50%; flex: none; background: var(--surface); display: grid; place-items: center; }
+.rd[data-s="on"] { border-color: var(--navy); }
+.rd[data-s="on"]::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--navy); }
+.msep { height: 1px; background: var(--line); margin: 4px 2px; }
+.mnote { font-size: 12px; color: var(--mut); padding: 4px 8px 2px; }
+.mnote.warn { color: var(--warn-text); }
+.spacer-menu { height: 262px; }
+.spacer-menu.short { height: 180px; }
+.spacer-menu.tall { height: 238px; }
+
+/* chip row */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 13px; cursor: pointer; transition: background .15s, border-color .15s; }
+.chip:hover { border-color: var(--navy-line); }
+.chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.chip[aria-pressed="true"] .pill { background: rgba(255,255,255,.2); color: #fff; }
+.chip.all { font-weight: 650; }
+.link { background: none; border: 0; color: var(--navy); font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 4px 2px; text-decoration: underline; text-underline-offset: 2px; }
+
+/* segmented */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+.sel { min-height: 34px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 0 8px; font: inherit; font-size: 13.5px; }
+
+/* overview mock */
+.ov { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.ov-sec { transition: opacity .25s, filter .25s; }
+.ov.spot .ov-sec.dim { opacity: .28; filter: grayscale(.6); }
+.attn { background: var(--warn-surface); border: 1px solid var(--warn-line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.attn.ok { background: var(--ok-surface); border-color: var(--ok-line); }
+.attn .t { font-weight: 700; font-size: 15px; color: var(--warn-text); }
+.attn.ok .t { color: var(--ok-text); }
+.attn .s { font-size: 12.5px; color: var(--mut); }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.tile .k { font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.tile .v { font-family: var(--f-display); font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile .d { font-size: 11.5px; color: var(--mut); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.card h5 { margin: 0 0 6px; font-size: 13.5px; font-weight: 700; }
+.brow { display: grid; grid-template-columns: minmax(80px, 110px) minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 4px 0; font-size: 13px; }
+.brow .bar { height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+.brow .bar i { display: block; height: 100%; border-radius: 4px; }
+.brow .nmx { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cmp { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cmp th, .cmp td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+.cmp th:first-child, .cmp td:first-child { text-align: left; }
+.cmp th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--mut); font-weight: 600; }
+.cmp td.dl { font-weight: 650; }
+.cmp td.up { color: var(--ok-text); } .cmp td.dn { color: var(--bad-text); }
+.scroll-x { overflow-x: auto; }
+.spark { width: 100%; height: 70px; display: block; }
+
+/* phone */
+.phone { width: 270px; flex: none; background: var(--bezel); border-radius: 28px; padding: 9px; }
+.phone-in { background: var(--page); border-radius: 20px; overflow: hidden; height: 470px; display: flex; flex-direction: column; position: relative; font-size: 13px; }
+.phone-top { background: var(--navy); color: #fff; padding: 9px 12px; font-size: 12.5px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+.phone-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; filter: brightness(.9); flex: 1; min-height: 0; overflow: hidden; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--surface); border-radius: 14px 14px 0 0; box-shadow: 0 -8px 24px rgba(0,42,74,.2); padding: 8px 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 6px; }
+.sheet .done { margin-top: 6px; }
+
+/* stage: a 16:9 presenting screen, sized in container units so type scales like a projector */
+.stage-wrap { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.stage { container-type: inline-size; aspect-ratio: 16 / 9; width: 100%; max-width: 100%; background: var(--page); border-radius: 8px; border: 1px solid var(--line); position: relative; overflow: hidden; }
+.stage-in { position: absolute; inset: 0; padding: 3.2cqw 3.6cqw 5.5cqw; display: flex; flex-direction: column; gap: 1.6cqw; }
+.st-bar { display: flex; align-items: center; gap: 1.2cqw; font-size: 1.5cqw; color: var(--mut); }
+.st-bar b { color: var(--navy); font-weight: 700; }
+.st-h { font-family: var(--f-display); font-weight: 700; font-size: 5.2cqw; line-height: 1.02; color: var(--warn-text); letter-spacing: -.01em; }
+.st-h.ok { color: var(--ok-text); }
+.st-sub { font-size: 1.8cqw; color: var(--mut); }
+.st-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.4cqw; margin-top: .6cqw; }
+.st-tile { background: var(--surface); border: 1px solid var(--line); border-radius: .8cqw; padding: 1.2cqw 1.5cqw; }
+.st-tile .k { font-size: 1.35cqw; color: var(--mut); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.st-tile .v { font-family: var(--f-display); font-weight: 700; font-size: 5.4cqw; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.st-title { font-family: var(--f-display); font-weight: 700; font-size: 3.4cqw; color: var(--navy); line-height: 1; }
+.st-groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.4cqw; }
+.st-group { background: var(--surface); border: 1px solid var(--line); border-radius: .8cqw; padding: 1.1cqw 1.4cqw; display: flex; flex-direction: column; gap: .8cqw; }
+.st-group h6 { margin: 0; font-size: 1.6cqw; font-weight: 700; display: flex; align-items: center; gap: .8cqw; }
+.st-group h6 span.n { margin-left: auto; font-size: 1.3cqw; color: var(--warn-text); background: var(--warn-surface); border: 1px solid var(--warn-line); border-radius: 99px; padding: 0 .9cqw; }
+.st-chips { display: flex; flex-wrap: wrap; gap: .6cqw; }
+.st-chip { font-size: 1.45cqw; background: var(--soft); border: 1px solid var(--line); border-radius: .5cqw; padding: .1cqw .8cqw; }
+.st-chip.priv { color: var(--mut); letter-spacing: .15em; }
+.st-brow { display: grid; grid-template-columns: 13cqw 1fr 11cqw; gap: 1.4cqw; align-items: center; font-size: 1.9cqw; padding: .55cqw 0; }
+.st-brow .bar { height: 1.4cqw; border-radius: .7cqw; background: var(--soft); overflow: hidden; }
+.st-brow .bar i { display: block; height: 100%; border-radius: .7cqw; }
+.st-brow .nmx { display: flex; align-items: center; gap: .8cqw; font-weight: 600; }
+.st-brow .dot { width: 1.3cqw; height: 1.3cqw; border-radius: .3cqw; }
+.st-brow .r { text-align: right; font-variant-numeric: tabular-nums; color: var(--mut); }
+.st-spark { width: 100%; flex: 1; min-height: 0; }
+.st-nav { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.1cqw 2cqw; display: flex; align-items: center; justify-content: center; gap: 1.6cqw; font-size: 1.5cqw; color: var(--mut); background: linear-gradient(to top, var(--page) 70%, transparent); }
+.st-nav button { border: 1px solid var(--line); background: var(--surface); border-radius: .6cqw; width: 3.2cqw; height: 3.2cqw; cursor: pointer; display: grid; place-items: center; }
+.st-nav button:hover { background: var(--hover); border-color: var(--navy-line); }
+.st-nav .dots { display: flex; gap: .8cqw; }
+.st-nav .dots button { width: 1.2cqw; height: 1.2cqw; border-radius: 50%; padding: 0; border-color: #aab2bb; }
+.st-nav .dots button[aria-current="true"] { background: var(--navy); border-color: var(--navy); width: 3cqw; border-radius: .8cqw; }
+.st-nav .ic { width: 1.8cqw; height: 1.8cqw; }
+.st-hint { font-size: 1.4cqw; }
+.st-hover { position: absolute; left: 50%; top: 0; transform: translateX(-50%); background: var(--night); color: #e8ebed; border-radius: 0 0 1cqw 1cqw; padding: .9cqw 2cqw; font-size: 1.45cqw; display: flex; align-items: center; gap: 1.6cqw; z-index: 2; white-space: nowrap; }
+.st-hover b { color: #fff; }
+.st-hover .x { border: 1px solid rgba(255,255,255,.35); border-radius: .5cqw; padding: 0 .9cqw; }
+.st-hover .tg { display: inline-flex; align-items: center; gap: .6cqw; cursor: pointer; background: none; border: 0; color: inherit; font: inherit; }
+.st-hover .tgb { width: 3cqw; height: 1.6cqw; border-radius: 1cqw; background: #5b6572; position: relative; }
+.st-hover .tgb::after { content: ""; position: absolute; top: .2cqw; left: .2cqw; width: 1.2cqw; height: 1.2cqw; border-radius: 50%; background: #fff; transition: transform .15s; }
+.st-hover .tg[aria-pressed="true"] .tgb { background: var(--green); }
+.st-hover .tg[aria-pressed="true"] .tgb::after { transform: translateX(1.4cqw); }
+.st-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 9cqw; background: linear-gradient(to top, var(--page), transparent); }
+.st-live { display: inline-flex; align-items: center; gap: .7cqw; }
+.st-live i { width: 1cqw; height: 1cqw; border-radius: 50%; background: #3f9b52; }
+.st-clock { margin-left: auto; font-family: var(--f-display); font-size: 3cqw; font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; }
+.st-prog { position: absolute; left: 0; right: 0; bottom: 0; height: .7cqw; background: var(--line); }
+.st-prog i { display: block; height: 100%; background: var(--navy); width: 0; }
+.st-prog i.run { animation: prog var(--dur, 6s) linear forwards; }
+@keyframes prog { from { width: 0; } to { width: 100%; } }
+.st-pill { position: absolute; left: 50%; bottom: 2cqw; transform: translateX(-50%); background: var(--night); color: #e8ebed; border-radius: 99px; padding: .8cqw 1.6cqw; display: flex; align-items: center; gap: 1.4cqw; font-size: 1.5cqw; box-shadow: 0 .8cqw 2.4cqw rgba(0,0,0,.25); white-space: nowrap; }
+.st-pill button { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: .6cqw; }
+.st-pill button:hover { color: #fff; }
+.st-pill b { color: #fff; }
+.st-pill .sep { width: 1px; height: 2cqw; background: #4b5562; }
+.st-pill .ic { width: 1.8cqw; height: 1.8cqw; }
+
+/* option E: two scopes */
+.band { background: var(--navy); color: #fff; border-radius: 6px; padding: 7px 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.band b { font-family: var(--f-display); font-size: 16px; letter-spacing: .2px; padding-left: 8px; border-left: 4px solid var(--green); }
+.band span { color: #d5e1ec; }
+.scopebar { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13px; }
+.scopebar .lbl { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--mut); }
+.chips.sm .chip { min-height: 28px; padding: 0 9px; font-size: 12.5px; }
+.chips.sm .chip[disabled] { opacity: .55; cursor: default; }
+.lk { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); font-size: 12.5px; cursor: pointer; }
+.lk[aria-pressed="true"] { background: var(--ok-surface); border-color: var(--ok-line); color: var(--ok-text); font-weight: 600; }
+.seg.sm button { padding: 4px 10px; font-size: 12.5px; }
+.seg button[disabled] { opacity: .45; cursor: not-allowed; }
+.ph { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 6px; align-items: stretch; }
+.ph .yl { display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: var(--mut); text-align: right; font-variant-numeric: tabular-nums; padding: 2px 0; }
+.ph .xl { grid-column: 2; display: flex; justify-content: space-between; font-size: 11px; color: var(--mut); }
+.chart-e { width: 100%; height: 110px; display: block; }
+.chart-e.s { height: 70px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--mut); align-items: center; }
+.legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
+.legend i.d { border-top-style: dashed; }
+.hint-e { font-size: 12px; color: var(--warn-text); }
+.sidegrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+
+/* rules table, comparison */
+.tbl { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+.tbl table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
+.tbl th, .tbl td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.tbl th { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); font-weight: 650; background: var(--soft); }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl td:first-child { font-weight: 650; white-space: nowrap; }
+.tbl .good { color: var(--ok-text); font-weight: 600; } .tbl .bad { color: var(--bad-text); font-weight: 600; } .tbl .mid { color: var(--warn-text); font-weight: 600; }
+
+/* recommendation + start sheet */
+.rec { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .rec { grid-template-columns: 1fr; } }
+.rec-l { display: flex; flex-direction: column; gap: 12px; }
+.rec-l ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.startsheet { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,42,74,.1); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.startsheet h4 { font-family: var(--f-display); font-size: 20px; }
+.fld { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.fld > span.l { font-size: 12px; font-weight: 650; color: var(--mut); text-transform: uppercase; letter-spacing: .06em; }
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.checks label, .fld label.inl { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.ssbtns { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* decision */
+.decide { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.decide fieldset { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px 14px; margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.decide legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
+.decide label { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+.decide input[type=radio], .decide input[type=checkbox] { margin-top: 4px; accent-color: var(--navy); }
+textarea#notes { width: 100%; min-height: 70px; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit; font-size: 13.5px; resize: vertical; background: var(--surface); }
+pre#decision-out { margin: 0; background: var(--night); color: #e8ebed; border-radius: 8px; padding: 14px 16px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.copied { font-size: 13px; color: var(--ok-text); font-weight: 600; }
+.qs { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.q { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+.q b { color: var(--navy); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+<!-- ================= header ================= -->
+<header class="hero">
+  <div class="hero-l">
+    <div class="eyebrow">Next build · Design proposal · 04 Nov 2026</div>
+    <h1>Present mode and board selection</h1>
+    <p class="lede">Two proposals for review. Board selection lets the Overview show more than one board at a time. Present mode turns the Overview into something you can put on a projector or a wall screen. Each has several options as working mockups on the same sample day, so you can compare them by using them.</p>
+    <p class="lede">Sample: Wed 04-Nov-2026, four boards, 106 people. Numbers are placeholders, and the mockups are not loaded by the app.</p>
+  </div>
+  <div class="hero-r" style="display:flex;flex-direction:column;gap:14px">
+    <div class="box">
+      <h4>How to review</h4>
+      <ol>
+        <li><a href="#select">Board selection</a>: tick boards in A to D and watch the numbers change.</li>
+        <li><a href="#present">Present mode</a>: step through P1 to P4 with the arrows.</li>
+        <li><a href="#rec">Recommendation</a>, then <a href="#decide">your decision</a> to copy back to me.</li>
+      </ol>
+    </div>
+    <div class="box assume">
+      <h4>What I assumed</h4>
+      <ul>
+        <li>You have <b>4 boards</b>, and "2 out of 4" means you could pick any two of them (I also show a hard cap of 2, option A).</li>
+        <li>Multi-select is for the <b>Overview only</b>. Board, Capacity and the lists keep one board at a time.</li>
+        <li>Present mode is a <b>read-only, large-type view</b> for a meeting room or a wall screen. Tell me if you meant something else.</li>
+      </ul>
+    </div>
+  </div>
+</header>
+
+<!-- ================= findings ================= -->
+<section id="today">
+  <div class="eyebrow">What the app does today</div>
+  <h2>Multi-select is mostly a picker change</h2>
+  <p class="lede">Read from <code>app.js</code>, <code>cloud.js</code> and the Overview handover notes.</p>
+  <div class="finds">
+    <div class="find"><b>1 · Sections already take a list</b><span>Every Overview section reads <code>boards = ovScopeBoards()</code>, which already returns an array. The numbers, the attention card and the By board rows sum or list whatever boards are in it.</span></div>
+    <div class="find"><b>2 · The selector is one or all</b><span>The picker stores a single id (or empty for all) in <code>manpower.ovBoard</code>, per device. The label, the "all boards" wording and the History control <b>Side by side</b> assume one or all.</span></div>
+    <div class="find"><b>3 · Rows set the selector</b><span>A row in By board or Boards &amp; areas, and a chart in Side by side, sets the selector to that one board. The Report dialog uses the selector as its scope.</span></div>
+    <div class="find"><b>4 · Loans cross the line</b><span>A loan from a ticked board to an unticked one is only half inside the selection. It needs a label such as "lent outside selection".</span></div>
+    <div class="find"><b>5 · No present mode yet</b><span>The nearest thing is Export (JPG, PDF), which is static. The Overview is already read-only. The Board tab is editable, so presenting it needs an edit lock.</span></div>
+    <div class="find"><b>6 · Names are permissioned</b><span><code>ov.status</code> and <code>ov.actionQueue</code> decide who sees the headline and the idle names, and <code>ov.history</code> guards per-person figures. A shared screen should not widen this, and needs a <b>Hide names</b> switch.</span></div>
+    <div class="find"><b>7 · Live data exists</b><span>The cloud layer already subscribes to realtime changes, so a wall display can stay current without polling or a reload.</span></div>
+  </div>
+</section>
+
+<!-- ================= board selection ================= -->
+<section id="select">
+  <div class="eyebrow">Proposal 1</div>
+  <h2>Board selection on the Overview</h2>
+  <p class="lede">Five ways to pick boards, driving the same sample Overview. Tick, press <b>Only</b>, and compare the summary line. Option C compares two boards instead of adding them up. Option E gives the Period group (History and the sections after it) its own board control, linked to the page by default.</p>
+
+  <div class="opts">
+
+    <!-- A -->
+    <article class="opt" id="opt-a">
+      <div class="opt-t">
+        <span class="tag recd">A</span>
+        <h3>Tick list in the existing picker</h3>
+        <p>The Board button keeps its place in toolbar row 1. Its menu gets checkboxes, an <b>All boards</b> row and an <b>Only</b> shortcut per row. The button names the boards you picked.</p>
+        <ul class="pc">
+          <li class="p">Smallest change to what people know</li>
+          <li class="p">Any mix of 1 to 4 boards, no extra rules</li>
+          <li class="p">Phone: the same list as a bottom sheet</li>
+          <li class="c">The choice hides behind a click (the label must carry it)</li>
+        </ul>
+        <div class="effort">Build: small. The saved value becomes a list of ids; one old id still reads correctly.</div>
+      </div>
+      <div class="opt-m">
+        <div class="row" style="align-items:center">
+          <label class="row" style="gap:8px;font-size:13.5px"><input type="checkbox" id="a-cap"> Limit to 2 boards (hard cap)</label>
+          <span class="cap">With a cap, "All boards" stays as its own row and ticking a third board is refused.</span>
+        </div>
+        <div class="row">
+          <div class="app" data-k="A" id="mockA"></div>
+          <div class="phone" aria-label="Phone mockup of the tick list as a bottom sheet"><div class="phone-in" id="phoneA"></div></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- B -->
+    <article class="opt" id="opt-b">
+      <div class="opt-t">
+        <span class="tag">B</span>
+        <h3>Board chips under the header</h3>
+        <p>A row of toggle chips sits at the top of the Overview, one per board, plus <b>All</b>. What is on screen is always visible, and one tap changes it.</p>
+        <ul class="pc">
+          <li class="p">The scope is readable at a glance, and a screenshot shows it</li>
+          <li class="p">One tap per board, no menu</li>
+          <li class="c">Uses a row of width; with 8 or more boards it needs to scroll</li>
+          <li class="c">Replaces the Board button on the Overview only, so that tab differs from the others</li>
+        </ul>
+        <div class="effort">Build: small to medium. New row, plus the same saved list as A.</div>
+      </div>
+      <div class="opt-m">
+        <div class="app" data-k="B" id="mockB"></div>
+      </div>
+    </article>
+
+    <!-- C -->
+    <article class="opt" id="opt-c">
+      <div class="opt-t">
+        <span class="tag">C</span>
+        <h3>Compare two boards</h3>
+        <p>A switch next to the picker: <b>Combined</b> or <b>Compare</b>. Compare takes exactly two boards and shows them as two columns with a difference column, instead of one summed figure. This is the "2 out of 4" idea taken literally.</p>
+        <ul class="pc">
+          <li class="p">Answers "how is One doing against Three?", which a sum cannot</li>
+          <li class="p">Fits History's Side by side</li>
+          <li class="c">A new layout for every section, not just a filter</li>
+          <li class="c">People, Workforce and Host coverage have no natural two-column form</li>
+        </ul>
+        <div class="effort">Build: medium to large. Best added after A, for the sections where a difference means something (summary, By board, History).</div>
+      </div>
+      <div class="opt-m">
+        <div class="app" data-k="C" id="mockC"></div>
+      </div>
+    </article>
+
+    <!-- D -->
+    <article class="opt" id="opt-d">
+      <div class="opt-t">
+        <span class="tag">D</span>
+        <h3>Saved board groups</h3>
+        <p>People name the groups they look at often, such as "Day crews" or "South". The picker lists All boards, each board and the saved groups. You build a group once by ticking boards, then reuse it with one pick.</p>
+        <ul class="pc">
+          <li class="p">Fast for recurring combinations, and meeting-ready ("Open Monday review")</li>
+          <li class="p">A group can be shared, so the whole team sees the same scope</li>
+          <li class="c">More to manage: names, edit, delete, boards that leave a group</li>
+          <li class="c">Shared groups need a database table and a permission</li>
+        </ul>
+        <div class="effort">Build: medium (device only) to large (shared). Needs A's tick list to build a group.</div>
+      </div>
+      <div class="opt-m">
+        <div class="app" data-k="D" id="mockD"></div>
+      </div>
+    </article>
+
+    <!-- E -->
+    <article class="opt" id="opt-e">
+      <div class="opt-t">
+        <span class="tag">E</span>
+        <h3>Two scopes: the page, and the Period</h3>
+        <p>The day sections (Overview, In detail) use a simple page scope, as in A. The Period group gets its own board control in its heading: <b>Combined</b>, <b>Side by side</b> or <b>A vs B</b>. It starts <b>linked</b> to the page, so most people never see a second choice. Unlink it to pick different boards.</p>
+        <ul class="pc">
+          <li class="p">Simple where people look quickly, as rich as needed where they analyse</li>
+          <li class="p">Fits the page's existing split: the Period group already has its own range and Compare with</li>
+          <li class="p">A vs B answers the board-against-board question over time, which C answers only for one day</li>
+          <li class="c">Two scopes on one page need clear labels, or the Report scope is ambiguous</li>
+          <li class="c">One comparison at a time: A vs B turns Compare with (previous period, last year) off</li>
+        </ul>
+        <div class="effort">Build: medium to large, in steps: page scope (A), then the linked Period scope with Combined, then A vs B for History and Boards &amp; areas. People, Engineer workload and Workforce only combine.</div>
+      </div>
+      <div class="opt-m">
+        <div class="app" data-k="E" id="mockE"></div>
+        <p class="cap">The page scope is shown as chips here to save room. In the app it is A's tick list. Try: unlink the Period, tick boards, switch to <b>A vs B</b>, then back to <b>Combined</b> and change Compare with.</p>
+      </div>
+    </article>
+  </div>
+
+  <h3>What each Overview section does with 2 or more boards</h3>
+  <p class="lede">The same rules apply to A, B, D and E. C shows its own columns. E adds the Period row.</p>
+  <div class="tbl rules"><table>
+    <thead><tr><th>Section</th><th>With the selection</th><th>Change needed</th></tr></thead>
+    <tbody>
+      <tr><td>Attention card, tiles</td><td>Sum over the picked boards. Idle names are grouped per board, and the subtitle names the boards ("Board One + Board Three").</td><td class="good">Label only</td></tr>
+      <tr><td>By board, Boards &amp; areas</td><td>Only the picked boards appear. A row click means <b>Only this board</b>; the arrow still opens the board.</td><td class="mid">Row click</td></tr>
+      <tr><td>History</td><td>Combined. <b>Side by side</b> is offered whenever more than one board is in scope, not only for All boards.</td><td class="mid">Show condition</td></tr>
+      <tr><td>People, Engineer workload, Workforce</td><td>Union of the picked boards. Same counting rules as today.</td><td class="good">None</td></tr>
+      <tr><td>Loans</td><td>A loan to or from a board outside the selection shows as "outside selection", so the net figure is not misread.</td><td class="mid">New label</td></tr>
+      <tr><td>Report, Export</td><td>Scope is the selection. Title: "Manpower report · October 2026 · Board One + Board Three".</td><td class="mid">Title and scope</td></tr>
+      <tr><td>Period group (option E)</td><td>Own scope, linked to the page by default. History and Boards &amp; areas can show Combined, Side by side or A vs B. People, Engineer workload and Workforce only combine. The heading states the scope.</td><td class="mid">New control, new label</td></tr>
+      <tr><td>Board, Capacity, lists</td><td><b>Not multi-select.</b> They edit or plan one board at a time, and dragging a person across two visible boards would read as a loan.</td><td class="good">None</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= present mode ================= -->
+<section id="present">
+  <div class="eyebrow">Proposal 2</div>
+  <h2>Present mode</h2>
+  <p class="lede">All four are read-only, use the board selection you already made, and leave with <b>Esc</b>. They differ in who drives, how much you see at once, and how much has to be built. Use the arrows or dots in P2 to P4, and the <b>Hide names</b> switch in P1 and P3.</p>
+
+  <div class="opts">
+
+    <!-- P1 -->
+    <article class="opt" id="opt-p1">
+      <div class="opt-t">
+        <span class="tag">P1</span>
+        <h3>Clean screen</h3>
+        <p>The same Overview with the banner and toolbar removed, the page at about 125% and full width. Move the pointer to the top edge to get a slim bar with the scope, the date, <b>Hide names</b> and <b>Exit</b>. You scroll as you talk.</p>
+        <ul class="pc">
+          <li class="p">The least to build, and it is the page people already know</li>
+          <li class="p">Every section is available, including People and History</li>
+          <li class="c">Small details stay small on a projector</li>
+          <li class="c">You scroll live, so the audience watches the page move</li>
+        </ul>
+        <div class="effort">Build: small. A body class plus a scale, a hover bar and the full-screen call.</div>
+      </div>
+      <div class="opt-m"><div class="stage-wrap" id="stageP1"></div></div>
+    </article>
+
+    <!-- P2 -->
+    <article class="opt" id="opt-p2">
+      <div class="opt-t">
+        <span class="tag recd">P2</span>
+        <h3>Slides, you drive</h3>
+        <p>One section per screen in large type: Today, Idle people, Boards, Trend, and optionally Host coverage. Arrow keys, a clicker or a tap move on. A start sheet picks the scope, the slides and whether names show.</p>
+        <ul class="pc">
+          <li class="p">Reads from the back of a room</li>
+          <li class="p">You control the pace, so it suits a stand-up or a review</li>
+          <li class="p">Each slide is built from the page's own functions, so figures cannot drift</li>
+          <li class="c">Slides are a second layout to keep in step with the page</li>
+        </ul>
+        <div class="effort">Build: medium. Four or five slide renderers plus the start sheet.</div>
+      </div>
+      <div class="opt-m"><div class="stage-wrap" id="stageP2"></div></div>
+    </article>
+
+    <!-- P3 -->
+    <article class="opt" id="opt-p3">
+      <div class="opt-t">
+        <span class="tag">P3</span>
+        <h3>Wall display</h3>
+        <p>The same slides, rotating on their own every 15, 30 or 60 seconds, for a TV in the planning room. Follows today's date, refreshes itself from the live feed, shows a clock and a last-updated time, and pauses when someone presses a key.</p>
+        <ul class="pc">
+          <li class="p">Nobody has to run it, and it is always current</li>
+          <li class="p">Costs little once P2 exists: a timer and a refresh</li>
+          <li class="c">Needs a kept-awake screen and a signed-in browser that stays open</li>
+          <li class="c">Names on a wall are the biggest privacy question (default hidden)</li>
+        </ul>
+        <div class="effort">Build: small on top of P2. In this mockup a slide lasts 6 seconds so you can see it turn.</div>
+      </div>
+      <div class="opt-m"><div class="stage-wrap" id="stageP3"></div></div>
+    </article>
+
+    <!-- P4 -->
+    <article class="opt" id="opt-p4">
+      <div class="opt-t">
+        <span class="tag">P4</span>
+        <h3>Spotlight strip</h3>
+        <p>The live Overview stays as it is. A floating strip at the bottom steps through sections, dimming everything except the one you are talking about. You can still click a name or a board, because nothing is replaced.</p>
+        <ul class="pc">
+          <li class="p">You can drill into a board or a person mid-meeting</li>
+          <li class="p">Nothing new to keep in step, because it is the page</li>
+          <li class="c">Page-sized type and dense tables on a projector</li>
+          <li class="c">The audience sees the whole page, including what you did not mean to show</li>
+        </ul>
+        <div class="effort">Build: small to medium. Section anchors, a dim class and the strip.</div>
+      </div>
+      <div class="opt-m"><div class="stage-wrap" id="stageP4"></div></div>
+    </article>
+  </div>
+
+  <h3>Rules for every present option</h3>
+  <div class="finds">
+    <div class="find"><b>Where it starts</b><span>A <b>Present</b> button next to Export on the Overview, and in the ⋯ menu on a phone. Board tab: later, with an edit lock (open question 4).</span></div>
+    <div class="find"><b>Who may</b><span>Anyone who can open the Overview. Present mode never adds a permission: names follow <code>ov.actionQueue</code>, per-person figures follow <code>ov.history</code>, and a section a role cannot see has no slide.</span></div>
+    <div class="find"><b>Names</b><span>A <b>Hide names</b> switch in the bar. Hidden shows counts and initials-free placeholders. Default: hidden for P3, remembered for the rest.</span></div>
+    <div class="find"><b>Screen</b><span>Uses full screen where the browser allows it and a clean fallback where it does not (iPhone). Asks to keep the screen awake. Thai and English follow the app language.</span></div>
+    <div class="find"><b>Date</b><span>Shows the date on screen. P3 can follow "today" so it rolls over at midnight; P1, P2 and P4 stay on the date you were viewing.</span></div>
+    <div class="find"><b>Exit</b><span>Esc, the bar's Exit, or a long press on a touch screen. A wall display needs a deliberate exit so a stray click does not drop it.</span></div>
+  </div>
+</section>
+
+<!-- ================= comparison ================= -->
+<section id="compare">
+  <div class="eyebrow">Side by side</div>
+  <h2>Comparison</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Board selection</th><th>A Tick list</th><th>B Chips</th><th>C Compare two</th><th>D Saved groups</th><th>E Two scopes</th></tr></thead>
+    <tbody>
+      <tr><td>Scope visible at a glance</td><td class="mid">Via the label</td><td class="good">Always</td><td class="good">Always</td><td class="mid">Via the group name</td><td class="good">Each group names its own</td></tr>
+      <tr><td>Taps to change</td><td class="mid">2 to 3</td><td class="good">1 per board</td><td class="mid">2 to 3</td><td class="good">1 for a saved group</td><td class="mid">Same as A, more if unlinked</td></tr>
+      <tr><td>Works with 8+ boards</td><td class="good">Yes</td><td class="bad">Scrolls</td><td class="good">Yes</td><td class="good">Yes</td><td class="good">Yes</td></tr>
+      <tr><td>Answers "A against B?"</td><td class="bad">No</td><td class="bad">No</td><td class="good">Yes</td><td class="bad">No</td><td class="good">Yes, over time</td></tr>
+      <tr><td>Build size</td><td class="good">Small</td><td class="good">Small to medium</td><td class="bad">Medium to large</td><td class="mid">Medium to large</td><td class="mid">Medium to large, in steps</td></tr>
+      <tr><td>Database change</td><td class="good">None</td><td class="good">None</td><td class="good">None</td><td class="mid">Only if shared</td><td class="good">None</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Present mode</th><th>P1 Clean screen</th><th>P2 Slides</th><th>P3 Wall display</th><th>P4 Spotlight strip</th></tr></thead>
+    <tbody>
+      <tr><td>Who drives</td><td>You, by scrolling</td><td>You, by arrows</td><td>The timer</td><td>You, by the strip</td></tr>
+      <tr><td>Readable from the back</td><td class="mid">Partly</td><td class="good">Yes</td><td class="good">Yes</td><td class="bad">No</td></tr>
+      <tr><td>Click into a board or person</td><td class="good">Yes</td><td class="bad">No</td><td class="bad">No</td><td class="good">Yes</td></tr>
+      <tr><td>Stays current unattended</td><td class="bad">No</td><td class="bad">No</td><td class="good">Yes</td><td class="bad">No</td></tr>
+      <tr><td>Privacy on a shared screen</td><td class="mid">Page shows all</td><td class="good">You pick slides</td><td class="good">You pick slides</td><td class="bad">Page shows all</td></tr>
+      <tr><td>Build size</td><td class="good">Small</td><td class="mid">Medium</td><td class="good">Small on top of P2</td><td class="good">Small to medium</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= recommendation ================= -->
+<section id="rec">
+  <div class="eyebrow">My recommendation</div>
+  <h2>A for selection, P2 with P3's timer for presenting</h2>
+  <div class="rec">
+    <div class="rec-l">
+      <p><b>Board selection: A for the page, then E for the Period group.</b> The Overview already handles any list of boards, so "2 of 4" is just a selection, and a cap blocks "3 of 4" without a reason. A cap also makes "All boards" an exception, which is awkward when the whole point of the Overview is the full picture. Then add <b>E</b>: the Period group gets its own scope, linked to the page until someone unlinks it, with Combined, Side by side and A vs B. A vs B covers the board-against-board question over time, so <b>C</b> is only needed if you also want it for a single day. <b>D saved groups</b> can wait until the same pairs keep coming back.</p>
+      <p><b>Present mode: P2, with P3's auto-advance as one switch in the same start sheet.</b> That is one build, with two uses: you drive it in a meeting, or you set it to rotate and leave it on a wall. P1 comes free as the first slide's look, so it needs no separate build. P4 is a good fit only if you mostly present on a laptop and want to click through, so I would keep it as a later extra.</p>
+      <ul>
+        <li>Build order: A first (small, and P2 reads the same selection), then P2 with its start sheet, then P3's timer, then E in two steps (linked Period scope with Combined, then A vs B), then D if wanted.</li>
+        <li>E rules: the Period scope starts linked; each group heading names its scope; A vs B and Compare with are never on together; the Report names both scopes.</li>
+        <li>Phone: P2's slides work in portrait with one tile per row. The wall display is for a TV, so it is not offered on a phone.</li>
+        <li>Tests: scope list saved and restored, an old single id still works, a deleted board drops out, Thai labels, no sideways scroll at 400 px, and names hidden means no name in the page text.</li>
+      </ul>
+    </div>
+    <div class="startsheet" aria-label="Start sheet mockup">
+      <h4>Present</h4>
+      <div class="fld"><span class="l">Boards</span><span>Board One + Board Three <span class="cap">(from the selector)</span></span></div>
+      <div class="fld"><span class="l">Slides</span>
+        <div class="checks">
+          <label><input type="checkbox" checked> Today</label>
+          <label><input type="checkbox" checked> Idle people</label>
+          <label><input type="checkbox" checked> Boards</label>
+          <label><input type="checkbox" checked> Trend</label>
+          <label><input type="checkbox"> Host coverage</label>
+          <label><input type="checkbox" disabled> People <span class="cap">(needs History)</span></label>
+        </div>
+      </div>
+      <div class="fld"><span class="l">Advance</span>
+        <div class="seg" role="group" aria-label="Advance"><button aria-pressed="true">Manual</button><button aria-pressed="false">15 s</button><button aria-pressed="false">30 s</button><button aria-pressed="false">60 s</button></div>
+      </div>
+      <div class="fld"><span class="l">Names</span>
+        <div class="seg" role="group" aria-label="Names"><button aria-pressed="false">Show</button><button aria-pressed="true">Hide</button></div>
+      </div>
+      <label class="inl"><input type="checkbox"> Follow today's date and refresh live</label>
+      <div class="ssbtns"><button class="btn">Cancel</button><button class="btn pri">Start presenting</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= questions ================= -->
+<section id="qs">
+  <div class="eyebrow">Before I build</div>
+  <h2>Questions for you</h2>
+  <div class="qs">
+    <div class="q"><b>1 · Is 2 a cap or an example?</b><span>If you only ever want two boards, say so and I will add the cap. Otherwise any 1 to 4.</span></div>
+    <div class="q"><b>2 · Where will it be shown?</b><span>A laptop on a projector favours P2 or P4. A TV on the wall favours P3.</span></div>
+    <div class="q"><b>3 · Names on screen?</b><span>Should idle names ever show in present mode, and for which roles?</span></div>
+    <div class="q"><b>4 · Board tab too?</b><span>Present the Board tab (one board, read-only) in the same build, or Overview only?</span></div>
+    <div class="q"><b>5 · Period linked by default?</b><span>Option E: should the Period scope follow the page until someone unlinks it, or always start on All boards?</span></div>
+    <div class="q"><b>6 · Saved groups: mine or shared?</b><span>Only matters if you pick D. Shared groups need a database table.</span></div>
+  </div>
+</section>
+
+<!-- ================= decision ================= -->
+<section id="decide">
+  <div class="eyebrow">Your decision</div>
+  <h2>Pick and copy back to me</h2>
+  <form class="decide" id="decide-form" autocomplete="off">
+    <fieldset><legend>Board selection</legend>
+      <label><input type="radio" name="sel" value="A Tick list"> A Tick list</label>
+      <label><input type="radio" name="sel" value="B Chips"> B Chips</label>
+      <label><input type="radio" name="sel" value="C Compare two"> C Compare two</label>
+      <label><input type="radio" name="sel" value="D Saved groups"> D Saved groups</label>
+      <label><input type="radio" name="sel" value="E Two scopes (A for the page, own Period scope)"> E Two scopes</label>
+      <label><input type="radio" name="sel" value="A now, E next" checked> A now, E next</label>
+      <label><input type="radio" name="sel" value="A now, C later"> A now, C later</label>
+    </fieldset>
+    <fieldset><legend>How many boards</legend>
+      <label><input type="radio" name="cap" value="Any 1 to 4 boards" checked> Any 1 to 4</label>
+      <label><input type="radio" name="cap" value="Hard cap of 2 boards"> Hard cap of 2</label>
+    </fieldset>
+    <fieldset><legend>Present mode</legend>
+      <label><input type="radio" name="pres" value="P1 Clean screen"> P1 Clean screen</label>
+      <label><input type="radio" name="pres" value="P2 Slides (with P3 auto-advance switch)" checked> P2 Slides + P3 auto-advance</label>
+      <label><input type="radio" name="pres" value="P3 Wall display only"> P3 Wall display only</label>
+      <label><input type="radio" name="pres" value="P4 Spotlight strip"> P4 Spotlight strip</label>
+    </fieldset>
+    <fieldset><legend>Names in present mode</legend>
+      <label><input type="radio" name="names" value="Hidden by default" checked> Hidden by default</label>
+      <label><input type="radio" name="names" value="Shown by default"> Shown by default</label>
+      <label><input type="radio" name="names" value="Hidden on wall display, shown otherwise"> Hidden on wall display only</label>
+    </fieldset>
+    <fieldset><legend>Where present mode applies</legend>
+      <label><input type="radio" name="where" value="Overview only" checked> Overview only</label>
+      <label><input type="radio" name="where" value="Overview and Board tab (read-only)"> Overview and Board tab</label>
+    </fieldset>
+    <fieldset><legend>Notes</legend>
+      <textarea id="notes" aria-label="Notes" placeholder="Anything else, such as the room, the screen or who presents"></textarea>
+    </fieldset>
+  </form>
+  <pre id="decision-out"></pre>
+  <div class="row"><button type="button" class="btn pri" id="copy-btn">Copy decision</button><span class="copied" id="copied" hidden></span></div>
+</section>
+
+</div>
+
+<script>
+(function () {
+"use strict";
+var $ = function (s, r) { return (r || document).querySelector(s); };
+var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+
+/* ---------- sample day: Wed 04-Nov-2026 ---------- */
+var BOARDS = [
+  { id: "b1", name: "Board One",   color: "#2a78d6", roster: 32, deployed: 22, leave: 4, idle: 6, missions: 8, day: 6, night: 2,
+    trend: [19,20,21,21,22,20,21,22,23,22,21,22,22,22], names: ["Somchai P.","Anong K.","Nattapong S.","Kanya R.","Wichai T.","Mali J."] },
+  { id: "b2", name: "Board Two",   color: "#c2410c", roster: 27, deployed: 20, leave: 3, idle: 4, missions: 7, day: 5, night: 2,
+    trend: [17,18,18,19,19,18,19,20,20,19,20,20,21,20], names: ["Arthit B.","Pimchanok L.","Surasak D.","Ratree M."] },
+  { id: "b3", name: "Board Three", color: "#0f8a5f", roster: 24, deployed: 15, leave: 5, idle: 4, missions: 5, day: 4, night: 1,
+    trend: [14,14,15,16,15,15,14,15,16,15,15,16,15,15], names: ["Thanakorn W.","Orawan N.","Prasert H.","Jiraporn C."] },
+  { id: "b4", name: "Board Four",  color: "#8b5cf6", roster: 23, deployed: 19, leave: 2, idle: 2, missions: 6, day: 5, night: 1,
+    trend: [16,17,17,18,18,17,18,19,18,19,19,18,19,19], names: ["Chaiwat S.","Napaporn E."] }
+];
+var DAY = "Wed 04-Nov-2026";
+var byId = {}; BOARDS.forEach(function (b) { byId[b.id] = b; });
+function pick(ids) { return BOARDS.filter(function (b) { return ids.indexOf(b.id) > -1; }); }
+function sum(bs, k) { return bs.reduce(function (s, b) { return s + b[k]; }, 0); }
+function scopeName(bs) {
+  if (bs.length === BOARDS.length) return "All boards";
+  if (bs.length <= 2) return bs.map(function (b) { return b.name; }).join(" + ");
+  return bs.length + " of " + BOARDS.length + " boards";
+}
+function plural(n, a, b) { return n + " " + (n === 1 ? a : b); }
+function trendOf(bs) { var n = BOARDS[0].trend.length, out = []; for (var i = 0; i < n; i++) out.push(bs.reduce(function (s, b) { return s + b.trend[i]; }, 0)); return out; }
+function sparkSvg(vals, color, big) {
+  var W = 300, H = 90, pad = 8, mn = Math.min.apply(null, vals) - 2, mx = Math.max.apply(null, vals) + 2;
+  var pts = vals.map(function (v, i) { return [pad + i * (W - 2 * pad) / (vals.length - 1), H - pad - (v - mn) / (mx - mn) * (H - 2 * pad)]; });
+  var line = pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+  var area = "M" + pts[0][0] + "," + (H - pad) + " L" + line.replace(/ /g, " L") + " L" + pts[pts.length - 1][0] + "," + (H - pad) + " Z";
+  var last = pts[pts.length - 1];
+  var grid = [0.25, 0.5, 0.75].map(function (f) { var y = pad + f * (H - 2 * pad); return '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + y + '" y2="' + y + '" stroke="#d8dde4" stroke-width="1"/>'; }).join("");
+  return '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" class="' + (big ? "st-spark" : "spark") + '" role="img" aria-label="Deployed people over 14 working days, from ' + vals[0] + " to " + vals[vals.length - 1] + '">' + grid +
+    '<path d="' + area + '" fill="' + color + '" fill-opacity=".12"/><polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+    '<path d="M' + last[0] + "," + last[1] + ' l0,0" stroke="#fff" stroke-width="12" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M' + last[0] + "," + last[1] + ' l0,0" stroke="' + color + '" stroke-width="8" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
+}
+
+/* ---------- mini Overview (used by A, B, D and P4) ---------- */
+function ovMock(ids, opt) {
+  opt = opt || {};
+  var bs = pick(ids), idle = sum(bs, "idle"), spot = opt.spot, cls = function (s) { return "ov-sec" + (spot && spot !== s ? " dim" : ""); };
+  var title = idle ? plural(idle, "permanent staff member has", "permanent staff have") + " no mission" : "All permanent staff are on a mission";
+  title = idle === 1 ? "1 permanent staff member has no mission" : (idle ? idle + " permanent staff have no mission" : title);
+  var rows = bs.map(function (b) {
+    return '<div class="brow"><span class="nmx"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name) + '</span><span class="bar"><i style="width:' + Math.round(b.deployed / b.roster * 100) + "%;background:" + b.color + '"></i></span><span class="num">' + b.deployed + " / " + b.roster + "</span></div>";
+  }).join("");
+  return '<div class="ov' + (spot ? " spot" : "") + '">' +
+    '<div class="' + cls("att") + '"><div class="attn' + (idle ? "" : " ok") + '"><span class="t">' + title + '</span><span class="s">' + DAY + " · " + esc(scopeName(bs)) + "</span></div>" +
+    '<div class="tiles"><div class="tile"><div class="k">On roster</div><div class="v">' + sum(bs, "roster") + '</div></div><div class="tile"><div class="k">Deployed</div><div class="v">' + sum(bs, "deployed") + '</div></div><div class="tile"><div class="k">On leave</div><div class="v">' + sum(bs, "leave") + '</div></div><div class="tile"><div class="k">Missions</div><div class="v">' + sum(bs, "missions") + "</div></div></div></div>" +
+    '<div class="' + cls("boards") + '"><div class="card"><h5>By board</h5>' + rows + "</div></div>" +
+    '<div class="' + cls("trend") + '"><div class="card"><h5>Deployed, last 14 working days</h5>' + sparkSvg(trendOf(bs), "#003a66", false) + "</div></div></div>";
+}
+
+/* ---------- component registry + one click handler ---------- */
+var C = {};
+document.addEventListener("click", function (e) {
+  var el = e.target.closest("[data-k]"); if (!el || !el.dataset.a) return;
+  var c = C[el.dataset.k]; if (c) { e.preventDefault(); c.act(el.dataset.a, el.dataset.v); }
+});
+var chev = '<svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="margin-left:auto;width:14px;height:14px;opacity:.7"><path d="m6 9 6 6 6-6"/></svg>';
+
+/* ---------- A: tick list ---------- */
+C.A = (function () {
+  var s = { sel: BOARDS.map(function (b) { return b.id; }), cap: false, hint: "" };
+  var el = $("#mockA"), ph = $("#phoneA");
+  function label() { var bs = pick(s.sel); return scopeName(bs); }
+  function menu(phone) {
+    var all = s.sel.length === BOARDS.length, none = s.sel.length === 0;
+    var h = '<button class="mrow" role="menuitemcheckbox" aria-checked="' + all + '" data-k="A" data-a="all"><span class="cb" data-s="' + (all ? "on" : "mix") + '"></span><span class="nm"><b>All boards</b></span><span class="pill">' + sum(BOARDS, "roster") + "</span></button><div class=\"msep\"></div>";
+    BOARDS.forEach(function (b) {
+      var on = s.sel.indexOf(b.id) > -1, blocked = s.cap && !on && s.sel.length >= 2 && s.sel.length < BOARDS.length;
+      h += '<div style="display:flex;align-items:center"><button class="mrow" role="menuitemcheckbox" aria-checked="' + on + '" aria-disabled="' + blocked + '" data-k="A" data-a="tick" data-v="' + b.id + '"><span class="cb" data-s="' + (on ? "on" : "off") + '"></span><i class="dot" style="background:' + b.color + '"></i><span class="nm">' + esc(b.name) + '</span><span class="pill">' + b.roster + '</span></button><button class="mrow only" style="width:auto" data-k="A" data-a="only" data-v="' + b.id + '" aria-label="Only ' + esc(b.name) + '"><span class="only">Only</span></button></div>';
+    });
+    h += '<div class="mnote' + (s.hint ? " warn" : "") + '">' + (s.hint || (s.cap ? "Up to 2 boards, or All boards." : "Tick any boards. At least one stays ticked.")) + "</div>";
+    if (phone) h += '<button class="btn pri done" style="justify-content:center" data-k="A" data-a="noop">Show ' + esc(label()) + "</button>";
+    return h;
+  }
+  function draw() {
+    var bs = pick(s.sel);
+    el.innerHTML = '<div class="app-bar"><button class="btn" aria-haspopup="menu" aria-expanded="true"><span class="cap2">Board</span><b>' + esc(label()) + '</b><span class="pill">' + sum(bs, "roster") + "</span>" + chev + '</button><span class="mut">Overview · ' + DAY + '</span><div class="menu" role="menu" aria-label="Boards shown on the Overview">' + menu(false) + '</div></div><div class="spacer-menu"></div>' + ovMock(s.sel);
+    ph.innerHTML = '<div class="phone-top"><span>Overview</span><span>' + esc(label()) + '</span></div><div class="phone-body">' + phoneBody(bs) + '</div><div class="sheet" role="menu"><div class="grab"></div>' + menu(true) + "</div>";
+  }
+  function phoneBody(bs) {
+    var idle = sum(bs, "idle");
+    return '<div class="attn"><span class="t" style="font-size:13.5px">' + idle + ' permanent staff have no mission</span><span class="s">' + DAY + "</span></div>";
+  }
+  function act(a, v) {
+    s.hint = "";
+    if (a === "all") s.sel = BOARDS.map(function (b) { return b.id; });
+    else if (a === "only") s.sel = [v];
+    else if (a === "tick") {
+      var i = s.sel.indexOf(v);
+      if (i > -1) { if (s.sel.length === 1) s.hint = "At least one board stays ticked."; else s.sel.splice(i, 1); }
+      else if (s.cap && s.sel.length === BOARDS.length) s.sel = [v];
+      else if (s.cap && s.sel.length >= 2) s.hint = "Up to 2 boards. Untick one first.";
+      else s.sel.push(v);
+    }
+    draw();
+  }
+  $("#a-cap").addEventListener("change", function (e) {
+    s.cap = e.target.checked; s.hint = "";
+    if (s.cap && s.sel.length > 2 && s.sel.length < BOARDS.length) s.sel = s.sel.slice(0, 2);
+    draw();
+  });
+  s.sel = ["b1", "b3"]; draw();
+  return { act: act };
+})();
+
+/* ---------- B: chips ---------- */
+C.B = (function () {
+  var s = { sel: ["b1", "b2", "b4"] }, el = $("#mockB");
+  function draw() {
+    var bs = pick(s.sel), all = s.sel.length === BOARDS.length;
+    var chips = '<button class="chip all" aria-pressed="' + all + '" data-k="B" data-a="all">All <span class="pill">' + sum(BOARDS, "roster") + "</span></button>";
+    BOARDS.forEach(function (b) {
+      chips += '<button class="chip" aria-pressed="' + (s.sel.indexOf(b.id) > -1) + '" data-k="B" data-a="tick" data-v="' + b.id + '"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name) + ' <span class="pill">' + b.roster + "</span></button>";
+    });
+    el.innerHTML = '<div class="app-bar" style="flex-direction:column;align-items:stretch;gap:8px"><div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><b style="font-family:var(--f-display);font-size:19px">Overview</b><span class="mut">' + DAY + '</span><span class="mut" style="margin-left:auto">Showing <b>' + s.sel.length + " of " + BOARDS.length + "</b> boards" + (all ? "" : ' · <button class="link" data-k="B" data-a="all">Reset</button>') + '</span></div><div class="chips" role="group" aria-label="Boards shown on the Overview">' + chips + "</div></div>" + ovMock(s.sel);
+  }
+  var api = {};
+  api.act = function (a, v) {
+    if (a === "all") s.sel = BOARDS.map(function (b) { return b.id; });
+    else { var i = s.sel.indexOf(v); if (i > -1) { if (s.sel.length > 1) s.sel.splice(i, 1); } else s.sel.push(v); }
+    draw();
+  };
+  draw();
+  return api;
+})();
+
+/* ---------- C: compare two ---------- */
+C.C = (function () {
+  var s = { mode: "compare", a: "b1", b: "b3" }, el = $("#mockC");
+  function opts(cur, other) { return BOARDS.map(function (b) { return '<option value="' + b.id + '"' + (b.id === cur ? " selected" : "") + (b.id === other ? " disabled" : "") + ">" + esc(b.name) + "</option>"; }).join(""); }
+  function row(label, k, hi) {
+    var A = byId[s.a][k], B = byId[s.b][k], d = A - B, cls = d === 0 ? "" : ((d > 0) === !!hi ? "up" : "dn");
+    return "<tr><td>" + label + '</td><td class="num">' + A + '</td><td class="num">' + B + '</td><td class="num dl ' + cls + '">' + (d > 0 ? "+" : "") + d + "</td></tr>";
+  }
+  function pct(b) { return Math.round(b.deployed / b.roster * 100); }
+  function draw() {
+    var A = byId[s.a], B = byId[s.b], ids = s.mode === "compare" ? [s.a, s.b] : BOARDS.map(function (b) { return b.id; });
+    var ctl = '<div class="app-bar"><div class="seg" role="group" aria-label="Scope mode"><button aria-pressed="' + (s.mode === "combined") + '" data-k="C" data-a="mode" data-v="combined">Combined</button><button aria-pressed="' + (s.mode === "compare") + '" data-k="C" data-a="mode" data-v="compare">Compare</button></div>';
+    if (s.mode === "compare") ctl += '<select class="sel" id="c-a" aria-label="First board">' + opts(s.a, s.b) + '</select><span class="mut">against</span><select class="sel" id="c-b" aria-label="Second board">' + opts(s.b, s.a) + "</select>";
+    else ctl += '<span class="mut">All 4 boards, summed (the Combined view is option A, B or D)</span>';
+    ctl += "</div>";
+    var body;
+    if (s.mode === "compare") {
+      var spark = function (b) { return '<div style="min-width:0"><div class="mut" style="font-size:12px;display:flex;gap:6px;align-items:center"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name) + "</div>" + sparkSvg(b.trend, b.color, false) + "</div>"; };
+      body = '<div class="ov"><div class="card"><h5>' + esc(A.name) + " against " + esc(B.name) + " · " + DAY + '</h5><div class="scroll-x"><table class="cmp"><thead><tr><th>Measure</th><th><i class="dot" style="background:' + A.color + '"></i> ' + esc(A.name) + '</th><th><i class="dot" style="background:' + B.color + '"></i> ' + esc(B.name) + "</th><th>Difference</th></tr></thead><tbody>" +
+        row("On roster", "roster", true) + row("Deployed", "deployed", true) + row("On leave", "leave", false) + row("Idle", "idle", false) + row("Missions", "missions", true) +
+        '<tr><td>Deployed share of roster</td><td class="num">' + pct(A) + '%</td><td class="num">' + pct(B) + '%</td><td class="num dl ' + (pct(A) === pct(B) ? "" : pct(A) > pct(B) ? "up" : "dn") + '">' + (pct(A) - pct(B) > 0 ? "+" : "") + (pct(A) - pct(B)) + " pts</td></tr></tbody></table></div></div>" +
+        '<div class="card"><h5>Deployed, last 14 working days, same scale</h5><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' + spark(A) + spark(B) + "</div></div></div>";
+    } else body = ovMock(ids);
+    el.innerHTML = ctl + body;
+    var sa = $("#c-a", el), sb = $("#c-b", el);
+    if (sa) sa.onchange = function () { s.a = sa.value; draw(); };
+    if (sb) sb.onchange = function () { s.b = sb.value; draw(); };
+  }
+  draw();
+  return { act: function (a, v) { if (a === "mode") { s.mode = v; draw(); } } };
+})();
+
+/* ---------- D: saved groups ---------- */
+C.D = (function () {
+  var GROUPS = [
+    { id: "g-all", name: "All boards", ids: ["b1","b2","b3","b4"], kind: "built-in" },
+    { id: "g-day", name: "Day crews", ids: ["b1","b2"], kind: "shared" },
+    { id: "g-south", name: "South", ids: ["b3","b4"], kind: "shared" },
+    { id: "g-mine", name: "My Monday review", ids: ["b1","b3","b4"], kind: "mine" }
+  ];
+  var s = { g: "g-day", open: true, name: "" }, el = $("#mockD");
+  function cur() { return GROUPS.filter(function (g) { return g.id === s.g; })[0]; }
+  function draw() {
+    var g = cur(), bs = pick(g.ids), h = '<div class="app-bar"><button class="btn" aria-haspopup="menu" aria-expanded="' + s.open + '" data-k="D" data-a="toggle"><span class="cap2">View</span><b>' + esc(g.name) + '</b><span class="pill">' + sum(bs, "roster") + "</span>" + chev + '</button><span class="mut">' + esc(scopeName(bs)) + "</span>";
+    if (s.open) {
+      h += '<div class="menu" role="menu" aria-label="Views"><div class="mnote" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px">Groups</div>';
+      GROUPS.filter(function (x) { return !x.hidden; }).forEach(function (x) {
+        var xb = pick(x.ids);
+        h += '<button class="mrow" role="menuitemradio" aria-checked="' + (x.id === s.g) + '" data-k="D" data-a="pick" data-v="' + x.id + '"><span class="rd" data-s="' + (x.id === s.g ? "on" : "off") + '"></span><span class="nm">' + esc(x.name) + '<br><span class="cap">' + xb.map(function (b) { return b.name.replace("Board ", ""); }).join(" · ") + (x.kind === "shared" ? " · shared" : x.kind === "mine" ? " · only you" : "") + '</span></span><span class="pill">' + sum(xb, "roster") + "</span></button>";
+      });
+      h += '<div class="msep"></div><div class="mnote" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px">One board</div>';
+      BOARDS.forEach(function (b) { h += '<button class="mrow" data-k="D" data-a="one" data-v="' + b.id + '"><i class="dot" style="background:' + b.color + '"></i><span class="nm">' + esc(b.name) + '</span><span class="pill">' + b.roster + "</span></button>"; });
+      h += '<div class="msep"></div><button class="mrow" data-k="D" data-a="noop"><span class="nm" style="color:var(--navy);font-weight:600">+ Save the current selection as a group…</span></button></div>';
+    }
+    h += "</div>" + (s.open ? '<div class="spacer-menu tall"></div>' : "") + ovMock(g.ids);
+    el.innerHTML = h;
+  }
+  draw();
+  return { act: function (a, v) {
+    if (a === "toggle") s.open = !s.open;
+    else if (a === "pick") { s.g = v; s.open = false; }
+    else if (a === "one") { var id = "one-" + v; if (!GROUPS.some(function (x) { return x.id === id; })) GROUPS.push({ id: id, name: byId[v].name, ids: [v], kind: "temp", hidden: true }); s.g = id; s.open = false; }
+    draw();
+  } };
+})();
+
+
+/* ---------- E: two scopes ---------- */
+C.E = (function () {
+  var s = { page: ["b1", "b3"], linked: true, own: ["b1", "b2"], mode: "combined", cmp: "prev", hint: "" }, el = $("#mockE"), api = {};
+  var DATES = ["16 Oct", "04 Nov"];
+  function pids() { return s.linked ? s.page : s.own; }
+  function ghost(vals) { return vals.map(function (v, i) { return s.cmp === "prev" ? Math.round(v * 0.95 - (i % 4 === 1 ? 1 : 0)) : Math.round(v * 0.9 + (i % 5 === 2 ? 1 : 0)); }); }
+  function range(list) { var all = [].concat.apply([], list); return [Math.floor(Math.min.apply(null, all)) - 1, Math.ceil(Math.max.apply(null, all)) + 1]; }
+  function lineChart(series, mn, mx, small) {
+    var W = 300, H = 100, pad = 6, g = "";
+    [0.25, 0.5, 0.75].forEach(function (f) { var y = pad + f * (H - 2 * pad); g += '<line x1="0" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#d8dde4" stroke-width="1" vector-effect="non-scaling-stroke"/>'; });
+    var body = series.map(function (sr) {
+      var pts = sr.vals.map(function (v, i) { return [i * W / (sr.vals.length - 1), H - pad - (v - mn) / (mx - mn) * (H - 2 * pad)]; });
+      var l = pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" "), last = pts[pts.length - 1];
+      var out = '<polyline points="' + l + '" fill="none" stroke="' + sr.color + '" stroke-width="' + (sr.dash ? 1.5 : 2.2) + '"' + (sr.dash ? ' stroke-dasharray="5 4"' : "") + ' stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
+      if (!sr.dash) out += '<path d="M' + last[0] + "," + last[1] + ' l0,0" stroke="#fff" stroke-width="11" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M' + last[0] + "," + last[1] + ' l0,0" stroke="' + sr.color + '" stroke-width="7" stroke-linecap="round" vector-effect="non-scaling-stroke"/>';
+      return out;
+    }).join("");
+    return '<div class="ph"><div class="yl"><span>' + mx + "</span><span>" + mn + '</span></div><svg class="chart-e' + (small ? " s" : "") + '" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="Deployed people per working day">' + g + body + '</svg><div class="xl"><span>' + DATES[0] + "</span><span>" + DATES[1] + "</span></div></div>";
+  }
+  function chipsFor(key, sel, off) {
+    return '<div class="chips sm" role="group" aria-label="' + key + ' boards">' + BOARDS.map(function (b) {
+      return '<button class="chip" aria-pressed="' + (sel.indexOf(b.id) > -1) + '"' + (off ? " disabled" : "") + ' data-k="E" data-a="tick" data-v="' + key + ":" + b.id + '"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name.replace("Board ", "")) + "</button>";
+    }).join("") + "</div>";
+  }
+  function avg(a) { return a.reduce(function (x, y) { return x + y; }, 0) / a.length; }
+  function fmt1(n) { return (Math.round(n * 10) / 10).toFixed(1); }
+  function chartBlock(ids) {
+    var bs = pick(ids), nm = s.cmp === "prev" ? "Previous period" : "Same period last year";
+    if (s.mode === "side" && bs.length > 1) {
+      var rg = range(bs.map(function (b) { return b.trend.concat(ghost(b.trend)); }));
+      return '<div class="sidegrid">' + bs.map(function (b) {
+        return '<div class="card"><h5 style="display:flex;gap:6px;align-items:center"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name) + '<span class="cap" style="margin-left:auto;font-weight:500">avg ' + fmt1(avg(b.trend)) + "</span></h5>" + lineChart([{ vals: ghost(b.trend), color: "#929496", dash: true }, { vals: b.trend, color: b.color }], rg[0], rg[1], true) + "</div>";
+      }).join("") + '</div><div class="legend"><span><i class="d" style="border-color:#929496"></i>' + nm + '</span><span>One shared scale, ' + rg[0] + " to " + rg[1] + " people</span></div>";
+    }
+    if (s.mode === "vs" && bs.length === 2) {
+      var a = bs[0], b = bs[1], rg2 = range([a.trend, b.trend]);
+      function row(lbl, fa, fb) { var d = fa - fb; return "<tr><td>" + lbl + '</td><td class="num">' + fmt1(fa) + '</td><td class="num">' + fmt1(fb) + '</td><td class="num dl ' + (d === 0 ? "" : d > 0 ? "up" : "dn") + '">' + (d > 0 ? "+" : "") + fmt1(d) + "</td></tr>"; }
+      return '<div class="card"><h5>' + esc(a.name) + " against " + esc(b.name) + " · deployed per day</h5>" + lineChart([{ vals: a.trend, color: a.color }, { vals: b.trend, color: b.color }], rg2[0], rg2[1]) +
+        '<div class="legend" style="margin-top:6px"><span><i style="border-color:' + a.color + '"></i>' + esc(a.name) + '</span><span><i style="border-color:' + b.color + '"></i>' + esc(b.name) + '</span></div></div>' +
+        '<div class="card scroll-x"><table class="cmp"><thead><tr><th>Over the period</th><th>' + esc(a.name) + "</th><th>" + esc(b.name) + "</th><th>Difference</th></tr></thead><tbody>" +
+        row("Average deployed / day", avg(a.trend), avg(b.trend)) + row("Peak", Math.max.apply(null, a.trend), Math.max.apply(null, b.trend)) + row("Lowest", Math.min.apply(null, a.trend), Math.min.apply(null, b.trend)) + "</tbody></table></div>";
+    }
+    var vals = trendOf(bs), gh = ghost(vals), rg3 = range([vals, gh]), d = avg(vals) - avg(gh);
+    return '<div class="card"><h5>Deployed per working day, ' + esc(scopeName(bs)) + '</h5>' + lineChart([{ vals: gh, color: "#929496", dash: true }, { vals: vals, color: "#003a66" }], rg3[0], rg3[1]) +
+      '<div class="legend" style="margin-top:6px"><span><i style="border-color:#003a66"></i>This period, avg <b class="num">' + fmt1(avg(vals)) + '</b> / day</span><span><i class="d" style="border-color:#929496"></i>' + nm + ", avg " + fmt1(avg(gh)) + '</span><span class="num" style="font-weight:650;color:' + (d >= 0 ? "var(--ok-text)" : "var(--bad-text)") + '">' + (d >= 0 ? "+" : "") + fmt1(d) + " vs " + nm.toLowerCase() + "</span></div></div>";
+  }
+  function draw() {
+    var pg = pick(s.page), ids = pids(), pb = pick(ids), two = ids.length === 2;
+    if (s.mode === "vs" && !two) { s.mode = "combined"; s.hint = "A vs B needs exactly 2 boards, so the view went back to Combined."; }
+    if (s.mode === "side" && ids.length < 2) { s.mode = "combined"; }
+    var idle = sum(pg, "idle");
+    var h = '<div class="scopebar"><span class="lbl">Page boards</span>' + chipsFor("page", s.page, false) + '<span class="cap">Overview and In detail · ' + DAY + "</span></div>" +
+      '<div class="ov" style="gap:10px"><div class="attn"><span class="t">' + idle + ' permanent staff have no mission</span><span class="s">' + DAY + " · " + esc(scopeName(pg)) + "</span></div></div>" +
+      '<div style="padding:0 14px"><div class="band"><b>Period</b><span>16 Oct → 04 Nov · 14 working days · ' + esc(scopeName(pb)) + (s.linked ? " (same as page)" : "") + '</span></div></div>' +
+      '<div class="scopebar" style="margin-top:10px;border-top:1px solid var(--line)"><span class="lbl">Boards</span><button class="lk" aria-pressed="' + s.linked + '" data-k="E" data-a="link" title="' + (s.linked ? "Unlink to pick other boards" : "Link back to the page boards") + '">' + (s.linked ? "Linked to page" : "Own boards · relink") + "</button>" + chipsFor("own", ids, s.linked) +
+      '<span class="lbl" style="margin-left:6px">View</span><div class="seg sm" role="group" aria-label="Period board view"><button aria-pressed="' + (s.mode === "combined") + '" data-k="E" data-a="mode" data-v="combined">Combined</button><button aria-pressed="' + (s.mode === "side") + '" data-k="E" data-a="mode" data-v="side"' + (ids.length < 2 ? " disabled" : "") + '>Side by side</button><button aria-pressed="' + (s.mode === "vs") + '" data-k="E" data-a="mode" data-v="vs"' + (two ? "" : " disabled") + '>A vs B</button></div>' +
+      '<span class="lbl" style="margin-left:6px">Compare with</span><div class="seg sm" role="group" aria-label="Compare with"><button aria-pressed="' + (s.cmp === "prev") + '" data-k="E" data-a="cmp" data-v="prev"' + (s.mode === "vs" ? " disabled" : "") + '>Previous period</button><button aria-pressed="' + (s.cmp === "ly") + '" data-k="E" data-a="cmp" data-v="ly"' + (s.mode === "vs" ? " disabled" : "") + '>Last year</button></div></div>' +
+      '<div class="ov" style="gap:10px;padding-top:4px">' + (s.mode === "vs" ? '<div class="mnote" style="padding:0">Compare with is off while two boards are compared.</div>' : "") + (s.hint ? '<div class="hint-e">' + s.hint + "</div>" : "") + (!two && !s.hint ? '<div class="cap">A vs B is available when exactly 2 boards are in the Period scope.</div>' : "") + chartBlock(ids) + "</div>";
+    el.innerHTML = h; s.hint = "";
+  }
+  api.act = function (a, v) {
+    if (a === "tick") {
+      var key = v.split(":")[0], id = v.split(":")[1], list = key === "page" ? s.page : s.own, i = list.indexOf(id);
+      if (i > -1) { if (list.length > 1) list.splice(i, 1); } else list.push(id);
+    } else if (a === "link") { s.linked = !s.linked; if (!s.linked) s.own = s.page.slice(); }
+    else if (a === "mode") s.mode = v;
+    else if (a === "cmp") s.cmp = v;
+    draw();
+  };
+  draw();
+  return api;
+})();
+
+/* ---------- present mode stages ---------- */
+var ALL = BOARDS.map(function (b) { return b.id; });
+var SL_PICK = ["b1", "b3"];
+var slideNames = ["Today", "Idle people", "Boards", "Trend"];
+var icL = '<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>', icR = '<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>';
+function stBar(bs, extra) { return '<div class="st-bar"><b>Overview</b><span>' + DAY + "</span><span>· " + esc(scopeName(bs)) + "</span>" + (extra || "") + "</div>"; }
+function slide(i, bs, names) {
+  var idle = sum(bs, "idle");
+  if (i === 0) {
+    return stBar(bs) + '<div class="st-h' + (idle ? "" : " ok") + '">' + idle + ' permanent staff have no mission</div><div class="st-sub">Day ' + sum(bs, "day") + " missions · Night " + sum(bs, "night") + ' missions</div><div class="st-tiles">' +
+      [["On roster", "roster"], ["Deployed", "deployed"], ["On leave", "leave"], ["Idle", "idle"]].map(function (t) { return '<div class="st-tile"><div class="k">' + t[0] + '</div><div class="v">' + sum(bs, t[1]) + "</div></div>"; }).join("") + "</div>";
+  }
+  if (i === 1) {
+    return stBar(bs) + '<div class="st-title">Idle people</div><div class="st-groups">' + bs.map(function (b) {
+      var chips = names ? b.names.map(function (n) { return '<span class="st-chip">' + esc(n) + "</span>"; }).join("") : b.names.map(function () { return '<span class="st-chip priv">•••</span>'; }).join("");
+      return '<div class="st-group"><h6><i class="dot" style="background:' + b.color + ';width:1.3cqw;height:1.3cqw"></i>' + esc(b.name) + '<span class="n">' + b.idle + ' idle</span></h6><div class="st-chips">' + chips + "</div></div>";
+    }).join("") + "</div>";
+  }
+  if (i === 2) {
+    return stBar(bs) + '<div class="st-title">Boards</div><div>' + bs.map(function (b) {
+      return '<div class="st-brow"><span class="nmx"><i class="dot" style="background:' + b.color + '"></i>' + esc(b.name) + '</span><span class="bar"><i style="width:' + Math.round(b.deployed / b.roster * 100) + "%;background:" + b.color + '"></i></span><span class="r">' + b.deployed + " of " + b.roster + "</span></div>";
+    }).join("") + "</div>";
+  }
+  return stBar(bs) + '<div class="st-title">Deployed, last 14 working days</div>' + sparkSvg(trendOf(bs), "#003a66", true);
+}
+function nav(k, cur, total) {
+  var dots = ""; for (var i = 0; i < total; i++) dots += '<button data-k="' + k + '" data-a="go" data-v="' + i + '" aria-label="Slide ' + (i + 1) + ": " + slideNames[i] + '"' + (i === cur ? ' aria-current="true"' : "") + "></button>";
+  return '<div class="st-nav"><button data-k="' + k + '" data-a="prev" aria-label="Previous slide">' + icL + '</button><span class="num">' + (cur + 1) + " / " + total + " · " + slideNames[cur] + '</span><span class="dots">' + dots + '</span><button data-k="' + k + '" data-a="next" aria-label="Next slide">' + icR + '</button><span class="st-hint">← → keys</span></div>';
+}
+function hoverBar(k, names, bs) {
+  return '<div class="st-hover"><b>Presenting</b><span>' + esc(scopeName(bs)) + "</span><span>" + DAY + '</span><button class="tg" data-k="' + k + '" data-a="names" aria-pressed="' + names + '"><span class="tgb"></span>Show names</button><span class="x">Exit · Esc</span></div>';
+}
+
+/* P1 */
+C.P1 = (function () {
+  var api = {};
+  var s = { names: false }, el = $("#stageP1"), bs = pick(SL_PICK);
+  function draw() {
+    el.innerHTML = '<div class="stage" aria-label="Clean screen mockup"><div class="stage-in" style="padding-top:5.6cqw;gap:1.6cqw">' + slide(0, bs, s.names).replace(stBar(bs), "") + '<div class="st-title" style="margin-top:.8cqw">Idle people</div><div class="st-groups">' + slide(1, bs, s.names).split('<div class="st-groups">')[1].replace(/<\/div>$/, "") + '</div><div class="st-fade"></div></div>' + hoverBar("P1", s.names, bs) + '</div><div class="cap">The top bar appears when the pointer reaches the top edge. The page scrolls under it, and the type is larger than the normal Overview.</div>';
+  }
+  api.act = function (a) { if (a === "names") { s.names = !s.names; draw(); } };
+  draw(); return api;
+})();
+
+/* P2 */
+C.P2 = (function () {
+  var api = {};
+  var s = { i: 0, names: false }, el = $("#stageP2"), bs = pick(SL_PICK);
+  function draw() {
+    el.innerHTML = '<div class="stage" tabindex="0" aria-label="Slides mockup, use the arrow keys"><div class="stage-in">' + slide(s.i, bs, s.names) + "</div>" + nav("P2", s.i, 4) + '</div><div class="cap">Click the stage, then use the arrow keys, or press the dots. Host coverage is an optional fifth slide.</div>';
+    var st = $(".stage", el);
+    st.onkeydown = function (e) { if (e.key === "ArrowRight") { C.P2.act("next"); $(".stage", el).focus(); } else if (e.key === "ArrowLeft") { C.P2.act("prev"); $(".stage", el).focus(); } };
+  }
+  api.act = function (a, v) { if (a === "next") s.i = (s.i + 1) % 4; else if (a === "prev") s.i = (s.i + 3) % 4; else if (a === "go") s.i = +v; draw(); };
+  draw(); return api;
+})();
+
+/* P3 */
+C.P3 = (function () {
+  var api = {};
+  var s = { i: 0, names: false, run: true, t: null }, el = $("#stageP3"), bs = pick(ALL);
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var DUR = 6;
+  function clock() { var d = new Date(); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); }
+  function draw() {
+    el.innerHTML = '<div class="stage" aria-label="Wall display mockup"><div class="stage-in" style="padding-bottom:6cqw">' + slide(s.i, bs, s.names).replace('<div class="st-bar">', '<div class="st-bar">') + '</div><div class="st-pill"><span class="st-live"><i></i>Live · updated ' + clock() + '</span><span class="sep"></span><button data-k="P3" data-a="toggle" aria-label="' + (s.run ? "Pause" : "Play") + '">' + (s.run ? "Pause" : "Play") + '</button><span class="sep"></span><span>' + (s.i + 1) + " / 4 · " + slideNames[s.i] + '</span><span class="sep"></span><button data-k="P3" data-a="names" aria-pressed="' + s.names + '">Names ' + (s.names ? "shown" : "hidden") + '</button></div><div class="st-prog"><i></i></div></div><div class="cap">Turns every ' + DUR + ' s here (15, 30 or 60 s in the app). It pauses when you press Pause, and does not turn at all if your device asks for reduced motion.</div>';
+    var bar = $(".st-prog i", el); bar.style.setProperty("--dur", DUR + "s");
+    if (s.run && !reduce) { void bar.offsetWidth; bar.classList.add("run"); }
+    else if (!s.run || reduce) bar.style.width = "0";
+  }
+  function tick() { clearTimeout(s.t); if (s.run && !reduce) s.t = setTimeout(function () { if (!document.hidden) s.i = (s.i + 1) % 4; draw(); tick(); }, DUR * 1000); }
+  api.act = function (a) { if (a === "toggle") { s.run = !s.run; } else if (a === "names") s.names = !s.names; draw(); tick(); };
+  draw(); tick(); return api;
+})();
+
+/* P4 */
+C.P4 = (function () {
+  var api = {};
+  var secs = ["att", "boards", "trend"], names = ["Today's summary", "By board", "Trend"];
+  var s = { i: 0 }, el = $("#stageP4"), bs = SL_PICK;
+  function draw() {
+    el.innerHTML = '<div class="app"><div class="app-bar"><b style="font-family:var(--f-display);font-size:18px">Overview</b><span class="mut">' + DAY + " · " + esc(scopeName(pick(bs))) + '</span></div><div style="position:relative">' + ovMock(bs, { spot: secs[s.i] }) +
+      '<div class="st-pill" style="position:static;transform:none;margin:0 auto 14px;width:max-content;max-width:calc(100% - 20px);font-size:13px;padding:7px 14px;gap:12px;flex-wrap:wrap;justify-content:center"><button data-k="P4" data-a="prev" aria-label="Previous section">' + icL + '</button><span>Spotlight <b>' + names[s.i] + "</b> · " + (s.i + 1) + ' / 3</span><button data-k="P4" data-a="next" aria-label="Next section">' + icR + '</button><span class="sep"></span><button data-k="P4" data-a="off">Spotlight off</button><span class="sep"></span><span>Exit · Esc</span></div></div></div><div class="cap">The page is untouched. Only the sections you are not on are dimmed, and the strip stays above the bottom edge.</div>';
+  }
+  api.act = function (a) { if (a === "next") s.i = (s.i + 1) % 3; else if (a === "prev") s.i = (s.i + 2) % 3; draw(); };
+  draw(); return api;
+})();
+
+/* ---------- decision ---------- */
+var form = $("#decide-form"), out = $("#decision-out"), copied = $("#copied");
+function decisionText() {
+  var f = new FormData(form), n = $("#notes").value.trim();
+  return "Present mode and board selection decision\n- Board selection: " + f.get("sel") + "\n- Boards allowed: " + f.get("cap") + "\n- Present mode: " + f.get("pres") + "\n- Names in present mode: " + f.get("names") + "\n- Present mode applies to: " + f.get("where") + (n ? "\n- Notes: " + n : "");
+}
+function drawDecision() { out.textContent = decisionText(); copied.hidden = true; }
+form.addEventListener("input", drawDecision);
+$("#copy-btn").addEventListener("click", function () {
+  var txt = decisionText();
+  var fallback = function () { var r = document.createRange(); r.selectNodeContents(out); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); copied.textContent = "Selected. Press Ctrl+C to copy."; copied.hidden = false; };
+  try { navigator.clipboard.writeText(txt).then(function () { copied.textContent = "Copied. Paste it into the chat."; copied.hidden = false; }, fallback); } catch (e) { fallback(); }
+});
+drawDecision();
+})();
+</script>

@@ -1,5 +1,5 @@
 /* End-to-end harness: serves the real app from the repo, replaces supabase-js
-   with tests/fake/fake-client.js, and backs every page with ONE shared FakeDb
+   with demo/fake-client.js, and backs every page with ONE shared FakeDb
    in this process — so two pages are two signed-in users on the same data, and
    a write by one reaches the other as a Realtime event.
 
@@ -12,7 +12,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
-const { FakeDb } = require("../fake/fake-db");
+const { FakeDb } = require("../../demo/fake-db");
 
 const ROOT = path.join(__dirname, "..", "..");
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg" };
@@ -106,7 +106,7 @@ async function launch() {
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
     await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2", (r) =>
-      r.fulfill({ contentType: "text/javascript", body: fs.readFileSync(path.join(ROOT, "tests", "fake", "fake-client.js"), "utf8") }));
+      r.fulfill({ contentType: "text/javascript", body: fs.readFileSync(path.join(ROOT, "demo", "fake-client.js"), "utf8") }));
     await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ contentType: "text/css", body: "" }));
     await page.exposeFunction("__fakeSupabaseExec", (q) => db.exec(q, user));
     await page.addInitScript((u) => {
@@ -138,4 +138,10 @@ async function submitEmployeeForm(page) {
   if (await page.locator("#modal-confirm:not(.hidden)").count()) await page.click("#btn-confirm-yes");
 }
 
-module.exports = { submitEmployeeForm, launch, seedBase, FakeDb, USERS, iso, addDays, nextWorking, prevWorking, isWeekend };
+/* An existing person is edited in their Profile now: open it straight on "Edit details" with `field` focused. */
+async function editEmployee(page, id, field = "name") {
+  await page.evaluate(([i, f]) => openEmployeeModal(i, f), [id, field]);
+  await page.waitForSelector("#modal-profile:not(.hidden) #form-employee");
+}
+
+module.exports = { editEmployee, submitEmployeeForm, launch, seedBase, FakeDb, USERS, iso, addDays, nextWorking, prevWorking, isWeekend };

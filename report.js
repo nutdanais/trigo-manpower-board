@@ -44,7 +44,7 @@ const OvReport = (() => {
   }
   const monthLabel = (m) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
   const periodLabel = (p, from, to) => (p.period === "range" ? `${fmtDate(from)} → ${fmtDate(to)}` : monthLabel(p.month));
-  const scopeLabel = (boards) => (boards.length === 1 && D().boards.length > 1 ? boards[0].name : "All boards");
+  const scopeLabel = (boards) => ovScopeLabel(boards);
 
   /* the period before comes in the same fetch (People's runs, Previous period); last year has its own, only when it is the choice */
   async function loadHist(from, to) {
@@ -60,7 +60,7 @@ const OvReport = (() => {
 
   /* ---------- the model ---------- */
   async function buildModel(p) {
-    const ov = state.overview, boards = ovScopeBoards();
+    const ov = state.overview, boards = ovPeriodBoards();   // a report covers a period, so it follows the Period's boards
     const [from, to] = rangeOf(p);
     const hist = await loadHist(from, to);
     const dates = historyDates(boards, from, to);
@@ -272,7 +272,7 @@ const OvReport = (() => {
         <input type="month" id="rp-month" value="${e(p.month)}" max="${e(todayStr().slice(0, 7))}" aria-label="Month">
         <label><input type="radio" name="rp-period" value="range"${p.period === "range" ? " checked" : ""}> <span>History range</span> <small class="ov-muted">${e(fmtDate(ov.historyFrom))} → ${e(fmtDate(ov.historyTo))}</small></label>
       </div>
-      <p class="rp-scope"><span>Compared with</span> <b>${e(historyCompareName())}</b> <small>(the choice in the Period heading)</small><br><span>Scope</span> <b${scopeLabel(ovScopeBoards()) === "All boards" ? "" : " data-no-i18n"}>${e(scopeLabel(ovScopeBoards()))}</b> <small>(the board selector)</small></p>
+      <p class="rp-scope"><span>Compared with</span> <b>${e(historyCompareName())}</b> <small>(the choice in the Period heading)</small><br><span>Scope</span> <b${scopeLabel(ovPeriodBoards()) === "All boards" ? "" : " data-no-i18n"}>${e(scopeLabel(ovPeriodBoards()))}</b> <small>(the Period's boards)</small></p>
       <div class="form-group">Sections</div>
       ${SECTIONS.map(([k, l]) => cb("rp-sec-" + k, l, p.sections[k])
         + (k === "history" ? `<div class="rp-sub-opts" id="rp-hist-opts">${OV_HISTORY_MEASURES.map(m => cb("rp-tile-" + m.key, m.label, p.tiles.includes(m.key))).join("")}${cb("rp-charts", "Include charts (PDF)", p.charts)}</div>` : "")

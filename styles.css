@@ -90,6 +90,8 @@
   --leave-unpaid: #7b8794;
   --leave-exchange: #1baf7a;
   --oncall-ghost: #fbe1d5;
+  --assigned-ghost: #d6e6fa;   /* the pale bar behind a column of people on a mission: everyone on the roster */
+  --oncall-free: #f2a07b;   /* On-call free columns: the on-call orange, lighter (between --oncall-ghost and --chart-oncall) */
   --chart-cat-1: #2a78d6;
   --chart-cat-2: #eb6834;
   --chart-cat-3: #1baf7a;
@@ -2600,13 +2602,17 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-hchart-head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
 .ov-hview .btn[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
 .ov-lv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
-.ov-lv-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
-.ov-lv-chip:hover { background: var(--hover-tint); }
-.ov-lv-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.ov-lv-chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.ov-lv-chip small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
-.ov-lv-chip[aria-pressed="false"] { opacity: .5; }
-.ov-lv-chip[aria-pressed="false"] i { background: var(--border) !important; }
+.ov-lv-chip, .ov-wf-chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-variant-numeric: tabular-nums; }
+/* Deployed / day: the series or service-area chips, with the Line | Bars choice pushed to the right edge */
+.ov-dep-chips { align-items: center; }
+.ov-dep-chips .ov-htool { margin-left: auto; }
+.ov-dep-note { margin: 2px 0 6px; font-size: 12px; }
+.ov-lv-chip:hover, .ov-wf-chip:hover { background: var(--hover-tint); }
+.ov-lv-chip:focus-visible, .ov-wf-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-lv-chip i, .ov-wf-chip i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.ov-lv-chip small, .ov-wf-chip small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.ov-lv-chip[aria-pressed="false"], .ov-wf-chip[aria-pressed="false"] { opacity: .5; }
+.ov-lv-chip[aria-pressed="false"] i, .ov-wf-chip[aria-pressed="false"] i { background: var(--border) !important; }
 .ov-lv-table { margin-top: 10px; }
 .ov-lv-table tr.ov-lv-off td { color: var(--muted); }
 .ov-hbar { display: inline-block; width: 90px; height: 7px; border-radius: 999px; background: var(--bg); overflow: hidden; vertical-align: middle; }
@@ -5408,12 +5414,8 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 .seg-pick button:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
 .modal-side .form-row > label { min-width: 0; }
 
-/* Employee: Host Record / Note / Edit Employee become tabs, one pane at a time */
+/* New employee: the one form */
 #modal-employee.modal-side { max-height: none; }   /* the older #modal-employee rule capped it at 90vh */
-#modal-employee.modal-side #employee-tabs {
-  flex: none; margin: 0; padding: 0 14px; gap: 2px; border-bottom: 1px solid var(--border);
-}
-#modal-employee.modal-side .settings-tab { padding: 11px 12px; font-size: 13px; }
 #modal-employee.modal-side .employee-pane-stack { display: block; padding-top: 6px; }
 #modal-employee.modal-side .settings-pane { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 0; overflow: visible; }
 #modal-employee.modal-side .settings-pane.hidden { display: none !important; visibility: visible !important; }
@@ -5475,7 +5477,7 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 #topbar.tb-snug #board-tabs .board-tab { padding: 0 8px; font-size: 13px; }
 #topbar.tb-snug #board-tabs .board-tab.active::after { left: 8px; right: 8px; }
 #topbar.tb-snug .topbar-left { gap: 8px; }
-#topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 10px; }
+#topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 9px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
 /* the last step: the logo alone, without the app's name (fitTopbar) */
@@ -5632,6 +5634,23 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   :is(#emplist-table, #hostlist-table) tbody tr:hover td { background: var(--hover-tint); }
   :is(#emplist-table, #hostlist-table) .col-off { display: none; }
   :is(#emplist-table, #hostlist-table) .el-tid { color: var(--muted); font-variant-numeric: tabular-nums; }
+  /* The table keeps to the page's width: the wrapper can't scroll sideways (overflow: visible above keeps the
+     headers sticky under the top bar), so a few long text columns may take a second line when the window is
+     narrow, instead of every cell holding one line and pushing the page wider than the header. */
+  /* wide enough that they take two lines at most ("7 years 8 months / 4 days", "Assistant Site / Engineer") */
+  #emplist-table td.el-wrap { white-space: normal; min-width: 8.6em; line-height: 1.3; }
+  #emplist-table td.el-svc { min-width: 9.8em; }   /* "7 years" kept together: serviceCellHtml in app.js */
+  #emplist-table td.el-svc .el-nw { white-space: nowrap; }
+  /* someone lent out: "LCB Port → Rayong", and "until Mon 30 Nov 2026" under it, so one loan doesn't
+     widen the column for everyone */
+  #emplist-table td.el-board .el-loan small { display: block; line-height: 1.25; }
+  #emplist-table td.el-board { line-height: 1.3; }
+  /* a long header ("Years of service", "30D utilization") may take two lines rather than set its column's width */
+  #emplist-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
+  /* still too wide for the window: the box scrolls sideways (fitListTable in app.js); its headers then sit at
+     its top, since a box that scrolls can't hold them under the page's top bar */
+  :is(#emplist-panel, #hostlist-panel) .table-wrap.tw-scroll { overflow-x: auto; }
+  :is(#emplist-panel, #hostlist-panel) .table-wrap.tw-scroll :is(#emplist-table, #hostlist-table) th { position: static; }
   :is(#emplist-table, #hostlist-table) .area-pill {
     background: transparent !important; color: var(--text) !important; padding: 0; font-weight: 550; letter-spacing: 0; font-size: 13.5px;
     display: inline-flex; align-items: center; gap: 7px; box-shadow: none; border-radius: 0; border: 0;
@@ -5810,10 +5829,30 @@ body.toolbar-one-row #row1-end { order: 2; padding: 7px 20px 7px 0; }
 .ovb-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 #btn-ov-board .ovb-dot[style*="transparent"] { display: none; }
 .ovb-count { min-width: 22px; padding: 0 6px; border-radius: 999px; background: var(--bg-soft); color: var(--muted); font-size: 11.5px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
-#ov-board-menu { min-width: 240px; }
-#ov-board-menu .tb-item .ovb-name { flex: 1; }
-#ov-board-menu .tb-item.is-current { background: var(--hover-tint); color: var(--primary-text); font-weight: 700; }
-#ov-board-menu .tb-item .ovb-dot[style*="transparent"] { box-shadow: inset 0 0 0 1.5px var(--border); }
+/* the Overview picker is a tick list: a checkbox per board, All boards on top, an Only shortcut per row */
+#ov-board-menu { min-width: 280px; }
+#ov-board-menu .ovb-row { padding: 0; gap: 2px; width: 100%; }
+#ov-board-menu .ovb-row:hover { background: var(--hover-tint); }
+#ov-board-menu .ovb-check { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; color: inherit; font: inherit; text-align: left; padding: 8px 10px; min-height: 36px; border-radius: var(--r); cursor: pointer; }
+#ov-board-menu .ovb-check:focus-visible, #ov-board-menu .ovb-only:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+#ov-board-menu .ovb-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#ov-board-menu .ovb-row.is-current .ovb-name { font-weight: 650; }
+.ovb-box { width: 16px; height: 16px; flex: none; border: 1.5px solid #8a929c; border-radius: 4px; background: var(--panel); display: grid; place-items: center; }
+.ovb-box[data-state="on"], .ovb-box[data-state="mixed"] { background: var(--primary); border-color: var(--primary); }
+.ovb-box[data-state="on"]::after { content: ""; width: 8px; height: 4px; border: solid #fff; border-width: 0 0 2px 2px; transform: rotate(-45deg) translate(1px, -1px); }
+.ovb-box[data-state="mixed"]::after { content: ""; width: 8px; height: 2px; background: #fff; }
+#ov-board-menu .ovb-only { flex: none; border: 1px solid transparent; background: none; color: var(--primary-text); font: inherit; font-size: 12px; font-weight: 600; padding: 3px 8px; margin-right: 6px; border-radius: 5px; cursor: pointer; min-height: 28px; }
+#ov-board-menu .ovb-only:hover { border-color: var(--border); background: var(--panel); }
+#ov-board-menu .ovb-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+#ov-board-menu .ovb-note { display: block; font-size: 12px; color: var(--muted); padding: 6px 10px 4px; }
+#ov-board-menu .ovb-note.warn { color: var(--warn-text); }
+/* the Period group's own board scope: linked to the page by default, then Combined / Side by side / A vs B */
+.ov-period-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.ov-period-boards { flex-wrap: wrap; }
+.ov-period-boards .btn:disabled { opacity: .6; cursor: default; }
+.ov-trend-btns .btn:disabled { cursor: not-allowed; }
+.ov-period-hint { font-size: 12.5px; }
+.ov-vs-diff { margin: 2px 0 6px; font-size: 13px; }
 body.ov-view #toolbar { position: sticky; top: var(--bar-h, 56px); z-index: 30; }
 
 /* Host stats: "No location" in the warning key colour, the By area line on its own row */
@@ -6041,6 +6080,7 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
 
   /* ⋯ menu */
   #board-menu .tb-item, #more-menu .tb-item, #m-more-menu .tb-item { min-height: 44px; font-size: 14.5px; }
+  #ov-board-menu .ovb-check, #ov-board-menu .ovb-only { min-height: 44px; font-size: 14.5px; }
   #board-menu { min-width: min(300px, calc(100vw - 24px)); }
   #m-more-menu:not(.hidden) {
     display: block; position: fixed; top: calc(var(--bar-h, 110px) + 4px); right: 8px; left: auto;
@@ -6556,19 +6596,9 @@ label > .pk { margin-top: 5px; }
 .file-chip b { display: block; font-size: 13.5px; color: var(--text); }
 .file-chip small { display: block; font-size: 12px; color: var(--muted); }
 
-/* 16 · Employee panel: the person's name in the header, tabs as a segmented control */
+/* 16 · Side panels: a person's or record's name in the header, with a line under it */
 .modal h3 .h3-sub { display: block; margin-top: 1px; font-size: 12.5px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
 .modal h3 .h3-sub.hidden { display: none; }
-#modal-employee #employee-tabs {
-  display: flex; gap: 2px; margin: 12px 22px 2px; padding: 2px; border: 0; border-radius: var(--r); background: var(--bg-soft);
-}
-#modal-employee #employee-tabs.hidden { display: none; }
-#modal-employee #employee-tabs .settings-tab {
-  flex: 1; margin: 0; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent;
-  color: var(--muted); font-size: 13px; font-weight: 600; text-align: center;
-}
-#modal-employee #employee-tabs .settings-tab:hover { color: var(--text); }
-#modal-employee #employee-tabs .settings-tab.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(8, 28, 56, .16); }
 
 /* 19 · on a phone the small centred dialogs rise from the bottom as short sheets,
    with full-width buttons and the main action on top */
@@ -7113,8 +7143,7 @@ label > .pk { margin-top: 5px; }
 .ov-band-l { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .ov-band-median .ov-band-l { color: var(--primary-text); font-weight: 700; }
 .ov-band-median .ov-band-l::after { content: "▲"; display: block; font-size: 8px; line-height: 1; margin-top: 1px; }
-.ov-people-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-top: 14px; }
-.ov-people-sum { margin: 10px 0 0; font-size: 13px; }
+.ov-people-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-top: 2px; }
 .ov-band-chip { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 12.5px; }
 .ov-band-chip > span { padding: 2px 10px; border-radius: 999px; background: var(--hover-tint); font-weight: 600; }
 .ov-person-link { font: inherit; padding: 0; border: 0; background: none; color: var(--primary-text); font-weight: 600; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; }
@@ -7125,6 +7154,34 @@ label > .pk { margin-top: 5px; }
 .ov-flag-ok { background: #e6f4ec; color: #1f8a4c; }
 .ov-flag-warn { background: #fdf0d9; color: #a15c00; }
 .ov-flag-bad { background: #fde8e7; color: #b42318; }
+/* People: the chart follows the view (spread, over time, calendar, flags) and a click on it filters the table */
+.ov-locked { font-size: 12px; font-weight: 600; color: var(--muted); }
+#ov-people .ov-hchart.ov-spread { margin-bottom: 12px; }
+.ov-empty { margin: 10px 0 0; font-size: 13px; }
+.ov-band-warn .ov-band-pt i { background: var(--leave-annual); }
+.ov-band-warn .ov-band-l { color: #a15c00; font-weight: 700; }
+.ov-band-bad .ov-band-pt i { background: var(--chart-standby); }
+.ov-band-bad .ov-band-l { color: #b42318; font-weight: 700; }
+.ov-band-l { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-band-chip small { font-size: 12px; }
+.ov-open-day { border: 0; background: none; padding: 2px 4px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--primary-text); cursor: pointer; }
+.ov-open-day:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; border-radius: 2px; }
+.chart-hit.is-picked { fill: var(--hover-tint); stroke: var(--primary-text); stroke-width: 1.5; }
+.ov-cal-cell.is-picked { border-color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-text); }
+#ov-people .ov-cal-cell[role="button"] { cursor: pointer; }
+/* Alerts, by flag: a label, a bar split amber and red, the count */
+.ov-flagrows { display: grid; gap: 4px; margin-top: 4px; }
+.ov-flagrow { display: grid; grid-template-columns: minmax(130px, 200px) minmax(0, 1fr) 150px; align-items: center; gap: 10px; font: inherit; text-align: left; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text); cursor: pointer; }
+.ov-flagrow:hover { background: var(--hover-tint); }
+.ov-flagrow:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.ov-flagrow[aria-pressed="true"] { border-color: var(--primary-text); background: var(--hover-tint); }
+.ov-flagrow > b { font-size: 13px; }
+.ov-flagbar { display: flex; height: 12px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.ov-flagbar i { display: block; height: 100%; }
+.ov-flagn { font-variant-numeric: tabular-nums; }
+.ov-flagn b { font-size: 13px; margin-right: 4px; }
+.ov-flagn small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+@media (max-width: 560px) { .ov-flagrow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ov-flagn { grid-column: 1 / -1; } }
 /* the employee profile: a wide side panel, full screen on a phone */
 #modal-profile.modal-side { width: min(1040px, 100vw); }
 .profile-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 22px 24px; display: flex; flex-direction: column; gap: 12px; }
@@ -7137,6 +7194,27 @@ label > .pk { margin-top: 5px; }
 .ov-prof-hosts td { white-space: nowrap; }
 .ov-prof-note { margin: 0 0 6px; font-size: 13px; }
 .profile-body .ov-hchart { margin-top: 0; }
+/* Details: the facts, or the form that edits them */
+.ov-prof-details-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.ov-prof-details-head .ov-eng-foot-h { margin: 0; }
+.ov-prof-details-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ov-prof-details form { padding: 0; }
+.ov-prof-details form > .form-group:first-child { margin-top: 4px; }
+/* the form's own buttons sit under it, not pinned to the panel's foot like a record dialog's */
+.ov-prof-details .modal-actions { position: static; margin: 8px 0 0; padding: 12px 0 0; background: none; }
+/* Leave record */
+.ov-prof-lv-sum { margin: 2px 0 6px; font-size: 13px; }
+.ov-prof-lv-sum b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.ov-prof-lv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ov-prof-lv { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ov-prof-lv i, .ov-prof-lv-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.ov-prof-lv-dot { margin-right: 7px; }
+.ov-prof-leave-table td { white-space: nowrap; }
+/* a note's delete sits at the end of its line, and the add-a-note form under the list */
+.ov-prof-note .note-delete { margin-left: 6px; }
+.ov-prof-note-form { margin-top: 8px; }
+.ov-prof-note-form label { margin-bottom: 8px; }
+.ov-prof-note-form textarea { width: 100%; margin-top: 5px; }
 @media (max-width: 640px) {
   #modal-profile.modal-side { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
   .profile-body { padding: 12px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
@@ -7177,6 +7255,9 @@ label > .pk { margin-top: 5px; }
 @media (max-width: 1100px) { .ov-wf-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .ov-wf-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ov-wf-chart { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.chart-bar-value { font-size: 10px; font-weight: 700; fill: var(--text); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.chart-total { font-size: 11px; font-weight: 700; fill: var(--text); font-variant-numeric: tabular-nums; pointer-events: none; }
+.ov-wf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 4px; }
 .chart-note { font-size: 10.5px; font-weight: 700; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
 
 /* ===== Overview phase 2, batch C: chart toolbar, Compare with, side by side ===== */
@@ -7324,3 +7405,97 @@ tr.ny-bad .ny-input { border-color: var(--danger); }
 .mission-header .m-was-line { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--warn-text); margin-bottom: 3px; }
 .mission-header .m-was-line b { font-weight: 700; font-variant-numeric: tabular-nums; }
 .mission-header .m-was-tag { background: var(--warn-surface); border: 1px solid var(--warn-line); color: var(--warn-text); border-radius: 999px; padding: 0 7px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; }
+
+/* ---------- Present mode (present.js) ----------
+   Overview: a stage. A header (the day, the board chips, and on a Period slide the period strip), the page's own section
+   laid out at 1280 px and scaled to fit (it scrolls when it is still taller), and a nav bar. The header and nav are sized
+   in --u (the smaller of 1% of the stage's width and 1.78% of its height, so type scales like a projector on any screen).
+   Board tab: the board with the chrome removed, bigger, and not clickable. The top bar shows when the pointer moves. */
+#present-root { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
+#present-root > * { pointer-events: auto; }
+.pr-stage { position: absolute; inset: 0; background: var(--bg); container-type: size; --u: min(1cqw, 1.7778cqh); --prnav: max(56px, calc(var(--u) * 4.1)); outline: none; overflow: hidden; display: flex; flex-direction: column; }
+.pr-head { flex: none; padding: 46px calc(var(--u) * 2.3) calc(var(--u) * .5); display: flex; flex-direction: column; gap: calc(var(--u) * .35); }
+.pr-r1, .pr-r2 { display: flex; align-items: center; gap: calc(var(--u) * 1.1); flex-wrap: wrap; min-height: calc(var(--u) * 2.4); font-size: max(13px, calc(var(--u) * 1.1)); color: var(--muted); }
+.pr-r1 > b { font-size: max(17px, calc(var(--u) * 1.4)); color: var(--primary-text); font-weight: 700; }
+.pr-d { font-size: max(14px, calc(var(--u) * 1.15)); }
+.pr-chips { display: flex; flex-wrap: wrap; gap: calc(var(--u) * .5); }
+.pr-chip { font: inherit; font-weight: 600; font-size: max(13px, calc(var(--u) * 1.04)); padding: calc(var(--u) * .3) calc(var(--u) * .95); border-radius: 99px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+.pr-chip:hover { background: var(--hover-tint); border-color: var(--primary-text); }
+.pr-chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.pr-reset { margin-left: auto; font: inherit; font-weight: 600; font-size: max(13px, calc(var(--u) * .95)); padding: calc(var(--u) * .3) calc(var(--u) * .9); border-radius: 99px; border: 1px dashed var(--warn-line); background: var(--warn-surface); color: var(--warn-text); cursor: pointer; }
+.pr-pc b { color: var(--primary-text); }
+.pr-strip { display: flex; align-items: center; flex-wrap: wrap; gap: calc(var(--u) * 1.2); }
+.pr-strip .ov-history-controls, .pr-strip .ov-history-compare, .pr-strip .ov-period-scope { display: flex; align-items: center; flex-wrap: wrap; gap: calc(var(--u) * .7); margin: 0; padding: 0; border: 0; }
+.pr-strip .ov-history-dates, .pr-strip .ov-period-hint { display: none; }
+.pr-strip .btn, .pr-strip .ov-muted { font-size: max(12px, calc(var(--u) * .95)); }
+.pr-strip .btn { padding: calc(var(--u) * .25) calc(var(--u) * .8); }
+.pr-scroll { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.pr-fit { position: relative; margin: 0 auto; }
+.pr-fit > #overview-panel { position: absolute; left: 0; top: 0; width: 1280px; box-sizing: border-box; transform-origin: 0 0; }
+/* the page's panel on the stage shows only the slide's own section(s) (data-pslide), and its controls look like controls only where a click reaches them */
+body.presenting-overview #overview-panel > * { display: none !important; }
+body.presenting-overview #overview-panel > .pr-on { display: block !important; }
+body.presenting-overview #overview-panel > .ov-detail-grid.pr-on { display: grid !important; }
+body.presenting-overview #overview-panel * { cursor: default; }
+body.presenting-overview #overview-panel [data-live], body.presenting-overview #overview-panel [data-live] * { cursor: pointer; }
+body.presenting-overview #overview-panel .ov-wl-more { display: none; }
+body.presenting #chart-tip { z-index: 500; }
+.pr-more { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--prnav) + 6px); z-index: 3; background: var(--night); color: #fff; font-size: max(12px, calc(var(--u) * .95)); font-weight: 600; padding: 4px 14px; border-radius: 99px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); pointer-events: none; }
+.pr-more[hidden], .pr-keys[hidden] { display: none; }
+.pr-note { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--prnav) + 44px); z-index: 4; background: var(--night); color: #fff; font-size: max(13px, calc(var(--u) * 1.05)); padding: 8px 18px; border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, .3); opacity: 0; transition: opacity .15s; pointer-events: none; }
+.pr-note.on { opacity: 1; }
+.pr-keys { position: absolute; right: calc(var(--u) * 2.3); bottom: calc(var(--prnav) + 8px); z-index: 5; width: min(440px, 92%); background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.pr-keys h4 { margin: 0 0 2px; font-size: 15px; }
+.pr-keys > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.pr-keys kbd, .pr-kb kbd { font: inherit; font-size: 12px; font-weight: 700; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: var(--panel); padding: 0 6px; margin-right: 3px; color: var(--text); }
+.pr-nav { flex: none; position: relative; height: var(--prnav); display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 1.4); font-size: max(13px, calc(var(--u) * 1.1)); color: var(--muted); padding: 0 calc(var(--u) * 2.3); }
+.pr-nav button { font: inherit; color: var(--text); cursor: pointer; }
+.pr-ab { border: 1px solid var(--border); background: var(--panel); border-radius: calc(var(--u) * .7); width: max(34px, calc(var(--u) * 2.9)); height: max(34px, calc(var(--u) * 2.9)); display: grid; place-items: center; }
+.pr-ab:hover { background: var(--hover-tint); border-color: var(--primary-text); }
+.pr-nav .ic { width: calc(var(--u) * 1.6); height: calc(var(--u) * 1.6); min-width: 14px; min-height: 14px; }
+.pr-tabs { display: flex; border: 1px solid var(--border); border-radius: calc(var(--u) * .7); overflow: hidden; background: var(--panel); }
+.pr-tabs button { border: 0; background: none; font-weight: 600; padding: calc(var(--u) * .5) calc(var(--u) * 1.3); }
+.pr-tabs button[aria-pressed="true"] { background: var(--primary); color: #fff; }
+.pr-dots { display: flex; gap: calc(var(--u) * .7); align-items: center; }
+.pr-dots button { width: max(10px, calc(var(--u) * 1)); height: max(10px, calc(var(--u) * 1)); border-radius: 50%; padding: 0; border: 1px solid #9aa4ae; background: none; }
+.pr-dots button.gap { margin-left: calc(var(--u) * .6); }
+.pr-dots button[aria-current="true"] { background: var(--primary); border-color: var(--primary); width: max(22px, calc(var(--u) * 2.4)); border-radius: 99px; }
+.pr-count { white-space: nowrap; }
+.pr-kb { position: absolute; right: calc(var(--u) * 2.3); border: 0; background: none; color: var(--muted); font-size: max(12px, calc(var(--u) * .95)); }
+.pr-kb[aria-pressed="true"] { color: var(--primary-text); }
+.pr-hover { position: fixed; left: 50%; top: 0; transform: translate(-50%, -110%); z-index: 2; background: var(--night); color: #e8ebed; border-radius: 0 0 12px 12px; padding: 9px 18px; font-size: 14px; display: flex; align-items: center; gap: 16px; white-space: nowrap; max-width: 100vw; transition: transform .18s ease; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); }
+.pr-hover b { color: #fff; }
+body.pr-bar-on .pr-hover, .pr-hover:focus-within { transform: translate(-50%, 0); }
+.pr-hover button { font: inherit; color: inherit; cursor: pointer; }
+.pr-hover .pr-x { border: 1px solid rgba(255, 255, 255, .35); background: none; border-radius: 6px; padding: 3px 10px; }
+.pr-hover .pr-x:hover, .pr-hover .pr-btn:hover { background: rgba(255, 255, 255, .14); }
+.pr-hover .pr-btn { border: 0; background: none; border-radius: 6px; width: 30px; height: 30px; display: grid; place-items: center; }
+.pr-hover .pr-tg { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 3px 4px; }
+.pr-hover .pr-tgb { width: 34px; height: 18px; border-radius: 10px; background: #5b6572; position: relative; transition: background .15s; }
+.pr-hover .pr-tgb::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.pr-hover .pr-tg[aria-pressed="true"] .pr-tgb { background: var(--brand-green); }
+.pr-hover .pr-tg[aria-pressed="true"] .pr-tgb::after { transform: translateX(16px); }
+.pr-hover :focus-visible, .pr-nav :focus-visible, .pr-head :focus-visible, .pr-scroll :focus-visible, .pr-keys :focus-visible { outline: 2px solid var(--brand-green); outline-offset: 2px; }
+@media (max-width: 700px) {
+  .pr-hover { gap: 10px; padding: 8px 12px; font-size: 13px; } .pr-hover .pr-sc { max-width: 28vw; overflow: hidden; text-overflow: ellipsis; }
+  /* a phone: the sections at their own width, scrolling, with no scaling */
+  .pr-stage.pr-narrow .pr-scroll { padding: 0 12px 12px; }
+  .pr-stage.pr-narrow .pr-fit { position: static; width: auto !important; height: auto !important; margin: 0; }
+  .pr-stage.pr-narrow .pr-fit > #overview-panel { position: static; width: auto !important; transform: none !important; }
+  .pr-stage.pr-narrow .pr-dots, .pr-stage.pr-narrow .pr-kb { display: none; }
+  .pr-stage.pr-narrow .pr-keys { right: 12px; }
+}
+/* Board tab: no banner, toolbar or available-people panel; the board bigger; nothing clickable */
+body.presenting-board #sticky-header, body.presenting-board #float-pool, body.presenting-board #plan-banners, body.presenting-board #bottom-nav { display: none !important; }
+body.presenting-board #toolbar-row1, body.presenting-board #toolbar-right, body.presenting-board #fp-resizer { display: none !important; }
+body.presenting-board #app-root { pointer-events: none; zoom: 1.2; margin-right: 0 !important; padding-top: 34px; }
+.pr-id { position: fixed; left: 0; right: 0; top: 0; height: 40px; z-index: 1; background: var(--primary); color: #fff; display: flex; align-items: center; gap: 16px; padding: 0 22px; font-size: 16px; border-bottom: 3px solid var(--brand-green); }
+.pr-id b { font-size: 18px; }
+.pr-id span { color: #d5e1ec; }
+body.presenting-board #toolbar { position: static; }
+body.presenting-board { user-select: none; -webkit-user-select: none; }
+body.presenting #toast-stack, body.presenting #modal-backdrop { display: none !important; }
+/* names off: the cards keep their shape, the names become dots (Board tab); the slides draw dots themselves */
+body.presenting-board.pres-hide-names .emp-name, body.presenting-board.pres-hide-names .emp-surname { font-size: 0 !important; }
+body.presenting-board.pres-hide-names .emp-name::before { content: "•••"; font-size: 13px; letter-spacing: .15em; }
+@media (prefers-reduced-motion: reduce) { .pr-hover, .pr-hover .pr-tgb, .pr-hover .pr-tgb::after, .pr-note { transition: none; } }

@@ -6,8 +6,8 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const { FakeDb } = require("./fake-db");
-const { makeClient } = require("./fake-client");
+const { FakeDb } = require("../../demo/fake-db");
+const { makeClient } = require("../../demo/fake-client");
 
 const ROOT = path.join(__dirname, "..", "..");
 
