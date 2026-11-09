@@ -9099,6 +9099,14 @@ function missionStatusHtml(r, p = missionPlacement(r)) {
   if (p.kind === "off") return `<span class="ml-tag ml-off" title="${escapeHtml(`It was on the ${board} board until ${r.lastOn ? fmtDate(r.lastOn) : "earlier"} and is not there now`)}">Off the board</span>`;
   return `<span class="ml-tag ml-wait" title="${escapeHtml(p.startsOn ? `It starts on ${fmtDate(p.startsOn)}` : "Registered, with no day on a board yet")}">Not started</span>`;
 }
+/* the gold highlight a mission has on the board on the day on screen (the card's Highlight), as a chip; what was
+   typed for "Other" is data and is not translated */
+function missionHighlightChip(day) {
+  if (!day || !day.highlight) return "";
+  const label = highlightLabel({ highlight: day.highlight, highlightNote: day.note });
+  const typed = day.highlight === "other" && day.note;
+  return `<span class="ml-tag ml-hl" title="${escapeHtml(window.I18N ? I18N.t("Highlighted on the board") : "Highlighted on the board")}">${icon("star")}<span${typed ? " data-no-i18n" : ""}>${escapeHtml(label)}</span></span>`;
+}
 function missionAlertsHtml(r, info, canClose) {
   return info.alerts.map((x) => {
     const cls = `ml-tag ${x.level === 2 ? "ml-late" : x.level === 1 ? "ml-warn" : "ml-wait"}`;
@@ -9130,7 +9138,8 @@ function missionRowMatchesFilters(r, f) {
   if (f.placement.length || f.alerts.length) {
     const info = missionInfo(r);
     if (f.placement.length && !f.placement.includes(info.p.kind)) return false;
-    if (f.alerts.length && !info.alerts.some(a => a.kinds.some(k => f.alerts.includes(k)))) return false;
+    if (f.alerts.length && !info.alerts.some(a => a.kinds.some(k => f.alerts.includes(k)))
+      && !(f.alerts.includes("highlighted") && info.day && info.day.highlight && r.status !== "closed")) return false;
   }
   return true;
 }
@@ -9142,6 +9151,7 @@ function missionFilterOptions(key) {
     { value: "noCrew", label: "No crew" }, { value: "noCrewLong", label: "No crew for over 5 working days" },
     { value: "hidden", label: "Hidden for over 5 working days" }, { value: "offBoard", label: "Off the board for over 5 working days" },
     { value: "number", label: "New-year number" }, { value: "noEngineer", label: "No Trigo responsible" },
+    { value: "highlighted", label: "Highlighted on the board" },
   ];
   const rows = missionScopeRows();
   const chosen = state.missions.filters[key];
@@ -9240,14 +9250,17 @@ function renderMissionStats(bar) {
     `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
   bar.classList.add("stats-tiles");
   bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${all.length}</b></div>` +
-    tile("Open", open, "assigned") + tile("Closed", closed, "holiday") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
-    (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "");
+    tile("Open", open, "perm") + tile("Closed", closed, "inactive") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
+    (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "") +
+    // the proportion bar under the tiles, as on Manpower and Host: open and closed missions
+    `<div class="st-split" aria-hidden="true">${[["perm", open], ["inactive", closed]].filter(([, n]) => n > 0)
+      .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
   renderPhoneViewCard({
     head: `<b>${open}</b><span class="ms-w"> open</span>`,
     label: `${all.length} missions: ${open} open, ${closed} closed`,
-    keys: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
-    bar: [["assigned", open], ["holiday", closed]],
-    tiles: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    keys: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    bar: [["perm", open], ["inactive", closed]],
+    tiles: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     areaHtml,
     filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0) + missionFilterCount(),
   });
@@ -9332,7 +9345,7 @@ function renderMissionList() {
       <td data-label="${lbl("Last on board")}" class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
       <td data-label="${lbl("Crew")}" class="ml-crew num">${crew}</td>
       <td data-label="${lbl("Avg crew / week")}" class="ml-avg num">${avg}</td>
-      <td data-label="${lbl("Status and alerts")}" class="ml-status"><span class="ml-chips">${missionStatusHtml(r, info.p)}<span class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</span></span></td>
+      <td data-label="${lbl("Status and alerts")}" class="ml-status"><span class="ml-chips">${missionStatusHtml(r, info.p)}${r.status === "closed" ? "" : missionHighlightChip(info.day)}<span class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</span></span></td>
       <td data-label="${lbl("PPE")}" class="ml-text">${missionTextCell(r.ppe)}</td>
       <td data-label="${lbl("Remark")}" class="ml-text">${missionTextCell(r.remark)}</td>
       <td class="ml-actions">${acts.join("")}</td></tr>`;
@@ -10996,6 +11009,12 @@ async function renderMissionDetail() {
   if (canPlan) act("btn-md-edit", "btn btn-small", "edit", "Edit details", () => guardEdit(editMissionDetails));
   if (canPlan) act("btn-md-dup", "btn btn-small", "copy", "Duplicate", () => guardEdit(() => { enterMissionListBoard(); openMissionModal(null, { from: m }); }));
   // the card menu's own Move or copy list (it says why a board cannot take the mission)
+  if (canPlan && !forecast && feat().highlight) act("btn-md-hl", "btn btn-small", "star", "Highlight", (ev) => {
+    ev.stopPropagation();   // the click would otherwise reach the page's outside-click handler and close the menu it opens
+    const r = ev.currentTarget.getBoundingClientRect();
+    ctxMenu = { mission: m, x: r.left, y: r.bottom + 4 };
+    renderCtxMenu("highlight");
+  });
   if (canPlan && !forecast && D().boards.length > 1) act("btn-md-move", "btn btn-small", "swap", "Move or copy…", (ev) => {
     ev.stopPropagation();   // the click would otherwise reach the page's outside-click handler and close the menu it opens
     const r = ev.currentTarget.getBoundingClientRect();
@@ -11021,6 +11040,7 @@ async function renderMissionDetail() {
     mdFact("Customer", escapeHtml(m.customer || "-")),
     mdFact("Trigo responsible", eng ? `${escapeHtml(eng.name)}${eng.phone ? " " + telLink(eng.phone) : ""}` : "-"),
     mdFact("Status", reg ? missionStatusHtml(reg) : (m.hidden ? "Hidden" : "On board")),
+    ...(!forecast && feat().highlight ? [mdFact("Highlight", m.highlight ? `<span${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span>` : "-")] : []),
     ...(reg ? [
       mdFact("First day on board", reg.openedOn ? escapeHtml(fmtDate(reg.openedOn)) : "-"),
       mdFact("Last on board", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : "-"),
@@ -11270,7 +11290,10 @@ function hideMission(missionId = state.editingMissionId) {
 function setMissionHighlight(m, highlight, note) {
   return safely(async () => {
     await cloud.setMissionHighlight(m.id, highlight, note);
+    state.missions.activityKey = null;   // the Missions tab reads the highlight with the crew facts
     await refreshAndRender();
+    // set from the mission panel: the panel shows the new state
+    if (state.editingMissionId === m.id && !$("#modal-mission").classList.contains("hidden") && !$("#mission-detail").classList.contains("hidden")) await renderMissionDetail();
   });
 }
 /* Highlight › Other…: the reason in the engineer's own words, shown on the card */

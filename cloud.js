@@ -2663,8 +2663,10 @@ const cloud = {
     if (!this.data.features.missions) return out;
     const from = addDaysISO(today, -(spanDays - 1));
     const outside = !!date && (date < from || date > today);
+    // a highlight (the gold frame on the board) is a column from migration-2026-10-28
+    const cols = "id, board_id, plan_date, number, shift, hidden" + (this.data.features.highlight ? ", highlight, highlight_note" : "");
     const read = (lo, hi) => Promise.all([
-      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, number, shift, hidden").gte("plan_date", lo).lte("plan_date", hi)),
+      fetchAllPages(() => sb.from("missions").select(cols).gte("plan_date", lo).lte("plan_date", hi)),
       fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id").gte("plan_date", lo).lte("plan_date", hi)),
     ]);
     const [win, extra] = await Promise.all([read(from, today), outside ? read(date, date) : Promise.resolve([[], []])]);
@@ -2680,8 +2682,9 @@ const cloud = {
     for (const m of missionRows || []) {
       const key = `${m.board_id}|${m.number}|${m.shift || "day"}`;
       const rows = (out.rows[key] = out.rows[key] || {});
-      const cell = (rows[m.plan_date] = rows[m.plan_date] || { crew: 0, hidden: false });
+      const cell = (rows[m.plan_date] = rows[m.plan_date] || { crew: 0, hidden: false, highlight: null, note: "" });
       if (m.hidden) cell.hidden = true;
+      if (m.highlight) { cell.highlight = m.highlight; cell.note = m.highlight_note || ""; }
       byId.set(m.id, { cell, date: m.plan_date });
     }
     for (const a of assignRows || []) {

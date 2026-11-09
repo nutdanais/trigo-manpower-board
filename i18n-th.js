@@ -3079,3 +3079,8 @@ I18N.add({
   "{a}: {b} days on {c}, last {d}": "{a}: {b} วันใน {c} ล่าสุด {d}",
   "{a}: {b} day on {c}, last {d}": "{a}: {b} วันใน {c} ล่าสุด {d}",
 });
+
+/* Missions tab: the highlight chip and the panel's Highlight */
+I18N.add({
+  "Highlighted on the board": "ไฮไลต์บนบอร์ด",
+});

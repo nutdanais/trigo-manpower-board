@@ -427,6 +427,50 @@ async function step(name, fn) {
       await goMissions(p);
     });
 
+    await step("a proportion bar under the tiles; a highlighted mission shows its reason in Status and alerts, can be filtered, and the panel has a Highlight button", async () => {
+      await goMissions(p);
+      const sure = async () => { const c = p.locator("#modal-confirm:not(.hidden)"); if (await c.waitFor({ timeout: 2000 }).then(() => true, () => false)) await p.click("#btn-confirm-yes"); };
+      // the bar under the tiles, as on Manpower and Host
+      assert.equal(await p.locator("#stats-bar .st-split").count(), 1);
+      assert.ok(await p.locator("#stats-bar .st-split i").count() >= 1);
+      // the board's highlight, read for the day on screen
+      db.t("missions").find((m) => m.id === "s7").highlight = "focus";
+      // the chip reads the day on screen: put the page on the day the seed's mission is on
+      await p.evaluate((d) => { state.date = d; state.missions.activityKey = null; cloud._invalidatePlans(); return refreshAndRender(); }, SRC);
+      assert.match(await row(p, M7).locator("td.ml-status").innerText(), /Focus activity/);
+      assert.equal(await row(p, M90).locator(".ml-hl").count(), 0, "only the highlighted one");
+      // Filters > Alerts > Highlighted on the board
+      await p.click("#btn-missions-filter-pop");
+      await p.evaluate(() => closeFilterPops());
+      await p.locator('#missions-filters .ms[data-filter="alerts"] .ms-btn').click();
+      await p.locator('#missions-filters .ms[data-filter="alerts"] .ms-opt', { hasText: /^Highlighted on the board$/ }).locator("input").check();
+      await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length === 1);
+      assert.equal(await row(p, M7).count(), 1);
+      await p.locator('#missions-filters .ms[data-filter="alerts"] .ms-clear').click();
+      await p.evaluate(() => closeFilterPops());
+      await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length > 1);
+      // the panel shows it and offers the board's Highlight menu
+      await row(p, M7).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.locator("#btn-md-hl").waitFor();
+      assert.match(await p.locator("#mission-detail").innerText(), /Highlight[\s\S]*Focus activity/);
+      await p.click("#btn-md-hl");
+      await p.locator("#context-menu:not(.hidden)").waitFor();
+      const items = (await p.locator("#context-menu .ctx-item").allInnerTexts()).map((t) => t.trim());
+      assert.ok(items.includes("New customer") && items.includes("Not enough manpower") && items.includes("Remove highlight"), items.join(" | "));
+      await p.locator("#context-menu .ctx-item", { hasText: "Not enough manpower" }).click();
+      await sure();
+      await p.waitForFunction(() => document.querySelector("#modal-confirm").classList.contains("hidden"));
+      await p.waitForFunction(() => (window.__demo ? true : true));
+      assert.equal(db.t("missions").find((m) => m.id === "s7").highlight, "short");
+      await p.waitForFunction((n) => [...document.querySelectorAll("#missions-body tr")].some((tr) => tr.querySelector(".ml-num").textContent === n && /Not enough manpower/.test(tr.innerText)), M7);
+      // put it away again
+      db.t("missions").find((m) => m.id === "s7").highlight = null;
+      await p.evaluate(() => { state.missions.activityKey = null; cloud._invalidatePlans(); return refreshAndRender(); });
+      await p.evaluate(() => closeModal());
+      await goMissions(p);
+    });
+
     await step("an engineer closes a mission: the days after lose it and carry over skips it", async () => {
       db.seed("missions", [{ id: "n102", board_id: "b1", plan_date: NEXT, number: "102", host: "Host Beta", customer: "Cust Beta", shift: "day", engineer_id: "eng-2" }]);
       db.seed("assignments", [{ employee_id: "e3", plan_date: NEXT, mission_id: "n102", zone: null }]);
