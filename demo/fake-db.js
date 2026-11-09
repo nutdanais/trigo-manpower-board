@@ -37,8 +37,9 @@ const UNIQUE = {
   role_permissions: ["role_key", "area"],
   profiles: ["id"],
   mission_register: ["board_id", "number", "shift"],
+  app_settings: ["key"],
 };
-const NO_ID = new Set(["plan_days", "plan_day_stamps", "day_overrides", "role_permissions", "roles"]);
+const NO_ID = new Set(["plan_days", "plan_day_stamps", "day_overrides", "role_permissions", "roles", "app_settings"]);
 const FORWARD_TABLES = new Set(["plan_day_stamps", "capacity_demand", "forecast_missions", "forecast_assignments", "forecast_hold_events"]);
 const DEFAULTS = {
   missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", hidden: false, ppe: null, remark: null, engineer_id: null }),
@@ -68,6 +69,8 @@ class FakeDb {
     this.exitReason = opts.exitReason !== false;
     // migration-2026-11-09 (mission_register, mission_number_history and their RPCs); { missions: false } is a database without it
     this.missions = opts.missions !== false;
+    // migration-2026-11-09b (app_settings: shared settings such as the days that make someone experienced); { appSettings: false } is a database without it
+    this.appSettings = opts.appSettings !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -94,7 +97,23 @@ class FakeDb {
   _missing(table) {
     return (!this.forwardPlanning && FORWARD_TABLES.has(table)) || (!this.mergeLog && table === "forecast_merge_decisions")
       || (!this.loans && table === "employee_loans")
-      || (!this.missions && (table === "mission_register" || table === "mission_number_history"));
+      || (!this.missions && (table === "mission_register" || table === "mission_number_history"))
+      || (!this.appSettings && table === "app_settings");
+  }
+
+  /* app_settings' row level security and check constraint (migration-2026-11-09b): changing a
+     setting needs Edit on Settings, host_experienced_days is a whole number from 1 to 365 and
+     host_at_risk_max one from 0 to 99 */
+  _appSettingsGuard(q, user) {
+    if (q.op === "select") return null;
+    if (!this._can(user, "settings", "edit")) return { code: "42501", message: 'new row violates row-level security policy for table "app_settings"' };
+    for (const v of [].concat(q.values || [])) {
+      const range = v && { host_experienced_days: [1, 365], host_at_risk_max: [0, 99] }[v.key];
+      if (range && !(Number.isInteger(v.value) && v.value >= range[0] && v.value <= range[1])) {
+        return { code: "23514", message: 'new row for relation "app_settings" violates check constraint "app_settings_value_ok"' };
+      }
+    }
+    return null;
   }
 
   /* A column-level migration not run yet: the errors Postgres / PostgREST give
@@ -122,6 +141,10 @@ class FakeDb {
       }
       const noCol = this._missingColumn(q);
       if (noCol) return { data: null, error: noCol };
+      if (q.table === "app_settings") {
+        const refused = this._appSettingsGuard(q, user);
+        if (refused) return { data: null, error: refused };
+      }
       if (!this.highlightShort && q.table === "missions" && [].concat(q.values || []).some((v) => v && v.highlight === "short")) {
         return { data: null, error: { code: "23514", message: 'new row for relation "missions" violates check constraint "missions_highlight_kind"' } };
       }

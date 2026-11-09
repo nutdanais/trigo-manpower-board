@@ -467,7 +467,7 @@ async function step(name, fn) {
       assert.equal(await p.locator("#sv-scroll").isVisible(), false, "the list replaces the pane");
       assert.equal(await p.locator("#sticky-header").isVisible(), false, "Settings takes the whole phone screen");
       const rows = await p.$$eval("#sv-home .svh-row", (r) => r.map((x) => x.dataset.tab));
-      assert.deepEqual(rows, ["account", "engineers", "areas", "boards", "users", "roles"]);
+      assert.deepEqual(rows, ["account", "engineers", "areas", "boards", "hostexp", "users", "roles"]);
       const open = async (t) => {
         if (!(await p.locator("#settings-view.sv-at-home").count())) { await p.click("#btn-settings-back-icon"); await p.waitForSelector("#settings-view.sv-at-home"); }
         await p.click(`#sv-home .svh-row[data-tab=${t}]`);

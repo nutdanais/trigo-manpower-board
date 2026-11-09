@@ -1926,6 +1926,52 @@ select v.name, v.phone, v.color from (values
 ) as v(name, phone, color)
 where not exists (select 1 from engineers);
 
+-- ===== Shared settings (migration-2026-11-09b-app-settings.sql) =====
+-- One row per setting; a setting with no row uses the app's own default. Today: host_experienced_days and host_at_risk_max.
+
+create table if not exists app_settings (
+  key        text primary key,
+  value      jsonb not null,
+  updated_at timestamptz not null default now(),
+  updated_by text
+);
+
+-- What each known setting may hold. Dropped and added again so a re-run also brings an older copy of
+-- this table (one that only knew host_experienced_days) up to date; other keys are free.
+alter table app_settings drop constraint if exists app_settings_value_ok;
+alter table app_settings add constraint app_settings_value_ok check (
+  case key
+    when 'host_experienced_days' then
+      jsonb_typeof(value) = 'number'
+      and case when (value #>> '{}') ~ '^[0-9]{1,3}$' then (value #>> '{}')::int between 1 and 365 else false end
+    when 'host_at_risk_max' then
+      jsonb_typeof(value) = 'number'
+      and case when (value #>> '{}') ~ '^[0-9]{1,2}$' then (value #>> '{}')::int between 0 and 99 else false end
+    else true
+  end
+);
+
+alter table app_settings enable row level security;
+
+drop policy if exists "app_settings read" on app_settings;
+create policy "app_settings read" on app_settings
+  for select using ((select public.is_active()));
+drop policy if exists "app_settings insert" on app_settings;
+create policy "app_settings insert" on app_settings
+  for insert with check ((select public.can('settings', 'edit')));
+drop policy if exists "app_settings update" on app_settings;
+create policy "app_settings update" on app_settings
+  for update using ((select public.can('settings', 'edit'))) with check ((select public.can('settings', 'edit')));
+drop policy if exists "app_settings delete" on app_settings;
+create policy "app_settings delete" on app_settings
+  for delete using ((select public.can('settings', 'edit')));
+
+do $$
+begin
+  alter publication supabase_realtime add table app_settings;
+exception when duplicate_object then null;
+end $$;
+
 -- ===== Bootstrap: make yourself the first admin =====
 -- A fresh project has no accounts yet, so this cannot be seeded. After running
 -- this file:
