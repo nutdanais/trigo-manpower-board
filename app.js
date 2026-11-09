@@ -1281,16 +1281,19 @@ function render() {
    the status pill, which used to leave Capacity (1280px) or Manpower, Host and
    Capacity (1100px) out of sight with nothing to say so. When the tabs don't fit,
    first the pill and the date get tighter (tb-tight: smaller pill, no year), then
-   the tabs (tb-snug: less padding), and only then does every tab but the current
-   one show its icon alone (tb-icons; the name is in its tooltip). Measured, not guessed from the width, so Thai, a long status and a
+   the tabs (tb-snug: less padding), then every tab but the current
+   one shows its icon alone (tb-icons; the name is in its tooltip), and last the app's name
+   beside the logo goes (tb-noname). Measured, not guessed from the width, so Thai, a long status and a
    larger browser font all fit. A phone has the bottom bar instead. */
 function fitTopbar() {
   const bar = $("#topbar"), tabs = $("#board-tabs");
   if (!bar || !tabs) return;
-  bar.classList.remove("tb-tight", "tb-snug", "tb-icons");
+  bar.classList.remove("tb-tight", "tb-snug", "tb-icons", "tb-noname");
   if (!tabs.offsetParent) return;
   const over = () => tabs.scrollWidth > tabs.clientWidth + 1;
-  for (const step of ["tb-tight", "tb-snug", "tb-icons"]) { if (!over()) break; bar.classList.add(step); }
+  // last of all the app's name beside the logo goes (tb-noname): at 1024px, with every module
+  // tab (Missions included), the icons alone did not fit next to the name and the date
+  for (const step of ["tb-tight", "tb-snug", "tb-icons", "tb-noname"]) { if (!over()) break; bar.classList.add(step); }
 }
 let _fitTopbarQueued = false;
 window.addEventListener("resize", () => {
@@ -2805,9 +2808,10 @@ function missionAsText(m) {
   // the labels in the app's language (the page is translated after it is
   // drawn, but this text goes straight to the clipboard); the data stays as typed
   const tx = (s) => (window.I18N ? I18N.t(s) : s);
+  const oldNumber = missionsOn() ? cloud.recentOldNumber(m.number, todayStr()) : null;
   const lines = [
     `${board ? board.name + " · " : ""}${tx(fmtDow(state.date) + " " + fmtDate(state.date))}`,
-    `${m.number} | ${m.host} → ${m.customer}`,
+    `${m.number}${oldNumber ? ` (${tx("was")} ${oldNumber})` : ""} | ${m.host} → ${m.customer}`,
     `${tx(m.shift === "night" ? "Night" : "Day")} ${nightTimeNotSet(m) ? tx("(time not set)") : m.startTime + "–" + m.endTime}`
       + (eng ? ` · ${tx("Engineer")}: ${eng.name}${eng.phone ? " " + eng.phone : ""}` : ""),
   ];
@@ -3181,7 +3185,11 @@ function renderMissions() {
     const hlTag = m.highlight
       ? `<div class="m-hl-tag"><span class="m-hl-star">${icon("star")}</span><span class="m-hl-text"${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span></div>`
       : "";
-    header.innerHTML = `${hlTag}
+    // a new-year number: the old one stays beside it for two weeks (cloud.recentOldNumber)
+    const oldNumber = missionsOn() ? cloud.recentOldNumber(m.number, todayStr()) : null;
+    const wasLine = oldNumber
+      ? `<div class="m-was-line" title="This mission's number changed for the new year. The old number is shown here for two weeks after the change."><span class="m-was-tag">New number</span> was <b data-no-i18n>${escapeHtml(oldNumber)}</b></div>` : "";
+    header.innerHTML = `${hlTag}${wasLine}
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>

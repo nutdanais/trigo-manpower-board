@@ -51,6 +51,19 @@
     return Math.round(ms / 86400000) + 1;
   }
 
+  /* After a new-year number is entered, the board shows the old one beside it for two weeks
+     (the day it was entered and the 13 days after), so every engineer notices the change and
+     can still find their mission by the number they know. enteredAt: the ISO timestamp or date
+     it was entered; today: YYYY-MM-DD. */
+  const SHOW_OLD_DAYS = 14;
+  function showsOldNumber(enteredAt, today) {
+    if (!enteredAt) return false;
+    const d = String(enteredAt).slice(0, 10);
+    const ms = Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 1, +today.slice(8, 10)) - Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+    const days = Math.round(ms / 86400000);
+    return days >= 0 && days < SHOW_OLD_DAYS;
+  }
+
   /* 1 January of the year a new number belongs to: the day it applies from */
   function validFrom(newNumber) {
     const y = yearOf(newNumber);
@@ -66,7 +79,7 @@
     return c;
   }
 
-  const api = { tidy, check, yearOf, needsNewYearNumber, daysWaiting, ALERT_AFTER_DAYS, validFrom, checkNewYear, EXAMPLE };
+  const api = { tidy, check, yearOf, needsNewYearNumber, daysWaiting, ALERT_AFTER_DAYS, validFrom, checkNewYear, EXAMPLE, SHOW_OLD_DAYS, showsOldNumber };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MissionNumber = api;
 })(typeof window !== "undefined" ? window : globalThis);

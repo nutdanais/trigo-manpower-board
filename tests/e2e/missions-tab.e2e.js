@@ -209,6 +209,21 @@ async function step(name, fn) {
       await sp.fill("#missions-search", "");
     });
 
+    await step("for two weeks after the change, the mission card shows the old number beside the new one", async () => {
+      await sp.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, SRC);
+      const card = sp.locator("#missions-grid .mission-card", { has: sp.locator(".m-number", { hasText: NEW }) });
+      assert.match(await card.locator(".m-was-line").innerText(), new RegExp("New number\\s+was\\s+" + OLD.replace(/\./g, "\\."), "i"));
+      assert.match(await sp.evaluate((n) => missionAsText(getPlan().missions.find((m) => m.number === n)), NEW), new RegExp(NEW.replace(/\./g, "\\.") + " \\(was " + OLD.replace(/\./g, "\\.") + "\\)"));
+      // fifteen days on, it is gone
+      db.t("mission_number_history")[0].entered_at = new Date(Date.now() - 15 * 86400000).toISOString();
+      await sp.evaluate(() => cloud.loadMissionRegister().then(render));
+      assert.equal(await card.locator(".m-was-line").count(), 0);
+      assert.doesNotMatch(await sp.evaluate((n) => missionAsText(getPlan().missions.find((m) => m.number === n)), NEW), /was/);
+      db.t("mission_number_history")[0].entered_at = new Date().toISOString();
+      await sp.evaluate(() => cloud.loadMissionRegister());
+      await goMissions(sp);
+    });
+
     await step("a Site Admin reopens a closed mission; the board stays view-only for them", async () => {
       await sp.selectOption("#missions-status", "closed");
       await row(sp, "102").locator("button[data-act=reopen]").click();
@@ -314,6 +329,21 @@ async function step(name, fn) {
       await sp.evaluate(() => closeModal());
       await sp.evaluate(() => I18N.setLang("en"));
       await sp.evaluate(() => cloud.loadMissionRegister().then(render));
+    });
+
+    await step("at 1024px every module tab, Missions included, is in full view (the app's name gives way)", async () => {
+      await p.setViewportSize({ width: 1024, height: 900 });
+      await p.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
+      const r = await p.evaluate(() => {
+        const strip = document.querySelector("#board-tabs").getBoundingClientRect();
+        return { titles: [...document.querySelectorAll("#board-tabs .board-tab")].map((t) => t.title),
+          hidden: [...document.querySelectorAll("#board-tabs .board-tab")].filter((t) => { const b = t.getBoundingClientRect(); return b.left < strip.left - 1 || b.right > strip.right + 1; }).map((t) => t.title) };
+      });
+      assert.ok(r.titles.includes("Missions"));
+      assert.deepEqual(r.hidden, []);
+      await p.setViewportSize({ width: 1400, height: 900 });
+      await p.evaluate(() => fitTopbar());
+      assert.equal(await p.locator("#app-title").isVisible(), true, "the name is back on a wide screen");
     });
 
     await step("no page errors", async () => {

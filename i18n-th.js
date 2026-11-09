@@ -2733,3 +2733,16 @@ I18N.add({
   "New number: {a}": "หมายเลขใหม่: {a}",
   "Mission number from 1 January {a}": "หมายเลขมิชชั่นตั้งแต่ 1 มกราคม {a}",
 });
+
+/* Chart labels read out by a screen reader: one pattern for any number, instead of one line per
+   total (a new value such as 0.5 was left in English). */
+I18N.add({}, {
+  "Stacked bar, total {num}": "แผนภูมิแท่งแบบซ้อน ผลรวม {num}",
+  "trend sparkline, {num} points": "เส้นแนวโน้มย่อ {num} จุด",
+});
+
+/* A new-year number on the mission card: the old number beside it for two weeks. */
+I18N.add({
+  "was": "เดิม",
+  "This mission's number changed for the new year. The old number is shown here for two weeks after the change.": "หมายเลขของมิชชั่นนี้เปลี่ยนสำหรับปีใหม่ หมายเลขเดิมจะแสดงที่นี่สองสัปดาห์หลังการเปลี่ยน",
+});

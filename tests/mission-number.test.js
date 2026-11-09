@@ -117,3 +117,12 @@ test("Bulk edit missions: the New number column renames a mission (both shifts) 
   const changed = plan([["r1", "Board One", "TSTTH.27.0001", "Day", "Cust A", "Host Alpha", "Eng One", "Open", "", ""]]);
   assert.match(changed.rows[0].errors.join(), /New number \(next year\)/, "the Mission number column is the key, not a way to rename");
 });
+
+test("the old number shows beside the new one for two weeks from the day it was entered", () => {
+  assert.equal(MN.SHOW_OLD_DAYS, 14);
+  assert.equal(MN.showsOldNumber("2027-01-05", "2027-01-05"), true, "the day it was entered");
+  assert.equal(MN.showsOldNumber("2027-01-05T09:30:00+07:00", "2027-01-18"), true, "the 14th day");
+  assert.equal(MN.showsOldNumber("2027-01-05", "2027-01-19"), false, "two weeks later it is gone");
+  assert.equal(MN.showsOldNumber("2027-01-05", "2027-01-04"), false);
+  assert.equal(MN.showsOldNumber(null, "2027-01-05"), false);
+});

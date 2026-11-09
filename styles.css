@@ -5478,6 +5478,8 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 10px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
+/* the last step: the logo alone, without the app's name (fitTopbar) */
+#topbar.tb-noname #app-title { display: none; }
 
 /* banner menus (board pill, account) */
 .tb-dd { position: relative; flex: none; }
@@ -7318,3 +7320,7 @@ tr.ny-bad .ny-input { border-color: var(--danger); }
   #missions-table td.ml-actions { justify-content: flex-start; border-bottom: none; padding-top: 8px; }
   .ny-input { width: 100%; }
 }
+/* a new-year number: the old one beside it for two weeks (Missions tab, phase 1) */
+.mission-header .m-was-line { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--warn-text); margin-bottom: 3px; }
+.mission-header .m-was-line b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.mission-header .m-was-tag { background: var(--warn-surface); border: 1px solid var(--warn-line); color: var(--warn-text); border-radius: 999px; padding: 0 7px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; }

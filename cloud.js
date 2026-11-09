@@ -2654,6 +2654,17 @@ const cloud = {
     const h = (this.data.numberHistory || []).filter((x) => x.newNumber === number).pop();
     return h ? h.oldNumber : null;
   },
+  /* the number `number` replaced, while the board still shows it beside the new one (the first
+     two weeks after the new number was entered, MissionNumber.showsOldNumber); else null.
+     enteredAt is the server's timestamp, read as a date in the browser's own time zone. */
+  recentOldNumber(number, today) {
+    const h = (this.data.numberHistory || []).filter((x) => x.newNumber === number).pop();
+    if (!h || typeof MissionNumber === "undefined") return null;
+    const t = new Date(h.enteredAt);
+    const entered = isNaN(t) ? String(h.enteredAt || "").slice(0, 10)
+      : t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+    return MissionNumber.showsOldNumber(entered, today) ? h.oldNumber : null;
+  },
   /* every number one mission has had, oldest first, ending with `number` */
   numberChain(number) {
     const chain = [number];
