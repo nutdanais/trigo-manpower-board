@@ -5480,6 +5480,8 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) { padding: 0 9px; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .tab-label { display: none; }
 #topbar.tb-icons #board-tabs .board-tab:not(.active) .ic { margin-right: 0; }
+/* the last step: the logo alone, without the app's name (fitTopbar) */
+#topbar.tb-noname #app-title { display: none; }
 
 /* banner menus (board pill, account) */
 .tb-dd { position: relative; flex: none; }
@@ -6285,9 +6287,9 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   body:not(.board-view) #topbar .topbar-right { grid-area: 1 / 4; justify-self: end; }
 
   /* line 2: summary card, Filter (lists only), ⋯ */
-  body:is(.ov-view, .el-view, .hl-view) #m-row2 { grid-area: 2 / 1 / 3 / -1; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
+  body:is(.ov-view, .el-view, .hl-view, .ml-view) #m-row2 { grid-area: 2 / 1 / 3 / -1; display: flex; gap: 6px; align-items: stretch; min-width: 0; }
   body.ov-view #m-filter { display: none; }
-  body:is(.ov-view, .el-view, .hl-view) #m-details:not(.hidden) {
+  body:is(.ov-view, .el-view, .hl-view, .ml-view) #m-details:not(.hidden) {
     grid-area: 3 / 1 / 4 / -1; display: flex; flex-direction: column; gap: 8px;
     padding: 8px 10px 9px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
   }
@@ -6299,28 +6301,28 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   .md-chips .status-chip.sc-red::before { background: var(--danger); }
   .md-chips .status-chip.sc-on { box-shadow: inset 0 0 0 1px currentColor; }
   /* four tiles with long names (Host): the label may take two lines rather than "…" */
-  body:is(.el-view, .hl-view) .md-l { white-space: normal; align-items: flex-start; line-height: 1.2; }
-  body:is(.el-view, .hl-view) .md-l i { margin-top: 3px; }
-  body:is(.el-view, .hl-view) .md-t { justify-content: space-between; }
+  body:is(.el-view, .hl-view, .ml-view) .md-l { white-space: normal; align-items: flex-start; line-height: 1.2; }
+  body:is(.el-view, .hl-view, .ml-view) .md-l i { margin-top: 3px; }
+  body:is(.el-view, .hl-view, .ml-view) .md-t { justify-content: space-between; }
 
   /* row 2 lives in the card and the ⋯ menu now */
-  body:is(.ov-view, .el-view, .hl-view) #toolbar-row2 { display: none; }
-  body:is(.el-view, .hl-view) #btn-toolbar-more,
-  body:is(.el-view, .hl-view) #toolbar-more { display: none; }
+  body:is(.ov-view, .el-view, .hl-view, .ml-view) #toolbar-row2 { display: none; }
+  body:is(.el-view, .hl-view, .ml-view) #btn-toolbar-more,
+  body:is(.el-view, .hl-view, .ml-view) #toolbar-more { display: none; }
   body.ov-view #toolbar-row1 > :not(#ov-board-dd) { display: none !important; }
   body.ov-view #toolbar-row1:not(:has(#ov-board-dd:not(.hidden))) { display: none; }
   body.ov-view #ov-board-dd { flex: 1 1 auto; }
   body.ov-view #btn-ov-board { width: 100%; justify-content: space-between; }
 
   /* Filter on a list: search and filters as a sheet under the header, like a board's */
-  body:is(.el-view, .hl-view).m-filter-open #toolbar {
+  body:is(.el-view, .hl-view, .ml-view).m-filter-open #toolbar {
     display: block; position: fixed; left: 0; right: 0; top: var(--bar-h, 110px); z-index: 80;
     max-height: calc(100dvh - var(--bar-h, 110px) - var(--bnav-h)); overflow-y: auto;
     background: var(--panel); border-bottom: 1px solid var(--border); box-shadow: 0 14px 30px -8px rgba(0, 38, 70, .35);
   }
-  body:is(.el-view, .hl-view).m-filter-open #toolbar-row1 { display: block; padding: 12px; background: var(--panel); }
-  body:is(.el-view, .hl-view).m-filter-open #toolbar-row1 > :not(#toolbar-more) { display: none !important; }
-  body:is(.el-view, .hl-view).m-filter-open #toolbar-more {
+  body:is(.el-view, .hl-view, .ml-view).m-filter-open #toolbar-row1 { display: block; padding: 12px; background: var(--panel); }
+  body:is(.el-view, .hl-view, .ml-view).m-filter-open #toolbar-row1 > :not(#toolbar-more) { display: none !important; }
+  body:is(.el-view, .hl-view, .ml-view).m-filter-open #toolbar-more {
     display: flex; position: static; margin: 0; padding: 0; border: 0; box-shadow: none; background: none;
   }
   body.el-view.m-filter-open #emplist-name-view + .seg-pick { display: none; }
@@ -6925,7 +6927,7 @@ label > .pk { margin-top: 5px; }
   body.m-filter-open #app-root::after {
     content: ""; position: fixed; inset: 0; z-index: 79; background: rgba(15, 27, 42, .38);
   }
-  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar,
+  body:is(.board-view, .el-view, .hl-view, .ml-view).m-filter-open #toolbar,
   body.oc-view.m-filter-open .oc-filterbox {
     display: flex; flex-direction: column; gap: 0; position: fixed; left: 0; right: 0; top: auto; bottom: 0; z-index: 90;
     max-height: calc(100dvh - 72px); overflow-y: auto; overscroll-behavior: contain;
@@ -6934,7 +6936,7 @@ label > .pk { margin-top: 5px; }
     box-shadow: 0 -14px 34px -10px rgba(0, 38, 70, .4);
   }
   body.m-filter-open .m-sheet-head { display: none; }
-  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar > .m-sheet-head,
+  body:is(.board-view, .el-view, .hl-view, .ml-view).m-filter-open #toolbar > .m-sheet-head,
   body.oc-view.m-filter-open .oc-filterbox > .m-sheet-head {
     display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 2;
     padding: 16px 12px 8px 16px; background: var(--panel);
@@ -6943,7 +6945,7 @@ label > .pk { margin-top: 5px; }
   body.m-filter-open .m-sheet-title { flex: 1; font-size: 16px; color: var(--text); }
   body.m-filter-open .m-sheet-clear { height: 34px; color: var(--primary-text); }
   body.m-filter-open .m-sheet-foot { display: none; }
-  body:is(.board-view, .el-view, .hl-view).m-filter-open #toolbar > .m-sheet-foot,
+  body:is(.board-view, .el-view, .hl-view, .ml-view).m-filter-open #toolbar > .m-sheet-foot,
   body.oc-view.m-filter-open .oc-filterbox > .m-sheet-foot {
     display: flex; position: sticky; bottom: 0; z-index: 2; margin-top: auto;
     padding: 10px 12px 12px; background: var(--panel); border-top: 1px solid var(--border);
@@ -7327,6 +7329,82 @@ label > .pk { margin-top: 5px; }
 .rp { box-sizing: border-box; padding-right: 2px; }
 .rp-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rp-tile { min-width: 0; box-sizing: border-box; }
+
+/* ===== Missions tab (migration-2026-11-09): the Mission register =====
+   The same table look as the Host list; its toolbar is a display:contents group like
+   #hostlist-toolbar. Status tags: Open (green), Waiting for the new-year number (grey),
+   no number after a week (red), Closed (muted). */
+#missions-toolbar { display: contents; }
+#missions-search {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel); color: var(--text); font-size: 13px; min-width: 220px;
+}
+#missions-board { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 13px; }
+#missions-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+#missions-panel { display: flex; flex-direction: column; gap: 10px; }
+#missions-panel.hidden { display: none; }
+#missions-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+#missions-table th, #missions-table td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+#missions-table th {
+  font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .3px;
+  cursor: pointer; user-select: none; white-space: nowrap; background: var(--bg-soft); position: sticky; top: 0;
+}
+#missions-table th.ml-actions-h { cursor: default; }
+#missions-table th:hover { color: var(--primary-text); }
+#missions-table th.sorted[aria-sort="ascending"]::after { content: " \25B2"; }
+#missions-table th.sorted[aria-sort="descending"]::after { content: " \25BC"; }
+#missions-table tbody tr:hover { background: var(--hover-tint); }
+#missions-table td.ml-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+#missions-table tr.ml-row-closed td { color: var(--muted); }
+.ml-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ml-was { display: block; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.ml-actions { white-space: nowrap; text-align: right; }
+.ml-actions .btn + .btn { margin-left: 6px; }
+.ml-tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; line-height: 1.5; }
+.ml-tag.ml-open { background: var(--ok-surface); color: var(--ok-text); border: 1px solid var(--ok-line); }
+.ml-tag.ml-wait { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+.ml-tag.ml-late { background: var(--danger-tint); color: var(--danger-text); border: 1px solid var(--danger-line); }
+.ml-tag.ml-closed { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+.ml-tag.ml-shift { padding: 0; font-weight: 500; font-size: 13.5px; }
+.ml-tag.ml-shift.ml-night { padding: 1px 8px; background: #e7e7f4; color: #2b2d5c; }
+#missions-empty { color: var(--muted); padding: 24px 4px; }
+.ml-alert { display: flex; align-items: center; gap: 10px; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.ml-alert-text { flex: 1 1 auto; }
+.ml-alert-ic .ic { width: 16px; height: 16px; }
+.ml-alert-wait { background: var(--bg-soft); border: 1px solid var(--border); color: var(--text); }
+.ml-alert-late { background: var(--danger-tint); border: 1px solid var(--danger-line); color: var(--danger-text); }
+.board-tab .tab-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+  margin-left: 6px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
+}
+.ov-attn-newyear { background: var(--danger-tint); border-color: var(--danger-line); color: var(--danger-text); }
+.ov-attn-newyear .ic { width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; }
+#modal-close-mission label, #modal-mission-add label { display: block; margin: 10px 0; }
+.close-mission-effect { font-size: 12.5px; color: var(--warn-text); background: var(--warn-surface); border: 1px solid var(--warn-line); border-radius: 6px; padding: 8px 10px; }
+#newyear-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#newyear-table th, #newyear-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+#newyear-table th { font-size: 12px; color: var(--muted); font-weight: 700; }
+.ny-cell { min-width: 220px; }
+#modal-newyear { width: min(880px, 94vw); }
+.ny-input { width: 150px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-variant-numeric: tabular-nums; }
+tr.ny-bad .ny-input { border-color: var(--danger); }
+.ny-err { display: block; font-size: 11.5px; color: var(--danger-text); }
+.ny-close { margin-left: 6px; font-size: 12px; }
+@media (max-width: 640px) {
+  #missions-search { min-width: 0; width: 100%; }
+  #missions-table thead { display: none; }
+  #missions-table, #missions-table tbody, #missions-table tr, #missions-table td { display: block; width: auto; }
+  #missions-table tbody tr { margin-bottom: 10px; padding: 12px 14px 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+  #missions-table td { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  #missions-table td[data-label]::before { content: attr(data-label); font-size: 10.5px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--muted); }
+  #missions-table td.ml-first { display: block; font-size: 15px; border-bottom: none; padding-bottom: 6px; }
+  #missions-table td.ml-actions { justify-content: flex-start; border-bottom: none; padding-top: 8px; }
+  .ny-input { width: 100%; }
+}
+/* a new-year number: the old one beside it for two weeks (Missions tab, phase 1) */
+.mission-header .m-was-line { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--warn-text); margin-bottom: 3px; }
+.mission-header .m-was-line b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.mission-header .m-was-tag { background: var(--warn-surface); border: 1px solid var(--warn-line); color: var(--warn-text); border-radius: 999px; padding: 0 7px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px; }
 
 /* ---------- Present mode (present.js) ----------
    Overview: a stage. A header (the day, the board chips, and on a Period slide the period strip), the page's own section

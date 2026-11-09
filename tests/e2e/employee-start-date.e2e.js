@@ -144,7 +144,7 @@ const X = require("../../xlsx-export.js");
     const row = {}; for (let r = 2; r <= 1 + shown; r++) row[ws.getCell(r, 1).value] = r;
     assert.equal(ws.getCell(row["Dated Person"], 4).value, "ประจำ");
     assert.equal(ws.getCell(row["Dated Person"], 8).value, X.serviceLength(ago(3, 5, 12), T, "th"));
-    assert.equal(ws.getCell(row["Dated Person"], 15).value, "ใช้งาน");   // after the three Worked / Leave columns
+    assert.equal(ws.getCell(row["Dated Person"], 15).value, "ใช้งาน");   // after the Worked, Leave and Leave share columns
     // the Thai choice is remembered by both exports
     await p.click("#btn-export");
     await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");

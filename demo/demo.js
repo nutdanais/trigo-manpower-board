@@ -7,7 +7,7 @@
    and every visitor has a database of their own.
 
    ?demo                  signs in as an Admin (sees everything)
-   ?demo&role=manager     or engineer, viewer: the same data, that role's permissions */
+   ?demo&role=manager     or engineer, siteadmin, viewer: the same data, that role's permissions */
 (function (root) {
   "use strict";
 
@@ -16,7 +16,8 @@
   S.seed(db);
 
   /* who is "signed in": the sample account for the chosen role */
-  const ROLES = ["admin", "manager", "engineer", "viewer"];
+  const ROLES = ["admin", "manager", "engineer", "siteadmin", "viewer"];
+  const ROLE_LABEL = { admin: "Admin", manager: "Manager", engineer: "Engineer", siteadmin: "Site Admin", viewer: "Viewer" };
   const asked = (new URLSearchParams(location.search).get("role") || "admin").toLowerCase();
   const role = ROLES.includes(asked) ? asked : "admin";
   const profile = db.t("profiles").find((p) => p.role_key === role && p.status === "active") || db.t("profiles")[0];
@@ -91,7 +92,7 @@
     const el = document.createElement("div");
     el.id = "demo-strip";
     el.innerHTML = '<b>DEMO</b><span>Sample data · not saved</span>' +
-      '<select aria-label="Sign in as">' + ROLES.map((r) => '<option value="' + r + '"' + (r === role ? " selected" : "") + ">" + r[0].toUpperCase() + r.slice(1) + "</option>").join("") + "</select>" +
+      '<select aria-label="Sign in as">' + ROLES.map((r) => '<option value="' + r + '"' + (r === role ? " selected" : "") + ">" + ROLE_LABEL[r] + "</option>").join("") + "</select>" +
       '<button type="button" class="reset">Reset</button><button type="button" class="x" aria-label="Hide this note">×</button>';
     el.querySelector("select").addEventListener("change", (e) => { location.search = "?demo&role=" + e.target.value; });
     el.querySelector(".reset").addEventListener("click", () => location.reload());

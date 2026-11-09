@@ -83,7 +83,11 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, missions: false },
+          /* the Mission register (migration-2026-11-09): one row per board + number + shift
+             (see loadMissionRegister), and every new-year number entered */
+          register: [],
+          numberHistory: [],
           /* employee_loans (migration-2026-10-20): [{id, employeeId, toBoardId,
              startDate, endDate, note, createdBy}] — see boardOn below */
           loans: [],
@@ -311,6 +315,7 @@ const cloud = {
     await Promise.all([this._loadAreas(), this._loadEngineers(), this._loadBoards(), this._loadEmployees(), this._loadOverrides(), this._loadLocks(), this._loadHosts(), this._loadDirectory(), this._loadFeatures()]);
     if (this.data.features.forecast) await this.loadHoldEvents();
     await this._loadLoans();
+    await this.loadMissionRegister();
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
   },
@@ -341,7 +346,9 @@ const cloud = {
     const highlight = await probe("missions", "highlight");
     // why someone left the roster (migration-2026-11-04): the Resigned choice needs the column
     const exitReason = await probe("employees", "exit_reason");
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason };
+    // the Missions tab: the register, its number history and the Site Admin role (migration-2026-11-09)
+    const missions = (await probe("mission_register", "id")) && (await probe("mission_number_history", "id"));
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions };
   },
 
   async _loadAreas() {
@@ -731,9 +738,12 @@ const cloud = {
      planning.js). Both paths share _carrySource / _carryPlacements, so the
      preview can never drift from what a real carry would do; the write path
      is unchanged row for row (tests/carry-parity.test.js holds it to that). */
-  async _carrySource(boardId, srcDate) {
-    const { data: srcMissions, error: mErr } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", srcDate);
+  async _carrySource(boardId, srcDate, destDate) {
+    let { data: srcMissions, error: mErr } = await sb.from("missions").select("*").eq("board_id", boardId).eq("plan_date", srcDate);
     if (mErr) throw mErr;
+    // a mission closed before the destination day is never carried onto it (the database
+    // refuses the insert too, skip_closed_mission): the preview has to agree
+    if (destDate) srcMissions = (srcMissions || []).filter((m) => !this.isClosedOn(boardId, m.number, m.shift, destDate));
     const { data: srcAssignments, error: aErr } = await sb.from("assignments").select("*").eq("plan_date", srcDate);
     if (aErr) throw aErr;
     return { srcMissions: srcMissions || [], srcAssignments: srcAssignments || [] };
@@ -780,7 +790,7 @@ const cloud = {
      ensurePlanLoaded returns, no writes. Mission ids are placeholders
      ("preview:<number>|<shift>"); PlanDiff matches by number+shift anyway. */
   async buildCarryPreview(boardId, srcDate, destDate) {
-    const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate);
+    const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate, destDate);
     const plan = { missions: [], zones: emptyZones(), updatedAt: null, sourceDate: srcDate };
     const byId = {};
     const virtualDest = srcMissions.map((m) => ({ id: "preview:" + m.number + "|" + m.shift, number: m.number, shift: m.shift }));
@@ -805,7 +815,7 @@ const cloud = {
   /* The write path behind Carry over / Reset Board. */
   async applyCarry(boardId, srcDate, destDate) {
     const updatedBy = await this._currentEmail();
-    const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate);
+    const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate, destDate);
 
     // Only a day with NO missions of its own gets yesterday's missions seeded in.
     // If the planner has already created/edited missions (or remarks) for this
@@ -2616,6 +2626,166 @@ const cloud = {
     return boardId ? { boardId, planDate: row.plan_date, updatedBy: row.updated_by } : null;
   },
 
+  /* ---------- the Mission register: the Missions tab (migration-2026-11-09) ----------
+     One row per board + mission number + shift, kept in step with the daily rows by the
+     database (sync_mission_register): this side only reads it, closes / reopens a mission,
+     enters new-year numbers and adds missions to a day from it. */
+  _registerFromRow(r) {
+    return {
+      id: r.id, boardId: r.board_id, number: r.number, shift: r.shift, host: r.host || "", customer: r.customer || "",
+      startTime: r.start_time ? hhmm(r.start_time) : "", endTime: r.end_time ? hhmm(r.end_time) : "", engineerId: r.engineer_id || null,
+      ppe: r.ppe || "", remark: r.remark || "", status: r.status, openedOn: r.opened_on || null, lastOn: r.last_on || null,
+      closedOn: r.closed_on || null, closedBy: r.closed_by || "", closedAt: r.closed_at || null, closeNote: r.close_note || "",
+      source: r.source || "board", updatedAt: r.updated_at || null,
+    };
+  },
+  async loadMissionRegister() {
+    if (!this.data.features.missions) { this.data.register = []; this.data.numberHistory = []; return; }
+    const [reg, hist] = await Promise.all([
+      fetchAllPages(() => sb.from("mission_register").select("*").order("number")),
+      sb.from("mission_number_history").select("*").order("valid_from"),
+    ]);
+    if (hist.error) throw hist.error;
+    this.data.register = (reg || []).map((r) => this._registerFromRow(r));
+    this.data.numberHistory = (hist.data || []).map((h) => ({ oldNumber: h.old_number, newNumber: h.new_number, validFrom: h.valid_from, enteredBy: h.entered_by || "", enteredAt: h.entered_at }));
+  },
+  /* the number a mission had before `number` (last year's), or null */
+  previousNumber(number) {
+    const h = (this.data.numberHistory || []).filter((x) => x.newNumber === number).pop();
+    return h ? h.oldNumber : null;
+  },
+  /* the number `number` replaced, while the board still shows it beside the new one (the first
+     two weeks after the new number was entered, MissionNumber.showsOldNumber); else null.
+     enteredAt is the server's timestamp, read as a date in the browser's own time zone. */
+  recentOldNumber(number, today) {
+    const h = (this.data.numberHistory || []).filter((x) => x.newNumber === number).pop();
+    if (!h || typeof MissionNumber === "undefined") return null;
+    const t = new Date(h.enteredAt);
+    const entered = isNaN(t) ? String(h.enteredAt || "").slice(0, 10)
+      : t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+    return MissionNumber.showsOldNumber(entered, today) ? h.oldNumber : null;
+  },
+  /* every number one mission has had, oldest first, ending with `number` */
+  numberChain(number) {
+    const chain = [number];
+    let cur = number;
+    for (let guard = 0; guard < 50; guard++) {
+      const prev = this.previousNumber(cur);
+      if (!prev || chain.includes(prev)) break;
+      chain.unshift(prev);
+      cur = prev;
+    }
+    return chain;
+  },
+  registerFor(boardId, number, shift) {
+    return (this.data.register || []).find((r) => r.boardId === boardId && r.number === number && r.shift === shift) || null;
+  },
+  /* true when that mission is closed and `date` is after its last working day */
+  isClosedOn(boardId, number, shift, date) {
+    const r = this.registerFor(boardId, number, shift);
+    return !!(r && r.status === "closed" && r.closedOn && date > r.closedOn);
+  },
+  async closeMission(id, closedOn, note) {
+    const { error } = await sb.rpc("close_mission", { p_id: id, p_closed_on: closedOn, p_note: note || null });
+    if (error) throw error;
+    this._invalidatePlans();
+    await this.loadMissionRegister();
+  },
+  async reopenMission(id) {
+    const { error } = await sb.rpc("reopen_mission", { p_id: id });
+    if (error) throw error;
+    await this.loadMissionRegister();
+  },
+  /* items: [{ old, new }]; every day from validFrom on takes the new number. Returns how many changed. */
+  async renumberMissions(items, validFrom) {
+    const { data, error } = await sb.rpc("renumber_missions", { p_items: items, p_valid_from: validFrom });
+    if (error) throw error;
+    this._invalidatePlans();
+    this._invalidateForecast && this._invalidateForecast();
+    await this.loadMissionRegister();
+    return data || 0;
+  },
+  /* Put register missions on a day, with the details the register holds (no crew). A mission
+     already on that day, or closed before it, is skipped. Returns { added, skipped }. */
+  async addMissionsFromRegister(boardId, date, ids) {
+    const rows = (this.data.register || []).filter((r) => ids.includes(r.id) && r.boardId === boardId && r.status === "open");
+    if (!rows.length) return { added: 0, skipped: ids.length };
+    const updatedBy = await this._currentEmail();
+    const night = (r) => r.shift === "night";
+    const inserts = rows.map((r) => ({
+      board_id: boardId, plan_date: date, number: r.number, host: r.host, customer: r.customer, shift: r.shift,
+      start_time: r.startTime || (night(r) ? "20:00" : "08:00"), end_time: r.endTime || (night(r) ? "05:00" : "17:00"),
+      engineer_id: r.engineerId, ppe: r.ppe || null, remark: r.remark || null, updated_by: updatedBy,
+    }));
+    const count = async () => (await sb.from("missions").select("id", { count: "exact", head: true }).eq("board_id", boardId).eq("plan_date", date)).count || 0;
+    const before = await count();
+    await this._upsertMissionsGuarded(inserts);
+    const added = (await count()) - before;
+    this._invalidatePlans();
+    await this.loadMissionRegister();
+    return { added, skipped: ids.length - added };
+  },
+
+  /* Bulk edit on the Missions tab (bulk-edit.js planMissions): new missions (source 'list', no
+     day yet), changed details, then reopen, close and the new-year numbers through their RPCs.
+     One row failing does not stop the rest; uploading the same file again only changes what
+     still differs. Returns { updated, created, failed }. */
+  async applyMissionImport(plan, { createNew = false } = {}) {
+    const rows = (plan && plan.rows) || [];
+    const updates = rows.filter((r) => r.kind === "update");
+    const creates = createNew ? rows.filter((r) => r.kind === "create") : [];
+    const failed = [];
+    const bad = new Set();
+    const by = await this._currentEmail();
+    const fail = (r, error) => { bad.add(r.rowNumber); failed.push({ rowNumber: r.rowNumber, name: r.name, message: (error && error.message) || String(error) }); };
+    const dbFields = (p) => {
+      const o = {};
+      if (p.customer !== undefined) o.customer = p.customer || null;
+      if (p.host !== undefined) o.host = p.host || null;
+      if (p.engineerId !== undefined) o.engineer_id = p.engineerId || null;
+      if (p.startTime) o.start_time = p.startTime;
+      if (p.endTime) o.end_time = p.endTime;
+      if (p.openedOn) o.opened_on = p.openedOn;
+      return o;
+    };
+    for (const r of creates) {
+      const c = r.create;
+      const { error } = await sb.from("mission_register").insert({
+        board_id: c.boardId, number: c.number, shift: c.shift, source: "list", status: "open", updated_by: by, ...dbFields(c),
+      });
+      if (error) fail(r, error.code === "23505" ? { message: `${c.number} (${c.shift}) is already on that board's Missions list` } : error);
+    }
+    for (const r of updates) {
+      const patch = dbFields(r.patch);
+      if (Object.keys(patch).length) {
+        const { error } = await sb.from("mission_register").update({ ...patch, updated_at: new Date().toISOString(), updated_by: by }).eq("id", r.id);
+        if (error) { fail(r, error); continue; }
+      }
+      if (r.reopen) { const { error } = await sb.rpc("reopen_mission", { p_id: r.id }); if (error) { fail(r, error); continue; } }
+      if (r.close) { const { error } = await sb.rpc("close_mission", { p_id: r.id, p_closed_on: r.close.date, p_note: "Closed by Bulk edit" }); if (error) { fail(r, error); continue; } }
+    }
+    // the new-year numbers: one per old number, grouped by the year they start
+    const seen = new Set();
+    const byFrom = {};
+    for (const r of updates) {
+      if (!r.renumber || bad.has(r.rowNumber) || seen.has(r.renumber.old)) continue;
+      seen.add(r.renumber.old);
+      const from = r.renumber.new.replace(/^[A-Z]+\.(\d{2})\..*$/, (m, yy) => "20" + yy + "-01-01");
+      (byFrom[from] = byFrom[from] || []).push(r);
+    }
+    for (const [from, list] of Object.entries(byFrom)) {
+      const { error } = await sb.rpc("renumber_missions", { p_items: list.map((r) => ({ old: r.renumber.old, new: r.renumber.new })), p_valid_from: from });
+      if (error) for (const r of list) fail(r, error);
+    }
+    this._invalidatePlans();
+    await this.loadMissionRegister();
+    return {
+      updated: updates.filter((r) => !bad.has(r.rowNumber)).length,
+      created: creates.filter((r) => !bad.has(r.rowNumber)).length,
+      failed,
+    };
+  },
+
   /* ---------- realtime ---------- */
   _subscribeRealtime() {
     // Drop all cached plans on any missions/assignments change — app.js's own
@@ -2649,6 +2819,10 @@ const cloud = {
         this.data.plans = {};
         this.notify(this._attributionFromPayload(payload));
       });
+    }
+    if (this.data.features.missions) {
+      // the Missions tab, and which missions carry over
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "mission_register" }, async () => { await this.loadMissionRegister(); this.notify({ register: true }); });
     }
     if (this.data.features.capacity) {
       ch.on("postgres_changes", { event: "*", schema: "public", table: "capacity_demand" }, async () => {

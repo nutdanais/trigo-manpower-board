@@ -16,6 +16,7 @@ const nextWorking = (s) => { let d = addDays(s, 1); while (isWeekend(d)) d = add
 const prevWorking = (s) => { let d = addDays(s, -1); while (isWeekend(d)) d = addDays(d, -1); return d; };
 
 const TODAY = iso(new Date());
+const YY = TODAY.slice(2, 4), LY = String(+TODAY.slice(0, 4) - 1).slice(2);   // this year's and last year's two digits
 const NEXT = nextWorking(TODAY);          // the confirmed day the board opens on
 const FORECAST = nextWorking(NEXT);       // first forecast day
 
@@ -97,6 +98,8 @@ const PROFILES = [
   { id: "00000000-0000-0000-0000-0000000000b3", email: "pimchanok.r@trigo-group.com", full_name: "Pimchanok Ruang", display_name: "Pimchanok.R", role_key: "engineer", phone: "080-555-0133" },
   { id: "00000000-0000-0000-0000-0000000000c1", email: "wichai.k@trigo-group.com", full_name: "Wichai Kanha", display_name: "Wichai.K", role_key: "manager", phone: "" },
   { id: "00000000-0000-0000-0000-0000000000d1", email: "suda.m@trigo-group.com", full_name: "Suda Mekin", display_name: "Suda.M", role_key: "viewer", phone: "" },
+  // the site's administrator: keeps the mission numbers in step with Etraq (Missions tab)
+  { id: "00000000-0000-0000-0000-0000000000f1", email: "ploy.s@trigo-group.com", full_name: "Ploy Sanit", display_name: "Ploy.S", role_key: "siteadmin", phone: "" },
 ].map((p) => ({ ...p, status: "active", last_seen_at: new Date(Date.now() - 3600e3).toISOString() }));
 const PENDING = [
   { id: "00000000-0000-0000-0000-0000000000e1", email: "arthit.c@trigo-group.com", full_name: "Arthit Chaiyo", display_name: "Arthit.C", role_key: "engineer", status: "pending", requested_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
@@ -126,7 +129,9 @@ const MISSIONS = {
   ],
   b3: [
     ["301", "Rojana Electronics", "Sensor Tech", "day", "eng-3", 3, ""],
-    ["302", "Hi-Tech Bearings", "Motion Parts", "day", "eng-1", 2, ""],
+    // a mission number in Etraq's form, renumbered for this year three days ago (see seed():
+    // the card shows "New number · was …" for two weeks)
+    [`AYTTH.${YY}.0302`, "Hi-Tech Bearings", "Motion Parts", "day", "eng-1", 2, ""],
   ],
 };
 const TIMES = { day: ["08:00:00", "17:00:00"], night: ["20:00:00", "05:00:00"] };
@@ -161,17 +166,23 @@ function seed(db) {
   const emps = employees();
   db.seed("roles", [
     { key: "admin", label: "Admin", rank: 10, protected: true }, { key: "manager", label: "Manager", rank: 20, protected: false },
-    { key: "engineer", label: "Engineer", rank: 30, protected: false }, { key: "viewer", label: "Viewer", rank: 40, protected: false },
+    { key: "engineer", label: "Engineer", rank: 30, protected: false }, { key: "siteadmin", label: "Site Admin", rank: 35, protected: false },
+    { key: "viewer", label: "Viewer", rank: 40, protected: false },
   ]);
   const AREAS_P = ["board", "overview", "orgchart", "emplist", "hostlist", "settings", "users", "capacity", "forecast", "loans",
-    "ov.status", "ov.kpi", "ov.actionQueue", "ov.byBoard", "ov.history", "ov.byEngineer", "ov.dayNight", "ov.hostRisk", "ov.byArea", "ov.leave", "ov.loans"];
+    "ov.status", "ov.kpi", "ov.actionQueue", "ov.byBoard", "ov.history", "ov.byEngineer", "ov.dayNight", "ov.hostRisk", "ov.byArea", "ov.leave", "ov.loans",
+    "missions", "missionadmin"];
   const perms = [];
-  for (const role of ["admin", "manager", "engineer", "viewer"]) {
+  for (const role of ["admin", "manager", "engineer", "siteadmin", "viewer"]) {
+    // the Site Admin starts as a Viewer, plus the Missions tab (migration-2026-11-09)
+    const as = role === "siteadmin" ? "viewer" : role;
     for (const area of AREAS_P) {
-      let level = area.startsWith("ov.") || area === "overview" || area === "orgchart" ? "view" : (role === "viewer" ? "view" : "edit");
-      if (area === "users") level = role === "admin" ? "edit" : "none";
-      if (area === "settings" && role === "viewer") level = "none";
-      if ((area === "ov.history" || area === "ov.byEngineer") && (role === "engineer" || role === "viewer")) level = "none";
+      let level = area.startsWith("ov.") || area === "overview" || area === "orgchart" ? "view" : (as === "viewer" ? "view" : "edit");
+      if (area === "users") level = as === "admin" ? "edit" : "none";
+      if (area === "settings" && as === "viewer") level = "none";
+      if ((area === "ov.history" || area === "ov.byEngineer") && (as === "engineer" || as === "viewer")) level = "none";
+      if (area === "missions") level = role === "viewer" ? "view" : "edit";
+      if (area === "missionadmin") level = ["admin", "manager", "siteadmin"].includes(role) ? "edit" : "none";
       perms.push({ role_key: role, area, level });
     }
   }
@@ -205,7 +216,19 @@ function seed(db) {
       }
     }
   });
+  // the Missions tab: a Chonburi job that ran for the first two weeks of the history and was
+  // closed on its last day (the register rows are made by the database as the days are saved)
+  const ended = days.slice(0, 10);
+  for (const date of ended) {
+    missions.push({ id: `m-b2-209-${date}`, board_id: "b2", plan_date: date, number: "209", host: "Amata Components", customer: "Seat Belt Co.",
+      shift: "day", start_time: TIMES.day[0], end_time: TIMES.day[1], engineer_id: "eng-3", ppe: null, remark: null, hidden: false });
+  }
   db.seed("missions", missions);
+  const closed = db.t("mission_register").find((r) => r.board_id === "b2" && r.number === "209");
+  if (closed) Object.assign(closed, { status: "closed", closed_on: ended[ended.length - 1], closed_by: PROFILES[3].email, closed_at: new Date().toISOString(), close_note: "Contract ended" });
+  // ...and the new-year number of Ayutthaya's bearing job, entered three days ago
+  db.seed("mission_number_history", [{ id: "mnh-1", old_number: `AYTTH.${LY}.0157`, new_number: `AYTTH.${YY}.0302`, valid_from: TODAY.slice(0, 4) + "-01-01",
+    entered_by: "ploy.s@trigo-group.com", entered_at: new Date(Date.now() - 3 * 86400e3).toISOString() }]);
   db.seed("assignments", assignments);
   db.seed("deployment_history", history);
   db.seed("employee_loans", [{ id: "loan-1", employee_id: LOANED, to_board_id: "b2", start_date: TODAY, end_date: addDays(NEXT, 2), note: "Extra sorting at Laem Chabang", created_by: ME.email }]);

@@ -85,7 +85,8 @@ async function step(name, fn) {
       const seeded = await count();
       await page.getByRole("button", { name: "New Mission" }).first().click();
       await page.locator("#modal-mission:not(.hidden)").waitFor();
-      await page.fill("#form-mission [name=number]", "999");
+      // a number in Etraq's form: the mission form checks it (mission-number.js)
+      await page.fill("#form-mission [name=number]", `RYGTH.${String(new Date().getFullYear()).slice(2)}.0999`);
       await page.fill("#form-mission [name=host]", "Siam Auto Parts");
       await page.fill("#form-mission [name=customer]", "Training Customer");
       await page.fill("#form-mission [name=engineer]", "Somchai.P");
@@ -96,6 +97,19 @@ async function step(name, fn) {
       await page.reload();
       await board(page);
       assert.equal(await count(), seeded, "back to the seed after a reload");
+      await ctx.close();
+    });
+
+    await step("?demo&role=siteadmin: the Missions tab with a closed mission and a renumbered one", async () => {
+      const { ctx, page } = await open("?demo&role=siteadmin");
+      assert.equal(await page.evaluate(() => window.__demo.role), "siteadmin");
+      await page.evaluate(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); });
+      await page.locator("#missions-panel:not(.hidden)").waitFor();
+      const yy = String(new Date().getFullYear()).slice(2), ly = String(new Date().getFullYear() - 1).slice(2);
+      assert.match(await page.locator("#missions-body").innerText(), new RegExp(`AYTTH\\.${yy}\\.0302[\\s\\S]*was AYTTH\\.${ly}\\.0157`));
+      await page.selectOption("#missions-status", "closed");
+      assert.match(await page.locator("#missions-body").innerText(), /209[\s\S]*Closed/);
+      assert.equal(await page.locator("#btn-new-mission").isVisible(), false, "the board is view-only for a Site Admin");
       await ctx.close();
     });
 

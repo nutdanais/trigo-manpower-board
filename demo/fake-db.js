@@ -36,6 +36,7 @@ const UNIQUE = {
   hosts: ["name"],
   role_permissions: ["role_key", "area"],
   profiles: ["id"],
+  mission_register: ["board_id", "number", "shift"],
 };
 const NO_ID = new Set(["plan_days", "plan_day_stamps", "day_overrides", "role_permissions", "roles"]);
 const FORWARD_TABLES = new Set(["plan_day_stamps", "capacity_demand", "forecast_missions", "forecast_assignments", "forecast_hold_events"]);
@@ -44,8 +45,10 @@ const DEFAULTS = {
   forecast_missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", ppe: null, remark: null, engineer_id: null }),
   employees: () => ({ active: true, position: null, phone: null, start_date: null, added_on: null }),
   boards: () => ({ weekend_days: [0, 6] }),
+  mission_register: () => ({ status: "open", source: "board", host: null, customer: null, start_time: null, end_time: null, engineer_id: null,
+    ppe: null, remark: null, opened_on: null, last_on: null, closed_on: null, closed_by: null, closed_at: null, close_note: null, updated_by: null }),
 };
-const TIMESTAMPS = new Set(["missions", "assignments", "forecast_missions", "forecast_assignments", "capacity_demand", "boards", "employees", "deployment_history", "hosts", "employee_notes", "forecast_hold_events"]);
+const TIMESTAMPS = new Set(["mission_register", "missions", "assignments", "forecast_missions", "forecast_assignments", "capacity_demand", "boards", "employees", "deployment_history", "hosts", "employee_notes", "forecast_hold_events"]);
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const nowIso = () => new Date(Date.now()).toISOString();
@@ -63,6 +66,8 @@ class FakeDb {
     this.highlightShort = this.highlight && opts.highlightShort !== false;
     // migration-2026-11-04 (employees.exit_reason); { exitReason: false } is a database without it
     this.exitReason = opts.exitReason !== false;
+    // migration-2026-11-09 (mission_register, mission_number_history and their RPCs); { missions: false } is a database without it
+    this.missions = opts.missions !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -88,7 +93,8 @@ class FakeDb {
 
   _missing(table) {
     return (!this.forwardPlanning && FORWARD_TABLES.has(table)) || (!this.mergeLog && table === "forecast_merge_decisions")
-      || (!this.loans && table === "employee_loans");
+      || (!this.loans && table === "employee_loans")
+      || (!this.missions && (table === "mission_register" || table === "mission_number_history"));
   }
 
   /* A column-level migration not run yet: the errors Postgres / PostgREST give
@@ -201,6 +207,9 @@ class FakeDb {
 
   _insertRow(table, values, user) {
     const row = { ...(DEFAULTS[table] ? DEFAULTS[table]() : {}), ...clone(values) };
+    // skip_closed_mission (migration-2026-11-09): a closed mission is never put on a day after it closed
+    if (table === "missions" && this.missions && this.t("mission_register").some((r) => r.board_id === row.board_id && r.number === row.number
+        && r.shift === row.shift && r.status === "closed" && r.closed_on && row.plan_date > r.closed_on)) return null;
     if (!NO_ID.has(table) && !row.id) row.id = uuid();
     if (TIMESTAMPS.has(table)) {
       const ts = this.now();
@@ -244,7 +253,8 @@ class FakeDb {
           const d = new Date();
           row = { ...v, added_on: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") };
         }
-        written.push(this._insertRow(q.table, row, user));
+        const inserted = this._insertRow(q.table, row, user);
+        if (inserted) written.push(inserted);
       }
     }
     if (!q.returning) return { data: null, error: null };
@@ -297,13 +307,14 @@ class FakeDb {
       for (const t of ["assignments", "deployment_history", "forecast_assignments", "forecast_hold_events"]) cascade(t, (r) => r.employee_id === row.id);
     }
     if (table === "boards") {
-      for (const t of ["missions", "employees", "plan_days", "plan_day_stamps", "capacity_demand", "forecast_missions", "day_overrides"]) cascade(t, (r) => r.board_id === row.id);
+      for (const t of ["missions", "employees", "plan_days", "plan_day_stamps", "capacity_demand", "forecast_missions", "day_overrides", "mission_register"]) cascade(t, (r) => r.board_id === row.id);
     }
   }
 
   /* ---------- triggers ---------- */
   _afterWrite(table, op, row, old, user) {
     this._emit(table, op, row, old);
+    if (table === "missions" && this.missions) this._syncRegister(op, row, old, user);
     if (!this.forwardPlanning) return;
     if (table !== "missions" && table !== "assignments") return;
     const by = (user && user.email) || "system";
@@ -323,11 +334,50 @@ class FakeDb {
     if (row && (!old || boardOf(row) !== boardOf(old) || row.plan_date !== old.plan_date)) bump(boardOf(row), row.plan_date);
   }
 
+  /* sync_mission_register / forget_unused_mission (migration-2026-11-09) */
+  _syncRegister(op, row, old, user) {
+    if (this._renumbering) return;   // renumber_missions renames the register itself
+    if (row && (op === "INSERT" || op === "UPDATE")) {
+      if (!this.t("boards").some((b) => b.id === row.board_id)) return;
+      const key = { board_id: row.board_id, number: row.number, shift: row.shift };
+      const r = this._findConflict("mission_register", key);
+      const details = { host: row.host, customer: row.customer, start_time: row.start_time, end_time: row.end_time,
+        engineer_id: row.engineer_id, ppe: row.ppe, remark: row.remark };
+      if (!r) {
+        this._insertRow("mission_register", { ...key, ...details, opened_on: row.plan_date, last_on: row.plan_date, updated_by: (user && user.email) || "system" }, user);
+      } else {
+        const prev = clone(r);
+        if (!r.opened_on || row.plan_date < r.opened_on) r.opened_on = row.plan_date;
+        if (!r.last_on || row.plan_date >= r.last_on) { Object.assign(r, details); r.last_on = row.plan_date; }
+        r.updated_at = this.now();
+        this._emit("mission_register", "UPDATE", r, prev);
+      }
+    }
+    if (op === "DELETE" && old) {
+      const r = this._findConflict("mission_register", { board_id: old.board_id, number: old.number, shift: old.shift });
+      if (r && r.status === "open" && r.source === "board"
+          && !this.t("missions").some((m) => m.board_id === old.board_id && m.number === old.number && m.shift === old.shift)
+          && !this.t("mission_number_history").some((h) => h.new_number === old.number || h.old_number === old.number)) {
+        this._deleteRow("mission_register", r, user);
+      }
+    }
+  }
+
+  /* public.can() for the RPCs: the caller's role from profiles, its level from role_permissions */
+  _can(user, area, need) {
+    const p = user && this.t("profiles").find((x) => x.id === user.id || (x.email || "").toLowerCase() === (user.email || "").toLowerCase());
+    if (!p || p.status !== "active") return false;
+    const rp = this.t("role_permissions").find((x) => x.role_key === p.role_key && x.area === area);
+    const L = { none: 0, view: 1, edit: 2 };
+    return !!rp && (L[rp.level] || 0) >= (L[need] || 0);
+  }
+
   /* ---------- RPCs ---------- */
   _rpc(q, user) {
     const fn = this.rpcs[q.fn];
     if (!fn) return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${q.fn} in the schema cache` } };
-    if (this._missing({ stamp_carry: "plan_day_stamps", stamp_forecast_merge: "plan_day_stamps", set_forecast_assignment: "forecast_assignments", acknowledge_hold_events: "forecast_hold_events", record_forecast_merge: "forecast_merge_decisions" }[q.fn] || "")) {
+    if (this._missing({ stamp_carry: "plan_day_stamps", stamp_forecast_merge: "plan_day_stamps", set_forecast_assignment: "forecast_assignments", acknowledge_hold_events: "forecast_hold_events", record_forecast_merge: "forecast_merge_decisions",
+      close_mission: "mission_register", reopen_mission: "mission_register", renumber_missions: "mission_register" }[q.fn] || "")) {
       return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${q.fn} in the schema cache` } };
     }
     return { data: fn(q.args || {}, user), error: null };
@@ -417,6 +467,70 @@ class FakeDb {
       }
       this.rpcs.stamp_forecast_merge({ p_board_id: a.p_board_id, p_plan_date: a.p_plan_date }, u);
       return { merge_id: mergeId, decisions: (a.p_items || []).length, events };
+    };
+    const fail = (msg, code) => { throw Object.assign(new Error(msg), { code }); };
+    /* mirrors public.close_mission (migration-2026-11-09) */
+    this.rpcs.close_mission = (a, u) => {
+      if (!this._can(u, "missions", "edit")) fail("Your role cannot close missions.", "42501");
+      if (!a.p_closed_on) fail("Choose the last working day.", "23514");
+      const r = this.t("mission_register").find((x) => x.id === a.p_id);
+      if (!r) fail("That mission is not in the Missions list.", "P0002");
+      if (r.status === "closed") fail(`Mission ${r.number} is already closed.`, "23514");
+      const after = (m) => m.board_id === r.board_id && m.number === r.number && m.shift === r.shift && m.plan_date > a.p_closed_on;
+      if (this.t("missions").some((m) => after(m) && this.t("plan_days").some((d) => d.board_id === m.board_id && d.plan_date === m.plan_date && d.locked_at))) {
+        fail(`Mission ${r.number} is on a locked day after ${a.p_closed_on}. Unlock that day first, or choose a later last working day.`, "23514");
+      }
+      const prev = clone(r);
+      Object.assign(r, { status: "closed", closed_on: a.p_closed_on, closed_by: email(u), closed_at: this.now(),
+        close_note: ((a.p_note || "").trim()) || null, last_on: r.last_on && r.last_on < a.p_closed_on ? r.last_on : a.p_closed_on, updated_at: this.now() });
+      this._emit("mission_register", "UPDATE", r, prev);
+      const gone = this.t("missions").filter(after);
+      for (const m of gone) {
+        const crew = this.t("assignments").filter((x) => x.mission_id === m.id).map((x) => x.employee_id);
+        for (const h of this.t("deployment_history").filter((h) => h.plan_date === m.plan_date && crew.includes(h.employee_id) && h.mission_number === r.number)) this._deleteRow("deployment_history", h, u);
+        this._deleteRow("missions", m, u);
+      }
+      if (this.forwardPlanning) for (const m of this.t("forecast_missions").filter(after)) this._deleteRow("forecast_missions", m, u);
+      return null;
+    };
+    this.rpcs.reopen_mission = (a, u) => {
+      if (!this._can(u, "missionadmin", "edit")) fail("Your role cannot reopen missions.", "42501");
+      const r = this.t("mission_register").find((x) => x.id === a.p_id && x.status === "closed");
+      if (!r) fail("That mission is not closed.", "P0002");
+      const prev = clone(r);
+      Object.assign(r, { status: "open", closed_on: null, closed_by: null, closed_at: null, close_note: null, updated_at: this.now() });
+      this._emit("mission_register", "UPDATE", r, prev);
+      return null;
+    };
+    /* mirrors public.renumber_missions: all or nothing, the days from p_valid_from on, stamps kept */
+    this.rpcs.renumber_missions = (a, u) => {
+      if (!this._can(u, "missionadmin", "edit")) fail("Your role cannot enter new mission numbers.", "42501");
+      if (!a.p_valid_from) fail("Choose the date the new numbers start.", "23514");
+      const items = (a.p_items || []).map((it) => ({ old: String(it.old || "").trim().toUpperCase(), new: String(it.new || "").trim().toUpperCase() }));
+      const reg = () => this.t("mission_register");
+      for (const it of items) {
+        if (!/^[A-Z]{2,10}\.[0-9]{2}\.[0-9]{4}$/.test(it.new)) fail(`Mission number ${it.new} is not in the form PREFIX.YY.NNNN.`, "23514");
+        if (it.new === it.old) continue;
+        if (!reg().some((r) => r.number === it.old)) fail(`Mission ${it.old} is not in the Missions list.`, "P0002");
+        if (reg().some((r) => r.number === it.new) || items.filter((x) => x.new === it.new).length > 1) fail(`Mission number ${it.new} is already used.`, "23505");
+      }
+      const stamps = clone(this.t("plan_day_stamps"));
+      let n = 0;
+      this._renumbering = true;
+      try {
+        for (const it of items) {
+          if (it.new === it.old) continue;
+          for (const r of reg().filter((r) => r.number === it.old)) { const prev = clone(r); r.number = it.new; r.updated_at = this.now(); this._emit("mission_register", "UPDATE", r, prev); }
+          for (const t of ["missions"].concat(this.forwardPlanning ? ["forecast_missions"] : [])) {
+            for (const m of this.t(t).filter((m) => m.number === it.old && m.plan_date >= a.p_valid_from)) { const prev = clone(m); m.number = it.new; this._emit(t, "UPDATE", m, prev); }
+          }
+          for (const h of this.t("deployment_history").filter((h) => h.mission_number === it.old && h.plan_date >= a.p_valid_from)) h.mission_number = it.new;
+          this._insertRow("mission_number_history", { old_number: it.old, new_number: it.new, valid_from: a.p_valid_from, entered_by: email(u), entered_at: this.now() }, u);
+          n++;
+        }
+      } finally { this._renumbering = false; }
+      this.tables.plan_day_stamps = stamps;
+      return n;
     };
     this.rpcs.acknowledge_hold_events = (a, u) => {
       let n = 0;

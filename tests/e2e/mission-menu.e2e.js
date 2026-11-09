@@ -129,10 +129,10 @@ async function step(name, fn) {
       assert.equal(await p.inputValue("#form-mission [name=number]"), "");
       assert.equal(await p.inputValue("#form-mission [name=host]"), "Host Beta");
       assert.equal(await p.inputValue("#form-mission [name=customer]"), "Cust Beta");
-      await p.fill("#form-mission [name=number]", "102B");
+      await p.fill("#form-mission [name=number]", "TSTTH.26.0102");
       await p.click("#form-mission button[type=submit]");
-      await card("102B").waitFor();
-      const dup = db.t("missions").find((m) => m.number === "102B");
+      await card("TSTTH.26.0102").waitFor();
+      const dup = db.t("missions").find((m) => m.number === "TSTTH.26.0102");
       assert.equal(dup.host, "Host Beta");
       assert.equal(dup.board_id, "b1");
     });
@@ -257,11 +257,11 @@ async function step(name, fn) {
     });
 
     await step("Delete asks first, then removes the mission", async () => {
-      await rightClick("102B");
+      await rightClick("TSTTH.26.0102");
       await item("Delete mission").click();
       await p.click("#btn-confirm-yes");
-      await card("102B").waitFor({ state: "detached" });
-      assert.equal(db.t("missions").find((m) => m.number === "102B"), undefined);
+      await card("TSTTH.26.0102").waitFor({ state: "detached" });
+      assert.equal(db.t("missions").find((m) => m.number === "TSTTH.26.0102"), undefined);
     });
 
     await step("the mission form's own Delete and Hide still work", async () => {
