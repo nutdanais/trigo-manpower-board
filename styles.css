@@ -7397,7 +7397,7 @@ td.ml-crew .ml-muted { color: var(--muted); font-size: 12.5px; }
   #missions-table .ml-actions .btn { border-color: transparent; background: none; color: var(--primary-text); }
   #missions-table .ml-actions .btn:hover { background: var(--hover-tint); }
   /* Customer and Host keep a readable width instead of wrapping to three lines beside the status and alert pills */
-  #missions-table td:nth-child(5), #missions-table td:nth-child(6) { min-width: 8.5em; }
+  #missions-table td.mcol-customer, #missions-table td.mcol-host { min-width: 8.5em; }
   /* long headers ("Avg crew / week") may take two lines rather than widen their column */
   #missions-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
   #missions-table th[data-sort="avgCrew"] { min-width: 5.8em; }
@@ -7572,3 +7572,38 @@ body.presenting-board.pres-hide-names .emp-name::before { content: "•••"; 
 /* a highlighted mission, in the Missions tab's Status and alerts and nowhere else: the board's gold */
 .ml-tag.ml-hl { display: inline-flex; align-items: center; gap: 4px; background: #e3a008; border: 1px solid #c98f06; color: #3d2a00; font-weight: 700; }
 .ml-tag.ml-hl .ic { width: 10px; height: 10px; flex: none; }
+
+/* Board and status in one cell: the board's chip (the one Host uses), the state and what needs a look under it */
+td.ml-status .ml-board-line { display: block; }
+td.ml-status .hl-board { padding: 0 8px; line-height: 1.6; }
+td.ml-status { min-width: 150px; max-width: 280px; }
+/* row actions stay out of sight until the row is hovered or focused; a touch screen and a phone always show them */
+@media (min-width: 641px) and (hover: hover) {
+  #missions-table .ml-hov { opacity: 0; transition: opacity .12s ease; }
+  #missions-table tbody tr:hover .ml-hov, #missions-table tbody tr:focus-within .ml-hov, #missions-table .ml-hov:focus-visible { opacity: 1; }
+}
+#missions-table .ml-more { padding: 3px 7px; }
+#missions-table .ml-more .ic { width: 16px; height: 16px; }
+@media (min-width: 641px) { #missions-table .ml-more { border-color: transparent; background: none; color: var(--muted); } #missions-table .ml-more:hover { background: var(--hover-tint); color: var(--text); } }
+/* the Columns list */
+#missions-cols-pop { display: flex; flex-direction: column; gap: 2px; padding: 8px; min-width: 210px; }
+#missions-cols-pop .ms-opt { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+#missions-cols-pop .ms-opt:hover { background: var(--hover-tint); }
+#missions-cols-pop .btn { margin-top: 6px; align-self: flex-start; }
+@media (max-width: 640px) { #missions-cols-dd { display: none; } }
+/* a column switched off in Columns (a phone's cards keep every field) */
+@media (min-width: 641px) {
+  #missions-table[data-hide~="shift"] .mcol-shift { display: none; }
+  #missions-table[data-hide~="time"] .mcol-time { display: none; }
+  #missions-table[data-hide~="customer"] .mcol-customer { display: none; }
+  #missions-table[data-hide~="host"] .mcol-host { display: none; }
+  #missions-table[data-hide~="engineer"] .mcol-engineer { display: none; }
+  #missions-table[data-hide~="openedOn"] .mcol-openedOn { display: none; }
+  #missions-table[data-hide~="lastOn"] .mcol-lastOn { display: none; }
+  #missions-table[data-hide~="crew"] .mcol-crew { display: none; }
+  #missions-table[data-hide~="avgCrew"] .mcol-avgCrew { display: none; }
+  #missions-table[data-hide~="ppe"] .mcol-ppe { display: none; }
+  #missions-table[data-hide~="remark"] .mcol-remark { display: none; }
+}
+.ml-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+@media (max-width: 640px) { .ml-stack { align-items: flex-end; } }

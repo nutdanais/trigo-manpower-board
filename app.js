@@ -504,6 +504,7 @@ const state = {
     status: "open",            // "open" | "closed" | "all"
     filters: { areaId: [], shift: [], engineerId: [], customer: [], host: [], placement: [], alerts: [] },   // behind the Filters button, like Host's; areaId is the host's service area, also the By area chips
     sort: { key: "number", dir: 1 },
+    hiddenCols: [],            // the columns the Columns button has switched off (kept on this device)
     activity: null,            // cloud.getMissionActivity(): how each mission was staffed in the last six weeks
     activityKey: null,         // what it was read for; cleared by every realtime change, like the Host directory
   },
@@ -2251,7 +2252,7 @@ function buildLangRow(onPick) {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-missions-filter-pop", "#missions-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-missions-filter-pop", "#missions-filter-pop"], ["#btn-missions-cols", "#missions-cols-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2665,7 +2666,8 @@ function renderCtxMenu(view) {
     menu.appendChild(it);
   };
 
-  if (ctxMenu.mission) renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep, addOff });
+  if (ctxMenu.row) renderMissionRowMenu({ addTitle, addItem });
+  else if (ctxMenu.mission) renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep, addOff });
   else renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep });
 
   menu.classList.remove("hidden");
@@ -3655,18 +3657,25 @@ function renderStats() {
 /* Manpower and Host: the "By area" chips double as a one-click area filter.
    A click shows only that area (the same filter as Filters → Service area);
    clicking the chip that is on again shows every area. "__none__" is No area. */
-function areaFilterChip(key, name, n, color, picked) {
-  const on = picked.length === 1 && picked[0] === key;
+function areaFilterChip(key, name, n, color, picked, multi = false) {
+  const on = multi ? picked.includes(key) : picked.length === 1 && picked[0] === key;
   const dot = /^#[0-9a-f]{3,8}$/i.test(color || "") ? color : "var(--muted)";
   return `<button type="button" class="area-chip ac-btn${on ? " ac-on" : ""}" data-area="${escapeHtml(name)}" data-area-key="${escapeHtml(key)}" aria-pressed="${on}"` +
-    ` title="${on ? "Click again to show every area" : `Show only ${escapeHtml(name)}`}"><i class="ac-dot" style="background:${dot}"></i>${escapeHtml(name)} <b>${n}</b></button>`;
+    ` title="${multi ? (on ? `Click to remove ${escapeHtml(name)} from the areas shown` : `Add ${escapeHtml(name)} to the areas shown`)
+      : on ? "Click again to show every area" : `Show only ${escapeHtml(name)}`}"><i class="ac-dot" style="background:${dot}"></i>${escapeHtml(name)} <b>${n}</b></button>`;
 }
-function wireAreaFilterChips(barEl, filters, redraw) {
+function wireAreaFilterChips(barEl, filters, redraw, multi = false) {
   for (const b of barEl.querySelectorAll(".ac-btn")) b.onclick = () => {
     const key = b.dataset.areaKey;
-    filters.areaId = filters.areaId.length === 1 && filters.areaId[0] === key ? [] : [key];
+    // one area at a time (Manpower, Host), or each click adds or removes one (Missions)
+    filters.areaId = multi ? (filters.areaId.includes(key) ? filters.areaId.filter(k => k !== key) : [...filters.areaId, key])
+      : filters.areaId.length === 1 && filters.areaId[0] === key ? [] : [key];
     redraw();
   };
+}
+/* the board's name as the one chip Host, Missions and Manpower share */
+function boardChipHtml(name, title) {
+  return `<span class="hl-board"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(name)}</span>`;
 }
 
 /* Phone header (styles.css, Phone header): the same numbers as the tiles above,
@@ -8211,7 +8220,7 @@ function renderEmployeeRows() {
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
       <td data-label="Years of service" class="m-x el-wrap el-svc">${e.startDate ? serviceCellHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) : "—"}</td>
       <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
-      <td data-label="Current board" class="el-board">${board ? escapeHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
+      <td data-label="Current board" class="el-board">${board ? boardChipHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
       <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" class="el-util">${utilCell(util)}</td>${emplistShowsWl() ? emplistWlCells(e) : ""}
       <td data-label="Status" class="el-status">
         <button type="button" class="m-fold" aria-expanded="false">More details</button>
@@ -9237,13 +9246,13 @@ function renderMissionStats(bar) {
   // By area: the service area of each mission's host, counted over what the Board picker and Open / Closed / All leave
   const areaBar = $("#area-bar");
   const scope = missionScopeRows();
-  const areaChip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.missions.filters.areaId);
+  const areaChip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.missions.filters.areaId, true);
   let areaHtml = "";
   for (const a of D().areas) { const n = scope.filter(r => missionAreaKey(r) === a.id).length; if (n) areaHtml += areaChip(a.id, a.name, n, a.color); }
   const noArea = scope.filter(r => missionAreaKey(r) === MISSION_NONE).length;
   if (noArea) areaHtml += areaChip(MISSION_NONE, "No area", noArea, "");
   areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
-  wireAreaFilterChips(areaBar, state.missions.filters, () => { renderMissionList(); renderStats(); });
+  wireAreaFilterChips(areaBar, state.missions.filters, () => { renderMissionList(); renderStats(); }, true);
   // open missions on their board with nobody on them
   const noCrew = all.filter(r => r.status === "open" && missionInfo(r).alerts.some(a => a.kinds.includes("noCrew"))).length;
   const tile = (label, n, kind) =>
@@ -9317,11 +9326,14 @@ function renderMissionList() {
   body.innerHTML = rows.map(r => {
     const prev = cloud.previousNumber(r.number);
     const info = missionInfo(r);
+    // quiet until the row is hovered or focused (always there on a phone and on a touch screen): Close…, Reopen and the ⋯ menu
     const acts = [];
-    // Add to board is for a mission that is not on its board: registered with no day, or off it
-    if (r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")) acts.push(`<button type="button" class="btn btn-small" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
-    if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
-    if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small" data-act="reopen">Reopen</button>`);
+    if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small ml-hov" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
+    if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small ml-hov" data-act="reopen">Reopen</button>`);
+    acts.push(`<button type="button" class="btn btn-small ml-hov ml-more" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`);
+    // Add to board sits on the state it fixes: a mission that is not on its board (registered with no day, or off it)
+    const addBtn = r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")
+      ? `<button type="button" class="ml-tag ml-wait ml-pill-btn" data-act="add" title="Put this mission on a day of its board">Add to board</button>` : "";
     const host = r.host ? (canHost
       ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Show this host in the Host tab") : "Show this host in the Host tab")}">${escapeHtml(r.host)}</button>`
       : escapeHtml(r.host)) : "—";
@@ -9334,23 +9346,23 @@ function renderMissionList() {
       : info.day.crew ? `<b>${info.day.crew}</b>` : `<span class="ml-zero" title="${dayTitle("Nobody is on it that day")}">0</span>`;
     // data-label: the phone shows each row as a card with these as its field names
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
-      <td class="ml-first"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
-      <td data-label="${lbl("Board")}">${escapeHtml(boardNameOf(r.boardId))}</td>
-      <td data-label="${lbl("Shift")}">${r.shift === "night" ? `<span class="ml-night">${icon("moon")}Night</span>` : "Day"}</td>
-      <td data-label="${lbl("Time")}" class="ml-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : "—"}</td>
-      <td data-label="${lbl("Customer")}">${escapeHtml(r.customer || "—")}</td>
-      <td data-label="${lbl("Host")}" class="ml-host-cell">${host}</td>
-      <td data-label="${lbl("Trigo responsible")}">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
-      <td data-label="${lbl("Start date")}" class="ml-date">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
-      <td data-label="${lbl("Last on board")}" class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
-      <td data-label="${lbl("Crew")}" class="ml-crew num">${crew}</td>
-      <td data-label="${lbl("Avg crew / week")}" class="ml-avg num">${avg}</td>
-      <td data-label="${lbl("Status and alerts")}" class="ml-status"><span class="ml-chips">${missionStatusHtml(r, info.p)}${r.status === "closed" ? "" : missionHighlightChip(info.day)}<span class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</span></span></td>
-      <td data-label="${lbl("PPE")}" class="ml-text">${missionTextCell(r.ppe)}</td>
-      <td data-label="${lbl("Remark")}" class="ml-text">${missionTextCell(r.remark)}</td>
+      <td class="ml-first mcol-number"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
+      <td data-label="${lbl("Board and status")}" class="ml-status mcol-status"><span class="ml-stack"><span class="ml-board-line">${boardChipHtml(boardNameOf(r.boardId))}</span><span class="ml-chips">${missionStatusHtml(r, info.p)}${addBtn}${r.status === "closed" ? "" : missionHighlightChip(info.day)}<span class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</span></span></span></td>
+      <td data-label="${lbl("Shift")}" class="mcol-shift">${r.shift === "night" ? `<span class="ml-night">${icon("moon")}Night</span>` : "Day"}</td>
+      <td data-label="${lbl("Time")}" class="ml-time mcol-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : "—"}</td>
+      <td data-label="${lbl("Customer")}" class="mcol-customer">${escapeHtml(r.customer || "—")}</td>
+      <td data-label="${lbl("Host")}" class="ml-host-cell mcol-host">${host}</td>
+      <td data-label="${lbl("Trigo responsible")}" class="mcol-engineer">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
+      <td data-label="${lbl("Start date")}" class="ml-date mcol-openedOn">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
+      <td data-label="${lbl("Last on board")}" class="ml-date mcol-lastOn">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
+      <td data-label="${lbl("Crew")}" class="ml-crew num mcol-crew">${crew}</td>
+      <td data-label="${lbl("Avg crew / week")}" class="ml-avg num mcol-avgCrew">${avg}</td>
+      <td data-label="${lbl("PPE")}" class="ml-text mcol-ppe">${missionTextCell(r.ppe)}</td>
+      <td data-label="${lbl("Remark")}" class="ml-text mcol-remark">${missionTextCell(r.remark)}</td>
       <td class="ml-actions">${acts.join("")}</td></tr>`;
   }).join("");
   $("#missions-crew-date").textContent = fmtDayMon(state.date);
+  renderMissionColumns();
   quietTable("#missions-table");
   const empty = $("#missions-empty");
   const none = !(D().register || []).length;
@@ -9359,6 +9371,72 @@ function renderMissionList() {
     ? "No missions yet. A mission appears here as soon as it is on a board, or add many at once with Bulk edit."
     : st.status === "closed" ? "No closed missions match." : "No missions match.";
   $("#missions-list-wrap").classList.toggle("hidden", !rows.length);
+}
+/* Columns: which of the table's columns show. The mission number and "Board and status" always do; the rest
+   can be switched off, and the choice is kept on this device. A phone's cards show every field. */
+const MISSION_COLUMNS = [["shift", "Shift"], ["time", "Time"], ["customer", "Customer"], ["host", "Host"], ["engineer", "Trigo responsible"], ["openedOn", "Start date"], ["lastOn", "Last on board"], ["crew", "Crew"], ["avgCrew", "Avg crew / week"], ["ppe", "PPE"], ["remark", "Remark"]];
+const MISSION_COLS_KEY = "manpower.missionsHiddenCols";
+function loadMissionColumns() {
+  try {
+    const v = JSON.parse(localStorage.getItem(MISSION_COLS_KEY) || "[]");
+    state.missions.hiddenCols = Array.isArray(v) ? v.filter(k => MISSION_COLUMNS.some(c => c[0] === k)) : [];
+  } catch (e) { state.missions.hiddenCols = []; }
+}
+function saveMissionColumns() {
+  try { localStorage.setItem(MISSION_COLS_KEY, JSON.stringify(state.missions.hiddenCols)); } catch (e) { /* remembering is a courtesy */ }
+}
+function renderMissionColumns() {
+  const hidden = state.missions.hiddenCols;
+  const table = $("#missions-table");
+  table.dataset.hide = hidden.join(" ");
+  const n = hidden.length;
+  $("#missions-cols-count").textContent = n;
+  $("#missions-cols-count").classList.toggle("hidden", !n);
+  $("#btn-missions-cols").classList.toggle("ms-active", n > 0);
+  const pop = $("#missions-cols-pop");
+  if (pop.dataset.built !== String(MISSION_COLUMNS.length)) {
+    pop.dataset.built = String(MISSION_COLUMNS.length);
+    pop.innerHTML = MISSION_COLUMNS.map(([k, label]) =>
+      `<label class="ms-opt"><input type="checkbox" data-col="${k}"> <span>${escapeHtml(label)}</span></label>`).join("")
+      + `<button type="button" class="btn btn-small" id="btn-missions-cols-reset">Show all columns</button>`;
+    pop.addEventListener("change", (e) => {
+      const box = e.target.closest("input[data-col]");
+      if (!box) return;
+      const set = new Set(state.missions.hiddenCols);
+      box.checked ? set.delete(box.dataset.col) : set.add(box.dataset.col);
+      state.missions.hiddenCols = MISSION_COLUMNS.map(c => c[0]).filter(k => set.has(k));
+      saveMissionColumns();
+      renderMissionList();
+    });
+    pop.addEventListener("click", (e) => {
+      if (!e.target.closest("#btn-missions-cols-reset")) return;
+      state.missions.hiddenCols = [];
+      saveMissionColumns();
+      renderMissionList();
+    });
+  }
+  for (const box of pop.querySelectorAll("input[data-col]")) box.checked = !hidden.includes(box.dataset.col);
+}
+/* the ⋯ menu on a row: the actions of the mission's panel, which opens (the board it borrows is the same one
+   the double click uses) and runs the one chosen, so the board's own checks and dialogs apply */
+function openMissionRowMenu(r, btn) {
+  const rect = btn.getBoundingClientRect();
+  ctxMenu = { row: r, x: rect.right, y: rect.bottom + 4 };
+  renderCtxMenu("root");
+}
+function renderMissionRowMenu({ addTitle, addItem }) {
+  const r = ctxMenu.row;
+  const p = missionPlacement(r);
+  const canPlan = can("board", "edit");
+  const onBoard = r.status === "open" && (p.kind === "on" || p.kind === "hidden");
+  const hasDay = r.status === "open" && p.kind !== "notstarted";
+  addTitle(`${r.number} · ${r.shift === "night" ? "Night" : "Day"}`);
+  addItem("Mission details", () => openMissionFromList(r), null, "clipboard");
+  if (canPlan && onBoard && feat().highlight) addItem("Highlight…", () => openMissionFromList(r, { then: "btn-md-hl" }), null, "star");
+  if (canPlan && hasDay) addItem("Duplicate", () => openMissionFromList(r, { then: "btn-md-dup" }), null, "copy");
+  if (canPlan && hasDay && D().boards.length > 1) addItem("Move or copy…", () => openMissionFromList(r, { then: "btn-md-move" }), null, "swap");
+  if (canPlan && onBoard) addItem(p.kind === "hidden" ? "Unhide" : "Hide", () => openMissionFromList(r, { then: "btn-md-hide" }), null, p.kind === "hidden" ? "eye" : "eye-off");
+  if (r.status === "closed" && can("missionadmin", "edit")) addItem("Reopen", () => reopenMissionRow(r), null, "undo");
 }
 function missionFromRow(el) {
   const tr = el.closest("tr[data-id]");
@@ -10852,8 +10930,10 @@ function leaveMissionListBoard() {
 /* Double-click on a Missions row (or its pencil): the same Edit Mission form as the board's card. It edits
    the mission's row on the day on screen, or on its latest day when it is not on its board that day (the form
    says which). A mission registered in Bulk edit that has no day yet opens as a New Mission, filled in. */
-function openMissionFromList(r) {
+let missionPanelThen = null;   // a panel button to press once the panel has drawn (the ⋯ menu on a row)
+function openMissionFromList(r, opts = {}) {
   if (!r) return;
+  missionPanelThen = opts.then || null;
   const days = missionDays(r) || {};
   let day = days[state.date] ? state.date : (Object.keys(days).sort().pop() || r.lastOn || null);
   const sel = $("#mission-board");
@@ -11025,6 +11105,9 @@ async function renderMissionDetail() {
   if (reg && reg.status === "open" && can("missions", "edit")) act("btn-md-close", "btn btn-small btn-danger", "check", "Close mission…", () => openCloseMissionModal(reg, state.date));
   head.appendChild(acts);
   box.appendChild(head);
+  const then = missionPanelThen;
+  missionPanelThen = null;
+  if (then) setTimeout(() => { const b = document.getElementById(then); if (b && !$("#mission-detail").classList.contains("hidden")) b.click(); }, 0);
 
   const hostLink = m.host && can("hostlist") ? `<button type="button" class="ml-host-link" id="btn-md-host">${escapeHtml(m.host)}</button>` : escapeHtml(m.host || "-");
   const dayNote = missionFromList.prevDate ? ` <small class="ov-muted">its latest day on the board</small>` : "";
@@ -15323,7 +15406,7 @@ function mergePersonCard(card) {
       cl.appendChild(mkEl("span", null, side === "carry" ? "Crew if kept" : "Crew if used"));
       cl.appendChild(mkEl("b", null, String(crew.length)));
       more.appendChild(cl);
-      const cr = mkEl("div", "mc-crew");
+      const cr = mkEl("div", "mcol-crew");
       for (const id of crew) cr.appendChild(mergeCrewChip(id, id === it.empId));
       more.appendChild(cr);
       b.appendChild(more);
@@ -15404,7 +15487,7 @@ function mergeFieldsCard(card) {
   cl.appendChild(mkEl("span", null, `People on ${bm.number}`));
   cl.appendChild(mkEl("b", null, String(crew.length)));
   el.appendChild(cl);
-  const cr = mkEl("div", "mc-crew");
+  const cr = mkEl("div", "mcol-crew");
   for (const id of crew) cr.appendChild(mergeCrewChip(id));
   el.appendChild(cr);
   // an engineer who would run two missions in the same shift
@@ -15434,7 +15517,7 @@ function mergeRemoveCard(card) {
   const opts = mkEl("div", "mc-opts");
   opts.appendChild(mergeOption("carry", `Keep ${bm.number}`, "1 · ←", d === "carry", (b) => {
     const cl = mkEl("div", "mc-crewl"); cl.appendChild(mkEl("span", null, "Crew stays")); cl.appendChild(mkEl("b", null, String(crew.length))); b.appendChild(cl);
-    const cr = mkEl("div", "mc-crew"); for (const id of crew) cr.appendChild(mergeCrewChip(id)); b.appendChild(cr);
+    const cr = mkEl("div", "mcol-crew"); for (const id of crew) cr.appendChild(mergeCrewChip(id)); b.appendChild(cr);
   }));
   opts.appendChild(mergeOption("forecast", `Remove ${bm.number} · as the forecast`, "2 · →", d === "forecast", (b) => {
     b.appendChild(mkEl("div", "mc-crewl", "Where the crew goes"));
@@ -18509,6 +18592,7 @@ function wireApp() {
   $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
   $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
   // Missions tab (migration-2026-11-09)
+  loadMissionColumns();
   $("#missions-search").addEventListener("input", (e) => { state.missions.search = e.target.value; renderMissionList(); renderStats(); });
   $("#missions-board").addEventListener("change", (e) => { state.missions.boardId = e.target.value; render(); });
   $("#missions-status").addEventListener("change", (e) => { state.missions.status = e.target.value; render(); });
@@ -18525,7 +18609,8 @@ function wireApp() {
     const b = e.target.closest("button[data-act]");
     const r = b && missionFromRow(b);
     if (!r) return;
-    if (b.dataset.act === "close" || b.dataset.act === "suggest-close") openCloseMissionModal(r);
+    if (b.dataset.act === "more") { e.stopPropagation(); closeTopbarMenus(); openMissionRowMenu(r, b); }
+    else if (b.dataset.act === "close" || b.dataset.act === "suggest-close") openCloseMissionModal(r);
     else if (b.dataset.act === "host") openHostFromMission(r);
     else if (b.dataset.act === "reopen") reopenMissionRow(r);
     else if (b.dataset.act === "add") openMissionAddModal(r);

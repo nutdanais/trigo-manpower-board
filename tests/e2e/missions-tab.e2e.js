@@ -173,7 +173,8 @@ async function step(name, fn) {
       assert.match(await alerts("108"), /No crew · 8 days · Close\?/);
       assert.equal(await row(p, "108").locator(".ml-alerts button[data-act=suggest-close]").count(), 1);
       assert.equal(await row(p, "108").locator(".ml-alerts .ml-late").count(), 1, "over 5 working days is red");
-      assert.match(await row(p, "108").locator('td[data-label="Status and alerts"]').innerText(), /On board[\s\S]*No crew/, "the state and the alerts share one cell");
+      assert.match(await row(p, "108").locator('td[data-label="Board and status"]').innerText(), /Board \w+[\s\S]*On board[\s\S]*No crew/, "the board, the state and the alerts share one cell");
+      assert.equal(await row(p, "108").locator("td.ml-status .hl-board").count(), 1, "the board is the chip Host uses");
       assert.equal(await p.locator("#missions-table th", { hasText: /^Alerts$/ }).count(), 0, "no separate Alerts column");
       // one day with nobody on it is amber and has no Close
       assert.match(await alerts(M7), /No crew · 1 day\b/);
@@ -374,7 +375,15 @@ async function step(name, fn) {
       const hosts = await p.locator("#missions-body tr td.ml-host-cell").allInnerTexts();
       assert.ok(hosts.length > 0 && hosts.every((t) => t.trim() === "Host Beta"), "only the hosts in that area: " + hosts.join(","));
       assert.match(await p.locator("#btn-missions-filter-pop").innerText(), /1/, "the Filters count says one is on");
-      await p.locator("#area-bar .ac-btn", { hasText: "Area One" }).click();   // again: every area
+      // several at once: a second chip adds its area
+      await p.locator("#area-bar .ac-btn", { hasText: "Area Two" }).click();
+      await p.waitForFunction(() => document.querySelectorAll("#area-bar .ac-btn.ac-on").length === 2);
+      const both = (await p.locator("#missions-body tr td.ml-host-cell").allInnerTexts()).map((t) => t.trim());
+      assert.ok(both.includes("Host Beta") && both.includes("Host Gamma"), "both areas are shown: " + both.join(","));
+      assert.match(await p.locator("#btn-missions-filter-pop").innerText(), /1/, "the Filters count counts the Service area filter once");
+      await p.locator("#area-bar .ac-btn", { hasText: "Area Two" }).click();   // off again
+      await p.waitForFunction(() => document.querySelectorAll("#area-bar .ac-btn.ac-on").length === 1);
+      await p.locator("#area-bar .ac-btn", { hasText: "Area One" }).click();   // and the last one: every area
       await p.waitForFunction((n) => document.querySelectorAll("#missions-body tr").length === n, all);
       // the same filter is inside Filters
       await p.click("#btn-missions-filter-pop");
@@ -467,6 +476,63 @@ async function step(name, fn) {
       // put it away again
       db.t("missions").find((m) => m.id === "s7").highlight = null;
       await p.evaluate(() => { state.missions.activityKey = null; cloud._invalidatePlans(); return refreshAndRender(); });
+      await p.evaluate(() => closeModal());
+      await goMissions(p);
+    });
+
+    await step("the Columns button hides and shows columns and remembers them; row actions show on hover, with a ⋯ menu", async () => {
+      await goMissions(p);
+      const sure = async () => { const c = p.locator("#modal-confirm:not(.hidden)"); if (await c.waitFor({ timeout: 2000 }).then(() => true, () => false)) await p.click("#btn-confirm-yes"); };
+      const heads = async () => (await p.locator("#missions-table thead th:visible").allInnerTexts()).map((t) => t.trim());
+      assert.ok((await heads()).some((t) => /^PPE$/.test(t)) && (await heads()).some((t) => /^Start date$/.test(t)), "Start date stays");
+      // Columns: PPE and Remark off
+      await p.click("#btn-missions-cols");
+      await p.locator("#missions-cols-pop:not(.hidden)").waitFor();
+      assert.equal(await p.locator('#missions-cols-pop input[data-col]').count(), 11);
+      await p.locator('#missions-cols-pop input[data-col="ppe"]').uncheck();
+      await p.locator('#missions-cols-pop input[data-col="remark"]').uncheck();
+      assert.ok(!(await heads()).some((t) => /^PPE$|^Remark$/.test(t)), "the two columns are gone: " + (await heads()).join("|"));
+      assert.equal(await p.locator("#missions-body td.mcol-ppe:visible").count(), 0);
+      assert.match(await p.locator("#btn-missions-cols").innerText(), /2/, "the button says how many are off");
+      assert.equal(await p.evaluate(() => localStorage.getItem("manpower.missionsHiddenCols")), JSON.stringify(["ppe", "remark"]), "kept on this device");
+      await p.locator("#missions-cols-pop #btn-missions-cols-reset").click();
+      assert.ok((await heads()).some((t) => /^PPE$/.test(t)), "Show all columns brings them back");   // (a column with nothing in it stays out of the way, as on Host)
+      await p.keyboard.press("Escape");
+      await p.evaluate(() => closeTopbarMenus());
+
+      // the row's actions are quiet until the row is hovered; Close… needs no menu
+      const r7 = row(p, M7);
+      await p.mouse.move(2, 2);
+      assert.equal(await r7.locator("button[data-act=close]").evaluate((b) => getComputedStyle(b).opacity), "0", "Close… is out of sight until the row is hovered");
+      await r7.hover();
+      await p.waitForFunction((n) => { const tr = [...document.querySelectorAll("#missions-body tr")].find((x) => x.querySelector(".ml-num").textContent === n); return getComputedStyle(tr.querySelector("button[data-act=close]")).opacity === "1"; }, M7);
+
+      // the ⋯ menu: the panel's own actions
+      await r7.locator("button[data-act=more]").click();
+      await p.locator("#context-menu:not(.hidden)").waitFor();
+      const items = (await p.locator("#context-menu .ctx-item").allInnerTexts()).map((t) => t.trim());
+      for (const want of ["Mission details", "Highlight…", "Duplicate", "Move or copy…", "Hide"]) assert.ok(items.includes(want), want + " | " + items.join(" | "));
+      assert.ok(!items.includes("Close mission…"), "Close is on the row, not in the menu");
+      // Mission details opens the panel
+      await p.locator("#context-menu .ctx-item", { hasText: "Mission details" }).click();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.evaluate(() => closeModal());
+      await goMissions(p);
+      // Highlight… opens the panel with the board's list of reasons already open
+      await row(p, M7).locator("button[data-act=more]").click();
+      await p.locator("#context-menu .ctx-item", { hasText: "Highlight…" }).click();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.locator("#context-menu .ctx-item", { hasText: "Remove highlight" }).or(p.locator("#context-menu .ctx-item", { hasText: "Focus activity" })).first().waitFor();
+      assert.match(await p.locator("#context-menu").innerText(), /New customer[\s\S]*Not enough manpower/);
+      await p.evaluate(() => { hideContextMenu(); closeModal(); });
+      await goMissions(p);
+      // Duplicate opens a New Mission filled in from it
+      await row(p, M7).locator("button[data-act=more]").click();
+      await p.locator("#context-menu .ctx-item", { hasText: "Duplicate" }).click();
+      await sure();
+      await p.locator("#form-mission").waitFor();
+      assert.match(await p.locator("#mission-modal-title").innerText(), /New Mission/);
+      assert.equal(await p.inputValue("#form-mission [name=customer]"), "Cust Seven");
       await p.evaluate(() => closeModal());
       await goMissions(p);
     });

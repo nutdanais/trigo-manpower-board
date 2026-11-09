@@ -3084,3 +3084,18 @@ I18N.add({
 I18N.add({
   "Highlighted on the board": "ไฮไลต์บนบอร์ด",
 });
+
+/* Missions tab: Board and status in one column, the Columns list, the ⋯ menu on a row, several areas at once */
+I18N.add({
+  "Board and status": "บอร์ดและสถานะ",
+  "Which board the mission is on and where it is now (on its board, hidden there, off the board, not started or closed), then what needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.": "มิชชั่นอยู่บอร์ดไหนและตอนนี้อยู่ในสถานะใด (บนบอร์ด ซ่อนอยู่ ออกจากบอร์ด ยังไม่เริ่ม หรือปิดแล้ว) ตามด้วยสิ่งที่ควรดู: ไม่มีทีมงาน ซ่อนหรือออกจากบอร์ดเกิน 5 วันทำงาน (ปิดมิชชั่นหากงานจบแล้ว) ไม่มีเลขมิชชั่นปีใหม่ ไม่มีผู้รับผิดชอบ TRIGO",
+  "Columns": "คอลัมน์",
+  "Choose which columns the table shows": "เลือกคอลัมน์ที่ตารางแสดง",
+  "Show all columns": "แสดงทุกคอลัมน์",
+  "Highlight…": "ไฮไลต์…",
+});
+
+I18N.add({}, {
+  "Add {a} to the areas shown": "เพิ่ม {a} ในพื้นที่ที่แสดง",
+  "Click to remove {a} from the areas shown": "คลิกเพื่อเอา {a} ออกจากพื้นที่ที่แสดง",
+});
