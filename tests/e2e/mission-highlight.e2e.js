@@ -157,11 +157,11 @@ async function step(name, fn) {
       await rightClick("102");
       await item("Duplicate mission").click();
       await p.locator("#modal-mission:not(.hidden)").waitFor();
-      await p.fill("#form-mission [name=number]", "102B");
+      await p.fill("#form-mission [name=number]", "TSTTH.26.0102");
       await p.click("#form-mission button[type=submit]");
-      await card("102B").waitFor();
-      assert.equal(db.t("missions").find((m) => m.number === "102B").highlight ?? null, null);
-      assert.equal(await tag("102B").count(), 0);
+      await card("TSTTH.26.0102").waitFor();
+      assert.equal(db.t("missions").find((m) => m.number === "TSTTH.26.0102").highlight ?? null, null);
+      assert.equal(await tag("TSTTH.26.0102").count(), 0);
     });
 
     await step("Carry over to the next day starts it plain", async () => {
@@ -195,7 +195,7 @@ async function step(name, fn) {
       assert.equal(await dim("101"), false);
       assert.equal(await dim("102"), false);
       assert.equal(await dim("103"), true);
-      assert.equal(await dim("102B"), true);
+      assert.equal(await dim("TSTTH.26.0102"), true);
       assert.equal(await p.locator("#filter-count").innerText(), "1");
       const order = await p.locator("#missions-grid .mission-card .m-number").allInnerTexts();
       assert.deepEqual(order.slice(0, 2).sort(), ["101", "102"]);

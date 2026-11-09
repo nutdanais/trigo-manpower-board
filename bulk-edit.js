@@ -25,6 +25,7 @@
   "use strict";
 
   const EmployeeId = (typeof module !== "undefined" && module.exports) ? require("./employee-id.js") : root.EmployeeId;
+  const MissionNumber = (typeof module !== "undefined" && module.exports) ? require("./mission-number.js") : root.MissionNumber;
 
   /* ---------- small helpers ---------- */
   const norm = (s) => String(s == null ? "" : s).normalize("NFC").replace(/\s+/g, " ").trim();
@@ -83,6 +84,24 @@
     { key: "area",     label: "Service area",     aliases: ["service area", "area"], width: 16 },
     { key: "note",     label: "Note",             aliases: ["note", "notes", "remark"], width: 36 },
   ];
+  /* The Missions tab (migration-2026-11-09): one row per board + mission number + shift.
+     "Last year's number" is shown for reference and never read back. */
+  const MISSION_COLUMNS = [
+    { key: "id",        label: "ID",                     aliases: ["id"], width: 12 },
+    { key: "board",     label: "Board",                  aliases: ["board", "บอร์ด"], width: 16 },
+    { key: "number",    label: "Mission number",         aliases: ["mission number", "mission no.", "mission no", "number", "เลขมิชชั่น"], width: 18 },
+    { key: "shift",     label: "Shift",                  aliases: ["shift", "กะ"], width: 9 },
+    { key: "customer",  label: "Customer",               aliases: ["customer", "customer name", "ลูกค้า"], width: 32 },
+    { key: "host",      label: "Host",                   aliases: ["host", "host / location", "host/location", "โฮสต์"], width: 30 },
+    { key: "engineer",  label: "Trigo responsible",      aliases: ["trigo responsible", "engineer", "วิศวกร"], width: 20 },
+    { key: "startTime", label: "Start time",             aliases: ["start time", "from"], width: 10 },
+    { key: "endTime",   label: "End time",               aliases: ["end time", "to"], width: 10 },
+    { key: "openedOn",  label: "Start date",             aliases: ["start date", "วันที่เริ่ม"], width: 13 },
+    { key: "status",    label: "Status",                 aliases: ["status", "mission status", "สถานะ"], width: 10 },
+    { key: "closedOn",  label: "Finish date",            aliases: ["finish date", "last working day", "closed on"], width: 13 },
+    { key: "lastYear",  label: "Last year's number",     aliases: ["last year's number", "mission no. (last year)", "last year"], width: 18 },
+    { key: "newNumber", label: "New number (next year)", aliases: ["new number (next year)", "new number", "new-year number"], width: 22 },
+  ];
 
   /* Find the header row (a banner or a few blank lines above it is fine) and
      read every row under it. rows2d: arrays of cell values. */
@@ -102,10 +121,10 @@
         const k = exact.get(asTyped(str(cell))) || alias.get(h);
         if (k && !(k in map)) map[k] = i; else extra.push(norm(str(cell)));
       });
-      if ("name" in map && Object.keys(map).length >= 2) { headerAt = r; colIndex = map; ignored = extra; break; }
+      if ((opts.key || "name") in map && Object.keys(map).length >= 2) { headerAt = r; colIndex = map; ignored = extra; break; }
     }
     if (headerAt < 0) {
-      return { cols: new Set(), records: [], ignored: [], fatal: ["Could not find a header row with at least a Thai name (or Name) column and one more known column. Use the template from the Download button."] };
+      return { cols: new Set(), records: [], ignored: [], fatal: [`Could not find a header row with at least a ${opts.keyLabel || "Thai name (or Name)"} column and one more known column. Use the template from the Download button.`] };
     }
     const records = [];
     for (let r = headerAt + 1; r < rows2d.length; r++) {
@@ -497,6 +516,190 @@
     return finish();
   }
 
+  /* ---------- planning: missions (the Missions tab, migration-2026-11-09) ---------- */
+  /* ctx: { register:[{id, boardId, number, shift, customer, host, engineerId, startTime, endTime, openedOn, status, closedOn}],
+            boards:[{id,name}], hosts:[name], engineers:[{id,label}], canReopen, canRenumber }
+     A row is matched by its ID, then by board + mission number + shift. Changing Customer, Host,
+     Trigo responsible or the hours changes the Missions list (what "Add to board" uses), not days
+     already planned. Status Closed + a Finish date closes a mission; Open reopens one; the New
+     number column gives a mission its next year's number from 1 January of that year. */
+  const SHIFT_LABEL = { day: "Day", night: "Night" };
+  function parseShift(raw) {
+    const s = lower(str(raw));
+    if (["day", "d", "กลางวัน", "เช้า"].includes(s)) return { value: "day" };
+    if (["night", "n", "กลางคืน", "ดึก"].includes(s)) return { value: "night" };
+    return { error: s ? `Shift "${str(raw)}" must be Day or Night` : "Shift is empty" };
+  }
+  function parseTime(raw) {
+    const p = plain(raw);
+    if (p === "") return { value: "" };
+    if (p instanceof Date) return { value: pad2(p.getUTCHours()) + ":" + pad2(p.getUTCMinutes()) };
+    if (typeof p === "number" && p >= 0 && p < 1) { const m = Math.round(p * 1440); return { value: pad2(Math.floor(m / 60) % 24) + ":" + pad2(m % 60) }; }
+    const x = /^(\d{1,2})[:.](\d{2})(?::\d{2})?$/.exec(norm(String(p)));
+    if (x && +x[1] < 24 && +x[2] < 60) return { value: pad2(+x[1]) + ":" + x[2] };
+    return { error: `"${norm(String(p))}" is not a time (use 08:00)` };
+  }
+  function parseMissionStatus(raw) {
+    const s = lower(str(raw));
+    if (!s) return { value: null };
+    if (["open", "running", "เปิด"].includes(s)) return { value: "open" };
+    if (["closed", "finished", "ปิด", "ปิดแล้ว"].includes(s)) return { value: "closed" };
+    return { error: `Status "${str(raw)}" must be Open or Closed` };
+  }
+  function planMissions(table, ctx) {
+    const reg = ctx.register || [];
+    const res = { rows: [], counts: {}, fatal: [...(table.fatal || [])], ignored: table.ignored || [], cols: table.cols };
+    const finish = () => {
+      const n = { update: 0, create: 0, same: 0, error: 0, clears: 0, close: 0, reopen: 0, renumber: 0, total: res.rows.length };
+      for (const r of res.rows) {
+        n[r.kind]++;
+        if (r.kind === "update") { if (r.close) n.close++; if (r.reopen) n.reopen++; if (r.renumber) n.renumber++; }
+      }
+      res.counts = n;
+      return res;
+    };
+    if (res.fatal.length) return finish();
+    const has = (k) => table.cols.has(k);
+    const boardByName = nameIndex(ctx.boards || []);
+    const boardName = (id) => ((ctx.boards || []).find((b) => b.id === id) || {}).name || "";
+    const hostByName = new Map((ctx.hosts || []).map((h) => [lower(h), h]));
+    const engByLabel = new Map((ctx.engineers || []).map((e) => [lower(e.label), e]));
+    const engLabel = (id) => ((ctx.engineers || []).find((e) => e.id === id) || {}).label || "";
+    const byId = new Map(reg.map((r) => [r.id, r]));
+    const keyOf = (b, n, sh) => b + "\u0001" + n + "\u0001" + sh;
+    const byKey = new Map(reg.map((r) => [keyOf(r.boardId, MissionNumber.tidy(r.number), r.shift), r]));
+    const claimed = new Map();
+    const newKeys = new Map();
+    const renumbers = new Map();   // old number -> { new, rowNumber }
+    for (const rec of table.records) {
+      const c = rec.cells;
+      const row = { rowNumber: rec.rowNumber, kind: "", id: null, name: "", changes: [], patch: {}, create: null,
+                    close: null, reopen: false, renumber: null, errors: [], warnings: [] };
+      res.rows.push(row);
+      const err = (m) => row.errors.push(m);
+      const number = MissionNumber.tidy(str(c.number));
+      row.name = number;
+      if (!number) { err("Mission number is empty"); row.kind = "error"; continue; }
+
+      // --- which mission is this row? the ID first, then board + number + shift ---
+      let cur = null;
+      const idRaw = has("id") ? str(c.id) : "";
+      const bName = has("board") ? str(c.board) : "";
+      const b = bName ? boardByName.get(lower(bName)) : null;
+      if (bName && !b) err(`Board "${bName}" does not exist (existing: ${(ctx.boards || []).map((x) => x.name).join(", ")})`);
+      const sh = has("shift") ? parseShift(c.shift) : { error: "Shift is empty" };
+      if (idRaw) {
+        cur = byId.get(idRaw) || null;
+        if (!cur) err("ID not found — was this mission deleted? Clear the ID cell to add it as a new mission.");
+      } else if (b && !sh.error) {
+        cur = byKey.get(keyOf(b.id, number, sh.value)) || null;
+      }
+      if (row.errors.length) { row.kind = "error"; continue; }
+      if (cur) {
+        if (claimed.has(cur.id)) { err(`Same mission as row ${claimed.get(cur.id)} — each mission may appear once`); row.kind = "error"; continue; }
+        claimed.set(cur.id, rec.rowNumber);
+        row.id = cur.id;
+        row.name = cur.number + " · " + SHIFT_LABEL[cur.shift] + " · " + boardName(cur.boardId);
+        if (number !== MissionNumber.tidy(cur.number)) err(`The Mission number is how a row is matched: put next year's number in "New number (next year)" instead of changing ${cur.number}`);
+        if (b && b.id !== cur.boardId) err(`A mission can't move to another board here (it is on ${boardName(cur.boardId)})`);
+        if (!sh.error && sh.value !== cur.shift) err(`A mission's shift can't change here (it is ${SHIFT_LABEL[cur.shift]}). Add the other shift as a new row.`);
+      } else {
+        if (!b) err("A new mission needs a Board");
+        if (sh.error) err(sh.error);
+        const chk = MissionNumber.check(number);
+        if (!chk.ok) err(chk.error);
+      }
+      if (row.errors.length) { row.kind = "error"; continue; }
+
+      // --- every cell ---
+      const next = {};
+      const note = (r) => { if (r.warn) row.warnings.push(r.warn); };
+      if (has("customer")) { const v = norm(str(c.customer)); if (v.length > 200) err("Customer is longer than 200 characters"); else next.customer = v; }
+      if (has("host")) {
+        const v = norm(str(c.host));
+        if (!v) next.host = "";
+        else { const h = hostByName.get(lower(v)); if (!h) err(`Host "${v}" is not in the Host list — add it there first (Host tab)`); else next.host = h; }
+      }
+      if (has("engineer")) {
+        const v = norm(str(c.engineer));
+        if (!v) next.engineerId = null;
+        else { const e = engByLabel.get(lower(v)); if (!e) err(`Trigo responsible "${v}" is not on the engineer list`); else next.engineerId = e.id; }
+      }
+      if (has("startTime")) { const r = parseTime(c.startTime); if (r.error) err("Start time: " + r.error); else next.startTime = r.value; }
+      if (has("endTime")) { const r = parseTime(c.endTime); if (r.error) err("End time: " + r.error); else next.endTime = r.value; }
+      if (has("openedOn")) { const r = parseDate(c.openedOn); if (r.error) err("Start date: " + r.error); else { next.openedOn = r.value; note(r); } }
+      let status = null, closedOn = "";
+      if (has("status")) { const r = parseMissionStatus(c.status); if (r.error) err(r.error); else status = r.value; }
+      if (has("closedOn")) { const r = parseDate(c.closedOn); if (r.error) err("Finish date: " + r.error); else { closedOn = r.value; note(r); } }
+      const newNumberRaw = has("newNumber") ? str(c.newNumber) : "";
+      if (row.errors.length) { row.kind = "error"; continue; }
+
+      if (cur) {
+        const was = { customer: cur.customer || "", host: cur.host || "", engineerId: cur.engineerId || null,
+                      startTime: cur.startTime || "", endTime: cur.endTime || "", openedOn: cur.openedOn || "" };
+        const label = { customer: "Customer", host: "Host", engineerId: "Trigo responsible", startTime: "Start time", endTime: "End time", openedOn: "Start date" };
+        const text = { engineerId: engLabel };
+        for (const f of Object.keys(next)) {
+          // a blank Start date / time leaves it as it is (the board fills it in)
+          if ((f === "openedOn" || f === "startTime" || f === "endTime") && !next[f]) continue;
+          if (next[f] === was[f]) continue;
+          const t = text[f] || ((v) => v || "");
+          row.changes.push({ field: f, label: label[f], from: t(was[f]), to: t(next[f]) });
+          row.patch[f] = next[f];
+        }
+        // status: Closed with a Finish date closes; Open reopens
+        if (status === "closed" && cur.status !== "closed") {
+          if (!closedOn) err("To close a mission, give its Finish date (its last working day)");
+          else if (cur.openedOn && closedOn < cur.openedOn) err(`Finish date ${closedOn} is before its Start date ${cur.openedOn}`);
+          else { row.close = { date: closedOn }; row.changes.push({ field: "status", label: "Status", from: "Open", to: "Closed " + closedOn }); }
+        } else if (status === "open" && cur.status === "closed") {
+          if (!ctx.canReopen) err("Your role cannot reopen missions (ask a Site Admin or a Manager)");
+          else { row.reopen = true; row.changes.push({ field: "status", label: "Status", from: "Closed " + (cur.closedOn || ""), to: "Open" }); }
+        } else if (cur.status === "closed" && closedOn && closedOn !== cur.closedOn) {
+          row.warnings.push("the Finish date of a closed mission is not changed by an upload");
+        }
+        // the new-year number
+        if (newNumberRaw) {
+          const chk = MissionNumber.checkNewYear(cur.number, newNumberRaw);
+          if (!chk.ok) err("New number: " + chk.error);
+          else if (!ctx.canRenumber) err("Your role cannot enter new mission numbers (ask a Site Admin or a Manager)");
+          else if (cur.status === "closed" && !row.reopen) err("A closed mission does not get a new number");
+          else if (reg.some((r) => MissionNumber.tidy(r.number) === chk.number)) err(`New number: ${chk.number} is already used by another mission`);
+          else {
+            const prev = renumbers.get(MissionNumber.tidy(cur.number));
+            if (prev && prev.new !== chk.number) err(`Row ${prev.rowNumber} gives ${cur.number} the new number ${prev.new} — the same mission (other shift or board) takes one number`);
+            else if ([...renumbers.entries()].some(([o, v]) => o !== MissionNumber.tidy(cur.number) && v.new === chk.number)) err(`New number: ${chk.number} is given to another mission in this file`);
+            else {
+              if (!prev) renumbers.set(MissionNumber.tidy(cur.number), { new: chk.number, rowNumber: rec.rowNumber });
+              row.renumber = { old: cur.number, new: chk.number };
+              row.changes.push({ field: "number", label: "Mission number from 1 January " + MissionNumber.yearOf(chk.number), from: cur.number, to: chk.number });
+              const others = reg.filter((r) => r.id !== cur.id && MissionNumber.tidy(r.number) === MissionNumber.tidy(cur.number));
+              if (others.length && !prev) row.warnings.push(`also renames ${others.map((r) => SHIFT_LABEL[r.shift] + " on " + boardName(r.boardId)).join(", ")} (the same mission)`);
+            }
+          }
+        }
+        if (row.errors.length) { row.kind = "error"; row.changes = []; row.patch = {}; row.close = null; row.reopen = false; row.renumber = null; continue; }
+        row.kind = row.changes.length ? "update" : "same";
+      } else {
+        if (status === "closed") err("A new mission starts Open");
+        if (newNumberRaw) err("A new mission has no next-year number yet: add it with its current number");
+        if (!next.customer) err("A new mission needs a Customer");
+        if (!next.host) err("A new mission needs a Host from the Host list");
+        const k = keyOf(b.id, number, sh.value);
+        if (newKeys.has(k)) err(`Same mission as row ${newKeys.get(k)}`);
+        if (row.errors.length) { row.kind = "error"; continue; }
+        newKeys.set(k, rec.rowNumber);
+        const elsewhere = reg.filter((r) => MissionNumber.tidy(r.number) === number && r.boardId !== b.id);
+        if (elsewhere.length) row.warnings.push(`${number} is already used on ${[...new Set(elsewhere.map((r) => boardName(r.boardId)))].join(", ")} — fine only if this is the same mission at another location`);
+        row.name = number + " · " + SHIFT_LABEL[sh.value] + " · " + b.name;
+        row.create = { boardId: b.id, number, shift: sh.value, customer: next.customer, host: next.host, engineerId: next.engineerId || null,
+                       startTime: next.startTime || "", endTime: next.endTime || "", openedOn: next.openedOn || "" };
+        row.kind = "create";
+      }
+    }
+    return finish();
+  }
+
   /* ---------- the template (rows -> Excel) ---------- */
   const dateOut = (iso) => (iso ? iso : "");
   function employeeTable(ctx) {
@@ -519,6 +722,17 @@
     }));
     return { cols: HOST_COLUMNS, rows };
   }
+  function missionTable(ctx) {
+    const boardName = (id) => ((ctx.boards || []).find((b) => b.id === id) || {}).name || "";
+    const engLabel = (id) => ((ctx.engineers || []).find((e) => e.id === id) || {}).label || "";
+    const rows = (ctx.register || []).map((r) => ({
+      id: r.id, board: boardName(r.boardId), number: r.number, shift: SHIFT_LABEL[r.shift] || r.shift, customer: r.customer || "",
+      host: r.host || "", engineer: engLabel(r.engineerId), startTime: r.startTime || "", endTime: r.endTime || "",
+      openedOn: dateOut(r.openedOn), status: r.status === "closed" ? "Closed" : "Open", closedOn: dateOut(r.closedOn),
+      lastYear: (ctx.previousNumber && ctx.previousNumber(r.number)) || "", newNumber: "",
+    }));
+    return { cols: MISSION_COLUMNS, rows };
+  }
   
   const NAVY = "FF003A66", GREEN = "FFA8C855", GREY = "FFE6EAEE", GREY_TXT = "FF7A8794", INK = "FF13222F";
   const EXTRA_ROWS = 300;   // validated, formatted blank rows under the data, for people who add new rows
@@ -526,19 +740,22 @@
   /* kind: "employees" | "hosts". The workbook has the data sheet, a Lists sheet
      the dropdowns read from, and a short Read me. */
   async function buildTemplateWorkbook(ExcelJS, kind, ctx) {
-    const isEmp = kind === "employees";
-    const t = isEmp ? employeeTable(ctx) : hostTable(ctx);
+    const isEmp = kind === "employees", isMis = kind === "missions";
+    const t = isEmp ? employeeTable(ctx) : isMis ? missionTable(ctx) : hostTable(ctx);
     const wb = new ExcelJS.Workbook();
     wb.creator = "TRIGO Manpower Board";
     wb.created = new Date();
-    const ws = wb.addWorksheet(isEmp ? "Employees" : "Hosts", { views: [{ state: "frozen", xSplit: isEmp ? 2 : 1, ySplit: 1 }] });
+    const ws = wb.addWorksheet(isEmp ? "Employees" : isMis ? "Missions" : "Hosts", { views: [{ state: "frozen", xSplit: isEmp ? 2 : isMis ? 3 : 1, ySplit: 1 }] });
     const lists = wb.addWorksheet("Lists");
     const readme = wb.addWorksheet("Read me");
 
     const posLabels = Object.values(ctx.positions || {}).map((p) => p.label);
     const listDefs = isEmp
       ? { contract: ["Permanent", "On-call"], position: posLabels, area: (ctx.areas || []).map((a) => a.name), board: (ctx.boards || []).map((b) => b.name), status: ["Active", "Inactive"] }
-      : { status: ["Active", "Archived"], area: (ctx.areas || []).map((a) => a.name) };
+      : isMis
+        ? { board: (ctx.boards || []).map((b) => b.name), shift: ["Day", "Night"], status: ["Open", "Closed"],
+            host: (ctx.hosts || []).slice().sort((a, b) => a.localeCompare(b)), engineer: (ctx.engineers || []).map((e) => e.label).sort((a, b) => a.localeCompare(b)) }
+        : { status: ["Active", "Archived"], area: (ctx.areas || []).map((a) => a.name) };
     const listRef = {};
     let lc = 1;
     for (const [key, vals] of Object.entries(listDefs)) {
@@ -558,13 +775,14 @@
       ws.getColumn(i + 1).width = col.width;
       const h = ws.getCell(1, i + 1);
       h.value = col.label;
-      h.font = { bold: true, color: { argb: col.key === "id" ? GREY_TXT : "FFFFFFFF" } };
-      h.fill = { type: "pattern", pattern: "solid", fgColor: { argb: col.key === "id" ? GREY : NAVY } };
+      const readOnly = col.key === "id" || col.key === "lastYear";
+      h.font = { bold: true, color: { argb: readOnly ? GREY_TXT : "FFFFFFFF" } };
+      h.fill = { type: "pattern", pattern: "solid", fgColor: { argb: readOnly ? GREY : col.key === "newNumber" ? "FF4D6810" : NAVY } };
       h.border = { bottom: { style: "medium", color: { argb: GREEN } } };
       h.alignment = { vertical: "middle" };
     });
     ws.getRow(1).height = 22;
-    const dateCols = new Set(["startDate", "addedOn"]);
+    const dateCols = new Set(["startDate", "addedOn", "openedOn", "closedOn"]);
     const last = 1 + t.rows.length + EXTRA_ROWS;
     for (let r = 2; r <= last; r++) {
       const data = t.rows[r - 2];
@@ -576,7 +794,7 @@
           if (v) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v); v = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : v; }
         } else cell.numFmt = "@";   // text: keeps 081-… and 0812… exactly as typed
         if (v !== "" && v != null) cell.value = v;
-        if (col.key === "id") { cell.font = { color: { argb: GREY_TXT }, size: 9 }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F6F8" } }; }
+        if (col.key === "id" || col.key === "lastYear") { cell.font = { color: { argb: GREY_TXT }, size: col.key === "id" ? 9 : 11 }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4F6F8" } }; }
         else cell.font = { color: { argb: INK } };
         if (listRef[col.key]) cell.dataValidation = { type: "list", allowBlank: true, formulae: [listRef[col.key]], showErrorMessage: true, errorTitle: col.label, error: "Pick a value from the list (see the Lists sheet)." };
       });
@@ -603,6 +821,22 @@
       "• Dates: 2023-04-20 (also 20-Apr-2023 or 20/04/2023, day first). Buddhist-era years are converted.",
       "• Changing a Board clears that person's assignment on the day you are viewing in the app.",
       "• 'On the board from' is the day someone was added to the app; headcount and Standby count them only from that day.",
+    ] : isMis ? [
+      "BULK EDIT — MISSIONS",
+      "1. Change the cells you need on the Missions sheet, or add new missions on the empty rows at the bottom (e.g. a new board's starting missions).",
+      "2. Save the file as .xlsx and upload it with 'Bulk edit' on the Missions tab. The app shows what would change and asks you to confirm.",
+      "",
+      "RULES",
+      "• One row per board + mission number + shift. Day and Night of the same mission are two rows with the same number.",
+      "• Mission number = the yearly number from Etraq, without the monthly suffix: BANGN.26.0007, not BANGN.26.0007.AA.",
+      "• Do not edit or delete the grey ID column. A row is matched by ID, then by Board + Mission number + Shift. A row that matches nothing adds a NEW mission (you will be asked first).",
+      "• A mission number is unique across the company. Use the same number on two boards only for the same mission running at two locations.",
+      "• Host and Trigo responsible must come from the Lists sheet (the Host list and the engineers). Add a new host on the Host tab first.",
+      "• Changing Customer, Host, Trigo responsible or the hours changes the Missions list: it is what 'Add to board' and 'Start from the Missions list' use. Days already planned keep what they show; edit those on the board.",
+      "• Status Closed + a Finish date (the last working day) closes a mission: the days after lose it and carry over no longer brings it. Status Open reopens a closed mission (Site Admin, Manager, Admin).",
+      "• New number (next year): the number Etraq gives a running mission for the new year. It applies from 1 January of that year on every board and shift of the mission; earlier days keep the old number. Site Admin, Manager and Admin only.",
+      "• Last year's number is for reference only and is never read back.",
+      "• Rows you delete from the file are NOT deleted or closed in the app.",
     ] : [
       "BULK EDIT — HOSTS",
       "1. Change the cells you need on the Hosts sheet (Location, Google Maps link, Service area, Note, Status).",
@@ -622,14 +856,14 @@
 
   /* an Excel workbook that was uploaded -> rows of its data sheet */
   function rowsFromWorkbook(wb, kind) {
-    const want = kind === "hosts" ? "hosts" : "employees";
+    const want = kind === "hosts" ? "hosts" : kind === "missions" ? "missions" : "employees";
     const ws = wb.worksheets.find((s) => s.name.toLowerCase() === want) || wb.worksheets[0];
     return ws ? rowsFromWorksheet(ws) : [];
   }
 
   const api = {
-    EMP_COLUMNS, HOST_COLUMNS, plain, readTable, rowsFromWorksheet, rowsFromWorkbook,
-    parseDate, parsePhone, planEmployees, planHosts, employeeTable, hostTable, buildTemplateWorkbook,
+    EMP_COLUMNS, HOST_COLUMNS, MISSION_COLUMNS, plain, readTable, rowsFromWorksheet, rowsFromWorkbook,
+    parseDate, parsePhone, parseTime, planEmployees, planHosts, planMissions, employeeTable, hostTable, missionTable, buildTemplateWorkbook,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.BulkEdit = api;

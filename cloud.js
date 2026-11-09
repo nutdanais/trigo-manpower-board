@@ -2715,6 +2715,66 @@ const cloud = {
     return { added, skipped: ids.length - added };
   },
 
+  /* Bulk edit on the Missions tab (bulk-edit.js planMissions): new missions (source 'list', no
+     day yet), changed details, then reopen, close and the new-year numbers through their RPCs.
+     One row failing does not stop the rest; uploading the same file again only changes what
+     still differs. Returns { updated, created, failed }. */
+  async applyMissionImport(plan, { createNew = false } = {}) {
+    const rows = (plan && plan.rows) || [];
+    const updates = rows.filter((r) => r.kind === "update");
+    const creates = createNew ? rows.filter((r) => r.kind === "create") : [];
+    const failed = [];
+    const bad = new Set();
+    const by = await this._currentEmail();
+    const fail = (r, error) => { bad.add(r.rowNumber); failed.push({ rowNumber: r.rowNumber, name: r.name, message: (error && error.message) || String(error) }); };
+    const dbFields = (p) => {
+      const o = {};
+      if (p.customer !== undefined) o.customer = p.customer || null;
+      if (p.host !== undefined) o.host = p.host || null;
+      if (p.engineerId !== undefined) o.engineer_id = p.engineerId || null;
+      if (p.startTime) o.start_time = p.startTime;
+      if (p.endTime) o.end_time = p.endTime;
+      if (p.openedOn) o.opened_on = p.openedOn;
+      return o;
+    };
+    for (const r of creates) {
+      const c = r.create;
+      const { error } = await sb.from("mission_register").insert({
+        board_id: c.boardId, number: c.number, shift: c.shift, source: "list", status: "open", updated_by: by, ...dbFields(c),
+      });
+      if (error) fail(r, error.code === "23505" ? { message: `${c.number} (${c.shift}) is already on that board's Missions list` } : error);
+    }
+    for (const r of updates) {
+      const patch = dbFields(r.patch);
+      if (Object.keys(patch).length) {
+        const { error } = await sb.from("mission_register").update({ ...patch, updated_at: new Date().toISOString(), updated_by: by }).eq("id", r.id);
+        if (error) { fail(r, error); continue; }
+      }
+      if (r.reopen) { const { error } = await sb.rpc("reopen_mission", { p_id: r.id }); if (error) { fail(r, error); continue; } }
+      if (r.close) { const { error } = await sb.rpc("close_mission", { p_id: r.id, p_closed_on: r.close.date, p_note: "Closed by Bulk edit" }); if (error) { fail(r, error); continue; } }
+    }
+    // the new-year numbers: one per old number, grouped by the year they start
+    const seen = new Set();
+    const byFrom = {};
+    for (const r of updates) {
+      if (!r.renumber || bad.has(r.rowNumber) || seen.has(r.renumber.old)) continue;
+      seen.add(r.renumber.old);
+      const from = r.renumber.new.replace(/^[A-Z]+\.(\d{2})\..*$/, (m, yy) => "20" + yy + "-01-01");
+      (byFrom[from] = byFrom[from] || []).push(r);
+    }
+    for (const [from, list] of Object.entries(byFrom)) {
+      const { error } = await sb.rpc("renumber_missions", { p_items: list.map((r) => ({ old: r.renumber.old, new: r.renumber.new })), p_valid_from: from });
+      if (error) for (const r of list) fail(r, error);
+    }
+    this._invalidatePlans();
+    await this.loadMissionRegister();
+    return {
+      updated: updates.filter((r) => !bad.has(r.rowNumber)).length,
+      created: creates.filter((r) => !bad.has(r.rowNumber)).length,
+      failed,
+    };
+  },
+
   /* ---------- realtime ---------- */
   _subscribeRealtime() {
     // Drop all cached plans on any missions/assignments change — app.js's own

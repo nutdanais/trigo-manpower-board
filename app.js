@@ -487,6 +487,12 @@ const state = {
     sortDir: 1,
     editingId: null,          // profile id the User modal is editing
   },
+  missions: {                 // Missions tab (migration-2026-11-09): search / board / status / sort over the register
+    search: "",
+    boardId: "",               // "" = all boards
+    status: "open",            // "open" | "closed" | "all"
+    sort: { key: "number", dir: 1 },
+  },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
     filters: { areaId: [], boardId: [], empId: [], location: [], status: [] },
@@ -571,11 +577,13 @@ const ORGCHART_ID = "__orgchart__";
 const EMPLIST_ID = "__emplist__";
 const HOSTLIST_ID = "__hostlist__";
 const CAPACITY_ID = "__capacity__";
+const MISSIONS_ID = "__missions__";
 const isOverview = () => D().activeBoardId === OVERVIEW_ID;
 const isOrgChart = () => D().activeBoardId === ORGCHART_ID;
 const isEmployeeList = () => D().activeBoardId === EMPLIST_ID;
 const isHostList = () => D().activeBoardId === HOSTLIST_ID;
 const isCapacity = () => D().activeBoardId === CAPACITY_ID;
+const isMissionList = () => D().activeBoardId === MISSIONS_ID;
 /* which forward-planning tables this database has (see cloud._loadFeatures) —
    each part of the feature stays hidden until its migration has been run */
 const feat = () => D().features || {};
@@ -621,6 +629,8 @@ const PERM_AREAS = [
     { key: "orgchart", label: "Org Chart",      hint: "Board → engineer → service area → mission → crew", viewOnly: true },
     { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
     { key: "hostlist", label: "Host",           hint: "Sites and their records" },
+    { key: "missions", label: "Missions",       hint: "The Missions tab, and closing a mission" },
+    { key: "missionadmin", label: "Reopen missions & new-year numbers", hint: "Missions tab: reopen a closed mission, enter next year's mission numbers" },
     { key: "capacity", label: "Capacity",       hint: "Headcount needed per host vs available, weeks ahead" },
     { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
@@ -651,6 +661,7 @@ function firstAllowedView() {
   if (can("orgchart")) return ORGCHART_ID;
   if (can("emplist")) return EMPLIST_ID;
   if (can("hostlist")) return HOSTLIST_ID;
+  if (can("missions") && missionsOn()) return MISSIONS_ID;
   if (can("capacity") && feat().capacity) return CAPACITY_ID;
   return null;
 }
@@ -661,10 +672,13 @@ function mayOpenView(id) {
   if (id === EMPLIST_ID) return can("emplist");
   if (id === HOSTLIST_ID) return can("hostlist");
   if (id === CAPACITY_ID) return can("capacity") && !!feat().capacity;
+  if (id === MISSIONS_ID) return can("missions") && missionsOn();
   return can("board") && D().boards.some(b => b.id === id);
 }
 /* the three app-wide tabs: not a board, so nothing date- or plan-scoped applies */
-const isNonBoardView = () => isOverview() || isOrgChart() || isEmployeeList() || isHostList() || isCapacity();
+const isNonBoardView = () => isOverview() || isOrgChart() || isEmployeeList() || isHostList() || isCapacity() || isMissionList();
+/* the Missions tab exists once its migration has run (migration-2026-11-09) */
+const missionsOn = () => !!feat().missions;
 
 /* ---------- confirm horizon: confirmed vs forecast dates ----------
    A confirmed plan is made up to the next working day of each board (its own
@@ -1020,6 +1034,9 @@ async function refreshData() {
     await ensureHostDirectoryLoaded();
   } else if (isCapacity()) {
     await ensureCapacityLoaded();
+  } else if (isMissionList()) {
+    // the register is kept warm by Realtime; one fresh read whenever the tab is opened or redrawn on demand
+    await cloud.loadMissionRegister();
   } else if (D().activeBoardId) {
     const boardId = D().activeBoardId, date = state.date;
     if (isForecastView()) {
@@ -1123,7 +1140,8 @@ function render() {
   const eml = isEmployeeList();
   const hl = isHostList();
   const cap = isCapacity();
-  const board = !ov && !org && !eml && !hl && !cap;   // an actual board is on screen
+  const msl = isMissionList();
+  const board = !ov && !org && !eml && !hl && !cap && !msl;   // an actual board is on screen
   // a board beyond the confirm horizon shows its FORECAST, with its own permission
   const fc = board && isForecastView();
   // Everything below asks "may this role edit here?" as well as "is this view on
@@ -1140,11 +1158,16 @@ function render() {
   $("#emplist-panel").classList.toggle("hidden", !eml);
   $("#hostlist-panel").classList.toggle("hidden", !hl);
   $("#capacity-panel").classList.toggle("hidden", !cap);
+  $("#missions-panel").classList.toggle("hidden", !msl);
+  $("#missions-toolbar").classList.toggle("hidden", !msl);
+  $("#missions-count").classList.toggle("hidden", !msl);
+  $("#btn-missions-bulk").classList.toggle("hidden", !msl || !can("missions", "edit"));
+  $("#btn-missions-newyear").classList.toggle("hidden", !msl || !can("missionadmin", "edit") || !newYearWaiting().length);
   $("#btn-new-mission").classList.toggle("hidden", !planEdit);
   // a forecast has no hidden missions; it is built from "Start from confirmed",
   // "Add Mission" (only the missions an engineer picks) or by hand
   $("#btn-hide-missions").classList.toggle("hidden", !boardEdit || fc);
-  $("#btn-new-employee").classList.toggle("hidden", ov || org || hl || cap || !can("emplist", "edit"));
+  $("#btn-new-employee").classList.toggle("hidden", ov || org || hl || cap || msl || !can("emplist", "edit"));
   // a view has ONE filled action: on a board that is New Mission, so New Employee
   // steps back to an outline; on Manpower it is the only create button, so it stays solid
   $("#btn-new-employee").classList.toggle("btn-primary", eml);
@@ -1200,6 +1223,7 @@ function render() {
   // the phone's "More" dropdown only holds other tabs' controls — on Overview it
   // would open empty, and so would it on Capacity (whose own ⋯ holds its actions)
   $("#btn-toolbar-more").classList.toggle("hidden", ov || isCapacity());
+  document.body.classList.toggle("ml-view", msl);
   // the cards only exist on a board (not Overview, Org Chart, lists or Capacity)
   $("#card-names").classList.toggle("hidden", !board);
   // Carry over / Reset Board on a confirmed day; "Start from confirmed" on an
@@ -1214,7 +1238,7 @@ function render() {
   document.body.classList.toggle("hl-view", hl);
   document.body.classList.toggle("oc-view", org);
   // phone header line 1 off a board: the tab's name where a board shows its own
-  $("#m-title").textContent = ov ? "Overview" : org ? "Org Chart" : eml ? "Manpower" : hl ? "Host" : cap ? "Capacity" : "";
+  $("#m-title").textContent = ov ? "Overview" : org ? "Org Chart" : eml ? "Manpower" : hl ? "Host" : cap ? "Capacity" : msl ? "Missions" : "";
   placeBoardRow1Tools(board);
   renderStats();
   // floating available panel: only on an actual board (hidden on the app-wide tabs)
@@ -1233,6 +1257,8 @@ function render() {
     renderHostList();
   } else if (cap) {
     renderCapacity();
+  } else if (msl) {
+    renderMissionList();
   } else {
     renderZones();
     renderMissions();
@@ -1888,6 +1914,18 @@ function renderBoardEmptyState() {
   box.appendChild(msg);
   box.appendChild(sub);
   box.appendChild(btn);
+  // the Missions list: every open mission of this board on this day (a new board's first day)
+  const fromList = !fc && missionsOn() && can("board", "edit")
+    ? (D().register || []).filter(r => r.boardId === D().activeBoardId && r.status === "open").length : 0;
+  if (fromList) {
+    const ml = document.createElement("button");
+    ml.type = "button";
+    ml.className = "btn btn-carry-alt";
+    setIconLabel(ml, "clipboard", `Start from the Missions list (${fromList})`);
+    ml.title = "Put every open mission of this board on this day, with no crew";
+    ml.onclick = () => guardEdit(() => startDayFromRegister());
+    box.appendChild(ml);
+  }
   if (fc && can("forecast", "edit")) {
     // or only the missions this engineer will work on
     const pick = document.createElement("button");
@@ -1952,6 +1990,18 @@ function renderTabs() {
   const hl = moduleTab("tab-hostlist", isHostList(), "site", "Host");
   hl.onclick = () => { clearSelection(); D().activeBoardId = HOSTLIST_ID; refreshAndRender(); };
   el.appendChild(hl);
+  }
+  if (can("missions") && missionsOn()) {
+  const mt = moduleTab("tab-missions", isMissionList(), "clipboard", "Missions");
+  // the new-year alert: a red count for the people who enter the numbers
+  const late = newYearAlertCount();
+  if (late) {
+    const badge = Object.assign(document.createElement("span"), { className: "tab-badge", textContent: String(late) });
+    badge.title = plural(late, "mission", "missions") + " still on last year's number after a week";
+    mt.appendChild(badge);
+  }
+  mt.onclick = () => { clearSelection(); D().activeBoardId = MISSIONS_ID; refreshAndRender(); };
+  el.appendChild(mt);
   }
   if (can("capacity") && feat().capacity) {
   const cp = moduleTab("tab-capacity", isCapacity(), "list", "Capacity");
@@ -2018,7 +2068,7 @@ function renderBottomNav() {
     if (t) items.push({ label, ic, on: t.classList.contains("active"), run: go(cls) });
   }
   const more = [];
-  for (const [cls, label, ic] of [["tab-orgchart", "Org Chart", "orgchart"], ["tab-capacity", "Capacity", "list"]]) {
+  for (const [cls, label, ic] of [["tab-orgchart", "Org Chart", "orgchart"], ["tab-missions", "Missions", "clipboard"], ["tab-capacity", "Capacity", "list"]]) {
     const t = tabs.querySelector("." + cls);
     if (t) more.push({ label, ic, on: t.classList.contains("active"), run: go(cls) });
   }
@@ -2733,6 +2783,8 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       if (!fc) {
         addItem("Hide mission", () => crew.length ? guardEdit(() => hideMission(m.id)) : hideMissionFromCard(m), null, "eye-off");
         addItem("Hide/Unhide missions…", () => openHideMissionsModal(), null, "eye");
+        const reg = missionsOn() && can("missions", "edit") ? cloud.registerFor(D().activeBoardId, m.number, m.shift) : null;
+        if (reg && reg.status === "open") addItem("Close mission…", () => openCloseMissionModal(reg, state.date), null, "check");
         addSep();
       }
       addItem("Delete mission", () => guardEdit(() => deleteMission(m.id)), "ctx-danger", "trash");
@@ -3418,6 +3470,10 @@ function renderStats() {
     });
     return;
   }
+  if (isMissionList()) {
+    renderMissionStats(bar);
+    return;
+  }
   if (isCapacity()) {
     const boardId = capBoardId();
     if (!boardId) return;
@@ -3668,7 +3724,7 @@ function buildPhoneMoreMenu() {
   const sep = () => { if (menu.lastChild && menu.lastChild.tagName !== "HR") menu.appendChild(document.createElement("hr")); };
   const click = (sel) => () => $(sel).click();
   // Overview, Manpower and Host: their own row-2 actions (the create button stays in view)
-  if (isOverview() || isOrgChart() || isEmployeeList() || isHostList()) {
+  if (isOverview() || isOrgChart() || isEmployeeList() || isHostList() || isMissionList()) {
     const nv = $("#emplist-name-view");
     if (isEmployeeList() && nv) {
       const row = document.createElement("div");
@@ -3695,6 +3751,8 @@ function buildPhoneMoreMenu() {
     }
     if (shown("#btn-emplist-bulk") && isEmployeeList()) item("Bulk edit", "edit", click("#btn-emplist-bulk"));
     if (shown("#btn-hostlist-bulk") && isHostList()) item("Bulk edit", "edit", click("#btn-hostlist-bulk"));
+    if (shown("#btn-missions-newyear") && isMissionList()) item("New-year numbers", "calendar", click("#btn-missions-newyear"), "tb-item-pri");
+    if (shown("#btn-missions-bulk") && isMissionList()) item("Bulk edit", "edit", click("#btn-missions-bulk"));
     if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
     if (shown("#btn-report")) item("Report", "clipboard", click("#btn-report"));
     if (!menu.children.length) menu.innerHTML = `<div class="tb-item tb-item-static">Nothing to do here</div>`;
@@ -6127,6 +6185,15 @@ function renderOverview() {
         <div class="ov-attn-main"><div class="ov-attn-title">${totalStandby ? icon("alert") : ""}<span>${title}</span></div>
           <div class="ov-attn-sub">${dayLabel} · ${escapeHtml(scoped ? scopeName : plural(boards.length, "board", "boards"))}${totalStandby && showNames ? " · click a name to open that person's board" : ""}</div></div>
         <div class="ov-attn-shifts">${shiftsHtml}</div></div>`;
+    // the new-year mission numbers: after a week, a line for whoever enters them (Missions tab)
+    const lateNumbers = newYearAlertCount();
+    if (lateNumbers) {
+      const ny = document.createElement("div");
+      ny.className = "ov-attn-calm ov-attn-newyear";
+      ny.innerHTML = `<span>${icon("alert")}${plural(lateNumbers, "mission is", "missions are")} still on last year's number after ${MissionNumber.daysWaiting(todayStr())} days.</span><button type="button" class="ov-linkbtn">Enter new-year numbers</button>`;
+      ny.querySelector("button").onclick = () => { D().activeBoardId = MISSIONS_ID; refreshAndRender().then(openNewYearModal); };
+      attn.appendChild(ny);
+    }
     if (showNames && totalStandby) {
       const groups = document.createElement("div");
       groups.className = "ov-attn-groups";
@@ -6901,12 +6968,24 @@ function bulkHostRows() {
     areaId: r.area ? r.area.id : "", archived: r.archived, hasRecord: r.hasRecord,
   }));
 }
+const bulkIsMis = () => bulk.kind === "missions";
+/* the Missions tab's rows for a template / backup / plan (migration-2026-11-09) */
+function bulkMissionCtx(rows) {
+  const engineers = D().engineers.map(e => ({ id: e.id, label: engineerLabelFor(e.id) })).filter(e => e.label);
+  return {
+    register: rows, boards: D().boards, hosts: D().hosts.filter(h => !h.archived).map(h => h.name), engineers,
+    canReopen: can("missionadmin", "edit"), canRenumber: can("missionadmin", "edit"),
+    previousNumber: (n) => cloud.previousNumber(n),
+  };
+}
 const bulkCtx = (kind, rows) => kind === "employees"
   ? { employees: rows, areas: D().areas, boards: D().boards, positions: POSITIONS }
+  : kind === "missions" ? bulkMissionCtx(rows)
   : { hosts: rows, areas: D().areas, similarKey: hostDupKey };
 /* the rows a template/backup holds: the list as it is shown (template) or everything (backup) */
 function bulkTemplateRows(kind, all) {
   if (kind === "employees") return all ? [...D().employees].sort((a, b) => a.name.localeCompare(b.name)) : emplistFilteredSorted();
+  if (kind === "missions") return all ? (D().register || []).slice() : missionRows();
   const hostsAll = bulkHostRows();
   if (all) return hostsAll;
   const shown = new Set(hostlistFilteredSorted().map(r => r.name));
@@ -6935,17 +7014,21 @@ function bulkDropLabel() {
   $("#bulk-drop-sub").innerHTML = f ? "Choose a different file" : "or <u>choose a file</u>";
 }
 
+const bulkArea = (kind) => kind === "employees" ? "emplist" : kind === "missions" ? "missions" : "hostlist";
 function openBulkModal(kind) {
-  const area = kind === "employees" ? "emplist" : "hostlist";
+  const area = bulkArea(kind);
   if (!can(area, "edit")) { toast("Your role can view this list but not change it.", "info"); return; }
   Object.assign(bulk, { kind, table: null, plan: null, fileName: "", result: null });
-  const emp = kind === "employees";
-  $("#bulk-title").textContent = emp ? "Bulk edit employees" : "Bulk edit hosts";
+  const emp = kind === "employees", mis = kind === "missions";
+  $("#bulk-title").textContent = emp ? "Bulk edit employees" : mis ? "Bulk edit missions" : "Bulk edit hosts";
   $("#bulk-intro").textContent = emp
     ? "Change many employees at once in a spreadsheet. Download the template (it holds everyone's current details), edit it, save it and upload it back. Rename people, change contract, position, phone, dates, service area, board or status, or add new people on the empty rows."
+    : mis
+    ? "Change many missions at once in a spreadsheet, or add a new board's starting missions on the empty rows. Download the template, edit it and upload it back. Close a mission with Status Closed and its Finish date; enter next year's numbers in the New number column."
     : "Change many hosts at once in a spreadsheet: Location, Google Maps link, Service area, Note and Status. Download the template, edit it and upload it back. A host's name is its key — renaming or merging hosts is still done from the Host List.";
   const n = bulkTemplateRows(kind, false).length;
-  $("#bulk-dl-note").textContent = `${n} ${emp ? (n === 1 ? "employee" : "employees") : (n === 1 ? "host" : "hosts")} — the rows the list is showing now. Clear the search and filters first to include everyone. The Excel file has dropdowns, real dates and keeps Thai text intact.`;
+  const nouns = emp ? ["employee", "employees"] : mis ? ["mission", "missions"] : ["host", "hosts"];
+  $("#bulk-dl-note").textContent = `${n} ${n === 1 ? nouns[0] : nouns[1]} — the rows the list is showing now. Clear the search and filters first to include everyone. The Excel file has dropdowns, real dates and keeps Thai text intact.`;
   $("#bulk-file").value = "";
   bulkDropLabel();
   $("#bulk-preview").classList.add("hidden");
@@ -6958,7 +7041,7 @@ function openBulkModal(kind) {
 
 async function bulkDownload() {
   const emp = bulkIsEmp();
-  await bulkWriteFile(bulk.kind, false, `${emp ? "manpower_edit" : "host_edit"}_${todayStr()}`);
+  await bulkWriteFile(bulk.kind, false, `${emp ? "manpower_edit" : bulkIsMis() ? "missions_edit" : "host_edit"}_${todayStr()}`);
   toast("Template downloaded. Edit it, save it, then upload it in step 2.", "info");
 }
 
@@ -6977,17 +7060,20 @@ async function bulkReadFile(file) {
 function bulkMakePlan() {
   return bulkIsEmp()
     ? BulkEdit.planEmployees(bulk.table, bulkCtx("employees", D().employees))
+    : bulkIsMis() ? BulkEdit.planMissions(bulk.table, bulkCtx("missions", D().register || []))
     : BulkEdit.planHosts(bulk.table, bulkCtx("hosts", bulkHostRows()));
 }
 /* what a plan would write, as text — to notice that the data moved under an open dialog */
-const bulkSig = (plan) => JSON.stringify(plan.rows.map(r => [r.rowNumber, r.kind, r.patch, r.create]));
+const bulkSig = (plan) => JSON.stringify(plan.rows.map(r => [r.rowNumber, r.kind, r.patch, r.create, r.close, r.reopen, r.renumber]));
 
 async function onBulkFile(ev) {
   const file = ev.target.files && ev.target.files[0];
   if (!file) return;
   try {
     const rows2d = await bulkReadFile(file);
-    bulk.table = BulkEdit.readTable(rows2d, bulkIsEmp() ? BulkEdit.EMP_COLUMNS : BulkEdit.HOST_COLUMNS);
+    bulk.table = bulkIsMis()
+      ? BulkEdit.readTable(rows2d, BulkEdit.MISSION_COLUMNS, { key: "number", keyLabel: "Mission number" })
+      : BulkEdit.readTable(rows2d, bulkIsEmp() ? BulkEdit.EMP_COLUMNS : BulkEdit.HOST_COLUMNS);
     bulk.plan = bulkMakePlan();
     bulk.fileName = file.name;
     bulk.result = null;
@@ -7003,6 +7089,7 @@ async function onBulkFile(ev) {
 const bulkNone = (v) => (v === "" || v == null ? "<i>(empty)</i>" : escapeHtml(v));
 function bulkCreateSummary(r) {
   const c = r.create;
+  if (bulkIsMis()) return [c.customer, c.host, engineerLabelFor(c.engineerId), c.startTime && c.endTime ? c.startTime + "–" + c.endTime : "", c.openedOn ? "from " + c.openedOn : ""].filter(Boolean).join(" · ");
   if (bulkIsEmp()) {
     const board = D().boards.find(b => b.id === c.boardId), area = D().areas.find(a => a.id === c.areaId);
     return [c.contract === "oncall" ? "On-call" : "Permanent", board ? board.name : "", area ? area.name : "", c.position && POSITIONS[c.position] ? POSITIONS[c.position].label : "", c.active === false ? "Inactive" : ""].filter(Boolean).join(" · ");
@@ -7024,15 +7111,15 @@ function bulkRefreshApplyButton() {
 function renderBulkPreview() {
   const el = $("#bulk-preview");
   el.classList.remove("hidden");
-  const plan = bulk.plan, n = plan.counts, emp = bulkIsEmp();
-  const noun = emp ? ["person", "people"] : ["host", "hosts"];
+  const plan = bulk.plan, n = plan.counts, emp = bulkIsEmp(), mis = bulkIsMis();
+  const noun = emp ? ["person", "people"] : mis ? ["mission", "missions"] : ["host", "hosts"];
   if (plan.fatal.length) {
     el.innerHTML = `<div class="bulk-fatal"><b>This file can't be used.</b><ul>${plan.fatal.map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul></div>`;
     bulkRefreshApplyButton();
     return;
   }
   const chip = (label, v, color) => `<span class="stat-chip"><span class="dot" style="background:${color}"></span>${label}: <b>${v}</b></span>`;
-  let html = `<div class="bulk-chips">${chip("To update", n.update, "var(--chart-assigned)")}${chip(emp ? "New people" : "New hosts", n.create, "var(--ok-text)")}${chip("Unchanged", n.same, "#c3ccd6")}${chip("Problems", n.error, "var(--warn)")}</div>`;
+  let html = `<div class="bulk-chips">${chip("To update", n.update, "var(--chart-assigned)")}${chip(emp ? "New people" : mis ? "New missions" : "New hosts", n.create, "var(--ok-text)")}${chip("Unchanged", n.same, "#c3ccd6")}${chip("Problems", n.error, "var(--warn)")}</div>`;
   const extra = [];
   if (emp && n.moves) extra.push(`${n.moves} ${n.moves === 1 ? "person changes" : "people change"} board — their assignment on ${escapeHtml(fmtDate(state.date))} is cleared`);
   if (emp && (n.noTrigoId || n.shortName)) {
@@ -7045,8 +7132,11 @@ function renderBulkPreview() {
   if (emp && n.deactivate) extra.push(`${n.deactivate} will be set Inactive`);
   if (emp && n.reactivate) extra.push(`${n.reactivate} will be set Active again`);
   if (n.clears) extra.push(`${n.clears} filled-in ${n.clears === 1 ? "value is" : "values are"} being cleared`);
+  if (mis && n.close) extra.push(`${n.close} will be closed (the days after their Finish date lose them)`);
+  if (mis && n.reopen) extra.push(`${n.reopen} will be reopened`);
+  if (mis && n.renumber) extra.push(`${n.renumber} get next year's number from 1 January`);
   if (plan.ignored.length) extra.push(`Ignored columns: ${plan.ignored.map(escapeHtml).join(", ")}`);
-  extra.push(`${n.total} data ${n.total === 1 ? "row" : "rows"} read from ${escapeHtml(bulk.fileName)}. People missing from the file are left alone.`);
+  extra.push(`${n.total} data ${n.total === 1 ? "row" : "rows"} read from ${escapeHtml(bulk.fileName)}. ${emp ? "People" : mis ? "Missions" : "Hosts"} missing from the file are left alone.`);
   html += `<div class="bulk-extra">${extra.join(" · ")}</div>`;
 
   const bad = plan.rows.filter(r => r.kind === "error");
@@ -7057,11 +7147,13 @@ function renderBulkPreview() {
   }
   if (n.create) {
     html += `<label class="bulk-create"><input type="checkbox" id="bulk-create"> Also add ${n.create} new ${n.create === 1 ? noun[0] : noun[1]}` +
-      (emp ? " (rows with a name that isn't on the list yet — if one is a misspelt existing name, fix it in the file instead)" : " (names not in the Host List yet — a renamed host would show up here, so check for typos)") + "</label>";
+      (emp ? " (rows with a name that isn't on the list yet — if one is a misspelt existing name, fix it in the file instead)"
+        : mis ? " (rows that match no board + mission number + shift — a mistyped number would show up here, so check)"
+        : " (names not in the Host List yet — a renamed host would show up here, so check for typos)") + "</label>";
   }
   const shown = plan.rows.filter(r => r.kind === "update" || r.kind === "create");
   if (shown.length) {
-    html += `<table class="bulk-table"><thead><tr><th>Row</th><th>${emp ? "Employee" : "Host"}</th><th>What changes</th></tr></thead><tbody>` +
+    html += `<table class="bulk-table"><thead><tr><th>Row</th><th>${emp ? "Employee" : mis ? "Mission" : "Host"}</th><th>What changes</th></tr></thead><tbody>` +
       shown.slice(0, 200).map(r => {
         const what = r.kind === "create"
           ? `<span class="bulk-new">NEW</span>${escapeHtml(bulkCreateSummary(r))}`
@@ -7080,7 +7172,7 @@ function renderBulkPreview() {
 }
 
 async function applyBulk() {
-  const kind = bulk.kind, area = kind === "employees" ? "emplist" : "hostlist";
+  const kind = bulk.kind, area = bulkArea(kind);
   if (!bulk.plan || !can(area, "edit")) return;
   const btn = $("#btn-bulk-apply");
   btn.disabled = true;
@@ -7102,10 +7194,11 @@ async function applyBulk() {
     if ($("#bulk-backup").checked) {
       const t = new Date();
       const stamp = todayStr() + "_" + String(t.getHours()).padStart(2, "0") + String(t.getMinutes()).padStart(2, "0");
-      await bulkWriteFile(kind, true, `${kind === "employees" ? "manpower" : "host"}_backup_before_import_${stamp}`);
+      await bulkWriteFile(kind, true, `${kind === "employees" ? "manpower" : kind === "missions" ? "missions" : "host"}_backup_before_import_${stamp}`);
     }
     const res = kind === "employees"
       ? await cloud.applyEmployeeImport(bulk.plan, { moveDate: state.date, createNew })
+      : kind === "missions" ? await cloud.applyMissionImport(bulk.plan, { createNew })
       : await cloud.applyHostImport(bulk.plan, { createNew });
     bulk.result = res;
     await refreshAndRender();
@@ -7875,6 +7968,368 @@ function renderHostView() {
 }
 
 /* full (re)build on tab entry: filter dropdown options + search box + rows */
+/* ---------- Missions tab: the Mission register (migration-2026-11-09) ----------
+   One row per board + mission number + shift (cloud.loadMissionRegister). Open missions carry
+   over; Close ends one (its later days lose it); a Site Admin or Manager reopens one and enters
+   the new-year numbers. Phase 1 keeps to the columns the team chose: number (and last year's),
+   board, shift, customer, host, Trigo responsible, start, last day on the board, status. */
+/* Export on the Missions tab: the rows shown, in the Bulk edit layout (it is also the template). */
+function exportMissionList() {
+  safely(async () => {
+    const rows = missionRows();
+    await bulkWriteFile("missions", false, `missions_${todayStr()}`);
+    toast(`Exported ${plural(rows.length, "mission", "missions")}.`, "info");
+  });
+}
+function boardNameOf(id) {
+  const b = D().boards.find(x => x.id === id);
+  return b ? b.name : "—";
+}
+/* Open missions still on an earlier year's number (MissionNumber.needsNewYearNumber), one entry
+   per number with its rows (a mission can run on two boards, and Day and Night share a number). */
+function newYearWaiting() {
+  if (!missionsOn()) return [];
+  const today = todayStr();
+  const by = new Map();
+  for (const r of D().register || []) {
+    if (r.status !== "open" || !MissionNumber.needsNewYearNumber(r.number, today)) continue;
+    if (!by.has(r.number)) by.set(r.number, []);
+    by.get(r.number).push(r);
+  }
+  return [...by.entries()].map(([number, rows]) => ({ number, rows })).sort((a, b) => a.number.localeCompare(b.number));
+}
+/* The alert: more than a week into the year (from 8 January), for whoever enters the numbers. */
+function newYearAlertCount() {
+  if (!missionsOn() || !can("missionadmin", "edit")) return 0;
+  if (MissionNumber.daysWaiting(todayStr()) <= MissionNumber.ALERT_AFTER_DAYS) return 0;
+  return newYearWaiting().length;
+}
+function missionStatusHtml(r) {
+  if (r.status === "closed") {
+    const t = `Closed${r.closedBy ? " by " + r.closedBy : ""}${r.closeNote ? ": " + r.closeNote : ""}`;
+    return `<span class="tag ml-closed" title="${escapeHtml(t)}">Closed ${escapeHtml(r.closedOn ? fmtDate(r.closedOn) : "")}</span>`;
+  }
+  const today = todayStr();
+  if (MissionNumber.needsNewYearNumber(r.number, today)) {
+    const year = today.slice(0, 4), days = MissionNumber.daysWaiting(today);
+    const late = days > MissionNumber.ALERT_AFTER_DAYS;
+    return `<span class="tag ${late ? "ml-late" : "ml-wait"}" title="${late ? `Still on last year's number after ${days} days` : "The board keeps running on last year's number until the new one is entered"}">${late ? `No ${year} number · ${days} days` : `Waiting for ${year} number`}</span>`;
+  }
+  return `<span class="tag ml-open">Open</span>`;
+}
+function missionRows() {
+  const st = state.missions;
+  const q = st.search.trim().toLowerCase();
+  let rows = (D().register || []).filter(r => !st.boardId || r.boardId === st.boardId);
+  if (st.status !== "all") rows = rows.filter(r => r.status === st.status);
+  if (q) {
+    rows = rows.filter(r => [...cloud.numberChain(r.number), r.customer, r.host, engineerLabelFor(r.engineerId), boardNameOf(r.boardId)]
+      .some(x => String(x || "").toLowerCase().includes(q)));
+  }
+  const key = st.sort.key, dir = st.sort.dir;
+  const val = (r) => key === "board" ? boardNameOf(r.boardId) : key === "engineer" ? engineerLabelFor(r.engineerId)
+    : key === "status" ? (r.status === "closed" ? "1" + (r.closedOn || "") : "0") : (r[key] || "");
+  return rows.slice().sort((a, b) => String(val(a)).localeCompare(String(val(b))) * dir || a.number.localeCompare(b.number) || a.shift.localeCompare(b.shift));
+}
+function renderMissionStats(bar) {
+  const all = (D().register || []).filter(r => !state.missions.boardId || r.boardId === state.missions.boardId);
+  const open = all.filter(r => r.status === "open").length;
+  const closed = all.length - open;
+  const waiting = newYearWaiting().filter(w => w.rows.some(r => !state.missions.boardId || r.boardId === state.missions.boardId)).length;
+  const late = MissionNumber.daysWaiting(todayStr()) > MissionNumber.ALERT_AFTER_DAYS;
+  const tile = (label, n, kind) =>
+    `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
+  bar.classList.add("stats-tiles");
+  bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${all.length}</b></div>` +
+    tile("Open", open, "assigned") + tile("Closed", closed, "holiday") + (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "");
+  renderPhoneViewCard({
+    head: `<b>${open}</b><span class="ms-w"> open</span>`,
+    label: `${all.length} missions: ${open} open, ${closed} closed`,
+    keys: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    bar: [["assigned", open], ["holiday", closed]],
+    tiles: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    areaHtml: "",
+    filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0),
+  });
+}
+function renderMissionList() {
+  const st = state.missions;
+  // the Board picker: All boards, then each board
+  const sel = $("#missions-board");
+  const opts = [["", "All boards"]].concat(D().boards.map(b => [b.id, b.name]));
+  if (sel.options.length !== opts.length || [...sel.options].some((o, i) => o.value !== opts[i][0] || o.textContent !== opts[i][1])) {
+    sel.innerHTML = "";
+    for (const [v, t] of opts) sel.appendChild(Object.assign(document.createElement("option"), { value: v, textContent: t }));
+  }
+  if (!D().boards.some(b => b.id === st.boardId)) st.boardId = "";
+  sel.value = st.boardId;
+  $("#missions-status").value = st.status;
+  syncSegmented(document);
+  if ($("#missions-search").value !== st.search) $("#missions-search").value = st.search;
+  // the new-year banner
+  const waiting = newYearWaiting();
+  const alertBox = $("#missions-alert");
+  const year = todayStr().slice(0, 4);
+  const days = MissionNumber.daysWaiting(todayStr());
+  const late = days > MissionNumber.ALERT_AFTER_DAYS;
+  const admin = can("missionadmin", "edit");
+  $("#missions-newyear-count").textContent = String(waiting.length);
+  $("#missions-newyear-count").classList.toggle("hidden", !waiting.length);
+  alertBox.classList.toggle("hidden", !waiting.length);
+  alertBox.className = waiting.length ? "ml-alert " + (late ? "ml-alert-late" : "ml-alert-wait") : "hidden";
+  if (waiting.length) {
+    const n = plural(waiting.length, "mission is", "missions are");
+    alertBox.innerHTML = `<span class="ml-alert-ic">${icon(late ? "alert" : "calendar")}</span><span class="ml-alert-text"></span>`;
+    alertBox.querySelector(".ml-alert-text").textContent = late
+      ? `${n} still on last year's number after ${days} days. Enter the ${year} numbers from Etraq, or close the missions that have ended.`
+      : `${n} waiting for ${year} numbers. The board keeps running on last year's number until ${admin ? "you enter" : "a Site Admin enters"} them.`;
+    if (admin) {
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "btn btn-small" + (late ? " btn-primary" : "") });
+      b.textContent = "Enter new-year numbers";
+      b.onclick = openNewYearModal;
+      alertBox.appendChild(b);
+    }
+  }
+  // the table
+  const rows = missionRows();
+  $("#missions-count").textContent = plural(rows.length, "mission", "missions");
+  for (const th of $$("#missions-table th[data-sort]")) {
+    th.classList.toggle("sorted", th.dataset.sort === st.sort.key);
+    th.setAttribute("aria-sort", th.dataset.sort === st.sort.key ? (st.sort.dir > 0 ? "ascending" : "descending") : "none");
+  }
+  const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit");
+  const body = $("#missions-body");
+  body.innerHTML = rows.map(r => {
+    const prev = cloud.previousNumber(r.number);
+    const acts = [];
+    if (r.status === "open" && canAdd) acts.push(`<button type="button" class="btn btn-small" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
+    if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
+    if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small" data-act="reopen">Reopen</button>`);
+    return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
+      <td><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
+      <td>${escapeHtml(boardNameOf(r.boardId))}</td>
+      <td><span class="tag ml-shift ml-${r.shift}">${r.shift === "night" ? "Night" : "Day"}</span></td>
+      <td>${escapeHtml(r.customer || "—")}</td>
+      <td>${escapeHtml(r.host || "—")}</td>
+      <td>${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
+      <td class="ml-date">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
+      <td class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
+      <td>${missionStatusHtml(r)}</td>
+      <td class="ml-actions">${acts.join("")}</td></tr>`;
+  }).join("");
+  const empty = $("#missions-empty");
+  const none = !(D().register || []).length;
+  empty.classList.toggle("hidden", rows.length > 0);
+  empty.textContent = none
+    ? "No missions yet. A mission appears here as soon as it is on a board, or add many at once with Bulk edit."
+    : st.status === "closed" ? "No closed missions match." : "No missions match.";
+  $("#missions-list-wrap").classList.toggle("hidden", !rows.length);
+}
+function missionFromRow(el) {
+  const tr = el.closest("tr[data-id]");
+  return tr ? (D().register || []).find(r => r.id === tr.dataset.id) || null : null;
+}
+
+/* Close: the last working day. Opened from the Missions tab and from a mission card. */
+let _closingMission = null;
+function openCloseMissionModal(r, defaultDate) {
+  if (!r) return;
+  if (!can("missions", "edit")) { toast("Your role cannot close missions.", "info"); return; }
+  _closingMission = r;
+  $("#close-mission-title").textContent = `Close mission ${r.number}`;
+  $("#close-mission-what").textContent = `${boardNameOf(r.boardId)} · ${r.shift === "night" ? "Night" : "Day"} · ${r.host || "—"} → ${r.customer || "—"}`;
+  let def = defaultDate || todayStr();
+  if (r.lastOn && r.lastOn < def) def = r.lastOn;
+  if (r.openedOn && def < r.openedOn) def = r.openedOn;
+  const d = $("#close-mission-date");
+  d.min = r.openedOn || "";
+  d.value = def;
+  $("#close-mission-note").value = "";
+  updateCloseMissionEffect();
+  openModal("#modal-close-mission");
+}
+function updateCloseMissionEffect() {
+  const v = $("#close-mission-date").value;
+  const next = v ? addDays(v, 1) : null;
+  $("#close-mission-effect").textContent = next
+    ? `From ${fmtDow(next)} ${fmtDate(next)} this mission comes off the board: carry over no longer brings it, and anyone placed on it on those days goes back to Standby.`
+    : "";
+}
+function submitCloseMission(ev) {
+  ev.preventDefault();
+  const r = _closingMission;
+  const date = $("#close-mission-date").value;
+  if (!r || !date) return;
+  if (r.openedOn && date < r.openedOn) { toast(`${r.number} only started on ${fmtDate(r.openedOn)}.`, "warn"); return; }
+  safely(async () => {
+    await cloud.closeMission(r.id, date, $("#close-mission-note").value.trim());
+    closeModal();
+    toast(`Closed ${r.number}. Its last working day is ${fmtDate(date)}.`, "info");
+    await refreshAndRender();
+  });
+}
+function reopenMissionRow(r) {
+  showConfirm("Reopen mission?",
+    `Reopen ${r.number} (${boardNameOf(r.boardId)}, ${r.shift === "night" ? "Night" : "Day"})? It goes back to the open missions and carries over again once it is on a day. Use Add to board to put it on a day.`,
+    () => safely(async () => {
+      await cloud.reopenMission(r.id);
+      toast(`Reopened ${r.number}.`, "info");
+      await refreshAndRender();
+    }));
+}
+
+/* Add to board: put a register mission on one day of its board, with no crew. */
+let _addingMission = null;
+function openMissionAddModal(r) {
+  if (!can("board", "edit")) { toast("Your role can view the board but not change it.", "info"); return; }
+  _addingMission = r;
+  $("#mission-add-what").textContent = `${r.number} · ${boardNameOf(r.boardId)} · ${r.shift === "night" ? "Night" : "Day"} · ${r.host || "—"} → ${r.customer || "—"}. It is added with no crew.`;
+  const d = $("#mission-add-date");
+  d.min = todayStr();
+  d.max = feat().forecast ? horizonEndFor(r.boardId) : "";
+  d.value = feat().forecast ? horizonEndFor(r.boardId) : addDays(todayStr(), 1);
+  openModal("#modal-mission-add");
+}
+function submitMissionAdd(ev) {
+  ev.preventDefault();
+  const r = _addingMission;
+  const date = $("#mission-add-date").value;
+  if (!r || !date) return;
+  if (isLocked(r.boardId, date)) { toast(`${boardNameOf(r.boardId)} is locked on ${fmtDate(date)}. Unlock that day first.`, "warn"); return; }
+  if (feat().forecast && date > horizonEndFor(r.boardId)) { toast("That day is a forecast. Pick a day up to the next working day.", "warn"); return; }
+  safely(async () => {
+    const res = await cloud.addMissionsFromRegister(r.boardId, date, [r.id]);
+    closeModal();
+    toast(res.added ? `Added ${r.number} to ${boardNameOf(r.boardId)} on ${fmtDow(date)} ${fmtDate(date)}.` : `${r.number} is already on ${boardNameOf(r.boardId)} that day.`, "info");
+    await refreshAndRender();
+  });
+}
+/* The empty board day: put every open mission of the Missions list on it (a new board's first
+   day, or a day with nothing to carry over). */
+function startDayFromRegister() {
+  const boardId = D().activeBoardId, date = state.date;
+  const ids = (D().register || []).filter(r => r.boardId === boardId && r.status === "open").map(r => r.id);
+  if (!ids.length) return;
+  safely(async () => {
+    const res = await cloud.addMissionsFromRegister(boardId, date, ids);
+    toast(`Added ${plural(res.added, "mission", "missions")} from the Missions list. Drag people onto them to plan the crew.`, "info");
+    await refreshAndRender();
+  });
+}
+
+/* New-year numbers: one box per mission waiting; typed or pasted as a column from Excel. */
+function openNewYearModal() {
+  if (!can("missionadmin", "edit")) { toast("Your role cannot enter new mission numbers.", "info"); return; }
+  const list = newYearWaiting();
+  const year = todayStr().slice(0, 4);
+  const days = MissionNumber.daysWaiting(todayStr());
+  $("#newyear-title").textContent = `New-year numbers · ${year}`;
+  $("#newyear-intro").textContent = `Type the ${year} number Etraq gave each mission, or paste a column of numbers from Excel into a box: they fill the boxes below it in order. A number applies from 1 January ${year}, so every ${year} day on the board, in the Host Record and in reports shows it. Earlier days keep last year's number. A mission that has ended can be closed instead.`;
+  const body = $("#newyear-body");
+  body.innerHTML = list.map((w, i) => {
+    const first = w.rows[0];
+    const boards = [...new Set(w.rows.map(r => boardNameOf(r.boardId)))].join(", ");
+    const shifts = [...new Set(w.rows.map(r => r.shift === "night" ? "Night" : "Day"))].join(" + ");
+    return `<tr data-old="${escapeHtml(w.number)}">
+      <td><b class="ml-num">${escapeHtml(w.number)}</b><small class="ml-was">${escapeHtml(shifts)}</small></td>
+      <td>${escapeHtml(boards)}</td>
+      <td>${escapeHtml(first.customer || "—")}</td>
+      <td>${escapeHtml(first.host || "—")}</td>
+      <td><span class="tag ${days > MissionNumber.ALERT_AFTER_DAYS ? "ml-late" : "ml-wait"}">${plural(days, "day", "days")}</span></td>
+      <td class="ny-cell"><input type="text" class="ny-input" id="ny-${i}" autocomplete="off" spellcheck="false" placeholder="${escapeHtml(first.number.replace(/\.\d{2}\./, "." + year.slice(2) + "."))}" aria-label="New number for ${escapeHtml(w.number)}">
+        <button type="button" class="ov-linkbtn ny-close" title="This mission has ended: close it on its last day on the board">Close instead</button>
+        <span class="ny-err" aria-live="polite"></span></td></tr>`;
+  }).join("") || `<tr><td colspan="6">Every open mission has its ${year} number.</td></tr>`;
+  for (const p of $$("#newyear-body .ny-input")) p.placeholder = "e.g. " + p.placeholder.replace(/\.\d{4}$/, ".0001");
+  updateNewYearState();
+  openModal("#modal-newyear");
+}
+function newYearEntries() {
+  const used = new Set((D().register || []).map(r => r.number));
+  const entries = $$("#newyear-body tr[data-old]").map(tr => ({ tr, old: tr.dataset.old, raw: tr.querySelector(".ny-input").value.trim() }));
+  const counts = {};
+  for (const e of entries) if (e.raw) { const n = MissionNumber.tidy(e.raw); counts[n] = (counts[n] || 0) + 1; }
+  for (const e of entries) {
+    e.error = null;
+    if (!e.raw) continue;
+    const c = MissionNumber.checkNewYear(e.old, e.raw);
+    e.number = c.number;
+    if (!c.ok) e.error = c.error;
+    else if (counts[c.number] > 1) e.error = `${c.number} is typed twice.`;
+    else if (used.has(c.number)) e.error = `${c.number} is already used by another mission.`;
+  }
+  return entries;
+}
+function updateNewYearState() {
+  const entries = newYearEntries();
+  let ok = 0, bad = 0;
+  for (const e of entries) {
+    e.tr.querySelector(".ny-err").textContent = e.error || "";
+    e.tr.classList.toggle("ny-bad", !!e.error);
+    if (e.raw && !e.error) ok++;
+    if (e.error) bad++;
+  }
+  $("#newyear-summary").textContent = !entries.length ? "" : bad
+    ? `${plural(bad, "number needs", "numbers need")} fixing before saving.`
+    : ok ? `${plural(ok, "number", "numbers")} ready to save. ${entries.length - ok ? `${entries.length - ok} left for later.` : ""}`.trim()
+    : "Type or paste the new numbers.";
+  $("#btn-newyear-save").disabled = !ok || !!bad;
+  $("#btn-newyear-save").textContent = ok ? `Save ${plural(ok, "number", "numbers")}` : "Save";
+}
+function saveNewYearNumbers() {
+  const entries = newYearEntries().filter(e => e.raw && !e.error);
+  if (!entries.length) return;
+  safely(async () => {
+    // grouped by the year of the new number: each applies from its own 1 January
+    const byFrom = {};
+    for (const e of entries) (byFrom[MissionNumber.validFrom(e.number)] = byFrom[MissionNumber.validFrom(e.number)] || []).push({ old: e.old, new: e.number });
+    let n = 0;
+    for (const [from, items] of Object.entries(byFrom)) n += await cloud.renumberMissions(items, from);
+    closeModal();
+    toast(`Saved ${plural(n, "new-year number", "new-year numbers")}. The board shows them from 1 January on.`, "info");
+    await refreshAndRender();
+  });
+}
+function closeWaitingMission(oldNumber) {
+  const rows = (D().register || []).filter(r => r.number === oldNumber && r.status === "open");
+  if (!rows.length) return;
+  const last = rows.map(r => r.lastOn || todayStr()).sort().pop();
+  showConfirm("Close mission?",
+    `Close ${oldNumber} on its last day on the board, ${fmtDate(last)}${rows.length > 1 ? ` (${rows.length} rows: every board and shift)` : ""}? It will not carry over again. Its history stays.`,
+    () => safely(async () => {
+      for (const r of rows) await cloud.closeMission(r.id, r.lastOn || todayStr(), "Ended: closed from the new-year numbers");
+      toast(`Closed ${oldNumber}.`, "info");
+      await refreshAndRender();
+      openNewYearModal();
+    }), () => openModal("#modal-newyear"));
+}
+
+/* Before a mission is saved with a new number: the Missions list's rules. A number is unique
+   across the company except one mission running at another location; a closed number is
+   reopened first (Manager, Admin, Site Admin) or refused. `then` saves. */
+function checkMissionNumberUse(number, shift, then, backToForm) {
+  const boardId = D().activeBoardId;
+  const mine = cloud.registerFor(boardId, number, shift);
+  if (mine && mine.status === "closed" && mine.closedOn && state.date > mine.closedOn) {
+    if (!can("missionadmin", "edit")) {
+      toast(`${number} (${shift === "night" ? "Night" : "Day"}) was closed on ${fmtDate(mine.closedOn)}. A Site Admin or a Manager can reopen it on the Missions tab.`, "warn");
+      return;
+    }
+    showConfirm("Reopen mission?", `${number} (${shift === "night" ? "Night" : "Day"}) was closed on ${fmtDate(mine.closedOn)}. Reopen it and save it on this day?`,
+      () => safely(async () => { await cloud.reopenMission(mine.id); then(); }), backToForm);
+    return;
+  }
+  const elsewhere = (D().register || []).filter(r => r.number === number && r.boardId !== boardId);
+  if (elsewhere.length) {
+    const boards = [...new Set(elsewhere.map(r => boardNameOf(r.boardId)))].join(", ");
+    showConfirm("Same mission at another location?",
+      `${number} is already used on ${boards}. Mission numbers are unique across the company: use it here only if this is the same mission running at another location.`,
+      then, backToForm, "Yes, same mission");
+    return;
+  }
+  then();
+}
+
 function renderHostList() {
   $("#hostlist-search").value = state.hostlist.search;
   renderHostlistFilterOptions();
@@ -8938,6 +9393,9 @@ const CONFIRM_ACTIONS = [
   [/^Create this host/, "Create host"],
   [/^Delete (forecast )?mission/, "Delete mission", true],
   [/^Hide mission/, "Hide mission"],
+  [/^Reopen mission/, "Reopen"],
+  [/^Close mission/, "Close mission"],
+  [/^Same mission at another location/, "Yes, same mission"],
   [/^Delete note/, "Delete note", true],
   [/^Remove this engineer/, "Remove engineer", true],
   [/^Delete this account/, "Delete account", true],
@@ -9198,6 +9656,16 @@ function saveMission(ev) {
     toast(`"${form.engineer.value.trim()}" isn't on the engineer list. Pick a name from the suggestions — everyone from Engineer upwards is there.`, "warn");
     return;
   }
+  // the mission number's form (PREFIX.YY.NNNN, no monthly suffix), checked when it is new or
+  // changed, on the confirmed board once the Missions list exists (migration-2026-11-09)
+  const editing = state.editingMissionId ? getPlan().missions.find(x => x.id === state.editingMissionId) : null;
+  const numberRules = missionsOn() && !isForecastView();
+  const newNumber = !editing || MissionNumber.tidy(editing.number) !== MissionNumber.tidy(vals.number);
+  if (numberRules && newNumber) {
+    const c = MissionNumber.check(vals.number);
+    if (!c.ok) { toast(c.error, "warn"); return; }
+    vals.number = c.number;
+  }
   // instant client-side check (same number + shift, excluding the mission being edited);
   // scans hidden missions too — the DB unique constraint covers them regardless —
   // this just avoids a round trip and points at the hidden one if that's the clash
@@ -9211,15 +9679,22 @@ function saveMission(ev) {
       : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`, "warn");
     return;
   }
-  safely(async () => {
+  const editingId = state.editingMissionId;   // a confirm in between must not lose which mission this is
+  const save = () => safely(async () => {
     // the first time somebody is picked they have no engineer record yet, so
     // one is made here — that is where their mission colour lives
     vals.engineerId = eng.engineerId || await cloud.ensureEngineerForProfile(eng.profileId);
-    if (isForecastView()) await cloud.saveForecastMission(D().activeBoardId, state.date, state.editingMissionId, vals);
-    else await cloud.saveMission(D().activeBoardId, state.date, state.editingMissionId, vals);
+    if (isForecastView()) await cloud.saveForecastMission(D().activeBoardId, state.date, editingId, vals);
+    else await cloud.saveMission(D().activeBoardId, state.date, editingId, vals);
     closeModal();
     await refreshAndRender();
   });
+  // a number (or shift) new on this board: closed? used on another board? (checkMissionNumberUse)
+  if (numberRules && (newNumber || (editing && editing.shift !== vals.shift))) {
+    checkMissionNumberUse(vals.number, vals.shift, save, () => { state.editingMissionId = editingId; openModal("#modal-mission"); });
+  } else {
+    save();
+  }
 }
 
 /* from the mission form (the one being edited) or the card's quick panel */
@@ -9230,9 +9705,13 @@ function deleteMission(missionId = state.editingMissionId) {
   const plan = getPlan();
   // someone else's holds go with the mission — say so rather than let it happen quietly
   const othersHolds = forecast ? m.members.filter(id => isOthersHold(plan.holds && plan.holds[id])).length : 0;
+  // a mission that has run for days and is finished should be closed, not deleted
+  const reg = !forecast && missionsOn() ? cloud.registerFor(D().activeBoardId, m.number, m.shift) : null;
+  const ran = reg && reg.openedOn && reg.openedOn < state.date;
   showConfirm(forecast ? "Delete forecast mission?" : "Delete mission?",
     `Delete ${m.number}? Its employees return to the Available pool.` +
-      (othersHolds ? ` ${othersHolds} of them ${othersHolds === 1 ? "is" : "are"} held by another engineer.` : ""), () => {
+      (othersHolds ? ` ${othersHolds} of them ${othersHolds === 1 ? "is" : "are"} held by another engineer.` : "") +
+      (ran ? ` Delete is for a mistake. If the job has ended, use Close mission instead (right-click the card): it keeps the mission's history and stops carry over.` : ""), () => {
     safely(async () => {
       if (forecast) await cloud.deleteForecastMission(missionId);
       else await cloud.deleteMission(missionId);
@@ -11213,6 +11692,7 @@ function openExportModal() {
   if (isEmployeeList()) return openEmplistXlsxModal();
   if (isHostList()) return openHostlistExportModal();
   if (isCapacity()) return openCapExportModal();
+  if (isMissionList()) return exportMissionList();
   return openBoardExportModal();
 }
 
@@ -16606,6 +17086,49 @@ function wireApp() {
   // ---------- Manpower List tab ----------
   $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
   $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
+  // Missions tab (migration-2026-11-09)
+  $("#missions-search").addEventListener("input", (e) => { state.missions.search = e.target.value; renderMissionList(); renderStats(); });
+  $("#missions-board").addEventListener("change", (e) => { state.missions.boardId = e.target.value; render(); });
+  $("#missions-status").addEventListener("change", (e) => { state.missions.status = e.target.value; render(); });
+  $("#btn-missions-newyear").onclick = openNewYearModal;
+  $("#btn-missions-bulk").onclick = () => openBulkModal("missions");
+  $("#missions-table thead").addEventListener("click", (e) => {
+    const th = e.target.closest("th[data-sort]");
+    if (!th) return;
+    const s = state.missions.sort;
+    if (s.key === th.dataset.sort) s.dir = -s.dir; else { s.key = th.dataset.sort; s.dir = 1; }
+    renderMissionList();
+  });
+  $("#missions-body").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-act]");
+    const r = b && missionFromRow(b);
+    if (!r) return;
+    if (b.dataset.act === "close") openCloseMissionModal(r);
+    else if (b.dataset.act === "reopen") reopenMissionRow(r);
+    else if (b.dataset.act === "add") openMissionAddModal(r);
+  });
+  $("#form-close-mission").onsubmit = submitCloseMission;
+  $("#close-mission-date").addEventListener("input", updateCloseMissionEffect);
+  $("#form-mission-add").onsubmit = submitMissionAdd;
+  $("#btn-newyear-save").onclick = saveNewYearNumbers;
+  $("#newyear-body").addEventListener("input", updateNewYearState);
+  $("#newyear-body").addEventListener("click", (e) => {
+    const b = e.target.closest(".ny-close");
+    if (b) closeWaitingMission(b.closest("tr[data-old]").dataset.old);
+  });
+  // a column pasted from Excel fills this box and the ones below it, in order
+  $("#newyear-body").addEventListener("paste", (e) => {
+    const box = e.target.closest(".ny-input");
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    const lines = String(text || "").split(/\r?\n/).map(x => x.split("\t")[0].trim());
+    while (lines.length && !lines[lines.length - 1]) lines.pop();
+    if (!box || lines.length < 2) return;
+    e.preventDefault();
+    const boxes = $$("#newyear-body .ny-input");
+    const at = boxes.indexOf(box);
+    lines.forEach((v, k) => { if (boxes[at + k]) boxes[at + k].value = v; });
+    updateNewYearState();
+  });
   $("#btn-bulk-dl-xlsx").onclick = () => safely(bulkDownload);
   $("#bulk-file").onchange = (e) => { bulkDropLabel(); safely(() => onBulkFile(e)); };
   const drop = $("#bulk-drop");

@@ -565,6 +565,18 @@
           </div>
         </div>
       </div>
+      <!-- Missions tab (migration-2026-11-09): search, board, status and the new-year numbers.
+           A display:contents group like #hostlist-toolbar; render() shows it on that tab only. -->
+      <div id="missions-toolbar" class="hidden">
+        <input id="missions-search" type="search" placeholder="Search number, customer, host…" autocomplete="off">
+        <select id="missions-board" aria-label="Board" title="Which board's missions"></select>
+        <select id="missions-status" data-seg aria-label="Status" title="Open or closed missions">
+          <option value="open">Open</option>
+          <option value="closed">Closed</option>
+          <option value="all">All</option>
+        </select>
+        <button type="button" class="btn hidden" id="btn-missions-newyear" title="Enter the new-year numbers Etraq gave the missions still running on last year's number"><svg class="ic" aria-hidden="true"><use href="#i-calendar"></use></svg> New-year numbers<span id="missions-newyear-count" class="fcount hidden"></span></button>
+      </div>
       <div id="filters">
         <!-- Engineer / Host / Customer / Shift and the sort order live in one popover, so the
              toolbar shows one "Filter & sort" button (with how many filters are on) instead of
@@ -640,6 +652,8 @@
       <button type="button" class="btn hidden" id="btn-emplist-bulk" title="Edit many employees in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
       <span id="hostlist-count" class="hidden"></span>
       <button type="button" class="btn hidden" id="btn-hostlist-bulk" title="Edit many hosts in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
+      <span id="missions-count" class="hidden"></span>
+      <button type="button" class="btn hidden" id="btn-missions-bulk" title="Edit many missions in a spreadsheet: download a template, change it, upload it back"><svg class="ic" aria-hidden="true"><use href="#i-edit"></use></svg> Bulk edit</button>
       <select id="card-names" class="hidden" data-seg data-no-i18n aria-label="Names on the cards" title="Which name the employee cards show. The app shows the Thai name by default.">
         <option value="th">ไทย</option>
         <option value="en">English</option>
@@ -795,6 +809,32 @@
         <tbody id="hostlist-body"></tbody>
       </table>
     </div>
+  </section>
+
+  <!-- Missions tab: the Mission register (migration-2026-11-09), one row per board + number +
+       shift. Open missions carry over; Close ends one. renderMissionList() in app.js. -->
+  <section id="missions-panel" class="hidden">
+    <div id="missions-alert" class="hidden" role="status"></div>
+    <div class="table-wrap" id="missions-list-wrap">
+      <table id="missions-table">
+        <thead>
+          <tr>
+            <th data-sort="number">Mission No.</th>
+            <th data-sort="board">Board</th>
+            <th data-sort="shift">Shift</th>
+            <th data-sort="customer">Customer</th>
+            <th data-sort="host">Host</th>
+            <th data-sort="engineer">Trigo responsible</th>
+            <th data-sort="openedOn" title="The first day this mission was on the board">Start date</th>
+            <th data-sort="lastOn" title="The latest day this mission is on the board">Last on board</th>
+            <th data-sort="status">Status</th>
+            <th class="ml-actions-h"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="missions-body"></tbody>
+      </table>
+    </div>
+    <p id="missions-empty" class="hidden"></p>
   </section>
 </main>
 
@@ -1534,6 +1574,54 @@
     </div>
   </div>
 
+  <!-- Close a mission: its last working day. The days after lose it, carry over never brings it
+       back, its history stays (cloud.closeMission -> close_mission()). -->
+  <div class="modal hidden" id="modal-close-mission" role="dialog" aria-modal="true" aria-labelledby="close-mission-title">
+    <h3><span id="close-mission-title">Close mission</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-close-mission">
+      <p class="import-note" id="close-mission-what"></p>
+      <label>Last working day <input type="date" name="closedOn" id="close-mission-date" required></label>
+      <p class="close-mission-effect" id="close-mission-effect"></p>
+      <label>Reason (optional) <input name="note" id="close-mission-note" maxlength="200" placeholder="e.g. Contract ended"></label>
+      <p class="import-note">Its earlier days, crew and Host Record stay as they are. A Site Admin or a Manager can reopen it from the Missions tab.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-close-mission-go">Close mission</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- New-year numbers: one box per mission still on last year's number. Typed, or pasted as a
+       column from Excel; checked, then saved in one go (cloud.renumberMissions). -->
+  <div class="modal modal-side hidden" id="modal-newyear" role="dialog" aria-modal="true" aria-labelledby="newyear-title">
+    <h3><span id="newyear-title">New-year numbers</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <p class="import-note" id="newyear-intro"></p>
+    <div class="table-wrap">
+      <table id="newyear-table">
+        <thead><tr><th>Last year's number</th><th>Board</th><th>Customer</th><th>Host</th><th>Days waiting</th><th>New number</th></tr></thead>
+        <tbody id="newyear-body"></tbody>
+      </table>
+    </div>
+    <p class="import-note" id="newyear-summary" role="status"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-newyear-save" disabled>Save</button>
+    </div>
+  </div>
+
+  <!-- Put a mission from the Missions tab on a day of its board (no crew). -->
+  <div class="modal hidden" id="modal-mission-add" role="dialog" aria-modal="true" aria-labelledby="mission-add-title">
+    <h3><span id="mission-add-title">Add to the board</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-mission-add">
+      <p class="import-note" id="mission-add-what"></p>
+      <label>Date <input type="date" name="date" id="mission-add-date" required></label>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add to the board</button>
+      </div>
+    </form>
+  </div>
+
   <div class="modal hidden" id="modal-confirm">
     <h3><span id="confirm-title">Confirm</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <p id="confirm-message"></p>
@@ -1560,6 +1648,7 @@
 <script src="i18n-th.js?v=2026-11-04g"></script>
 <script src="planning.js?v=2026-11-04g"></script>
 <script src="employee-id.js?v=2026-11-04g"></script>
+<script src="mission-number.js?v=2026-11-04g"></script>
 <script src="cloud.js?v=2026-11-04g"></script>
 <script src="charts.js?v=2026-11-04g"></script>
 <script src="xlsx-export.js?v=2026-11-04g"></script>

@@ -7246,3 +7246,70 @@ label > .pk { margin-top: 5px; }
 .rp { box-sizing: border-box; padding-right: 2px; }
 .rp-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rp-tile { min-width: 0; box-sizing: border-box; }
+
+/* ===== Missions tab (migration-2026-11-09): the Mission register =====
+   The same table look as the Host list; its toolbar is a display:contents group like
+   #hostlist-toolbar. Status tags: Open (green), Waiting for the new-year number (grey),
+   no number after a week (red), Closed (muted). */
+#missions-toolbar { display: contents; }
+#missions-search {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel); color: var(--text); font-size: 13px; min-width: 220px;
+}
+#missions-board { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font-size: 13px; }
+#missions-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+#missions-panel { display: flex; flex-direction: column; gap: 10px; }
+#missions-panel.hidden { display: none; }
+#missions-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+#missions-table th, #missions-table td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+#missions-table th {
+  font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .3px;
+  cursor: pointer; user-select: none; white-space: nowrap; background: var(--bg-soft); position: sticky; top: 0;
+}
+#missions-table th.ml-actions-h { cursor: default; }
+#missions-table th:hover { color: var(--primary-text); }
+#missions-table th.sorted[aria-sort="ascending"]::after { content: " \25B2"; }
+#missions-table th.sorted[aria-sort="descending"]::after { content: " \25BC"; }
+#missions-table tbody tr:hover { background: var(--hover-tint); }
+#missions-table td.ml-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+#missions-table tr.ml-row-closed td { color: var(--muted); }
+.ml-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ml-was { display: block; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.ml-actions { white-space: nowrap; text-align: right; }
+.ml-actions .btn + .btn { margin-left: 6px; }
+.tag.ml-open { background: var(--ok-surface); color: var(--ok-text); border: 1px solid var(--ok-line); }
+.tag.ml-wait { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+.tag.ml-late { background: var(--danger-tint); color: var(--danger-text); border: 1px solid var(--danger-line); }
+.tag.ml-closed { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+.tag.ml-shift.ml-night { background: #e7e7f4; color: #2b2d5c; }
+#missions-empty { color: var(--muted); padding: 24px 4px; }
+.ml-alert { display: flex; align-items: center; gap: 10px; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.ml-alert-text { flex: 1 1 auto; }
+.ml-alert-ic .ic { width: 16px; height: 16px; }
+.ml-alert-wait { background: var(--bg-soft); border: 1px solid var(--border); color: var(--text); }
+.ml-alert-late { background: var(--danger-tint); border: 1px solid var(--danger-line); color: var(--danger-text); }
+.board-tab .tab-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+  margin-left: 6px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
+}
+.ov-attn-newyear { background: var(--danger-tint); border-color: var(--danger-line); color: var(--danger-text); }
+.ov-attn-newyear .ic { width: 14px; height: 14px; margin-right: 6px; vertical-align: -2px; }
+#modal-close-mission label, #modal-mission-add label { display: block; margin: 10px 0; }
+.close-mission-effect { font-size: 12.5px; color: var(--warn-text); background: var(--warn-surface); border: 1px solid var(--warn-line); border-radius: 6px; padding: 8px 10px; }
+#newyear-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#newyear-table th, #newyear-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+#newyear-table th { font-size: 12px; color: var(--muted); font-weight: 700; }
+.ny-cell { min-width: 220px; }
+.ny-input { width: 160px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-variant-numeric: tabular-nums; text-transform: uppercase; }
+tr.ny-bad .ny-input { border-color: var(--danger); }
+.ny-err { display: block; font-size: 11.5px; color: var(--danger-text); }
+.ny-close { margin-left: 6px; font-size: 12px; }
+@media (max-width: 640px) {
+  #missions-search { min-width: 0; width: 100%; }
+  #missions-table thead { display: none; }
+  #missions-table, #missions-table tbody, #missions-table tr, #missions-table td { display: block; width: auto; }
+  #missions-table tbody tr { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--panel); }
+  #missions-table td { border-bottom: 0; padding: 4px 12px; }
+  #missions-table td.ml-actions { text-align: left; padding-bottom: 10px; }
+  .ny-input { width: 100%; }
+}
