@@ -2986,6 +2986,8 @@ I18N.add({
 /* Missions tab: the crew, status and alert columns, the Host link, and the filters for them */
 I18N.add({
   "Avg crew / week": "ทีมงานเฉลี่ย / สัปดาห์",
+  "Add a mission to a board, on the day shown at the top": "เพิ่มมิชชั่นลงบอร์ด ในวันที่แสดงด้านบน",
+  "Add a board first.": "เพิ่มบอร์ดก่อน",
   "The start and end time from the mission's latest day on the board.": "เวลาเริ่มและสิ้นสุดจากวันล่าสุดของมิชชั่นบนบอร์ด",
   "The protective equipment the mission asks for, from its latest day on the board.": "อุปกรณ์ป้องกันที่มิชชั่นต้องใช้ จากวันล่าสุดบนบอร์ด",
   "The mission's remark, from its latest day on the board.": "หมายเหตุของมิชชั่น จากวันล่าสุดบนบอร์ด",
@@ -3025,4 +3027,5 @@ I18N.add({
   "{a} has been hidden on its board for more than 5 working days in a row ({b}). If the job has ended, close it; otherwise unhide it from the board's Hide/Unhide.": "{a} ถูกซ่อนบนบอร์ดเกิน 5 วันทำงานติดต่อกัน ({b}) หากงานจบแล้วให้ปิดมิชชั่น ไม่เช่นนั้นให้แสดงอีกครั้งจาก ซ่อน/แสดง ของบอร์ด",
   "{a} was last on the board on {b}. Close it if the job has ended, or add it back with Add to board.": "{a} อยู่บนบอร์ดครั้งล่าสุดเมื่อ {b} ปิดมิชชั่นหากงานจบแล้ว หรือเพิ่มกลับด้วย เพิ่มลงบอร์ด",
   "{a} is not in the Host list.": "{a} ไม่อยู่ในรายชื่อโฮสต์",
+  "It is added on {a}, the day shown at the top.": "จะเพิ่มในวัน {a} ซึ่งเป็นวันที่แสดงด้านบน",
 });

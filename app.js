@@ -1254,6 +1254,7 @@ function render() {
   // refuse the write anyway, so hiding them is about not offering a dead end.
   $("#btn-add-board").classList.toggle("hidden", !can("settings", "edit"));
   $("#btn-add-host").classList.toggle("hidden", !hl || !can("hostlist", "edit"));
+  $("#btn-add-mission-list").classList.toggle("hidden", !msl || !can("board", "edit"));
   // One Export button on every tab (the file type is picked in its dialog).
   // A forecast is never exported: the JPG and the PDF are what goes to LINE,
   // and a tentative plan must not reach it (exportBoard refuses as well).
@@ -3807,6 +3808,7 @@ function buildPhoneMoreMenu() {
     }
     if (shown("#btn-emplist-bulk") && isEmployeeList()) item("Bulk edit", "edit", click("#btn-emplist-bulk"));
     if (shown("#btn-hostlist-bulk") && isHostList()) item("Bulk edit", "edit", click("#btn-hostlist-bulk"));
+    if (shown("#btn-add-mission-list") && isMissionList()) item("New mission", "plus", click("#btn-add-mission-list"), "tb-item-pri");
     if (shown("#btn-missions-newyear") && isMissionList()) item("New-year numbers", "calendar", click("#btn-missions-newyear"), "tb-item-pri");
     if (shown("#btn-missions-bulk") && isMissionList()) item("Bulk edit", "edit", click("#btn-missions-bulk"));
     if (shown("#btn-export")) item("Export", "download", click("#btn-export"));
@@ -9931,6 +9933,7 @@ function openModal(id) {
   backdrop.classList.remove("hidden");
   for (const m of $$(".modal")) m.classList.add("hidden");
   $(id).classList.remove("hidden");
+  if (id === "#modal-mission") enterMissionListBoard();   // coming back to the form after creating a host
   syncSegmented($(id));
   pickerClose();
   // long help text in a record panel folds to one line, after the content is
@@ -10543,6 +10546,7 @@ function closeModal() {
   const pw = $("#form-account-password");
   if (pw) pw.reset();
   if (_confirmCancel) { const c = _confirmCancel; _confirmCancel = null; c(); }
+  if (missionFromList.swapped && document.querySelectorAll(".modal:not(.hidden)").length === 0) leaveMissionListBoard();   // the Missions tab again
   if (_modalReturnFocus && backdrop.classList.contains("hidden")) {
     const back = _modalReturnFocus;
     _modalReturnFocus = null;
@@ -10792,7 +10796,43 @@ function updateMissionEngineerNote() {
 
 /* opts.from: a mission to start a NEW one from (the quick panel's Duplicate) —
    every field but the number, which has to be new anyway on the same shift */
+/* "+ Mission" on the Missions tab: the board's own New Mission form, with a Board box. The form works on
+   the active board and the day on screen, so the chosen board is made the active one while the form is
+   open (enterMissionListBoard) and the Missions tab is put back when it closes (leaveMissionListBoard). */
+let missionFromList = { open: false, swapped: false };
+function enterMissionListBoard() {
+  if (!missionFromList.open || missionFromList.swapped || !isMissionList()) return;
+  const id = $("#mission-board").value;
+  if (!id) return;
+  D().activeBoardId = id;
+  missionFromList.swapped = true;
+}
+function leaveMissionListBoard() {
+  if (!missionFromList.swapped) return;
+  D().activeBoardId = MISSIONS_ID;
+  missionFromList.swapped = false;
+  render();
+}
+function openNewMissionFromList() {
+  if (!can("board", "edit")) { toast("Your role can view the board but not change it.", "info"); return; }
+  const boards = D().boards;
+  if (!boards.length) { toast("Add a board first.", "info"); return; }
+  const first = boards.find(b => b.id === state.missions.boardId) || boards[0];
+  const sel = $("#mission-board");
+  sel.innerHTML = boards.map(b => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`).join("");
+  sel.value = first.id;
+  missionFromList = { open: true, swapped: false };
+  safely(async () => {
+    await cloud.ensurePlanLoaded(first.id, state.date);
+    enterMissionListBoard();
+    guardEdit(() => openMissionModal(null));
+    // a refused guard (no permission) opens no form: back to the list
+    if (document.querySelectorAll(".modal:not(.hidden)").length === 0) leaveMissionListBoard();
+  });
+}
+
 function openMissionModal(missionId, opts = {}) {
+  enterMissionListBoard();   // a no-op unless the form was asked for on the Missions tab
   state.editingMissionId = missionId || null;
   const form = $("#form-mission");
   form.reset();
@@ -10817,6 +10857,14 @@ function openMissionModal(missionId, opts = {}) {
   }
   updateMissionHostNote();
   updateMissionEngineerNote();
+  // from the Missions tab the form also asks which board; the day is the one shown at the top
+  const listMode = missionFromList.swapped && !missionId;
+  $("#mission-board-row").classList.toggle("hidden", !listMode);
+  $("#mission-day-note").classList.toggle("hidden", !listMode);
+  if (listMode) {
+    $("#mission-board").value = D().activeBoardId;
+    $("#mission-day-note").textContent = `It is added on ${fmtDow(state.date)} ${fmtDate(state.date)}, the day shown at the top.`;
+  }
   openModal("#modal-mission");
 }
 
@@ -10881,12 +10929,13 @@ function saveMission(ev) {
     return;
   }
   const editingId = state.editingMissionId;   // a confirm in between must not lose which mission this is
+  const boardId = D().activeBoardId, forecast = isForecastView();   // nor the board and the kind of day (a confirm closes the form)
   const save = () => safely(async () => {
     // the first time somebody is picked they have no engineer record yet, so
     // one is made here — that is where their mission colour lives
     vals.engineerId = eng.engineerId || await cloud.ensureEngineerForProfile(eng.profileId);
-    if (isForecastView()) await cloud.saveForecastMission(D().activeBoardId, state.date, editingId, vals);
-    else await cloud.saveMission(D().activeBoardId, state.date, editingId, vals);
+    if (forecast) await cloud.saveForecastMission(boardId, state.date, editingId, vals);
+    else await cloud.saveMission(boardId, state.date, editingId, vals);
     closeModal();
     await refreshAndRender();
   });
@@ -18284,6 +18333,12 @@ function wireApp() {
   // ---------- Host List tab ----------
   $("#btn-hostlist-export-go").onclick = () => safely(async () => { await exportHostlistXlsx(); closeModal(); });
   $("#btn-add-host").onclick = () => openHostModal(null);
+  $("#btn-add-mission-list").onclick = openNewMissionFromList;
+  $("#mission-board").onchange = () => safely(async () => {
+    D().activeBoardId = $("#mission-board").value;
+    await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
+    $("#mission-modal-title").textContent = "New" + (isForecastView() ? " Forecast Mission" : " Mission");
+  });
   $("#hostlist-search").addEventListener("input", (e) => { state.hostlist.search = e.target.value; renderHostRows(); });
   for (const th of $$("#hostlist-table th[data-sort]")) {
     th.onclick = () => {

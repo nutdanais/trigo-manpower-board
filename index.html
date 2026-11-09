@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-09g">
+<link rel="stylesheet" href="styles.css?v=2026-11-09h">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-09g"></script>
+<script src="version.js?v=2026-11-09h"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -486,6 +486,8 @@
     <button id="btn-new-mission" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Mission</button>
     <button id="btn-new-employee" class="btn btn-primary"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> New Employee</button>
     <button id="btn-add-host" class="btn btn-primary hidden" title="Record a host that isn't on any mission yet"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Host</button>
+    <!-- Missions tab: the same form as the board's New Mission, with a Board box (openNewMissionFromList) -->
+    <button id="btn-add-mission-list" class="btn btn-primary hidden" title="Add a mission to a board, on the day shown at the top"><svg class="ic" aria-hidden="true"><use href="#i-plus"></use></svg> Mission</button>
     <!-- Capacity tab: the board it shows (one at a time, each with its count of
          short days), how far ahead, the main action, the week copy, and a ⋯
          menu that keeps Reset to 0 out of the everyday row (on a phone it also
@@ -924,6 +926,9 @@
     <h3><span id="mission-modal-title">New Mission</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-mission">
       <div class="form-group">Where</div>
+      <!-- only when the form is opened from the Missions tab: which board, and on which day -->
+      <label id="mission-board-row" class="hidden">Board <select name="board" id="mission-board"></select></label>
+      <p id="mission-day-note" class="import-note hidden"></p>
       <label>Mission number <input name="number" required placeholder="e.g. BANGN.26.0007"></label>
       <!-- Host is a search over the Host list: the datalist is filled by
            renderMissionHostOptions() so the browser's own type-ahead filters
@@ -1653,22 +1658,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-09g"></script>
-<script src="i18n-th.js?v=2026-11-09g"></script>
-<script src="planning.js?v=2026-11-09g"></script>
-<script src="employee-id.js?v=2026-11-09g"></script>
-<script src="mission-number.js?v=2026-11-09g"></script>
-<script src="mission-activity.js?v=2026-11-09g"></script>
+<script src="i18n.js?v=2026-11-09h"></script>
+<script src="i18n-th.js?v=2026-11-09h"></script>
+<script src="planning.js?v=2026-11-09h"></script>
+<script src="employee-id.js?v=2026-11-09h"></script>
+<script src="mission-number.js?v=2026-11-09h"></script>
+<script src="mission-activity.js?v=2026-11-09h"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-09g"></script>
-<script src="cloud.js?v=2026-11-09g"></script>
-<script src="charts.js?v=2026-11-09g"></script>
-<script src="xlsx-export.js?v=2026-11-09g"></script>
-<script src="orgchart-pptx.js?v=2026-11-09g"></script>
-<script src="bulk-edit.js?v=2026-11-09g"></script>
-<script src="app.js?v=2026-11-09g"></script>
-<script src="report.js?v=2026-11-09g"></script>
-<script src="present.js?v=2026-11-09g"></script>
+<script src="demo/demo-gate.js?v=2026-11-09h"></script>
+<script src="cloud.js?v=2026-11-09h"></script>
+<script src="charts.js?v=2026-11-09h"></script>
+<script src="xlsx-export.js?v=2026-11-09h"></script>
+<script src="orgchart-pptx.js?v=2026-11-09h"></script>
+<script src="bulk-edit.js?v=2026-11-09h"></script>
+<script src="app.js?v=2026-11-09h"></script>
+<script src="report.js?v=2026-11-09h"></script>
+<script src="present.js?v=2026-11-09h"></script>
 </body>
 </html>

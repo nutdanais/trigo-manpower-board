@@ -244,6 +244,44 @@ async function step(name, fn) {
       assert.equal(await p.locator("#missions-body tr").count(), 7);
     });
 
+    await step("+ Mission on the Missions tab opens the board's New Mission form with a Board box, and returns to the list", async () => {
+      await goMissions(p);
+      const btn = p.locator("#btn-add-mission-list");
+      assert.equal(await btn.isVisible(), true, "the main action, like + Host");
+      assert.match(await btn.innerText(), /Mission/);
+      // cancelling puts the Missions tab back
+      await btn.click();
+      await p.locator("#modal-mission:not(.hidden)").waitFor();
+      assert.equal(await p.locator("#mission-board-row").isVisible(), true);
+      assert.match(await p.locator("#mission-day-note").innerText(), /the day shown at the top/);
+      await p.evaluate(() => closeModal());
+      assert.equal(await p.evaluate(() => isMissionList()), true, "back on the Missions tab after Cancel");
+      assert.equal(await p.locator("#missions-panel").isVisible(), true);
+      // saving adds the mission to the chosen board
+      const NEWM = `TSTTH.${YY}.0777`;
+      const host = await p.evaluate(() => D().hosts[0].name);
+      const eng = await p.evaluate(() => engineerLabelFor(D().engineers[0].id));
+      await btn.click();
+      await p.locator("#modal-mission:not(.hidden)").waitFor();
+      await p.selectOption("#mission-board", "b2");
+      await p.fill("#form-mission [name=number]", NEWM);
+      await p.fill("#form-mission [name=host]", host);
+      await p.fill("#form-mission [name=customer]", "Cust Fresh");
+      await p.fill("#form-mission [name=engineer]", eng);
+      await p.click("#form-mission button[type=submit]");
+      await p.waitForFunction(() => document.querySelector("#modal-mission").classList.contains("hidden"));
+      await p.waitForFunction((n) => [...document.querySelectorAll("#missions-body .ml-num")].some((e) => e.textContent === n), NEWM);
+      assert.ok(reg(NEWM, "b2"), "registered on Board Two");
+      assert.equal(reg(NEWM, "b1"), undefined, "not on Board One");
+      assert.equal(await p.evaluate(() => isMissionList()), true, "still on the Missions tab");
+      assert.match(await row(p, NEWM).innerText(), /Board Two/);
+      // put it away again
+      const drop = (t, f) => { const a = db.t(t); for (let i = a.length - 1; i >= 0; i--) if (f(a[i])) a.splice(i, 1); };
+      drop("missions", (x) => x.number === NEWM);
+      drop("mission_register", (x) => x.number === NEWM);
+      await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister().then(refreshAndRender); });
+    });
+
     await step("an engineer closes a mission: the days after lose it and carry over skips it", async () => {
       db.seed("missions", [{ id: "n102", board_id: "b1", plan_date: NEXT, number: "102", host: "Host Beta", customer: "Cust Beta", shift: "day", engineer_id: "eng-2" }]);
       db.seed("assignments", [{ employee_id: "e3", plan_date: NEXT, mission_id: "n102", zone: null }]);
