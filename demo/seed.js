@@ -156,7 +156,8 @@ function dayPlan(board, date, k, emps, { loanOut } = {}) {
   const short = k > 0 && k % 5 === 0;
   for (const [num, host, customer, shift, eng, crew, ppe] of MISSIONS[board]) {
     const id = `m-${board}-${num}-${date}`;
-    missions.push({ id, board_id: board, plan_date: date, number: num, host, customer, shift, start_time: TIMES[shift][0], end_time: TIMES[shift][1], engineer_id: eng, ppe: ppe || null, remark: REMARKS[num] || null, hidden: false });
+    missions.push({ id, board_id: board, plan_date: date, number: num, host, customer, shift, start_time: TIMES[shift][0], end_time: TIMES[shift][1], engineer_id: eng, ppe: ppe || null, remark: REMARKS[num] || null, hidden: false,
+      updated_by: PROFILES[1 + (num.length % 3)].email, updated_at: date + "T0" + (3 + (num.length % 5)) + ":2" + (num.length % 10) + ":00Z" });
     const size = short && crew > 2 ? crew - 1 : crew;
     for (let i = 0; i < size && w < workers.length; i++) assignments.push({ employee_id: workers[w++].id, plan_date: date, mission_id: id, zone: null });
   }

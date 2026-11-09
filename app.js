@@ -502,7 +502,7 @@ const state = {
     search: "",
     boardId: "",               // "" = all boards
     status: "open",            // "open" | "closed" | "all"
-    filters: { shift: [], engineerId: [], customer: [], host: [], placement: [], alerts: [] },   // behind the Filters button, like Host's
+    filters: { areaId: [], shift: [], engineerId: [], customer: [], host: [], placement: [], alerts: [] },   // behind the Filters button, like Host's; areaId is the host's service area, also the By area chips
     sort: { key: "number", dir: 1 },
     activity: null,            // cloud.getMissionActivity(): how each mission was staffed in the last six weeks
     activityKey: null,         // what it was read for; cleared by every realtime change, like the Host directory
@@ -9109,14 +9109,20 @@ function missionAlertsHtml(r, info, canClose) {
 /* The Filters button on the Missions tab (the same pattern as Host's): Shift, Trigo responsible,
    Customer, Host and "On the board". The Board picker and Open / Closed / All stay beside the
    search, so a filter's choices are built from the rows they leave on screen. */
-const MISSION_FILTER_LABELS = { shift: "Shift", engineerId: "Trigo responsible", customer: "Customer", host: "Host", placement: "Board status", alerts: "Alerts" };
+const MISSION_FILTER_LABELS = { areaId: "Service area", shift: "Shift", engineerId: "Trigo responsible", customer: "Customer", host: "Host", placement: "Board status", alerts: "Alerts" };
 const MISSION_NONE = "__none__";
 const missionText = (s) => String(s || "").trim();
 function missionScopeRows() {
   const st = state.missions;
   return (D().register || []).filter(r => (!st.boardId || r.boardId === st.boardId) && (st.status === "all" || r.status === st.status));
 }
+/* the service area of a mission's host, as a filter key ("__none__" for a host with no area) */
+function missionAreaKey(r) {
+  const a = hostAreaOf(r.host);
+  return a ? a.id : MISSION_NONE;
+}
 function missionRowMatchesFilters(r, f) {
+  if (f.areaId.length && !f.areaId.includes(missionAreaKey(r))) return false;
   if (f.shift.length && !f.shift.includes(r.shift)) return false;
   if (f.engineerId.length && !f.engineerId.includes(r.engineerId || MISSION_NONE)) return false;
   if (f.customer.length && !f.customer.includes(missionText(r.customer) || MISSION_NONE)) return false;
@@ -9129,6 +9135,7 @@ function missionRowMatchesFilters(r, f) {
   return true;
 }
 function missionFilterOptions(key) {
+  if (key === "areaId") return [...D().areas.map(a => ({ value: a.id, label: a.name })), { value: MISSION_NONE, label: "— none —" }];
   if (key === "shift") return [{ value: "day", label: "Day" }, { value: "night", label: "Night" }];
   if (key === "placement") return [{ value: "on", label: "On board" }, { value: "hidden", label: "Hidden" }, { value: "off", label: "Off the board" }, { value: "notstarted", label: "Not started" }];
   if (key === "alerts") return [
@@ -9204,7 +9211,7 @@ function missionRows() {
   // the crew and alert columns sort as zero-padded text, so a number sorts as a number
   const info = (r) => missionInfo(r);
   const val = (r) => key === "board" ? boardNameOf(r.boardId) : key === "engineer" ? engineerLabelFor(r.engineerId)
-    : key === "status" ? String(MISSION_PLACEMENT_RANK[info(r).p.kind]) + (r.status === "closed" ? (r.closedOn || "") : "")
+    : key === "status" ? String(MISSION_PLACEMENT_RANK[info(r).p.kind]) + String(3 - (info(r).worst + 1)) + (r.status === "closed" ? (r.closedOn || "") : "")
     : key === "avgCrew" ? (info(r).avg == null ? "" : String(Math.round(info(r).avg * 100)).padStart(6, "0"))
     : key === "crew" ? (info(r).day ? String(info(r).day.hidden ? 0 : info(r).day.crew + 1).padStart(4, "0") : "")
     : key === "alerts" ? String(info(r).worst + 1) + String(info(r).alerts.length).padStart(2, "0")
@@ -9217,6 +9224,16 @@ function renderMissionStats(bar) {
   const closed = all.length - open;
   const waiting = newYearWaiting().filter(w => w.rows.some(r => !state.missions.boardId || r.boardId === state.missions.boardId)).length;
   const late = MissionNumber.daysWaiting(todayStr()) > MissionNumber.ALERT_AFTER_DAYS;
+  // By area: the service area of each mission's host, counted over what the Board picker and Open / Closed / All leave
+  const areaBar = $("#area-bar");
+  const scope = missionScopeRows();
+  const areaChip = (key, name, n, color) => areaFilterChip(key, name, n, color, state.missions.filters.areaId);
+  let areaHtml = "";
+  for (const a of D().areas) { const n = scope.filter(r => missionAreaKey(r) === a.id).length; if (n) areaHtml += areaChip(a.id, a.name, n, a.color); }
+  const noArea = scope.filter(r => missionAreaKey(r) === MISSION_NONE).length;
+  if (noArea) areaHtml += areaChip(MISSION_NONE, "No area", noArea, "");
+  areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+  wireAreaFilterChips(areaBar, state.missions.filters, () => { renderMissionList(); renderStats(); });
   // open missions on their board with nobody on them
   const noCrew = all.filter(r => r.status === "open" && missionInfo(r).alerts.some(a => a.kinds.includes("noCrew"))).length;
   const tile = (label, n, kind) =>
@@ -9231,7 +9248,7 @@ function renderMissionStats(bar) {
     keys: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     bar: [["assigned", open], ["holiday", closed]],
     tiles: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
-    areaHtml: "",
+    areaHtml,
     filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0) + missionFilterCount(),
   });
 }
@@ -9306,17 +9323,16 @@ function renderMissionList() {
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
       <td class="ml-first"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
       <td data-label="${lbl("Board")}">${escapeHtml(boardNameOf(r.boardId))}</td>
-      <td data-label="${lbl("Shift")}"><span class="ml-tag ml-shift ml-${r.shift}">${r.shift === "night" ? "Night" : "Day"}</span></td>
+      <td data-label="${lbl("Shift")}">${r.shift === "night" ? `<span class="ml-night">${icon("moon")}Night</span>` : "Day"}</td>
       <td data-label="${lbl("Time")}" class="ml-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : "—"}</td>
       <td data-label="${lbl("Customer")}">${escapeHtml(r.customer || "—")}</td>
       <td data-label="${lbl("Host")}" class="ml-host-cell">${host}</td>
       <td data-label="${lbl("Trigo responsible")}">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
       <td data-label="${lbl("Start date")}" class="ml-date">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
       <td data-label="${lbl("Last on board")}" class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
-      <td data-label="${lbl("Crew")}" class="ml-crew">${crew}</td>
-      <td data-label="${lbl("Avg crew / week")}" class="ml-avg">${avg}</td>
-      <td data-label="${lbl("Status")}">${missionStatusHtml(r, info.p)}</td>
-      <td data-label="${lbl("Alerts")}" class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</td>
+      <td data-label="${lbl("Crew")}" class="ml-crew num">${crew}</td>
+      <td data-label="${lbl("Avg crew / week")}" class="ml-avg num">${avg}</td>
+      <td data-label="${lbl("Status and alerts")}" class="ml-status"><span class="ml-chips">${missionStatusHtml(r, info.p)}<span class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</span></span></td>
       <td data-label="${lbl("PPE")}" class="ml-text">${missionTextCell(r.ppe)}</td>
       <td data-label="${lbl("Remark")}" class="ml-text">${missionTextCell(r.remark)}</td>
       <td class="ml-actions">${acts.join("")}</td></tr>`;
@@ -10940,6 +10956,7 @@ function editMissionDetails() {
   $("#mission-modal-title").textContent = "Edit Mission";
   $("#form-mission").number.focus();
 }
+const MISSION_PEOPLE_CAP = 12;   // names shown before "+N more", as on the Host tab
 const mdFact = (label, value, cls = "") => `<div${cls ? ` class="${cls}"` : ""}><span>${label}</span> <b>${value}</b></div>`;
 async function renderMissionDetail() {
   const id = state.editingMissionId;
@@ -10977,6 +10994,14 @@ async function renderMissionDetail() {
   };
   const canPlan = forecast ? can("forecast", "edit") : can("board", "edit");
   if (canPlan) act("btn-md-edit", "btn btn-small", "edit", "Edit details", () => guardEdit(editMissionDetails));
+  if (canPlan) act("btn-md-dup", "btn btn-small", "copy", "Duplicate", () => guardEdit(() => { enterMissionListBoard(); openMissionModal(null, { from: m }); }));
+  // the card menu's own Move or copy list (it says why a board cannot take the mission)
+  if (canPlan && !forecast && D().boards.length > 1) act("btn-md-move", "btn btn-small", "swap", "Move or copy…", (ev) => {
+    ev.stopPropagation();   // the click would otherwise reach the page's outside-click handler and close the menu it opens
+    const r = ev.currentTarget.getBoundingClientRect();
+    ctxMenu = { mission: m, x: r.left, y: r.bottom + 4 };
+    renderCtxMenu("move");
+  });
   if (canPlan && !forecast) act("btn-md-hide", "btn btn-small", m.hidden ? "eye" : "eye-off", m.hidden ? "Unhide" : "Hide", () => guardEdit(() => { enterMissionListBoard(); hideMission(m.id); }));
   if (reg && reg.status === "open" && can("missions", "edit")) act("btn-md-close", "btn btn-small btn-danger", "check", "Close mission…", () => openCloseMissionModal(reg, state.date));
   head.appendChild(acts);
@@ -11001,6 +11026,7 @@ async function renderMissionDetail() {
       mdFact("Last on board", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : "-"),
     ] : []),
     ...(earlier.length ? [mdFact("Earlier numbers", escapeHtml(earlier.join(", ")))] : []),
+    ...(m.updatedBy || m.updatedAt ? [mdFact("Last edited", `${escapeHtml(who(m.updatedBy))}${m.updatedAt ? ` <small class="ov-muted">${escapeHtml(fmtStamp(m.updatedAt))}</small>` : ""}`)] : []),
     mdFact("PPE", m.ppe ? escapeHtml(m.ppe) : "-", (m.ppe || "").length > 36 ? "wide" : ""),
     mdFact("Remark", m.remark ? escapeHtml(m.remark) : "-", (m.remark || "").length > 36 ? "wide" : ""),
   ].join("");
@@ -11009,9 +11035,39 @@ async function renderMissionDetail() {
   if (hostBtn) hostBtn.onclick = () => { closeModal(); openHostFromMission({ host: m.host }); };
   body.replaceChildren(box);
 
+  // who has worked on it, all time, with the days (the Host tab's "Inspectors deployed", for one mission)
+  const addPeople = () => {
+    if (forecast) return;
+    const box = document.createElement("div");
+    box.className = "ov-prof-block";
+    box.innerHTML = `<div class="ov-eng-foot-h">People who have worked on it <span class="ov-muted">days on this mission, all time</span></div><p class="ov-muted">Loading…</p>`;
+    body.appendChild(box);
+    const onNow = new Set(crew.map(e => e.id));
+    cloud.getMissionPeople(boardId, cloud.numberChain(m.number)).then(list => {
+      if (state.editingMissionId !== id || $("#mission-detail").classList.contains("hidden")) return;
+      const people = list.map(x => ({ ...x, emp: D().employees.find(e => e.id === x.employeeId) })).filter(x => x.emp);
+      const draw = (all) => {
+        const shown = all ? people : people.slice(0, MISSION_PEOPLE_CAP);
+        const chips = shown.map(x => `<button type="button" class="hl-insp md-person${onNow.has(x.employeeId) ? " now" : ""}" data-emp="${escapeHtml(x.employeeId)}" data-no-i18n`
+          + ` title="${escapeHtml(`${x.emp.name}: ${x.days} ${x.days === 1 ? "day" : "days"} on ${m.number}, last ${fmtDate(x.last)}`)}">${escapeHtml(x.emp.name)}<b>${x.days}d</b></button>`).join("");
+        const rest = people.length - shown.length;
+        const more = rest > 0 ? `<button type="button" class="hl-more" data-more="1">+${rest} more</button>`
+          : (all && people.length > MISSION_PEOPLE_CAP ? `<button type="button" class="hl-more" data-more="0">Show less</button>` : "");
+        box.querySelector("p, .hl-chips") && box.querySelector("p, .hl-chips").remove();
+        box.insertAdjacentHTML("beforeend", people.length
+          ? `<div class="hl-chips"><span class="hl-count" title="${people.length} ${people.length === 1 ? "person" : "people"} have worked on this mission">${people.length}</span>${chips}${more}</div>`
+          : `<p class="ov-muted">Nobody has been placed on this mission yet.</p>`);
+        for (const b of box.querySelectorAll(".md-person")) b.onclick = () => openProfile(b.dataset.emp);
+        const mb = box.querySelector("[data-more]");
+        if (mb) mb.onclick = () => draw(mb.dataset.more === "1");
+      };
+      draw(false);
+    }).catch(() => { const p = box.querySelector("p"); if (p) p.textContent = "The people list could not be read."; });
+  };
+
   // the crew facts need the mission register and the last six weeks of days (not on a forecast day)
   const actv = state.missions.activity;
-  if (!reg || !actv) return;
+  if (!reg || !actv) { addPeople(); return; }
   const days = missionDays(reg) || {};
   const summary = missionActivityOf(reg);
   const working = actv.working[boardId] || [];
@@ -11069,6 +11125,7 @@ async function renderMissionDetail() {
     <div class="md-bars" role="img" aria-label="${escapeHtml(window.I18N ? I18N.t("Crew per working day, last 6 weeks") : "Crew per working day, last 6 weeks")}">${bars}</div>
     <div class="md-axis"><span>${escapeHtml(dates.length ? fmtDayMon(dates[0]) : "")}</span><span>most ${maxCrew}</span><span>${escapeHtml(dates.length ? fmtDayMon(dates[dates.length - 1]) : "")}</span></div>`;
   body.appendChild(chart);
+  addPeople();
 }
 
 function saveMission(ev) {

@@ -3060,3 +3060,22 @@ I18N.add({
   "Not on the board on {a}": "ไม่ได้อยู่บนบอร์ดในวันที่ {a}",
   "Hidden on {a}": "ซ่อนอยู่ในวันที่ {a}",
 });
+
+/* Missions tab: one Status column, By area, and the detail panel's last edit, Duplicate, Move and people list */
+I18N.add({
+  "someone": "ใครบางคน",
+  "Status and alerts": "สถานะและการแจ้งเตือน",
+  "Duplicate": "ทำซ้ำ",
+  "Move or copy…": "ย้ายหรือคัดลอก…",
+  "Last edited": "แก้ไขล่าสุด",
+  "People who have worked on it": "คนที่เคยทำงานในมิชชั่นนี้",
+  "days on this mission, all time": "จำนวนวันในมิชชั่นนี้ ตลอดเวลา",
+  "Nobody has been placed on this mission yet.": "ยังไม่มีใครถูกจัดลงมิชชั่นนี้",
+  "The people list could not be read.": "อ่านรายชื่อไม่ได้",
+  "Where the mission is now (on its board, hidden there, off the board, not started or closed), then what needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.": "มิชชั่นอยู่ที่ไหนตอนนี้ (บนบอร์ด ซ่อนอยู่ ไม่ได้อยู่บนบอร์ด ยังไม่เริ่ม หรือปิดแล้ว) ตามด้วยสิ่งที่ต้องดู: ไม่มีทีมงาน ซ่อนหรือไม่ได้อยู่บนบอร์ดเกิน 5 วันทำงาน (ปิดมิชชั่นหากงานจบแล้ว) ยังไม่มีเลขปีใหม่ ไม่มีผู้รับผิดชอบ TRIGO",
+}, {
+  "{a} people have worked on this mission": "{a} คน เคยทำงานในมิชชั่นนี้",
+  "{a} person has worked on this mission": "{a} คน เคยทำงานในมิชชั่นนี้",
+  "{a}: {b} days on {c}, last {d}": "{a}: {b} วันใน {c} ล่าสุด {d}",
+  "{a}: {b} day on {c}, last {d}": "{a}: {b} วันใน {c} ล่าสุด {d}",
+});

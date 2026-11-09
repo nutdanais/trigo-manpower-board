@@ -103,7 +103,7 @@ async function step(name, fn) {
       assert.equal(await p.locator("#missions-filter-count").isVisible(), false, "no count while nothing is filtered");
       await p.click("#btn-missions-filter-pop");
       await p.locator("#missions-filter-pop:not(.hidden)").waitFor();
-      assert.equal(await p.locator("#missions-filters .ms").count(), 6);
+      assert.equal(await p.locator("#missions-filters .ms").count(), 7, "Service area joins the filters");
       // Customer: one ticked customer leaves its rows; the button and the count say so
       await tick("customer", "Cust Ninety");
       await shown(1);
@@ -173,15 +173,17 @@ async function step(name, fn) {
       assert.match(await alerts("108"), /No crew · 8 days · Close\?/);
       assert.equal(await row(p, "108").locator(".ml-alerts button[data-act=suggest-close]").count(), 1);
       assert.equal(await row(p, "108").locator(".ml-alerts .ml-late").count(), 1, "over 5 working days is red");
+      assert.match(await row(p, "108").locator('td[data-label="Status and alerts"]').innerText(), /On board[\s\S]*No crew/, "the state and the alerts share one cell");
+      assert.equal(await p.locator("#missions-table th", { hasText: /^Alerts$/ }).count(), 0, "no separate Alerts column");
       // one day with nobody on it is amber and has no Close
       assert.match(await alerts(M7), /No crew · 1 day\b/);
       assert.equal(await row(p, M7).locator(".ml-alerts .ml-warn").count(), 1);
       assert.equal(await row(p, M7).locator(".ml-alerts button").count(), 0);
       // hidden on every one of its days
-      assert.match(await row(p, "109").locator("td[data-label=Status]").innerText(), /Hidden/);
+      assert.match(await row(p, "109").locator("td.ml-status").innerText(), /Hidden/);
       assert.match(await alerts("109"), /Hidden · 8 days · Close\?/);
       // off the board: it had days and has none on the latest working day
-      assert.match(await row(p, "110").locator("td[data-label=Status]").innerText(), /Off the board/);
+      assert.match(await row(p, "110").locator("td.ml-status").innerText(), /Off the board/);
       assert.match(await alerts("110"), /Off the board · 6 days · Close\?/);
       assert.equal(await row(p, "110").locator("button[data-act=add]").count(), 1, "Add to board is only offered off the board");
       assert.equal(await row(p, "108").locator("button[data-act=add]").count(), 0, "not for a mission already on its board");
@@ -352,6 +354,76 @@ async function step(name, fn) {
       await p.evaluate(() => closeModal());
       db.t("mission_register").splice(db.t("mission_register").findIndex((x) => x.number === `TSTTH.${YY}.0888`), 1);
       await p.evaluate(() => cloud.loadMissionRegister().then(refreshAndRender));
+      await goMissions(p);
+    });
+
+    await step("By area chips in the top bar filter the missions by their host's service area", async () => {
+      await goMissions(p);
+      await p.evaluate(() => {
+        D().areas.push({ id: "ar-t1", name: "Area One", color: "#7fb2ea" }, { id: "ar-t2", name: "Area Two", color: "#ec9a64" });
+        D().hosts.find((x) => x.name === "Host Beta").areaId = "ar-t1";
+        D().hosts.find((x) => x.name === "Host Gamma").areaId = "ar-t2";
+        return refreshAndRender();
+      });
+      const chips = p.locator("#area-bar .ac-btn");
+      assert.ok(await chips.count() >= 2, "a chip for each area with missions, like Host and Manpower");
+      assert.match(await p.locator("#area-bar").innerText(), /By area/);
+      const all = await p.locator("#missions-body tr").count();
+      await p.locator("#area-bar .ac-btn", { hasText: "Area One" }).click();
+      await p.waitForFunction((n) => document.querySelectorAll("#missions-body tr").length < n, all);
+      const hosts = await p.locator("#missions-body tr td.ml-host-cell").allInnerTexts();
+      assert.ok(hosts.length > 0 && hosts.every((t) => t.trim() === "Host Beta"), "only the hosts in that area: " + hosts.join(","));
+      assert.match(await p.locator("#btn-missions-filter-pop").innerText(), /1/, "the Filters count says one is on");
+      await p.locator("#area-bar .ac-btn", { hasText: "Area One" }).click();   // again: every area
+      await p.waitForFunction((n) => document.querySelectorAll("#missions-body tr").length === n, all);
+      // the same filter is inside Filters
+      await p.click("#btn-missions-filter-pop");
+      assert.equal(await p.locator('#missions-filters .ms[data-filter="areaId"]').count(), 1);
+      await p.evaluate(() => closeFilterPops());
+      await p.keyboard.press("Escape");
+      await p.evaluate(() => {
+        D().areas = D().areas.filter((a) => !a.id.startsWith("ar-t"));
+        for (const n of ["Host Beta", "Host Gamma"]) D().hosts.find((x) => x.name === n).areaId = null;
+        return refreshAndRender();
+      });
+    });
+
+    await step("the detail panel shows who last edited it, Duplicate, Move or copy, and who has worked on it", async () => {
+      await goMissions(p);
+      const sure = async () => { const c = p.locator("#modal-confirm:not(.hidden)"); if (await c.waitFor({ timeout: 2000 }).then(() => true, () => false)) await p.click("#btn-confirm-yes"); };
+      const back = (d, n) => { const x = new Date(d + "T00:00:00"); x.setDate(x.getDate() - n); return h.iso(x); };
+      db.t("missions").find((m) => m.id === "s7").updated_by = "eng.a@example.com";
+      db.t("missions").find((m) => m.id === "s7").updated_at = new Date().toISOString();
+      db.seed("deployment_history", [
+        ...[30, 31, 32].map((n) => ({ employee_id: "e3", plan_date: back(SRC, n), mission_number: M7, host: "Host Beta", customer: "Cust Seven", board_id: "b1" })),
+        { employee_id: "e4", plan_date: back(SRC, 30), mission_number: M7, host: "Host Beta", customer: "Cust Seven", board_id: "b1" },
+      ]);
+      await p.evaluate(() => { cloud._invalidatePlans(); return refreshAndRender(); });
+      await row(p, M7).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.locator("#btn-md-edit").waitFor();
+      // who last edited it, and when
+      assert.match(await p.locator("#mission-detail").innerText(), /Last edited[\s\S]*eng\.a/);
+      // the people who have worked on it, with their days
+      await p.locator("#mission-detail .md-person").first().waitFor();
+      const chips = await p.locator("#mission-detail .md-person").allInnerTexts();
+      assert.ok(chips.length >= 2, "both people are listed: " + chips.join(" | "));
+      assert.ok(chips.some((t) => /3d/.test(t)), "the busiest one has 3 days: " + chips.join(" | "));
+      assert.match(await p.locator("#mission-detail").innerText(), /People who have worked on it/);
+      // Move or copy… lists the other boards, as the card menu does
+      await p.click("#btn-md-move");
+      await p.locator("#context-menu:not(.hidden)").waitFor();
+      assert.match(await p.locator("#context-menu").innerText(), /Board Two/);
+      await p.evaluate(() => hideContextMenu());   // not Escape: that closes the panel too
+      // Duplicate opens a New Mission filled in from it, with the number blank
+      await p.click("#btn-md-dup");
+      await sure();
+      await p.locator("#form-mission").waitFor();
+      assert.match(await p.locator("#mission-modal-title").innerText(), /New Mission/);
+      assert.equal(await p.inputValue("#form-mission [name=number]"), "");
+      assert.equal(await p.inputValue("#form-mission [name=customer]"), "Cust Seven");
+      await p.evaluate(() => closeModal());
+      assert.equal(await p.evaluate(() => isMissionList()), true, "back on the Missions tab");
       await goMissions(p);
     });
 

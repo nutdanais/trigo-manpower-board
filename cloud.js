@@ -656,6 +656,7 @@ const cloud = {
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
         ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
         highlight: m.highlight || null, highlightNote: m.highlight_note || "",
+        updatedBy: m.updated_by || "", updatedAt: m.updated_at || null,
       };
       missionMap[m.id] = obj;
       plan.missions.push(obj);
@@ -2693,6 +2694,27 @@ const cloud = {
       out.working[b.id] = w;
     }
     return out;
+  },
+  /* Who has worked on one mission, all time: deployment_history keeps a row per person and day, and it
+     survives the mission being hidden or deleted. Matched by board and any of the mission's numbers (last
+     year's too). Returns [{ employeeId, days, last }], most days first. */
+  async getMissionPeople(boardId, numbers) {
+    let rows;
+    try {
+      rows = await fetchAllPages(() => sb.from("deployment_history").select("employee_id, plan_date")
+        .eq("board_id", boardId).in("mission_number", numbers));
+    } catch (error) {
+      if (this._tableMissing(error)) return [];
+      throw error;
+    }
+    const by = new Map();
+    for (const r of rows || []) {
+      const x = by.get(r.employee_id) || by.set(r.employee_id, { employeeId: r.employee_id, dates: new Set(), last: "" }).get(r.employee_id);
+      x.dates.add(r.plan_date);
+      if (r.plan_date > x.last) x.last = r.plan_date;
+    }
+    return [...by.values()].map((x) => ({ employeeId: x.employeeId, days: x.dates.size, last: x.last }))
+      .sort((a, b) => b.days - a.days || b.last.localeCompare(a.last));
   },
   /* the number a mission had before `number` (last year's), or null */
   previousNumber(number) {
