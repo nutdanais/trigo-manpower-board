@@ -8,6 +8,7 @@
      - ?demo&role=viewer signs in with that role's permissions (no New Mission),
      - Settings → Users lists the sample accounts, and creating an account says
        it is switched off instead of failing,
+     - Settings → Host experience saves a new value for the session and a Viewer has no such section,
      - Sign out starts the demo over, and
      - on a phone the strip is a small DEMO tag that opens on tap.
    It serves the repo itself (not harness.js, which puts the test backend in
@@ -141,6 +142,50 @@ async function step(name, fn) {
       await board(page);
       assert.deepEqual(errors, [], "page errors");
       await ctx.close();
+    });
+
+    await step("Settings → Host experience works in the demo: lowering the days makes more people experienced, raising the at-risk number flags more hosts, and a reload starts again at 5 and 2", async () => {
+      const { ctx, page, errors } = await open("?demo");
+      await board(page);
+      await page.waitForFunction(() => typeof hostExperiencedDays === "function" && D().features && D().features.appSettings);
+      assert.equal(await page.evaluate(() => hostExperiencedDays()), 5);
+      await page.evaluate(async () => { D().activeBoardId = HOSTLIST_ID; state.hostlist.view = "matrix"; await refreshAndRender(); });
+      await page.waitForSelector("#hostlist-matrix-wrap:not(.hidden) .mx-row");
+      const experienced = () => page.evaluate(() => hostMatrixRows().reduce((n, m) => n + m.x.experienced.length, 0));
+      const atRisk = () => page.evaluate(() => hostMatrixRows().filter((m) => m.x.atRisk).length);
+      const before = await experienced(), atRiskBefore = await atRisk();
+      await page.click("#btn-avatar");
+      await page.click("#btn-settings");
+      await page.waitForSelector("#settings-view:not(.hidden)");
+      await page.click("#settings-tabs [data-tab=hostexp]");
+      await page.fill("#hostexp-days", "2");
+      assert.equal(await page.inputValue("#hostexp-risk"), "2", "at risk at 2 or fewer until changed");
+      await page.fill("#hostexp-risk", "0");
+      await page.click("#btn-sv-save");
+      await page.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
+      assert.equal(await page.evaluate(() => hostExperiencedDays()), 2);
+      assert.equal(await page.evaluate(() => hostAtRiskMax()), 0);
+      await page.click("#btn-settings-back");
+      await page.evaluate(() => refreshAndRender());
+      assert.ok((await experienced()) > before, "with 2 days, more people count as experienced than with 5");
+      assert.ok((await atRisk()) <= atRiskBefore, "at 0 people, no more hosts are at risk than at 2");
+      await page.evaluate(async () => { await cloud.saveHostAtRiskMax(99); await refreshAndRender(); });
+      assert.equal(await atRisk(), await page.evaluate(() => hostMatrixRows().length), "at 99 people every host is at risk");
+      assert.deepEqual(errors, [], "page errors");
+      await ctx.close();
+      const again = await open("?demo");
+      await board(again.page);
+      await again.page.waitForFunction(() => typeof hostExperiencedDays === "function");
+      assert.equal(await again.page.evaluate(() => hostExperiencedDays()), 5, "a reload starts from the seed");
+      assert.equal(await again.page.evaluate(() => hostAtRiskMax()), 2, "and at 2 people");
+      await again.ctx.close();
+      const v = await open("?demo&role=viewer");
+      await board(v.page);
+      await v.page.click("#btn-avatar");
+      await v.page.click("#btn-settings");
+      await v.page.waitForSelector("#settings-view:not(.hidden)");
+      assert.equal(await v.page.locator("#settings-tabs [data-tab=hostexp]").isVisible(), false, "a Viewer has no Host experience section");
+      await v.ctx.close();
     });
 
     await step("on a phone the strip is a DEMO tag that opens on tap", async () => {

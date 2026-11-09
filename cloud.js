@@ -62,6 +62,13 @@ async function fetchAllPages(buildQuery) {
   }
 }
 
+/* the settings app_settings holds (migration-2026-11-09b): the key, where it lands in data.settings, and the
+   whole numbers it may take (the database's check constraint says the same) */
+const APP_SETTINGS = {
+  host_experienced_days: { prop: "hostExperiencedDays", min: 1, max: 365, label: "Days" },
+  host_at_risk_max:      { prop: "hostAtRiskMax",       min: 0, max: 99,  label: "The number of people" },
+};
+
 const cloud = {
   data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], hosts: [],
           /* who is signed in, what the roles are, and the role x area matrix.
@@ -83,7 +90,10 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, missions: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, missions: false, appSettings: false },
+          /* shared settings (migration-2026-11-09b, table app_settings): { hostExperiencedDays, hostAtRiskMax }.
+             A setting nobody has changed is absent here, and app.js uses its own default. */
+          settings: {},
           /* the Mission register (migration-2026-11-09): one row per board + number + shift
              (see loadMissionRegister), and every new-year number entered */
           register: [],
@@ -316,6 +326,7 @@ const cloud = {
     if (this.data.features.forecast) await this.loadHoldEvents();
     await this._loadLoans();
     await this.loadMissionRegister();
+    await this._loadSettings();
     if (!this.data.activeBoardId && this.data.boards.length) this.data.activeBoardId = this.data.boards[0].id;
     this._subscribeRealtime();
   },
@@ -348,7 +359,9 @@ const cloud = {
     const exitReason = await probe("employees", "exit_reason");
     // the Missions tab: the register, its number history and the Site Admin role (migration-2026-11-09)
     const missions = (await probe("mission_register", "id")) && (await probe("mission_number_history", "id"));
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions };
+    // shared settings, e.g. the days that make someone experienced at a host (migration-2026-11-09b)
+    const appSettings = await probe("app_settings", "key");
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions, appSettings };
   },
 
   async _loadAreas() {
@@ -2639,6 +2652,37 @@ const cloud = {
       source: r.source || "board", updatedAt: r.updated_at || null,
     };
   },
+  /* ---------- shared settings (migration-2026-11-09b) ----------
+     One row per setting in app_settings. Only the settings the app knows are read, and a value
+     that is not a whole number of days in range is ignored, so a hand-edited row cannot make
+     every host "experienced" or nobody. Without the table the settings stay empty and the app
+     keeps its defaults. */
+  async _loadSettings() {
+    if (!this.data.features.appSettings) { this.data.settings = {}; return; }
+    const { data, error } = await sb.from("app_settings").select("key,value");
+    if (error) throw error;
+    const out = {};
+    for (const r of data || []) {
+      const rule = APP_SETTINGS[r.key];
+      if (rule && Number.isInteger(r.value) && r.value >= rule.min && r.value <= rule.max) out[rule.prop] = r.value;
+    }
+    this.data.settings = out;
+  },
+  /* one known setting, for everyone. Needs Edit on Settings. */
+  async _saveSetting(key, value) {
+    const rule = APP_SETTINGS[key];
+    if (!this.data.features.appSettings) throw new Error("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
+    if (!Number.isInteger(value) || value < rule.min || value > rule.max) throw new Error(`${rule.label} must be a whole number from ${rule.min} to ${rule.max}.`);
+    const { error } = await sb.from("app_settings").upsert(
+      { key, value, updated_at: new Date().toISOString(), updated_by: await this._currentEmail() },
+      { onConflict: "key" });
+    if (error) throw error;
+    await this._loadSettings();
+  },
+  /* days at a host that make someone experienced there */
+  saveHostExperiencedDays(days) { return this._saveSetting("host_experienced_days", days); },
+  /* a host is at risk when this many or fewer ACTIVE people are experienced there */
+  saveHostAtRiskMax(n) { return this._saveSetting("host_at_risk_max", n); },
   async loadMissionRegister() {
     if (!this.data.features.missions) { this.data.register = []; this.data.numberHistory = []; return; }
     const [reg, hist] = await Promise.all([
@@ -2823,6 +2867,10 @@ const cloud = {
     if (this.data.features.missions) {
       // the Missions tab, and which missions carry over
       ch.on("postgres_changes", { event: "*", schema: "public", table: "mission_register" }, async () => { await this.loadMissionRegister(); this.notify({ register: true }); });
+    }
+    if (this.data.features.appSettings) {
+      // a changed rule redraws the Host tab, Overview and the report for everybody
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, async () => { await this._loadSettings(); this.notify({ settings: true }); });
     }
     if (this.data.features.capacity) {
       ch.on("postgres_changes", { event: "*", schema: "public", table: "capacity_demand" }, async () => {
