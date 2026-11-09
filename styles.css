@@ -1794,7 +1794,8 @@ body.fp-pools-empty { --fp-w: 264px; }
   #toolbar-more.open { display: flex; }
   #toolbar-more #filters,
   #toolbar-more #emplist-filters,
-  #toolbar-more #hostlist-filters { width: 100%; margin: 0; }
+  #toolbar-more #hostlist-filters,
+  #toolbar-more #missions-filters { width: 100%; margin: 0; }
   #toolbar-more .btn { width: 100%; }
   #toolbar-more .toggle { width: 100%; justify-content: center; }
   #toolbar-more #emplist-search,
@@ -3015,7 +3016,7 @@ body.exporting #app-root { margin-right: 0; }
   font-size: 13px;
   min-width: 220px;
 }
-#hostlist-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+#hostlist-filters, #missions-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 #hostlist-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
 #hostlist-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
@@ -6552,21 +6553,21 @@ label > .pk { margin-top: 5px; }
   #modal-mission .form-row:has(select[name="shift"]) > label:not(:first-child) { flex: 1 1 0; min-width: 0; }
 }
 
-/* 11 · Host list: one Filters button, the same as Manpower */
-#btn-hostlist-filter-pop .fcount {
+/* 11 · Host list and Missions: one Filters button, the same as Manpower */
+:is(#btn-hostlist-filter-pop, #btn-missions-filter-pop) .fcount {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px;
   background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
 }
-#btn-hostlist-filter-pop .fcount.hidden { display: none; }
-#hostlist-filter-pop { width: 280px; padding: 12px; }
-#hostlist-filter-pop #hostlist-filters { display: grid; gap: 8px; }
-#hostlist-filter-pop .ms { display: block; }
-#hostlist-filter-pop .ms-btn { width: 100%; justify-content: space-between; }
+:is(#btn-hostlist-filter-pop, #btn-missions-filter-pop) .fcount.hidden { display: none; }
+:is(#hostlist-filter-pop, #missions-filter-pop) { width: 280px; padding: 12px; }
+:is(#hostlist-filter-pop #hostlist-filters, #missions-filter-pop #missions-filters) { display: grid; gap: 8px; }
+:is(#hostlist-filter-pop, #missions-filter-pop) .ms { display: block; }
+:is(#hostlist-filter-pop, #missions-filter-pop) .ms-btn { width: 100%; justify-content: space-between; }
 @media (max-width: 640px) {
-  #btn-hostlist-filter-pop { display: none; }
-  #hostlist-filter-dd { display: block; width: 100%; }
-  #hostlist-filter-pop { position: static; display: block; width: 100%; padding: 0; box-shadow: none; background: none; }
-  #hostlist-filter-pop.hidden { display: block !important; }
+  :is(#btn-hostlist-filter-pop, #btn-missions-filter-pop) { display: none; }
+  :is(#hostlist-filter-dd, #missions-filter-dd) { display: block; width: 100%; }
+  :is(#hostlist-filter-pop, #missions-filter-pop) { position: static; display: block; width: 100%; padding: 0; box-shadow: none; background: none; }
+  :is(#hostlist-filter-pop, #missions-filter-pop).hidden { display: block !important; }
 }
 
 /* 12 · Temporary password: large, and a full-width Copy */

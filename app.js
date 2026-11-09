@@ -502,6 +502,7 @@ const state = {
     search: "",
     boardId: "",               // "" = all boards
     status: "open",            // "open" | "closed" | "all"
+    filters: { shift: [], engineerId: [], customer: [], host: [], onBoard: [] },   // behind the Filters button, like Host's
     sort: { key: "number", dir: 1 },
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
@@ -2227,7 +2228,7 @@ function buildLangRow(onPick) {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-missions-filter-pop", "#missions-filter-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2487,7 +2488,7 @@ function clearSelection() {
 }
 
 function closeFilterPops() {
-  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop")) p.classList.add("hidden");
+  for (const p of $$("#filters .ms-pop, #emplist-filters .ms-pop, #hostlist-filters .ms-pop, #missions-filters .ms-pop")) p.classList.add("hidden");
 }
 
 /* phone-only toolbar overflow (see #toolbar-more in styles.css) — a no-op
@@ -3870,7 +3871,7 @@ function phoneSheetChrome() {
   } else if (box.lastElementChild !== box.querySelector(":scope > .m-sheet-foot")) {
     box.append(box.querySelector(":scope > .m-sheet-foot"));
   }
-  head.querySelector(".m-sheet-title").textContent = isOrgChart() || isEmployeeList() || isHostList() ? "Filter" : "Filter & sort";
+  head.querySelector(".m-sheet-title").textContent = isOrgChart() || isEmployeeList() || isHostList() || isMissionList() ? "Filter" : "Filter & sort";
   head.querySelector(".m-sheet-clear").onclick = (e) => { e.stopPropagation(); clearViewFilters(); };
 }
 /* Clear all, in the phone Filter sheet: every filter (and the search) of the tab on screen */
@@ -3890,6 +3891,9 @@ function clearViewFilters() {
     empty(state.hostlist.filters); state.hostlist.search = "";
     const q = $("#hostlist-search"); if (q) q.value = "";
     renderHostlistFilterOptions(); renderHostRows(); renderStats();
+  } else if (isMissionList()) {
+    empty(state.missions.filters); state.missions.search = ""; state.missions.boardId = "";
+    render();
   } else {
     empty(state.filters);
     renderFilterOptions(); renderMissions();
@@ -8953,11 +8957,89 @@ function missionStatusHtml(r) {
   }
   return `<span class="ml-tag ml-open">Open</span>`;
 }
+/* The Filters button on the Missions tab (the same pattern as Host's): Shift, Trigo responsible,
+   Customer, Host and "On the board". The Board picker and Open / Closed / All stay beside the
+   search, so a filter's choices are built from the rows they leave on screen. */
+const MISSION_FILTER_LABELS = { shift: "Shift", engineerId: "Trigo responsible", customer: "Customer", host: "Host", onBoard: "On the board" };
+const MISSION_NONE = "__none__";
+const missionText = (s) => String(s || "").trim();
+/* "On the board" = its latest day on the board is today or later (a forecast day counts) */
+const missionOnBoard = (r) => (r.lastOn && r.lastOn >= todayStr() ? "on" : "off");
+function missionScopeRows() {
+  const st = state.missions;
+  return (D().register || []).filter(r => (!st.boardId || r.boardId === st.boardId) && (st.status === "all" || r.status === st.status));
+}
+function missionRowMatchesFilters(r, f) {
+  if (f.shift.length && !f.shift.includes(r.shift)) return false;
+  if (f.engineerId.length && !f.engineerId.includes(r.engineerId || MISSION_NONE)) return false;
+  if (f.customer.length && !f.customer.includes(missionText(r.customer) || MISSION_NONE)) return false;
+  if (f.host.length && !f.host.includes(missionText(r.host) || MISSION_NONE)) return false;
+  if (f.onBoard.length && !f.onBoard.includes(missionOnBoard(r))) return false;
+  return true;
+}
+function missionFilterOptions(key) {
+  if (key === "shift") return [{ value: "day", label: "Day" }, { value: "night", label: "Night" }];
+  if (key === "onBoard") return [{ value: "on", label: "On the board now" }, { value: "off", label: "Not on the board now" }];
+  const rows = missionScopeRows();
+  const chosen = state.missions.filters[key];
+  const get = key === "engineerId" ? (r) => r.engineerId || "" : (r) => missionText(r[key]);
+  const label = key === "engineerId" ? (v) => engineerLabelFor(v) : (v) => v;
+  const values = new Set(rows.map(get).filter(Boolean));
+  for (const v of chosen) if (v !== MISSION_NONE) values.add(v);   // a ticked choice stays listed
+  const out = [...values].map(v => ({ value: v, label: label(v) })).sort((a, b) => a.label.localeCompare(b.label));
+  if (rows.some(r => !get(r)) || chosen.includes(MISSION_NONE)) out.push({ value: MISSION_NONE, label: "— none —" });
+  return out;
+}
+function missionMsLabel(key) {
+  const sel = state.missions.filters[key];
+  return `${MISSION_FILTER_LABELS[key]}: ${sel.length ? sel.length + " selected" : "All"}`;
+}
+function missionFilterCount() {
+  return Object.values(state.missions.filters).filter(v => v && v.length).length;
+}
+/* The options are rebuilt only when the choices change (a new board or status, new data), never on
+   a tick, which would close the list mid-use; the ticks, labels and count are synced every time. */
+let _missionFilterSig = "";
+function renderMissionFilterOptions() {
+  const st = state.missions;
+  const sig = JSON.stringify(Object.keys(st.filters).map(missionFilterOptions));
+  const rebuild = sig !== _missionFilterSig;
+  _missionFilterSig = sig;
+  for (const ms of $$("#missions-filters .ms")) {
+    const key = ms.dataset.filter;
+    const pop = ms.querySelector(".ms-pop");
+    if (rebuild) {
+      pop.innerHTML = "";
+      const clear = document.createElement("div");
+      clear.className = "ms-clear";
+      clear.textContent = "Clear";
+      clear.onclick = () => { st.filters[key] = []; renderMissionList(); renderStats(); };
+      pop.appendChild(clear);
+      for (const o of missionFilterOptions(key)) {
+        const row = document.createElement("label");
+        row.className = "ms-opt";
+        row.innerHTML = `<input type="checkbox" value="${escapeHtml(o.value)}"><span>${escapeHtml(o.label)}</span>`;
+        row.querySelector("input").onchange = (e) => {
+          const set = new Set(st.filters[key]);
+          e.target.checked ? set.add(o.value) : set.delete(o.value);
+          st.filters[key] = [...set];
+          renderMissionList(); renderStats();
+        };
+        pop.appendChild(row);
+      }
+    }
+    for (const box of pop.querySelectorAll("input[type=checkbox]")) box.checked = st.filters[key].includes(box.value);
+    ms.querySelector(".ms-btn").textContent = missionMsLabel(key);
+  }
+  const on = missionFilterCount();
+  $("#missions-filter-count").textContent = on;
+  $("#missions-filter-count").classList.toggle("hidden", !on);
+  $("#btn-missions-filter-pop").classList.toggle("ms-active", on > 0);
+}
 function missionRows() {
   const st = state.missions;
   const q = st.search.trim().toLowerCase();
-  let rows = (D().register || []).filter(r => !st.boardId || r.boardId === st.boardId);
-  if (st.status !== "all") rows = rows.filter(r => r.status === st.status);
+  let rows = missionScopeRows().filter(r => missionRowMatchesFilters(r, st.filters));
   if (q) {
     rows = rows.filter(r => [...cloud.numberChain(r.number), r.customer, r.host, engineerLabelFor(r.engineerId), boardNameOf(r.boardId)]
       .some(x => String(x || "").toLowerCase().includes(q)));
@@ -8985,7 +9067,7 @@ function renderMissionStats(bar) {
     bar: [["assigned", open], ["holiday", closed]],
     tiles: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     areaHtml: "",
-    filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0),
+    filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0) + missionFilterCount(),
   });
 }
 function renderMissionList() {
@@ -9002,6 +9084,7 @@ function renderMissionList() {
   $("#missions-status").value = st.status;
   syncSegmented(document);
   if ($("#missions-search").value !== st.search) $("#missions-search").value = st.search;
+  renderMissionFilterOptions();
   // the new-year banner
   const waiting = newYearWaiting();
   const alertBox = $("#missions-alert");
@@ -17769,7 +17852,7 @@ function wireApp() {
   };
 
   // multi-select filter dropdowns: toggle open on button click
-  for (const ms of $$("#filters .ms, #emplist-filters .ms, #hostlist-filters .ms")) {
+  for (const ms of $$("#filters .ms, #emplist-filters .ms, #hostlist-filters .ms, #missions-filters .ms")) {
     ms.querySelector(".ms-btn").onclick = (ev) => {
       ev.stopPropagation();
       const pop = ms.querySelector(".ms-pop");
@@ -18065,7 +18148,7 @@ function wireApp() {
     if (!ev.target.closest("#context-menu")) hideContextMenu();
     if (!ev.target.closest("#datepicker-pop") && !ev.target.closest("#btn-date")) hideDatePicker();
     if (!ev.target.closest("#filters .ms") && !ev.target.closest("#emplist-filters .ms")
-        && !ev.target.closest("#hostlist-filters .ms")) closeFilterPops();
+        && !ev.target.closest("#hostlist-filters .ms") && !ev.target.closest("#missions-filters .ms")) closeFilterPops();
     if (!ev.target.closest("#toolbar-more")) hideToolbarMore();
     if (!ev.target.closest(".cap-pop")) capClosePop();
   });

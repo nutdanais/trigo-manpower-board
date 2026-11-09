@@ -576,6 +576,19 @@
           <option value="closed">Closed</option>
           <option value="all">All</option>
         </select>
+        <!-- Five filters behind one "Filters" button, the same as Host's and Manpower's -->
+        <div id="missions-filter-dd" class="tb-dd">
+          <button type="button" id="btn-missions-filter-pop" class="btn" aria-haspopup="true" aria-expanded="false" title="Filter the list"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg> Filters<span id="missions-filter-count" class="fcount hidden"></span></button>
+          <div id="missions-filter-pop" class="tb-pop hidden" aria-label="Filters">
+            <div id="missions-filters">
+              <div class="ms" data-filter="shift"><button type="button" class="ms-btn">Shift: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="engineerId"><button type="button" class="ms-btn">Trigo responsible: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="customer"><button type="button" class="ms-btn">Customer: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="host"><button type="button" class="ms-btn">Host: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="onBoard"><button type="button" class="ms-btn">On the board: All</button><div class="ms-pop hidden"></div></div>
+            </div>
+          </div>
+        </div>
         <button type="button" class="btn hidden" id="btn-missions-newyear" title="Enter the new-year numbers Etraq gave the missions still running on last year's number"><svg class="ic" aria-hidden="true"><use href="#i-calendar"></use></svg> New-year numbers<span id="missions-newyear-count" class="fcount hidden"></span></button>
       </div>
       <div id="filters">

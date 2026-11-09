@@ -89,6 +89,56 @@ async function step(name, fn) {
       await p.selectOption("#missions-board", "");
     });
 
+    await step("the Filters button narrows the list by customer, Trigo responsible, shift and whether it is on the board", async () => {
+      const openRows = () => db.t("mission_register").filter((r) => r.status === "open");
+      const rowsShown = () => p.locator("#missions-body tr").count();
+      const ms = (key) => p.locator(`#missions-filters .ms[data-filter=${key}]`);
+      const tick = async (key, text) => {
+        await ms(key).locator(".ms-btn").click();
+        await ms(key).locator(".ms-opt", { hasText: text }).locator("input").check();
+      };
+      const shown = async (n) => p.waitForFunction((k) => document.querySelectorAll("#missions-body tr").length === k, n);
+      assert.equal(await p.locator("#btn-missions-filter-pop").isVisible(), true, "a Filters button, like Host's");
+      assert.equal(await p.locator("#missions-filter-count").isVisible(), false, "no count while nothing is filtered");
+      await p.click("#btn-missions-filter-pop");
+      await p.locator("#missions-filter-pop:not(.hidden)").waitFor();
+      assert.equal(await p.locator("#missions-filters .ms").count(), 5);
+      // Customer: one ticked customer leaves its rows; the button and the count say so
+      await tick("customer", "Cust Ninety");
+      await shown(1);
+      assert.equal(await ms("customer").locator(".ms-btn").innerText(), "Customer: 1 selected");
+      assert.equal((await p.locator("#missions-filter-count").innerText()).trim(), "1");
+      assert.match(await p.locator("#missions-count").innerText(), /^1 mission\b/);
+      await ms("customer").locator(".ms-clear").click();
+      await shown(openRows().length);
+      assert.equal(await p.locator("#missions-filter-count").isVisible(), false);
+      // Trigo responsible
+      await tick("engineerId", "Eng Two");
+      await shown(openRows().filter((r) => r.engineer_id === "eng-2").length);
+      assert.equal(await row(p, M7).count(), 1);
+      assert.equal(await row(p, OLD).count(), 0, "the shared mission belongs to Eng One");
+      await ms("engineerId").locator(".ms-clear").click();
+      // Shift
+      await tick("shift", "Night");
+      await shown(openRows().filter((r) => r.shift === "night").length);
+      await ms("shift").locator(".ms-clear").click();
+      // On the board: the register's latest day is today or later
+      await tick("onBoard", "Not on the board now");
+      await shown(openRows().filter((r) => !(r.last_on && r.last_on >= T)).length);
+      await ms("onBoard").locator(".ms-clear").click();
+      await shown(openRows().length);
+      // a filter stays with the Board picker and the search
+      await tick("engineerId", "Eng Two");
+      await p.selectOption("#missions-board", "b2");
+      await shown(openRows().filter((r) => r.engineer_id === "eng-2" && r.board_id === "b2").length);
+      assert.equal(await rowsShown(), 1);
+      await p.selectOption("#missions-board", "");
+      await ms("engineerId").locator(".ms-clear").click();
+      await shown(openRows().length);
+      await p.keyboard.press("Escape");
+      assert.equal(await p.locator("#missions-filter-pop").isVisible(), false, "Esc closes the Filters list");
+    });
+
     await step("an engineer closes a mission: the days after lose it and carry over skips it", async () => {
       db.seed("missions", [{ id: "n102", board_id: "b1", plan_date: NEXT, number: "102", host: "Host Beta", customer: "Cust Beta", shift: "day", engineer_id: "eng-2" }]);
       db.seed("assignments", [{ employee_id: "e3", plan_date: NEXT, mission_id: "n102", zone: null }]);
