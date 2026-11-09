@@ -1,7 +1,7 @@
 /* Takes the user guide's screenshots from the real app.
 
    The app runs unmodified from this repo; only Supabase is swapped for the
-   in-memory fake the e2e tests use (tests/fake/), filled with the invented data
+   in-memory fake the e2e tests use (demo/), filled with the invented data
    in ./seed.js. Each shot is taken in English and Thai, at desktop and/or phone
    size, and written to design/user-guide/img/<name>.<lang>.jpg.
 
@@ -16,7 +16,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
-const { FakeDb } = require("../../tests/fake/fake-db");
+const { FakeDb } = require("../../demo/fake-db");
 const S = require("./seed");
 
 const ROOT = path.join(__dirname, "..", "..");
@@ -54,7 +54,7 @@ async function open(env, { device, lang, user = S.ME, profilePatch, view, waitFo
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2", (r) =>
-    r.fulfill({ contentType: "text/javascript", body: fs.readFileSync(path.join(ROOT, "tests", "fake", "fake-client.js"), "utf8") }));
+    r.fulfill({ contentType: "text/javascript", body: fs.readFileSync(path.join(ROOT, "demo", "fake-client.js"), "utf8") }));
   await page.exposeFunction("__fakeSupabaseExec", (q) => db.exec(q, user));
   await page.addInitScript(({ u, lang, view }) => {
     window.__fakeSession = u ? { user: { id: u.id, email: u.email }, access_token: "fake" } : null;
