@@ -135,6 +135,8 @@ const MISSIONS = {
   ],
 };
 const TIMES = { day: ["08:00:00", "17:00:00"], night: ["20:00:00", "05:00:00"] };
+/* a remark on a few missions, so the Missions tab's Remark column has something to show */
+const REMARKS = { "107": "Waiting for the customer's PO before the crew is booked", "203": "Night crew enters by gate 2", "301": "Sorting and rework of door seals" };
 const LEAVE_PATTERN = ["annual", "sick", "business"];
 
 /* One day's plan for one board: missions plus who goes where. `k` rotates the
@@ -154,7 +156,7 @@ function dayPlan(board, date, k, emps, { loanOut } = {}) {
   const short = k > 0 && k % 5 === 0;
   for (const [num, host, customer, shift, eng, crew, ppe] of MISSIONS[board]) {
     const id = `m-${board}-${num}-${date}`;
-    missions.push({ id, board_id: board, plan_date: date, number: num, host, customer, shift, start_time: TIMES[shift][0], end_time: TIMES[shift][1], engineer_id: eng, ppe: ppe || null, remark: null, hidden: false });
+    missions.push({ id, board_id: board, plan_date: date, number: num, host, customer, shift, start_time: TIMES[shift][0], end_time: TIMES[shift][1], engineer_id: eng, ppe: ppe || null, remark: REMARKS[num] || null, hidden: false });
     const size = short && crew > 2 ? crew - 1 : crew;
     for (let i = 0; i < size && w < workers.length; i++) assignments.push({ employee_id: workers[w++].id, plan_date: date, mission_id: id, zone: null });
   }

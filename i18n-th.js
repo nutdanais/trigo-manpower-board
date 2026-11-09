@@ -2986,6 +2986,9 @@ I18N.add({
 /* Missions tab: the crew, status and alert columns, the Host link, and the filters for them */
 I18N.add({
   "Avg crew / week": "ทีมงานเฉลี่ย / สัปดาห์",
+  "The start and end time from the mission's latest day on the board.": "เวลาเริ่มและสิ้นสุดจากวันล่าสุดของมิชชั่นบนบอร์ด",
+  "The protective equipment the mission asks for, from its latest day on the board.": "อุปกรณ์ป้องกันที่มิชชั่นต้องใช้ จากวันล่าสุดบนบอร์ด",
+  "The mission's remark, from its latest day on the board.": "หมายเหตุของมิชชั่น จากวันล่าสุดบนบอร์ด",
   "Not on its board that day": "ไม่ได้อยู่บนบอร์ดของมิชชั่นในวันนั้น",
   "Hidden on its board that day": "ซ่อนอยู่บนบอร์ดในวันนั้น",
   "Nobody is on it that day": "วันนั้นไม่มีใครอยู่ในมิชชั่น",

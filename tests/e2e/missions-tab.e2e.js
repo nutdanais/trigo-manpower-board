@@ -159,7 +159,7 @@ async function step(name, fn) {
         ...wd.map((d) => mk("q8", "108", d)),
         ...wd.map((d) => mk("q9", "109", d, { hidden: true })),
         mk("q10", "110", wd[7]), mk("q10", "110", wd[6]),
-        mk("q12", "112", wd[0]), mk("q12", "112", wd[1]), mk("q12", "112", wd[2]),
+        ...[0, 1, 2].map((i) => mk("q12", "112", wd[i], { ppe: "Helmet and gloves", remark: "Check the labels", start_time: "07:30:00", end_time: "16:30:00" })),
       ]);
       db.seed("assignments", [
         { employee_id: "e1", plan_date: wd[1], mission_id: `q12-${wd[1]}`, zone: null },
@@ -198,6 +198,15 @@ async function step(name, fn) {
       assert.equal(await crewOn(NEXT, "112"), "\u2014", "a day with no plan yet, outside the six weeks, is read on its own");
       assert.match(await p.locator("#missions-crew-date").innerText(), /\d/, "the header names the day");
       await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, original);
+      // the Time, PPE and Remark columns come from the mission's latest day; search finds a remark
+      const cell = async (num, label) => (await row(p, num).locator(`td[data-label="${label}"]`).innerText()).trim();
+      assert.equal(await cell("112", "Time"), "07:30\u201316:30");
+      assert.equal(await cell("112", "PPE"), "Helmet and gloves");
+      assert.equal(await cell("112", "Remark"), "Check the labels");
+      await p.fill("#missions-search", "check the labels");
+      await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length === 1);
+      await p.fill("#missions-search", "");
+      await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length > 1);
       // the tile counts the missions on their board with nobody on them
       assert.match(await p.locator("#stats-bar").innerText(), /No crew\s*\d/);
       // the Filters button finds them

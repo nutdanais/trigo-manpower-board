@@ -7374,6 +7374,10 @@ label > .pk { margin-top: 5px; }
 td.ml-alerts { min-width: 150px; }
 td.ml-alerts .ml-tag { margin: 2px 4px 2px 0; }
 td.ml-avg, td.ml-crew { font-variant-numeric: tabular-nums; }
+td.ml-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* PPE and remark: up to two lines, then an ellipsis; the whole text is in the tooltip */
+td.ml-text { min-width: 10em; max-width: 220px; font-size: 12.5px; line-height: 1.35; }
+.ml-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 td.ml-crew .ml-zero { color: var(--warn-text); font-weight: 600; }
 td.ml-crew .ml-muted { color: var(--muted); font-size: 12.5px; }
 .ml-th-date { font-weight: 400; opacity: .8; }
@@ -7386,10 +7390,13 @@ td.ml-crew .ml-muted { color: var(--muted); font-size: 12.5px; }
   #missions-table .ml-actions .btn { border-color: transparent; background: none; color: var(--primary-text); }
   #missions-table .ml-actions .btn:hover { background: var(--hover-tint); }
   /* Customer and Host keep a readable width instead of wrapping to three lines beside the status and alert pills */
-  #missions-table td:nth-child(4), #missions-table td:nth-child(5) { min-width: 8.5em; }
+  #missions-table td:nth-child(5), #missions-table td:nth-child(6) { min-width: 8.5em; }
   /* long headers ("Avg crew / week") may take two lines rather than widen their column */
   #missions-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
   #missions-table th[data-sort="avgCrew"] { min-width: 5.8em; }
+  /* the table has many columns: when its box scrolls sideways, the mission number stays in view */
+  #missions-panel .table-wrap.tw-scroll :is(th, td):first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); box-shadow: 1px 0 0 var(--border); }
+  #missions-panel .table-wrap.tw-scroll tbody tr:hover td:first-child { background: var(--hover-tint); }
   #missions-table td { padding-left: 10px; padding-right: 10px; }
 }
 .ml-tag.ml-shift { padding: 0; font-weight: 500; font-size: 13.5px; }

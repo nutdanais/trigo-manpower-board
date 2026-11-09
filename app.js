@@ -9078,6 +9078,11 @@ function missionInfo(r) {
   const alerts = missionAlerts(r, p);
   return { p, alerts, avg: p.a ? p.a.avgCrew : null, day: missionDayCell(r), worst: alerts.length ? alerts[0].level : -1 };
 }
+/* a long text (PPE, remark) keeps to two lines in the table; the whole text is its tooltip */
+function missionTextCell(text) {
+  const t = missionText(text);
+  return t ? `<span class="ml-clamp" title="${escapeHtml(t)}">${escapeHtml(t)}</span>` : "—";
+}
 function missionStatusHtml(r, p = missionPlacement(r)) {
   if (p.kind === "closed") {
     const t = `Closed${r.closedBy ? " by " + r.closedBy : ""}${r.closeNote ? ": " + r.closeNote : ""}`;
@@ -9187,7 +9192,7 @@ function missionRows() {
   const q = st.search.trim().toLowerCase();
   let rows = missionScopeRows().filter(r => missionRowMatchesFilters(r, st.filters));
   if (q) {
-    rows = rows.filter(r => [...cloud.numberChain(r.number), r.customer, r.host, engineerLabelFor(r.engineerId), boardNameOf(r.boardId)]
+    rows = rows.filter(r => [...cloud.numberChain(r.number), r.customer, r.host, r.ppe, r.remark, engineerLabelFor(r.engineerId), boardNameOf(r.boardId)]
       .some(x => String(x || "").toLowerCase().includes(q)));
   }
   const key = st.sort.key, dir = st.sort.dir;
@@ -9297,6 +9302,7 @@ function renderMissionList() {
       <td class="ml-first"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
       <td data-label="${lbl("Board")}">${escapeHtml(boardNameOf(r.boardId))}</td>
       <td data-label="${lbl("Shift")}"><span class="ml-tag ml-shift ml-${r.shift}">${r.shift === "night" ? "Night" : "Day"}</span></td>
+      <td data-label="${lbl("Time")}" class="ml-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : "—"}</td>
       <td data-label="${lbl("Customer")}">${escapeHtml(r.customer || "—")}</td>
       <td data-label="${lbl("Host")}" class="ml-host-cell">${host}</td>
       <td data-label="${lbl("Trigo responsible")}">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
@@ -9306,6 +9312,8 @@ function renderMissionList() {
       <td data-label="${lbl("Avg crew / week")}" class="ml-avg">${avg}</td>
       <td data-label="${lbl("Status")}">${missionStatusHtml(r, info.p)}</td>
       <td data-label="${lbl("Alerts")}" class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</td>
+      <td data-label="${lbl("PPE")}" class="ml-text">${missionTextCell(r.ppe)}</td>
+      <td data-label="${lbl("Remark")}" class="ml-text">${missionTextCell(r.remark)}</td>
       <td class="ml-actions">${acts.join("")}</td></tr>`;
   }).join("");
   $("#missions-crew-date").textContent = fmtDayMon(state.date);
