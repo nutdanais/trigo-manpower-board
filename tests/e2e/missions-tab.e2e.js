@@ -73,7 +73,7 @@ async function step(name, fn) {
     });
 
     await step("a mission still on last year's number is flagged; an engineer cannot enter the new one", async () => {
-      assert.match(await row(p, OLD, "Board One").locator(".ml-tag").last().innerText(), new RegExp(`No 20${YY} number|Waiting for 20${YY} number`));
+      assert.match(await row(p, OLD, "Board One").locator(".ml-alerts").innerText(), new RegExp(`No 20${YY} number|Waiting for 20${YY} number`), "the new-year number is an alert pill");
       assert.equal(await p.locator("#missions-alert").isVisible(), true);
       assert.equal(await p.locator("#missions-alert button").count(), 0, "no button for an engineer");
       assert.equal(await p.locator("#btn-missions-newyear").isVisible(), false);
@@ -94,6 +94,7 @@ async function step(name, fn) {
       const rowsShown = () => p.locator("#missions-body tr").count();
       const ms = (key) => p.locator(`#missions-filters .ms[data-filter=${key}]`);
       const tick = async (key, text) => {
+        await p.evaluate(() => closeFilterPops());   // an open list would cover the next filter's button
         await ms(key).locator(".ms-btn").click();
         await ms(key).locator(".ms-opt", { hasText: text }).locator("input").check();
       };
@@ -102,7 +103,7 @@ async function step(name, fn) {
       assert.equal(await p.locator("#missions-filter-count").isVisible(), false, "no count while nothing is filtered");
       await p.click("#btn-missions-filter-pop");
       await p.locator("#missions-filter-pop:not(.hidden)").waitFor();
-      assert.equal(await p.locator("#missions-filters .ms").count(), 5);
+      assert.equal(await p.locator("#missions-filters .ms").count(), 6);
       // Customer: one ticked customer leaves its rows; the button and the count say so
       await tick("customer", "Cust Ninety");
       await shown(1);
@@ -122,10 +123,19 @@ async function step(name, fn) {
       await tick("shift", "Night");
       await shown(openRows().filter((r) => r.shift === "night").length);
       await ms("shift").locator(".ms-clear").click();
-      // On the board: the register's latest day is today or later
-      await tick("onBoard", "Not on the board now");
-      await shown(openRows().filter((r) => !(r.last_on && r.last_on >= T)).length);
-      await ms("onBoard").locator(".ms-clear").click();
+      // Board status: every mission is on its board on the latest working day, so "Off the board" leaves none
+      await tick("placement", "Off the board");
+      await shown(0);
+      assert.equal(await p.locator("#missions-empty").isVisible(), true);
+      await ms("placement").locator(".ms-clear").click();
+      await shown(openRows().length);
+      // Alerts: the missions nobody is on
+      await p.evaluate(() => closeFilterPops());
+      await ms("alerts").locator(".ms-btn").click();
+      await ms("alerts").locator(".ms-opt", { hasText: /^No crew$/ }).locator("input").check();
+      const noCrew = await p.locator("#missions-body tr").evaluateAll((trs) => trs.length);
+      assert.ok(noCrew > 0 && noCrew <= openRows().length);
+      await ms("alerts").locator(".ms-clear").click();
       await shown(openRows().length);
       // a filter stays with the Board picker and the search
       await tick("engineerId", "Eng Two");
@@ -137,6 +147,92 @@ async function step(name, fn) {
       await shown(openRows().length);
       await p.keyboard.press("Escape");
       assert.equal(await p.locator("#missions-filter-pop").isVisible(), false, "Esc closes the Filters list");
+    });
+
+    await step("each row says where its mission is and what needs a look: status, average crew, alert pills, the Host link", async () => {
+      // working days back from SRC: 108 on Board Two with nobody on it for 8 of them, 109 hidden for 8, 110 last on the board
+      // 7 working days ago, 112 with a crew of 2, 1 and none
+      const wd = [SRC];
+      for (let i = 0; i < 7; i++) wd.push(h.prevWorking(wd[wd.length - 1]));
+      const mk = (id, num, day, extra = {}) => ({ id: `${id}-${day}`, board_id: "b2", plan_date: day, number: num, host: "Host Delta", customer: "Cust " + num, shift: "day", engineer_id: "eng-1", ...extra });
+      db.seed("missions", [
+        ...wd.map((d) => mk("q8", "108", d)),
+        ...wd.map((d) => mk("q9", "109", d, { hidden: true })),
+        mk("q10", "110", wd[7]), mk("q10", "110", wd[6]),
+        mk("q12", "112", wd[0]), mk("q12", "112", wd[1]), mk("q12", "112", wd[2]),
+      ]);
+      db.seed("assignments", [
+        { employee_id: "e1", plan_date: wd[1], mission_id: `q12-${wd[1]}`, zone: null },
+        { employee_id: "e1", plan_date: wd[2], mission_id: `q12-${wd[2]}`, zone: null },
+        { employee_id: "e2", plan_date: wd[2], mission_id: `q12-${wd[2]}`, zone: null },
+      ]);
+      await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister().then(refreshAndRender); });
+      const alerts = (n) => row(p, n).locator(".ml-alerts").innerText();
+      // on the board, nobody on it for 8 working days in a row: red, and the pill offers Close
+      assert.match(await row(p, "108").innerText(), /On board/);
+      assert.match(await alerts("108"), /No crew · 8 days · Close\?/);
+      assert.equal(await row(p, "108").locator(".ml-alerts button[data-act=suggest-close]").count(), 1);
+      assert.equal(await row(p, "108").locator(".ml-alerts .ml-late").count(), 1, "over 5 working days is red");
+      // one day with nobody on it is amber and has no Close
+      assert.match(await alerts(M7), /No crew · 1 day\b/);
+      assert.equal(await row(p, M7).locator(".ml-alerts .ml-warn").count(), 1);
+      assert.equal(await row(p, M7).locator(".ml-alerts button").count(), 0);
+      // hidden on every one of its days
+      assert.match(await row(p, "109").locator("td[data-label=Status]").innerText(), /Hidden/);
+      assert.match(await alerts("109"), /Hidden · 8 days · Close\?/);
+      // off the board: it had days and has none on the latest working day
+      assert.match(await row(p, "110").locator("td[data-label=Status]").innerText(), /Off the board/);
+      assert.match(await alerts("110"), /Off the board · 6 days · Close\?/);
+      assert.equal(await row(p, "110").locator("button[data-act=add]").count(), 1, "Add to board is only offered off the board");
+      assert.equal(await row(p, "108").locator("button[data-act=add]").count(), 0, "not for a mission already on its board");
+      // the average crew: (0 + 1 + 2) / 3 people a day on its three days
+      assert.equal((await row(p, "112").locator(".ml-avg").innerText()).trim(), "1.0");
+      // the Crew column: the people on it on the day on screen, from its own board
+      const original = await p.evaluate(() => state.date);
+      const crewOn = async (day, num) => { await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, day); return (await row(p, num).locator(".ml-crew").innerText()).trim(); };
+      assert.equal(await crewOn(wd[2], "112"), "2");
+      assert.equal(await crewOn(wd[1], "112"), "1");
+      assert.equal(await crewOn(wd[2], "108"), "0", "on the board with nobody on it");
+      assert.equal(await crewOn(wd[2], "110"), "\u2014", "not on its board that day");
+      assert.match(await crewOn(wd[2], "109"), /Hidden/i);
+      assert.equal(await crewOn(NEXT, "112"), "\u2014", "a day with no plan yet, outside the six weeks, is read on its own");
+      assert.match(await p.locator("#missions-crew-date").innerText(), /\d/, "the header names the day");
+      await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, original);
+      // the tile counts the missions on their board with nobody on them
+      assert.match(await p.locator("#stats-bar").innerText(), /No crew\s*\d/);
+      // the Filters button finds them
+      await p.click("#btn-missions-filter-pop");
+      await p.evaluate(() => closeFilterPops());
+      await p.locator("#missions-filters .ms[data-filter=alerts] .ms-btn").click();
+      await p.locator("#missions-filters .ms[data-filter=alerts] .ms-opt", { hasText: /^No crew for over 5 working days$/ }).locator("input").check();
+      await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length === 1);
+      assert.equal(await row(p, "108").count(), 1);
+      await p.locator("#missions-filters .ms[data-filter=alerts] .ms-clear").click();
+      await p.evaluate(() => closeFilterPops());
+      await p.locator("#missions-filters .ms[data-filter=placement] .ms-btn").click();
+      await p.locator("#missions-filters .ms[data-filter=placement] .ms-opt", { hasText: "Hidden" }).locator("input").check();
+      await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length === 1);
+      assert.equal(await row(p, "109").count(), 1);
+      await p.locator("#missions-filters .ms[data-filter=placement] .ms-clear").click();
+      await p.keyboard.press("Escape");
+      // the suggestion opens Close for that mission
+      await row(p, "108").locator(".ml-alerts button").click();
+      await p.locator("#modal-close-mission:not(.hidden)").waitFor();
+      assert.match(await p.locator("#close-mission-title").innerText(), /Close mission 108/);
+      await p.evaluate(() => closeModal());
+      // the Host name opens the Host tab with that host's row marked, and the search empty
+      await row(p, M7).locator(".ml-host-link").click();
+      await p.locator("#hostlist-panel:not(.hidden)").waitFor();
+      await p.locator('#hostlist-body tr[data-host="Host Beta"].row-focus').waitFor();
+      assert.equal(await p.inputValue("#hostlist-search"), "");
+      await p.locator('#hostlist-body tr[data-host="Host Beta"].row-focus').waitFor({ state: "detached", timeout: 12000 });
+      // put the sample missions away again
+      const drop = (t, f) => { const a = db.t(t); for (let i = a.length - 1; i >= 0; i--) if (f(a[i])) a.splice(i, 1); };
+      drop("assignments", (x) => String(x.mission_id || "").startsWith("q12-"));
+      drop("missions", (x) => /^q\d+-/.test(x.id));
+      drop("mission_register", (x) => ["108", "109", "110", "112"].includes(x.number));
+      await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister().then(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); }); });
+      assert.equal(await p.locator("#missions-body tr").count(), 7);
     });
 
     await step("an engineer closes a mission: the days after lose it and carry over skips it", async () => {

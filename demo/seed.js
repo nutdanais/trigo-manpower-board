@@ -223,7 +223,16 @@ function seed(db) {
     missions.push({ id: `m-b2-209-${date}`, board_id: "b2", plan_date: date, number: "209", host: "Amata Components", customer: "Seat Belt Co.",
       shift: "day", start_time: TIMES.day[0], end_time: TIMES.day[1], engineer_id: "eng-3", ppe: null, remark: null, hidden: false });
   }
+  // ...a Chonburi job that was running and has been hidden on the board for its last ten days, so it is
+  // open but on no board (Status: Hidden, with a pill suggesting Close)...
+  const mk = (id, board, num, host, customer, eng, date, hidden) => ({ id: `${id}-${date}`, board_id: board, plan_date: date, number: num, host, customer,
+    shift: "day", start_time: TIMES.day[0], end_time: TIMES.day[1], engineer_id: eng, ppe: null, remark: null, hidden });
+  days.forEach((date, i) => missions.push(mk("m-b2-204", "b2", "204", "Amata Components", "Cable Assembly Co.", "eng-3", date, i >= days.length - 10)));
+  // ...an Ayutthaya job that stopped being planned nine working days ago (Status: Off the board, with Add to board)
+  days.slice(0, days.length - 9).forEach((date) => missions.push(mk("m-b3-303", "b3", "303", "Rojana Electronics", "Optic Parts Ltd.", "eng-1", date, false)));
   db.seed("missions", missions);
+  // ...and a mission registered in Bulk edit that has no day on a board yet (Status: Not started)
+  db.seed("mission_register", [{ board_id: "b1", number: "108", shift: "day", source: "list", status: "open", host: "Map Ta Phut Steel", customer: "Gear Works Ltd.", engineer_id: "eng-2", updated_by: ME.email }]);
   const closed = db.t("mission_register").find((r) => r.board_id === "b2" && r.number === "209");
   if (closed) Object.assign(closed, { status: "closed", closed_on: ended[ended.length - 1], closed_by: PROFILES[3].email, closed_at: new Date().toISOString(), close_note: "Contract ended" });
   // ...and the new-year number of Ayutthaya's bearing job, entered three days ago

@@ -2649,6 +2649,51 @@ const cloud = {
     this.data.register = (reg || []).map((r) => this._registerFromRow(r));
     this.data.numberHistory = (hist.data || []).map((h) => ({ oldNumber: h.old_number, newNumber: h.new_number, validFrom: h.valid_from, enteredBy: h.entered_by || "", enteredAt: h.entered_at }));
   },
+  /* What the Missions tab needs to say how each mission has been staffed lately: for the last
+     `spanDays` days up to `today`, every mission row with how many people were on it and whether it
+     was hidden, grouped by board + number + shift, and each board's working dates (weekends and
+     holidays left out). MissionActivity.summarise (mission-activity.js) turns this into the average
+     crew and the "no crew for N working days" count. Two reads, like getUtilizationRange.
+     `date` is the day on screen: the Crew column shows who is on each mission that day, so a day outside
+     the six weeks (a future day, an old one) is read too, on its own.
+     Returns { rows: { "board|number|shift": { [date]: { crew, hidden } } }, working: { [boardId]: [date…] } }. */
+  async getMissionActivity(today, spanDays = 42, date = null) {
+    const out = { rows: {}, working: {} };
+    if (!this.data.features.missions) return out;
+    const from = addDaysISO(today, -(spanDays - 1));
+    const outside = !!date && (date < from || date > today);
+    const read = (lo, hi) => Promise.all([
+      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, number, shift, hidden").gte("plan_date", lo).lte("plan_date", hi)),
+      fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id").gte("plan_date", lo).lte("plan_date", hi)),
+    ]);
+    const [win, extra] = await Promise.all([read(from, today), outside ? read(date, date) : Promise.resolve([[], []])]);
+    const missionRows = [...(win[0] || []), ...(extra[0] || [])];
+    const assignRows = [...(win[1] || []), ...(extra[1] || [])];
+    const empById = new Map(this.data.employees.map((e) => [e.id, e]));
+    // the same rule as the Overview's headcount: a person counts from the day they were added until they were deactivated
+    const counts = (id, date) => {
+      const e = empById.get(id);
+      return !!e && this.rosterOn(e, date) && !(e.addedOn && e.addedOn > date);
+    };
+    const byId = new Map();
+    for (const m of missionRows || []) {
+      const key = `${m.board_id}|${m.number}|${m.shift || "day"}`;
+      const rows = (out.rows[key] = out.rows[key] || {});
+      const cell = (rows[m.plan_date] = rows[m.plan_date] || { crew: 0, hidden: false });
+      if (m.hidden) cell.hidden = true;
+      byId.set(m.id, { cell, date: m.plan_date });
+    }
+    for (const a of assignRows || []) {
+      const m = a.mission_id && byId.get(a.mission_id);
+      if (m && counts(a.employee_id, m.date)) m.cell.crew++;
+    }
+    for (const b of this.data.boards) {
+      const w = [];
+      for (let d = from; d <= today; d = addDaysISO(d, 1)) if (!isNonWorkingDate(d, b.id)) w.push(d);
+      out.working[b.id] = w;
+    }
+    return out;
+  },
   /* the number a mission had before `number` (last year's), or null */
   previousNumber(number) {
     const h = (this.data.numberHistory || []).filter((x) => x.newNumber === number).pop();

@@ -502,13 +502,17 @@ const state = {
     search: "",
     boardId: "",               // "" = all boards
     status: "open",            // "open" | "closed" | "all"
-    filters: { shift: [], engineerId: [], customer: [], host: [], onBoard: [] },   // behind the Filters button, like Host's
+    filters: { shift: [], engineerId: [], customer: [], host: [], placement: [], alerts: [] },   // behind the Filters button, like Host's
     sort: { key: "number", dir: 1 },
+    activity: null,            // cloud.getMissionActivity(): how each mission was staffed in the last six weeks
+    activityKey: null,         // what it was read for; cleared by every realtime change, like the Host directory
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
     filters: { areaId: [], boardId: [], empId: [], location: [], status: [] },
     dupOnly: false,      // "Review duplicates" — show only names that look like duplicates of each other
+    focus: null,         // a host name to mark and scroll to (the Missions tab's Host link); cleared after a few seconds
+    focusScroll: false,  // scroll to it once, on the next draw
     sortKey: "name",
     sortDir: 1,
     dir: null,           // cloud.getHostDirectory() result; null = not fetched yet
@@ -1002,6 +1006,23 @@ async function ensureHostDirectoryLoaded() {
   state.hostlist.dirCacheKey = cacheKey;
 }
 
+/* The Missions tab's crew facts (average crew, "no crew for N days", on the board / hidden / off it):
+   one read of the last six weeks of missions and assignments, cached across redraws like the Host
+   directory and cleared by every realtime change. */
+let missionActivitySeq = 0;
+async function ensureMissionActivityLoaded() {
+  const key = todayStr() + "|" + state.date + "|" + (D().register || []).length + "|" + D().boards.length + "|" + D().employees.length;
+  const st = state.missions;
+  if (st.activityKey === key && st.activity) return;
+  const seq = ++missionActivitySeq;
+  let result = null;
+  try { result = await cloud.getMissionActivity(todayStr(), 42, state.date); }
+  catch (e) { console.warn("Mission activity could not be read; the Missions tab shows the register only:", e && e.message || e); }
+  if (seq !== missionActivitySeq) return;   // a newer request has since superseded this one
+  st.activity = result;
+  st.activityKey = result ? key : null;
+}
+
 /* Overview's "Host coverage risk" module: for every host with a mission on
    the date on screen, how many distinct employees have ever been deployed
    there (across all history, not just this window). Refetches only when the
@@ -1056,6 +1077,7 @@ async function refreshData() {
   } else if (isMissionList()) {
     // the register is kept warm by Realtime; one fresh read whenever the tab is opened or redrawn on demand
     await cloud.loadMissionRegister();
+    await ensureMissionActivityLoaded();
   } else if (D().activeBoardId) {
     const boardId = D().activeBoardId, date = state.date;
     if (isForecastView()) {
@@ -8261,7 +8283,7 @@ function quietTable(sel) {
     for (const pill of r.querySelectorAll(".area-pill")) pill.style.setProperty("--ac", pill.style.backgroundColor || "#999");
   }
   if (rows.length) ths.forEach((th, i) => {
-    if (th.classList.contains("el-check")) return;
+    if (th.classList.contains("el-check") || th.hasAttribute("data-keep")) return;
     if (!rows.every(r => quietCellEmpty(r.children[i]))) return;
     th.classList.add("col-off");
     for (const r of rows) r.children[i].classList.add("col-off");
@@ -8698,6 +8720,40 @@ function hostBoardCell(r) {
     + `${escapeHtml(b.name)}</span>`).join("") + `</span>`;
 }
 
+/* The Missions tab's Host link lands here: the host's row is marked and scrolled to the middle once, and
+   the mark fades after a few seconds so it does not sit there for good. */
+let hostFocusTimer = 0;
+function showFocusedHost(body) {
+  const hl = state.hostlist;
+  if (!hl.focus || !hl.focusScroll) return;
+  hl.focusScroll = false;
+  const row = body.querySelector("tr.row-focus");
+  if (!row) { toast(`${hl.focus} is not in the Host list.`, "info"); hl.focus = null; return; }
+  requestAnimationFrame(() => row.scrollIntoView({ block: "center" }));
+  clearTimeout(hostFocusTimer);
+  hostFocusTimer = setTimeout(() => {
+    hl.focus = null;
+    for (const x of $$("#hostlist-body tr.row-focus")) x.classList.remove("row-focus");
+  }, 8000);
+}
+/* The Host column of the Missions tab: open the Host tab with that host's row marked. The search and
+   filters are cleared so the row is on the list. */
+function openHostFromMission(r) {
+  const name = missionText(r.host);
+  if (!name) return;
+  if (!can("hostlist")) { toast("Your role cannot open the Host tab.", "info"); return; }
+  clearSelection();
+  const hl = state.hostlist;
+  hl.search = "";
+  for (const k of Object.keys(hl.filters)) hl.filters[k] = [];
+  hl.dupOnly = false;
+  hl.view = "list";
+  hl.focus = name;
+  hl.focusScroll = true;
+  D().activeBoardId = HOSTLIST_ID;
+  refreshAndRender();
+}
+
 /* redraws just the table body + count — cheap enough for every keystroke,
    filter tick, sort click or "+N more" toggle */
 function renderHostRows() {
@@ -8710,6 +8766,7 @@ function renderHostRows() {
     const tr = document.createElement("tr");
     tr.dataset.host = r.name;
     if (r.archived) tr.classList.add("row-archived");
+    if (state.hostlist.focus === r.name) tr.classList.add("row-focus");
     // data-label feeds the phone breakpoint's ::before, same responsive-table
     // pattern the Manpower List uses (see renderEmployeeRows)
     tr.innerHTML = `
@@ -8774,6 +8831,7 @@ function renderHostRows() {
     tr.addEventListener("dblclick", () => openHostModal(r.name));
     body.appendChild(tr);
   }
+  showFocusedHost(body);
   const noLoc = rows.filter(r => !r.location && !r.mapUrl).length;
   const archived = rows.filter(r => r.archived).length;
   $("#hostlist-count").textContent = `${rows.length} of ${all.length}`
@@ -8944,27 +9002,106 @@ function newYearAlertCount() {
   if (MissionNumber.daysWaiting(todayStr()) <= MissionNumber.ALERT_AFTER_DAYS) return 0;
   return newYearWaiting().length;
 }
-function missionStatusHtml(r) {
-  if (r.status === "closed") {
+/* What each mission's recent days say about it (mission-activity.js, read by
+   cloud.getMissionActivity): where it is now, how many people it has had, and what needs a look. */
+function missionDays(r) {
+  const act = state.missions.activity;
+  if (!act) return null;
+  // days under last year's number are the same mission's days
+  const days = {};
+  for (const n of cloud.numberChain(r.number)) Object.assign(days, act.rows[`${r.boardId}|${n}|${r.shift}`] || {});
+  return days;
+}
+function missionActivityOf(r) {
+  const days = missionDays(r);
+  if (!days) return null;
+  return MissionActivity.summarise({ days, working: state.missions.activity.working[r.boardId] || [], today: todayStr() });
+}
+/* the mission's row on the day on screen: { crew, hidden }, or null when it is not on its board that day */
+function missionDayCell(r) {
+  const days = r.status === "closed" ? null : missionDays(r);
+  return (days && days[state.date]) || null;
+}
+/* where a mission is now: closed, on its board, hidden there, off it (it had days and has none now),
+   or not started (registered, or starting later, with no day on a board yet) */
+function missionPlacement(r) {
+  if (r.status === "closed") return { kind: "closed", a: null };
+  const today = todayStr();
+  if (r.openedOn && r.openedOn > today) return { kind: "notstarted", a: null, startsOn: r.openedOn };
+  const a = missionActivityOf(r);
+  if (!a) return { kind: r.lastOn && r.lastOn >= today ? "on" : r.lastOn ? "off" : "notstarted", a };
+  if (a.placement === "on" || a.placement === "hidden") return { kind: a.placement, a };
+  return { kind: r.lastOn ? "off" : "notstarted", a };
+}
+const MISSION_PLACEMENT_RANK = { on: 0, hidden: 1, off: 2, notstarted: 3, closed: 4 };
+/* the pills in the Alerts column, worst first: { kinds (what the Alerts filter matches), level
+   (2 red, 1 amber, 0 grey), text, title, close (offers Close…) } */
+function missionAlerts(r, p) {
+  if (r.status === "closed") return [];
+  const out = [];
+  const today = todayStr(), a = p.a, limit = MissionActivity.NO_CREW_ALERT_AFTER;
+  const days = (n, capped) => `${n}${capped ? "+" : ""} ${n === 1 && !capped ? "day" : "days"}`;
+  const count = (n, capped) => `${n}${capped ? "+" : ""}`;
+  if (p.kind === "on" && a && a.noCrewDays > 0) {
+    const long = a.noCrewDays > limit, d = days(a.noCrewDays, a.noCrewCapped), n = count(a.noCrewDays, a.noCrewCapped);
+    out.push({
+      kinds: long ? ["noCrew", "noCrewLong"] : ["noCrew"], level: long ? 2 : 1, close: long, text: `No crew · ${d}`,
+      title: long ? `Nobody has been on ${r.number} for more than 5 working days in a row (${n}). If the job has ended, close it.`
+        : `Nobody is on ${r.number}. Working days in a row: ${n}.`,
+    });
+  }
+  if (p.kind === "hidden" && a && a.hiddenDays > limit) {
+    const d = days(a.hiddenDays, a.hiddenCapped), n = count(a.hiddenDays, a.hiddenCapped);
+    out.push({ kinds: ["hidden"], level: 1, close: true, text: `Hidden · ${d}`,
+      title: `${r.number} has been hidden on its board for more than 5 working days in a row (${n}). If the job has ended, close it; otherwise unhide it from the board's Hide/Unhide.` });
+  }
+  if (p.kind === "off" && r.lastOn) {
+    const gap = MissionActivity.workingDaysBetween(r.lastOn, today, (d) => isNonWorkingDate(d, r.boardId));
+    if (gap > limit) {
+      out.push({ kinds: ["offBoard"], level: 1, close: true, text: `Off the board · ${gap} days`,
+        title: `${r.number} was last on the board on ${fmtDate(r.lastOn)}. Close it if the job has ended, or add it back with Add to board.` });
+    }
+  }
+  if (MissionNumber.needsNewYearNumber(r.number, today)) {
+    const year = today.slice(0, 4), d = MissionNumber.daysWaiting(today);
+    const late = d > MissionNumber.ALERT_AFTER_DAYS;
+    out.push({ kinds: ["number"], level: late ? 2 : 0, close: false,
+      text: late ? `No ${year} number · ${d} days` : `Waiting for ${year} number`,
+      title: late ? `Still on last year's number after ${d} days` : "The board keeps running on last year's number until the new one is entered" });
+  }
+  if (!r.engineerId) out.push({ kinds: ["noEngineer"], level: 1, close: false, text: "No Trigo responsible", title: "Nobody is named as this mission's Trigo responsible" });
+  return out.sort((x, y) => y.level - x.level);
+}
+/* everything the table, its sort and its filters ask about one row */
+function missionInfo(r) {
+  const p = missionPlacement(r);
+  const alerts = missionAlerts(r, p);
+  return { p, alerts, avg: p.a ? p.a.avgCrew : null, day: missionDayCell(r), worst: alerts.length ? alerts[0].level : -1 };
+}
+function missionStatusHtml(r, p = missionPlacement(r)) {
+  if (p.kind === "closed") {
     const t = `Closed${r.closedBy ? " by " + r.closedBy : ""}${r.closeNote ? ": " + r.closeNote : ""}`;
     return `<span class="ml-tag ml-closed" title="${escapeHtml(t)}">Closed ${escapeHtml(r.closedOn ? fmtDate(r.closedOn) : "")}</span>`;
   }
-  const today = todayStr();
-  if (MissionNumber.needsNewYearNumber(r.number, today)) {
-    const year = today.slice(0, 4), days = MissionNumber.daysWaiting(today);
-    const late = days > MissionNumber.ALERT_AFTER_DAYS;
-    return `<span class="ml-tag ${late ? "ml-late" : "ml-wait"}" title="${late ? `Still on last year's number after ${days} days` : "The board keeps running on last year's number until the new one is entered"}">${late ? `No ${year} number · ${days} days` : `Waiting for ${year} number`}</span>`;
-  }
-  return `<span class="ml-tag ml-open">Open</span>`;
+  const board = boardNameOf(r.boardId);
+  if (p.kind === "on") return `<span class="ml-tag ml-open" title="${escapeHtml(`On the ${board} board today`)}">On board</span>`;
+  if (p.kind === "hidden") return `<span class="ml-tag ml-hidden" title="${escapeHtml(`Open, but hidden on the ${board} board`)}">Hidden</span>`;
+  if (p.kind === "off") return `<span class="ml-tag ml-off" title="${escapeHtml(`It was on the ${board} board until ${r.lastOn ? fmtDate(r.lastOn) : "earlier"} and is not there now`)}">Off the board</span>`;
+  return `<span class="ml-tag ml-wait" title="${escapeHtml(p.startsOn ? `It starts on ${fmtDate(p.startsOn)}` : "Registered, with no day on a board yet")}">Not started</span>`;
+}
+function missionAlertsHtml(r, info, canClose) {
+  return info.alerts.map((x) => {
+    const cls = `ml-tag ${x.level === 2 ? "ml-late" : x.level === 1 ? "ml-warn" : "ml-wait"}`;
+    if (x.close && canClose) return `<button type="button" class="${cls} ml-pill-btn" data-act="suggest-close" title="${escapeHtml(x.title)}">${escapeHtml(x.text)} · Close?</button>`;
+    return `<span class="${cls}" title="${escapeHtml(x.title)}">${escapeHtml(x.text)}</span>`;
+  }).join("");
 }
 /* The Filters button on the Missions tab (the same pattern as Host's): Shift, Trigo responsible,
    Customer, Host and "On the board". The Board picker and Open / Closed / All stay beside the
    search, so a filter's choices are built from the rows they leave on screen. */
-const MISSION_FILTER_LABELS = { shift: "Shift", engineerId: "Trigo responsible", customer: "Customer", host: "Host", onBoard: "On the board" };
+const MISSION_FILTER_LABELS = { shift: "Shift", engineerId: "Trigo responsible", customer: "Customer", host: "Host", placement: "Board status", alerts: "Alerts" };
 const MISSION_NONE = "__none__";
 const missionText = (s) => String(s || "").trim();
-/* "On the board" = its latest day on the board is today or later (a forecast day counts) */
-const missionOnBoard = (r) => (r.lastOn && r.lastOn >= todayStr() ? "on" : "off");
 function missionScopeRows() {
   const st = state.missions;
   return (D().register || []).filter(r => (!st.boardId || r.boardId === st.boardId) && (st.status === "all" || r.status === st.status));
@@ -8974,12 +9111,21 @@ function missionRowMatchesFilters(r, f) {
   if (f.engineerId.length && !f.engineerId.includes(r.engineerId || MISSION_NONE)) return false;
   if (f.customer.length && !f.customer.includes(missionText(r.customer) || MISSION_NONE)) return false;
   if (f.host.length && !f.host.includes(missionText(r.host) || MISSION_NONE)) return false;
-  if (f.onBoard.length && !f.onBoard.includes(missionOnBoard(r))) return false;
+  if (f.placement.length || f.alerts.length) {
+    const info = missionInfo(r);
+    if (f.placement.length && !f.placement.includes(info.p.kind)) return false;
+    if (f.alerts.length && !info.alerts.some(a => a.kinds.some(k => f.alerts.includes(k)))) return false;
+  }
   return true;
 }
 function missionFilterOptions(key) {
   if (key === "shift") return [{ value: "day", label: "Day" }, { value: "night", label: "Night" }];
-  if (key === "onBoard") return [{ value: "on", label: "On the board now" }, { value: "off", label: "Not on the board now" }];
+  if (key === "placement") return [{ value: "on", label: "On board" }, { value: "hidden", label: "Hidden" }, { value: "off", label: "Off the board" }, { value: "notstarted", label: "Not started" }];
+  if (key === "alerts") return [
+    { value: "noCrew", label: "No crew" }, { value: "noCrewLong", label: "No crew for over 5 working days" },
+    { value: "hidden", label: "Hidden for over 5 working days" }, { value: "offBoard", label: "Off the board for over 5 working days" },
+    { value: "number", label: "New-year number" }, { value: "noEngineer", label: "No Trigo responsible" },
+  ];
   const rows = missionScopeRows();
   const chosen = state.missions.filters[key];
   const get = key === "engineerId" ? (r) => r.engineerId || "" : (r) => missionText(r[key]);
@@ -9045,8 +9191,14 @@ function missionRows() {
       .some(x => String(x || "").toLowerCase().includes(q)));
   }
   const key = st.sort.key, dir = st.sort.dir;
+  // the crew and alert columns sort as zero-padded text, so a number sorts as a number
+  const info = (r) => missionInfo(r);
   const val = (r) => key === "board" ? boardNameOf(r.boardId) : key === "engineer" ? engineerLabelFor(r.engineerId)
-    : key === "status" ? (r.status === "closed" ? "1" + (r.closedOn || "") : "0") : (r[key] || "");
+    : key === "status" ? String(MISSION_PLACEMENT_RANK[info(r).p.kind]) + (r.status === "closed" ? (r.closedOn || "") : "")
+    : key === "avgCrew" ? (info(r).avg == null ? "" : String(Math.round(info(r).avg * 100)).padStart(6, "0"))
+    : key === "crew" ? (info(r).day ? String(info(r).day.hidden ? 0 : info(r).day.crew + 1).padStart(4, "0") : "")
+    : key === "alerts" ? String(info(r).worst + 1) + String(info(r).alerts.length).padStart(2, "0")
+    : (r[key] || "");
   return rows.slice().sort((a, b) => String(val(a)).localeCompare(String(val(b))) * dir || a.number.localeCompare(b.number) || a.shift.localeCompare(b.shift));
 }
 function renderMissionStats(bar) {
@@ -9055,17 +9207,20 @@ function renderMissionStats(bar) {
   const closed = all.length - open;
   const waiting = newYearWaiting().filter(w => w.rows.some(r => !state.missions.boardId || r.boardId === state.missions.boardId)).length;
   const late = MissionNumber.daysWaiting(todayStr()) > MissionNumber.ALERT_AFTER_DAYS;
+  // open missions on their board with nobody on them
+  const noCrew = all.filter(r => r.status === "open" && missionInfo(r).alerts.some(a => a.kinds.includes("noCrew"))).length;
   const tile = (label, n, kind) =>
     `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
   bar.classList.add("stats-tiles");
   bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${all.length}</b></div>` +
-    tile("Open", open, "assigned") + tile("Closed", closed, "holiday") + (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "");
+    tile("Open", open, "assigned") + tile("Closed", closed, "holiday") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
+    (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "");
   renderPhoneViewCard({
     head: `<b>${open}</b><span class="ms-w"> open</span>`,
     label: `${all.length} missions: ${open} open, ${closed} closed`,
-    keys: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    keys: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     bar: [["assigned", open], ["holiday", closed]],
-    tiles: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    tiles: [["assigned", open, "Open"], ["holiday", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     areaHtml: "",
     filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0) + missionFilterCount(),
   });
@@ -9116,28 +9271,45 @@ function renderMissionList() {
     th.classList.toggle("sorted", th.dataset.sort === st.sort.key);
     th.setAttribute("aria-sort", th.dataset.sort === st.sort.key ? (st.sort.dir > 0 ? "ascending" : "descending") : "none");
   }
-  const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit");
+  const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit"), canHost = can("hostlist");
   const body = $("#missions-body");
   const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);   // an attribute the translator does not walk
   body.innerHTML = rows.map(r => {
     const prev = cloud.previousNumber(r.number);
+    const info = missionInfo(r);
     const acts = [];
-    if (r.status === "open" && canAdd) acts.push(`<button type="button" class="btn btn-small" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
+    // Add to board is for a mission that is not on its board: registered with no day, or off it
+    if (r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")) acts.push(`<button type="button" class="btn btn-small" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
     if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
     if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small" data-act="reopen">Reopen</button>`);
+    const host = r.host ? (canHost
+      ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Show this host in the Host tab") : "Show this host in the Host tab")}">${escapeHtml(r.host)}</button>`
+      : escapeHtml(r.host)) : "—";
+    const avg = info.avg == null || r.status === "closed" ? "—"
+      : `<span title="${escapeHtml(`Average number of people on it each working day over the last 4 weeks (${info.p.a.avgDays} days)`)}">${info.avg.toFixed(1)}</span>`;
+    // the crew on the day on screen, from the mission's own board
+    const dayTitle = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);
+    const crew = r.status === "closed" ? "—" : !info.day ? `<span title="${dayTitle("Not on its board that day")}">—</span>`
+      : info.day.hidden ? `<span class="ml-muted" title="${dayTitle("Hidden on its board that day")}">${dayTitle("Hidden")}</span>`
+      : info.day.crew ? `<b>${info.day.crew}</b>` : `<span class="ml-zero" title="${dayTitle("Nobody is on it that day")}">0</span>`;
     // data-label: the phone shows each row as a card with these as its field names
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
       <td class="ml-first"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
       <td data-label="${lbl("Board")}">${escapeHtml(boardNameOf(r.boardId))}</td>
       <td data-label="${lbl("Shift")}"><span class="ml-tag ml-shift ml-${r.shift}">${r.shift === "night" ? "Night" : "Day"}</span></td>
       <td data-label="${lbl("Customer")}">${escapeHtml(r.customer || "—")}</td>
-      <td data-label="${lbl("Host")}">${escapeHtml(r.host || "—")}</td>
+      <td data-label="${lbl("Host")}" class="ml-host-cell">${host}</td>
       <td data-label="${lbl("Trigo responsible")}">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
       <td data-label="${lbl("Start date")}" class="ml-date">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
       <td data-label="${lbl("Last on board")}" class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
-      <td data-label="${lbl("Status")}">${missionStatusHtml(r)}</td>
+      <td data-label="${lbl("Crew")}" class="ml-crew">${crew}</td>
+      <td data-label="${lbl("Avg crew / week")}" class="ml-avg">${avg}</td>
+      <td data-label="${lbl("Status")}">${missionStatusHtml(r, info.p)}</td>
+      <td data-label="${lbl("Alerts")}" class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</td>
       <td class="ml-actions">${acts.join("")}</td></tr>`;
   }).join("");
+  $("#missions-crew-date").textContent = fmtDayMon(state.date);
+  quietTable("#missions-table");
   const empty = $("#missions-empty");
   const none = !(D().register || []).length;
   empty.classList.toggle("hidden", rows.length > 0);
@@ -17999,7 +18171,8 @@ function wireApp() {
     const b = e.target.closest("button[data-act]");
     const r = b && missionFromRow(b);
     if (!r) return;
-    if (b.dataset.act === "close") openCloseMissionModal(r);
+    if (b.dataset.act === "close" || b.dataset.act === "suggest-close") openCloseMissionModal(r);
+    else if (b.dataset.act === "host") openHostFromMission(r);
     else if (b.dataset.act === "reopen") reopenMissionRow(r);
     else if (b.dataset.act === "add") openMissionAddModal(r);
   });
@@ -18327,6 +18500,7 @@ async function boot() {
     // a mission or an assignment anywhere can change who has worked where —
     // refreshData only re-reads the directory when the Host List is on screen
     state.hostlist.dirCacheKey = null;
+    state.missions.activityKey = null;   // so does who is on which mission
     // {boardId, planDate, updatedBy} from a missions/assignments write (see
     // cloud.js's _attributionFromPayload) — undefined for every other kind of
     // change, and for a write from before the updated-by migration was run.

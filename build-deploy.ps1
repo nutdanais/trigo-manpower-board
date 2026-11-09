@@ -19,6 +19,8 @@ Copy-Item (Join-Path $root "report.js") $deploy -Force
 Copy-Item (Join-Path $root "present.js") $deploy -Force
 Copy-Item (Join-Path $root "bulk-edit.js") $deploy -Force
 Copy-Item (Join-Path $root "employee-id.js") $deploy -Force
+Copy-Item (Join-Path $root "mission-number.js") $deploy -Force
+Copy-Item (Join-Path $root "mission-activity.js") $deploy -Force
 Copy-Item (Join-Path $root "config.js") $deploy -Force
 Copy-Item (Join-Path $root "version.js") $deploy -Force
 Copy-Item (Join-Path $root "logo.svg") $deploy -Force

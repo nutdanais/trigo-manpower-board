@@ -3019,14 +3019,14 @@ body.exporting #app-root { margin-right: 0; }
 #hostlist-filters, #missions-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 #hostlist-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
-#hostlist-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-#hostlist-table th, #hostlist-table td {
+#hostlist-table, #missions-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+#hostlist-table th, #hostlist-table td, #missions-table th, #missions-table td {
   padding: 9px 12px;
   text-align: left;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
-#hostlist-table th {
+#hostlist-table th, #missions-table th {
   font-weight: 700;
   color: var(--muted);
   font-size: 12px;
@@ -3039,11 +3039,17 @@ body.exporting #app-root { margin-right: 0; }
   position: sticky;
   top: 0;
 }
-#hostlist-table th:hover { color: var(--primary-text); }
+#hostlist-table th:hover, #missions-table th:hover { color: var(--primary-text); }
 #hostlist-table th.sorted-asc::after { content: " \25B2"; }
 #hostlist-table th.sorted-desc::after { content: " \25BC"; }
-#hostlist-table tbody tr:hover { background: var(--hover-tint); }
+#hostlist-table tbody tr:hover, #missions-table tbody tr:hover { background: var(--hover-tint); }
 #hostlist-table td.hl-name { white-space: nowrap; }
+/* the row the Missions tab's Host link opened: tinted, with an edge, and a short pulse (app.js showFocusedHost) */
+#hostlist-table tbody tr { scroll-margin-top: 140px; }
+#hostlist-table tbody tr.row-focus td { background: rgba(0, 58, 102, .10); animation: hl-focus-pulse 1.8s ease-out 1; }
+#hostlist-table tbody tr.row-focus td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+@keyframes hl-focus-pulse { from { background: rgba(245, 158, 11, .32); } to { background: rgba(0, 58, 102, .10); } }
+@media (max-width: 640px) { #hostlist-table tbody tr.row-focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--hover-tint); } }
 .hl-host { font-weight: 700; }
 /* the edit affordance rides the row's hover on a mouse; on touch there is no
    hover to reveal it, so it stays visible there */
@@ -5617,24 +5623,24 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   display: inline; align-self: center; margin: 0 auto; font-size: 12.5px;
 }
 
-/* ===== Quiet tables: Manpower and Host (2026-10-13c) =====
+/* ===== Quiet tables: Manpower, Host and Missions (2026-10-13c) =====
    No box, sentence-case headers that stay put while the page scrolls, row lines only,
    a colour key beside the area name instead of a pill, a plain toggle for Status, and
    columns that are empty on every row left out (see quietTable in app.js). Phones keep
    the card layout of the phone block above. */
 @media (min-width: 641px) {
-  #emplist-panel .table-wrap, #hostlist-panel .table-wrap { border: 0; background: transparent; border-radius: 0; overflow: visible; }
-  :is(#emplist-table, #hostlist-table) { border-collapse: separate; border-spacing: 0; }
-  :is(#emplist-table, #hostlist-table) th {
+  #emplist-panel .table-wrap, #hostlist-panel .table-wrap, #missions-panel .table-wrap { border: 0; background: transparent; border-radius: 0; overflow: visible; }
+  :is(#emplist-table, #hostlist-table, #missions-table) { border-collapse: separate; border-spacing: 0; }
+  :is(#emplist-table, #hostlist-table, #missions-table) th {
     position: sticky; top: var(--bar-h, 56px); z-index: 3; background: var(--panel);
     text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 600; color: var(--muted);
     padding: 12px; border-bottom: 1px solid var(--border);
   }
-  :is(#emplist-table, #hostlist-table) td { padding: 0 12px; height: 46px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
-  :is(#emplist-table, #hostlist-table) tbody tr:hover { background: transparent; }
-  :is(#emplist-table, #hostlist-table) tbody tr:hover td { background: var(--hover-tint); }
-  :is(#emplist-table, #hostlist-table) .col-off { display: none; }
-  :is(#emplist-table, #hostlist-table) .el-tid { color: var(--muted); font-variant-numeric: tabular-nums; }
+  :is(#emplist-table, #hostlist-table, #missions-table) td { padding: 0 12px; height: 46px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  :is(#emplist-table, #hostlist-table, #missions-table) tbody tr:hover { background: transparent; }
+  :is(#emplist-table, #hostlist-table, #missions-table) tbody tr:hover td { background: var(--hover-tint); }
+  :is(#emplist-table, #hostlist-table, #missions-table) .col-off { display: none; }
+  :is(#emplist-table, #hostlist-table, #missions-table) .el-tid { color: var(--muted); font-variant-numeric: tabular-nums; }
   /* The table keeps to the page's width: the wrapper can't scroll sideways (overflow: visible above keeps the
      headers sticky under the top bar), so a few long text columns may take a second line when the window is
      narrow, instead of every cell holding one line and pushing the page wider than the header. */
@@ -5650,28 +5656,28 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #emplist-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
   /* still too wide for the window: the box scrolls sideways (fitListTable in app.js); its headers then sit at
      its top, since a box that scrolls can't hold them under the page's top bar */
-  :is(#emplist-panel, #hostlist-panel) .table-wrap.tw-scroll { overflow-x: auto; }
-  :is(#emplist-panel, #hostlist-panel) .table-wrap.tw-scroll :is(#emplist-table, #hostlist-table) th { position: static; }
-  :is(#emplist-table, #hostlist-table) .area-pill {
+  :is(#emplist-panel, #hostlist-panel, #missions-panel) .table-wrap.tw-scroll { overflow-x: auto; }
+  :is(#emplist-panel, #hostlist-panel, #missions-panel) .table-wrap.tw-scroll :is(#emplist-table, #hostlist-table, #missions-table) th { position: static; }
+  :is(#emplist-table, #hostlist-table, #missions-table) .area-pill {
     background: transparent !important; color: var(--text) !important; padding: 0; font-weight: 550; letter-spacing: 0; font-size: 13.5px;
     display: inline-flex; align-items: center; gap: 7px; box-shadow: none; border-radius: 0; border: 0;
   }
-  :is(#emplist-table, #hostlist-table) .area-pill::before {
+  :is(#emplist-table, #hostlist-table, #missions-table) .area-pill::before {
     content: ""; width: 10px; height: 10px; border-radius: 4px; flex: none; display: inline-block;
     background: var(--ac, #999); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14);
   }
-  :is(#emplist-table, #hostlist-table) .toggle-track { width: 30px; height: 18px; border-radius: 9px; }
-  :is(#emplist-table, #hostlist-table) .toggle-thumb { width: 14px; height: 14px; top: 2px; left: 2px; }
-  :is(#emplist-table, #hostlist-table) .toggle input:checked + .toggle-track .toggle-thumb { left: 14px; }
-  :is(#emplist-table, #hostlist-table) .toggle-active input:checked + .toggle-track { background: var(--primary); }
-  :is(#emplist-table, #hostlist-table) .toggle-active input:checked ~ .toggle-text { display: none; }
-  :is(#emplist-table, #hostlist-table) .el-util-meter { height: 4px; border-radius: 2px; }
-  :is(#emplist-table, #hostlist-table) .el-util-val { font-weight: 600; color: var(--muted); }
+  :is(#emplist-table, #hostlist-table, #missions-table) .toggle-track { width: 30px; height: 18px; border-radius: 9px; }
+  :is(#emplist-table, #hostlist-table, #missions-table) .toggle-thumb { width: 14px; height: 14px; top: 2px; left: 2px; }
+  :is(#emplist-table, #hostlist-table, #missions-table) .toggle input:checked + .toggle-track .toggle-thumb { left: 14px; }
+  :is(#emplist-table, #hostlist-table, #missions-table) .toggle-active input:checked + .toggle-track { background: var(--primary); }
+  :is(#emplist-table, #hostlist-table, #missions-table) .toggle-active input:checked ~ .toggle-text { display: none; }
+  :is(#emplist-table, #hostlist-table, #missions-table) .el-util-meter { height: 4px; border-radius: 2px; }
+  :is(#emplist-table, #hostlist-table, #missions-table) .el-util-val { font-weight: 600; color: var(--muted); }
   #hostlist-table .hl-empty { display: none; }
 }
 @media (min-width: 641px) { #emplist-search { min-width: 330px; } }
-@media (min-width: 641px) { #hostlist-table td { vertical-align: middle; } }
-@media (min-width: 641px) { :is(#emplist-table, #hostlist-table) td.q-dash { color: transparent; user-select: none; } }
+@media (min-width: 641px) { #hostlist-table td, #missions-table td { vertical-align: middle; } }
+@media (min-width: 641px) { :is(#emplist-table, #hostlist-table, #missions-table) td.q-dash { color: transparent; user-select: none; } }
 
 /* ===== Filter & sort popover ===== */
 #btn-filter-pop .fcount {
@@ -7344,17 +7350,9 @@ label > .pk { margin-top: 5px; }
 #missions-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 #missions-panel { display: flex; flex-direction: column; gap: 10px; }
 #missions-panel.hidden { display: none; }
-#missions-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-#missions-table th, #missions-table td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
-#missions-table th {
-  font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .3px;
-  cursor: pointer; user-select: none; white-space: nowrap; background: var(--bg-soft); position: sticky; top: 0;
-}
 #missions-table th.ml-actions-h { cursor: default; }
-#missions-table th:hover { color: var(--primary-text); }
 #missions-table th.sorted[aria-sort="ascending"]::after { content: " \25B2"; }
 #missions-table th.sorted[aria-sort="descending"]::after { content: " \25BC"; }
-#missions-table tbody tr:hover { background: var(--hover-tint); }
 #missions-table td.ml-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
 #missions-table tr.ml-row-closed td { color: var(--muted); }
 .ml-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -7366,6 +7364,34 @@ label > .pk { margin-top: 5px; }
 .ml-tag.ml-wait { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
 .ml-tag.ml-late { background: var(--danger-tint); color: var(--danger-text); border: 1px solid var(--danger-line); }
 .ml-tag.ml-closed { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
+.ml-tag.ml-hidden { background: var(--bg-soft); color: var(--muted); border: 1px dashed var(--border); }
+.ml-tag.ml-warn, .ml-tag.ml-off { background: var(--warn-tint); color: var(--warn-text); border: 1px solid var(--warn-line); }
+/* an alert that offers Close… is a button: the same pill, with a pointer */
+.ml-pill-btn { font-family: inherit; cursor: pointer; transition: filter .15s ease, transform .1s ease; }
+.ml-pill-btn:hover { filter: brightness(.95); }
+.ml-pill-btn:active { transform: translateY(1px); }
+.ml-pill-btn:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+td.ml-alerts { min-width: 150px; }
+td.ml-alerts .ml-tag { margin: 2px 4px 2px 0; }
+td.ml-avg, td.ml-crew { font-variant-numeric: tabular-nums; }
+td.ml-crew .ml-zero { color: var(--warn-text); font-weight: 600; }
+td.ml-crew .ml-muted { color: var(--muted); font-size: 12.5px; }
+.ml-th-date { font-weight: 400; opacity: .8; }
+/* the host name opens its row in the Host tab */
+.ml-host-link { padding: 0; border: 0; border-bottom: 1px dotted currentColor; background: none; color: var(--primary-text); font: inherit; text-align: left; cursor: pointer; }
+.ml-host-link:hover { border-bottom-style: solid; }
+.ml-host-link:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 2px; }
+@media (min-width: 641px) {
+  /* quiet row actions, like the Host rows' edit button: text, with a tint on hover */
+  #missions-table .ml-actions .btn { border-color: transparent; background: none; color: var(--primary-text); }
+  #missions-table .ml-actions .btn:hover { background: var(--hover-tint); }
+  /* Customer and Host keep a readable width instead of wrapping to three lines beside the status and alert pills */
+  #missions-table td:nth-child(4), #missions-table td:nth-child(5) { min-width: 8.5em; }
+  /* long headers ("Avg crew / week") may take two lines rather than widen their column */
+  #missions-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
+  #missions-table th[data-sort="avgCrew"] { min-width: 5.8em; }
+  #missions-table td { padding-left: 10px; padding-right: 10px; }
+}
 .ml-tag.ml-shift { padding: 0; font-weight: 500; font-size: 13.5px; }
 .ml-tag.ml-shift.ml-night { padding: 1px 8px; background: #e7e7f4; color: #2b2d5c; }
 #missions-empty { color: var(--muted); padding: 24px 4px; }
@@ -7400,6 +7426,7 @@ tr.ny-bad .ny-input { border-color: var(--danger); }
   #missions-table td[data-label]::before { content: attr(data-label); font-size: 10.5px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--muted); }
   #missions-table td.ml-first { display: block; font-size: 15px; border-bottom: none; padding-bottom: 6px; }
   #missions-table td.ml-actions { justify-content: flex-start; border-bottom: none; padding-top: 8px; }
+  #missions-table td.ml-alerts:empty { display: none; }
   .ny-input { width: 100%; }
 }
 /* a new-year number: the old one beside it for two weeks (Missions tab, phase 1) */

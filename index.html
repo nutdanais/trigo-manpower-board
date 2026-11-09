@@ -576,7 +576,7 @@
           <option value="closed">Closed</option>
           <option value="all">All</option>
         </select>
-        <!-- Five filters behind one "Filters" button, the same as Host's and Manpower's -->
+        <!-- Six filters behind one "Filters" button, the same as Host's and Manpower's -->
         <div id="missions-filter-dd" class="tb-dd">
           <button type="button" id="btn-missions-filter-pop" class="btn" aria-haspopup="true" aria-expanded="false" title="Filter the list"><svg class="ic" aria-hidden="true"><use href="#i-search"></use></svg> Filters<span id="missions-filter-count" class="fcount hidden"></span></button>
           <div id="missions-filter-pop" class="tb-pop hidden" aria-label="Filters">
@@ -585,7 +585,8 @@
               <div class="ms" data-filter="engineerId"><button type="button" class="ms-btn">Trigo responsible: All</button><div class="ms-pop hidden"></div></div>
               <div class="ms" data-filter="customer"><button type="button" class="ms-btn">Customer: All</button><div class="ms-pop hidden"></div></div>
               <div class="ms" data-filter="host"><button type="button" class="ms-btn">Host: All</button><div class="ms-pop hidden"></div></div>
-              <div class="ms" data-filter="onBoard"><button type="button" class="ms-btn">On the board: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="placement"><button type="button" class="ms-btn">Board status: All</button><div class="ms-pop hidden"></div></div>
+              <div class="ms" data-filter="alerts"><button type="button" class="ms-btn">Alerts: All</button><div class="ms-pop hidden"></div></div>
             </div>
           </div>
         </div>
@@ -843,8 +844,11 @@
             <th data-sort="engineer">Trigo responsible</th>
             <th data-sort="openedOn" title="The first day this mission was on the board">Start date</th>
             <th data-sort="lastOn" title="The latest day this mission is on the board">Last on board</th>
-            <th data-sort="status">Status</th>
-            <th class="ml-actions-h"><span class="sr-only">Actions</span></th>
+            <th data-sort="crew" data-keep title="The number of people on the mission on the day shown at the top, from its own board.">Crew <small id="missions-crew-date" class="ml-th-date"></small></th>
+            <th data-sort="avgCrew" data-keep title="The average number of people on the mission each working day, over the last 4 weeks. Days it was hidden or not on the board do not count.">Avg crew / week</th>
+            <th data-sort="status" data-keep title="Where the mission is now: on its board, hidden there, off the board, not started, or closed.">Status</th>
+            <th data-sort="alerts" data-keep title="What needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.">Alerts</th>
+            <th class="ml-actions-h" data-keep><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody id="missions-body"></tbody>
@@ -1651,6 +1655,7 @@
 <script src="planning.js?v=2026-11-09d"></script>
 <script src="employee-id.js?v=2026-11-09d"></script>
 <script src="mission-number.js?v=2026-11-09d"></script>
+<script src="mission-activity.js?v=2026-11-09d"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
 <script src="demo/demo-gate.js?v=2026-11-09d"></script>
