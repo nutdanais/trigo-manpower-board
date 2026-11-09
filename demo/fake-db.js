@@ -1,4 +1,5 @@
-/* An in-memory stand-in for the Supabase/PostgREST backend, for tests only.
+/* An in-memory stand-in for the Supabase/PostgREST backend, for the tests and
+   for the browser-only demo.
    It speaks the small query language fake-client.js builds (the subset of
    supabase-js the app uses), keeps the tables in memory, enforces the unique
    keys and cascades the app relies on, emulates the forward-planning triggers
@@ -6,10 +7,21 @@
 
    One FakeDb can serve several "users" (browser pages) at once, which is how
    the end-to-end tests check that a second user sees a change live. Fixtures
-   are fake people on example.com — nothing real. */
-"use strict";
+   are fake people on example.com — nothing real.
 
-const crypto = require("crypto");
+   It also runs in a browser (demo mode, see demo/demo.js): the whole file is
+   wrapped in a function so its helpers do not become globals of the page, and
+   it exports FakeDb on window instead of module.exports. */
+"use strict";
+(function (root) {
+
+const crypto = (typeof require === "function") ? require("crypto") : root.crypto;
+/* randomUUID exists only in secure contexts in a browser (https, localhost) */
+const uuid = () => (crypto && crypto.randomUUID) ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    return (c === "x" ? r : (r & 3) | 8).toString(16);
+  });
 
 const UNIQUE = {
   missions: ["board_id", "plan_date", "number", "shift"],
@@ -189,7 +201,7 @@ class FakeDb {
 
   _insertRow(table, values, user) {
     const row = { ...(DEFAULTS[table] ? DEFAULTS[table]() : {}), ...clone(values) };
-    if (!NO_ID.has(table) && !row.id) row.id = crypto.randomUUID();
+    if (!NO_ID.has(table) && !row.id) row.id = uuid();
     if (TIMESTAMPS.has(table)) {
       const ts = this.now();
       if (!row.created_at && table !== "assignments") row.created_at = ts;
@@ -371,7 +383,7 @@ class FakeDb {
        only for a carry choice over somebody else's forecast */
     this.rpcs.record_forecast_merge = (a, u) => {
       const me = email(u);
-      const mergeId = crypto.randomUUID();
+      const mergeId = uuid();
       const at = this.now();
       let events = 0;
       for (const it of a.p_items || []) {
@@ -422,4 +434,7 @@ class FakeDb {
   }
 }
 
-module.exports = { FakeDb };
+if (typeof module !== "undefined" && module.exports) module.exports = { FakeDb };
+else root.FakeDb = FakeDb;
+
+})(typeof window !== "undefined" ? window : globalThis);

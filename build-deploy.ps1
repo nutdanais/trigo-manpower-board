@@ -24,6 +24,10 @@ Copy-Item (Join-Path $root "version.js") $deploy -Force
 Copy-Item (Join-Path $root "logo.svg") $deploy -Force
 Copy-Item (Join-Path $root "manifest.webmanifest") $deploy -Force
 Copy-Item (Join-Path $root "icons") $deploy -Recurse -Force
+# the browser-only demo (/?demo): index.html loads demo/demo-gate.js on every visit
+$demo = Join-Path $deploy "demo"
+New-Item -ItemType Directory -Force $demo | Out-Null
+foreach ($f in "demo-gate.js", "demo.js", "fake-db.js", "fake-client.js", "seed.js") { Copy-Item (Join-Path $root "demo\$f") $demo -Force }
 if (Test-Path (Join-Path $root "logo.png")) { Copy-Item (Join-Path $root "logo.png") $deploy -Force }
 if (Test-Path (Join-Path $root "logo-on-navy.png")) { Copy-Item (Join-Path $root "logo-on-navy.png") $deploy -Force }
 Copy-Item (Join-Path $root "vendor\html2canvas.min.js") $vendor -Force
