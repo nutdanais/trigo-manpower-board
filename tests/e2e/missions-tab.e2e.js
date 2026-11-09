@@ -73,7 +73,7 @@ async function step(name, fn) {
     });
 
     await step("a mission still on last year's number is flagged; an engineer cannot enter the new one", async () => {
-      assert.match(await row(p, OLD, "Board One").locator(".tag").last().innerText(), new RegExp(`No 20${YY} number|Waiting for 20${YY} number`));
+      assert.match(await row(p, OLD, "Board One").locator(".ml-tag").last().innerText(), new RegExp(`No 20${YY} number|Waiting for 20${YY} number`));
       assert.equal(await p.locator("#missions-alert").isVisible(), true);
       assert.equal(await p.locator("#missions-alert button").count(), 0, "no button for an engineer");
       assert.equal(await p.locator("#btn-missions-newyear").isVisible(), false);

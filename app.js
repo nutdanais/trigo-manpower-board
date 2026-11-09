@@ -8007,15 +8007,15 @@ function newYearAlertCount() {
 function missionStatusHtml(r) {
   if (r.status === "closed") {
     const t = `Closed${r.closedBy ? " by " + r.closedBy : ""}${r.closeNote ? ": " + r.closeNote : ""}`;
-    return `<span class="tag ml-closed" title="${escapeHtml(t)}">Closed ${escapeHtml(r.closedOn ? fmtDate(r.closedOn) : "")}</span>`;
+    return `<span class="ml-tag ml-closed" title="${escapeHtml(t)}">Closed ${escapeHtml(r.closedOn ? fmtDate(r.closedOn) : "")}</span>`;
   }
   const today = todayStr();
   if (MissionNumber.needsNewYearNumber(r.number, today)) {
     const year = today.slice(0, 4), days = MissionNumber.daysWaiting(today);
     const late = days > MissionNumber.ALERT_AFTER_DAYS;
-    return `<span class="tag ${late ? "ml-late" : "ml-wait"}" title="${late ? `Still on last year's number after ${days} days` : "The board keeps running on last year's number until the new one is entered"}">${late ? `No ${year} number · ${days} days` : `Waiting for ${year} number`}</span>`;
+    return `<span class="ml-tag ${late ? "ml-late" : "ml-wait"}" title="${late ? `Still on last year's number after ${days} days` : "The board keeps running on last year's number until the new one is entered"}">${late ? `No ${year} number · ${days} days` : `Waiting for ${year} number`}</span>`;
   }
-  return `<span class="tag ml-open">Open</span>`;
+  return `<span class="ml-tag ml-open">Open</span>`;
 }
 function missionRows() {
   const st = state.missions;
@@ -8099,22 +8099,24 @@ function renderMissionList() {
   }
   const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit");
   const body = $("#missions-body");
+  const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);   // an attribute the translator does not walk
   body.innerHTML = rows.map(r => {
     const prev = cloud.previousNumber(r.number);
     const acts = [];
     if (r.status === "open" && canAdd) acts.push(`<button type="button" class="btn btn-small" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
     if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
     if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small" data-act="reopen">Reopen</button>`);
+    // data-label: the phone shows each row as a card with these as its field names
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
-      <td><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
-      <td>${escapeHtml(boardNameOf(r.boardId))}</td>
-      <td><span class="tag ml-shift ml-${r.shift}">${r.shift === "night" ? "Night" : "Day"}</span></td>
-      <td>${escapeHtml(r.customer || "—")}</td>
-      <td>${escapeHtml(r.host || "—")}</td>
-      <td>${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
-      <td class="ml-date">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
-      <td class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
-      <td>${missionStatusHtml(r)}</td>
+      <td class="ml-first"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
+      <td data-label="${lbl("Board")}">${escapeHtml(boardNameOf(r.boardId))}</td>
+      <td data-label="${lbl("Shift")}"><span class="ml-tag ml-shift ml-${r.shift}">${r.shift === "night" ? "Night" : "Day"}</span></td>
+      <td data-label="${lbl("Customer")}">${escapeHtml(r.customer || "—")}</td>
+      <td data-label="${lbl("Host")}">${escapeHtml(r.host || "—")}</td>
+      <td data-label="${lbl("Trigo responsible")}">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
+      <td data-label="${lbl("Start date")}" class="ml-date">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
+      <td data-label="${lbl("Last on board")}" class="ml-date">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
+      <td data-label="${lbl("Status")}">${missionStatusHtml(r)}</td>
       <td class="ml-actions">${acts.join("")}</td></tr>`;
   }).join("");
   const empty = $("#missions-empty");
@@ -8235,7 +8237,7 @@ function openNewYearModal() {
       <td>${escapeHtml(boards)}</td>
       <td>${escapeHtml(first.customer || "—")}</td>
       <td>${escapeHtml(first.host || "—")}</td>
-      <td><span class="tag ${days > MissionNumber.ALERT_AFTER_DAYS ? "ml-late" : "ml-wait"}">${plural(days, "day", "days")}</span></td>
+      <td><span class="ml-tag ${days > MissionNumber.ALERT_AFTER_DAYS ? "ml-late" : "ml-wait"}">${plural(days, "day", "days")}</span></td>
       <td class="ny-cell"><input type="text" class="ny-input" id="ny-${i}" autocomplete="off" spellcheck="false" placeholder="${escapeHtml(first.number.replace(/\.\d{2}\./, "." + year.slice(2) + "."))}" aria-label="New number for ${escapeHtml(w.number)}">
         <button type="button" class="ov-linkbtn ny-close" title="This mission has ended: close it on its last day on the board">Close instead</button>
         <span class="ny-err" aria-live="polite"></span></td></tr>`;
