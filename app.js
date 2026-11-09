@@ -323,7 +323,15 @@ const OV_NEWCOMER_YEARS = 1;          // under this many years of service = a ne
 const HOST_EXPERIENCED_DAYS_DEFAULT = 5;
 const HOST_EXPERIENCED_DAYS_MIN = 1, HOST_EXPERIENCED_DAYS_MAX = 365;
 const HOSTLIST_VIEW_KEY = "manpower.hostView";
-const HOST_AT_RISK_MAX = 2;           // a host is at risk when at most this many ACTIVE people are experienced there
+/* A host is at risk when at most this many ACTIVE people are experienced there: 2 until somebody changes it in
+   Settings -> Host experience (shared by everyone, read through hostAtRiskMax()). 0 means only a host nobody
+   active is experienced at. */
+const HOST_AT_RISK_MAX_DEFAULT = 2;
+const HOST_AT_RISK_MAX_MIN = 0, HOST_AT_RISK_MAX_MAX = 99;
+function hostAtRiskMax() {
+  const n = (D().settings || {}).hostAtRiskMax;
+  return Number.isInteger(n) && n >= HOST_AT_RISK_MAX_MIN && n <= HOST_AT_RISK_MAX_MAX ? n : HOST_AT_RISK_MAX_DEFAULT;
+}
 /* the days at a host that make someone experienced there: the Settings value, else the default */
 function hostExperiencedDays() {
   const n = (D().settings || {}).hostExperiencedDays;
@@ -331,7 +339,7 @@ function hostExperiencedDays() {
 }
 /* The one "experienced" rule, shared by Overview's Host coverage and the Host tab's skills matrix.
    `days` is { employeeId: days worked at the host }. A person is experienced at hostExperiencedDays()
-   days or more; a host is at risk when HOST_AT_RISK_MAX or fewer of the experienced people are
+   days or more; a host is at risk when hostAtRiskMax() or fewer of the experienced people are
    active (on the roster on `date`: not deactivated or resigned yet). Someone whose record no longer
    exists is not counted. Returns { experienced: [ids], active: [ids], atRisk } */
 function hostExperience(days, date = todayStr()) {
@@ -343,7 +351,7 @@ function hostExperience(days, date = todayStr()) {
     experienced.push(id);
     if (cloud.rosterOn(e, date)) active.push(id);
   }
-  return { experienced, active, atRisk: active.length <= HOST_AT_RISK_MAX };
+  return { experienced, active, atRisk: active.length <= hostAtRiskMax() };
 }
 const OV_IDLE_SHOWN = 6;   // idle names shown per board in the attention card before "+N more"
 /* the utilization formula, said once behind an ⓘ (hover / focus) instead of
@@ -7432,7 +7440,7 @@ function renderOverview() {
      A host only one or two people have ever worked (deployment_history, up to
      the date on screen) is only at risk when those people are away — so each
      one is listed with where they are today, read from every board's plan. */
-  const hostSec = ovSection("Host coverage", `Today's hosts where ${HOST_AT_RISK_MAX} or fewer people on the roster are experienced (${hostExperiencedDays()}+ days there), and where those people are today.`);
+  const hostSec = ovSection("Host coverage", `Today's hosts where ${hostAtRiskMax()} or fewer people on the roster are experienced (${hostExperiencedDays()}+ days there), and where those people are today.`);
   {
     const cov = state.overview.hostCoverage || {};
     const empById = new Map(D().employees.map(e => [e.id, e]));
@@ -7449,7 +7457,7 @@ function renderOverview() {
       if (isNonWorkingDate(state.date, boardOf(e))) return { away: false, text: "day off" };
       return { away: false, text: e.contract === "oncall" ? "on-call, free today" : "free today" };
     };
-    // the shared rule (hostExperience): experienced = hostExperiencedDays()+ days there, at risk = 2 or fewer of them active
+    // the shared rule (hostExperience): experienced = hostExperiencedDays()+ days there, at risk = hostAtRiskMax() or fewer of them active
     const rated = todaysHosts.map(h => ({ host: h, ...hostExperience((cov[h] || {}).days, state.date) }));
     const thin = rated.filter(r => r.atRisk)
       .map(r => ({ ...r, people: r.experienced.map(id => ({ id, name: (empById.get(id) || {}).name || "Unknown", ...statusOf(id) })) }))
@@ -7479,11 +7487,11 @@ function renderOverview() {
       const ok = document.createElement("p");
       ok.className = "ov-avail ov-avail-ok";
       ok.textContent = !thin.length
-        ? `No host at risk today: every host on today's missions has more than ${HOST_AT_RISK_MAX} experienced people on the roster.`
+        ? `No host at risk today: every host on today's missions has more than ${hostAtRiskMax()} experienced people on the roster.`
         : covered.length
           ? (covered.length <= 4
             ? `${covered.map(c => `${c.host} (${c.active.length} experienced)`).join(", ").replace(/, ([^,]*)$/, " and $1")} ${covered.length === 1 ? "is" : "are"} well covered.`
-            : `The other ${covered.length} hosts have more than ${HOST_AT_RISK_MAX} experienced people.`)
+            : `The other ${covered.length} hosts have more than ${hostAtRiskMax()} experienced people.`)
           : "";
       if (ok.textContent) hostSec.appendChild(ok);
     }
@@ -8812,7 +8820,7 @@ function renderHostRows() {
 /* ---------- Host tab: List | Skills matrix ----------
    The matrix reads the same rows as the list (allHostRows, the same search and filters) and
    judges them by the one shared rule (hostExperience): a person is experienced at a host after
-   hostExperiencedDays() days there (Settings -> Host experience), and a host is at risk when HOST_AT_RISK_MAX or fewer ACTIVE
+   hostExperiencedDays() days there (Settings -> Host experience), and a host is at risk when hostAtRiskMax() or fewer ACTIVE
    people are experienced. Inactive and Resigned people stay in the lists, greyed, but do not
    count. Picking a person (the Person box, which is the Filter popover's Inspector filter) shows
    only the hosts they have worked, with their own days and last date. */
@@ -8877,7 +8885,7 @@ function renderHostView() {
   const cols = ["host", "people", "exp", "last", "risk"];
   const person = picked ? D().employees.find(e => e.id === picked) : null;
   const statusTag = (e) => { const st = e ? empStatus(e) : "inactive"; return st === "active" ? "" : ` <span class="mx-tag">${EMP_STATUS_LABEL[st]}</span>`; };
-  const today = todayStr(), needDays = hostExperiencedDays();
+  const today = todayStr(), needDays = hostExperiencedDays(), needRisk = hostAtRiskMax();
   let html = `<table class="mx-table"><thead><tr>${cols.map(k => `<th class="${k === "host" ? "" : "r"}"><button type="button" class="ov-sort" data-k="${k}" aria-sort="${(hl.mxSort || {}).key === k ? (sort.dir < 0 ? "descending" : "ascending") : "none"}">${MX_COLS[k]}</button></th>`).join("")}${person ? "<th class=\"r\">Their days</th><th class=\"r\">Their last day</th>" : ""}</tr></thead><tbody>`;
   if (!dir) html += `<tr><td colspan="${person ? 7 : 5}" class="ov-muted">…</td></tr>`;
   else if (!rows.length) html += `<tr><td colspan="${person ? 7 : 5}" class="ov-muted">No hosts match the current filters.</td></tr>`;
@@ -8889,7 +8897,7 @@ function renderHostView() {
       <td class="r">${r.inspectors.length} <span class="ov-muted">· ${totalDays} days</span></td>
       <td class="r"><b>${x.experienced.length}</b>${x.experienced.length !== x.active.length ? ` <span class="ov-muted">· ${x.active.length} active</span>` : ""}</td>
       <td class="r">${r.lastWorked ? escapeHtml(fmtDate(r.lastWorked)) : "—"}</td>
-      <td class="r">${x.atRisk ? `<span class="ov-flag ov-flag-bad" title="${HOST_AT_RISK_MAX} or fewer active people are experienced here (${needDays}+ days)">at risk</span>` : "—"}</td>
+      <td class="r">${x.atRisk ? `<span class="ov-flag ov-flag-bad" title="${needRisk} or fewer active people are experienced here (${needDays}+ days)">at risk</span>` : "—"}</td>
       ${person ? `<td class="r">${m.mine ? m.mine.days : 0}</td><td class="r">${m.mine && m.mine.last ? escapeHtml(fmtDate(m.mine.last)) : "—"}</td>` : ""}</tr>`;
     if (open) {
       html += `<tr class="mx-detail"><td colspan="${person ? 7 : 5}">${r.inspectors.length ? `<table class="mx-people"><thead><tr><th>Name</th><th class="r">Days</th><th>Last worked</th><th></th></tr></thead><tbody>${
@@ -10847,7 +10855,7 @@ const SETTINGS_SECTIONS = {
   engineers: { label: "Engineers",           group: "Board setup",    hint: "Who can run a mission, and the colour of their mission cards." },
   areas:     { label: "Service areas",       group: "Board setup",    hint: "Labels used across people, missions and hosts." },
   boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and working days." },
-  hostexp:   { label: "Host experience",     group: "Board setup",    hint: "How many days at a host make someone experienced there." },
+  hostexp:   { label: "Host experience",     group: "Board setup",    hint: "How many days make someone experienced at a host, and how few experienced people make a host at risk." },
   users:     { label: "Users",               group: "Administration", hint: "Accounts, access requests and status." },
   roles:     { label: "Roles & permissions", group: "Administration", hint: "Review what each role can see and change." },
 };
@@ -11143,7 +11151,7 @@ function svHomeMeta(tab) {
   if (tab === "engineers") return { count: engineerPaneRows().length, sub: n("person", "people", engineerPaneRows().length) };
   if (tab === "areas") return { count: D().areas.length, sub: n("area", "areas", D().areas.length) };
   if (tab === "boards") return { count: D().boards.length, sub: n("board", "boards", D().boards.length) };
-  if (tab === "hostexp") return { sub: `${hostExperiencedDays()}+ ${hostExperiencedDays() === 1 ? "day" : "days"} at a host` };
+  if (tab === "hostexp") return { sub: `${hostExperiencedDays()}+ ${hostExperiencedDays() === 1 ? "day" : "days"} at a host · at risk at ${hostAtRiskMax()} or fewer` };
   if (tab === "users") {
     const all = D().users || [];
     const waiting = all.filter(u => u.status === "pending").length;
@@ -11340,11 +11348,14 @@ function settingsSaveOps(section) {
     }
   }
 
-  if (section === "hostexp" && d.days) {
-    const days = parseExperiencedDays(d.days.after);
-    if (days === null) errors.push(`Days must be a whole number from ${HOST_EXPERIENCED_DAYS_MIN} to ${HOST_EXPERIENCED_DAYS_MAX}.`);
-    else if (!cloud.data.features.appSettings) errors.push("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
-    else ops.push({ keys: ["days"], label: "Days to count as experienced", run: () => cloud.saveHostExperiencedDays(days) });
+  if (section === "hostexp") {
+    for (const f of Object.values(HOSTEXP_FIELDS)) {
+      if (!d[f.draft]) continue;
+      const n = parseWholeNumber(d[f.draft].after, f.min(), f.max());
+      if (n === null) errors.push(`${f.errorName} must be a whole number from ${f.min()} to ${f.max()}.`);
+      else if (!cloud.data.features.appSettings) errors.push("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
+      else ops.push({ keys: [f.draft], label: f.label, run: () => f.save(n) });
+    }
   }
   return { ops, errors };
 }
@@ -16833,40 +16844,53 @@ function userLockReason(u) {
 }
 
 /* ---------- My account ---------- */
-/* ----- Settings -> Host experience: the days at a host that make someone experienced there ----- */
-/* what was typed -> a whole number in range, or null. The box is a draft (its text, not a number), so
-   "", "5.5", "-1" and "1e2" are all caught here rather than by the browser's number parsing. */
-function parseExperiencedDays(raw) {
+/* ----- Settings -> Host experience: the days at a host that make someone experienced there, and how few
+   active experienced people make a host at risk. Two numbers, each a draft (the box's own text, not a number),
+   each written by Save changes as its own op. ----- */
+const HOSTEXP_FIELDS = {
+  days: { input: "#hostexp-days", note: "#hostexp-note", draft: "days", min: () => HOST_EXPERIENCED_DAYS_MIN, max: () => HOST_EXPERIENCED_DAYS_MAX, saved: () => hostExperiencedDays(),
+    label: "Days to count as experienced", save: (n) => cloud.saveHostExperiencedDays(n), errorName: "Days",
+    ok: (n) => `Someone is tagged experienced at a host once they have worked ${n} or more ${n === 1 ? "day" : "days"} there.` },
+  risk: { input: "#hostexp-risk", note: "#hostexp-risk-note", draft: "risk", min: () => HOST_AT_RISK_MAX_MIN, max: () => HOST_AT_RISK_MAX_MAX, saved: () => hostAtRiskMax(),
+    label: "People for a host to be at risk", save: (n) => cloud.saveHostAtRiskMax(n), errorName: "The number of people",
+    ok: (n) => n === 0
+      ? "A host is at risk only when nobody active is experienced there."
+      : `A host is at risk when ${n} or fewer active people are experienced there.` },
+};
+/* what was typed -> a whole number in range, or null. "", "5.5", "-1" and "1e2" are all caught here
+   rather than by the browser's number parsing. */
+function parseWholeNumber(raw, min, max) {
   const t = String(raw == null ? "" : raw).trim();
   if (!/^\d{1,3}$/.test(t)) return null;
   const n = Number(t);
-  return n >= HOST_EXPERIENCED_DAYS_MIN && n <= HOST_EXPERIENCED_DAYS_MAX ? n : null;
+  return n >= min && n <= max ? n : null;
 }
 function renderHostExpPane() {
-  const input = $("#hostexp-days");
-  if (!input) return;
-  const saved = String(hostExperiencedDays());
-  const shown = sdVal("hostexp", "days", saved);
-  // what the user has typed wins over what is saved, so a live update cannot overwrite a half-typed value
-  if (input.value !== String(shown)) input.value = shown;
+  if (!$("#hostexp-days")) return;
   const ready = !!cloud.data.features.appSettings;
-  input.disabled = !ready;
   $("#hostexp-migrate").classList.toggle("hidden", ready);
-  const n = parseExperiencedDays(shown);
-  input.setAttribute("aria-invalid", n === null ? "true" : "false");
-  $("#hostexp-note").textContent = n === null
-    ? `Enter a whole number from ${HOST_EXPERIENCED_DAYS_MIN} to ${HOST_EXPERIENCED_DAYS_MAX}.`
-    : `Someone is tagged experienced at a host once they have worked ${n} or more ${n === 1 ? "day" : "days"} there.`;
+  for (const f of Object.values(HOSTEXP_FIELDS)) {
+    const input = $(f.input);
+    const shown = sdVal("hostexp", f.draft, String(f.saved()));
+    // what the user has typed wins over what is saved, so a live update cannot overwrite a half-typed value
+    if (input.value !== String(shown)) input.value = shown;
+    input.disabled = !ready;
+    const n = parseWholeNumber(shown, f.min(), f.max());
+    input.setAttribute("aria-invalid", n === null ? "true" : "false");
+    $(f.note).textContent = n === null ? `Enter a whole number from ${f.min()} to ${f.max()}.` : f.ok(n);
+  }
 }
 function wireHostExpPane() {
-  const input = $("#hostexp-days");
-  if (!input) return;
-  input.oninput = () => {
-    sdSet("hostexp", "days", input.value, "Days to count as experienced", () => String(hostExperiencedDays()));
-    renderHostExpPane();
-  };
-  // Enter saves, like the profile fields
-  input.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); saveSettingsSection(); } };
+  for (const f of Object.values(HOSTEXP_FIELDS)) {
+    const input = $(f.input);
+    if (!input) return;
+    input.oninput = () => {
+      sdSet("hostexp", f.draft, input.value, f.label, () => String(f.saved()));
+      renderHostExpPane();
+    };
+    // Enter saves, like the profile fields
+    input.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); saveSettingsSection(); } };
+  }
 }
 
 function renderAccountPane() {

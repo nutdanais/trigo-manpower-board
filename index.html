@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-09d">
+<link rel="stylesheet" href="styles.css?v=2026-11-09e">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-09d"></script>
+<script src="version.js?v=2026-11-09e"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -387,7 +387,7 @@
         </div>
       </div>
 
-      <!-- Host experience: the one number behind "experienced" and "at risk" on the Host tab, Overview and the report.
+      <!-- Host experience: the two numbers behind "experienced" and "at risk" on the Host tab, Overview and the report.
            Shared by everyone (app_settings), so it is a draft like every other field here and is written by Save changes. -->
       <div class="settings-pane" data-pane="hostexp">
         <div class="sv-wrap">
@@ -398,11 +398,16 @@
                 <div><input id="hostexp-days" type="number" inputmode="numeric" min="1" max="365" step="1" autocomplete="off" aria-describedby="hostexp-note"><span class="sv-unit">days</span></div>
                 <p class="import-note" id="hostexp-note"></p>
               </div>
+              <div class="sv-field">
+                <label class="sv-field-label" for="hostexp-risk">A host is at risk when this many or fewer active people are experienced there</label>
+                <div><input id="hostexp-risk" type="number" inputmode="numeric" min="0" max="99" step="1" autocomplete="off" aria-describedby="hostexp-risk-note"><span class="sv-unit">people</span></div>
+                <p class="import-note" id="hostexp-risk-note"></p>
+              </div>
             </div>
           </section>
-          <p class="import-note">One value for everyone. It decides who is tagged experienced in the Host tab's Skills matrix and in a person's host list, and which hosts are at risk in Overview's Host coverage and the report's Skills risks.</p>
-          <p class="import-note">Days are counted from the Host Record, all time: one day for each date someone was on a mission at that host.</p>
-          <p id="hostexp-migrate" class="import-note settings-error hidden">The database needs a one-time update before this can be changed: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor. Until then the default of 5 days is used.</p>
+          <p class="import-note">Both are one value for everyone. The days decide who is tagged experienced in the Host tab's Skills matrix and in a person's host list; the number of people decides which hosts are at risk in the Skills matrix, Overview's Host coverage and the report's Skills risks.</p>
+          <p class="import-note">Days are counted from the Host Record, all time: one day for each date someone was on a mission at that host. Only active people count towards a host being covered: someone who resigned or is inactive is still shown as experienced, but does not keep the host safe.</p>
+          <p id="hostexp-migrate" class="import-note settings-error hidden">The database needs a one-time update before these can be changed: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor. Until then the defaults are used: 5 days and 2 people.</p>
         </div>
       </div>
 
@@ -1653,21 +1658,21 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-09d"></script>
-<script src="i18n-th.js?v=2026-11-09d"></script>
-<script src="planning.js?v=2026-11-09d"></script>
-<script src="employee-id.js?v=2026-11-09d"></script>
-<script src="mission-number.js?v=2026-11-09d"></script>
+<script src="i18n.js?v=2026-11-09e"></script>
+<script src="i18n-th.js?v=2026-11-09e"></script>
+<script src="planning.js?v=2026-11-09e"></script>
+<script src="employee-id.js?v=2026-11-09e"></script>
+<script src="mission-number.js?v=2026-11-09e"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-09d"></script>
-<script src="cloud.js?v=2026-11-09d"></script>
-<script src="charts.js?v=2026-11-09d"></script>
-<script src="xlsx-export.js?v=2026-11-09d"></script>
-<script src="orgchart-pptx.js?v=2026-11-09d"></script>
-<script src="bulk-edit.js?v=2026-11-09d"></script>
-<script src="app.js?v=2026-11-09d"></script>
-<script src="report.js?v=2026-11-09d"></script>
-<script src="present.js?v=2026-11-09d"></script>
+<script src="demo/demo-gate.js?v=2026-11-09e"></script>
+<script src="cloud.js?v=2026-11-09e"></script>
+<script src="charts.js?v=2026-11-09e"></script>
+<script src="xlsx-export.js?v=2026-11-09e"></script>
+<script src="orgchart-pptx.js?v=2026-11-09e"></script>
+<script src="bulk-edit.js?v=2026-11-09e"></script>
+<script src="app.js?v=2026-11-09e"></script>
+<script src="report.js?v=2026-11-09e"></script>
+<script src="present.js?v=2026-11-09e"></script>
 </body>
 </html>

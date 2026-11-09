@@ -62,6 +62,13 @@ async function fetchAllPages(buildQuery) {
   }
 }
 
+/* the settings app_settings holds (migration-2026-11-09b): the key, where it lands in data.settings, and the
+   whole numbers it may take (the database's check constraint says the same) */
+const APP_SETTINGS = {
+  host_experienced_days: { prop: "hostExperiencedDays", min: 1, max: 365, label: "Days" },
+  host_at_risk_max:      { prop: "hostAtRiskMax",       min: 0, max: 99,  label: "The number of people" },
+};
+
 const cloud = {
   data: { areas: [], engineers: [], employees: [], boards: [], plans: {}, overrides: [], locks: [], hosts: [],
           /* who is signed in, what the roles are, and the role x area matrix.
@@ -84,7 +91,7 @@ const cloud = {
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
           features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, missions: false, appSettings: false },
-          /* shared settings (migration-2026-11-09b, table app_settings): { hostExperiencedDays }.
+          /* shared settings (migration-2026-11-09b, table app_settings): { hostExperiencedDays, hostAtRiskMax }.
              A setting nobody has changed is absent here, and app.js uses its own default. */
           settings: {},
           /* the Mission register (migration-2026-11-09): one row per board + number + shift
@@ -2656,20 +2663,26 @@ const cloud = {
     if (error) throw error;
     const out = {};
     for (const r of data || []) {
-      if (r.key === "host_experienced_days" && Number.isInteger(r.value) && r.value >= 1 && r.value <= 365) out.hostExperiencedDays = r.value;
+      const rule = APP_SETTINGS[r.key];
+      if (rule && Number.isInteger(r.value) && r.value >= rule.min && r.value <= rule.max) out[rule.prop] = r.value;
     }
     this.data.settings = out;
   },
-  /* days at a host that make someone experienced there, for everyone. Needs Edit on Settings. */
-  async saveHostExperiencedDays(days) {
+  /* one known setting, for everyone. Needs Edit on Settings. */
+  async _saveSetting(key, value) {
+    const rule = APP_SETTINGS[key];
     if (!this.data.features.appSettings) throw new Error("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
-    if (!Number.isInteger(days) || days < 1 || days > 365) throw new Error("Days must be a whole number from 1 to 365.");
+    if (!Number.isInteger(value) || value < rule.min || value > rule.max) throw new Error(`${rule.label} must be a whole number from ${rule.min} to ${rule.max}.`);
     const { error } = await sb.from("app_settings").upsert(
-      { key: "host_experienced_days", value: days, updated_at: new Date().toISOString(), updated_by: await this._currentEmail() },
+      { key, value, updated_at: new Date().toISOString(), updated_by: await this._currentEmail() },
       { onConflict: "key" });
     if (error) throw error;
     await this._loadSettings();
   },
+  /* days at a host that make someone experienced there */
+  saveHostExperiencedDays(days) { return this._saveSetting("host_experienced_days", days); },
+  /* a host is at risk when this many or fewer ACTIVE people are experienced there */
+  saveHostAtRiskMax(n) { return this._saveSetting("host_at_risk_max", n); },
   async loadMissionRegister() {
     if (!this.data.features.missions) { this.data.register = []; this.data.numberHistory = []; return; }
     const [reg, hist] = await Promise.all([

@@ -102,12 +102,14 @@ class FakeDb {
   }
 
   /* app_settings' row level security and check constraint (migration-2026-11-09b): changing a
-     setting needs Edit on Settings, and host_experienced_days is a whole number from 1 to 365 */
+     setting needs Edit on Settings, host_experienced_days is a whole number from 1 to 365 and
+     host_at_risk_max one from 0 to 99 */
   _appSettingsGuard(q, user) {
     if (q.op === "select") return null;
     if (!this._can(user, "settings", "edit")) return { code: "42501", message: 'new row violates row-level security policy for table "app_settings"' };
     for (const v of [].concat(q.values || [])) {
-      if (v && v.key === "host_experienced_days" && !(Number.isInteger(v.value) && v.value >= 1 && v.value <= 365)) {
+      const range = v && { host_experienced_days: [1, 365], host_at_risk_max: [0, 99] }[v.key];
+      if (range && !(Number.isInteger(v.value) && v.value >= range[0] && v.value <= range[1])) {
         return { code: "23514", message: 'new row for relation "app_settings" violates check constraint "app_settings_value_ok"' };
       }
     }

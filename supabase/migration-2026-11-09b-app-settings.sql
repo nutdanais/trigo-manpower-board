@@ -1,16 +1,22 @@
 -- Migration 2026-11-09b: app_settings — shared settings, starting with "days to count as experienced"
 -- Run once in the Supabase SQL Editor (safe to re-run), then redeploy the app. Until it has run the
--- app works exactly as before: everyone is "experienced" at a host after 5 days, and Settings ->
--- Host experience shows the 5 with a note that the value can't be changed yet.
+-- app works exactly as before: everyone is "experienced" at a host after 5 days, a host is at risk
+-- when 2 or fewer active people are experienced there, and Settings -> Host experience shows those
+-- two numbers with a note that they can't be changed yet.
 --
--- Why: how many days at a host make someone "experienced" was fixed in the code at 5. It drives
--- the Host tab's Skills matrix, the Overview's Host coverage, a person's host list and the Skills
--- risks section of the report, so it has to be one value for everybody — not a per-browser choice.
+-- Why: how many days at a host make someone "experienced" (5) and how few active experienced people
+-- make a host "at risk" (2 or fewer) were fixed in the code. They drive the Host tab's Skills matrix,
+-- the Overview's Host coverage, a person's host list and the Skills risks section of the report, so
+-- each has to be one value for everybody — not a per-browser choice.
 --
 --   * app_settings — one row per setting: key, a JSON value, who changed it and when. A setting
 --     with no row uses the app's own default, so nothing needs seeding.
---   * 'host_experienced_days' — a whole number of days, 1 to 365 (the default is 5). The database
---     refuses anything else.
+--   * 'host_experienced_days' — a whole number of days, 1 to 365 (the default is 5).
+--   * 'host_at_risk_max' — a host is at risk when this many or fewer ACTIVE people are experienced
+--     there: a whole number, 0 to 99 (the default is 2). 0 means only a host nobody active is
+--     experienced at.
+--     The database refuses anything else for either. A re-run on a table that has only the first
+--     of these brings its check up to date.
 --   * Everyone who is active can read; changing needs Edit on Settings (the same grant as
 --     Settings -> Engineers / Service areas / Boards).
 --   * Realtime is on, so a change reaches every open browser without a refresh.
@@ -19,12 +25,22 @@ create table if not exists app_settings (
   key        text primary key,
   value      jsonb not null,
   updated_at timestamptz not null default now(),
-  updated_by text,
-  constraint app_settings_value_ok check (
-    key <> 'host_experienced_days'
-    or (jsonb_typeof(value) = 'number'
-        and case when (value #>> '{}') ~ '^[0-9]{1,3}$' then (value #>> '{}')::int between 1 and 365 else false end)
-  )
+  updated_by text
+);
+
+-- What each known setting may hold. Dropped and added again so a re-run also brings an older copy of
+-- this table (one that only knew host_experienced_days) up to date; other keys are free.
+alter table app_settings drop constraint if exists app_settings_value_ok;
+alter table app_settings add constraint app_settings_value_ok check (
+  case key
+    when 'host_experienced_days' then
+      jsonb_typeof(value) = 'number'
+      and case when (value #>> '{}') ~ '^[0-9]{1,3}$' then (value #>> '{}')::int between 1 and 365 else false end
+    when 'host_at_risk_max' then
+      jsonb_typeof(value) = 'number'
+      and case when (value #>> '{}') ~ '^[0-9]{1,2}$' then (value #>> '{}')::int between 0 and 99 else false end
+    else true
+  end
 );
 
 alter table app_settings enable row level security;

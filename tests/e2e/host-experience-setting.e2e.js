@@ -1,10 +1,10 @@
 /* Acceptance run for Settings -> Host experience: the number of days at a host that make someone
-   "experienced" (migration-2026-11-09b, app_settings), driving the real app in Chromium against the
-   shared fake backend.
+   "experienced" and the number of active experienced people at or under which a host is "at risk"
+   (migration-2026-11-09b, app_settings), driving the real app in Chromium against the shared fake backend.
      NODE_PATH=$(npm root -g) node tests/e2e/host-experience-setting.e2e.js
    Checked: 5 days until somebody changes it; the section is in Settings for a role that may edit
    Settings and absent for one that may not; the box is a draft written by Save changes (and Enter);
-   whole numbers 1-365 only; the new value drives the Host tab's Skills matrix, Overview's Host
+   whole numbers only (days 1-365, people 0-99); both are saved together from one bar; the new values drive the Host tab's Skills matrix, Overview's Host
    coverage and a person's host list; a second signed-in person sees the change live; the database
    refuses a write from a role without Edit on Settings; on a database that has not run the
    migration the app keeps 5 and says why the box is locked; Thai reads in Thai. */
@@ -50,6 +50,8 @@ async function step(name, fn) {
       return page.evaluate(() => Object.fromEntries([...document.querySelectorAll(".mx-row")].map((tr) => [tr.dataset.host, { risk: tr.classList.contains("is-risk"), exp: tr.cells[2].textContent.replace(/\s+/g, " ").trim() }])));
     };
     const type = async (v) => { await p.fill("#hostexp-days", v); };
+    const typeRisk = async (v) => { await p.fill("#hostexp-risk", v); };
+    const settingRows = () => Object.fromEntries(db.t("app_settings").map((r) => [r.key, r.value]));
     const save = async () => { await p.click("#btn-sv-save"); };
 
     await step("until somebody changes it, 5 days make someone experienced", async () => {
@@ -151,6 +153,84 @@ async function step(name, fn) {
       assert.equal(m["Host Beta"].exp, "2");
     });
 
+    await step("the at-risk number is 2 until changed: with 3 days, Alpha (3 experienced) is covered and Beta (2) is at risk", async () => {
+      assert.equal(await p.evaluate(() => hostAtRiskMax()), 2);
+      const m = await matrix(p);
+      assert.equal(m["Host Alpha"].risk, false);
+      assert.equal(m["Host Beta"].risk, true);
+      await openSettings();
+      await tab("hostexp");
+      assert.equal(await p.inputValue("#hostexp-risk"), "2");
+      assert.match(await p.locator("#hostexp-risk-note").innerText(), /at risk when 2 or fewer active people are experienced there/);
+    });
+
+    await step("raising it to 3 saves a second row, and Alpha becomes at risk; the tooltip and the Overview heading say 3", async () => {
+      await typeRisk("3");
+      assert.match(await p.locator("#sv-status").innerText(), /Unsaved changes \(1\)/);
+      assert.equal(settingRows().host_at_risk_max, undefined, "a draft until saved");
+      await save();
+      await p.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
+      assert.deepEqual(settingRows(), { host_experienced_days: 3, host_at_risk_max: 3 });
+      assert.equal(db.t("app_settings").find((r) => r.key === "host_at_risk_max").updated_by, "eng.a@example.com");
+      assert.equal(await p.evaluate(() => hostAtRiskMax()), 3);
+      await backToBoard();
+      const m = await matrix(p);
+      assert.equal(m["Host Alpha"].risk, true, "3 experienced is now 3 or fewer");
+      assert.match(await p.locator('.mx-row[data-host="Host Alpha"] .ov-flag-bad').getAttribute("title"), /^3 or fewer active people are experienced here \(3\+ days\)/);
+      const wording = await p.evaluate(async ([day]) => { state.date = day; D().activeBoardId = OVERVIEW_ID; state.overview.hostCoverageCacheKey = null; await refreshAndRender(); return document.querySelector("#ov-body, main, body").innerText; }, [src]);
+      assert.match(wording, /where 3 or fewer people on the roster are experienced/);
+    });
+
+    await step("a second signed-in person sees the new at-risk number live", async () => {
+      await pb.waitForFunction(() => hostAtRiskMax() === 3);
+      const risky = await pb.evaluate(() => Object.fromEntries([...document.querySelectorAll(".mx-row")].map((tr) => [tr.dataset.host, tr.classList.contains("is-risk")])));
+      assert.equal(risky["Host Alpha"], true);
+    });
+
+    await step("the report's Skills risks names the number it used", async () => {
+      const title = await p.evaluate(async () => { const m = await OvReport.buildModel(OvReport.defaults()); return OvReport.tables(m).find((x) => x.key === "skills").blocks[0].title; });
+      assert.equal(title, "Hosts where 3 or fewer active people are experienced");
+    });
+
+    await step("0 is allowed (at risk only when nobody active is experienced); 100, -1, 1.5 and an empty box are not", async () => {
+      await openSettings();
+      await tab("hostexp");
+      await typeRisk("0");
+      assert.equal(await p.getAttribute("#hostexp-risk", "aria-invalid"), "false");
+      assert.match(await p.locator("#hostexp-risk-note").innerText(), /only when nobody active is experienced there/);
+      for (const bad of ["100", "-1", "1.5", ""]) {
+        await typeRisk(bad);
+        assert.equal(await p.getAttribute("#hostexp-risk", "aria-invalid"), "true", `"${bad}" is flagged as you type`);
+        assert.match(await p.locator("#hostexp-risk-note").innerText(), /Enter a whole number from 0 to 99/);
+        await save();
+        await p.waitForFunction(() => /The number of people must be a whole number from 0 to 99/.test(document.querySelector("#sv-status").textContent));
+        assert.equal(settingRows().host_at_risk_max, 3, `"${bad}" was not written`);
+      }
+      await typeRisk("0");
+      await save();
+      await p.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
+      assert.equal(settingRows().host_at_risk_max, 0);
+      await backToBoard();
+      const m = await matrix(p);
+      assert.equal(m["Host Alpha"].risk, false);
+      assert.equal(m["Host Beta"].risk, false, "two active experienced people are more than 0");
+    });
+
+    await step("both numbers are staged together and saved from one bar: 5 days and 1 person", async () => {
+      await openSettings();
+      await tab("hostexp");
+      await type("5");
+      await typeRisk("1");
+      assert.match(await p.locator("#sv-status").innerText(), /Unsaved changes \(2\)/);
+      await p.press("#hostexp-risk", "Enter");
+      await p.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
+      assert.deepEqual(settingRows(), { host_experienced_days: 5, host_at_risk_max: 1 });
+      await backToBoard();
+      const m = await matrix(p);
+      assert.equal(m["Host Beta"].risk, true, "one experienced at 5 days is 1 or fewer");
+      assert.equal(m["Host Alpha"].risk, false);
+    });
+
     await step("someone who may not edit Settings has no such section, and the database refuses them too", async () => {
       const v = await env.openAs(db, h.USERS.v);
       await v.page.click("#btn-avatar");
@@ -159,15 +239,23 @@ async function step(name, fn) {
       assert.equal(await v.page.locator('#settings-tabs [data-tab=hostexp]').isVisible(), false);
       const refused = await v.page.evaluate(async () => { try { await cloud.saveHostExperiencedDays(9); return "saved"; } catch (e) { return e.message; } });
       assert.match(refused, /row-level security/);
-      assert.equal(db.t("app_settings")[0].value, 3, "unchanged");
+      const refusedRisk = await v.page.evaluate(async () => { try { await cloud.saveHostAtRiskMax(5); return "saved"; } catch (e) { return e.message; } });
+      assert.match(refusedRisk, /row-level security/);
+      assert.deepEqual(settingRows(), { host_experienced_days: 5, host_at_risk_max: 1 }, "unchanged");
     });
 
-    await step("a value outside 1-365 is refused by the database even if the app were bypassed", async () => {
+    await step("a value outside its range is refused by the database even if the app were bypassed", async () => {
       const res = await db.exec({ op: "upsert", table: "app_settings", values: { key: "host_experienced_days", value: 0 }, onConflict: "key" }, h.USERS.a);
       assert.equal(res.error && res.error.code, "23514");
       const res2 = await db.exec({ op: "upsert", table: "app_settings", values: { key: "host_experienced_days", value: 2.5 }, onConflict: "key" }, h.USERS.a);
       assert.equal(res2.error && res2.error.code, "23514");
-      assert.equal(db.t("app_settings")[0].value, 3);
+      for (const bad of [100, -1, 2.5]) {
+        const r = await db.exec({ op: "upsert", table: "app_settings", values: { key: "host_at_risk_max", value: bad }, onConflict: "key" }, h.USERS.a);
+        assert.equal(r.error && r.error.code, "23514", `${bad} is refused for host_at_risk_max`);
+      }
+      assert.equal((await db.exec({ op: "upsert", table: "app_settings", values: { key: "host_at_risk_max", value: 0 }, onConflict: "key" }, h.USERS.a)).error, null, "0 is allowed");
+      await db.exec({ op: "upsert", table: "app_settings", values: { key: "host_at_risk_max", value: 1 }, onConflict: "key" }, h.USERS.a);
+      assert.deepEqual(settingRows(), { host_experienced_days: 5, host_at_risk_max: 1 });
     });
 
     await step("on Thai the section reads in Thai", async () => {

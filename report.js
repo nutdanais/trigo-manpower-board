@@ -120,7 +120,7 @@ const OvReport = (() => {
     }
     if (sel.skills) {
       await ensureHostDirectoryLoaded();
-      model.sections.skills = { rows: hostRiskRows(!!p.names) };
+      model.sections.skills = { rows: hostRiskRows(!!p.names), max: hostAtRiskMax() };   // the threshold is a Settings value, so the report words itself from it
     }
     return model;
   }
@@ -177,7 +177,7 @@ const OvReport = (() => {
       if (B.loans.length) blocks.push({ title: "Loans in the range", columns: [{ label: "From", width: 22 }, { label: "To", width: 22 }, { label: "Person-days", width: 13, center: true }, { label: "People", width: 10, center: true }], rows: B.loans.map(r => [r.from, r.to, r.days, r.people]) });
       out.push({ key: "boards", name: "Boards & areas", blocks });
     }
-    if (S.skills) out.push({ key: "skills", name: "Skills risks", blocks: [{ title: "Hosts where two or fewer active people are experienced", columns: [{ label: "Host", width: 30 }, { label: "Experienced", width: 13, center: true }, { label: "Active experienced", width: 17, center: true }, { label: "Who (active)", width: 44 }],
+    if (S.skills) out.push({ key: "skills", name: "Skills risks", blocks: [{ title: `Hosts where ${S.skills.max} or fewer active people are experienced`, columns: [{ label: "Host", width: 30 }, { label: "Experienced", width: 13, center: true }, { label: "Active experienced", width: 17, center: true }, { label: "Who (active)", width: 44 }],
       rows: S.skills.rows.map(r => [r.host, r.experienced, r.active, r.who || ""]) }] });
     return out;
   }
@@ -233,7 +233,7 @@ const OvReport = (() => {
     }
     if (S.skills) {
       const t = tables(m).find(x => x.key === "skills").blocks[0];
-      sec("Skills risks", S.skills.rows.length ? table(t.columns, t.rows) : `<p class="rp-sub">No host has two or fewer active experienced people.</p>`);
+      sec("Skills risks", S.skills.rows.length ? table(t.columns, t.rows) : `<p class="rp-sub">No host has ${S.skills.max} or fewer active experienced people.</p>`);
     }
     el.innerHTML = parts.join("");
     return el;

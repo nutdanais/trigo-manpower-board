@@ -1927,18 +1927,28 @@ select v.name, v.phone, v.color from (values
 where not exists (select 1 from engineers);
 
 -- ===== Shared settings (migration-2026-11-09b-app-settings.sql) =====
--- One row per setting; a setting with no row uses the app's own default. Today: host_experienced_days.
+-- One row per setting; a setting with no row uses the app's own default. Today: host_experienced_days and host_at_risk_max.
 
 create table if not exists app_settings (
   key        text primary key,
   value      jsonb not null,
   updated_at timestamptz not null default now(),
-  updated_by text,
-  constraint app_settings_value_ok check (
-    key <> 'host_experienced_days'
-    or (jsonb_typeof(value) = 'number'
-        and case when (value #>> '{}') ~ '^[0-9]{1,3}$' then (value #>> '{}')::int between 1 and 365 else false end)
-  )
+  updated_by text
+);
+
+-- What each known setting may hold. Dropped and added again so a re-run also brings an older copy of
+-- this table (one that only knew host_experienced_days) up to date; other keys are free.
+alter table app_settings drop constraint if exists app_settings_value_ok;
+alter table app_settings add constraint app_settings_value_ok check (
+  case key
+    when 'host_experienced_days' then
+      jsonb_typeof(value) = 'number'
+      and case when (value #>> '{}') ~ '^[0-9]{1,3}$' then (value #>> '{}')::int between 1 and 365 else false end
+    when 'host_at_risk_max' then
+      jsonb_typeof(value) = 'number'
+      and case when (value #>> '{}') ~ '^[0-9]{1,2}$' then (value #>> '{}')::int between 0 and 99 else false end
+    else true
+  end
 );
 
 alter table app_settings enable row level security;

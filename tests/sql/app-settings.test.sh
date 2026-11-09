@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# migration-2026-11-09b (app_settings: the shared "days at a host that make someone experienced")
+# migration-2026-11-09b (app_settings: the shared "days at a host that make someone experienced" and
+# "a host is at risk at this many or fewer active experienced people")
 # against a throwaway database built from schema.sql. Checks: a new database gets the table from
 # schema.sql; on an older database the migration creates it and a re-run changes nothing (a saved
-# value stays); host_experienced_days accepts whole numbers 1-365 and nothing else; who may read
+# value stays, and a table that only has the first version of the check is brought up to date);
+# host_experienced_days accepts whole numbers 1-365 and nothing else, host_at_risk_max whole
+# numbers 0-99 and nothing else; who may read
 # (any active account) and who may change it (Edit on Settings); the table is in the Realtime
 # publication. Needs a local Postgres (PGHOST/PGPORT/PGUSER as for the other tests/sql scripts).
 # Fixtures are fake.
@@ -80,8 +83,32 @@ for v in 0 366 -3 2.5 '"7"' null '[5]' 5.0; do
   check_refused "$out" "$v is refused"
 done
 eq "select value from app_settings where key = 'host_experienced_days'" 365 "a refused value leaves the saved one alone"
+for v in 0 1 2 99; do
+  q "insert into app_settings (key, value) values ('host_at_risk_max', '$v') on conflict (key) do update set value = excluded.value" >/dev/null
+  eq "select value from app_settings where key = 'host_at_risk_max'" $v "host_at_risk_max accepts $v"
+done
+for v in -1 100 2.5 '"3"' null '[2]' 2.0 1000; do
+  out="$($P -d $DB -c "insert into app_settings (key, value) values ('host_at_risk_max', '$v') on conflict (key) do update set value = excluded.value" 2>&1 || true)"
+  check_refused "$out" "host_at_risk_max refuses $v"
+done
+eq "select value from app_settings where key = 'host_at_risk_max'" 99 "a refused value leaves the saved one alone (at risk)"
 q "insert into app_settings (key, value) values ('some_other_setting', '\"free\"')" >/dev/null
-ok "the check applies to host_experienced_days only, so later settings can hold other values"
+ok "the check applies to the two known settings only, so later settings can hold other values"
+
+# ---------- a table made by the first version of this migration (only host_experienced_days checked) ----------
+q "alter table app_settings drop constraint app_settings_value_ok;
+   alter table app_settings add constraint app_settings_value_ok check (
+     key <> 'host_experienced_days' or (jsonb_typeof(value) = 'number'
+       and case when (value #>> '{}') ~ '^[0-9]{1,3}\$' then (value #>> '{}')::int between 1 and 365 else false end));
+   update app_settings set value = '500' where key = 'host_at_risk_max';" >/dev/null
+eq "select value from app_settings where key = 'host_at_risk_max'" 500 "the first version let any host_at_risk_max in"
+$P -d $DB -c "alter table app_settings drop constraint app_settings_value_ok" >/dev/null
+q "update app_settings set value = '2' where key = 'host_at_risk_max'" >/dev/null
+$P -d $DB -f $MIG >/dev/null
+eq "select value from app_settings where key = 'host_at_risk_max'" 2 "re-running on it keeps the saved values"
+out="$($P -d $DB -c "update app_settings set value = '500' where key = 'host_at_risk_max'" 2>&1 || true)"
+check_refused "$out" "and the check now covers host_at_risk_max"
+q "update app_settings set value = '12' where key = 'host_experienced_days'" >/dev/null
 
 # ---------- re-running ----------
 q "update app_settings set value = '12' where key = 'host_experienced_days'" >/dev/null

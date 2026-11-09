@@ -144,7 +144,7 @@ async function step(name, fn) {
       await ctx.close();
     });
 
-    await step("Settings → Host experience works in the demo: lowering the days makes more people experienced, and a reload starts again at 5", async () => {
+    await step("Settings → Host experience works in the demo: lowering the days makes more people experienced, raising the at-risk number flags more hosts, and a reload starts again at 5 and 2", async () => {
       const { ctx, page, errors } = await open("?demo");
       await board(page);
       await page.waitForFunction(() => typeof hostExperiencedDays === "function" && D().features && D().features.appSettings);
@@ -152,24 +152,32 @@ async function step(name, fn) {
       await page.evaluate(async () => { D().activeBoardId = HOSTLIST_ID; state.hostlist.view = "matrix"; await refreshAndRender(); });
       await page.waitForSelector("#hostlist-matrix-wrap:not(.hidden) .mx-row");
       const experienced = () => page.evaluate(() => hostMatrixRows().reduce((n, m) => n + m.x.experienced.length, 0));
-      const before = await experienced();
+      const atRisk = () => page.evaluate(() => hostMatrixRows().filter((m) => m.x.atRisk).length);
+      const before = await experienced(), atRiskBefore = await atRisk();
       await page.click("#btn-avatar");
       await page.click("#btn-settings");
       await page.waitForSelector("#settings-view:not(.hidden)");
       await page.click("#settings-tabs [data-tab=hostexp]");
       await page.fill("#hostexp-days", "2");
+      assert.equal(await page.inputValue("#hostexp-risk"), "2", "at risk at 2 or fewer until changed");
+      await page.fill("#hostexp-risk", "0");
       await page.click("#btn-sv-save");
       await page.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
       assert.equal(await page.evaluate(() => hostExperiencedDays()), 2);
+      assert.equal(await page.evaluate(() => hostAtRiskMax()), 0);
       await page.click("#btn-settings-back");
       await page.evaluate(() => refreshAndRender());
       assert.ok((await experienced()) > before, "with 2 days, more people count as experienced than with 5");
+      assert.ok((await atRisk()) <= atRiskBefore, "at 0 people, no more hosts are at risk than at 2");
+      await page.evaluate(async () => { await cloud.saveHostAtRiskMax(99); await refreshAndRender(); });
+      assert.equal(await atRisk(), await page.evaluate(() => hostMatrixRows().length), "at 99 people every host is at risk");
       assert.deepEqual(errors, [], "page errors");
       await ctx.close();
       const again = await open("?demo");
       await board(again.page);
       await again.page.waitForFunction(() => typeof hostExperiencedDays === "function");
       assert.equal(await again.page.evaluate(() => hostExperiencedDays()), 5, "a reload starts from the seed");
+      assert.equal(await again.page.evaluate(() => hostAtRiskMax()), 2, "and at 2 people");
       await again.ctx.close();
       const v = await open("?demo&role=viewer");
       await board(v.page);
