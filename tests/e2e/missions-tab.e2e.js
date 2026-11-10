@@ -978,29 +978,54 @@ async function step(name, fn) {
       await sp.evaluate(() => cloud.loadMissionRegister().then(render));
     });
 
-    await step("the tiles count the missions running this year: one that ended last year is left out, and stays in the list", async () => {
+    await step("the tiles, the switch and the list show this year's missions; one that ended last year is behind the \"from earlier years\" chip", async () => {
       await goMissions(p);
       await p.selectOption("#missions-status", "all");
       const tiles = () => p.evaluate(() => {
         const n = (k) => { const el = document.querySelector(`#stats-bar [data-stat="${k}"] b`); return el ? Number(el.textContent) : null; };
         const lead = document.querySelector('#stats-bar [data-stat="Total"]');
-        return { total: n("Total"), open: n("Open"), closed: n("Closed"), year: lead.querySelector(".st-year").textContent, title: lead.title, rows: document.querySelectorAll("#missions-body tr").length };
+        const seg = Object.fromEntries([...document.querySelector("#missions-status")._seg.children].map((b) => [b.dataset.v, Number(b.querySelector(".seg-n").textContent)]));
+        const chip = document.querySelector('#board-status [data-chip="earlier"]');
+        return { total: n("Total"), open: n("Open"), closed: n("Closed"), year: lead.querySelector(".st-year").textContent, title: lead.title, seg,
+          rows: document.querySelectorAll("#missions-body tr").length, chip: chip ? chip.textContent.trim() : null, on: chip ? chip.getAttribute("aria-pressed") : null };
       });
       const before = await tiles();
       const year = String(new Date().getFullYear());
       assert.equal(before.year, `in ${year}`, "the tiles say which year they count");
       assert.equal(before.total, before.open + before.closed);
+      assert.equal(before.rows, before.total, "under All the list has as many rows as Total");
+      assert.deepEqual(before.seg, { open: before.open, closed: before.closed, all: before.total }, "the switch carries the same counts");
       assert.ok(before.closed >= 1, "there is a closed mission to move back a year");
-      assert.doesNotMatch(before.title, /not counted/);
+      assert.equal(before.chip, null, "no chip while nothing is from an earlier year");
       // a mission that ended on 20 December last year
-      await p.evaluate((day) => { const r = D().register.find((x) => x.status === "closed"); r.closedOn = day; r.lastOn = day; render(); }, `${Number(year) - 1}-12-20`);
+      const moved = await p.evaluate((day) => { const r = D().register.find((x) => x.status === "closed"); r.closedOn = day; r.lastOn = day; render(); return r.id; }, `${Number(year) - 1}-12-20`);
       const after = await tiles();
       assert.equal(after.total, before.total - 1, "Total leaves it out");
       assert.equal(after.closed, before.closed - 1, "Closed leaves it out");
       assert.equal(after.open, before.open, "open missions are all counted");
-      assert.match(after.title, new RegExp(`1 mission that ended before ${year} is not counted`));
-      assert.equal(after.rows, before.rows, "the list still shows it under All");
-      // an open mission still on last year's number is running, so it is counted (the weeks before its new number is entered)
+      assert.equal(after.rows, after.total, "and the list leaves it out too");
+      assert.equal(await p.locator(`#missions-body tr[data-id="${moved}"]`).count(), 0);
+      assert.deepEqual(after.seg, { open: after.open, closed: after.closed, all: after.total });
+      assert.match(after.title, new RegExp(`1 mission that ended before ${year} is not shown`));
+      assert.equal(after.chip, "1 from earlier years");
+      assert.equal(after.on, "false");
+      // the Closed tile lists exactly its number
+      await p.locator('#stats-bar [data-stat="Closed"]').click();
+      assert.equal(await p.locator("#missions-body tr").count(), after.closed);
+      await p.selectOption("#missions-status", "all");
+      // the chip brings the earlier years back: the row, the counts and the label follow
+      await p.locator('#board-status [data-chip="earlier"]').click();
+      const withOld = await tiles();
+      assert.equal(withOld.on, "true");
+      assert.equal(withOld.year, "all years");
+      assert.equal(withOld.total, before.total);
+      assert.equal(withOld.closed, before.closed);
+      assert.equal(withOld.rows, withOld.total);
+      assert.equal(await p.locator(`#missions-body tr[data-id="${moved}"]`).count(), 1);
+      assert.deepEqual(withOld.seg, { open: withOld.open, closed: withOld.closed, all: withOld.total });
+      await p.locator('#board-status [data-chip="earlier"]').click();
+      assert.equal((await tiles()).rows, after.total, "a second click hides them again");
+      // an open mission still on last year's number is running, so it is listed and counted (the weeks before its new number is entered)
       const waiting = await p.evaluate(() => { const r = D().register.find((x) => x.status === "open"); r.number = r.number.replace(/\.\d{2}\./, ".01."); r.lastOn = "2001-12-30"; render();
         return Number(document.querySelector('#stats-bar [data-stat="Open"] b').textContent); });
       assert.equal(waiting, before.open, "an open mission on an old number still counts as open");

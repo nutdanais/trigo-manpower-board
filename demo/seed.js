@@ -236,6 +236,11 @@ function seed(db) {
   db.seed("missions", missions);
   // ...and a mission registered in Bulk edit that has no day on a board yet (Status: Not started)
   db.seed("mission_register", [{ board_id: "b1", number: "108", shift: "day", source: "list", status: "open", host: "Map Ta Phut Steel", customer: "Gear Works Ltd.", engineer_id: "eng-2", updated_by: ME.email }]);
+  // ...and a Rayong job that ended in December of last year: off the list until "from earlier years" is on
+  const LAST = String(+TODAY.slice(0, 4) - 1);
+  db.seed("mission_register", [{ board_id: "b1", number: `RAYTH.${LY}.0091`, shift: "day", source: "list", status: "closed", host: "Rayong Precision", customer: "Brake Systems Ltd.",
+    engineer_id: "eng-2", opened_on: `${LAST}-09-01`, last_on: `${LAST}-12-18`, closed_on: `${LAST}-12-18`, closed_by: PROFILES[3].email, closed_at: `${LAST}-12-18T10:00:00.000Z`,
+    close_note: "Contract ended", updated_by: ME.email }]);
   const closed = db.t("mission_register").find((r) => r.board_id === "b2" && r.number === "209");
   if (closed) Object.assign(closed, { status: "closed", closed_on: ended[ended.length - 1], closed_by: PROFILES[3].email, closed_at: new Date().toISOString(), close_note: "Contract ended" });
   // ...and the new-year number of Ayutthaya's bearing job, entered three days ago

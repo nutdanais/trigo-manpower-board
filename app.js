@@ -522,6 +522,7 @@ const state = {
     search: "",
     boardId: "",               // "" = all boards
     status: "open",            // "open" | "closed" | "all"
+    earlier: false,            // the "from earlier years" chip: also list the missions that ended before this year
     filters: { areaId: [], shift: [], engineerId: [], customer: [], host: [], placement: [], alerts: [] },   // behind the Filters button, like Host's; areaId is the host's service area, also the By area chips
     sort: { key: "number", dir: 1 },
     activity: null,            // cloud.getMissionActivity(): how each mission was staffed in the last six weeks
@@ -9553,9 +9554,15 @@ function missionAlertsHtml(r, info) {
 const MISSION_FILTER_LABELS = { areaId: "Service area", shift: "Shift", engineerId: "Trigo responsible", customer: "Customer", host: "Host", placement: "Board status", alerts: "Alerts" };
 const MISSION_NONE = "__none__";
 const missionText = (s) => String(s || "").trim();
+/* The list is this year's missions (MissionNumber.runsInYear: every open one, and the closed ones whose last working
+   day is in this year). A mission that ended in an earlier year is listed only while the "from earlier years" chip is on. */
+function missionYearRows() {
+  const st = state.missions, today = todayStr();
+  return (D().register || []).filter(r => (!st.boardId || r.boardId === st.boardId) && (st.earlier || MissionNumber.runsInYear(r, today)));
+}
 function missionScopeRows() {
   const st = state.missions;
-  return (D().register || []).filter(r => (!st.boardId || r.boardId === st.boardId) && (st.status === "all" || r.status === st.status));
+  return missionYearRows().filter(r => st.status === "all" || r.status === st.status);
 }
 /* the service area of a mission's host, as a filter key ("__none__" for a host with no area) */
 function missionAreaKey(r) {
@@ -9662,13 +9669,13 @@ function missionRows() {
   return rows.slice().sort((a, b) => String(val(a)).localeCompare(String(val(b))) * dir || a.number.localeCompare(b.number) || a.shift.localeCompare(b.shift));
 }
 function renderMissionStats(bar) {
-  // The tiles count the missions running this year (MissionNumber.runsInYear): every open one, and the
-  // closed ones whose last working day is in this year. A mission that ended in an earlier year is left
-  // out, and stays in the list under Closed / All.
+  // The tiles, the switch and the list count the same missions: this year's (missionYearRows), or every year's
+  // while the "from earlier years" chip is on. `earlier` is how many ended before this year, for that chip.
   const today = todayStr(), year = today.slice(0, 4);
   const onBoard = (D().register || []).filter(r => !state.missions.boardId || r.boardId === state.missions.boardId);
-  const all = onBoard.filter(r => MissionNumber.runsInYear(r, today));
-  const earlier = onBoard.length - all.length;
+  const earlier = onBoard.filter(r => !MissionNumber.runsInYear(r, today)).length;
+  const withEarlier = state.missions.earlier;
+  const all = missionYearRows();
   const open = all.filter(r => r.status === "open").length;
   const closed = all.length - open;
   const waiting = newYearWaiting().filter(w => w.rows.some(r => !state.missions.boardId || r.boardId === state.missions.boardId)).length;
@@ -9693,9 +9700,15 @@ function renderMissionStats(bar) {
     `<button type="button" class="stat-tile st-${kind} st-click${n === 0 ? " st-zero" : ""}" data-stat="${label}" data-status="${v}" aria-pressed="${shown === v}"` +
     ` title="${shown === v ? "Show all missions" : v === "open" ? "Show only open missions" : "Show only closed missions"}"><span class="st-main"><span class="st-l">${label}</span><b>${n}</b></span></button>`;
   bar.classList.add("stats-tiles");
-  const leadTitle = `Missions running in ${year}: every open mission, and the closed ones whose last working day is in ${year}.`
-    + (earlier ? ` ${earlier === 1 ? "1 mission that ended before" : `${earlier} missions that ended before`} ${year} ${earlier === 1 ? "is" : "are"} not counted.` : "");
-  bar.innerHTML = `<div class="stat-lead" data-stat="Total" title="${leadTitle}"><span class="st-l">Total</span><b>${all.length}</b><small class="st-year">in ${year}</small></div>` +
+  const leadTitle = withEarlier ? `Every mission, the ones that ended before ${year} included.`
+    : `Missions running in ${year}: every open mission, and the closed ones whose last working day is in ${year}.`
+      + (earlier ? ` ${earlier === 1 ? "1 mission that ended before" : `${earlier} missions that ended before`} ${year} ${earlier === 1 ? "is" : "are"} not shown.` : "");
+  // the way to the earlier years: a chip beside the tiles, as Host has "at risk" (on a phone it is in the summary card's details)
+  const chip = earlier || withEarlier ? statusChip("", earlier, "from earlier years", () => { state.missions.earlier = !state.missions.earlier; render(); },
+    withEarlier ? `Click again to show only the missions running in ${year}` : `Also show the missions that ended before ${year}`) : null;
+  statusGroup(bar, [chip]);
+  if (chip) { chip.dataset.chip = "earlier"; chip.setAttribute("aria-pressed", String(withEarlier)); chip.classList.toggle("sc-on", withEarlier); }
+  bar.innerHTML = `<div class="stat-lead" data-stat="Total" title="${leadTitle}"><span class="st-l">Total</span><b>${all.length}</b><small class="st-year">${withEarlier ? "all years" : `in ${year}`}</small></div>` +
     pickTile("Open", open, "perm", "open") + pickTile("Closed", closed, "inactive", "closed") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
     (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "") +
     // the proportion bar under the tiles, as on Manpower and Host: open and closed missions
@@ -9706,12 +9719,11 @@ function renderMissionStats(bar) {
   if (seg) for (const b of seg.children) {
     let c = b.querySelector(".seg-n");
     if (!c) { c = document.createElement("b"); c.className = "seg-n"; b.appendChild(c); }
-    // the switch counts what the list shows under each choice, earlier years' closed missions included (the tiles count this year)
-    c.textContent = String({ open, closed: onBoard.length - open, all: onBoard.length }[b.dataset.v]);
+    c.textContent = String({ open, closed, all: all.length }[b.dataset.v]);
   }
   renderPhoneViewCard({
     head: `<b>${open}</b><span class="ms-w"> open</span>`,
-    label: `${all.length} missions in ${year}: ${open} open, ${closed} closed`,
+    label: withEarlier ? `${all.length} missions: ${open} open, ${closed} closed` : `${all.length} missions in ${year}: ${open} open, ${closed} closed`,
     // the head already says how many are open; the dots after it carry their names
     keys: [["inactive", closed, "Closed", false, true]].concat(noCrew ? [["noloc", noCrew, "No crew", true, true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     bar: [["perm", open], ["inactive", closed]],
