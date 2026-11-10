@@ -97,7 +97,7 @@ async function step(name, fn) {
     await step("right-click on a mission opens its quick panel", async () => {
       await rightClick("101");
       assert.match(await menu.locator(".ctx-title").innerText(), /101 · Day · 2 crew/);
-      assert.deepEqual(await menuLabels(), ["Mission details", "Edit mission", "Duplicate mission", "Move or copy to board", "Crew",
+      assert.deepEqual(await menuLabels(), ["Mission details", "Edit mission", "Duplicate mission", "Move or copy to board", "Find crew", "Crew",
         "Highlight", "Copy as text", "Open host location", "Hide mission", "Hide/Unhide missions…", "Delete mission"]);
       await p.keyboard.press("Escape");
     });
@@ -285,7 +285,7 @@ async function step(name, fn) {
       await openDay(FC);
       await rightClick("901");
       const labels = await menuLabels();
-      assert.deepEqual(labels, ["Mission details", "Edit mission", "Duplicate mission", "Copy as text", "Open host location", "Delete mission"]);
+      assert.deepEqual(labels, ["Mission details", "Edit mission", "Duplicate mission", "Find crew", "Copy as text", "Open host location", "Delete mission"]);
       await p.keyboard.press("Escape");
       await openDay(SRC);
     });

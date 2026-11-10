@@ -79,7 +79,18 @@
     return c;
   }
 
-  const api = { tidy, check, yearOf, needsNewYearNumber, daysWaiting, ALERT_AFTER_DAYS, validFrom, checkNewYear, EXAMPLE, SHOW_OLD_DAYS, showsOldNumber };
+  /* true when a Missions-list row runs in the year of `today` (YYYY-MM-DD): what the Missions tab's
+     tiles count. An open mission is running, whatever year its number is from, so one still waiting
+     for its new-year number in January is counted. A closed one counts when its last working day
+     (closedOn, else its last day on a board, else the day it was closed) is in this year; one that
+     ended in an earlier year is left out. A closed row with no date at all cannot be placed, so it stays in. */
+  function runsInYear(row, today) {
+    if (!row || row.status !== "closed") return true;
+    const end = row.closedOn || row.lastOn || (row.closedAt ? String(row.closedAt).slice(0, 10) : "") || row.openedOn || "";
+    return !end || end >= String(today).slice(0, 4) + "-01-01";
+  }
+
+  const api = { tidy, check, yearOf, needsNewYearNumber, daysWaiting, ALERT_AFTER_DAYS, validFrom, checkNewYear, EXAMPLE, SHOW_OLD_DAYS, showsOldNumber, runsInYear };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MissionNumber = api;
 })(typeof window !== "undefined" ? window : globalThis);

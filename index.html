@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-10e">
+<link rel="stylesheet" href="styles.css?v=2026-11-10f">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-10e"></script>
+<script src="version.js?v=2026-11-10f"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -935,6 +935,11 @@
   <div class="fp-head">
     <input id="emp-search" type="search" placeholder="Search employee…" autocomplete="off">
     <p id="emp-search-note" class="fp-search-note hidden"></p>
+    <!-- Find crew: the panel is in order of days at one mission's host (app.js setCrewLens); × puts the usual order back -->
+    <div id="crew-lens" class="fp-lens hidden">
+      <span class="fp-lens-text"><span>Sorted by days at</span> <b id="crew-lens-host" data-no-i18n></b></span>
+      <button type="button" id="crew-lens-off" aria-label="Back to the usual order" title="Back to the usual order"><svg class="ic" aria-hidden="true"><use href="#i-close"></use></svg></button>
+    </div>
     <div id="area-filter" class="fp-areas"></div>
     <div id="selection-bar" class="hidden">
       <span id="selection-count"></span>
@@ -1750,22 +1755,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-10e"></script>
-<script src="i18n-th.js?v=2026-11-10e"></script>
-<script src="planning.js?v=2026-11-10e"></script>
-<script src="employee-id.js?v=2026-11-10e"></script>
-<script src="mission-number.js?v=2026-11-10e"></script>
-<script src="mission-activity.js?v=2026-11-10e"></script>
+<script src="i18n.js?v=2026-11-10f"></script>
+<script src="i18n-th.js?v=2026-11-10f"></script>
+<script src="planning.js?v=2026-11-10f"></script>
+<script src="employee-id.js?v=2026-11-10f"></script>
+<script src="mission-number.js?v=2026-11-10f"></script>
+<script src="mission-activity.js?v=2026-11-10f"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-10e"></script>
-<script src="cloud.js?v=2026-11-10e"></script>
-<script src="charts.js?v=2026-11-10e"></script>
-<script src="xlsx-export.js?v=2026-11-10e"></script>
-<script src="orgchart-pptx.js?v=2026-11-10e"></script>
-<script src="bulk-edit.js?v=2026-11-10e"></script>
-<script src="app.js?v=2026-11-10e"></script>
-<script src="report.js?v=2026-11-10e"></script>
-<script src="present.js?v=2026-11-10e"></script>
+<script src="demo/demo-gate.js?v=2026-11-10f"></script>
+<script src="cloud.js?v=2026-11-10f"></script>
+<script src="charts.js?v=2026-11-10f"></script>
+<script src="xlsx-export.js?v=2026-11-10f"></script>
+<script src="orgchart-pptx.js?v=2026-11-10f"></script>
+<script src="bulk-edit.js?v=2026-11-10f"></script>
+<script src="app.js?v=2026-11-10f"></script>
+<script src="report.js?v=2026-11-10f"></script>
+<script src="present.js?v=2026-11-10f"></script>
 </body>
 </html>

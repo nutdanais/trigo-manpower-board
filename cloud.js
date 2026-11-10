@@ -2763,6 +2763,23 @@ const cloud = {
     return [...by.values()].map((x) => ({ employeeId: x.employeeId, days: x.dates.size, last: x.last }))
       .sort((a, b) => b.days - a.days || b.last.localeCompare(a.last));
   },
+  /* The crew a mission had the last time it had one before `before` (YYYY-MM-DD): the mission's own days on
+     this board and shift, by any of its numbers (last year's too), newest first, and the first of them that
+     had people on it. Looks back over its last 60 days on the board. Returns { date, employeeIds } or null. */
+  async getMissionLastCrew(boardId, numbers, shift, before) {
+    const { data: days, error } = await sb.from("missions").select("id, plan_date")
+      .eq("board_id", boardId).in("number", numbers).eq("shift", shift).lt("plan_date", before)
+      .order("plan_date", { ascending: false }).limit(60);
+    if (error) throw error;
+    if (!days || !days.length) return null;
+    const { data: rows, error: aErr } = await sb.from("assignments").select("employee_id, mission_id").in("mission_id", days.map((d) => d.id));
+    if (aErr) throw aErr;
+    for (const d of days) {
+      const crew = (rows || []).filter((a) => a.mission_id === d.id).map((a) => a.employee_id);
+      if (crew.length) return { date: d.plan_date, employeeIds: crew };
+    }
+    return null;
+  },
   /* the number a mission had before `number` (last year's), or null */
   previousNumber(number) {
     const h = (this.data.numberHistory || []).filter((x) => x.newNumber === number).pop();
