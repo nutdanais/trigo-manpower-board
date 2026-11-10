@@ -35,6 +35,10 @@
   --danger-dot: #d33a30;
   --lt-off-text: #4b5563;
   --lt-off-dot: #8b949e;
+  --lt-closed-surface: #e5e7eb;   /* Closed: the grey family, but solid, so it never reads as Hidden or Not started */
+  --lt-closed-line: #c4c9d1;
+  --lt-closed-text: #374151;
+  --lt-closed-dot: #4b5563;
   --lt-bd-text: #374151;
   --lt-link-line: #9db4c8;
   --lt-dash: #a3abb5;
@@ -7537,6 +7541,8 @@ td.ml-status { min-width: 150px; max-width: 280px; }
 .lt-st-ok i { background: var(--ok-dot); }
 .lt-st-off { background: var(--bg-soft); color: var(--lt-off-text); border-color: var(--border); }
 .lt-st-off i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--lt-off-dot); }
+.lt-st-closed { background: var(--lt-closed-surface); color: var(--lt-closed-text); border-color: var(--lt-closed-line); font-weight: 600; }
+.lt-st-closed i { background: var(--lt-closed-dot); }
 .lt-st-warn { background: var(--warn-surface); color: var(--warn-text); border-color: var(--warn-line); }
 .lt-st-warn i { background: var(--warn-dot); }
 .lt-st-bad { background: var(--danger-tint); color: var(--danger-text); border-color: var(--danger-line); }
@@ -7746,3 +7752,16 @@ form.rp-form { display: flex; flex-direction: column; min-height: 0; }
   .hr-m-cust { grid-column: 1 / -1; grid-row: 2; }
   .hr-m-shift { display: none; }
 }
+
+/* Missions tab: Open and Closed are the filter. The Open / Closed / All switch carries its counts, and the Open and
+   Closed tiles are buttons that set the same value (the pressed one is underlined). */
+.seg-pick button .seg-n { margin-left: 5px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
+.seg-pick button[aria-pressed="true"] .seg-n { color: var(--text); }
+button.stat-tile.st-click { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.stat-tile.st-click:hover { background: var(--hover-tint); }
+.stat-tile.st-click[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--primary); }
+.stat-tile.st-click:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+.ms-k .ms-kl { font-weight: 500; }
+.md-t[role="button"] { cursor: pointer; }
+.md-t[role="button"][aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--primary); }
+.md-t[role="button"]:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }

@@ -713,6 +713,50 @@ async function step(name, fn) {
       await p.selectOption("#missions-status", "open");
     });
 
+    await step("Open and Closed are the filter: counts on the switch, clickable tiles, a solid Closed pill", async () => {
+      await goMissions(p);
+      const rows = () => p.locator("#missions-body tr").count();
+      const seg = (v) => p.locator(`#missions-status + .seg-pick button[data-v=${v}]`);
+      const segN = async (v) => Number(await seg(v).locator(".seg-n").innerText());
+      const tile = (v) => p.locator(`#stats-bar .st-click[data-status=${v}]`);
+      assert.equal(await p.evaluate(() => state.missions.status), "open", "the tab opens on Open");
+      // the switch carries its counts and they equal what each view lists
+      const open = await segN("open"), closed = await segN("closed");
+      assert.ok(closed >= 1, "the mission closed above is counted");
+      assert.equal(await segN("all"), open + closed);
+      assert.equal(await rows(), open);
+      assert.equal(await tile("open").getAttribute("aria-pressed"), "true");
+      assert.equal(await tile("closed").getAttribute("aria-pressed"), "false");
+      // the Closed tile filters, like the switch
+      await tile("closed").click();
+      assert.equal(await p.evaluate(() => state.missions.status), "closed");
+      assert.equal(await rows(), closed);
+      assert.equal(await seg("closed").getAttribute("aria-pressed"), "true", "the switch follows the tile");
+      assert.equal(await tile("closed").getAttribute("aria-pressed"), "true");
+      // a closed row has the solid Closed pill, not the hollow grey one of Hidden or Not started
+      const pill = row(p, "102").locator(".ml-status .lt-st");
+      assert.match(await pill.getAttribute("class"), /lt-st-closed/);
+      assert.doesNotMatch(await pill.getAttribute("class"), /lt-st-off/);
+      // the pressed tile again shows every mission
+      await tile("closed").click();
+      assert.equal(await p.evaluate(() => state.missions.status), "all");
+      assert.equal(await rows(), open + closed);
+      assert.equal(await tile("open").getAttribute("aria-pressed"), "false");
+      assert.equal(await tile("closed").getAttribute("aria-pressed"), "false");
+      // the Open tile and the switch both come back to Open
+      await tile("open").click();
+      assert.equal(await rows(), open);
+      await seg("all").click();
+      assert.equal(await rows(), open + closed);
+      await seg("open").click();
+      assert.equal(await rows(), open);
+      // the phone's summary names the dots
+      await p.setViewportSize({ width: 390, height: 844 });
+      await p.waitForTimeout(200);
+      assert.match(await p.locator("#m-summary").innerText(), new RegExp(`${closed}\\s*Closed`), "the Closed dot says what it counts");
+      await p.setViewportSize({ width: 1366, height: 800 });
+    });
+
     await step("the mission card's quick panel offers Close mission…", async () => {
       await p.evaluate((d) => { D().activeBoardId = "b1"; state.date = d; return refreshAndRender(); }, NEXT);
       const card = p.locator("#missions-grid .mission-card", { has: p.locator(".m-number", { hasText: /^101$/ }) });
