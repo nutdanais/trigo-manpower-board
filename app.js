@@ -10116,8 +10116,8 @@ function setHostView(view) {
 }
 /* the host's row, by its name or by the same name in other letters (a mission may spell it differently) */
 function hostRowByName(name) {
-  const rows = allHostRows(), key = String(name || "").trim().toLowerCase();
-  return rows.find(r => r.name === name) || rows.find(r => r.name.trim().toLowerCase() === key) || null;
+  const rows = allHostRows(), rec = hostRecordOf(name);   // hostRecordOf: the one case-insensitive match
+  return rows.find(r => r.name === name) || (rec && rows.find(r => r.name === rec.name)) || null;
 }
 /* Open a host's record. Any role that can see the Host tab may read it; Edit and More are for the roles that can edit. */
 async function openHostRecord(name) {
@@ -10197,8 +10197,9 @@ async function renderHostRecord(name) {
   // everyone who has worked here, most days first, the experienced ones outlined; all of them, wrapping
   const seeProfile = can("emplist");
   const expSet = new Set(x.experienced);
+  const empById = new Map(D().employees.map(m => [m.id, m]));
   const chips = r.inspectors.map(i => {
-    const e = D().employees.find(m => m.id === i.id);
+    const e = empById.get(i.id);
     const gone = e && empStatus(e) !== "active";
     const tip = `${i.name}: ${i.days} ${i.days === 1 ? "day" : "days"} at ${r.name}${i.last ? `, last ${fmtDate(i.last)}` : ""}${expSet.has(i.id) ? " · experienced" : ""}${gone ? " · not active now" : ""}`;
     const cls = `lt-pc${expSet.has(i.id) ? " lt-exp" : ""}${gone ? " lt-gone" : ""}`;
@@ -10225,7 +10226,7 @@ async function renderHostRecord(name) {
   const closed = mine.filter(m => m.status === "closed").sort((a, b) => String(b.closedOn || "").localeCompare(String(a.closedOn || "")) || a.number.localeCompare(b.number));
   const line = (m) => {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "hr-mission"; b.dataset.mission = m.id || `${m.boardId}|${m.number}|${m.shift}`;
+    b.type = "button"; b.className = "hr-mission";
     b.innerHTML = `<b class="hr-m-no" data-no-i18n>${escapeHtml(m.number)}</b>`
       + `<span class="hr-m-cust">${m.customer ? `<span data-no-i18n>${escapeHtml(m.customer)}</span>` : emptyCell()}</span>`
       + `<span class="hr-m-shift">${m.shift === "night" ? "Night" : "Day"}</span>`
@@ -10251,6 +10252,19 @@ async function renderHostRecord(name) {
   }
 }
 
+/* A change somebody else made (or this browser's own write coming back) redraws the Host record that is open in read view */
+function refreshOpenHostRecord() {
+  const name = state.hostlist.editingHost;
+  if (!name || $("#modal-host").classList.contains("hidden") || $("#host-detail").classList.contains("hidden")) return;
+  safely(async () => { await ensureHostDirectoryLoaded(); await renderHostRecord(name); });
+}
+/* Close the panel; out of the New Mission hand-off the half-finished mission is still waiting, its form keeps its values */
+function hostLeaveForm() {
+  const back = state.hostlist.returnToMission;
+  state.hostlist.returnToMission = false;
+  closeModal();
+  if (back) openModal("#modal-mission");
+}
 /* The form of the host record. `name` names an existing host (the form opens inside its panel; Save and Cancel come back
    to its record). opts.prefillName seeds a NEW host's name — that's the New Mission hand-off, where the planner
    has already typed a host that isn't in the list yet; opts.returnToMission sends them back to the mission form
@@ -10285,14 +10299,7 @@ function openHostModal(name, opts = {}) {
   $("#btn-delete-host").classList.toggle("hidden", !rec);
   renderHostMergeSection(name);
   $("#host-merge").open = !!opts.merge;
-  // Cancel out of the hand-off and the half-finished mission is still waiting —
-  // its form keeps its values, nothing has reset it
-  $("#modal-host .modal-close").onclick = () => {
-    const back = state.hostlist.returnToMission;
-    state.hostlist.returnToMission = false;
-    closeModal();
-    if (back) openModal("#modal-mission");
-  };
+  $("#modal-host .modal-close").onclick = hostLeaveForm;
   openModal("#modal-host");
   if (opts.merge) { const m = $("#host-merge"); m.scrollIntoView({ block: "center" }); $("#host-merge-target").focus({ preventScroll: true }); }
   else if (opts.focus && form[opts.focus]) { try { form[opts.focus].focus({ preventScroll: true }); } catch (e) { /* a picker: no cursor */ } }
@@ -19399,10 +19406,7 @@ function wireApp() {
     // Edit, then Cancel: back to the record; a new host just closes (or goes back to the half-finished mission)
     const name = state.hostlist.editingHost;
     if (name && hostRecState.fromRecord) { safely(() => openHostRecord(name)); return; }
-    const back = state.hostlist.returnToMission;
-    state.hostlist.returnToMission = false;
-    closeModal();
-    if (back) openModal("#modal-mission");
+    hostLeaveForm();
   };
   $("#btn-delete-host").onclick = deleteHostRecord;
   $("#btn-host-merge").onclick = mergeHostFromModal;
@@ -19631,7 +19635,7 @@ async function boot() {
     }
     // an approval or a role change arriving over Realtime reaches an open
     // Settings page through refreshAndRender (settingsLiveRefresh)
-    refreshAndRender();
+    Promise.resolve(refreshAndRender()).then(refreshOpenHostRecord);
   });
   await refreshAndRender();
   // fonts can settle after the first paint and change card heights — re-pack once ready

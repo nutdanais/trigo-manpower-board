@@ -84,11 +84,11 @@ async function step(name, fn) {
       assert.match(await p.locator("#host-modal-status .lt-st").innerText(), /Active|Archived/);
       assert.match(await p.locator("#host-modal-sub").innerText(), /^Host/, "line 2 says it is a Host");
       assert.ok(await p.locator("#host-modal-sub .lt-bd").count() >= 1, "its board tag(s)");
-      const hostW = (await p.locator("#modal-host").boundingBox()).width;
-      // the same panel as the Mission: one width
+      // the same panel as the Mission: one width (computed, so the opening animation cannot skew it)
+      const widths = await p.evaluate(() => ["#modal-host", "#modal-mission", "#modal-profile"].map((q) => getComputedStyle(document.querySelector(q)).width));
+      assert.equal(widths[0], widths[1], `Host ${widths[0]}, Mission ${widths[1]}`);
+      assert.equal(widths[0], widths[2], `Host ${widths[0]}, Profile ${widths[2]}`);
       await p.evaluate(() => closeModal());
-      const w = await p.evaluate(() => getComputedStyle(document.querySelector("#modal-mission")).width);
-      assert.equal(`${hostW}px`.replace(/\.\d+/, ""), w.replace(/\.\d+/, ""), `Host ${hostW}px, Mission ${w}`);
       const acts = await p.locator("#host-modal-acts").count();
       assert.equal(acts, 1);
       assert.ok(name.length);
@@ -252,6 +252,41 @@ async function step(name, fn) {
       await p.evaluate(() => closeModal());
     });
 
+    await step("Closed (N): a closed mission is under a line that expands", async () => {
+      const host = await p.evaluate(() => { const r = (D().register || []).find((m) => m.status !== "closed" && m.host); r.status = "closed"; r.closedOn = todayStr(); return r.host; });
+      await p.evaluate((h) => openHostRecord(h), host);
+      await waitRecord(p, host);
+      const toggle = p.locator("#host-detail .hr-m-closed");
+      await toggle.waitFor();
+      assert.match(await toggle.innerText(), /^Closed \(\d+\)$/);
+      assert.equal(await p.locator("#host-detail .hr-m-list.hidden .hr-mission").count() >= 1, true, "closed ones are hidden until it is pressed");
+      await toggle.click();
+      assert.equal(await p.locator("#host-detail .hr-m-list.hidden").count(), 0, "now shown");
+      assert.ok(await p.locator("#host-detail .hr-m-list .hr-mission .lt-st", { hasText: /Closed/ }).count() >= 1);
+      await p.evaluate(() => closeModal());
+    });
+
+    await step("renaming a host from its record asks first and lands on the renamed record", async () => {
+      await p.evaluate(() => openHostRecord("Rayong Precision"));
+      await waitRecord(p, "Rayong Precision");
+      await p.locator("#btn-hr-edit").click();
+      await p.fill('#form-host [name="name"]', "Rayong Precision 2");
+      await p.locator('#form-host button[type="submit"]').click();
+      await p.waitForSelector("#modal-confirm:not(.hidden)");
+      await p.locator("#btn-confirm-yes").click();
+      await waitRecord(p, "Rayong Precision 2");
+      assert.equal(await p.evaluate(() => allHostRows().some((r) => r.name === "Rayong Precision")), false);
+      await p.evaluate(() => closeModal());
+    });
+
+    await step("a change made elsewhere redraws the open record", async () => {
+      await p.evaluate(() => openHostRecord("Pluak Daeng Plastics"));
+      await waitRecord(p, "Pluak Daeng Plastics");
+      await p.evaluate(() => { const r = allHostRows().find((x) => x.name === "Pluak Daeng Plastics"); return cloud.saveHost({ name: r.name, location: r.location, mapUrl: r.mapUrl, areaId: r.area ? r.area.id : "", archived: true, note: "Changed by someone else" }); });
+      await p.waitForFunction(() => /Archived/.test(document.querySelector("#host-modal-status").textContent) && /Changed by someone else/.test(document.querySelector("#host-detail").textContent), null, { timeout: 8000 });
+      await p.evaluate(() => closeModal());
+    });
+
     await step("the experienced-days setting changes the record's Experienced number", async () => {
       const before = await p.evaluate(async () => { await openHostRecord("Siam Auto Parts"); return null; });
       await waitRecord(p, "Siam Auto Parts");
@@ -274,14 +309,15 @@ async function step(name, fn) {
     await step("Thai: nothing new in English on the record", async () => {
       await p.evaluate(() => I18N.setLang("th"));
       await p.waitForTimeout(300);
-      for (const n of ["Siam Auto Parts", "Hi-Tech Bearings"]) {
+      const before = await p.evaluate(() => I18N.missing());
+      for (const n of ["Siam Auto Parts", "Hi-Tech Bearings", "Bowin Glass"]) {
         await p.evaluate((x) => openHostRecord(x), n);
         await waitRecord(p, n);
         await p.locator("#btn-hr-more").click();
         await p.waitForTimeout(400);
       }
-      const missing = await p.evaluate(() => I18N.missing());
-      const mine = missing.filter((m) => /Host|Site|experienced|Experienced|worked here|Missions at this host|Note for the crew|Merge into another|Clear record|Add location|See who|ever worked|in all|days or more|Closed \(|Open this host/.test(m));
+      // the record itself (the form's Merge note is built from names and numbers and was English in Thai before this change)
+      const mine = (await p.evaluate(() => I18N.missing())).filter((m) => !before.includes(m));
       assert.deepEqual(mine, [], "untranslated: " + mine.join(" | "));
       await p.evaluate(() => closeModal());
       await p.evaluate(() => I18N.setLang("en"));
