@@ -934,6 +934,36 @@ async function step(name, fn) {
       await sp.evaluate(() => cloud.loadMissionRegister().then(render));
     });
 
+    await step("the tiles count the missions running this year: one that ended last year is left out, and stays in the list", async () => {
+      await goMissions(p);
+      await p.selectOption("#missions-status", "all");
+      const tiles = () => p.evaluate(() => {
+        const n = (k) => { const el = document.querySelector(`#stats-bar [data-stat="${k}"] b`); return el ? Number(el.textContent) : null; };
+        const lead = document.querySelector('#stats-bar [data-stat="Total"]');
+        return { total: n("Total"), open: n("Open"), closed: n("Closed"), year: lead.querySelector(".st-year").textContent, title: lead.title, rows: document.querySelectorAll("#missions-body tr").length };
+      });
+      const before = await tiles();
+      const year = String(new Date().getFullYear());
+      assert.equal(before.year, `in ${year}`, "the tiles say which year they count");
+      assert.equal(before.total, before.open + before.closed);
+      assert.ok(before.closed >= 1, "there is a closed mission to move back a year");
+      assert.doesNotMatch(before.title, /not counted/);
+      // a mission that ended on 20 December last year
+      await p.evaluate((day) => { const r = D().register.find((x) => x.status === "closed"); r.closedOn = day; r.lastOn = day; render(); }, `${Number(year) - 1}-12-20`);
+      const after = await tiles();
+      assert.equal(after.total, before.total - 1, "Total leaves it out");
+      assert.equal(after.closed, before.closed - 1, "Closed leaves it out");
+      assert.equal(after.open, before.open, "open missions are all counted");
+      assert.match(after.title, new RegExp(`1 mission that ended before ${year} is not counted`));
+      assert.equal(after.rows, before.rows, "the list still shows it under All");
+      // an open mission still on last year's number is running, so it is counted (the weeks before its new number is entered)
+      const waiting = await p.evaluate(() => { const r = D().register.find((x) => x.status === "open"); r.number = r.number.replace(/\.\d{2}\./, ".01."); r.lastOn = "2001-12-30"; render();
+        return Number(document.querySelector('#stats-bar [data-stat="Open"] b').textContent); });
+      assert.equal(waiting, before.open, "an open mission on an old number still counts as open");
+      await p.evaluate(() => cloud.loadMissionRegister().then(render));
+      await p.selectOption("#missions-status", "open");
+    });
+
     await step("at 1024px every module tab, Missions included, is in full view (the app's name gives way)", async () => {
       await p.setViewportSize({ width: 1024, height: 900 });
       await p.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });

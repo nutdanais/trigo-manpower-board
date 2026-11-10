@@ -1,0 +1,477 @@
+<title>Host Crew Finder</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: a proposal for finding crew by host history, a catalogue of
+   further assignment helpers to approve, and the Missions tiles' year rule. Tokens copied from
+   styles.css so the mockups read like the app. Light only, like the app.
+   Layout: one reading column; each mockup sits in an app-styled frame; ideas are a list of rows
+   with a decision control on the right. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --line: #eceff3; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --hover-tint: #eef3fb; --brand-green: #a8c855;
+  --ok: #1f8a4c; --ok-bg: #e6f4ec; --warn: #a15c00; --warn-bg: #fdf0d9; --bad: #b42318; --bad-bg: #fde8e7;
+  --assigned: #2a78d6; --oncall: #eb6834; --neutral-bg: #e3e8ee; --gold: #b7860b;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 34px; }
+h1 { font-size: 27px; letter-spacing: -.4px; text-wrap: balance; line-height: 1.2; }
+h2 { font-size: 20px; letter-spacing: -.2px; text-wrap: balance; line-height: 1.25; }
+h3 { font-size: 15px; line-height: 1.3; }
+p, li { max-width: 74ch; }
+.lede { color: var(--muted); margin-top: 6px; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--primary); }
+.part { display: grid; gap: 14px; min-width: 0; }
+.part-head { display: grid; gap: 4px; }
+code { font-size: 12.5px; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--primary); }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px; }
+nav.toc a { font-size: 12.5px; font-weight: 600; text-decoration: none; border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 4px 11px; }
+nav.toc a:hover { background: var(--hover-tint); }
+
+.tag { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--neutral-bg); color: var(--muted); white-space: nowrap; }
+.tag.ready { background: var(--ok-bg); color: var(--ok); }
+.tag.some { background: var(--warn-bg); color: var(--warn); }
+.tag.done { background: var(--primary); color: #fff; }
+
+/* the answer box */
+.answer { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 10px; }
+.answer ol { padding-left: 20px; display: grid; gap: 6px; }
+
+/* today: three facts, then the gaps */
+.cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 820px) { .cols3 { grid-template-columns: 1fr; } }
+.fact { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.fact span { color: var(--muted); font-size: 13px; }
+.gaps { list-style: none; display: grid; gap: 8px; }
+.gaps li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; }
+.gaps li > b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--warn-bg); color: var(--warn); font-size: 11.5px; margin-top: 1px; }
+
+/* app-styled frames for the mockups */
+.frame { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; min-width: 0; overflow: hidden; }
+.frame-cap { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; padding: 8px 14px; background: #f6f8fa; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--muted); }
+.frame-body { padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.sample-note { font-size: 12px; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 13.5px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+.chip:hover { background: var(--hover-tint); }
+.chip[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.split { display: grid; grid-template-columns: minmax(0, 250px) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+.hostlist { display: grid; gap: 4px; align-content: start; }
+.hostrow { display: grid; gap: 1px; text-align: left; font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--text); cursor: pointer; min-width: 0; }
+.hostrow:hover { background: var(--hover-tint); }
+.hostrow[aria-pressed="true"] { border-color: var(--primary); background: var(--hover-tint); }
+.hostrow b { font-size: 13.5px; overflow-wrap: anywhere; }
+.hostrow span { font-size: 12px; color: var(--muted); }
+.nomatch { font-size: 13px; color: var(--muted); padding: 8px 10px; }
+
+.record { border: 1px solid var(--border); border-radius: 10px; min-width: 0; display: grid; align-content: start; }
+.rec-head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: grid; gap: 3px; }
+.rec-head h3 { font-size: 17px; }
+.rec-tabs { display: flex; gap: 16px; padding: 0 14px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--muted); }
+.rec-tabs span { padding: 9px 0; }
+.rec-tabs .on { color: var(--primary); box-shadow: inset 0 -2px 0 var(--primary); }
+.rec-body { padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.tscroll { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.who b { display: block; white-space: nowrap; }
+.who span { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.daysbar { display: grid; grid-template-columns: 34px 70px; gap: 8px; align-items: center; justify-content: end; }
+.daysbar i { display: block; height: 6px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; }
+.daysbar i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--assigned); border-radius: 3px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.free { color: var(--ok); } .pill.busy { color: var(--assigned); } .pill.leave { color: var(--warn); } .pill.off { color: var(--muted); }
+.exp { font-size: 11.5px; font-weight: 700; color: var(--ok); white-space: nowrap; }
+.act { font: inherit; font-size: 12.5px; font-weight: 700; color: var(--primary); background: none; border: 0; cursor: pointer; white-space: nowrap; padding: 2px 0; }
+.act:hover { text-decoration: underline; }
+tr.dim td { color: var(--muted); }
+.toast { font-size: 12.5px; color: var(--ok); font-weight: 600; min-height: 19px; }
+
+/* board mockup */
+.board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 270px); gap: 14px; }
+@media (max-width: 760px) { .board { grid-template-columns: 1fr; } }
+.mcard { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: grid; gap: 8px; align-content: start; }
+.mcard-top { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; justify-content: space-between; }
+.mcard-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.mcard-empty { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; color: var(--muted); font-size: 13px; }
+.btn { font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 6px; border: 1px solid var(--primary); background: var(--primary); color: #fff; }
+.pool { border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: grid; gap: 8px; align-content: start; background: #fafbfc; }
+.lens { display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--hover-tint); border: 1px solid #cddcf0; border-radius: 6px; padding: 6px 9px; font-size: 12.5px; font-weight: 600; color: var(--primary); }
+.pool-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.ecard { display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 13px; font-weight: 600; }
+.badge { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 1px 7px; border-radius: 999px; background: var(--ok-bg); color: var(--ok); white-space: nowrap; }
+.badge.low { background: var(--neutral-bg); color: var(--muted); }
+
+/* decisions */
+.asks { display: grid; gap: 8px; }
+.ask { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 18px; align-items: start; }
+@media (max-width: 720px) { .ask { grid-template-columns: 1fr; } }
+.ask-main { display: grid; gap: 5px; min-width: 0; }
+.ask-title { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.ask-id { font-size: 12px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+.ask-meta { font-size: 12.5px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.seg label { font-size: 12.5px; font-weight: 600; padding: 6px 11px; cursor: pointer; border-left: 1px solid var(--border); background: var(--panel); white-space: nowrap; }
+.seg label:first-of-type { border-left: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg input:focus-visible + label { outline: 2px solid var(--primary); outline-offset: -2px; }
+.seg input:checked + label.yes { background: var(--ok-bg); color: var(--ok); }
+.seg input:checked + label.later { background: var(--warn-bg); color: var(--warn); }
+.seg input:checked + label.no { background: var(--bad-bg); color: var(--bad); }
+.copybar { display: grid; gap: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.copybar textarea { font: inherit; font-size: 13px; width: 100%; min-height: 62px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: #fafbfc; resize: vertical; }
+.copybar .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn-line { font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--primary); background: var(--panel); color: var(--primary); cursor: pointer; }
+.btn-line:hover { background: var(--hover-tint); }
+
+/* stat bar */
+.tiles { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.lead { padding: 4px 16px 4px 2px; display: grid; align-content: center; }
+.lead span, .tile span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.lead b, .tile b { font-size: 21px; font-weight: 650; letter-spacing: -.4px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.lead small { font-size: 11px; font-weight: 600; color: var(--muted); }
+.tile { border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; display: grid; min-width: 86px; border-top: 3px solid var(--c, var(--border)); }
+.steps { padding-left: 20px; display: grid; gap: 6px; }
+ul.plain { padding-left: 18px; display: grid; gap: 6px; }
+</style>
+
+<div class="wrap">
+  <header class="part-head">
+    <p class="eyebrow">Proposal for approval · 10 Nov 2026</p>
+    <h1>Find crew by host history</h1>
+    <p class="lede">Where the lookup should live, how it works, nine more helpers for assigning people, and the Missions tiles counting this year only. Every name, host and number in the mockups is invented sample data.</p>
+    <nav class="toc" aria-label="Sections" style="margin-top:10px">
+      <a href="#answer">Short answer</a><a href="#today">What exists today</a><a href="#host">Host tab</a><a href="#board">Board shortcut</a><a href="#ideas">More ideas</a><a href="#stats">Missions tiles</a><a href="#decide">Your decisions</a>
+    </nav>
+  </header>
+
+  <section class="part" id="answer">
+    <div class="answer">
+      <h2>Short answer</h2>
+      <ol>
+        <li><b>The Host tab is the home of the lookup.</b> Search a host, open it, and a new <b>People</b> view lists everyone who has worked there with their days, their last day, and whether they are free on the day you are planning.</li>
+        <li><b>The Board gets a shortcut to the same list</b>, because that is where the assigning happens: <b>Find crew</b> on a mission sorts the available-people panel by days at that mission's host.</li>
+        <li><b>No new data is needed.</b> The app already stores one row per person per day per host (the Host Record) and already counts the days. The work is showing it at the right moment.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="part" id="today">
+    <div class="part-head">
+      <p class="eyebrow">Review</p>
+      <h2>What the app has today</h2>
+    </div>
+    <div class="cols3">
+      <div class="fact"><h3>The day counts exist</h3><span>Host tab › Skills matrix › open a host: the names, their days, their last day, and <i>experienced</i> at 5 days (Settings › Host experience).</span></div>
+      <div class="fact"><h3>Host search exists</h3><span>The Host tab's search box already finds a host by name, location, service area or a person's name.</span></div>
+      <div class="fact"><h3>A person's side exists</h3><span>The Employee profile lists the hosts one person has worked, with days. Review &amp; merge shows days at the host for each person.</span></div>
+    </div>
+    <ul class="gaps">
+      <li><b>1</b><span><b>It is three steps away from the work.</b> Host tab, switch to Skills matrix, expand the row. On the Board, where an engineer assigns, there is nothing about who knows the host.</span></li>
+      <li><b>2</b><span><b>It does not say who is free.</b> The list names 22 people. The engineer needs the few who are on Standby or on-call and free on the planning day.</span></li>
+      <li><b>3</b><span><b>It cannot act.</b> From the list there is no way to put a person on a mission. The engineer has to remember the names and go back to the Board.</span></li>
+      <li><b>4</b><span><b>Clicking a host opens the edit form.</b> Name, location, area and note. A role that cannot edit hosts gets a message and no record to read.</span></li>
+    </ul>
+  </section>
+
+  <section class="part" id="host">
+    <div class="part-head">
+      <p class="eyebrow">H1 · Host tab</p>
+      <h2>Open a host and see who has worked there</h2>
+      <p class="muted">A click on a host opens a read-first record, the same panel the Employee and Mission records use, with a <b>People</b> view. Edit stays one button away. Try it: search, pick a host, switch the chips.</p>
+    </div>
+    <div class="frame">
+      <div class="frame-cap"><span>Mockup · Host tab · planning day Wed 11 Nov 2026</span><span>Sample data</span></div>
+      <div class="frame-body">
+        <div class="split">
+          <div style="display:grid;gap:8px;align-content:start;min-width:0">
+            <input class="search" id="host-q" type="search" placeholder="Search host…" autocomplete="off" aria-label="Search host">
+            <div class="hostlist" id="host-list"></div>
+          </div>
+          <div class="record">
+            <div class="rec-head">
+              <h3 id="rec-name"></h3>
+              <span class="small muted" id="rec-sub"></span>
+            </div>
+            <div class="rec-tabs" aria-hidden="true"><span class="on">People</span><span>Missions</span><span>Details</span></div>
+            <div class="rec-body">
+              <div class="toolbar">
+                <div class="chips" role="group" aria-label="Show">
+                  <button type="button" class="chip" data-f="all" aria-pressed="true">Everyone</button>
+                  <button type="button" class="chip" data-f="free" aria-pressed="false">Free on 11 Nov</button>
+                  <button type="button" class="chip" data-f="exp" aria-pressed="false">Experienced</button>
+                </div>
+                <span class="small muted" id="rec-count"></span>
+              </div>
+              <div class="tscroll">
+                <table>
+                  <thead><tr><th>Person</th><th class="num">Days here</th><th>Last worked</th><th>On 11 Nov</th><th></th></tr></thead>
+                  <tbody id="rec-rows"></tbody>
+                </table>
+              </div>
+              <p class="toast" id="rec-toast" role="status"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="plain">
+      <li><b>Sorted by days, most first.</b> Days are all time, one per day worked at the host, the same count as the Skills matrix. <i>Experienced</i> follows the setting.</li>
+      <li><b>On 11 Nov</b> is the day on screen: Standby, on-call and free, on another mission (with its number), on leave, on another board, or off the roster.</li>
+      <li><b>Assign…</b> shows for people who are free and asks which of that host's missions on the day to put them on. One mission: it assigns straight away.</li>
+      <li><b>On a phone</b> each person is a card with the same four facts.</li>
+    </ul>
+  </section>
+
+  <section class="part" id="board">
+    <div class="part-head">
+      <p class="eyebrow">H2 · Board</p>
+      <h2>Find crew, from the mission you are filling</h2>
+      <p class="muted">The same list, reached without leaving the Board. <b>Find crew</b> on a mission (on the empty card, and in the card's right-click panel) sorts the available-people panel by days at that host and puts the count on each card. Dragging and clicking to assign work as they do now.</p>
+    </div>
+    <div class="frame">
+      <div class="frame-cap"><span>Mockup · Board · Wed 11 Nov 2026</span><span>Sample data</span></div>
+      <div class="frame-body">
+        <div class="board">
+          <div class="mcard">
+            <div class="mcard-top"><span class="mcard-num">RAYTH.26.0044</span><span class="small muted">Day · 08:00–17:00</span></div>
+            <div><b>Siam Brake Systems</b> <span class="muted">at</span> <b>Eastern Seaboard Plant 2</b></div>
+            <div class="mcard-empty"><span><b>No crew yet</b> · drag people here</span><span class="btn">Find crew</span></div>
+            <p class="small muted">9 people have worked at this host. 4 are free today.</p>
+          </div>
+          <div class="pool" aria-label="Available people panel">
+            <div class="lens"><span>Days at Eastern Seaboard Plant 2</span><span aria-hidden="true">×</span></div>
+            <span class="pool-label">Standby · 6</span>
+            <div class="ecard"><span>Anan P.</span><span class="badge">34 days</span></div>
+            <div class="ecard"><span>Kanya S.</span><span class="badge">12 days</span></div>
+            <div class="ecard"><span>Wichai T.</span><span class="badge low">3 days</span></div>
+            <div class="ecard"><span>Malee R.</span><span class="badge low">new here</span></div>
+            <span class="pool-label">Available on-call · 3</span>
+            <div class="ecard"><span>Somsak N.</span><span class="badge">8 days</span></div>
+            <div class="ecard"><span>Preecha L.</span><span class="badge low">new here</span></div>
+          </div>
+        </div>
+        <p class="sample-note">The × puts the panel back in its usual order. The panel's own search and area chips keep working while the sort is on.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="part">
+    <div class="part-head">
+      <p class="eyebrow">H1 and H2</p>
+      <h2>How it is built</h2>
+    </div>
+    <ol class="steps">
+      <li><b>Data:</b> none new. Days per person per host and the last day come from the Host Record (<code>deployment_history</code>), which the Host tab already loads. The day's status comes from the plan on screen.</li>
+      <li><b>One shared list</b> drawn in two places, so the Host tab and the Board can never disagree, and the same rule as the Skills matrix decides <i>experienced</i>.</li>
+      <li><b>Demo:</b> the sample data at <code>/?demo</code> already has a Host Record, so both views can be previewed there before release.</li>
+      <li><b>Order:</b> H1 first (one PR), then H2 (one PR). Each is small enough to review on a deploy preview.</li>
+    </ol>
+    <p class="muted small">Limits to know: a forecast day does not count as a day worked until it is merged, the same as everywhere else. Days counted before a host was merged or renamed follow the host, as today.</p>
+  </section>
+
+  <section class="part" id="ideas">
+    <div class="part-head">
+      <p class="eyebrow">More ideas</p>
+      <h2>Nine more helpers for assigning people</h2>
+      <p class="muted">Each one reuses data the app already has unless the tag says otherwise. Mark each one on the right, then copy your decisions at the bottom and send them back.</p>
+    </div>
+    <div class="asks" id="asks"></div>
+  </section>
+
+  <section class="part" id="stats">
+    <div class="part-head">
+      <p class="eyebrow">Missions tab · built in this PR <span class="tag done" style="margin-left:6px">Done</span></p>
+      <h2>The tiles count this year's missions</h2>
+      <p class="muted">Before, Total and Closed counted every mission ever registered, so they would only grow. Now a mission counts when it runs in the current year.</p>
+    </div>
+    <div class="frame">
+      <div class="frame-cap"><span>Mockup · Missions tab on 10 Jan 2027</span><span>Sample data</span></div>
+      <div class="frame-body">
+        <div class="tiles">
+          <div class="lead"><span>Total</span><b>41</b><small>in 2027</small></div>
+          <div class="tile" style="--c:#2a78d6"><span>Open</span><b>38</b></div>
+          <div class="tile" style="--c:#9aa3af"><span>Closed</span><b>3</b></div>
+          <div class="tile" style="--c:#e3a008"><span>No crew</span><b>2</b></div>
+          <div class="tile" style="--c:#e34948"><span>No new-year number</span><b>6</b></div>
+        </div>
+        <div class="tscroll">
+          <table>
+            <thead><tr><th>Mission</th><th>Its state on 10 Jan 2027</th><th>Counted in 2027?</th></tr></thead>
+            <tbody>
+              <tr><td>BANGN.27.0001</td><td>Open, new number entered</td><td><span class="pill free">Yes, as Open</span></td></tr>
+              <tr><td>BANGN.26.0031</td><td>Open, still waiting for its 2027 number</td><td><span class="pill free">Yes, as Open</span></td></tr>
+              <tr><td>BANGN.26.0022</td><td>Closed, last working day 5 Jan 2027</td><td><span class="pill free">Yes, as Closed</span></td></tr>
+              <tr class="dim"><td>BANGN.26.0018</td><td>Closed, last working day 20 Dec 2026</td><td><span class="pill off">No, it ended in 2026</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <ul class="plain">
+      <li><b>The rule:</b> every open mission counts. A closed mission counts when its last working day is in this year.</li>
+      <li><b>The new-year weeks need no special case.</b> A mission still on its 2026 number in January is open, so it is counted, and it keeps its place under <i>No new-year number</i> until the Site Admin enters the 2027 number.</li>
+      <li><b>Total says its year</b> (<i>in 2026</i>) and its tooltip says how many earlier missions are left out.</li>
+      <li><b>The list is unchanged.</b> Closed and All still show earlier years' missions, so nothing is lost from search, Export or Bulk edit.</li>
+    </ul>
+    <p class="muted small">One point for you to confirm (S1 below): an open mission still on a 2026 number stays counted for as long as it is open, with no cut-off after two weeks. Dropping it on a date would hide a running job from Total while it is still on the board.</p>
+  </section>
+
+  <section class="part" id="decide">
+    <div class="part-head">
+      <p class="eyebrow">Approval</p>
+      <h2>Your decisions</h2>
+      <p class="muted">Your marks are kept in this browser only. Copy the line and paste it into the chat.</p>
+    </div>
+    <div class="copybar">
+      <textarea id="out" readonly aria-label="Your decisions as text"></textarea>
+      <div class="row"><button type="button" class="btn-line" id="copy">Copy decisions</button><span class="small muted" id="copied" role="status"></span></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+
+  /* ---- H1 mockup: sample hosts and people (invented) ---- */
+  var NEED = 5;
+  var HOSTS = [
+    { name: "Eastern Seaboard Plant 2", sub: "Host · Rayong · 2 missions on 11 Nov", people: [
+      ["Anan P.", "Board Rayong", 34, "6 Nov 2026", "free", "Standby"],
+      ["Sunisa K.", "Board Rayong", 27, "10 Nov 2026", "busy", "On RAYTH.26.0031"],
+      ["Kanya S.", "Board Rayong", 12, "22 Oct 2026", "free", "Standby"],
+      ["Somsak N.", "Board Rayong · on-call", 8, "3 Sep 2026", "free", "On-call, free"],
+      ["Narong W.", "Board Rayong", 7, "10 Nov 2026", "leave", "Annual leave"],
+      ["Pim C.", "Board Chonburi", 6, "14 Aug 2026", "off", "On another board"],
+      ["Wichai T.", "Board Rayong", 3, "30 Oct 2026", "free", "Standby"],
+      ["Chai B.", "Board Rayong", 2, "12 May 2026", "busy", "On RAYTH.26.0012"],
+      ["Dao M.", "Resigned", 19, "28 Feb 2026", "off", "Off the roster"]
+    ] },
+    { name: "Eastern Seaboard Plant 5", sub: "Host · Rayong · 1 mission on 11 Nov", people: [
+      ["Sunisa K.", "Board Rayong", 15, "2 Oct 2026", "busy", "On RAYTH.26.0031"],
+      ["Wichai T.", "Board Rayong", 9, "9 Nov 2026", "free", "Standby"],
+      ["Malee R.", "Board Rayong", 1, "9 Nov 2026", "free", "Standby"]
+    ] },
+    { name: "Amata Stamping Works", sub: "Host · Chonburi · no mission on 11 Nov", people: [
+      ["Pim C.", "Board Chonburi", 41, "10 Nov 2026", "busy", "On CHNTH.26.0007"],
+      ["Kanya S.", "Board Rayong", 5, "19 Jun 2026", "free", "Standby"],
+      ["Preecha L.", "Board Chonburi · on-call", 4, "1 Jul 2026", "free", "On-call, free"],
+      ["Narong W.", "Board Rayong", 2, "11 Mar 2026", "leave", "Annual leave"]
+    ] },
+    { name: "Laem Chabang Seat Factory", sub: "Host · Chonburi · 1 mission on 11 Nov · at risk", people: [
+      ["Chai B.", "Board Rayong", 11, "17 Sep 2026", "busy", "On RAYTH.26.0012"],
+      ["Anan P.", "Board Rayong", 3, "4 Apr 2026", "free", "Standby"]
+    ] },
+    { name: "Rojana Lamp Assembly", sub: "Host · Ayutthaya · no mission on 11 Nov", people: [] }
+  ];
+  var cur = 0, filter = "all";
+  var q = document.getElementById("host-q"), list = document.getElementById("host-list");
+  function drawList() {
+    var t = q.value.trim().toLowerCase();
+    var html = "";
+    HOSTS.forEach(function (h, i) {
+      if (t && h.name.toLowerCase().indexOf(t) < 0) return;
+      var days = h.people.reduce(function (n, p) { return n + p[2]; }, 0);
+      html += '<button type="button" class="hostrow" data-i="' + i + '" aria-pressed="' + (i === cur) + '"><b>' + esc(h.name) + "</b><span>" +
+        (h.people.length ? h.people.length + " people · " + days + " days in all" : "Nobody has worked here yet") + "</span></button>";
+    });
+    list.innerHTML = html || '<p class="nomatch">No host matches.</p>';
+  }
+  function drawRecord() {
+    var h = HOSTS[cur];
+    document.getElementById("rec-name").textContent = h.name;
+    document.getElementById("rec-sub").textContent = h.sub;
+    var max = Math.max.apply(null, h.people.map(function (p) { return p[2]; }).concat([1]));
+    var rows = h.people.slice().sort(function (a, b) { return b[2] - a[2]; }).filter(function (p) {
+      return filter === "all" || (filter === "free" && p[4] === "free") || (filter === "exp" && p[2] >= NEED);
+    });
+    var free = h.people.filter(function (p) { return p[4] === "free"; }).length;
+    document.getElementById("rec-count").textContent = h.people.length + " people · " + free + " free on 11 Nov";
+    document.getElementById("rec-rows").innerHTML = rows.length ? rows.map(function (p) {
+      return '<tr class="' + (p[4] === "off" ? "dim" : "") + '"><td class="who"><b>' + esc(p[0]) + "</b><span>" + esc(p[1]) + "</span></td>" +
+        '<td class="num"><div class="daysbar"><span>' + p[2] + '</span><i style="--w:' + Math.round(p[2] / max * 100) + '%"></i></div>' +
+        (p[2] >= NEED ? '<span class="exp">experienced</span>' : "") + "</td>" +
+        "<td>" + esc(p[3]) + '</td><td><span class="pill ' + p[4] + '">' + esc(p[5]) + "</span></td>" +
+        "<td>" + (p[4] === "free" ? '<button type="button" class="act" data-n="' + esc(p[0]) + '">Assign…</button>' : "") + "</td></tr>";
+    }).join("") : '<tr><td colspan="5" class="muted">' + (h.people.length ? "Nobody matches this filter." : "Nobody has worked at this host yet.") + "</td></tr>";
+    document.getElementById("rec-toast").textContent = "";
+  }
+  q.addEventListener("input", drawList);
+  list.addEventListener("click", function (e) {
+    var b = e.target.closest(".hostrow"); if (!b) return;
+    cur = Number(b.dataset.i); drawList(); drawRecord();
+  });
+  document.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () {
+      filter = c.dataset.f;
+      document.querySelectorAll(".chip").forEach(function (x) { x.setAttribute("aria-pressed", String(x === c)); });
+      drawRecord();
+    });
+  });
+  document.getElementById("rec-rows").addEventListener("click", function (e) {
+    var b = e.target.closest(".act"); if (!b) return;
+    document.getElementById("rec-toast").textContent = "In the app: " + b.dataset.n + " goes on this host's mission for 11 Nov (it asks which, when there are two).";
+  });
+  drawList(); drawRecord();
+
+  /* ---- decisions ---- */
+  var ASKS = [
+    ["H1", "Host record with a People view", "ready", "Data ready", "The lookup itself, on the Host tab: who worked there, days, last day, free or not, Assign.", "Size: medium · the first PR"],
+    ["H2", "Find crew on the Board", "ready", "Data ready", "The same list from a mission: the available-people panel sorted by days at that host.", "Size: small, after H1"],
+    ["A1", "Bring back the last crew", "ready", "Data ready", "A mission added back to the board arrives with no crew. One button offers the people who were on it last time and says who is free today.", "Where: the empty mission card · Size: small"],
+    ["A2", "Find a replacement", "ready", "Data ready", "When someone on a mission goes on leave, offer Find replacement: free people who know that host, most days first.", "Where: the leave move and the mission panel · Size: small, after H1"],
+    ["A3", "Warn when a whole crew is new to the host", "ready", "Data ready", "Overview flags newcomer-only missions afterwards. This shows it on the card while planning, when nobody on the crew has the days to count as experienced there.", "Where: the mission card's alert line · Size: small"],
+    ["A4", "Suggest crew for an empty mission", "ready", "Data ready", "Suggest crew proposes people for the usual crew size: days at the host first, then the host's service area, then who has worked least this week. The engineer accepts, changes or ignores it.", "Where: the empty mission card · Size: medium, after H2"],
+    ["A5", "Build cover at an at-risk host", "ready", "Data ready", "A mission at a host with too few experienced people suggests one free person who is close to the mark (3 of 5 days), so cover grows on normal working days.", "Where: the mission card and Overview's Host coverage · Size: small to medium"],
+    ["A6", "Show workload when choosing", "some", "Needs one extra read", "Small marks on available people: days in a row and nights this week, so work is spread and long runs are seen before they are made longer.", "Where: the available-people panel · Size: medium"],
+    ["A7", "Borrow from another board", "ready", "Data ready", "The finder also lists free, experienced people on other boards, with Lend to this board, which opens the Lend dialog the app already has.", "Where: the People view and Find crew · Size: medium"],
+    ["A8", "Customer history", "ready", "Data ready", "The same lookup by customer: who has worked for this customer, at any host, with days. Useful when a customer opens a job at a new site.", "Where: the mission panel · Size: small, after H1"],
+    ["A9", "My gaps for tomorrow", "ready", "Data ready", "For the engineer signed in: their missions on the next working day with no crew, or fewer people than their average, as a short list with Find crew on each.", "Where: the Board's status row, and the phone's summary card · Size: medium"],
+    ["S1", "Missions tiles: open missions on an old number stay counted", "ready", "Built", "Confirm the rule as built: no cut-off date for an open mission still waiting for its new-year number.", "Approve to keep · No to add a cut-off (say after how many days)"]
+  ];
+  var KEY = "host-crew-finder.decisions", state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state = {}; }
+  var box = document.getElementById("asks"), out = document.getElementById("out");
+  box.innerHTML = ASKS.map(function (a) {
+    var id = a[0], seg = [["yes", "Approve"], ["later", "Later"], ["no", "No"]].map(function (o) {
+      return '<input type="radio" name="d-' + id + '" id="d-' + id + "-" + o[0] + '" value="' + o[0] + '"' + (state[id] === o[0] ? " checked" : "") + '><label class="' + o[0] + '" for="d-' + id + "-" + o[0] + '">' + o[1] + "</label>";
+    }).join("");
+    return '<div class="ask"><div class="ask-main"><div class="ask-title"><span class="ask-id">' + id + "</span><h3>" + esc(a[1]) + '</h3><span class="tag ' + a[2] + '">' + esc(a[3]) + "</span></div><p>" + esc(a[4]) + '</p><p class="ask-meta">' + esc(a[5]) + '</p></div><div class="seg" role="radiogroup" aria-label="Decision for ' + id + '">' + seg + "</div></div>";
+  }).join("");
+  var WORD = { yes: "approve", later: "later", no: "no" };
+  function drawOut() {
+    var marked = ASKS.filter(function (a) { return state[a[0]]; });
+    out.value = marked.length ? marked.map(function (a) { return a[0] + " " + WORD[state[a[0]]]; }).join(", ") : "Nothing marked yet.";
+  }
+  box.addEventListener("change", function (e) {
+    if (!e.target.name) return;
+    state[e.target.name.slice(2)] = e.target.value;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (err) { /* not remembered */ }
+    drawOut();
+  });
+  document.getElementById("copy").addEventListener("click", function () {
+    var done = function (ok) { document.getElementById("copied").textContent = ok ? "Copied." : "Select the text above and copy it."; };
+    out.focus(); out.select();
+    try { navigator.clipboard.writeText(out.value).then(function () { done(true); }, function () { done(false); }); } catch (err) { done(false); }
+  });
+  drawOut();
+})();
+</script>

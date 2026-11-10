@@ -33,6 +33,13 @@ every Overview section at full size on one consistent sample day (pick a board,
 switch Desktop / Phone, hover anything), with numbered markers keyed to a change
 list (1–11) that says, per section, what changes and why.
 
+## Host crew finder (2026-11-10)
+
+`host-crew-finder-proposal.html` is a standalone page for approval: where a lookup of
+"who has worked at this host, and for how many days" should live (a People view on the
+Host record, and Find crew on the Board), nine more helpers for assigning people with an
+Approve / Later / No control each, and the Missions tiles' year rule. Sample data only.
+
 ## Re-seeding the canvas
 
 The published canvas (`overview-tab-review.html`, gitignored — 2.5 MB of editor

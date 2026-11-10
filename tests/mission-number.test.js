@@ -126,3 +126,21 @@ test("the old number shows beside the new one for two weeks from the day it was 
   assert.equal(MN.showsOldNumber("2027-01-05", "2027-01-04"), false);
   assert.equal(MN.showsOldNumber(null, "2027-01-05"), false);
 });
+
+test("the Missions tiles count a mission that runs this year: every open one, and a closed one by its last working day", () => {
+  const T = "2027-01-10";
+  // open: running, whatever its number (the weeks before the new-year number is entered) or its last day on a board
+  assert.equal(MN.runsInYear({ status: "open", number: "BANGN.26.0005", lastOn: "2026-12-30" }, T), true);
+  assert.equal(MN.runsInYear({ status: "open", number: "BANGN.27.0001", lastOn: "2027-01-08" }, T), true);
+  // closed last year: left out, from 1 January
+  assert.equal(MN.runsInYear({ status: "closed", closedOn: "2026-12-20", lastOn: "2026-12-20" }, T), false);
+  assert.equal(MN.runsInYear({ status: "closed", closedOn: "2026-12-31" }, "2027-01-01"), false);
+  assert.equal(MN.runsInYear({ status: "closed", closedOn: "2026-12-31" }, "2026-12-31"), true);
+  // closed this year, even on last year's number (it ended before its new number was entered)
+  assert.equal(MN.runsInYear({ status: "closed", number: "BANGN.26.0005", closedOn: "2027-01-05" }, T), true);
+  // no closing day: its last day on a board, then the day it was closed
+  assert.equal(MN.runsInYear({ status: "closed", closedOn: null, lastOn: "2026-11-02" }, T), false);
+  assert.equal(MN.runsInYear({ status: "closed", closedAt: "2027-01-03T02:00:00Z" }, T), true);
+  // nothing to place it by: kept
+  assert.equal(MN.runsInYear({ status: "closed" }, T), true);
+});

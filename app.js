@@ -9636,7 +9636,13 @@ function missionRows() {
   return rows.slice().sort((a, b) => String(val(a)).localeCompare(String(val(b))) * dir || a.number.localeCompare(b.number) || a.shift.localeCompare(b.shift));
 }
 function renderMissionStats(bar) {
-  const all = (D().register || []).filter(r => !state.missions.boardId || r.boardId === state.missions.boardId);
+  // The tiles count the missions running this year (MissionNumber.runsInYear): every open one, and the
+  // closed ones whose last working day is in this year. A mission that ended in an earlier year is left
+  // out, and stays in the list under Closed / All.
+  const today = todayStr(), year = today.slice(0, 4);
+  const onBoard = (D().register || []).filter(r => !state.missions.boardId || r.boardId === state.missions.boardId);
+  const all = onBoard.filter(r => MissionNumber.runsInYear(r, today));
+  const earlier = onBoard.length - all.length;
   const open = all.filter(r => r.status === "open").length;
   const closed = all.length - open;
   const waiting = newYearWaiting().filter(w => w.rows.some(r => !state.missions.boardId || r.boardId === state.missions.boardId)).length;
@@ -9656,7 +9662,9 @@ function renderMissionStats(bar) {
   const tile = (label, n, kind) =>
     `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
   bar.classList.add("stats-tiles");
-  bar.innerHTML = `<div class="stat-lead" data-stat="Total"><span class="st-l">Total</span><b>${all.length}</b></div>` +
+  const leadTitle = `Missions running in ${year}: every open mission, and the closed ones whose last working day is in ${year}.`
+    + (earlier ? ` ${earlier === 1 ? "1 mission that ended before" : `${earlier} missions that ended before`} ${year} ${earlier === 1 ? "is" : "are"} not counted.` : "");
+  bar.innerHTML = `<div class="stat-lead" data-stat="Total" title="${leadTitle}"><span class="st-l">Total</span><b>${all.length}</b><small class="st-year">in ${year}</small></div>` +
     tile("Open", open, "perm") + tile("Closed", closed, "inactive") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
     (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "") +
     // the proportion bar under the tiles, as on Manpower and Host: open and closed missions
@@ -9664,7 +9672,7 @@ function renderMissionStats(bar) {
       .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
   renderPhoneViewCard({
     head: `<b>${open}</b><span class="ms-w"> open</span>`,
-    label: `${all.length} missions: ${open} open, ${closed} closed`,
+    label: `${all.length} missions in ${year}: ${open} open, ${closed} closed`,
     keys: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     bar: [["perm", open], ["inactive", closed]],
     tiles: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
