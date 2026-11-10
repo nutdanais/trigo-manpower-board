@@ -177,6 +177,7 @@ async function step(name, fn) {
       await p.waitForSelector("#modal-backdrop", { state: "hidden" });
       await p.click("#btn-new-mission");
       await p.waitForSelector("#modal-mission:not(.hidden)");
+      await p.waitForTimeout(600);   // a click on the scrim in the first moments is the second click of a double click, and is ignored
       await p.mouse.click(60, 450);
       await p.waitForSelector("#modal-backdrop", { state: "hidden" });
     });
@@ -220,9 +221,9 @@ async function step(name, fn) {
       assert.equal(emp.box, "0px");
       await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
       const hidden = await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th.col-off")].map((t) => t.textContent.trim()));
-      assert.ok(hidden.includes("Inspectors deployed"), "columns empty on every row are left out: " + hidden);
+      assert.ok(hidden.includes("People who know the site"), "columns empty on every row are left out: " + hidden);
       assert.ok(!hidden.includes("Note"), "a blank note shows + Add, so its column stays: " + hidden);
-      assert.ok(await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th:not(.col-off)")].some((t) => /Host name/.test(t.textContent))));
+      assert.ok(await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th:not(.col-off)")].some((t) => /^\s*Host\s*$/.test(t.textContent))));
     });
 
     await step("the board toolbar is the white bar of every tab, the board menu has no edge, Export is a centred dialog", async () => {

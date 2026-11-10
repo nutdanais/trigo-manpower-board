@@ -60,7 +60,7 @@ async function step(name, fn) {
     await step("Manpower: every blank field a person fills in shows + Add (mobile, start date, position)", async () => {
       for (const f of ["phone", "startDate", "position"]) {
         const b = p.locator(`#emplist-body .el-fix[data-fix=${f}]`).first();
-        assert.equal((await b.textContent()).trim(), "+ Add");
+        assert.match((await b.textContent()).trim(), /^\+ Add/, "a text button that says what it adds");
         await b.click();
         await p.waitForSelector("#modal-profile:not(.hidden) #form-employee");
         // focus moves on the next frame (renderProfile), so wait for it to leave the page

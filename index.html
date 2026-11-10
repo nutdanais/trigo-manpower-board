@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-10a">
+<link rel="stylesheet" href="styles.css?v=2026-11-10b">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-10a"></script>
+<script src="version.js?v=2026-11-10b"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -574,6 +574,11 @@
             </div>
           </div>
         </div>
+        <!-- Columns: which of the table's columns to show (kept on this device) -->
+        <div id="emplist-cols-dd" class="tb-dd">
+          <button type="button" id="btn-emplist-cols" class="btn" aria-haspopup="true" aria-expanded="false" title="Choose which columns the table shows"><svg class="ic" aria-hidden="true"><use href="#i-list"></use></svg> Columns<span id="emplist-cols-count" class="fcount hidden"></span></button>
+          <div id="emplist-cols-pop" class="tb-pop hidden" aria-label="Columns"></div>
+        </div>
       </div>
       <!-- Host's search/filters — same idea, folded up from its old standalone
            panel-level row. -->
@@ -591,6 +596,11 @@
           <div class="ms" data-filter="status"><button type="button" class="ms-btn">Status: All</button><div class="ms-pop hidden"></div></div>
         </div>
           </div>
+        </div>
+        <!-- Columns: which of the table's columns to show (kept on this device) -->
+        <div id="hostlist-cols-dd" class="tb-dd">
+          <button type="button" id="btn-hostlist-cols" class="btn" aria-haspopup="true" aria-expanded="false" title="Choose which columns the table shows"><svg class="ic" aria-hidden="true"><use href="#i-list"></use></svg> Columns<span id="hostlist-cols-count" class="fcount hidden"></span></button>
+          <div id="hostlist-cols-pop" class="tb-pop hidden" aria-label="Columns"></div>
         </div>
       </div>
       <!-- Missions tab (migration-2026-11-09): search, board, status and the new-year numbers.
@@ -799,21 +809,23 @@
       <table id="emplist-table">
         <thead>
           <tr>
-            <th class="el-check"><input type="checkbox" id="emplist-select-all" title="Select all"></th>
-            <th data-sort="name">Name</th>
-            <th data-sort="trigoId">TRIGO ID</th>
-            <th data-sort="contract" title="Contract type">Contract</th>
-            <th data-sort="position">Position</th>
-            <th data-sort="phone" title="Mobile number">Mobile</th>
-            <th data-sort="startDate">Start date</th>
-            <th data-sort="service" title="Years of service">Service</th>
-            <th data-sort="areaId">Service area</th>
-            <th data-sort="boardId">Current board</th>
-            <th data-sort="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for. It keeps its own rule: the columns to its right (Worked, Leave, Leave share) count planned working days only, as History does.">30D utilization</th>
-            <th data-sort="worked" class="el-wl r" title="Days on a mission in the period, on planned working days (a day with no missions on the person's board is left out, as in Overview History). Shown to roles that can see Overview History.">Worked</th>
-            <th data-sort="leaveDays" class="el-wl r" title="Days on leave in the period (annual, sick, business, unpaid). Exchange Working Day is not leave: it is worked back.">Leave</th>
-            <th data-sort="leaveShare" class="el-wl r" title="Leave days as a share of the working days in the period: amber above 20%, red above 30%. Click to sort, to find who takes the most leave.">Leave share</th>
-            <th data-sort="active">Status</th>
+            <th class="el-check" data-col="check"><input type="checkbox" id="emplist-select-all" title="Select all"></th>
+            <th data-sort="name" data-col="person" data-keep>Person</th>
+            <th data-sort="status" data-col="status" data-keep title="Whether the person is on the roster (Active, Inactive for now or Resigned), and under it what needs a look: no TRIGO ID, no service area, or a leave share above 20% (red above 30%) in the period on screen.">Status</th>
+            <th data-sort="boardId" data-col="boardarea" data-keep title="The board the person works on, and their service area. Someone lent out shows where, and until when.">Board and area</th>
+            <th data-sort="contract" data-col="contract" title="Contract type, and since when">Contract</th>
+            <th data-sort="phone" data-col="phone" title="Mobile number">Mobile</th>
+            <th data-sort="util" data-col="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for. It keeps its own rule: the columns to its right (Worked, Leave, Leave share) count planned working days only, as History does.">30D utilization</th>
+            <th data-sort="worked" data-col="wl" class="el-wl r" title="Days on a mission and days on leave in the period, on planned working days (a day with no missions on the person's board is left out, as in Overview History), and under them the leave share: amber above 20%, red above 30%. Exchange Working Day is not leave: it is worked back. Shown to roles that can see Overview History.">Worked · Leave</th>
+            <th data-sort="trigoId" data-col="trigoId" class="m-x-h">TRIGO ID</th>
+            <th data-sort="position" data-col="position">Position</th>
+            <th data-sort="startDate" data-col="startDate">Start date</th>
+            <th data-sort="service" data-col="service" title="Years of service">Service</th>
+            <th data-sort="areaId" data-col="areaId">Service area</th>
+            <th data-sort="worked" data-col="worked" class="el-wl r" title="Days on a mission in the period, on planned working days. Shown to roles that can see Overview History.">Worked</th>
+            <th data-sort="leaveDays" data-col="leaveDays" class="el-wl r" title="Days on leave in the period (annual, sick, business, unpaid). Exchange Working Day is not leave: it is worked back.">Leave</th>
+            <th data-sort="leaveShare" data-col="leaveShare" class="el-wl r" title="Leave days as a share of the working days in the period: amber above 20%, red above 30%. Click to sort, to find who takes the most leave.">Leave share</th>
+            <th class="el-act" data-col="actions" data-keep aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody id="emplist-body"></tbody>
@@ -843,17 +855,27 @@
         <select id="hostlist-person" aria-label="Show the hosts one person has worked"></select></label>
     </div>
     <div class="table-wrap hidden" id="hostlist-matrix-wrap"></div>
+    <div id="hostlist-bulkbar" class="hidden">
+      <span id="hostlist-bulk-count"></span>
+      <button type="button" class="btn btn-small" id="hostlist-bulk-archive">Archive</button>
+      <button type="button" class="btn btn-small" id="hostlist-bulk-activate">Make active</button>
+      <button type="button" class="btn btn-small" id="hostlist-bulk-clear">Clear selection</button>
+    </div>
     <div class="table-wrap" id="hostlist-list-wrap">
       <table id="hostlist-table">
         <thead>
           <tr>
-            <th data-sort="name">Host name</th>
-            <th data-sort="location">Location</th>
-            <th data-sort="area" title="Which service area this host sits in. The same pill shows on every mission card for the host.">Service area</th>
-            <th data-sort="note" title="Anything the crew needs to know about this site — gate, contact, a PPE reminder. It also shows on every mission card for this host, at the front of the PPE line.">Note</th>
-            <th data-sort="inspectors" title="Every inspector ever deployed to this host, with how many days each has worked there. Sorts by how many inspectors know the site.">Inspectors deployed</th>
-            <th data-sort="boards" title="Which boards this host's missions belong to.">Boards</th>
-            <th data-sort="status" title="Archived hosts keep their row and all of their history here, but are no longer offered when creating a mission. Use it for a site you no longer serve — a duplicate or a typo should be merged instead.">Status</th>
+            <th class="el-check" data-col="check"><input type="checkbox" id="hostlist-select-all" title="Select all"></th>
+            <th data-sort="name" data-col="host" data-keep>Host</th>
+            <th data-sort="status" data-col="status" data-keep title="Whether the host is Active or Archived, and under it what needs a look: no location or Maps link, or too few experienced people left (at risk). Archived hosts keep their row and all of their history here, but are no longer offered when creating a mission. Use it for a site you no longer serve — a duplicate or a typo should be merged instead.">Status</th>
+            <th data-sort="boardFirst" data-col="boardarea" data-keep title="Which boards this host's missions belong to, and which service area it sits in. The same area shows on every mission card for the host.">Board and area</th>
+            <th data-sort="exp" data-col="people" title="How many people are experienced at this site (Settings → Host experience), and under it how many people have ever worked there and how many days in all. Sorts by how many are experienced.">People who know the site</th>
+            <th data-sort="lastWorked" data-col="lastWorked" title="The last day anyone worked at this host.">Last worked</th>
+            <th data-sort="note" data-col="note" title="Anything the crew needs to know about this site — gate, contact, a PPE reminder. It also shows on every mission card for this host, at the front of the PPE line.">Note</th>
+            <th data-sort="location" data-col="location">Location</th>
+            <th data-sort="area" data-col="area" title="Which service area this host sits in. The same pill shows on every mission card for the host.">Service area</th>
+            <th data-sort="inspectors" data-col="inspectors" title="How many people have ever been deployed to this host. Sorts by how many people know the site.">People</th>
+            <th class="hl-act" data-col="actions" data-keep aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody id="hostlist-body"></tbody>
@@ -865,24 +887,33 @@
        shift. Open missions carry over; Close ends one. renderMissionList() in app.js. -->
   <section id="missions-panel" class="hidden">
     <div id="missions-alert" class="hidden" role="status"></div>
+    <div id="missions-bulkbar" class="hidden">
+      <span id="missions-bulk-count"></span>
+      <button type="button" class="btn btn-small" id="missions-bulk-close">Close…</button>
+      <button type="button" class="btn btn-small" id="missions-bulk-clear">Clear selection</button>
+    </div>
     <div class="table-wrap" id="missions-list-wrap">
       <table id="missions-table">
         <thead>
           <tr>
-            <th data-sort="number" class="mcol-number">Mission No.</th>
-            <th data-sort="status" data-keep class="mcol-status" title="Which board the mission is on and where it is now (on its board, hidden there, off the board, not started or closed), then what needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.">Board and status</th>
-            <th data-sort="shift" class="mcol-shift">Shift</th>
-            <th data-sort="startTime" class="mcol-time" title="The start and end time from the mission's latest day on the board.">Time</th>
-            <th data-sort="customer" class="mcol-customer">Customer</th>
-            <th data-sort="host" class="mcol-host">Host</th>
-            <th data-sort="engineer" class="mcol-engineer" title="Trigo responsible">Responsible</th>
-            <th data-sort="openedOn" class="mcol-openedOn" title="The first day this mission was on the board">Start date</th>
-            <th data-sort="lastOn" class="mcol-lastOn" title="The latest day this mission is on the board">Last on board</th>
-            <th class="num mcol-crew" data-sort="crew" data-keep title="The number of people on the mission on the day shown at the top, from its own board.">Crew <small id="missions-crew-date" class="ml-th-date"></small></th>
-            <th class="num mcol-avgCrew" data-sort="avgCrew" data-keep title="The average number of people on the mission each working day, over the last 4 weeks. Days it was hidden or not on the board do not count.">Avg crew</th>
-            <th data-sort="ppe" class="mcol-ppe" title="The protective equipment the mission asks for, from its latest day on the board.">PPE</th>
-            <th data-sort="remark" class="mcol-remark" title="The mission's remark, from its latest day on the board.">Remark</th>
-            <th class="ml-actions-h" data-keep><span class="sr-only">Actions</span></th>
+            <th class="el-check" data-col="check"><input type="checkbox" id="missions-select-all" title="Select all"></th>
+            <th data-sort="number" data-col="mission" data-keep class="ml-first-h" title="The mission number (a gold star beside it: the mission is highlighted on the board that day), and under it the customer.">Mission</th>
+            <th data-sort="status" data-col="status" data-keep title="Where the mission is now (on its board, hidden there, off the board, not started or closed), then what needs a look: no crew, hidden or off the board for over 5 working days (close it if the job has ended), a missing new-year number, no Trigo responsible.">Status</th>
+            <th data-sort="board" data-col="boardarea" data-keep title="Which board the mission is on, and the service area of its host.">Board and area</th>
+            <th data-sort="host" data-col="host" title="The host (a link that opens the Host tab with that host's row marked) and under it the Trigo responsible.">Host and responsible</th>
+            <th data-sort="shift" data-col="shift" title="Day or Night, and under it the start and end time from the mission's latest day on the board.">Shift</th>
+            <th data-sort="openedOn" data-col="onboard" title="The first and the latest day this mission is on the board.">On the board</th>
+            <th class="num" data-sort="crew" data-col="crew" title="The number of people on the mission on the day shown at the top, from its own board, and under it the average per working day over the last 4 weeks (days it was hidden or not on the board do not count).">Crew <small id="missions-crew-date" class="ml-th-date"></small></th>
+            <th data-sort="ppe" data-col="note" title="The protective equipment the mission asks for and its remark, from its latest day on the board.">Note</th>
+            <th data-sort="customer" data-col="customer">Customer</th>
+            <th data-sort="engineer" data-col="engineer" title="Trigo responsible">Responsible</th>
+            <th data-sort="startTime" data-col="startTime" title="The start and end time from the mission's latest day on the board.">Time</th>
+            <th data-sort="openedOn" data-col="openedOn" title="The first day this mission was on the board">Start date</th>
+            <th data-sort="lastOn" data-col="lastOn" title="The latest day this mission is on the board">Last on board</th>
+            <th class="num" data-sort="avgCrew" data-col="avgCrew" title="The average number of people on the mission each working day, over the last 4 weeks. Days it was hidden or not on the board do not count.">Avg crew</th>
+            <th data-sort="ppe" data-col="ppe" title="The protective equipment the mission asks for, from its latest day on the board.">PPE</th>
+            <th data-sort="remark" data-col="remark" title="The mission's remark, from its latest day on the board.">Remark</th>
+            <th class="ml-actions-h" data-col="actions" data-keep aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody id="missions-body"></tbody>
@@ -1690,22 +1721,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-10a"></script>
-<script src="i18n-th.js?v=2026-11-10a"></script>
-<script src="planning.js?v=2026-11-10a"></script>
-<script src="employee-id.js?v=2026-11-10a"></script>
-<script src="mission-number.js?v=2026-11-10a"></script>
-<script src="mission-activity.js?v=2026-11-10a"></script>
+<script src="i18n.js?v=2026-11-10b"></script>
+<script src="i18n-th.js?v=2026-11-10b"></script>
+<script src="planning.js?v=2026-11-10b"></script>
+<script src="employee-id.js?v=2026-11-10b"></script>
+<script src="mission-number.js?v=2026-11-10b"></script>
+<script src="mission-activity.js?v=2026-11-10b"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-10a"></script>
-<script src="cloud.js?v=2026-11-10a"></script>
-<script src="charts.js?v=2026-11-10a"></script>
-<script src="xlsx-export.js?v=2026-11-10a"></script>
-<script src="orgchart-pptx.js?v=2026-11-10a"></script>
-<script src="bulk-edit.js?v=2026-11-10a"></script>
-<script src="app.js?v=2026-11-10a"></script>
-<script src="report.js?v=2026-11-10a"></script>
-<script src="present.js?v=2026-11-10a"></script>
+<script src="demo/demo-gate.js?v=2026-11-10b"></script>
+<script src="cloud.js?v=2026-11-10b"></script>
+<script src="charts.js?v=2026-11-10b"></script>
+<script src="xlsx-export.js?v=2026-11-10b"></script>
+<script src="orgchart-pptx.js?v=2026-11-10b"></script>
+<script src="bulk-edit.js?v=2026-11-10b"></script>
+<script src="app.js?v=2026-11-10b"></script>
+<script src="report.js?v=2026-11-10b"></script>
+<script src="present.js?v=2026-11-10b"></script>
 </body>
 </html>

@@ -1,10 +1,10 @@
 /* The Manpower List keeps to the page's width (desktop):
      - at 1600 px the whole table fits beside the header: the page has no sideways scroll and the box isn't a
        scroller (so the headers can stay sticky under the top bar);
-     - someone lent out reads "LCB Port → Rayong" with "until …" on its own line, so one loan doesn't widen
-       the Current board column for everyone;
+     - someone lent out reads "→ Rayong until …" on the second line of Board and area, so one loan doesn't widen
+       that column for everyone;
      - Years of service reads "7y 8m" on one line, and copies with plain spaces;
-     - at 1100 px, too narrow for every column, the table's own box scrolls sideways (.tw-scroll), never the page.
+     - at 700 px, too narrow for every column, the table's own box scrolls sideways (.tw-scroll), never the page.
    Run: node tests/e2e/manpower-fit.e2e.js */
 "use strict";
 const assert = require("assert");
@@ -52,23 +52,26 @@ async function step(name, fn) {
       assert.equal(m.th, "sticky");
 
       const cell = a.page.locator("#emplist-body tr", { hasText: "T300" }).locator('td[data-label="Current board"]');
-      assert.equal((await cell.textContent()).replace(/\s+/g, " ").trim().startsWith("Non-Rayong → Rayong until"), true);
+      // someone lent out: their board on line 1, and "→ Rayong until …" on line 2 in place of the service area
+      assert.equal((await cell.locator(".lt-l1").textContent()).trim(), "Non-Rayong");
+      assert.equal((await cell.locator(".lt-l2").textContent()).replace(/\s+/g, " ").trim().startsWith("→ Rayong until"), true);
       const lines = await cell.evaluate((td) => {
-        const small = td.querySelector(".el-loan small"), to = td.querySelector(".el-loan");
-        return { untilBelow: small.getBoundingClientRect().top >= to.getBoundingClientRect().top + 8, block: getComputedStyle(small).display };
+        const l2 = td.querySelector(".lt-l2"), small = td.querySelector(".el-loan small");
+        return { oneLine: l2.getBoundingClientRect().height < 24, inline: getComputedStyle(small).display };
       });
-      assert.deepEqual(lines, { untilBelow: true, block: "block" }, '"until …" sits on its own line');
-      // the loan's column is no wider than one without it would need for "Non-Rayong → Rayong"
+      assert.deepEqual(lines, { oneLine: true, inline: "inline" }, "the loan, with its end date, is one line");
+      // the loan's column is no wider than one without it would need
       const col = await cell.evaluate((td) => td.getBoundingClientRect().width);
-      assert.ok(col < 240, `Current board stays narrow (${Math.round(col)} px)`);
+      assert.ok(col < 300, `Board and area stays narrow (${Math.round(col)} px)`);
+      assert.equal(await cell.locator(".lt-l2").evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true, "the loan and its date are shown whole, not cut");
 
       const svc = await a.page.evaluate(() => [...document.querySelectorAll('#emplist-body td[data-label="Years of service"]')].map((td) => td.textContent));
       assert.ok(svc.every((t) => /^(\d+y( \d+m)?|\d+m|\d+d)$/.test(t)), "short, with plain spaces: " + svc.map((t) => JSON.stringify(t)).join(", "));
       await a.close();
     });
 
-    await step("1100 px: too narrow for every column, so the table's box scrolls sideways, never the page", async () => {
-      const a = await open(1100);
+    await step("700 px: too narrow for every column, so the table's box scrolls sideways, never the page", async () => {
+      const a = await open(700);
       const m = await measure(a.page);
       assert.equal(m.page, m.vw, "the page is no wider than the window");
       assert.equal(m.scroller, true);

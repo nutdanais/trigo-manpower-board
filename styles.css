@@ -2925,7 +2925,7 @@ body.exporting #app-root { margin-right: 0; }
 #emplist-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 #emplist-count { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
 
-#emplist-bulkbar {
+#emplist-bulkbar, #hostlist-bulkbar, #missions-bulkbar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2936,7 +2936,7 @@ body.exporting #app-root { margin-right: 0; }
   padding: 8px 10px;
   margin-bottom: 10px;
 }
-#emplist-bulkbar span { font-size: 13px; font-weight: 700; color: var(--primary-text); }
+:is(#emplist-bulkbar, #hostlist-bulkbar, #missions-bulkbar) span { font-size: 13px; font-weight: 700; color: var(--primary-text); }
 #emplist-bulkbar select {
   padding: 5px 8px;
   border: 1px solid var(--border);
@@ -5650,10 +5650,7 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
   #emplist-table td.el-wrap { white-space: normal; min-width: 8.6em; line-height: 1.3; }
   #emplist-table td.el-svc { white-space: nowrap; }   /* "7y 8m": serviceShortHtml in app.js */
   #emplist-table td.el-svc .el-nw { white-space: nowrap; }
-  /* someone lent out: "LCB Port → Rayong", and "until Mon 30 Nov 2026" under it, so one loan doesn't
-     widen the column for everyone */
-  #emplist-table td.el-board .el-loan small { display: block; line-height: 1.25; }
-  #emplist-table td.el-board { line-height: 1.3; }
+  /* someone lent out: "→ Rayong until Mon 30 Nov 2026" is the second line of Board and area (the lt-l2 line) */
   /* a long header ("Years of service", "30D utilization") may take two lines rather than set its column's width */
   #emplist-table th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
   /* still too wide for the window: the box scrolls sideways (fitListTable in app.js); its headers then sit at
@@ -6339,11 +6336,11 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   #emplist-table thead th.el-check::after { text-transform: none; }
   :is(#emplist-table, #hostlist-table) tr:not(.m-open) td.m-x { display: none; }
   #hostlist-table td { width: auto !important; align-self: stretch; }
-  /* the card's footer: More details on the left, the Active switch on the right */
-  :is(#emplist-table, #hostlist-table) td:is(.el-status, .hl-status) {
+  /* the card's footer: More details on the left, the ⋯ menu on the right */
+  :is(#emplist-table, #hostlist-table) td:is(.el-act, .hl-act) {
     flex-direction: row; align-items: center; justify-content: space-between; gap: 10px;
   }
-  :is(#emplist-table, #hostlist-table) td:is(.el-status, .hl-status)::before { content: none; }
+  :is(#emplist-table, #hostlist-table) td:is(.el-act, .hl-act)::before { content: none; }
   .m-fold {
     display: inline-flex; align-items: center; min-height: 36px; padding: 0; border: 0; background: none;
     font: inherit; font-size: 13px; font-weight: 600; color: var(--primary-text); cursor: pointer;
@@ -7564,25 +7561,6 @@ td.ml-status { min-width: 150px; max-width: 280px; }
 #missions-table .ml-more .ic { width: 16px; height: 16px; }
 @media (min-width: 641px) { #missions-table .ml-more { border-color: transparent; background: none; color: var(--muted); } #missions-table .ml-more:hover { background: var(--hover-tint); color: var(--text); } }
 /* the Columns list */
-#missions-cols-pop { display: flex; flex-direction: column; gap: 2px; padding: 8px; min-width: 210px; }
-#missions-cols-pop .ms-opt { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-#missions-cols-pop .ms-opt:hover { background: var(--hover-tint); }
-#missions-cols-pop .btn { margin-top: 6px; align-self: flex-start; }
-@media (max-width: 640px) { #missions-cols-dd { display: none; } }
-/* a column switched off in Columns (a phone's cards keep every field) */
-@media (min-width: 641px) {
-  #missions-table[data-hide~="shift"] .mcol-shift { display: none; }
-  #missions-table[data-hide~="time"] .mcol-time { display: none; }
-  #missions-table[data-hide~="customer"] .mcol-customer { display: none; }
-  #missions-table[data-hide~="host"] .mcol-host { display: none; }
-  #missions-table[data-hide~="engineer"] .mcol-engineer { display: none; }
-  #missions-table[data-hide~="openedOn"] .mcol-openedOn { display: none; }
-  #missions-table[data-hide~="lastOn"] .mcol-lastOn { display: none; }
-  #missions-table[data-hide~="crew"] .mcol-crew { display: none; }
-  #missions-table[data-hide~="avgCrew"] .mcol-avgCrew { display: none; }
-  #missions-table[data-hide~="ppe"] .mcol-ppe { display: none; }
-  #missions-table[data-hide~="remark"] .mcol-remark { display: none; }
-}
 .ml-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 @media (max-width: 640px) { .ml-stack { align-items: flex-end; } }
 
@@ -7623,3 +7601,62 @@ td.ml-status { min-width: 150px; max-width: 280px; }
 .lt-empty { color: var(--lt-dash); }
 /* inside a profile or mission fact tile, the service area takes the tile's weight like its neighbours */
 .ov-eng-facts b .lt-ar { font-weight: inherit; }
+
+/* ===== List tables, Batch B: two-line rows, one column order (design/handover-list-tabs.md, section 5) ===== */
+.lt-c { display: block; min-width: 0; max-width: 260px; overflow: hidden; line-height: 1.25; }
+.lt-l1, .lt-l2 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lt-l1 { min-height: 20px; line-height: 20px; }
+.lt-l2 { font-size: 12.5px; line-height: 18px; color: var(--muted); }
+.lt-l1 .lt-st { vertical-align: top; }
+.lt-name { font-weight: 600; }
+.lt-name .el-name-en { display: inline; margin-left: 6px; font-weight: 400; color: var(--muted); }
+.lt-muted { color: var(--muted); }
+.lt-l2 .lt-al { max-width: 100%; }
+.lt-l2 .lt-more { margin-left: 4px; }
+.lt-l2 .el-loan small { display: inline; }
+.lt-dots { padding: 3px 7px; }
+.lt-dots .ic { width: 16px; height: 16px; }
+.ov-share-t-warn { color: var(--warn-text); font-weight: 600; }
+.ov-share-t-bad { color: var(--danger-text); font-weight: 600; }
+td.r .lt-l1, td.r .lt-l2 { text-align: right; }
+@media (min-width: 641px) {
+  :is(#emplist-table, #hostlist-table, #missions-table) td { height: 56px; }
+  .lt-c { max-height: 44px; }
+  .lt-col-off { display: none; }
+  /* the ⋯ is quiet until it is wanted, as on Missions */
+  .lt-dots { border-color: transparent; background: none; color: var(--muted); }
+  .lt-dots:hover { background: var(--hover-tint); color: var(--text); }
+  /* "+ Add" sits in the cell where the value would be, and shows when the row is hovered or focused */
+  @media (hover: hover) {
+    .lt-add { opacity: 0; transition: opacity .12s ease; }
+    tr:hover .lt-add, tr:focus-within .lt-add, .lt-add:focus-visible { opacity: 1; }
+  }
+  :is(#hostlist-table, #missions-table) :is(th, td).el-check { width: 30px; cursor: default; }
+  :is(#hostlist-table, #missions-table) .el-check input { width: auto; margin: 0; }
+  :is(#hostlist-table, #missions-table) tbody tr.selected td { background: var(--pool-tint); }
+  td.el-act, th.el-act, td.hl-act, td.ml-actions { width: 1%; white-space: nowrap; text-align: right; }
+  .m-fold { display: none; }
+}
+/* a card shows every field once: a second line that repeats a column of its own is left out, that column is shown
+   in its place, and a column made only of facts the card lists elsewhere is left out */
+@media (max-width: 640px) {
+  .lt-l2:not(.lt-keep) { display: none; }
+  :is(#emplist-table, #hostlist-table, #missions-table) td.lt-ph-off { display: none; }   /* beats each table's own td { display: flex } */
+  .lt-c { max-width: none; }
+  .lt-l1, .lt-l2 { white-space: normal; text-align: right; }
+  td.el-name .lt-l1, td.hl-name .lt-l1, td.ml-first .lt-l1 { text-align: left; }
+  #emplist-table td.el-act, #hostlist-table td.hl-act { border-bottom: none; }
+  :is(#hostlist-table, #missions-table) td.el-check { position: absolute; top: 12px; right: 12px; padding: 0; border: none; }
+  :is(#hostlist-table, #missions-table) tbody tr { position: relative; }
+  :is(#hostlist-table, #missions-table) td.el-check input { width: 22px; height: 22px; }
+  #emplist-cols-dd, #hostlist-cols-dd, #missions-cols-dd { display: none; }
+}
+#emplist-cols-pop, #hostlist-cols-pop, #missions-cols-pop { display: flex; flex-direction: column; gap: 2px; padding: 8px; min-width: 210px; }
+:is(#emplist-cols-pop, #hostlist-cols-pop, #missions-cols-pop) .ms-opt { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+:is(#emplist-cols-pop, #hostlist-cols-pop, #missions-cols-pop) .ms-opt:hover { background: var(--hover-tint); }
+:is(#emplist-cols-pop, #hostlist-cols-pop, #missions-cols-pop) .btn { margin-top: 6px; align-self: flex-start; }
+.ml-star { display: inline-flex; vertical-align: -2px; margin-right: 4px; color: #e3a008; }
+.ml-star .ic { width: 13px; height: 13px; fill: currentColor; }
+.ml-first .ml-was { display: none; }
+#missions-table td.ml-crew .lt-l1 { font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .ml-first .ml-was { display: block; } }
