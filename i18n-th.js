@@ -3136,3 +3136,26 @@ I18N.add({
   "{num}m": "{num} ด.",
   "{num}d": "{num} ว.",
 });
+
+/* The record panel: Employee and Mission (design/handover-list-tabs.md, Batch C) */
+I18N.add({
+  "optional": "ไม่บังคับ",
+  "Job": "งาน",
+  "Contact": "ติดต่อ",
+  "Activate": "เปิดใช้งาน",
+  "Deactivate…": "ปิดใช้งาน…",
+  "Deactivated on": "ปิดใช้งานเมื่อ",
+  "+ Add TRIGO ID": "+ เพิ่ม TRIGO ID",
+  "+ Add service area": "+ เพิ่มพื้นที่บริการ",
+  "+ Add responsible": "+ เพิ่มผู้รับผิดชอบ",
+  "No TRIGO ID": "ไม่มี TRIGO ID",
+  "Two people with the same name can only be told apart by their TRIGO ID.": "คนที่ชื่อเหมือนกันแยกกันได้ด้วย TRIGO ID เท่านั้น",
+  "This person is not in a service area, so no area chip or filter counts them.": "คนนี้ไม่ได้อยู่ในพื้นที่บริการใด จึงไม่ถูกนับในชิปหรือตัวกรองพื้นที่",
+  "First day": "วันแรก",
+  "Latest day": "วันล่าสุด",
+  "at": "ที่",
+  "its latest day on the board": "เป็นวันล่าสุดของมิชชั่นบนบอร์ด",
+}, {
+  "Leave {a}%": "ลา {a}%",
+  "Leave is {a}% of the working days in this period.": "วันลาคิดเป็น {a}% ของวันทำงานในช่วงนี้",
+});

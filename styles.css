@@ -5423,15 +5423,6 @@ body.board-view #toolbar-row2 #area-bar { gap: 6px 8px; margin-top: 0; }
 .seg-pick button:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
 .modal-side .form-row > label { min-width: 0; }
 
-/* New employee: the one form */
-#modal-employee.modal-side { max-height: none; }   /* the older #modal-employee rule capped it at 90vh */
-#modal-employee.modal-side .employee-pane-stack { display: block; padding-top: 6px; }
-#modal-employee.modal-side .settings-pane { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 0; overflow: visible; }
-#modal-employee.modal-side .settings-pane.hidden { display: none !important; visibility: visible !important; }
-#modal-employee.modal-side .settings-pane form { flex: 1 1 auto; display: flex; flex-direction: column; }
-#modal-employee.modal-side .settings-pane > .modal-actions,
-#modal-employee.modal-side .settings-pane form > .modal-actions { margin: auto -22px 0; position: sticky; bottom: 0; }
-
 @media (max-width: 640px) {
   #modal-backdrop:has(.modal-side:not(.hidden)) { align-items: flex-end; justify-content: stretch; }
   .modal.modal-side {
@@ -7184,25 +7175,13 @@ label > .pk { margin-top: 5px; }
 .ov-flagn small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
 @media (max-width: 560px) { .ov-flagrow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ov-flagn { grid-column: 1 / -1; } }
 /* the employee profile: a wide side panel, full screen on a phone */
-#modal-profile.modal-side { width: min(1040px, 100vw); }
 .profile-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 22px 24px; display: flex; flex-direction: column; gap: 12px; }
-.ov-prof-id { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-.ov-prof-id > div { overflow-wrap: anywhere; }
 .ov-prof-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 0; }
 @media (max-width: 860px) { .ov-prof-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.ov-prof-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
 .ov-prof-block { min-width: 0; }
 .ov-prof-hosts td { white-space: nowrap; }
 .ov-prof-note { margin: 0 0 6px; font-size: 13px; }
 .profile-body .ov-hchart { margin-top: 0; }
-/* Details: the facts, or the form that edits them */
-.ov-prof-details-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-.ov-prof-details-head .ov-eng-foot-h { margin: 0; }
-.ov-prof-details-acts { display: flex; gap: 6px; flex-wrap: wrap; }
-.ov-prof-details form { padding: 0; }
-.ov-prof-details form > .form-group:first-child { margin-top: 4px; }
-/* the form's own buttons sit under it, not pinned to the panel's foot like a record dialog's */
-.ov-prof-details .modal-actions { position: static; margin: 8px 0 0; padding: 12px 0 0; background: none; }
 /* Leave record */
 .ov-prof-lv-sum { margin: 2px 0 6px; font-size: 13px; }
 .ov-prof-lv-sum b { font-size: 17px; font-variant-numeric: tabular-nums; }
@@ -7526,12 +7505,6 @@ body.presenting-board.pres-hide-names .emp-name::before { content: "•••"; 
 
 
 /* ===== Mission detail: read first, like the Manpower profile (renderMissionDetail in app.js) ===== */
-#modal-mission.modal-side.md-detail { width: min(880px, 100vw); }
-.md-facts { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.md-facts b { font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
-.md-facts small { font-weight: 400; }
-.md-facts .wide { grid-column: 1 / -1; }
-@media (max-width: 640px) { .md-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .md-facts b { font-size: 13.5px; } }
 /* a pill or a tag inside a fact keeps its own width (the facts grid makes every span a block) */
 .md-crew { display: flex; flex-wrap: wrap; gap: 6px; }
 .md-bars { display: flex; align-items: flex-end; gap: 3px; height: 88px; border-bottom: 1px solid var(--border); }
@@ -7541,12 +7514,6 @@ body.presenting-board.pres-hide-names .emp-name::before { content: "•••"; 
 .md-bar.hid { height: 28%; background: repeating-linear-gradient(135deg, var(--border) 0 3px, transparent 3px 6px); }
 .md-bar.on { outline: 2px solid var(--primary-text); outline-offset: 1px; }
 .md-axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-
-/* the people who have worked on a mission (the detail panel): Host's chips, clickable; outlined when on it that day */
-.md-person { font: inherit; cursor: pointer; }
-.md-person b { margin-left: 6px; }
-.hl-insp.md-person.now { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
-.hl-insp.md-person:hover { background: var(--hover-tint); }
 
 /* a highlighted mission, in the Missions tab's Status and alerts and nowhere else: the board's gold */
 .ml-tag.ml-hl { display: inline-flex; align-items: center; gap: 4px; background: #e3a008; border: 1px solid #c98f06; color: #3d2a00; font-weight: 700; }
@@ -7623,3 +7590,103 @@ td.ml-status { min-width: 150px; max-width: 280px; }
 .lt-empty { color: var(--lt-dash); }
 /* inside a profile or mission fact tile, the service area takes the tile's weight like its neighbours */
 .ov-eng-facts b .lt-ar { font-weight: inherit; }
+
+
+/* ===== The record panel: Employee and Mission, in read and in edit (design/handover-list-tabs.md, section 6) =====
+   One width for the profile, the mission panel and their forms. The header (the name or number, the status, what
+   it is, the actions) does not scroll; the body does; a form's footer is pinned under it. */
+.modal.modal-side.modal-record { width: min(760px, 100vw); }
+#modal-employee.modal-side { max-height: none; }   /* the older #modal-employee rule capped it at 90vh */
+.rp-head { flex: none; border-bottom: 1px solid var(--border); background: var(--panel); position: relative; z-index: 3; }
+.rp-head h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; padding: 16px 56px 8px 22px; border-bottom: 0; margin: 0; position: relative; top: auto; }
+.rp-head h3 .modal-close { top: 14px; transform: none; }
+.rp-t1 { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.rp-title { font-size: 18px; font-weight: 700; letter-spacing: -.2px; overflow-wrap: anywhere; }
+.rp-status { display: inline-flex; }
+.rp-sub, .modal h3 .h3-sub.rp-sub { flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; font-size: 13px; font-weight: 400; color: var(--muted); letter-spacing: 0; min-width: 0; }
+.rp-sub:empty { display: none; }
+.rp-sub .ov-muted { color: var(--muted); }
+/* line 3: at most two buttons and More */
+.rp-acts { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 2px 22px 12px; }
+.rp-acts.hidden { display: none; }
+.rp-acts .btn { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+.rp-acts .btn-edit { border-color: var(--primary-text); color: var(--primary-text); font-weight: 600; }
+.rp-acts .btn-edit:hover { background: var(--hover-tint); }
+.rp-more { position: absolute; z-index: 20; top: calc(100% - 8px); left: 22px; min-width: 210px; padding: 5px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 28px rgba(8, 40, 80, .22); display: flex; flex-direction: column; }
+.rp-more-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 6px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.rp-more-item:hover, .rp-more-item:focus-visible { background: var(--hover-tint); outline: none; }
+.rp-more-item .ic { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.rp-more-item.danger { color: var(--danger-text); }
+.rp-more-item.danger .ic { color: inherit; }
+.rp-more-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+/* the body: groups of label and value pairs, no boxes; the key numbers are the only cards */
+.profile-body.rp-body { gap: 18px; }
+.rp-group { min-width: 0; }
+.rp-gh { margin: 0 0 8px; font-size: 12px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+.rp-dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.rp-dl > div { min-width: 0; }
+.rp-dl dt { color: var(--muted); font-size: 12.5px; font-weight: 400; margin: 0 0 1px; }
+.rp-dl dd { margin: 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.rp-dl .wide { grid-column: 1 / -1; }
+.rp-dl dd small { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.rp-dl dd .lt-ar { font-weight: 500; }
+/* the alert box: tinted amber or red, the alert on the left and its one fix as text on the right */
+.rp-alert { display: flex; flex-direction: column; gap: 6px; padding: 9px 12px; border: 1px solid var(--warn-line); border-radius: 8px; background: var(--warn-surface); }
+.rp-alert.rp-alert-bad { border-color: var(--danger-line); background: var(--danger-tint); }
+.rp-alert.rp-alert-info { border-color: var(--border); background: var(--bg-soft); }
+.rp-al-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.rp-al-row .lt-al { white-space: normal; }
+.rp-al-why { color: var(--text); font-size: 13px; flex: 1 1 220px; min-width: 0; }
+.rp-al-row .lt-act { margin-left: auto; }
+/* key numbers: a small row of cards; four across in the panel */
+.profile-body .ov-prof-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 640px) { .rp-dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; } .profile-body .ov-prof-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* a mission's short list: First day, Latest day, Last edited */
+.rp-rows { display: grid; border: 1px solid var(--border); border-radius: 8px; }
+.rp-rows > div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.rp-rows > div:last-child { border-bottom: 0; }
+.rp-rows span { color: var(--muted); }
+.rp-rows b { font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+/* people who have worked on a mission, as person chips; a navy outline marks the ones on it that day */
+.rp-people { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-people .lt-pc { font: inherit; font-size: 12.5px; cursor: pointer; border: 0; }
+.rp-people .lt-pc:hover { background: var(--hover-tint); }
+.rp-people .lt-pc.now { box-shadow: inset 0 0 0 1.5px var(--primary-text); background: var(--panel); }
+
+/* forms: the same groups as the read view, two columns, the footer pinned under the scrolling fields */
+.modal-side > form.rp-form, #modal-employee .employee-pane-stack { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+form.rp-form { display: flex; flex-direction: column; min-height: 0; }
+.modal-side > form.rp-form.hidden { display: none; }
+.profile-body.is-form { padding: 0; gap: 0; overflow: hidden; }
+.profile-body.is-form > form.rp-form { flex: 1 1 auto; min-height: 0; }
+.rp-fields { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 4px 22px 18px; }
+.rp-fields .form-group { margin: 18px 0 8px; font-size: 12px; font-weight: 650; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+.rp-fields > .form-group:first-child { margin-top: 12px; }
+.rp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; align-items: start; }
+.rp-grid > label, .rp-grid > .form-row, .rp-grid > p { margin-bottom: 12px; min-width: 0; }
+.rp-grid > .rp-full, .rp-grid > p { grid-column: 1 / -1; }
+.rp-grid > p.field-hint { margin: -6px 0 12px; }
+.rp-grid > p.hidden, .rp-grid > label.hidden { display: none; }
+.rp-grid .form-row { display: flex; gap: 12px; }
+.rp-grid .form-row > label { flex: 1 1 0; min-width: 0; margin-bottom: 0; }
+.rp-grid input:not([type="checkbox"]), .rp-grid select:not(.seg-source), .rp-grid textarea { width: 100%; max-width: 100%; box-sizing: border-box; }
+.rp-foot { flex: none; position: static; margin: 0; padding: 12px 22px; background: var(--panel); border-top: 1px solid var(--border); z-index: 2; }
+.modal-side .rp-foot { margin: 0; }
+.rp-danger { border: 0; background: none; padding: 6px 2px; color: var(--danger-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rp-danger:hover { text-decoration: underline; text-underline-offset: 3px; }
+.rp-danger:focus-visible { outline: 2px solid var(--danger-text); outline-offset: 2px; border-radius: 4px; }
+.rp-danger.hidden { display: none; }
+/* required fields carry the red star; optional ones say so, in muted type */
+.opt { margin-left: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+@media (max-width: 640px) {
+  .modal.modal-side.modal-record { width: 100%; }
+  .rp-head h3 { padding: calc(14px + env(safe-area-inset-top, 0px)) 52px 6px 16px; }
+  .rp-acts { padding: 2px 16px 12px; }
+  .rp-more { left: 16px; }
+  .rp-fields { padding: 4px 16px 16px; }
+  .rp-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .rp-grid { grid-template-columns: minmax(0, 1fr); }
+  .rp-grid .form-row { flex-wrap: wrap; }
+  .rp-grid .form-row > label { flex: 1 1 100px; }
+  .rp-danger { min-height: 44px; }
+}

@@ -5635,19 +5635,23 @@ function peopleLink(view) {
   return p;
 }
 
-/* a flag as a pill: the words, and the numbers behind it in the tooltip */
-function pplFlagPill(p, f) {
-  const lvl = f.level === "bad" ? "bad" : "warn";
-  const pill = (text, tip) => `<span class="ov-flag ov-flag-${lvl}" title="${escapeHtml(tip)}">${escapeHtml(text)}</span>`;
+/* a flag: the words, and the numbers behind it in the tooltip */
+function pplFlagText(p, f) {
   if (f.key === "run") {
     const r = p.run;
-    return pill(`${r.len} in a row${r.ongoing ? " · still going" : ""}`,
-      `${fmtDayMon(r.start)} → ${r.ongoing ? "still going" : fmtDayMon(r.end)}. Calendar days, weekends and holidays included.`);
+    return { text: `${r.len} in a row${r.ongoing ? " \u00b7 still going" : ""}`,
+      tip: `${fmtDayMon(r.start)} \u2192 ${r.ongoing ? "still going" : fmtDayMon(r.end)}. Calendar days, weekends and holidays included.` };
   }
-  if (f.key === "nights") return pill("mostly nights", `${p.nights} nights, ${Math.round(p.nightShare)}% of the days worked`);
-  if (f.key === "leave") return pill(`leave > ${OV_LEAVE_RED}%`, `Leave share ${fmt1(p.share)}% of ${p.working} working days`);
-  if (f.key === "never") return pill("never called in", `On the roster for ${p.available} available days, not called in once`);
-  return pill("newcomer-only mission", `${p.newcomer} ${p.newcomer === 1 ? "mission" : "missions"} where everyone had under ${OV_NEWCOMER_YEARS} year of service`);
+  if (f.key === "nights") return { text: "mostly nights", tip: `${p.nights} nights, ${Math.round(p.nightShare)}% of the days worked` };
+  if (f.key === "leave") return { text: `leave > ${OV_LEAVE_RED}%`, tip: `Leave share ${fmt1(p.share)}% of ${p.working} working days` };
+  if (f.key === "never") return { text: "never called in", tip: `On the roster for ${p.available} available days, not called in once` };
+  return { text: "newcomer-only mission", tip: `${p.newcomer} ${p.newcomer === 1 ? "mission" : "missions"} where everyone had under ${OV_NEWCOMER_YEARS} year of service` };
+}
+/* a flag as a pill */
+function pplFlagPill(p, f) {
+  const lvl = f.level === "bad" ? "bad" : "warn";
+  const t = pplFlagText(p, f);
+  return `<span class="ov-flag ov-flag-${lvl}" title="${escapeHtml(t.tip)}">${escapeHtml(t.text)}</span>`;
 }
 function pplFlagsHtml(p) { return p.flags.length ? p.flags.map(f => pplFlagPill(p, f)).join(" ") : '<span class="ov-muted">—</span>'; }
 
@@ -6237,6 +6241,132 @@ function profileMonths(id, hist) {
   });
 }
 
+/* ---------- The record panel: Employee and Mission ----------
+   One header (the name or number, the status pill, what it is with its board and service area, the actions),
+   an alert box when the record has an alert, fields as label and value pairs in groups, the key numbers as the
+   only cards, then the history. design/handover-list-tabs.md, section 6. The Employee profile and the Mission
+   panel both build theirs from these. */
+/* line 1 to 3 of the header; prefix is "profile" or "mission-modal" */
+function rpFillHead(prefix, { title, statusHtml = "", subHtml = "" }) {
+  $(`#${prefix}-title`).textContent = title;
+  $(`#${prefix}-status`).innerHTML = statusHtml;
+  const sub = $(`#${prefix}-sub`);
+  sub.innerHTML = subHtml;
+  sub.classList.toggle("hidden", !subHtml);
+}
+/* line 2: the plain text parts joined with a dot, then the board tag and the service area (all names are data) */
+function rpSubHtml(parts, board, area, extra = "") {
+  const text = parts.filter(Boolean).map(t => `<span data-no-i18n>${escapeHtml(t)}</span>`).join(" · ");
+  return [text ? `<span>${text}</span>` : "", board ? boardChipHtml(board.name) : "", area ? areaMarkHtml(area) : "", extra].filter(Boolean).join("");
+}
+/* groups of label and value pairs, two columns, no boxes: groups = [[heading, [[label, valueHtml, wide?], ...]], ...] */
+function rpGroupEls(groups) {
+  return groups.map(([heading, rows]) => {
+    const sec = document.createElement("section");
+    sec.className = "rp-group";
+    sec.innerHTML = `<h4 class="rp-gh">${escapeHtml(heading)}</h4><dl class="rp-dl">${rows.map(([l, v, wide]) =>
+      `<div${wide ? ' class="wide"' : ""}><dt>${escapeHtml(l)}</dt> <dd>${v}</dd></div>`).join("")}</dl>`;
+    return sec;
+  });
+}
+/* the alert box under the header: a tinted box (amber, red, or grey for information) with each alert on the left
+   and its one fix as a text button on the right. alerts: [{ level, text, title, fix: { label, fn } | null }]; none: no box */
+function rpAlertBox(alerts) {
+  if (!alerts.length) return null;
+  const worst = Math.max(...alerts.map(a => a.level));
+  const box = document.createElement("div");
+  box.className = "rp-alert" + (worst >= 2 ? " rp-alert-bad" : worst === 1 ? "" : " rp-alert-info");
+  for (const a of alerts) {
+    const row = document.createElement("div");
+    row.className = "rp-al-row";
+    row.innerHTML = `${alertHtml(a.level, a.text)}${a.title ? `<span class="rp-al-why">${escapeHtml(a.title)}</span>` : ""}`;
+    if (a.fix) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "lt-act rp-al-fix"; b.textContent = a.fix.label;
+      b.onclick = a.fix.fn;
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  }
+  return box;
+}
+/* a header button; the first one of a panel is its Edit */
+function rpButton(id, label, ic, fn, cls = "btn") {
+  const b = document.createElement("button");
+  b.type = "button"; b.id = id; b.className = cls;
+  b.innerHTML = `${ic ? icon(ic) + " " : ""}${escapeHtml(label)}`;
+  b.onclick = fn;
+  return b;
+}
+/* the More ⋯ button and the menu under it. items: [{ id, label, icon, danger, fn(anchor) }] or "-" for a rule.
+   A second click, a click elsewhere or Escape closes it; the menu lives in the header's action row, so it stays put
+   while the body scrolls. */
+function rpMoreButton(items, id = "btn-rp-more") {
+  const b = rpButton(id, "More", "more", () => rpToggleMenu(b, items));
+  b.setAttribute("aria-haspopup", "menu");
+  b.setAttribute("aria-expanded", "false");
+  return b;
+}
+function rpCloseMenus(root = document) {
+  for (const m of root.querySelectorAll(".rp-more")) {
+    const btn = m.parentElement && m.parentElement.querySelector('[aria-expanded="true"]');
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    m.remove();
+  }
+}
+function rpToggleMenu(btn, items) {
+  const row = btn.parentElement;
+  const had = row.querySelector(".rp-more");
+  rpCloseMenus(row);
+  if (had) return;
+  const menu = document.createElement("div");
+  menu.className = "rp-more";
+  menu.setAttribute("role", "menu");
+  for (const it of items) {
+    if (it === "-") { menu.appendChild(Object.assign(document.createElement("div"), { className: "rp-more-sep" })); continue; }
+    const mi = document.createElement("button");
+    mi.type = "button"; mi.className = "rp-more-item" + (it.danger ? " danger" : ""); mi.setAttribute("role", "menuitem");
+    if (it.id) mi.id = it.id;
+    mi.innerHTML = `${it.icon ? icon(it.icon) : ""}<span>${escapeHtml(it.label)}</span>`;
+    mi.onclick = (ev) => { ev.stopPropagation(); rpCloseMenus(row); it.fn(btn); };
+    menu.appendChild(mi);
+  }
+  row.appendChild(menu);
+  btn.setAttribute("aria-expanded", "true");
+  const first = menu.querySelector(".rp-more-item");
+  if (first) first.focus({ preventScroll: true });
+}
+document.addEventListener("click", (ev) => { if (!ev.target.closest(".rp-more") && !ev.target.closest('[aria-haspopup="menu"]')) rpCloseMenus(); });
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape" || !document.querySelector(".rp-more")) return;
+  ev.stopPropagation();
+  const btn = document.querySelector('.rp-acts [aria-expanded="true"]');
+  rpCloseMenus();
+  if (btn) btn.focus({ preventScroll: true });
+}, true);
+
+/* what needs a look on a person, worst first (the Manpower alerts of section 3 of the hand-over): no TRIGO ID, no
+   service area, leave above 20% of the working days (30% is red) in the period on screen, and the other flags People
+   shows for it. Only an active person has any, as the tile chips count them; share and cur (the period's row) are
+   null while the figures are not loaded or the role cannot see them. */
+function employeeAlerts(e, share, cur = null) {
+  if (e.active === false) return [];
+  const out = [];
+  if (!e.trigoId) out.push({ level: 1, text: "No TRIGO ID", title: "Two people with the same name can only be told apart by their TRIGO ID.", focus: "trigoId", fixLabel: "+ Add TRIGO ID" });
+  if (!D().areas.some(a => a.id === e.areaId)) out.push({ level: 1, text: "No service area", title: "This person is not in a service area, so no area chip or filter counts them.", focus: "areaId", fixLabel: "+ Add service area" });
+  if (share != null && share > OV_LEAVE_AMBER) {
+    out.push({ level: share > OV_LEAVE_RED ? 2 : 1, text: `Leave ${Math.round(share)}%`, title: `Leave is ${fmt1(share)}% of the working days in this period.` });
+  }
+  // the other flags People shows for the period (a long run, mostly nights, never called in, newcomer-only missions)
+  // keep a place here, where the old Flags line was; the leave one is the alert above
+  for (const f of cur ? cur.flags : []) {
+    if (f.key === "leave") continue;
+    const t = pplFlagText(cur, f);
+    out.push({ level: f.level === "bad" ? 2 : 1, text: t.text, title: t.tip });
+  }
+  return out.sort((x, y) => y.level - x.level);
+}
+
 async function openProfile(id, period, opts = {}) {
   if (!D().employees.some(e => e.id === id)) return;
   if (!can("emplist")) { toast("Your role cannot open employee profiles.", "info"); return; }
@@ -6250,8 +6380,8 @@ async function openProfile(id, period, opts = {}) {
   pr.focus = pr.editing ? opts.focus || null : null;
   pr.detailsEl = null; pr.noteDraft = "";
   const e = D().employees.find(x => x.id === id);
-  $("#profile-title").textContent = e.name;
-  $("#profile-sub").textContent = "";
+  rpFillHead("profile", { title: e.name });
+  $("#profile-acts").classList.add("hidden");
   $("#profile-body").innerHTML = '<p class="ov-muted ov-prof-loading">Loading…</p>';
   openModal("#modal-profile");
   renderProfile();   // the Details first (or the form, straight away); the figures follow once they are loaded
@@ -6310,6 +6440,46 @@ async function loadProfile() {
   await Promise.all(jobs);
 }
 
+/* the header of the profile: the name, the status pill, "TRIGO ID · English name" with the board and the service
+   area under it, and (outside Edit) the actions: Edit, Move to board (Lend to board when loans are on) and More */
+function profileHead(e, ctx) {
+  const pr = state.profile, { board, area, loanNow, loanTo } = ctx;
+  const st = empStatus(e);
+  const since = e.active === false && e.deactivatedOn ? `since ${fmtDate(e.deactivatedOn)}` : "";
+  const loan = loanNow ? ` <small class="ov-muted">→ <span data-no-i18n>${escapeHtml(loanTo)}</span> <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "";
+  rpFillHead("profile", {
+    title: e.name,
+    statusHtml: statusPillHtml(st === "active" ? "ok" : st === "resigned" ? "bad" : "off", EMP_STATUS_LABEL[st], since),
+    subHtml: rpSubHtml([e.trigoId, e.nameEn], board, area, loan),
+  });
+  const acts = $("#profile-acts");
+  acts.replaceChildren();
+  const canEdit = can("emplist", "edit");
+  acts.classList.toggle("hidden", pr.editing || !canEdit);
+  if (pr.editing || !canEdit) return;
+  acts.appendChild(rpButton("btn-profile-edit", "Edit", "edit", () => { pr.editing = true; pr.focus = "name"; pr.detailsEl = null; renderProfile(); }, "btn btn-edit"));
+  // On a board people are lent to another board for a few days; moving them for good is the Manpower List's
+  // (the right-click menu's rule). Someone who is off the roster has no board to move from.
+  const lending = !isNonBoardView() && !isForecastView() && feat().loans && D().boards.length > 1;
+  const targets = D().boards.filter(b => b.id !== e.boardId);
+  if (e.active !== false && lending) {
+    acts.appendChild(rpButton("btn-profile-move", "Lend to board\u2026", "swap", () => guardEdit(() => openLendModal([e.id]))));
+  } else if (e.active !== false && targets.length) {
+    const mv = rpButton("btn-profile-move", "Move to board", "arrow-right", () => rpToggleMenu(mv, targets.map(b => ({
+      id: "", label: b.name, fn: () => guardEdit(() => safely(async () => {
+        await cloud.moveEmployeesToBoard([e.id], b.id, state.date);
+        await refreshAndRender();
+        renderProfile();
+      })),
+    }))));
+    mv.setAttribute("aria-haspopup", "menu"); mv.setAttribute("aria-expanded", "false");
+    acts.appendChild(mv);
+  }
+  acts.appendChild(rpMoreButton([e.active === false
+    ? { id: "btn-profile-active", label: "Activate", icon: "return", fn: profileReactivate }
+    : { id: "btn-profile-active", label: "Deactivate…", icon: "ban", danger: true, fn: profileDeactivate }], "btn-profile-more"));
+}
+
 function renderProfile() {
   const pr = state.profile, body = $("#profile-body");
   const e = D().employees.find(x => x.id === pr.id);
@@ -6321,19 +6491,37 @@ function renderProfile() {
   const loanNow = loanOf(e, today);
   const loanTo = loanNow ? (D().boards.find(b => b.id === loanNow.toBoardId) || {}).name : "";
   const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
-  $("#profile-sub").textContent = [board && board.name, e.contract === "oncall" ? "On-call" : "Permanent", area && area.name].filter(Boolean).join(" · ");
+  profileHead(e, { board, area, loanNow, loanTo });
 
   const scrollTop = body.scrollTop;
-  // putting the Details node back into the page drops focus from a field being typed in
-  const typing = pr.detailsEl && pr.detailsEl.contains(document.activeElement) ? document.activeElement : null;
-  body.replaceChildren(profileDetails(e, { board, area, pos, loanNow, loanTo, today }));
-  if (typing && typing.isConnected) typing.focus({ preventScroll: true });
+  // Edit turns the panel into the form: the same header, the form in place of the body, Save and Cancel pinned
+  if (pr.editing) {
+    body.classList.add("is-form");
+    // putting the form back into the page drops focus from a field being typed in
+    const typing = pr.detailsEl && pr.detailsEl.contains(document.activeElement) ? document.activeElement : null;
+    body.replaceChildren(profileForm(e));
+    if (typing && typing.isConnected) typing.focus({ preventScroll: true });
+    if (pr.focus) {
+      const f = pr.detailsEl && pr.detailsEl[pr.focus];
+      pr.focus = null;
+      if (f) requestAnimationFrame(() => { ((f._pk && f._pk.btn) || (f._dp && f._dp.btn) || f).focus(); });
+    }
+    return;
+  }
+  body.classList.remove("is-form");
+  let from, to, fig = null;
+  if (showFigures) {
+    [from, to] = profileRange(pr.period);
+    fig = profileFigures(pr.id, pr.cache.hist, from, to);
+  }
+  const canEdit = can("emplist", "edit");
+  const alertBox = rpAlertBox(employeeAlerts(e, fig ? fig.row.share : null, fig ? fig.row : null).map(a => ({ ...a,
+    fix: a.focus && canEdit ? { label: a.fixLabel, fn: () => { pr.editing = true; pr.focus = a.focus; pr.detailsEl = null; renderProfile(); } } : null })));
+  body.replaceChildren(...[alertBox, ...profileFacts(e, { pos, today })].filter(Boolean));
 
   if (!can("ov.history")) {
     body.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help", textContent: "Worked, leave and nights are shown to roles that can see Overview History." }));
   } else if (showFigures) {
-    const [from, to] = profileRange(pr.period);
-    const fig = profileFigures(pr.id, pr.cache.hist, from, to);
     const cur = fig.row, prev = fig.prev;
     // period switch
     const bar = document.createElement("div");
@@ -6376,12 +6564,6 @@ function renderProfile() {
     body.appendChild(tiles);
     body.appendChild(Object.assign(document.createElement("p"), { className: "ov-htile-help",
       textContent: "Worked, leave and standby count planned working days. Days in a row count calendar days, weekends included." }));
-
-    // flags
-    const flags = document.createElement("div");
-    flags.className = "ov-prof-flags";
-    flags.innerHTML = `<b>Flags</b> ${cur.flags.length ? pplFlagsHtml(cur) : '<span class="ov-muted">None in this period</span>'}`;
-    body.appendChild(flags);
 
     body.appendChild(profileLeaveRecord(pr.id, pr.cache.hist, from, to));
 
@@ -6476,11 +6658,6 @@ function renderProfile() {
   for (const fill of pendingCharts) fill();
   Charts.wireChartTooltips(body);
   body.scrollTop = scrollTop;
-  if (pr.editing && pr.focus) {
-    const f = pr.detailsEl && pr.detailsEl.querySelector("form") && pr.detailsEl.querySelector("form")[pr.focus];
-    pr.focus = null;
-    if (f) requestAnimationFrame(() => { ((f._pk && f._pk.btn) || (f._dp && f._dp.btn) || f).focus(); });
-  }
 }
 
 function profileAddNote(text) {
@@ -6506,64 +6683,43 @@ function profileDeleteNote(noteId) {
   }), () => openModal("#modal-profile"));
 }
 
-/* Details: every field of the person, and the way to change them. Kept between redraws (pr.detailsEl)
-   so a period switch while the form is open does not wipe what was typed. */
-function profileDetails(e, ctx) {
+/* The fields of the person, read: Contract and Contact as label and value pairs. Who they are, their board and
+   their service area are in the header. */
+function profileFacts(e, ctx) {
+  const { pos, today } = ctx;
+  const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
+  return rpGroupEls([
+    ["Contract", [
+      ["Contract type", e.contract === "oncall" ? "On-call" : "Permanent"],
+      ["Position", pos ? pos.label : emptyCell()],
+      ["Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small>${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : emptyCell()],
+      ["On the board from", e.addedOn ? escapeHtml(fmtDate(e.addedOn)) : emptyCell()],
+      ...(e.active === false && e.deactivatedOn ? [["Deactivated on", escapeHtml(fmtDate(e.deactivatedOn))]] : []),
+    ]],
+    ["Contact", [
+      ["Mobile number", e.phone ? telLink(e.phone) : emptyCell()],
+      ["English name", e.nameEn ? sc(e.nameEn) : emptyCell()],
+    ]],
+  ]);
+}
+/* The form that edits them, kept between redraws (pr.detailsEl) so a period switch or a late load while it is open
+   does not wipe what was typed. Its footer is pinned at the bottom of the panel: Deactivate… in red on the left
+   (for someone who is active), Cancel and Save on the right. */
+function profileForm(e) {
   const pr = state.profile;
   if (pr.detailsEl) return pr.detailsEl;
-  const { board, area, pos, loanNow, loanTo, today } = ctx;
-  const canEdit = can("emplist", "edit");
-  const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
-  const box = document.createElement("div");
-  box.className = "ov-prof-block ov-prof-details";
-  const head = document.createElement("div");
-  head.className = "ov-prof-details-head";
-  head.innerHTML = `<div class="ov-eng-foot-h">${pr.editing ? "Edit details" : "Details"}</div>`;
-  box.appendChild(head);
-  if (pr.editing) {
-    const slot = document.createElement("div");
-    box.appendChild(slot);
-    const form = employeeFormMount(slot, e);
-    const cancel = form.querySelector(".emp-form-cancel");
-    cancel.removeAttribute("data-close");   // leaves the form, not the Profile
-    cancel.onclick = () => profileShowDetails();
-  } else {
-    if (canEdit) {
-      const acts = document.createElement("div");
-      acts.className = "ov-prof-details-acts";
-      const edit = document.createElement("button");
-      edit.type = "button"; edit.id = "btn-profile-edit"; edit.className = "btn btn-small";
-      edit.innerHTML = `${icon("edit")} Edit details`;
-      edit.onclick = () => { pr.editing = true; pr.focus = "name"; pr.detailsEl = null; renderProfile(); };
-      acts.appendChild(edit);
-      const off = e.active === false;
-      const tog = document.createElement("button");
-      tog.type = "button"; tog.id = "btn-profile-active";
-      tog.className = off ? "btn btn-small" : "btn btn-small btn-danger";
-      tog.innerHTML = off ? `${icon("return")} Reactivate` : `${icon("ban")} Deactivate`;
-      tog.onclick = off ? profileReactivate : profileDeactivate;
-      acts.appendChild(tog);
-      head.appendChild(acts);
-    }
-    const fact = (l, v) => `<div><span>${l}</span> <b>${v}</b></div>`;
-    const grid = document.createElement("div");
-    grid.className = "ov-eng-facts ov-prof-id";
-    grid.innerHTML = [
-      fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : emptyCell()),
-      fact("Contract", e.contract === "oncall" ? "On-call" : "Permanent"),
-      fact("Position", pos ? pos.label : emptyCell()),
-      fact("Service area", area ? areaMarkHtml(area) : emptyCell()),
-      fact("Board", (board ? boardChipHtml(board.name) : emptyCell()) + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
-      fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : emptyCell()),
-      fact("Status", e.active === false ? `<span>${EMP_STATUS_LABEL[empStatus(e)]}</span>${e.deactivatedOn ? ` <small class="ov-muted"><span>since ${escapeHtml(fmtDate(e.deactivatedOn))}</span></small>` : ""}` : "Active"),
-      fact("English name", e.nameEn ? sc(e.nameEn) : emptyCell()),
-      fact("Mobile number", e.phone ? telLink(e.phone) : emptyCell()),
-      fact("On the board from", e.addedOn ? escapeHtml(fmtDate(e.addedOn)) : emptyCell()),
-    ].join("");
-    box.appendChild(grid);
+  const form = employeeFormMount(document.createElement("div"), e);
+  form.remove();
+  const cancel = form.querySelector(".emp-form-cancel");
+  cancel.removeAttribute("data-close");   // leaves the form, not the Profile
+  cancel.onclick = () => profileShowDetails();
+  if (e.active !== false) {
+    const off = Object.assign(document.createElement("button"), { type: "button", id: "btn-emp-deactivate", className: "rp-danger", textContent: "Deactivate…" });
+    off.onclick = profileDeactivate;
+    form.querySelector(".rp-foot").prepend(off);
   }
-  pr.detailsEl = box;
-  return box;
+  pr.detailsEl = form;
+  return form;
 }
 
 /* Leave record: each stretch of leave in the period as one line (the type, the dates, the days), and the
@@ -11024,13 +11180,8 @@ function openMissionModal(missionId, opts = {}) {
   renderMissionHostOptions();
   renderMissionEngineerOptions();
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
-  $("#btn-hide-mission").classList.toggle("hidden", !missionId || isForecastView());
   const src = missionId ? getPlan().missions.find(x => x.id === missionId) : opts.from;
   fillMissionForm(src, missionId, opts);
-  const isHidden = !!(missionId && src && src.hidden);
-  $("#hide-mission-label").textContent = isHidden ? "Unhide" : "Hide";
-  $("#btn-hide-mission use").setAttribute("href", isHidden ? "#i-eye" : "#i-eye-off");
-  $("#btn-hide-mission").title = isHidden ? "Put this mission back on the board" : "Take this mission off the board without deleting it";
   // from the Missions tab: a new mission also asks which board; any mission says which day it is on
   const fromList = missionFromList.swapped;
   $("#mission-board-row").classList.toggle("hidden", !(fromList && !missionId));
@@ -11047,8 +11198,7 @@ function openMissionModal(missionId, opts = {}) {
   const detailView = !!missionId && !opts.edit && !isForecastView();
   mdState = { fromDetail: detailView };
   setMissionView(detailView ? "detail" : "form");
-  if (!detailView) setMissionFormTitle(missionId && src ? src.number : "");
-  else if (src) $("#mission-modal-title").textContent = src.number;
+  setMissionFormTitle();
   openModal("#modal-mission");
   if (detailView) renderMissionDetail();
 }
@@ -11058,26 +11208,30 @@ function openMissionModal(missionId, opts = {}) {
    needs a look, how it has been staffed and who is on it that day. Hide and Close mission sit in the
    Details header; Edit details swaps the form in, and Save or Cancel come back here. */
 let mdState = { fromDetail: false };
-/* the form's title, as the Host and Employee forms have it: the mission's number, with "Edit mission" under it;
-   a new mission has no number yet, so it is "New Mission" alone */
-function setMissionFormTitle(number) {
-  const sub = $("#mission-modal-sub");
-  const kind = isForecastView() ? "forecast mission" : "mission";
-  if (number) {
-    $("#mission-modal-title").textContent = number;
-    sub.textContent = `Edit ${kind}`;
-    sub.classList.remove("hidden");
-  } else {
-    $("#mission-modal-title").textContent = isForecastView() ? "New Forecast Mission" : "New Mission";
-    sub.classList.add("hidden");
-  }
+/* The header of the mission panel, in read and in edit alike: the number, the status pill, "Customer at Host" with the
+   board and the host's service area under it. A new mission has no number yet, so it is "New Mission" alone. */
+function missionPanelHead(m) {
+  const forecast = isForecastView();
+  const board = D().boards.find(b => b.id === D().activeBoardId);
+  const reg = !forecast && missionsOn() ? cloud.registerFor(D().activeBoardId, m.number, m.shift) : null;
+  const what = [m.customer ? `<span data-no-i18n>${escapeHtml(m.customer)}</span>` : "", m.customer && m.host ? " at " : "", m.host ? `<span data-no-i18n>${escapeHtml(m.host)}</span>` : ""].join("");
+  rpFillHead("mission-modal", {
+    title: m.number,
+    statusHtml: reg ? missionStatusHtml(reg) : m.hidden ? statusPillHtml("off", "Hidden") : statusPillHtml("ok", "On board"),
+    subHtml: [what ? `<span>${what}</span>` : "", board ? boardChipHtml(board.name) : "", hostAreaOf(m.host) ? areaMarkHtml(hostAreaOf(m.host)) : ""].filter(Boolean).join(""),
+  });
+  return reg;
+}
+function setMissionFormTitle() {
+  const m = state.editingMissionId ? getPlan().missions.find(x => x.id === state.editingMissionId) : null;
+  if (m) missionPanelHead(m);
+  else rpFillHead("mission-modal", { title: isForecastView() ? "New Forecast Mission" : "New Mission" });
 }
 function setMissionView(view) {
   const detail = view === "detail";
   $("#mission-detail").classList.toggle("hidden", !detail);
   $("#form-mission").classList.toggle("hidden", detail);
-  $("#modal-mission").classList.toggle("md-detail", detail);
-  if (!detail) $("#mission-modal-sub").classList.add("hidden");
+  if (!detail) $("#mission-modal-acts").classList.add("hidden");
 }
 function fillMissionForm(src, missionId, opts = {}) {
   const form = $("#form-mission");
@@ -11096,7 +11250,7 @@ function fillMissionForm(src, missionId, opts = {}) {
   updateMissionHostNote();
   updateMissionEngineerNote();
 }
-function editMissionDetails() {
+function editMissionDetails(focus = "number") {
   // "Edit today's board?" and the like are confirms that close the panel (and, from the Missions tab, leave the
   // board it borrowed): come back to both before the form is shown
   enterMissionListBoard();
@@ -11105,101 +11259,109 @@ function editMissionDetails() {
   if (!m) return;
   fillMissionForm(m, m.id);
   setMissionView("form");
-  setMissionFormTitle(m.number);
-  $("#form-mission").number.focus();
+  setMissionFormTitle();
+  $("#form-mission")[focus].focus();
 }
 const MISSION_PEOPLE_CAP = 12;   // names shown before "+N more", as on the Host tab
-const mdFact = (label, value, cls = "") => `<div${cls ? ` class="${cls}"` : ""}><span>${label}</span> <b>${value}</b></div>`;
+/* The mission panel, read: the header (number, status, "Customer at Host", board, area, and the actions Edit,
+   Move or copy… and More), the alert box when the mission has an alert, the fields in two groups (Job, Notes), the
+   four crew tiles, then its history: the crew on the day, the crew per day, the people who have worked on it, and a
+   short list. Edit swaps the form in; Save or Cancel come back here. */
 async function renderMissionDetail() {
   const id = state.editingMissionId;
   const m = getPlan().missions.find(x => x.id === id);
   const body = $("#mission-detail");
   if (!m) return;
-  const boardId = D().activeBoardId, board = D().boards.find(b => b.id === boardId);
+  const boardId = D().activeBoardId;
   const forecast = isForecastView();
-  const reg = !forecast && missionsOn() ? cloud.registerFor(boardId, m.number, m.shift) : null;
+  const reg = missionPanelHead(m);
+  $("#mission-modal-acts").classList.add("hidden");   // the last mission's buttons must not show while this one's figures load
   const area = hostAreaOf(m.host);
   const eng = D().engineers.find(e => e.id === m.engineerId);
   const crew = missionCrew(m);
   const night = m.shift === "night";
-  $("#mission-modal-title").textContent = m.number;
-  const sub = $("#mission-modal-sub");
-  sub.textContent = [board && board.name, night ? "Night" : "Day", area && area.name].filter(Boolean).join(" · ");
-  sub.classList.remove("hidden");
   if (reg) await ensureMissionActivityLoaded();
   // closed, or another mission opened, while the crew facts were being read
   if (state.editingMissionId !== id || $("#modal-mission").classList.contains("hidden") || $("#mission-detail").classList.contains("hidden")) return;
 
-  const box = document.createElement("div");
-  box.className = "ov-prof-block ov-prof-details";
-  const head = document.createElement("div");
-  head.className = "ov-prof-details-head";
-  head.innerHTML = `<div class="ov-eng-foot-h">Details</div>`;
-  const acts = document.createElement("div");
-  acts.className = "ov-prof-details-acts";
-  const act = (btnId, cls, ic, label, fn) => {
-    const b = document.createElement("button");
-    b.type = "button"; b.id = btnId; b.className = cls;
-    b.innerHTML = `${icon(ic)} ${label}`;
-    b.onclick = fn;
-    acts.appendChild(b);
-  };
+  // the actions: Edit, Move or copy… and More. `actions` is also what the Missions row's ⋯ menu runs (missionPanelThen)
   const canPlan = forecast ? can("forecast", "edit") : can("board", "edit");
-  if (canPlan) act("btn-md-edit", "btn btn-small", "edit", "Edit details", () => guardEdit(editMissionDetails));
-  if (canPlan) act("btn-md-dup", "btn btn-small", "copy", "Duplicate", () => guardEdit(() => { enterMissionListBoard(); openMissionModal(null, { from: m }); }));
-  // the card menu's own Move or copy list (it says why a board cannot take the mission)
-  if (canPlan && !forecast && feat().highlight) act("btn-md-hl", "btn btn-small", "star", "Highlight", (ev) => {
-    ev.stopPropagation();   // the click would otherwise reach the page's outside-click handler and close the menu it opens
-    const r = ev.currentTarget.getBoundingClientRect();
+  const acts = $("#mission-modal-acts");
+  acts.replaceChildren();
+  const actions = {};
+  const menuAt = (view) => (anchor) => {
+    const r = anchor.getBoundingClientRect();
     ctxMenu = { mission: m, x: r.left, y: r.bottom + 4 };
-    renderCtxMenu("highlight");
-  });
-  if (canPlan && !forecast && D().boards.length > 1) act("btn-md-move", "btn btn-small", "swap", "Move or copy…", (ev) => {
-    ev.stopPropagation();   // the click would otherwise reach the page's outside-click handler and close the menu it opens
-    const r = ev.currentTarget.getBoundingClientRect();
-    ctxMenu = { mission: m, x: r.left, y: r.bottom + 4 };
-    renderCtxMenu("move");
-  });
-  if (canPlan && !forecast) act("btn-md-hide", "btn btn-small", m.hidden ? "eye" : "eye-off", m.hidden ? "Unhide" : "Hide", () => guardEdit(() => { enterMissionListBoard(); hideMission(m.id); }));
-  if (reg && reg.status === "open" && can("missions", "edit")) act("btn-md-close", "btn btn-small btn-danger", "check", "Close mission…", () => openCloseMissionModal(reg, state.date));
-  head.appendChild(acts);
-  box.appendChild(head);
+    renderCtxMenu(view);   // the card menu's own Highlight and Move or copy lists (it says why a board cannot take the mission)
+  };
+  const more = [];
+  const addMore = (bid, label, ic, fn, danger) => { actions[bid] = fn; more.push({ id: bid, label, icon: ic, fn, danger }); };
+  if (canPlan) {
+    actions["btn-md-edit"] = () => guardEdit(editMissionDetails);
+    acts.appendChild(rpButton("btn-md-edit", "Edit", "edit", () => actions["btn-md-edit"](), "btn btn-edit"));
+  }
+  if (canPlan && !forecast && D().boards.length > 1) {
+    actions["btn-md-move"] = menuAt("move");
+    const mv = rpButton("btn-md-move", "Move or copy…", "swap", (ev) => { ev.stopPropagation(); actions["btn-md-move"](mv); });
+    acts.appendChild(mv);
+  }
+  if (canPlan) addMore("btn-md-dup", "Duplicate", "copy", () => guardEdit(() => { enterMissionListBoard(); openMissionModal(null, { from: m }); }));
+  if (canPlan && !forecast && feat().highlight) addMore("btn-md-hl", "Highlight", "star", menuAt("highlight"));
+  if (canPlan && !forecast) addMore("btn-md-hide", m.hidden ? "Unhide" : "Hide", m.hidden ? "eye" : "eye-off", () => guardEdit(() => { enterMissionListBoard(); hideMission(m.id); }));
+  if (reg && reg.status === "open" && can("missions", "edit")) addMore("btn-md-close", "Close mission…", "check", () => openCloseMissionModal(reg, state.date));
+  if (canPlan) { more.push("-"); addMore("btn-md-delete", "Delete", "trash", () => guardEdit(() => { enterMissionListBoard(); deleteMission(m.id); }), true); }
+  if (more.length) acts.appendChild(rpMoreButton(more, "btn-md-more"));
+  acts.classList.toggle("hidden", !acts.children.length);
   const then = missionPanelThen;
   missionPanelThen = null;
-  if (then) setTimeout(() => { const b = document.getElementById(then); if (b && !$("#mission-detail").classList.contains("hidden")) b.click(); }, 0);
+  if (then) setTimeout(() => {
+    if ($("#mission-detail").classList.contains("hidden") || !actions[then]) return;
+    actions[then]($("#btn-md-more") || acts);   // a menu that needs a place opens under More
+  }, 0);
+
+  const actv = state.missions.activity;
+  // what needs a look, with its one fix
+  const alerts = reg && actv ? missionAlerts(reg, missionPlacement(reg)) : [];
+  const alertBox = rpAlertBox(alerts.map(a => ({ ...a,
+    fix: a.close && reg.status === "open" && can("missions", "edit") ? { label: "Close mission…", fn: () => openCloseMissionModal(reg, state.date) }
+      : a.kinds.includes("noEngineer") && canPlan ? { label: "+ Add responsible", fn: () => guardEdit(() => editMissionDetails("engineer")) } : null })));
 
   const hostLink = m.host && can("hostlist") ? `<button type="button" class="ml-host-link" id="btn-md-host">${escapeHtml(m.host)}</button>` : m.host ? escapeHtml(m.host) : emptyCell();
-  const dayNote = missionFromList.prevDate ? ` <small class="ov-muted">its latest day on the board</small>` : "";
-  const earlier = reg ? cloud.numberChain(m.number).slice(0, -1) : [];
-  const grid = document.createElement("div");
-  grid.className = "ov-eng-facts ov-prof-id md-facts";
-  grid.innerHTML = [
-    mdFact("Board", board ? boardChipHtml(board.name) : emptyCell()),
-    mdFact("Day", `${escapeHtml(fmtDow(state.date))} ${escapeHtml(fmtDate(state.date))}${dayNote}`),
-    mdFact("Shift", `${night ? "Night" : "Day"} <small class="ov-muted">${escapeHtml(m.startTime)}-${escapeHtml(m.endTime)}</small>`),
-    mdFact("Host", hostLink),
-    mdFact("Service area", area ? areaMarkHtml(area) : emptyCell()),
-    mdFact("Customer", m.customer ? escapeHtml(m.customer) : emptyCell()),
-    mdFact("Trigo responsible", eng ? `${escapeHtml(eng.name)}${eng.phone ? " " + telLink(eng.phone) : ""}` : emptyCell()),
-    mdFact("Status", reg ? missionStatusHtml(reg) : m.hidden ? statusPillHtml("off", "Hidden") : statusPillHtml("ok", "On board")),
-    ...(!forecast && feat().highlight ? [mdFact("Highlight", m.highlight ? `<span${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span>` : emptyCell())] : []),
-    ...(reg ? [
-      mdFact("First day on board", reg.openedOn ? escapeHtml(fmtDate(reg.openedOn)) : emptyCell()),
-      mdFact("Last on board", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : emptyCell()),
-    ] : []),
-    ...(earlier.length ? [mdFact("Earlier numbers", escapeHtml(earlier.join(", ")))] : []),
-    ...(m.updatedBy || m.updatedAt ? [mdFact("Last edited", `${escapeHtml(who(m.updatedBy))}${m.updatedAt ? ` <small class="ov-muted">${escapeHtml(fmtStamp(m.updatedAt))}</small>` : ""}`)] : []),
-    mdFact("PPE", m.ppe ? escapeHtml(m.ppe) : emptyCell(), (m.ppe || "").length > 36 ? "wide" : ""),
-    mdFact("Remark", m.remark ? escapeHtml(m.remark) : emptyCell(), (m.remark || "").length > 36 ? "wide" : ""),
-  ].join("");
-  box.appendChild(grid);
-  const hostBtn = grid.querySelector("#btn-md-host");
+  const fields = rpGroupEls([
+    ["Job", [
+      ["Customer", m.customer ? escapeHtml(m.customer) : emptyCell()],
+      ["Host", hostLink],
+      ["Trigo responsible", eng ? `${escapeHtml(eng.name)}${eng.phone ? " " + telLink(eng.phone) : ""}` : emptyCell()],
+      ["Shift", `${night ? "Night" : "Day"} <small>${escapeHtml(m.startTime)}–${escapeHtml(m.endTime)}</small>`],
+    ]],
+    ["Notes", [
+      ["PPE", m.ppe ? escapeHtml(m.ppe) : emptyCell(), (m.ppe || "").length > 36],
+      ["Remark", m.remark ? escapeHtml(m.remark) : emptyCell(), (m.remark || "").length > 36],
+      ...(!forecast && feat().highlight ? [["Highlight", m.highlight ? `<span${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span>` : emptyCell()]] : []),
+    ]],
+  ]);
+  const hostBtn = fields[0].querySelector("#btn-md-host");
   if (hostBtn) hostBtn.onclick = () => { closeModal(); openHostFromMission({ host: m.host }); };
-  body.replaceChildren(box);
+  body.replaceChildren(...[alertBox, ...fields].filter(Boolean));
 
-  // who has worked on it, all time, with the days (the Host tab's "Inspectors deployed", for one mission)
+  // the short list at the very end: when it was on the board and who last touched it
+  const earlier = reg ? cloud.numberChain(m.number).slice(0, -1) : [];
+  const addList = () => {
+    const rows = [
+      ...(reg ? [["First day", reg.openedOn ? escapeHtml(fmtDate(reg.openedOn)) : emptyCell()], ["Latest day", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : emptyCell()]] : []),
+      ...(earlier.length ? [["Earlier numbers", escapeHtml(earlier.join(", "))]] : []),
+      ...(m.updatedBy || m.updatedAt ? [["Last edited", `<span data-no-i18n>${escapeHtml(who(m.updatedBy))}</span>${m.updatedAt ? ` <small class="ov-muted">${escapeHtml(fmtStamp(m.updatedAt))}</small>` : ""}`]] : []),
+    ];
+    if (!rows.length) return;
+    const box = document.createElement("div");
+    box.className = "ov-prof-block";
+    box.innerHTML = `<div class="ov-eng-foot-h">On the board</div><div class="rp-rows">${rows.map(([l, v]) => `<div><span>${escapeHtml(l)}</span><b>${v}</b></div>`).join("")}</div>`;
+    body.appendChild(box);
+  };
+
+  // who has worked on it, all time, with the days (the Host tab's "Inspectors deployed", for one mission), as person chips
   const addPeople = () => {
-    if (forecast) return;
+    if (forecast) { addList(); return; }
     const box = document.createElement("div");
     box.className = "ov-prof-block";
     box.innerHTML = `<div class="ov-eng-foot-h">People who have worked on it <span class="ov-muted">days on this mission, all time</span></div><p class="ov-muted">Loading…</p>`;
@@ -11210,52 +11372,45 @@ async function renderMissionDetail() {
       const people = list.map(x => ({ ...x, emp: D().employees.find(e => e.id === x.employeeId) })).filter(x => x.emp);
       const draw = (all) => {
         const shown = all ? people : people.slice(0, MISSION_PEOPLE_CAP);
-        const chips = shown.map(x => `<button type="button" class="hl-insp md-person${onNow.has(x.employeeId) ? " now" : ""}" data-emp="${escapeHtml(x.employeeId)}" data-no-i18n`
-          + ` title="${escapeHtml(`${x.emp.name}: ${x.days} ${x.days === 1 ? "day" : "days"} on ${m.number}, last ${fmtDate(x.last)}`)}">${escapeHtml(x.emp.name)}<b>${x.days}d</b></button>`).join("");
+        const chips = shown.map(x => `<button type="button" class="lt-pc md-person${onNow.has(x.employeeId) ? " now" : ""}" data-emp="${escapeHtml(x.employeeId)}" data-no-i18n`
+          + ` title="${escapeHtml(`${x.emp.name}: ${x.days} ${x.days === 1 ? "day" : "days"} on ${m.number}, last ${fmtDate(x.last)}`)}">${escapeHtml(x.emp.name)} <small>${x.days}d</small></button>`).join("");
         const rest = people.length - shown.length;
-        const more = rest > 0 ? `<button type="button" class="hl-more" data-more="1">+${rest} more</button>`
-          : (all && people.length > MISSION_PEOPLE_CAP ? `<button type="button" class="hl-more" data-more="0">Show less</button>` : "");
-        box.querySelector("p, .hl-chips") && box.querySelector("p, .hl-chips").remove();
+        const more = rest > 0 ? `<button type="button" class="lt-act" data-more="1">+${rest} more</button>`
+          : (all && people.length > MISSION_PEOPLE_CAP ? `<button type="button" class="lt-act" data-more="0">Show less</button>` : "");
+        box.querySelector("p, .rp-people") && box.querySelector("p, .rp-people").remove();
         box.insertAdjacentHTML("beforeend", people.length
-          ? `<div class="hl-chips"><span class="hl-count" title="${people.length} ${people.length === 1 ? "person" : "people"} have worked on this mission">${people.length}</span>${chips}${more}</div>`
+          ? `<div class="rp-people" title="${people.length} ${people.length === 1 ? "person has" : "people have"} worked on this mission">${chips}${more}</div>`
           : `<p class="ov-muted">Nobody has been placed on this mission yet.</p>`);
         for (const b of box.querySelectorAll(".md-person")) b.onclick = () => openProfile(b.dataset.emp);
         const mb = box.querySelector("[data-more]");
         if (mb) mb.onclick = () => draw(mb.dataset.more === "1");
       };
       draw(false);
-    }).catch(() => { const p = box.querySelector("p"); if (p) p.textContent = "The people list could not be read."; });
+      addList();
+    }).catch(() => { const p = box.querySelector("p"); if (p) p.textContent = "The people list could not be read."; addList(); });
   };
 
   // the crew facts need the mission register and the last six weeks of days (not on a forecast day)
-  const actv = state.missions.activity;
   if (!reg || !actv) { addPeople(); return; }
   const days = missionDays(reg) || {};
   const summary = missionActivityOf(reg);
   const working = actv.working[boardId] || [];
   const dayText = `${fmtDow(state.date)} ${fmtDate(state.date)}`;
 
-  const flags = document.createElement("div");
-  flags.className = "ov-prof-flags";
-  const alerts = missionAlerts(reg, missionPlacement(reg));
-  flags.innerHTML = `<b>Flags</b> ${alerts.length
-    ? alerts.map(x => alertHtml(x.level, x.text, x.title)).join(" ")
-    : '<span class="ov-muted">None right now</span>'}`;
-  body.appendChild(flags);
-
+  // key numbers: the only cards in the panel
   const tiles = document.createElement("div");
   tiles.className = "ov-htiles ov-prof-tiles";
   const tile = (t) => { const d = document.createElement("div"); d.className = "ov-htile ov-htile-static"; d.innerHTML = ovTileInner(t); tiles.appendChild(d); };
   const onBoardDays = working.filter(d => days[d] && !days[d].hidden).length;
   tile({ label: "Crew on this day", value: crew.length, sub: escapeHtml(dayText) });
-  tile({ label: "Avg crew / week", value: summary && summary.avgCrew != null ? summary.avgCrew.toFixed(1) : "-", sub: "per working day, last 4 weeks" });
+  tile({ label: "Avg crew / week", value: summary && summary.avgCrew != null ? summary.avgCrew.toFixed(1) : "—", sub: "per working day, last 4 weeks" });
   tile({ label: "Days on board", value: onBoardDays, sub: `of ${working.length} working days in 6 weeks` });
   tile({ label: "No crew in a row", value: summary ? summary.noCrewDays + (summary.noCrewCapped ? "+" : "") : 0, sub: "working days, up to the latest" });
   body.appendChild(tiles);
 
   const crewBox = document.createElement("div");
   crewBox.className = "ov-prof-block";
-  crewBox.innerHTML = `<div class="ov-eng-foot-h">Crew on ${escapeHtml(dayText)} <span class="ov-muted">${crew.length}</span></div>`;
+  crewBox.innerHTML = `<div class="ov-eng-foot-h">Crew on ${escapeHtml(dayText)} <span class="ov-muted">${crew.length}${missionFromList.prevDate ? ` · <span>its latest day on the board</span>` : ""}</span></div>`;
   if (!crew.length) crewBox.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: "Nobody is on this mission on this day." }));
   else {
     const row = document.createElement("div");
@@ -18498,7 +18653,6 @@ function wireApp() {
   initSegmented();
   initPickers();
   $("#btn-delete-mission").onclick = () => deleteMission();
-  $("#btn-hide-mission").onclick = () => hideMission();
   $("#btn-hide-missions").onclick = openHideMissionsModal;
   $("#btn-hide-missions-save").onclick = saveHideMissions;
   bindHideMissionsModal();
@@ -18853,7 +19007,7 @@ function wireApp() {
   $("#mission-board").onchange = () => safely(async () => {
     D().activeBoardId = $("#mission-board").value;
     await cloud.ensurePlanLoaded(D().activeBoardId, state.date);
-    $("#mission-modal-title").textContent = "New" + (isForecastView() ? " Forecast Mission" : " Mission");
+    setMissionFormTitle();
   });
   $("#hostlist-search").addEventListener("input", (e) => { state.hostlist.search = e.target.value; renderHostRows(); });
   for (const th of $$("#hostlist-table th[data-sort]")) {

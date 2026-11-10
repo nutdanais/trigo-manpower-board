@@ -307,6 +307,11 @@ async function step(name, fn) {
       assert.match(text, /No crew/, "the flags say nobody is on it");
       assert.equal(await p.locator("#mission-detail .ov-htile").count(), 4);
       assert.equal(await p.locator("#mission-detail .md-bar").count() > 0, true, "crew per working day");
+      // the header: Edit and Move or copy… are buttons, the rest is behind More; at most two buttons and More
+      assert.deepEqual(await p.locator("#mission-modal-acts > button").evaluateAll((b) => b.map((x) => x.id)), ["btn-md-edit", "btn-md-move", "btn-md-more"]);
+      assert.equal(await p.locator("#btn-md-hide").count(), 0, "Hide is not a header button");
+      await p.click("#btn-md-more");
+      assert.deepEqual((await p.locator(".rp-more .rp-more-item").allInnerTexts()).map((t) => t.trim()), ["Duplicate", "Highlight", "Hide", "Close mission…", "Delete"]);
       assert.equal(await p.locator("#btn-md-hide").isVisible(), true);
       assert.equal(await p.locator("#btn-md-close").isVisible(), true);
       // Close mission… opens the last-working-day dialog for this mission, and closing it comes back to the list
@@ -318,12 +323,14 @@ async function step(name, fn) {
       assert.equal(await p.evaluate(() => state.date), dateBefore, "the day on screen is back too");
       // Hide takes it off the board; the list says so, and the detail then offers Unhide
       await open(M7);
+      await p.click("#btn-md-more");
       await p.click("#btn-md-hide");
       await sure();
       await p.waitForFunction(() => document.querySelector("#modal-mission").classList.contains("hidden") && document.querySelector("#modal-confirm").classList.contains("hidden"));
       assert.equal(db.t("missions").find((m) => m.id === "s7").hidden, true);
       await p.waitForFunction((n) => [...document.querySelectorAll("#missions-body tr")].some((tr) => tr.querySelector(".ml-num").textContent === n && /Hidden/.test(tr.innerText)), M7);
       await open(M7);
+      await p.click("#btn-md-more");
       assert.match(await p.locator("#btn-md-hide").innerText(), /Unhide/);
       await p.click("#btn-md-hide");
       await sure();
@@ -336,9 +343,10 @@ async function step(name, fn) {
       await p.locator("#form-mission").waitFor();
       assert.equal(await p.locator("#form-mission").isVisible(), true);
       assert.equal(await p.inputValue("#form-mission [name=number]"), M7);
-      assert.equal((await p.locator("#mission-modal-title").innerText()).trim(), M7, "the form's title is the mission number, as on the Host and Employee forms");
-      assert.equal((await p.locator("#mission-modal-sub").innerText()).trim(), "Edit mission", "with Edit mission under it");
-      assert.equal(await p.locator("#mission-modal-sub").isVisible(), true);
+      assert.equal((await p.locator("#mission-modal-title").innerText()).trim(), M7, "the form has the read view's header: the mission number");
+      assert.equal((await p.locator("#mission-modal-status").innerText()).trim().length > 0, true, "its status pill");
+      assert.match(await p.locator("#mission-modal-sub").innerText(), /Cust Seven at Host Beta/, "and what it is on line 2");
+      assert.equal(await p.locator("#mission-modal-acts:not(.hidden)").count(), 0, "no action row in the form");
       await p.click("#btn-mission-cancel");
       await p.locator("#mission-detail:not(.hidden)").waitFor();
       await p.click("#btn-md-edit");
@@ -363,6 +371,84 @@ async function step(name, fn) {
       db.t("mission_register").splice(db.t("mission_register").findIndex((x) => x.number === `TSTTH.${YY}.0888`), 1);
       await p.evaluate(() => cloud.loadMissionRegister().then(refreshAndRender));
       await goMissions(p);
+    });
+
+    await step("the record panel: the alert box and its fix, no Flags line without an alert, one width, a pinned footer", async () => {
+      await goMissions(p);
+      // M7 has no crew: one alert box, the alert on the left; a short gap of days has no fix to press
+      await row(p, M7).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.locator("#mission-detail .rp-alert").waitFor();
+      assert.match(await p.locator("#mission-detail .rp-alert").innerText(), /No crew/);
+      assert.equal(await p.locator("#mission-detail .rp-alert .lt-al").count(), 1);
+      assert.equal(await p.locator("#mission-detail .rp-alert .rp-al-fix").count(), 0, "no crew for a day has no fix");
+      assert.equal(await p.locator("#mission-detail .ov-prof-flags").count(), 0, "the Flags line is gone");
+      await p.evaluate(() => closeModal());
+      // no Trigo responsible: the fix is + Add responsible, which opens the form on that field
+      await p.evaluate((n) => { D().register.filter((r) => r.number === n).forEach((r) => { r.engineerId = null; }); }, M7);
+      await row(p, M7).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.locator("#mission-detail .rp-alert .rp-al-fix").waitFor();
+      assert.equal((await p.locator("#mission-detail .rp-alert .rp-al-fix").innerText()).trim(), "+ Add responsible");
+      assert.equal(await p.locator("#mission-detail .rp-alert .rp-al-fix").evaluate((b) => b.className.includes("lt-act")), true, "the fix is a text button");
+      await p.click("#mission-detail .rp-alert .rp-al-fix");
+      const guard = p.locator("#modal-confirm:not(.hidden)");
+      if (await guard.waitFor({ timeout: 1500 }).then(() => true, () => false)) await p.click("#btn-confirm-yes");
+      await p.waitForFunction(() => document.activeElement && document.activeElement.name === "engineer");
+      await p.evaluate(() => closeModal());
+      // a long gap with no crew: Close mission… is the one fix, and it opens the closing dialog
+      await p.evaluate(() => { window.__alerts = window.missionAlerts; window.missionAlerts = (r) => (r.status === "open" ? [{ kinds: ["noCrew", "noCrewLong"], level: 2, close: true, text: "No crew, 9 days", title: "Nobody has been on it for more than 5 working days in a row (9). If the job has ended, close it." }] : []); });
+      await row(p, M7).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.locator("#mission-detail .rp-alert").waitFor();
+      assert.equal((await p.locator("#mission-detail .rp-alert .rp-al-fix").innerText()).trim(), "Close mission…");
+      await p.click("#mission-detail .rp-alert .rp-al-fix");
+      await p.locator("#modal-close-mission:not(.hidden)").waitFor();
+      await p.evaluate(() => { window.missionAlerts = window.__alerts; closeModal(); });
+      await row(p, M7).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      // the action row: at most two buttons and More
+      assert.equal(await p.locator("#mission-modal-acts > *").count() <= 3, true);
+      // the same width as the employee profile, in read and in edit
+      const widthOf = (sel) => p.locator(sel).evaluate((m) => Math.round(m.getBoundingClientRect().width));
+      assert.equal(await widthOf("#modal-mission"), 760);
+      await p.click("#btn-md-edit");
+      const sure = p.locator("#modal-confirm:not(.hidden)");
+      if (await sure.waitFor({ timeout: 1500 }).then(() => true, () => false)) await p.click("#btn-confirm-yes");
+      await p.locator("#form-mission").waitFor();
+      assert.equal(await widthOf("#modal-mission"), 760, "the form has the panel's width too");
+      await p.evaluate(() => openProfile(D().employees[0].id));
+      await p.locator("#modal-profile:not(.hidden) .rp-group").first().waitFor();
+      assert.equal(await widthOf("#modal-profile"), 760, "the profile and the mission panel are one width");
+      await p.evaluate(() => closeModal());
+      // a mission with no alert has no box and no Flags line
+      await goMissions(p);
+      const clean = await p.evaluate(() => { const r = D().register.find((x) => x.status === "open" && missionAlerts(x, missionPlacement(x)).length === 0 && missionPlacement(x).kind === "on"); return r && r.number; });
+      assert.ok(clean, "some open mission has no alert");
+      await row(p, clean).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.locator("#mission-detail .ov-htile").first().waitFor();
+      assert.equal(await p.locator("#mission-detail .rp-alert").count(), 0, "no alert, no box: " + clean + " " + await p.locator("#mission-detail .rp-alert").allInnerTexts());
+      assert.equal(await p.locator("#mission-detail").innerText().then((t) => /Flags/.test(t)), false);
+      await p.evaluate(() => closeModal());
+      // the form's footer stays in view with the fields scrolled to the end, on a desktop and at 390px
+      const footer = () => p.evaluate(() => {
+        const f = document.querySelector("#form-mission .rp-foot").getBoundingClientRect(), m = document.querySelector("#modal-mission").getBoundingClientRect();
+        const save = document.querySelector('#form-mission .rp-foot button[type=submit]').getBoundingClientRect();
+        return { fBottom: Math.round(f.bottom), mBottom: Math.round(m.bottom), vh: innerHeight, saveIn: save.top >= 0 && save.bottom <= innerHeight };
+      });
+      for (const [w, h] of [[1400, 700], [390, 600]]) {
+        await p.setViewportSize({ width: w, height: h });
+        await p.evaluate(() => openNewMissionFromList());
+        await p.locator("#form-mission").waitFor();
+        await p.waitForTimeout(450);
+        await p.locator("#form-mission .rp-fields").evaluate((el) => { el.scrollTop = el.scrollHeight; });
+        const r = await footer();
+        assert.ok(r.saveIn && r.fBottom >= r.mBottom - 2 && r.fBottom <= r.vh, `the footer is pinned at ${w}px: ` + JSON.stringify(r));
+        assert.equal(await p.locator("#form-mission .rp-foot #btn-delete-mission").isVisible(), false, "a new mission has no Delete");
+        await p.evaluate(() => closeModal());
+      }
+      await p.setViewportSize({ width: 1400, height: 860 });
     });
 
     await step("By area chips in the top bar filter the missions by their host's service area", async () => {
@@ -408,12 +494,13 @@ async function step(name, fn) {
       // the mission panel
       await row(p, M7).locator("td").first().dblclick();
       await p.locator("#mission-detail:not(.hidden)").waitFor();
-      const panelArea = p.locator("#mission-detail .lt-ar");
+      // the board, the service area and the status are in the panel's header
+      const panelArea = p.locator("#modal-mission .rp-head .lt-ar");
       assert.equal(await panelArea.count(), 1, "the panel draws the service area with lt-ar");
       assert.match(await panelArea.innerText(), /Area One/);
-      assert.equal(await p.locator("#mission-detail .lt-bd").count(), 1, "and the board as the square tag");
-      assert.equal(await p.locator("#mission-detail .area-pill, #mission-detail .ml-tag").count(), 0, "no solid pill left");
-      assert.equal(await p.locator("#mission-detail .lt-st").count(), 1, "the status is the pill with a dot");
+      assert.equal(await p.locator("#modal-mission .rp-head .lt-bd").count(), 1, "and the board as the square tag");
+      assert.equal(await p.locator("#modal-mission .area-pill, #modal-mission .ml-tag").count(), 0, "no solid pill left");
+      assert.equal(await p.locator("#modal-mission .rp-head .lt-st").count(), 1, "the status is the pill with a dot");
       await p.evaluate(() => closeModal());
       // Host and Manpower tables draw it the same way
       await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
@@ -458,6 +545,7 @@ async function step(name, fn) {
       assert.match(await p.locator("#context-menu").innerText(), /Board Two/);
       await p.evaluate(() => hideContextMenu());   // not Escape: that closes the panel too
       // Duplicate opens a New Mission filled in from it, with the number blank
+      await p.click("#btn-md-more");
       await p.click("#btn-md-dup");
       await sure();
       await p.locator("#form-mission").waitFor();
@@ -494,8 +582,9 @@ async function step(name, fn) {
       // the panel shows it and offers the board's Highlight menu
       await row(p, M7).locator("td").first().dblclick();
       await p.locator("#mission-detail:not(.hidden)").waitFor();
-      await p.locator("#btn-md-hl").waitFor();
+      await p.locator("#btn-md-more").waitFor();
       assert.match(await p.locator("#mission-detail").innerText(), /Highlight[\s\S]*Focus activity/);
+      await p.click("#btn-md-more");
       await p.click("#btn-md-hl");
       await p.locator("#context-menu:not(.hidden)").waitFor();
       const items = (await p.locator("#context-menu .ctx-item").allInnerTexts()).map((t) => t.trim());
