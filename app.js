@@ -3773,7 +3773,7 @@ function wireAreaFilterChips(barEl, filters, redraw, multi = false) {
 function emptyCell(title) {
   return `<span class="lt-empty"${title ? ` title="${escapeHtml(title)}"` : ""}>\u2014</span>`;
 }
-/* kind: ok (green, live), off (grey, parked), warn (amber, drifting), bad (red, ended) */
+/* kind: ok (green, live), off (grey, parked), warn (amber, drifting), bad (red, ended), closed (solid grey: a mission that was closed) */
 function statusPillHtml(kind, text, title) {
   return `<span class="lt-st lt-st-${kind}"${title ? ` title="${escapeHtml(title)}"` : ""}><i></i>${escapeHtml(text)}</span>`;
 }
@@ -3979,7 +3979,7 @@ function renderPhoneSummary(s, areaHtml, loans = []) {
 function renderPhoneViewCard(o) {
   const card = $("#m-summary");
   if (!card) return;
-  const k = ([kind, n, label, alert]) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}</span>`;
+  const k = ([kind, n, label, alert, named]) => `<span class="ms-k st-${kind}${alert ? " ms-alert" : ""}" title="${label}"><i></i>${n}${named ? ` <span class="ms-kl">${label}</span>` : ""}</span>`;
   card.innerHTML = `<span class="ms-row"><span class="ms-t">${o.head}</span>${o.keys.map(k).join("")}` +
     `<span class="ms-chev">${icon("chevron-down")}</span></span>` +
     `<span class="ms-bar" aria-hidden="true">${o.bar.filter(([, n]) => n > 0).map(([kind, n]) => `<i class="st-${kind}" style="flex:${n}"></i>`).join("")}</span>`;
@@ -9526,7 +9526,7 @@ function missionTextCell(text) {
 function missionStatusHtml(r, p = missionPlacement(r)) {
   if (p.kind === "closed") {
     const t = `Closed${r.closedBy ? " by " + r.closedBy : ""}${r.closeNote ? ": " + r.closeNote : ""}`;
-    return statusPillHtml("off", `Closed ${r.closedOn ? fmtDate(r.closedOn) : ""}`.trim(), t);
+    return statusPillHtml("closed", `Closed ${r.closedOn ? fmtDate(r.closedOn) : ""}`.trim(), t);
   }
   const board = boardNameOf(r.boardId);
   if (p.kind === "on") return statusPillHtml("ok", "On board", `On the ${board} board today`);
@@ -9687,24 +9687,49 @@ function renderMissionStats(bar) {
   const noCrew = all.filter(r => r.status === "open" && missionInfo(r).alerts.some(a => a.kinds.includes("noCrew"))).length;
   const tile = (label, n, kind) =>
     `<div class="stat-tile st-${kind}${n === 0 ? " st-zero" : ""}" data-stat="${label}"><div class="st-main"><span class="st-l">${label}</span><b>${n}</b></div></div>`;
+  // Open and Closed are the filter: a tile is a button that sets the Open / Closed / All switch; the pressed one a second time shows All
+  const shown = state.missions.status;
+  const pickTile = (label, n, kind, v) =>
+    `<button type="button" class="stat-tile st-${kind} st-click${n === 0 ? " st-zero" : ""}" data-stat="${label}" data-status="${v}" aria-pressed="${shown === v}"` +
+    ` title="${shown === v ? "Show all missions" : v === "open" ? "Show only open missions" : "Show only closed missions"}"><span class="st-main"><span class="st-l">${label}</span><b>${n}</b></span></button>`;
   bar.classList.add("stats-tiles");
   const leadTitle = `Missions running in ${year}: every open mission, and the closed ones whose last working day is in ${year}.`
     + (earlier ? ` ${earlier === 1 ? "1 mission that ended before" : `${earlier} missions that ended before`} ${year} ${earlier === 1 ? "is" : "are"} not counted.` : "");
   bar.innerHTML = `<div class="stat-lead" data-stat="Total" title="${leadTitle}"><span class="st-l">Total</span><b>${all.length}</b><small class="st-year">in ${year}</small></div>` +
-    tile("Open", open, "perm") + tile("Closed", closed, "inactive") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
+    pickTile("Open", open, "perm", "open") + pickTile("Closed", closed, "inactive", "closed") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
     (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "") +
     // the proportion bar under the tiles, as on Manpower and Host: open and closed missions
     `<div class="st-split" aria-hidden="true">${[["perm", open], ["inactive", closed]].filter(([, n]) => n > 0)
       .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
+  // the switch carries its counts, for the board the picker shows
+  const seg = $("#missions-status") && $("#missions-status")._seg;
+  if (seg) for (const b of seg.children) {
+    let c = b.querySelector(".seg-n");
+    if (!c) { c = document.createElement("b"); c.className = "seg-n"; b.appendChild(c); }
+    // the switch counts what the list shows under each choice, earlier years' closed missions included (the tiles count this year)
+    c.textContent = String({ open, closed: onBoard.length - open, all: onBoard.length }[b.dataset.v]);
+  }
   renderPhoneViewCard({
     head: `<b>${open}</b><span class="ms-w"> open</span>`,
     label: `${all.length} missions in ${year}: ${open} open, ${closed} closed`,
-    keys: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    // the head already says how many are open; the dots after it carry their names
+    keys: [["inactive", closed, "Closed", false, true]].concat(noCrew ? [["noloc", noCrew, "No crew", true, true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     bar: [["perm", open], ["inactive", closed]],
     tiles: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
     areaHtml,
     filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0) + missionFilterCount(),
   });
+  // the Open and Closed tiles, on the desktop strip and in the phone's details, set the same value as the switch
+  const setStatus = (v) => { state.missions.status = v === state.missions.status ? "all" : v; render(); };
+  for (const b of bar.querySelectorAll(".st-click")) b.onclick = () => setStatus(b.dataset.status);
+  for (const t of $$('#m-details .md-t[data-stat="Open"], #m-details .md-t[data-stat="Closed"]')) {
+    const v = t.dataset.stat.toLowerCase();
+    t.setAttribute("role", "button");
+    t.tabIndex = 0;
+    t.setAttribute("aria-pressed", String(shown === v));
+    t.onclick = () => setStatus(v);
+    t.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setStatus(v); } };
+  }
 }
 function renderMissionList() {
   const st = state.missions;
