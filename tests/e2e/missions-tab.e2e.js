@@ -244,12 +244,12 @@ async function step(name, fn) {
       await p.locator("#modal-close-mission:not(.hidden)").waitFor();
       assert.match(await p.locator("#close-mission-title").innerText(), /Close mission 108/);
       await p.evaluate(() => closeModal());
-      // the Host name opens the Host tab with that host's row marked, and the search empty
+      // the Host name opens that host's record (Batch D), over the Missions tab: the Host tab is not switched to
       await row(p, M7).locator(".ml-host-link").click();
-      await p.locator("#hostlist-panel:not(.hidden)").waitFor();
-      await p.locator('#hostlist-body tr[data-host="Host Beta"].row-focus').waitFor();
-      assert.equal(await p.inputValue("#hostlist-search"), "");
-      await p.locator('#hostlist-body tr[data-host="Host Beta"].row-focus').waitFor({ state: "detached", timeout: 12000 });
+      await p.locator("#modal-host:not(.hidden) #host-detail:not(.hidden) .rp-group").waitFor();
+      assert.equal((await p.locator("#host-modal-title").innerText()).trim(), "Host Beta");
+      assert.equal(await p.locator("#hostlist-panel:not(.hidden)").count(), 0, "still on the Missions tab");
+      await p.evaluate(() => closeModal());
       // put the sample missions away again
       const drop = (t, f) => { const a = db.t(t); for (let i = a.length - 1; i >= 0; i--) if (f(a[i])) a.splice(i, 1); };
       drop("assignments", (x) => String(x.mission_id || "").startsWith("q12-"));
