@@ -173,7 +173,8 @@ const TABS = {
     await step("a click on a row opens its record: the profile, the host form, the mission panel", async () => {
       await go(p, "emplist");
       await p.locator("#emplist-body tr").nth(2).locator("td.el-name").click();
-      await p.waitForSelector("#modal-profile:not(.hidden) .ov-prof-details");
+      // the click lands on the cell's middle, where a hovered "+ Add" can sit: that opens the same panel, in its form
+      await p.waitForSelector("#modal-profile:not(.hidden) .rp-group, #modal-profile:not(.hidden) #form-employee");
       await p.evaluate(() => closeModal());
       await go(p, "hostlist");
       await p.locator("#hostlist-body tr").nth(1).locator("td.hl-name").click();

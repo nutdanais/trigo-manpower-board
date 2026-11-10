@@ -384,9 +384,11 @@ async function step(name, fn) {
       await showOverview();
       await p.locator(".ov-person-link", { hasText: "Person A" }).click();
       await p.waitForSelector("#modal-profile:not(.hidden) .ov-prof-tiles");
-      const facts = await read("#profile-body .ov-prof-id > div");
-      assert.deepEqual(facts.slice(0, 4), ["TRIGO ID —", "Contract Permanent", "Position —", "Service area AREA1"]);
-      assert.ok(facts[4].startsWith("Board Board One"), facts[4]);
+      const facts = await read("#profile-body .rp-dl > div");
+      assert.deepEqual(facts.slice(0, 2), ["Contract type Permanent", "Position —"]);
+      // who they are, their board and their service area are the header's second line
+      assert.equal((await p.locator("#profile-sub .lt-bd").innerText()).trim(), "Board One");
+      assert.equal((await p.locator("#profile-sub .lt-ar").innerText()).trim(), "AREA1");
       assert.equal(await p.locator("#profile-title").textContent(), "Person A");
       assert.equal(await p.locator("#profile-body .ov-prof-bar .btn.active").textContent(), "History range", "from People: History's range");
       const tiles = await p.evaluate(() => Object.fromEntries([...document.querySelectorAll(".ov-prof-tiles .ov-htile")].map((t) => [t.querySelector(".ov-htile-label").textContent, [t.querySelector(".ov-htile-value").textContent, t.querySelector(".ov-htile-delta").textContent]])));
@@ -399,7 +401,8 @@ async function step(name, fn) {
       assert.equal(tiles["Weekend and holiday days"][0], "2", "worked Saturday and Sunday");
       assert.equal(tiles["Longest run"][0], "14");
       assert.match(tiles["Longest run"][1], /previous period/);
-      assert.deepEqual(await read(".ov-prof-flags .ov-flag"), ["14 in a row · still going"], "the same flag as in People");
+      // the Flags line is the alert box now: no TRIGO ID, and the same flag as in People
+      assert.deepEqual((await read("#profile-body .rp-alert .lt-al")).sort(), ["14 in a row · still going", "No TRIGO ID"]);
       assert.equal(await p.locator(".ov-prof-chart .chart-column-chart rect.chart-mark").count() > 0, true, "the 12-month chart is drawn");
       assert.equal(await p.locator(".ov-prof-chart .chart-column-chart polyline").count(), 1, "against the average of their contract type");
       assert.deepEqual(await rowsOf(".ov-prof-hosts").then((r) => r.map((x) => x.slice(0, 2).concat(x[3]))), [["Host Alpha", "6", "experienced"], ["Host Beta", "2", ""]], "experienced from 5 days");
@@ -421,7 +424,7 @@ async function step(name, fn) {
       await p.waitForSelector("#modal-profile:not(.hidden) .ov-prof-tiles");
       const loanRows = await read("#profile-body .ov-prof-block tbody tr");
       assert.equal(loanRows.filter((x) => /Board One → Board Two/.test(x) && /Training/.test(x)).length, 1, "the loan to Board Two");
-      assert.deepEqual(await read(".ov-prof-flags .ov-flag"), ["never called in"]);
+      assert.ok((await read("#profile-body .rp-alert .lt-al")).includes("never called in"), "the same flag as in People");
       assert.equal((await read(".ov-prof-tiles .ov-htile-label")).includes("Not called in"), true, "on-call: not called in, not standby");
       await p.evaluate(() => closeModal());
     });
@@ -464,7 +467,7 @@ async function step(name, fn) {
       await v.page.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       await v.page.waitForTimeout(300);
       await v.page.evaluate(() => openProfile(D().employees.find((e) => e.name === "Person A").id, "30"));
-      await v.page.waitForSelector("#modal-profile:not(.hidden) .ov-prof-id");
+      await v.page.waitForSelector("#modal-profile:not(.hidden) .rp-dl");
       assert.equal(await v.page.locator(".ov-prof-tiles, .ov-prof-chart, .ov-prof-flags").count(), 0, "no per-person figures");
       assert.equal(await v.page.evaluate(() => state.profile.cache), null, "and nothing fetched for them");
       assert.equal(await v.page.locator("#profile-body .ov-prof-hosts").count(), 1, "the hosts are roster data and still show");

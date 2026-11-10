@@ -264,13 +264,18 @@ async function step(name, fn) {
       assert.equal(db.t("missions").find((m) => m.number === "TSTTH.26.0102"), undefined);
     });
 
-    await step("the mission form's own Delete and Hide still work", async () => {
+    await step("the mission form has Delete in its footer and no Hide; Hide is in the panel's More", async () => {
       await card("103").locator(".mission-header .m-line2").dblclick();
       await p.locator("#modal-mission:not(.hidden)").waitFor();
       await p.click("#btn-md-edit");
       if (await p.locator("#modal-confirm:not(.hidden)").waitFor({ timeout: 1500 }).then(() => true, () => false)) await p.click("#btn-confirm-yes");
       await p.locator("#form-mission").waitFor();
-      await p.click("#btn-hide-mission");
+      assert.equal(await p.locator("#btn-hide-mission").count(), 0, "Hide left the form's footer");
+      assert.equal(await p.locator("#form-mission .rp-foot #btn-delete-mission").isVisible(), true, "Delete is the footer's red text");
+      await p.click("#btn-mission-cancel");
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      await p.click("#btn-md-more");
+      await p.click("#btn-md-hide");
       await p.click("#btn-confirm-yes");
       await card("103").waitFor({ state: "detached" });
       assert.equal(mission("s103").hidden, true);

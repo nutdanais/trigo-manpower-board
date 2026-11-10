@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-10b">
+<link rel="stylesheet" href="styles.css?v=2026-11-10c">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-10b"></script>
+<script src="version.js?v=2026-11-10c"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -982,49 +982,57 @@
 <!-- ===== Modals ===== -->
 <div id="modal-backdrop" class="hidden">
 
-  <div class="modal modal-side hidden" id="modal-mission">
-    <h3><span id="mission-modal-title">New Mission</span><small id="mission-modal-sub" class="h3-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <!-- An existing mission opens here first, read-first like the Manpower profile (renderMissionDetail in
-         app.js); Edit details swaps in the form below, a new or duplicated mission goes straight to the form. -->
+  <!-- Mission panel (a record panel, like the Manpower profile; see "The record panel" in app.js): the header holds
+       the number, the status, what it is and the actions; an existing mission opens read-first in #mission-detail,
+       and Edit swaps the form below in. A new or duplicated mission goes straight to the form. -->
+  <div class="modal modal-side modal-record hidden" id="modal-mission">
+    <div class="rp-head">
+      <h3><span class="rp-t1"><span id="mission-modal-title" class="rp-title">New Mission</span><span id="mission-modal-status" class="rp-status"></span></span><small id="mission-modal-sub" class="h3-sub rp-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+      <div id="mission-modal-acts" class="rp-acts hidden"></div>
+    </div>
     <div id="mission-detail" class="profile-body hidden"></div>
-    <form id="form-mission">
-      <div class="form-group">Where</div>
-      <!-- only when the form is opened from the Missions tab: which board, and on which day -->
-      <label id="mission-board-row" class="hidden">Board <select name="board" id="mission-board"></select></label>
-      <p id="mission-day-note" class="import-note hidden"></p>
-      <label>Mission number <input name="number" required placeholder="e.g. BANGN.26.0007"></label>
-      <!-- Host is a search over the Host list: the datalist is filled by
-           renderMissionHostOptions() so the browser's own type-ahead filters
-           it, and #mission-host-note says live whether what's typed is a known
-           host. A host that isn't on the list is caught on save, which offers
-           to create it (see saveMission). -->
-      <label>Host (company) <input name="host" required list="host-options" autocomplete="off" placeholder="Search the Host list…"></label>
-      <datalist id="host-options"></datalist>
-      <p id="mission-host-note" class="import-note hidden"></p>
-      <label>Customer (company) <input name="customer" required placeholder="e.g. Hayashi"></label>
-      <div class="form-group">When</div>
-      <div class="form-row">
-        <label>Shift
-          <select name="shift" data-seg><option value="day">Day</option><option value="night">Night</option></select>
-        </label>
-        <label>Start <input name="startTime" type="time" value="08:00"></label>
-        <label>End <input name="endTime" type="time" value="17:00"></label>
+    <form id="form-mission" class="rp-form">
+      <div class="rp-fields">
+      <div class="form-group">Job</div>
+      <div class="rp-grid">
+        <!-- only when the form is opened from the Missions tab: which board, and on which day -->
+        <label id="mission-board-row" class="hidden">Board <select name="board" id="mission-board"></select></label>
+        <p id="mission-day-note" class="import-note hidden"></p>
+        <label>Mission number <span class="req" aria-hidden="true">*</span> <input name="number" required placeholder="e.g. BANGN.26.0007"></label>
+        <!-- Host is a search over the Host list: the datalist is filled by
+             renderMissionHostOptions() so the browser's own type-ahead filters
+             it, and #mission-host-note says live whether what's typed is a known
+             host. A host that isn't on the list is caught on save, which offers
+             to create it (see saveMission). -->
+        <label>Host (company) <span class="req" aria-hidden="true">*</span> <input name="host" required list="host-options" autocomplete="off" placeholder="Search the Host list…"></label>
+        <datalist id="host-options"></datalist>
+        <p id="mission-host-note" class="import-note hidden"></p>
+        <label>Customer (company) <span class="req" aria-hidden="true">*</span> <input name="customer" required placeholder="e.g. Hayashi"></label>
+        <!-- Engineer is a search over the people who may run a mission: everyone
+             from Engineer upwards, by the display name on their account. Same
+             shape as the Host box above — the datalist gives the browser's own
+             type-ahead, and #mission-engineer-note says live who has been
+             matched. Resolved to an engineer record on save (see saveMission). -->
+        <label>Engineer <span class="req" aria-hidden="true">*</span> <input name="engineer" required list="engineer-options" autocomplete="off" placeholder="Search by name…"></label>
+        <datalist id="engineer-options"></datalist>
+        <p id="mission-engineer-note" class="import-note hidden"></p>
+        <div class="form-row rp-full">
+          <label>Shift
+            <select name="shift" data-seg><option value="day">Day</option><option value="night">Night</option></select>
+          </label>
+          <label>Start <input name="startTime" type="time" value="08:00"></label>
+          <label>End <input name="endTime" type="time" value="17:00"></label>
+        </div>
       </div>
-      <div class="form-group">Who</div>
-      <!-- Engineer is a search over the people who may run a mission: everyone
-           from Engineer upwards, by the display name on their account. Same
-           shape as the Host box above — the datalist gives the browser's own
-           type-ahead, and #mission-engineer-note says live who has been
-           matched. Resolved to an engineer record on save (see saveMission). -->
-      <label>Engineer <input name="engineer" required list="engineer-options" autocomplete="off" placeholder="Search by name…"></label>
-      <datalist id="engineer-options"></datalist>
-      <p id="mission-engineer-note" class="import-note hidden"></p>
       <div class="form-group">Notes</div>
-      <label>PPE (required equipment) <input name="ppe" placeholder="e.g. Safety shoes, helmet, glasses"></label>
-      <label>Remark <textarea name="remark" rows="2" placeholder="Optional notes"></textarea></label>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-danger hidden" id="btn-delete-mission">Delete</button>
-        <button type="button" class="btn hidden" id="btn-hide-mission" title="Take this mission off the board without deleting it"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"></use></svg> <span id="hide-mission-label">Hide</span></button>
+      <div class="rp-grid">
+        <label class="rp-full">PPE (required equipment) <span class="opt">optional</span> <input name="ppe" placeholder="e.g. Safety shoes, helmet, glasses"></label>
+        <label class="rp-full">Remark <span class="opt">optional</span> <textarea name="remark" rows="2" placeholder="Optional notes"></textarea></label>
+      </div>
+      </div>
+      <!-- pinned at the bottom of the panel: the destructive action on the left as red text, Cancel and Save on the right -->
+      <div class="modal-actions rp-foot">
+        <button type="button" class="rp-danger hidden" id="btn-delete-mission">Delete</button>
         <span class="toolbar-spacer"></span>
         <button type="button" class="btn" id="btn-mission-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -1034,51 +1042,56 @@
 
   <!-- New employee. An existing person is edited in their Profile (#modal-profile); both
        draw the same form from #tpl-employee-form, so the fields exist in one place. -->
-  <div class="modal modal-side hidden" id="modal-employee">
-    <h3><span id="employee-modal-title">New Employee</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <div class="employee-pane-stack">
-      <div class="settings-pane" id="employee-form-slot"></div>
+  <div class="modal modal-side modal-record hidden" id="modal-employee">
+    <div class="rp-head">
+      <h3><span class="rp-t1"><span id="employee-modal-title" class="rp-title">New Employee</span></span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     </div>
+    <div class="employee-pane-stack" id="employee-form-slot"></div>
   </div>
 
   <template id="tpl-employee-form">
-    <form id="form-employee">
+    <form id="form-employee" class="rp-form">
+      <div class="rp-fields">
       <div class="form-group">Identity</div>
-      <label>Thai name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
-      <p class="field-hint" id="hint-name-th">Required. This is the name shown in the app by default.</p>
-      <label>English name (optional) <input name="nameEn" maxlength="200" autocomplete="off" placeholder="e.g. Somchai Jaidee" title="Used when you export to Excel in English. If it is empty, the Thai name is used."></label>
-      <p class="field-hint" id="hint-name-en">Used when you export to Excel in English. If it is empty, the Thai name is used.</p>
-      <label>TRIGO ID (optional) <input name="trigoId" placeholder="e.g. T329" maxlength="8" autocomplete="off" title="The letter T and digits, like T329. Must be unique; two people may share a name only when both have a TRIGO ID."></label>
-      <label>Mobile number <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
-      <div class="form-group">Contract</div>
-      <div class="form-row">
-      <label>Contract type
-        <select name="contract" data-seg>
-          <option value="permanent">Permanent</option>
-          <option value="oncall">On-call</option>
-        </select>
-      </label>
-      <label>Position
-        <select name="position" data-picker>
-          <option value="">— none —</option>
-          <option value="inspector">Inspector</option>
-          <option value="senior_inspector">Senior Inspector</option>
-          <option value="technician">Technician</option>
-          <option value="team_leader">Team Leader</option>
-          <option value="assistant_site_engineer">Assistant Site Engineer</option>
-        </select>
-      </label>
+      <div class="rp-grid">
+        <label class="rp-full">Thai name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="First name and surname, e.g. สมชาย ใจดี" title="The full name only — no ID, initial or nickname. Use the TRIGO ID field to tell people with the same name apart."></label>
+        <p class="field-hint rp-full" id="hint-name-th">Required. This is the name shown in the app by default.</p>
+        <label>TRIGO ID <span class="opt">optional</span> <input name="trigoId" placeholder="e.g. T329" maxlength="8" autocomplete="off" title="The letter T and digits, like T329. Must be unique; two people may share a name only when both have a TRIGO ID."></label>
       </div>
-      <div class="form-row">
-      <label>Start date (optional) <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
-      <label>On the board from (optional) <input name="addedOn" type="date" min="2000-01-01" max="2099-12-31" title="The day this person was added to the app. Dashboard headcount and Standby count them only from this date. Blank on a new employee = today; clear it on an existing one = counted on every date."></label>
+      <div class="form-group">Contract</div>
+      <div class="rp-grid">
+        <label>Contract type
+          <select name="contract" data-seg>
+            <option value="permanent">Permanent</option>
+            <option value="oncall">On-call</option>
+          </select>
+        </label>
+        <label>Position <span class="opt">optional</span>
+          <select name="position" data-picker>
+            <option value="">— none —</option>
+            <option value="inspector">Inspector</option>
+            <option value="senior_inspector">Senior Inspector</option>
+            <option value="technician">Technician</option>
+            <option value="team_leader">Team Leader</option>
+            <option value="assistant_site_engineer">Assistant Site Engineer</option>
+          </select>
+        </label>
+        <label>Start date <span class="opt">optional</span> <input name="startDate" type="date" min="1980-01-01" max="2099-12-31"></label>
+        <label>On the board from <span class="opt">optional</span> <input name="addedOn" type="date" min="2000-01-01" max="2099-12-31" title="The day this person was added to the app. Dashboard headcount and Standby count them only from this date. Blank on a new employee = today; clear it on an existing one = counted on every date."></label>
+      </div>
+      <div class="form-group">Contact</div>
+      <div class="rp-grid">
+        <label>Mobile number <span class="opt">optional</span> <input name="phone" type="tel" placeholder="e.g. 081-234-5678"></label>
+        <label>English name <span class="opt">optional</span> <input name="nameEn" maxlength="200" autocomplete="off" placeholder="e.g. Somchai Jaidee" title="Used when you export to Excel in English. If it is empty, the Thai name is used."></label>
+        <p class="field-hint rp-full" id="hint-name-en">Used when you export to Excel in English. If it is empty, the Thai name is used.</p>
       </div>
       <div class="form-group">Placement</div>
-      <div class="form-row">
-      <label>Service area <select name="areaId" required data-picker></select></label>
-      <label>Board <select name="boardId" required data-picker></select></label>
+      <div class="rp-grid">
+        <label>Service area <span class="req" aria-hidden="true">*</span> <select name="areaId" required data-picker></select></label>
+        <label>Board <span class="req" aria-hidden="true">*</span> <select name="boardId" required data-picker></select></label>
       </div>
-      <div class="modal-actions">
+      </div>
+      <div class="modal-actions rp-foot">
         <span class="toolbar-spacer"></span>
         <button type="button" class="btn emp-form-cancel" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
@@ -1088,8 +1101,11 @@
 
   <!-- Employee profile: opened from a name in Overview > People, from the Manpower List and from a board
        card. Everything about one person, and where they are edited; built by renderProfile in app.js. A side panel on a desktop, full screen on a phone. -->
-  <div class="modal modal-side modal-profile hidden" id="modal-profile" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-    <h3><span id="profile-title" data-no-i18n>Profile</span><small id="profile-sub" class="h3-sub"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+  <div class="modal modal-side modal-record modal-profile hidden" id="modal-profile" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+    <div class="rp-head">
+      <h3><span class="rp-t1"><span id="profile-title" class="rp-title" data-no-i18n>Profile</span><span id="profile-status" class="rp-status"></span></span><small id="profile-sub" class="h3-sub rp-sub"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+      <div id="profile-acts" class="rp-acts hidden"></div>
+    </div>
     <div id="profile-body" class="profile-body"></div>
   </div>
 
@@ -1116,13 +1132,13 @@
   <div class="modal modal-side hidden" id="modal-host">
     <h3><span id="host-modal-title">Host</span><small id="host-modal-sub" class="h3-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
     <form id="form-host">
-      <label>Host name <input name="name" required placeholder="e.g. Fortune"></label>
+      <label>Host name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="e.g. Fortune"></label>
       <p id="host-name-note" class="import-note hidden">The name is how this record is tied to the host's missions and deployment history. Renaming rewrites it on all of them, so the history follows the host — past mission cards will read the new name too. To combine this host with another one instead, use <b>Merge</b> below.</p>
-      <label>Location <input name="location" placeholder="e.g. Amata City Chonburi, Plant 2"></label>
-      <label>Service area <select name="areaId" data-picker></select></label>
-      <label>Google Maps link <input name="mapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
+      <label>Location <span class="opt">optional</span> <input name="location" placeholder="e.g. Amata City Chonburi, Plant 2"></label>
+      <label>Service area <span class="opt">optional</span> <select name="areaId" data-picker></select></label>
+      <label>Google Maps link <span class="opt">optional</span> <input name="mapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
       <p class="import-note">Paste the link from Google Maps (Share → Copy link). Location shows as a pin link on the Host List when a link is saved.</p>
-      <label>Note <textarea name="note" rows="2" placeholder="Optional — gate, contact, PPE reminder…"></textarea></label>
+      <label>Note <span class="opt">optional</span> <textarea name="note" rows="2" placeholder="Optional — gate, contact, PPE reminder…"></textarea></label>
       <label class="toggle toggle-archived" title="A site the team no longer serves: kept here with all of its history, but not offered when creating a mission">
         <input type="checkbox" name="archived">
         <span class="toggle-track"><span class="toggle-thumb"></span></span>
@@ -1721,22 +1737,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-10b"></script>
-<script src="i18n-th.js?v=2026-11-10b"></script>
-<script src="planning.js?v=2026-11-10b"></script>
-<script src="employee-id.js?v=2026-11-10b"></script>
-<script src="mission-number.js?v=2026-11-10b"></script>
-<script src="mission-activity.js?v=2026-11-10b"></script>
+<script src="i18n.js?v=2026-11-10c"></script>
+<script src="i18n-th.js?v=2026-11-10c"></script>
+<script src="planning.js?v=2026-11-10c"></script>
+<script src="employee-id.js?v=2026-11-10c"></script>
+<script src="mission-number.js?v=2026-11-10c"></script>
+<script src="mission-activity.js?v=2026-11-10c"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-10b"></script>
-<script src="cloud.js?v=2026-11-10b"></script>
-<script src="charts.js?v=2026-11-10b"></script>
-<script src="xlsx-export.js?v=2026-11-10b"></script>
-<script src="orgchart-pptx.js?v=2026-11-10b"></script>
-<script src="bulk-edit.js?v=2026-11-10b"></script>
-<script src="app.js?v=2026-11-10b"></script>
-<script src="report.js?v=2026-11-10b"></script>
-<script src="present.js?v=2026-11-10b"></script>
+<script src="demo/demo-gate.js?v=2026-11-10c"></script>
+<script src="cloud.js?v=2026-11-10c"></script>
+<script src="charts.js?v=2026-11-10c"></script>
+<script src="xlsx-export.js?v=2026-11-10c"></script>
+<script src="orgchart-pptx.js?v=2026-11-10c"></script>
+<script src="bulk-edit.js?v=2026-11-10c"></script>
+<script src="app.js?v=2026-11-10c"></script>
+<script src="report.js?v=2026-11-10c"></script>
+<script src="present.js?v=2026-11-10c"></script>
 </body>
 </html>

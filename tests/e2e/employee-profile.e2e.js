@@ -66,8 +66,11 @@ async function step(name, fn) {
       }, name);
       await menu.waitFor();
     };
-    const profileOpen = () => p.waitForSelector("#modal-profile:not(.hidden) .ov-prof-details");
-    const facts = () => p.locator("#profile-body .ov-prof-id > div").allInnerTexts().then((r) => r.map((x) => x.replace(/\s+/g, " ").trim()));
+    const profileOpen = () => p.waitForSelector("#modal-profile:not(.hidden) .rp-group");
+    // the fields as "label value" lines (Contract and Contact); who they are, their board and area are in the header
+    const facts = () => p.locator("#profile-body .rp-dl > div").allInnerTexts().then((r) => r.map((x) => x.replace(/\s+/g, " ").trim()));
+    const head = () => p.locator("#modal-profile .rp-head").innerText().then((x) => x.replace(/\s+/g, " ").trim());
+    const openMore = () => p.click("#btn-profile-more");
 
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
 
@@ -106,8 +109,13 @@ async function step(name, fn) {
       await profileOpen();
       assert.equal(await p.locator("#profile-title").textContent(), "สมชาย ใจดี");
       const f = await facts();
-      assert.deepEqual(f.slice(0, 3), ["TRIGO ID T101", "Contract Permanent", "Position —"]);
-      for (const x of ["English name Somchai Jaidee", "Mobile number 081-234-5678", "On the board from —", "Status Active"]) assert.ok(f.includes(x), x + " in " + JSON.stringify(f));
+      assert.deepEqual(f.slice(0, 2), ["Contract type Permanent", "Position —"]);
+      for (const x of ["English name Somchai Jaidee", "Mobile number 081-234-5678", "On the board from —"]) assert.ok(f.includes(x), x + " in " + JSON.stringify(f));
+      // who they are is the header: the status pill, TRIGO ID · English name, then the board and the service area
+      assert.equal((await p.locator("#profile-status").innerText()).trim(), "Active");
+      assert.match(await p.locator("#profile-sub").innerText(), /^T101\s+·\s+Somchai Jaidee/);
+      assert.equal(await p.locator("#profile-sub .lt-bd").count(), 1, "the board tag");
+      assert.equal(await p.locator("#profile-sub .lt-ar").count(), 1, "the service area");
       assert.equal(await p.locator("#btn-profile-edit").count(), 1);
       assert.equal(await p.locator("#profile-body #form-employee").count(), 0, "the form is not there until asked for");
     });
@@ -126,11 +134,12 @@ async function step(name, fn) {
       await p.click("#form-employee button[type=submit]");
       await p.waitForFunction(() => /T102 already belongs to Person B/.test(document.querySelector("#toast-stack").textContent));
       assert.equal(await p.locator("#modal-profile:not(.hidden) #form-employee").count(), 1, "still the form");
-      // a period switch while the form is open keeps what was typed
+      // a redraw while the form is open (the figures finishing their load, a board change elsewhere) keeps what was typed;
+      // the form replaces the whole body, so there is no period switch to press while editing
       await p.fill("#form-employee input[name=trigoId]", "T555");
       await p.fill("#form-employee input[name=phone]", "089-000-1111");
-      await p.locator(".ov-prof-bar .btn", { hasText: "90D" }).click();
-      await p.waitForFunction(() => document.querySelector(".ov-prof-bar .btn.active").textContent === "90D");
+      assert.equal(await p.locator("#profile-body .ov-prof-bar").count(), 0, "the form is the whole body");
+      await p.evaluate(() => renderProfile());
       assert.equal(await p.inputValue("#form-employee input[name=phone]"), "089-000-1111", "what was typed survives the redraw");
       await p.click('#form-employee .seg-pick button[data-v="oncall"]');
       await p.click("#form-employee .pk-btn[aria-label=Position]");
@@ -140,7 +149,8 @@ async function step(name, fn) {
       const row = db.t("employees").find((e) => e.id === "e1");
       assert.deepEqual([row.trigo_id, row.phone, row.contract, row.position], ["T555", "089-000-1111", "oncall", "senior_inspector"]);
       const f = await facts();
-      for (const x of ["TRIGO ID T555", "Contract On-call", "Position Senior Inspector", "Mobile number 089-000-1111"]) assert.ok(f.includes(x), x + " in " + JSON.stringify(f));
+      for (const x of ["Contract type On-call", "Position Senior Inspector", "Mobile number 089-000-1111"]) assert.ok(f.includes(x), x + " in " + JSON.stringify(f));
+      assert.match(await head(), /T555/, "the new TRIGO ID is in the header");
       assert.equal(await p.locator("#modal-profile:not(.hidden)").count(), 1, "the Profile stays open");
     });
 
@@ -151,6 +161,85 @@ async function step(name, fn) {
       assert.equal(await p.locator("#modal-profile:not(.hidden)").count(), 1);
       assert.equal(await p.locator("#profile-body #form-employee").count(), 0);
       assert.equal(db.t("employees").find((e) => e.id === "e1").phone, "089-000-1111");
+      await p.evaluate(() => closeModal());
+    });
+
+    await step("the header: the name, the status and at most two buttons and More; Edit turns the panel into the form with its footer pinned", async () => {
+      await p.evaluate(() => openProfile("e1", "90"));
+      await profileOpen();
+      assert.deepEqual(await p.locator("#profile-acts > button").evaluateAll((b) => b.map((x) => x.id)), ["btn-profile-edit", "btn-profile-move", "btn-profile-more"], "Edit, Move to board, More");
+      const w = await p.locator("#modal-profile").evaluate((m) => Math.round(m.getBoundingClientRect().width));
+      assert.equal(w, 760, "the one panel width");
+      await p.click("#btn-profile-edit");
+      await p.waitForSelector("#modal-profile #form-employee");
+      assert.equal(await p.locator("#modal-profile #profile-acts:not(.hidden)").count(), 0, "no action row in the form");
+      assert.equal(await p.locator("#modal-profile").evaluate((m) => Math.round(m.getBoundingClientRect().width)), 760, "the form has the same width");
+      assert.equal((await p.locator("#profile-status").innerText()).trim(), "Active", "the same header in the form");
+      assert.equal(await p.locator("#form-employee .rp-foot #btn-emp-deactivate").count(), 1, "Deactivate… sits in the footer, on the left");
+      // the footer stays in view with the fields scrolled to their end
+      await p.locator("#form-employee .rp-fields").evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      const r = await p.evaluate(() => {
+        const f = document.querySelector("#form-employee .rp-foot").getBoundingClientRect(), m = document.querySelector("#modal-profile").getBoundingClientRect();
+        return { fBottom: Math.round(f.bottom), mBottom: Math.round(m.bottom), vh: innerHeight };
+      });
+      assert.ok(r.fBottom <= r.vh && r.fBottom >= r.mBottom - 2, "the footer is pinned at the panel's bottom " + JSON.stringify(r));
+      // the labels: the required ones have the red star, the optional ones say so
+      assert.equal(await p.locator("#form-employee label:has(input[name=name]) .req").count(), 1);
+      assert.equal(await p.locator("#form-employee label:has(input[name=trigoId]) .opt").innerText(), "optional");
+      assert.equal(await p.locator("#form-employee label:has(select[name=areaId]) .req").count(), 1);
+      await p.click("#form-employee .emp-form-cancel");
+      await profileOpen();
+      assert.equal(await p.locator("#profile-acts:not(.hidden)").count(), 1, "Cancel returns to the read view of the same record");
+      await p.evaluate(() => closeModal());
+    });
+
+    await step("the alert box: only when the person has an alert, with its one fix, which opens the form on that field", async () => {
+      // Person B works every day, has a TRIGO ID and an area: no alert, so no box and no Flags line
+      await p.evaluate(() => openProfile("e2", "90"));
+      await profileOpen();
+      assert.equal(await p.locator("#profile-body .rp-alert").count(), 0);
+      assert.equal(await p.locator(".ov-prof-flags").count(), 0);
+      await p.evaluate(() => closeModal());
+      // Person A took six leave days: leave above 20% of the working days is an alert, which has no fix to press
+      await p.evaluate(() => openProfile("e1", "90"));
+      await p.waitForSelector("#modal-profile:not(.hidden) .rp-alert");
+      assert.match(await p.locator("#profile-body .rp-alert").innerText(), /Leave \d+%/);
+      assert.equal(await p.locator("#profile-body .rp-alert .rp-al-fix").count(), 0);
+      await p.evaluate(() => closeModal());
+      // no TRIGO ID: the alert, and its fix opens the form with that field focused
+      db.t("employees").find((e) => e.id === "e3").trigo_id = null;
+      await p.evaluate(() => cloud._loadEmployees().then(refreshAndRender));
+      await p.evaluate(() => openProfile("e3", "90"));
+      await p.waitForSelector("#modal-profile:not(.hidden) .rp-alert");
+      assert.match(await p.locator("#profile-body .rp-alert").innerText(), /No TRIGO ID/);
+      assert.equal(await p.locator("#profile-body .rp-alert .lt-al").count() >= 1, true);
+      assert.equal(await p.locator("#profile-body .rp-alert .rp-al-fix").evaluate((b) => b.className.includes("lt-act")), true, "the fix is a text button");
+      await p.click("#profile-body .rp-alert .rp-al-fix");
+      await p.waitForSelector("#modal-profile #form-employee");
+      await p.waitForFunction(() => document.activeElement && document.activeElement.name === "trigoId");
+      await p.evaluate(() => closeModal());
+      db.t("employees").find((e) => e.id === "e3").trigo_id = "T103";
+      await p.evaluate(() => cloud._loadEmployees().then(refreshAndRender));
+    });
+
+    await step("More opens under its button and Escape closes only the menu; Move to board lists the other boards and moves the person", async () => {
+      await toList();
+      await p.evaluate(() => openProfile("e9", "90"));
+      await profileOpen();
+      await openMore();
+      assert.equal(await p.locator("#profile-acts .rp-more").count(), 1);
+      await p.keyboard.press("Escape");
+      assert.equal(await p.locator("#profile-acts .rp-more").count(), 0, "Escape closed the menu");
+      assert.equal(await p.locator("#modal-profile:not(.hidden)").count(), 1, "and left the panel open");
+      const from = db.t("employees").find((e) => e.id === "e9").board_id;
+      await p.click("#btn-profile-move");
+      const boards = (await p.locator("#profile-acts .rp-more .rp-more-item").allInnerTexts()).map((t) => t.trim());
+      assert.equal(boards.length >= 1 && !boards.includes(await p.evaluate((id) => D().boards.find((b) => b.id === D().employees.find((e) => e.id === id).boardId).name, "e9")), true, "the other boards only: " + boards.join(", "));
+      await p.locator("#profile-acts .rp-more .rp-more-item").first().click();
+      // today's board is read-only: the same "edit anyway?" the board's own menu asks first
+      if (await p.locator("#modal-confirm:not(.hidden)").waitFor({ timeout: 1500 }).then(() => true, () => false)) await p.click("#btn-confirm-yes");
+      await p.waitForFunction((b) => D().employees.find((e) => e.id === "e9").boardId !== b, from);
+      assert.notEqual(db.t("employees").find((e) => e.id === "e9").board_id, from, "moved for good");
       await p.evaluate(() => closeModal());
     });
 
@@ -227,20 +316,26 @@ async function step(name, fn) {
 
     await step("Deactivate and Reactivate from the Profile", async () => {
       await p.evaluate(() => openProfile("e3", "90"));
-      await p.waitForSelector("#modal-profile:not(.hidden) #btn-profile-active");
+      await p.waitForSelector("#modal-profile:not(.hidden) #btn-profile-more");
+      assert.equal(await p.locator("#modal-profile #btn-profile-active").count(), 0, "Deactivate is behind More, not a header button");
+      await openMore();
+      assert.equal((await p.locator("#btn-profile-active").innerText()).trim(), "Deactivate…");
       await p.click("#btn-profile-active");
       await p.waitForSelector("#modal-deactivate:not(.hidden)");
       await p.click("#btn-deactivate-no");
       assert.equal(await p.locator("#modal-profile:not(.hidden)").count(), 1, "Cancel returns to the Profile");
       assert.notEqual(db.t("employees").find((e) => e.id === "e3").active, false);
+      await openMore();
       await p.click("#btn-profile-active");
       await p.waitForSelector("#modal-deactivate:not(.hidden)");
       await p.click("#btn-deactivate-yes");
-      await p.waitForFunction(() => document.querySelector("#btn-profile-active") && /Reactivate/.test(document.querySelector("#btn-profile-active").textContent));
+      await p.waitForFunction(() => /Inactive/.test(document.querySelector("#profile-status").textContent));
       assert.equal(db.t("employees").find((e) => e.id === "e3").active, false);
-      assert.ok((await facts()).some((x) => x.startsWith("Status Inactive")), "the status reads Inactive");
+      assert.equal(await p.locator("#profile-body .rp-alert").count(), 0, "someone off the roster has no alert");
+      await openMore();
+      assert.equal((await p.locator("#btn-profile-active").innerText()).trim(), "Activate");
       await p.click("#btn-profile-active");
-      await p.waitForFunction(() => /Deactivate/.test(document.querySelector("#btn-profile-active").textContent));
+      await p.waitForFunction(() => /Active/.test(document.querySelector("#profile-status").textContent) && !/Inactive/.test(document.querySelector("#profile-status").textContent));
       assert.equal(db.t("employees").find((e) => e.id === "e3").active, true);
       await p.evaluate(() => closeModal());
     });
@@ -250,8 +345,9 @@ async function step(name, fn) {
       await v.page.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       await v.page.evaluate(() => openEmployeeModal("e1"));
       await v.page.waitForSelector("#modal-profile:not(.hidden) .ov-prof-leave");
-      assert.equal(await v.page.locator("#btn-profile-edit, #btn-profile-active, .ov-prof-note-form, #form-employee").count(), 0);
-      assert.equal(await v.page.locator("#profile-body .ov-prof-id > div").count() >= 10, true);
+      assert.equal(await v.page.locator("#btn-profile-edit, #btn-profile-move, #btn-profile-more, #btn-profile-active, .ov-prof-note-form, #form-employee").count(), 0);
+      assert.equal(await v.page.locator("#profile-acts:not(.hidden)").count(), 0, "no action row at all for a viewer");
+      assert.equal(await v.page.locator("#profile-body .rp-dl > div").count() >= 6, true);
       assert.deepEqual(v.errors, []);
     });
 

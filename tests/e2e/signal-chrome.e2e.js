@@ -158,7 +158,7 @@ async function step(name, fn) {
         return { right: Math.round(m.right), w: Math.round(m.width), top: Math.round(m.top), bottom: Math.round(m.bottom), fBottom: Math.round(f.bottom), vw: innerWidth, vh: innerHeight };
       });
       assert.equal(r.right, r.vw, "flush with the right edge");
-      assert.ok(r.w <= 520 && r.w >= 400, "width " + r.w);
+      assert.equal(r.w, 760, "the one record-panel width " + r.w);
       assert.ok(r.top <= 1 && r.bottom >= r.vh - 1, "full height");
       assert.ok(r.fBottom >= r.vh - 2, "footer sits at the bottom");
     });

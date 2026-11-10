@@ -272,13 +272,16 @@ async function step(name, fn) {
       assert.deepEqual(dbRow("e7"), [false, today, null], "Inactive for now: no reason");
       // the Profile's Deactivate
       await p.evaluate(() => openEmployeeModal("e10"));
+      await p.locator("#btn-profile-more").click();
       await p.locator("#btn-profile-active").click();
       await p.waitForSelector("#modal-deactivate:not(.hidden)");
       await p.locator("#modal-deactivate label", { hasText: "Resigned" }).click();
       await p.locator("#btn-deactivate-yes").click();
       await p.waitForTimeout(400);
       assert.deepEqual(dbRow("e10"), [false, today, "resigned"]);
-      assert.equal(await p.locator("#modal-profile:not(.hidden) #btn-profile-active").textContent().then((t) => t.trim()), "Reactivate", "the Profile stays open and offers Reactivate");
+      await p.locator("#modal-profile:not(.hidden) #btn-profile-more").click();
+      assert.equal(await p.locator("#btn-profile-active").textContent().then((t) => t.trim()), "Activate", "the Profile stays open and offers Activate");
+      assert.match(await p.locator("#profile-status").innerText(), /Resigned/, "the status pill reads Resigned");
       await p.evaluate(() => closeModal());
       // bulk bar over e2 (active) and e6 (inactive for now since last month): Resigned for both; e6 keeps its date
       const e6date = dbRow("e6")[1];
