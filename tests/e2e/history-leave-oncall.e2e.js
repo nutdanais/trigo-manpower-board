@@ -213,7 +213,10 @@ async function step(name, fn) {
       for (const hd of ["90D utilization", "Worked", "Leave", "Leave share"]) assert.ok(heads.includes(hd), hd + " in " + heads.join(" | "));
       assert.ok(!heads.includes("Worked : Leave"), "the ratio column is gone: the leave share replaces it");
       const cells = await p.evaluate(() => Object.fromEntries([...document.querySelectorAll("#emplist-body tr")].map((tr) =>
-        [tr.querySelector("td[data-label=Name]").textContent.trim().split(/\s{2,}|\n/)[0], [...tr.querySelectorAll("td.el-wl")].map((td) => td.textContent.replace(/\s+/g, " ").trim())])));
+        [tr.querySelector("td.el-name .lt-name").textContent.trim(), [...tr.querySelectorAll("td.el-wl.lt-opt")].map((td) => td.textContent.replace(/\s+/g, " ").trim())])));
+      // Worked · Leave on one line, and the leave share under it (the three facts are also columns of their own)
+      const wl = await p.evaluate(() => [...document.querySelectorAll("#emplist-body tr")].find((tr) => tr.querySelector("td.el-name .lt-name").textContent.trim() === "Person D").querySelector('td[data-col="wl"]').innerText.replace(/\s+/g, " ").trim());
+      assert.match(wl, /^4 · 2 \d+\.\d% leave$/, "Worked · Leave, and the leave share under it: " + wl);
       // seedBase also puts D on a mission and E on annual leave today
       assert.deepEqual(cells["Person D"].slice(0, 2), ["4", "2"], "Wed-Fri and today worked; annual leave Mon and Tue");
       assert.deepEqual(cells["Person E"].slice(0, 2), ["4", "2"], "sick Monday and annual leave today");
@@ -231,7 +234,7 @@ async function step(name, fn) {
       await v.page.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       await v.page.waitForTimeout(400);
       assert.equal(await v.page.locator("#emplist-table th.el-wl:not(.hidden)").count(), 0, "headers hidden");
-      assert.equal(await v.page.locator("#emplist-body td.el-wl").count(), 0, "no cells");
+      assert.equal(await v.page.locator("#emplist-body td.el-wl:not(.hidden)").count(), 0, "no cells");
       assert.equal(await v.page.evaluate(() => emplistXlsxRows().some((r) => "worked" in r)), false, "not in the Excel rows");
       assert.deepEqual(v.errors, []);
     });

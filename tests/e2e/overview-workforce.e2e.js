@@ -209,7 +209,7 @@ async function step(name, fn) {
     await step("B1: Manpower shows Resigned apart from Inactive: status, filter option, tile, count", async () => {
       await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       await p.waitForTimeout(400);
-      const status = () => p.evaluate(() => Object.fromEntries([...document.querySelectorAll("#emplist-body tr")].map((tr) => [tr.querySelector("td.el-name").textContent.trim(), tr.querySelector(".el-status .toggle-text").textContent.trim()])));
+      const status = () => p.evaluate(() => Object.fromEntries([...document.querySelectorAll("#emplist-body tr")].map((tr) => [tr.querySelector("td.el-name .lt-name").textContent.trim(), tr.querySelector(".el-status .lt-st").textContent.trim()])));
       const st = await status();
       assert.equal(st["Person E"], "Resigned");
       assert.equal(st["Person F"], "Inactive");
@@ -229,24 +229,30 @@ async function step(name, fn) {
     const row = (name) => p.locator("#emplist-body tr", { hasText: name }).first();
     const dbRow = (id) => { const e = db.t("employees").find((x) => x.id === id); return [e.active, e.deactivated_on || null, e.exit_reason || null]; };
 
-    await step("B1: the Status switch asks why; Cancel puts the switch back; Resigned stores the reason and the date; switching on clears both", async () => {
-      await row("Person H").locator(".toggle-track").click();
+    // the Status switch left the table: Deactivate is in the row's ⋯ menu (it asks why), Activate is there for an inactive person
+    const rowMenu = async (name, item) => {
+      await row(name).locator(".lt-dots").click();
+      await p.locator("#context-menu .ctx-item", { hasText: item }).click();
+    };
+    await step("B1: Deactivate in the ⋯ menu asks why; Cancel changes nothing; Resigned stores the reason and the date; Activate clears both", async () => {
+      assert.equal(await row("Person H").locator(".el-status input, .toggle").count(), 0, "no switch in the Status cell any more");
+      await rowMenu("Person H", "Deactivate employee");
       await p.waitForSelector("#modal-deactivate:not(.hidden)");
       assert.equal(await p.locator("#modal-deactivate input[value=inactive]").isChecked(), true, "Inactive for now is the default");
       assert.equal(await p.locator("#deactivate-resigned").isDisabled(), false);
       await p.locator("#btn-deactivate-no").click();
       await p.waitForTimeout(250);
       assert.deepEqual(dbRow("e8"), [true, null, null], "nothing changed");
-      assert.equal(await row("Person H").locator(".el-status input").isChecked(), true, "the switch is back on");
-      await row("Person H").locator(".toggle-track").click();
+      assert.equal((await row("Person H").locator(".el-status .lt-st").textContent()).trim(), "Active", "still active");
+      await rowMenu("Person H", "Deactivate employee");
       await p.waitForSelector("#modal-deactivate:not(.hidden)");
       await p.locator("#modal-deactivate label", { hasText: "Resigned" }).click();
       await p.locator("#btn-deactivate-yes").click();
       await p.waitForTimeout(400);
       assert.deepEqual(dbRow("e8"), [false, today, "resigned"]);
-      assert.equal((await row("Person H").locator(".toggle-text").textContent()).trim(), "Resigned");
+      assert.equal((await row("Person H").locator(".el-status .lt-st").textContent()).trim(), "Resigned");
       assert.match(await p.locator("#emplist-count").textContent(), /2 resigned/);
-      await row("Person H").locator(".toggle-track").click();
+      await rowMenu("Person H", "Activate employee");
       await p.waitForTimeout(400);
       assert.deepEqual(dbRow("e8"), [true, null, null], "reactivating clears the reason and the date");
     });
@@ -333,7 +339,7 @@ async function step(name, fn) {
       await p.evaluate(() => { state.hostlist.mxOpen.clear(); state.hostlist.view = "list"; localStorage.removeItem("manpower.hostView"); D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
       await p.waitForTimeout(400);
       assert.ok((await read(".stat-tile .st-l")).includes("ลาออก"), "the Resigned tile");
-      assert.ok((await read(".el-status .toggle-text")).includes("ลาออก"), "the Resigned pill");
+      assert.ok((await read(".el-status .lt-st")).includes("ลาออก"), "the Resigned pill");
       await p.evaluate(() => askDeactivate("Deactivate employee?", "Deactivate Person A? Hidden from today's and future boards; past dates keep them.", () => {}));
       await p.waitForTimeout(200);
       assert.deepEqual(english(await read("#modal-deactivate")), [], "the Deactivate dialog in Thai");

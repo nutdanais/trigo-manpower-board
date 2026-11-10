@@ -141,8 +141,8 @@ async function sheetOf(path) {
     });
 
     await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return cloud._loadEmployees().then(refreshAndRender); });
-    const names = () => p.locator("#emplist-body tr td[data-label=Name]").allTextContents();
-    const cellOf = (thai) => p.locator(`#emplist-body tr:has(td[data-label=Name]:has-text("${thai}")) td[data-label=Name]`).first();
+    const names = () => p.locator("#emplist-body tr td.el-name .lt-name").allTextContents();
+    const cellOf = (thai) => p.locator(`#emplist-body tr:has(td.el-name .lt-name:has-text("${thai}")) td.el-name .lt-name`).first();
 
     await step("the Manpower List shows Thai names by default", async () => {
       assert.equal(await p.inputValue("#emplist-name-view"), "th");

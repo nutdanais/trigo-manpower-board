@@ -95,11 +95,14 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
 
     // ---- Manpower List ----
     await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
-    const heads = await p.locator("#emplist-table thead th").allTextContents();
-    assert.equal(heads[2], "TRIGO ID");
+    // the TRIGO ID is under the name; its own column is one of Columns' optional ones (off until chosen)
+    assert.equal((await p.locator('#emplist-table thead th[data-col="trigoId"]').textContent()).trim(), "TRIGO ID");
+    assert.equal(await p.locator('#emplist-table thead th[data-col="trigoId"]').isVisible(), false, "off by default");
+    await p.evaluate(() => { state.listCols.emplist.trigoId = true; renderEmployeeRows(); });
+    assert.equal(await p.locator('#emplist-table thead th[data-col="trigoId"]').isVisible(), true, "on when chosen");
     const col = () => p.locator("#emplist-body td.el-tid").allTextContents();
     await p.fill("#emplist-search", "t101");
-    assert.deepEqual((await p.locator("#emplist-body td[data-label=Name]").allTextContents()), ["Person A"], "search finds the TRIGO ID");
+    assert.deepEqual((await p.locator("#emplist-body td.el-name .lt-name").allTextContents()), ["Person A"], "search finds the TRIGO ID");
     await p.fill("#emplist-search", "");
     await p.click('#emplist-table th[data-sort="trigoId"]');
     const sorted = (await col()).filter((x) => x !== "—" && !/^\+ Add$/.test(x.trim()));
