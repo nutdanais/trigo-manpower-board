@@ -1,0 +1,208 @@
+<title>Mission Open and Closed Options</title>
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not loaded by the app. Light mode only, like the app.
+   Layout: one reading column; findings, three options side by side, then the recommended
+   mockup you can click (tiles and the segmented control filter the sample rows). Tokens mirror styles.css. */
+:root {
+  --page: #eef1f4; --surface: #ffffff; --line: #d8dde4; --ink: #1f2937; --mut: #5f6773;
+  --navy: #003a66; --navy-tint: rgba(0,58,102,.07); --navy-line: rgba(0,58,102,.28);
+  --soft: #eef1f5; --hover: #eef3fb;
+  --ok-text: #4d6810; --ok-surface: #f7faef; --ok-line: #cfdcae; --ok-dot: #7fa22b;
+  --warn-text: #8a4f10; --warn-surface: #fdf8ef; --warn-line: #e0c9a4;
+  --bad-text: #a3271f; --bad-surface: #fef2f2; --bad-line: #e6c2be;
+  --off-text: #5f6773; --off-dot: #8a929c; --closed-text: #374151; --closed-dot: #4b5563;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", "Noto Sans", sans-serif;
+  --f-body: "Noto Sans", "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14.5px/1.55 var(--f-body);
+  padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 1060px; margin: 0 auto; display: grid; gap: 28px; }
+h1, h2, h3 { font-family: var(--f-display); color: var(--navy); margin: 0; text-wrap: balance; letter-spacing: .1px; }
+h1 { font-size: 34px; line-height: 1.1; } h2 { font-size: 22px; } h3 { font-size: 17px; }
+p { margin: 0; max-width: 68ch; } small, .mut { color: var(--mut); }
+.lead { font-size: 16px; max-width: 70ch; }
+section { display: grid; gap: 14px; min-width: 0; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; min-width: 0; }
+.grid3 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+.finds { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; counter-reset: f; }
+.finds li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; }
+.finds li::before { counter-increment: f; content: "F" counter(f); font: 700 12px/26px var(--f-display); color: var(--navy); background: var(--navy-tint); border-radius: 4px; text-align: center; height: 26px; }
+.verdict { display: inline-block; font: 600 11.5px/1 var(--f-body); letter-spacing: .5px; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; }
+.v-no { background: var(--bad-surface); color: var(--bad-text); border: 1px solid var(--bad-line); }
+.v-part { background: var(--warn-surface); color: var(--warn-text); border: 1px solid var(--warn-line); }
+.v-yes { background: var(--ok-surface); color: var(--ok-text); border: 1px solid var(--ok-line); }
+.opt ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.pick { border-color: var(--navy-line); box-shadow: 0 0 0 2px var(--navy-tint); }
+
+/* ---- the mockup: the app's own shapes ---- */
+.frame { background: #f6f8fa; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-width: 0; }
+.frame > .cap { font: 600 12px/1 var(--f-body); letter-spacing: .5px; text-transform: uppercase; color: var(--mut); padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tb { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; }
+.fld { height: 34px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 0 12px; display: inline-flex; align-items: center; color: var(--mut); font-size: 13px; }
+.seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--soft); }
+.seg button { font: 500 12.5px var(--f-body); height: 28px; padding: 0 12px; border: 0; background: none; border-radius: 5px; color: var(--mut); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(8,28,56,.16); }
+.seg button b { font-weight: 600; margin-left: 4px; font-variant-numeric: tabular-nums; }
+button:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
+.tiles { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 4px 14px 12px; align-items: flex-end; }
+.tile { font: inherit; background: none; border: 0; border-bottom: 2px solid transparent; padding: 2px 2px 4px; text-align: left; color: var(--ink); }
+.tile.click { cursor: pointer; } .tile.click:hover { background: var(--hover); }
+.tile[aria-pressed="true"] { border-bottom-color: var(--navy); }
+.tile .l { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--mut); }
+.tile .l i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--mut)); }
+.tile b { display: block; font: 600 24px/1.1 var(--f-display); font-variant-numeric: tabular-nums; }
+.tile.lead b { font-size: 26px; }
+.tscroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; background: var(--surface); }
+th { text-align: left; font: 600 12px var(--f-body); color: var(--mut); padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; height: 46px; }
+td small { display: block; font-size: 12px; } tr.closed td { color: var(--mut); }
+.lt-st { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 11px; border: 1px solid; font: 500 12.5px var(--f-body); white-space: nowrap; }
+.lt-st i { width: 8px; height: 8px; border-radius: 50%; }
+.st-ok { background: var(--ok-surface); color: var(--ok-text); border-color: var(--ok-line); } .st-ok i { background: var(--ok-dot); }
+.st-off { background: var(--soft); color: var(--off-text); border-color: var(--line); } .st-off i { box-shadow: inset 0 0 0 1.5px var(--off-dot); }
+.st-warn { background: var(--warn-surface); color: var(--warn-text); border-color: var(--warn-line); } .st-warn i { background: #e3a008; }
+.st-closed { background: #e5e7eb; color: var(--closed-text); border-color: #c4c9d1; font-weight: 600; } .st-closed i { background: var(--closed-dot); }
+.al { color: var(--bad-text); font-weight: 600; font-size: 12px; display: block; margin-top: 2px; }
+.tag { border: 1px solid var(--line); border-radius: 4px; padding: 1px 7px; font-size: 12.5px; background: var(--surface); }
+.hl { outline: 2px dashed var(--navy-line); outline-offset: 2px; border-radius: 6px; }
+.note { max-width: none; font-size: 12.5px; color: var(--mut); padding: 10px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+table.cmp { min-width: 0; } table.cmp td { height: auto; vertical-align: top; padding: 9px 12px; }
+.phone { width: 300px; max-width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 12px; display: grid; gap: 8px; font-size: 13px; }
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.two { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.two > * { min-width: 0; }
+@media (prefers-reduced-motion: no-preference) { .seg button, .tile { transition: background .15s ease, border-color .15s ease; } }
+</style>
+
+<main>
+<header class="grid" style="display:grid;gap:10px">
+  <h1>Open and closed missions in the Missions table</h1>
+  <p class="lead">You can't quickly see or filter open against closed missions. I read the Missions tab code and ran it on the demo data. The short answer: don't add a column. Make the Status column's Closed value unmistakable, and make the Open and Closed counts at the top of the tab the filter.</p>
+</header>
+
+<section>
+  <h2>What the tab does today</h2>
+  <div class="box">
+    <ol class="finds">
+      <li><p><b>Closed missions are hidden on arrival.</b> The tab opens on <i>Open</i>, so a closed mission does not exist on screen until someone finds the small Open / Closed / All switch between the Board picker and Filters. It carries no counts.</p></li>
+      <li><p><b>The Open and Closed tiles are display only.</b> I clicked the Closed tile on the demo and the list did not change. They are the first place the eye goes to ask "how many are closed?", and they do nothing.</p></li>
+      <li><p><b>"Open" is never written in a row.</b> An open mission says <i>On board</i>, <i>Hidden</i>, <i>Off the board</i> or <i>Not started</i>. Only a closed one says <i>Closed 20 Oct 2026</i>. So the Status column already is the open / closed column; it just never names the open side.</p></li>
+      <li><p><b>Closed looks like "parked".</b> On the demo's All view, <i>Hidden</i>, <i>Not started</i> and <i>Closed</i> are the same grey pill with a hollow dot. A finished job reads the same as a paused one.</p></li>
+      <li><p><b>Filters → Board status has no Closed.</b> It lists On board, Hidden, Off the board and Not started. That is deliberate (the switch already scopes the list, so Open plus Closed would show nothing), but it means the only way to reach Closed is the small switch.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <h2>Three ways to fix it</h2>
+  <div class="grid3">
+    <div class="box opt"><span class="verdict v-no">Not recommended</span><h3>A. A new Open / Closed column</h3>
+      <ul><li>Repeats what Status already says.</li><li>Breaks the list-tab rule of <b>one status pill per row</b> (handover-list-tabs, section 3).</li><li>The table already shows eight columns by default, and a ninth costs width on every row.</li><li>It would still not filter anything.</li></ul></div>
+    <div class="box opt"><span class="verdict v-part">Half the answer</span><h3>B. Status column only</h3>
+      <ul><li>Make the Closed pill solid and darker, so it is no longer confused with Hidden or Not started.</li><li>Cheap and safe, and it fixes the reading problem.</li><li>It leaves the filtering problem as it is.</li></ul></div>
+    <div class="box opt pick"><span class="verdict v-yes">Recommended</span><h3>C. B, plus the counts as the filter</h3>
+      <ul><li>The Open / Closed / All switch shows its counts.</li><li>The Open and Closed tiles filter when clicked, and the active one is underlined.</li><li><b>No separate chip row.</b> Chips in this app mean a category (board, service area); a third row under the tiles next to <i>By area</i> would add clutter for one yes/no choice.</li></ul></div>
+  </div>
+</section>
+
+<section>
+  <h2>Recommended: try it</h2>
+  <p>Click Open, Closed or All in the switch, or click the Open and Closed tiles. The sample rows are the demo's. The dashed outline marks what changes.</p>
+  <div class="frame">
+    <div class="cap">Missions, desktop (recommended)</div>
+    <div class="tb">
+      <span class="fld" style="min-width:200px">Search number, customer, host…</span><span class="fld">All boards ▾</span>
+      <span class="seg hl" id="seg" role="group" aria-label="Open or closed missions">
+        <button type="button" data-v="open" aria-pressed="true">Open<b></b></button>
+        <button type="button" data-v="closed" aria-pressed="false">Closed<b></b></button>
+        <button type="button" data-v="all" aria-pressed="false">All<b></b></button>
+      </span>
+      <span class="fld">Filters</span><span class="fld">Columns</span>
+    </div>
+    <div class="tiles hl" style="margin:0 14px 10px;padding:6px 8px">
+      <span class="tile lead"><span class="l">Total</span><b id="n-all"></b></span>
+      <button type="button" class="tile click" data-v="open" aria-pressed="true" style="--c:#2f6fb5"><span class="l"><i></i>Open</span><b id="n-open"></b></button>
+      <button type="button" class="tile click" data-v="closed" aria-pressed="false" style="--c:#8a929c"><span class="l"><i></i>Closed</span><b id="n-closed"></b></button>
+      <span class="tile" style="--c:#e3a008"><span class="l"><i></i>No crew</span><b>1</b></span>
+    </div>
+    <div class="tscroll"><table aria-label="Sample missions"><thead><tr><th>Mission</th><th>Status</th><th>Board and area</th><th>Host and responsible</th><th>On the board</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <p class="note">The Closed pill has a solid dark dot and darker text. Hidden and Not started keep the hollow grey dot, so the three no longer look alike. Rows of a closed mission stay muted, as today.</p>
+  </div>
+</section>
+
+<section>
+  <h2>On a phone</h2>
+  <div class="two">
+    <div class="phone" aria-label="Phone summary card, today">
+      <small>Today</small>
+      <div class="card"><span><b style="font-size:18px">15</b> open</span><span>● 15 &nbsp;● 1 &nbsp;● 1</span></div>
+      <small>The summary card shows three dots with numbers and no words. Nothing on it says which one is closed.</small>
+    </div>
+    <div class="phone" aria-label="Phone summary card, proposed">
+      <small>Proposed</small>
+      <div class="card hl"><span><b style="font-size:18px">15</b> open</span><span>● 15 open &nbsp;● 1 closed &nbsp;● 1 no crew</span></div>
+      <small>Name the dots. A tap on open or closed sets the same filter as on the desktop.</small>
+    </div>
+  </div>
+  <p class="mut">I did not open the phone's Filter sheet on the demo, so where the Open / Closed switch sits there is unconfirmed. The build would check it.</p>
+</section>
+
+<section>
+  <h2>What the build touches</h2>
+  <div class="box"><table class="cmp"><tbody>
+    <tr><td><b>Closed pill</b></td><td>A new status kind in <code>statusPillHtml</code> and the <code>lt-st</code> styles. The kind keeps the existing grey family; the dot is filled.</td></tr>
+    <tr><td><b>Counts on the switch</b></td><td>Set from <code>renderMissionStats</code>, which already counts open and closed for the chosen board. The words stay translatable in <code>i18n-th.js</code>; the numbers are added after translation.</td></tr>
+    <tr><td><b>Clickable tiles</b></td><td>Open and Closed tiles become buttons that set <code>state.missions.status</code>, the same value the switch sets. Total stays plain text.</td></tr>
+    <tr><td><b>Phone card</b></td><td>The key labels in <code>renderPhoneViewCard</code>.</td></tr>
+    <tr><td><b>Tests and demo</b></td><td>Extend <code>tests/e2e/missions-tab.e2e.js</code>. The demo already has a closed mission (Chonburi 209), so <code>/?demo</code> shows the change with no new data and no database change.</td></tr>
+  </tbody></table></div>
+  <p class="mut">The demo proves the look and the click behaviour. It does not prove the real database, row-level security, live updates between people, or real data.</p>
+</section>
+
+<section>
+  <h2>Decisions for you</h2>
+  <div class="box"><ol class="finds">
+    <li><p>Go with <b>C</b> (no column, solid Closed pill, counts on the switch, clickable tiles)? Or only <b>B</b>?</p></li>
+    <li><p>Should the tab open on <b>Open</b> as now, or on <b>All</b> with closed rows sorted last? I would keep Open: that is the working list, and Closed is one click away.</p></li>
+    <li><p>Should Manpower's and Host's tiles also become filters, for consistency? I only tested the Missions tab; I did not check whether they respond to a click.</p></li>
+  </ol></div>
+</section>
+</main>
+
+<script>
+(function () {
+  var data = [
+    ["101", "Tier-1 Seating", "ok", "On board", "Rayong", "Inspection", "Siam Auto Parts", "Somchai.P", "7 Oct → 11 Nov"],
+    ["107", "Door Module Co.", "ok", "On board", "Rayong", "Inspection", "Siam Auto Parts", "Somchai.P", "7 Oct → 11 Nov", "No crew, 25 days"],
+    ["108", "Gear Works Ltd.", "off", "Not started", "Rayong", "Rework", "Map Ta Phut Steel", "Kittipong.W", "—"],
+    ["204", "Cable Assembly Co.", "off", "Hidden", "Chonburi", "Resident", "Amata Components", "Pimchanok.R", "7 Oct → 11 Nov"],
+    ["303", "Optic Parts Ltd.", "warn", "Off the board", "Ayutthaya", "Inspection", "Rojana Electronics", "Somchai.P", "7 Oct → 29 Oct"],
+    ["209", "Seat Belt Co.", "closed", "Closed 20 Oct", "Chonburi", "Resident", "Amata Components", "Pimchanok.R", "7 Oct → 20 Oct"]
+  ];
+  var view = "open";
+  function isClosed(r) { return r[2] === "closed"; }
+  function draw() {
+    var open = data.filter(function (r) { return !isClosed(r); }).length, closed = data.length - open;
+    document.getElementById("n-all").textContent = data.length;
+    document.getElementById("n-open").textContent = open;
+    document.getElementById("n-closed").textContent = closed;
+    var counts = { open: open, closed: closed, all: data.length };
+    document.querySelectorAll("#seg button").forEach(function (b) { b.querySelector("b").textContent = counts[b.dataset.v]; });
+    document.querySelectorAll("[data-v]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.v === view)); });
+    // tiles: only Open and Closed can be pressed; All leaves both unpressed
+    var rows = data.filter(function (r) { return view === "all" || (view === "closed") === isClosed(r); });
+    document.getElementById("rows").innerHTML = rows.map(function (r) {
+      return '<tr class="' + (isClosed(r) ? "closed" : "") + '"><td><b>' + r[0] + '</b><small>' + r[1] + '</small></td>' +
+        '<td><span class="lt-st st-' + r[2] + '"><i></i>' + r[3] + '</span>' + (r[9] ? '<span class="al">⚠ ' + r[9] + '</span>' : "") + '</td>' +
+        '<td><span class="tag">' + r[4] + '</span><small>' + r[5] + '</small></td><td>' + r[6] + '<small>' + r[7] + '</small></td><td>' + r[8] + '</td></tr>';
+    }).join("");
+  }
+  document.querySelectorAll("[data-v]").forEach(function (b) { b.addEventListener("click", function () { view = b.dataset.v; draw(); }); });
+  draw();
+})();
+</script>
