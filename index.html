@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-10c">
+<link rel="stylesheet" href="styles.css?v=2026-11-10d">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-10c"></script>
+<script src="version.js?v=2026-11-10d"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -1129,27 +1129,38 @@
     </div>
   </div>
 
-  <div class="modal modal-side hidden" id="modal-host">
-    <h3><span id="host-modal-title">Host</span><small id="host-modal-sub" class="h3-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
-    <form id="form-host">
-      <label>Host name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="e.g. Fortune"></label>
-      <p id="host-name-note" class="import-note hidden">The name is how this record is tied to the host's missions and deployment history. Renaming rewrites it on all of them, so the history follows the host — past mission cards will read the new name too. To combine this host with another one instead, use <b>Merge</b> below.</p>
-      <label>Location <span class="opt">optional</span> <input name="location" placeholder="e.g. Amata City Chonburi, Plant 2"></label>
-      <label>Service area <span class="opt">optional</span> <select name="areaId" data-picker></select></label>
-      <label>Google Maps link <span class="opt">optional</span> <input name="mapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
-      <p class="import-note">Paste the link from Google Maps (Share → Copy link). Location shows as a pin link on the Host List when a link is saved.</p>
-      <label>Note <span class="opt">optional</span> <textarea name="note" rows="2" placeholder="Optional — gate, contact, PPE reminder…"></textarea></label>
-      <label class="toggle toggle-archived" title="A site the team no longer serves: kept here with all of its history, but not offered when creating a mission">
-        <input type="checkbox" name="archived">
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span class="toggle-text">Archived — keep the history, stop offering it on new missions</span>
-      </label>
+  <!-- Host record (a record panel, like the mission panel: see "The record panel" in app.js). The header holds the
+       name, the status, what it is (Host, its boards, its service area) and the actions; an existing host opens
+       read-first in #host-detail, and Edit swaps the form in. A new host goes straight to the form. -->
+  <div class="modal modal-side modal-record hidden" id="modal-host">
+    <div class="rp-head">
+      <h3><span class="rp-t1"><span id="host-modal-title" class="rp-title">Host</span><span id="host-modal-status" class="rp-status"></span></span><small id="host-modal-sub" class="h3-sub rp-sub hidden"></small><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+      <div id="host-modal-acts" class="rp-acts hidden"></div>
+    </div>
+    <div id="host-detail" class="profile-body rp-body hidden"></div>
+    <form id="form-host" class="rp-form">
+      <div class="rp-fields">
+      <div class="form-group">Site</div>
+      <div class="rp-grid">
+        <label class="rp-full">Host name <span class="req" aria-hidden="true">*</span> <input name="name" required placeholder="e.g. Fortune"></label>
+        <p id="host-name-note" class="import-note hidden">The name is how this record is tied to the host's missions and deployment history. Renaming rewrites it on all of them, so the history follows the host — past mission cards will read the new name too. To combine this host with another one instead, use <b>Merge</b> below.</p>
+        <label class="rp-full">Location <span class="opt">optional</span> <input name="location" placeholder="e.g. Amata City Chonburi, Plant 2"></label>
+        <label>Service area <span class="opt">optional</span> <select name="areaId" data-picker></select></label>
+        <label>Google Maps link <span class="opt">optional</span> <input name="mapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
+        <p class="import-note">Paste the link from Google Maps (Share → Copy link). Location shows as a pin link on the Host List when a link is saved.</p>
+        <label class="rp-full">Note <span class="opt">optional</span> <textarea name="note" rows="2" placeholder="Optional — gate, contact, PPE reminder…"></textarea></label>
+        <label class="toggle toggle-archived rp-full" title="A site the team no longer serves: kept here with all of its history, but not offered when creating a mission">
+          <input type="checkbox" name="archived">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-text">Archived — keep the history, stop offering it on new missions</span>
+        </label>
+      </div>
       <!-- Merge: the fix for a duplicate or a misspelled host. It rewrites the
            name on this host's mission and deployment rows, so the wrong spelling
            disappears everywhere and the two hosts' day counts join up — unlike
            "Clear record", which only drops the details and leaves the row.
-           Inside the form now, above the pinned footer, so it is never left
-           below Save. -->
+           Inside the form, above the pinned footer, so it is never left
+           below Save. The record's More menu opens it. -->
       <details id="host-merge" class="hidden">
         <summary><svg class="ic" aria-hidden="true"><use href="#i-merge"></use></svg>Merge into another host<svg class="ic hm-chev" aria-hidden="true"><use href="#i-chevron-down"></use></svg></summary>
         <p id="host-merge-note" class="import-note"></p>
@@ -1158,10 +1169,12 @@
           <button type="button" class="btn btn-danger btn-small" id="btn-host-merge">Merge</button>
         </div>
       </details>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-danger hidden" id="btn-delete-host" title="Remove the saved details — the host itself and its history are kept">Clear record</button>
+      </div>
+      <!-- pinned at the bottom of the panel: the destructive action on the left as red text, Cancel and Save on the right -->
+      <div class="modal-actions rp-foot">
+        <button type="button" class="rp-danger hidden" id="btn-delete-host" title="Remove the saved details — the host itself and its history are kept">Clear record</button>
         <span class="toolbar-spacer"></span>
-        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="button" class="btn" id="btn-host-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
@@ -1737,22 +1750,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-10c"></script>
-<script src="i18n-th.js?v=2026-11-10c"></script>
-<script src="planning.js?v=2026-11-10c"></script>
-<script src="employee-id.js?v=2026-11-10c"></script>
-<script src="mission-number.js?v=2026-11-10c"></script>
-<script src="mission-activity.js?v=2026-11-10c"></script>
+<script src="i18n.js?v=2026-11-10d"></script>
+<script src="i18n-th.js?v=2026-11-10d"></script>
+<script src="planning.js?v=2026-11-10d"></script>
+<script src="employee-id.js?v=2026-11-10d"></script>
+<script src="mission-number.js?v=2026-11-10d"></script>
+<script src="mission-activity.js?v=2026-11-10d"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-10c"></script>
-<script src="cloud.js?v=2026-11-10c"></script>
-<script src="charts.js?v=2026-11-10c"></script>
-<script src="xlsx-export.js?v=2026-11-10c"></script>
-<script src="orgchart-pptx.js?v=2026-11-10c"></script>
-<script src="bulk-edit.js?v=2026-11-10c"></script>
-<script src="app.js?v=2026-11-10c"></script>
-<script src="report.js?v=2026-11-10c"></script>
-<script src="present.js?v=2026-11-10c"></script>
+<script src="demo/demo-gate.js?v=2026-11-10d"></script>
+<script src="cloud.js?v=2026-11-10d"></script>
+<script src="charts.js?v=2026-11-10d"></script>
+<script src="xlsx-export.js?v=2026-11-10d"></script>
+<script src="orgchart-pptx.js?v=2026-11-10d"></script>
+<script src="bulk-edit.js?v=2026-11-10d"></script>
+<script src="app.js?v=2026-11-10d"></script>
+<script src="report.js?v=2026-11-10d"></script>
+<script src="present.js?v=2026-11-10d"></script>
 </body>
 </html>
