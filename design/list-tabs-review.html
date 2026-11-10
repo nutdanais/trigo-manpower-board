@@ -142,6 +142,7 @@ table.t { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 .t .more { width: 40px; color: var(--muted); text-align: right; letter-spacing: 1px; font-weight: 700; }
 .t .stc { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .t.two td { padding-block: 8px; }
+.t.two .stc { flex-direction: column; align-items: flex-start; flex-wrap: nowrap; gap: 3px; }
 .t.dense th, .t.dense td { padding: 5px 10px; font-size: 13px; white-space: nowrap; }
 .t.one td { white-space: nowrap; }
 .t.dense .stc { flex-wrap: nowrap; }
@@ -226,16 +227,16 @@ dl.dl div.hov dd { background: var(--navy-soft); border-radius: 6px; padding: 3p
 
 <main>
 <header style="display:grid;gap:10px">
-  <div class="eyebrow">Design review · for approval · 11 Nov 2026</div>
+  <div class="eyebrow">Design review · approved 10 Nov 2026 · Table B, Panel A, Alerts A with the alert stacked under the status</div>
   <h1>Manpower, Host and Missions: one way to show a list, a record and a form</h1>
-  <p class="lede">I went through the three tabs in the demo: each table, the path from a row to its record, the detail panel and the edit form. The three tabs share a toolbar and summary strip that already work well. Below that line each one has grown its own answer to the same questions, and this page proposes how to bring them back together. Nothing in the app has changed yet.</p>
+  <p class="lede">I went through the three tabs in the demo: each table, the path from a row to its record, the detail panel and the edit form. The three tabs share a toolbar and summary strip that already work well. Below that line each one has grown its own answer to the same questions, and this page proposes how to bring them back together. Nothing in the app has changed yet. The build brief is <code>design/handover-list-tabs.md</code>.</p>
 </header>
 
 <section class="sheet">
   <div class="verdict">
     <div><b>What already works</b>The toolbar, the stat tiles with the proportion bar, and the By area chips are the same on all three tabs. Keep them.</div>
     <div><b>The main problem</b>Status, board, service area and alerts are drawn and placed differently on each tab, and a row leads to a different kind of panel on each.</div>
-    <div><b>What I need from you</b>Three choices: the table layout, the panel model, and where alerts live. My pick for each is marked. Reply with three letters, for example <b style="display:inline;color:inherit;font-size:inherit">B, A, A</b>.</div>
+    <div><b>What was chosen</b>Two-line rows, a read-first panel with Edit as a second step, and alerts in the status cell: the status chip on the first line, the alert under it.</div>
   </div>
 </section>
 
@@ -392,7 +393,7 @@ dl.dl div.hov dd { background: var(--navy-soft); border-radius: 6px; padding: 3p
 <section>
   <div class="eyebrow">Your call</div>
   <h2>Choose one of each</h2>
-  <p>My recommendation is selected. Change any of them, then send me the line at the bottom, or just tell me in your own words. You can also mix: for example B for Manpower and Missions with C's Columns button.</p>
+  <p>Approved on 10 Nov 2026: Table B, Panel A, Alerts A, with the status on the first line of its cell and the alert on the second. The mockups above show that stacking.</p>
   <div class="sheet pad pick">
     <fieldset><legend>1. Table layout</legend>
       <label><input type="radio" name="d1" id="d1a" value="A">A · Aligned columns</label><label><input type="radio" name="d1" id="d1b" value="B" checked>B · Two-line rows</label><label><input type="radio" name="d1" id="d1c" value="C">C · Compact grid</label></fieldset>
@@ -597,7 +598,7 @@ seg("p-opt", (x) => { pState.opt = x; renderPanel(); }); seg("p-mod", (x) => { p
 
 /* ---- alerts ---- */
 const A_INFO = {
-  A: ["A · In the status cell, counted by a tile", "The alert sits right after the status chip on the same line. A \"need a look\" tile counts them, and clicking it filters the table to those rows. The fix appears as a button on the row.", "The problem is read together with the record. No new column, no extra row height. One tile works the same on all three tabs.", "On a narrow screen a long alert can wrap under the chip.", "Small"],
+  A: ["A · In the status cell, counted by a tile", "The alert sits under the status chip, as the second line of the cell, so the column stays narrow and matches the other two-line cells. A \"need a look\" tile counts them, and clicking it filters the table to those rows. The fix appears as a button on the row.", "The problem is read together with the record. No new column, no extra row height. One tile works the same on all three tabs.", "Only the most serious alert shows in the row; a second one is a +1 with the rest in the tooltip and in the record.", "Small"],
   B: ["B · A Needs attention strip above the table", "A panel above the table lists each alert as a sentence with its fix. The rows below carry status only.", "Nothing can be missed, and each item is one click from done. Good when there are a handful of alerts.", "Pushes the table down. With twenty alerts it becomes a second list to manage. The row itself no longer says anything is wrong.", "Medium"],
   C: ["C · An Alerts column and a coloured row edge", "Alerts get their own sortable column, and a row with an alert gets an amber or red edge on the left.", "Sort by alert to bring every problem to the top. The edge is visible while scrolling fast.", "The column is empty on most rows and takes width from the facts. Two signals (edge and text) for one thing.", "Small"],
 };
