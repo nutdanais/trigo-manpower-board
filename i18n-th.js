@@ -3119,3 +3119,20 @@ I18N.add({}, {
   "Add {a} to the areas shown": "เพิ่ม {a} ในพื้นที่ที่แสดง",
   "Click to remove {a} from the areas shown": "คลิกเพื่อเอา {a} ออกจากพื้นที่ที่แสดง",
 });
+
+/* List-tab chips and the shorter table headers (design/handover-list-tabs.md, Batch A) */
+I18N.add({
+  "Mobile": "มือถือ",
+  "Service": "อายุงาน",
+  "Responsible": "ผู้รับผิดชอบ",
+  "Avg crew": "ทีมงานเฉลี่ย",
+  "No responsible": "ไม่มีผู้รับผิดชอบ",
+  "Edit forecast mission": "แก้ไขมิชชั่นคาดการณ์",
+}, {
+  "No crew, {a}": "ไม่มีทีมงาน {a}",
+  "Off {a} days": "ออกจากบอร์ด {a} วัน",
+  "Needs {a} number": "ต้องมีหมายเลขปี {a}",
+  "{num}y": "{num} ปี",
+  "{num}m": "{num} ด.",
+  "{num}d": "{num} ว.",
+});

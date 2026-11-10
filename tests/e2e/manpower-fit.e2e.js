@@ -3,7 +3,7 @@
        scroller (so the headers can stay sticky under the top bar);
      - someone lent out reads "LCB Port → Rayong" with "until …" on its own line, so one loan doesn't widen
        the Current board column for everyone;
-     - Years of service takes two lines at most, and copies with plain spaces;
+     - Years of service reads "7y 8m" on one line, and copies with plain spaces;
      - at 1100 px, too narrow for every column, the table's own box scrolls sideways (.tw-scroll), never the page.
    Run: node tests/e2e/manpower-fit.e2e.js */
 "use strict";
@@ -63,7 +63,7 @@ async function step(name, fn) {
       assert.ok(col < 240, `Current board stays narrow (${Math.round(col)} px)`);
 
       const svc = await a.page.evaluate(() => [...document.querySelectorAll('#emplist-body td[data-label="Years of service"]')].map((td) => td.textContent));
-      assert.ok(svc.every((t) => /^\d+ years? \d+ months? \d+ days?$/.test(t)), "plain spaces: " + svc.map((t) => JSON.stringify(t)).join(", "));
+      assert.ok(svc.every((t) => /^(\d+y( \d+m)?|\d+m|\d+d)$/.test(t)), "short, with plain spaces: " + svc.map((t) => JSON.stringify(t)).join(", "));
       await a.close();
     });
 
@@ -76,7 +76,7 @@ async function step(name, fn) {
       assert.equal(m.th, "static", "a scrolling box can't hold the headers under the page's top bar");
       // Years of service and Position take two lines at most
       const tall = await a.page.evaluate(() => [...document.querySelectorAll('#emplist-body td:is([data-label="Years of service"], [data-label="Position"])')]
-        .map((td) => { const r = document.createRange(); r.selectNodeContents(td); return r.getClientRects().length ? Math.round(r.getBoundingClientRect().height / parseFloat(getComputedStyle(td).lineHeight)) : 0; }));
+        .map((td) => { const r = document.createRange(); r.selectNodeContents(td); return r.getClientRects().length ? Math.round(r.getBoundingClientRect().height / (parseFloat(getComputedStyle(td).lineHeight) || parseFloat(getComputedStyle(td).fontSize) * 1.3)) : 0; }));
       assert.ok(tall.every((n) => n <= 2), "lines per cell: " + tall.join(", "));
       // widening the window brings the full-page layout back
       await a.page.setViewportSize({ width: 1700, height: 900 });

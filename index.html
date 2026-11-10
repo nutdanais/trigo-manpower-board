@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-09m">
+<link rel="stylesheet" href="styles.css?v=2026-11-10a">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-09m"></script>
+<script src="version.js?v=2026-11-10a"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -802,11 +802,11 @@
             <th class="el-check"><input type="checkbox" id="emplist-select-all" title="Select all"></th>
             <th data-sort="name">Name</th>
             <th data-sort="trigoId">TRIGO ID</th>
-            <th data-sort="contract">Contract type</th>
+            <th data-sort="contract" title="Contract type">Contract</th>
             <th data-sort="position">Position</th>
-            <th data-sort="phone">Mobile number</th>
+            <th data-sort="phone" title="Mobile number">Mobile</th>
             <th data-sort="startDate">Start date</th>
-            <th data-sort="service">Years of service</th>
+            <th data-sort="service" title="Years of service">Service</th>
             <th data-sort="areaId">Service area</th>
             <th data-sort="boardId">Current board</th>
             <th data-sort="util" title="Share of the last 30 days' working days this employee was deployed on a mission. This one is per-person — unlike the board utilization figures, an on-call employee who was not called still counts those days, since here that is the answer being asked for. It keeps its own rule: the columns to its right (Worked, Leave, Leave share) count planned working days only, as History does.">30D utilization</th>
@@ -852,7 +852,7 @@
             <th data-sort="area" title="Which service area this host sits in. The same pill shows on every mission card for the host.">Service area</th>
             <th data-sort="note" title="Anything the crew needs to know about this site — gate, contact, a PPE reminder. It also shows on every mission card for this host, at the front of the PPE line.">Note</th>
             <th data-sort="inspectors" title="Every inspector ever deployed to this host, with how many days each has worked there. Sorts by how many inspectors know the site.">Inspectors deployed</th>
-            <th data-sort="boards" title="Which boards this host's missions belong to.">Appear on board</th>
+            <th data-sort="boards" title="Which boards this host's missions belong to.">Boards</th>
             <th data-sort="status" title="Archived hosts keep their row and all of their history here, but are no longer offered when creating a mission. Use it for a site you no longer serve — a duplicate or a typo should be merged instead.">Status</th>
           </tr>
         </thead>
@@ -875,11 +875,11 @@
             <th data-sort="startTime" class="mcol-time" title="The start and end time from the mission's latest day on the board.">Time</th>
             <th data-sort="customer" class="mcol-customer">Customer</th>
             <th data-sort="host" class="mcol-host">Host</th>
-            <th data-sort="engineer" class="mcol-engineer">Trigo responsible</th>
+            <th data-sort="engineer" class="mcol-engineer" title="Trigo responsible">Responsible</th>
             <th data-sort="openedOn" class="mcol-openedOn" title="The first day this mission was on the board">Start date</th>
             <th data-sort="lastOn" class="mcol-lastOn" title="The latest day this mission is on the board">Last on board</th>
             <th class="num mcol-crew" data-sort="crew" data-keep title="The number of people on the mission on the day shown at the top, from its own board.">Crew <small id="missions-crew-date" class="ml-th-date"></small></th>
-            <th class="num mcol-avgCrew" data-sort="avgCrew" data-keep title="The average number of people on the mission each working day, over the last 4 weeks. Days it was hidden or not on the board do not count.">Avg crew / week</th>
+            <th class="num mcol-avgCrew" data-sort="avgCrew" data-keep title="The average number of people on the mission each working day, over the last 4 weeks. Days it was hidden or not on the board do not count.">Avg crew</th>
             <th data-sort="ppe" class="mcol-ppe" title="The protective equipment the mission asks for, from its latest day on the board.">PPE</th>
             <th data-sort="remark" class="mcol-remark" title="The mission's remark, from its latest day on the board.">Remark</th>
             <th class="ml-actions-h" data-keep><span class="sr-only">Actions</span></th>
@@ -1690,22 +1690,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-09m"></script>
-<script src="i18n-th.js?v=2026-11-09m"></script>
-<script src="planning.js?v=2026-11-09m"></script>
-<script src="employee-id.js?v=2026-11-09m"></script>
-<script src="mission-number.js?v=2026-11-09m"></script>
-<script src="mission-activity.js?v=2026-11-09m"></script>
+<script src="i18n.js?v=2026-11-10a"></script>
+<script src="i18n-th.js?v=2026-11-10a"></script>
+<script src="planning.js?v=2026-11-10a"></script>
+<script src="employee-id.js?v=2026-11-10a"></script>
+<script src="mission-number.js?v=2026-11-10a"></script>
+<script src="mission-activity.js?v=2026-11-10a"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-09m"></script>
-<script src="cloud.js?v=2026-11-09m"></script>
-<script src="charts.js?v=2026-11-09m"></script>
-<script src="xlsx-export.js?v=2026-11-09m"></script>
-<script src="orgchart-pptx.js?v=2026-11-09m"></script>
-<script src="bulk-edit.js?v=2026-11-09m"></script>
-<script src="app.js?v=2026-11-09m"></script>
-<script src="report.js?v=2026-11-09m"></script>
-<script src="present.js?v=2026-11-09m"></script>
+<script src="demo/demo-gate.js?v=2026-11-10a"></script>
+<script src="cloud.js?v=2026-11-10a"></script>
+<script src="charts.js?v=2026-11-10a"></script>
+<script src="xlsx-export.js?v=2026-11-10a"></script>
+<script src="orgchart-pptx.js?v=2026-11-10a"></script>
+<script src="bulk-edit.js?v=2026-11-10a"></script>
+<script src="app.js?v=2026-11-10a"></script>
+<script src="report.js?v=2026-11-10a"></script>
+<script src="present.js?v=2026-11-10a"></script>
 </body>
 </html>
