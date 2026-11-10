@@ -107,7 +107,8 @@ async function step(name, fn) {
       await page.evaluate(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); });
       await page.locator("#missions-panel:not(.hidden)").waitFor();
       const yy = String(new Date().getFullYear()).slice(2), ly = String(new Date().getFullYear() - 1).slice(2);
-      assert.match(await page.locator("#missions-body").innerText(), new RegExp(`AYTTH\\.${yy}\\.0302[\\s\\S]*was AYTTH\\.${ly}\\.0157`));
+      assert.match(await page.locator("#missions-body").innerText(), new RegExp(`AYTTH\\.${yy}\\.0302`));
+      assert.match(await page.locator("#missions-body tr", { hasText: `AYTTH.${yy}.0302` }).locator("td.ml-first .lt-c").getAttribute("title"), new RegExp(`was AYTTH\\.${ly}\\.0157`), "the old number is the tooltip of the new one");
       await page.selectOption("#missions-status", "closed");
       assert.match(await page.locator("#missions-body").innerText(), /209[\s\S]*Closed/);
       assert.equal(await page.locator("#btn-new-mission").isVisible(), false, "the board is view-only for a Site Admin");

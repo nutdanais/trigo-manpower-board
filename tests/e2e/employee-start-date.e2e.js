@@ -55,9 +55,9 @@ const X = require("../../xlsx-export.js");
 
     db.t("employees").find((e) => e.id === dated.id).start_date = "2023-04-20";
     await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return cloud._loadEmployees().then(refreshAndRender); });
-    const cells = await p.locator("#emplist-body tr:has(td:text-is(\"Dated Person\"))").locator("td[data-label='Start date']").allTextContents();
+    const cells = await p.locator("#emplist-body tr:has(td.el-name .lt-name:text-is(\"Dated Person\"))").locator("td[data-label='Start date']").allTextContents();
     assert.deepEqual(cells, ["20 Apr 2023"]);
-    const none = await p.locator("#emplist-body tr:has(td:text-is(\"Undated Person\"))").locator("td[data-label='Start date']").allTextContents();
+    const none = await p.locator("#emplist-body tr:has(td.el-name .lt-name:text-is(\"Undated Person\"))").locator("td[data-label='Start date']").allTextContents();
     assert.deepEqual(none.map((x) => x.trim()), ["+ Add"], "a blank start date offers + Add");
     console.log("ok - the Manpower List shows it");
 
@@ -70,13 +70,13 @@ const X = require("../../xlsx-export.js");
     set("Person B", ago(1, 6, 0));
     set("Person C", ago(2, 1, 0));
     await p.evaluate(() => cloud._loadEmployees().then(refreshAndRender));
-    const rowsText = async () => p.locator("#emplist-body tr td[data-label=Name]").allTextContents();
-    const cell = (name, label) => p.locator(`#emplist-body tr:has(td:text-is("${name}")) td[data-label="${label}"]`).textContent();
+    const rowsText = async () => p.locator("#emplist-body tr td.el-name .lt-name").allTextContents();
+    const cell = (name, label) => p.locator(`#emplist-body tr:has(td.el-name .lt-name:text-is("${name}")) td[data-label="${label}"]`).textContent();
 
     // the table keeps it short ("3y 5m", days dropped); the whole length is the tooltip
     const full = X.serviceLength(ago(3, 5, 12), T), parts = X.serviceParts(ago(3, 5, 12), T);
     assert.equal(await cell("Dated Person", "Years of service"), `${parts.years}y ${parts.months}m`);
-    assert.equal(await p.locator('#emplist-body tr:has(td:text-is("Dated Person")) td[data-label="Years of service"] [title]').first().getAttribute("title"), full, "the full text is the tooltip");
+    assert.equal(await p.locator('#emplist-body tr:has(td.el-name .lt-name:text-is("Dated Person")) td[data-label="Years of service"] [title]').first().getAttribute("title"), full, "the full text is the tooltip");
     // under a month it is the days alone; a whole number of years has no months
     assert.deepEqual(await p.evaluate(([a, b]) => [a, b].map((d) => { const el = document.createElement("div"); el.innerHTML = serviceShortHtml(d, todayStr()); return el.textContent; }), [ago(0, 0, 26), ago(2, 0, 0)]), ["26d", "2y"]);
     assert.equal(await cell("Undated Person", "Years of service"), "—");
@@ -104,6 +104,7 @@ const X = require("../../xlsx-export.js");
     await p.click("body", { position: { x: 5, y: 5 } });
     console.log("ok - the Years of service filter");
 
+    await p.evaluate(() => { state.listCols.emplist.service = true; renderEmployeeRows(); });   // Years of service is an optional column of its own
     await p.click('#emplist-table th[data-sort=service]');
     let sorted = await rowsText();
     assert.equal(sorted[0], "Person A", "ascending: shortest service first");

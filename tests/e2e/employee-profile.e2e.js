@@ -102,7 +102,7 @@ async function step(name, fn) {
 
     await step("double-click in the Manpower List opens the Profile: every detail, and Edit details", async () => {
       await toList();
-      await p.locator("#emplist-body tr", { hasText: "สมชาย ใจดี" }).dblclick();
+      await p.locator("#emplist-body tr", { hasText: "สมชาย ใจดี" }).locator("td.el-name").dblclick();
       await profileOpen();
       assert.equal(await p.locator("#profile-title").textContent(), "สมชาย ใจดี");
       const f = await facts();

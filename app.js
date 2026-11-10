@@ -481,6 +481,9 @@ const state = {
   rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
   svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
+  selectedHosts: new Set(),   // the Host List's ticked rows (host names): the bulk bar's Archive / Make active
+  selectedMissions: new Set(),   // the Missions list's ticked rows (register ids): the bulk bar's Close…
+  listCols: { emplist: {}, hostlist: {}, missions: {} },   // the Columns button on the three list tabs: what each person switched on or off (loadListColumns)
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
     filters: { contract: [], position: [], service: [], areaId: [], boardId: [], status: [] },
@@ -521,13 +524,13 @@ const state = {
     status: "open",            // "open" | "closed" | "all"
     filters: { areaId: [], shift: [], engineerId: [], customer: [], host: [], placement: [], alerts: [] },   // behind the Filters button, like Host's; areaId is the host's service area, also the By area chips
     sort: { key: "number", dir: 1 },
-    hiddenCols: [],            // the columns the Columns button has switched off (kept on this device)
     activity: null,            // cloud.getMissionActivity(): how each mission was staffed in the last six weeks
     activityKey: null,         // what it was read for; cleared by every realtime change, like the Host directory
   },
   hostlist: {                 // Host List tab: search/filter/sort over the host directory
     search: "",
     filters: { areaId: [], boardId: [], empId: [], location: [], status: [] },
+    atRisk: false,       // the "at risk" chip: only the hosts with too few experienced people
     dupOnly: false,      // "Review duplicates" — show only names that look like duplicates of each other
     focus: null,         // a host name to mark and scroll to (the Missions tab's Host link); cleared after a few seconds
     focusScroll: false,  // scroll to it once, on the next draw
@@ -2269,7 +2272,7 @@ function buildLangRow(onPick) {
 
 /* The two menus in the banner (boards, account): one open at a time, closed by a
    click anywhere else, Esc, or choosing something. */
-const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-missions-filter-pop", "#missions-filter-pop"], ["#btn-missions-cols", "#missions-cols-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
+const TOPBAR_MENUS = [["#btn-board-dd", "#board-menu"], ["#btn-avatar", "#user-menu"], ["#btn-filter-pop", "#filter-pop"], ["#btn-emplist-filter-pop", "#emplist-filter-pop"], ["#btn-hostlist-filter-pop", "#hostlist-filter-pop"], ["#btn-missions-filter-pop", "#missions-filter-pop"], ["#btn-missions-cols", "#missions-cols-pop"], ["#btn-emplist-cols", "#emplist-cols-pop"], ["#btn-hostlist-cols", "#hostlist-cols-pop"], ["#btn-ov-board", "#ov-board-menu"], ["#btn-cap-board", "#cap-board-menu"]];
 function closeTopbarMenus() {
   for (const [btn, pop] of TOPBAR_MENUS) {
     $(pop).classList.add("hidden");
@@ -2676,7 +2679,10 @@ function renderCtxMenu(view) {
     menu.appendChild(it);
   };
 
-  if (ctxMenu.row) renderMissionRowMenu({ addTitle, addItem });
+  if (ctxMenu.items) {   // a row's ⋯ menu that is just a list (Host)
+    if (ctxMenu.title) addTitle(ctxMenu.title);
+    for (const it of ctxMenu.items) addItem(it.label, it.fn, it.cls, it.ico);
+  } else if (ctxMenu.row) renderMissionRowMenu({ addTitle, addItem });
   else if (ctxMenu.mission) renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep, addOff });
   else renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep });
 
@@ -2750,6 +2756,9 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
     addTitle(many ? `${ids.length} employees selected` : emp.name);
     // the person's Profile: everything about them, and where they are edited (roster data, so no day lock)
     if (!many) addItem("Profile", () => openEmployeeModal(emp.id), null, "person");
+    // on the Manpower List these change the roster: only for a role that may edit it (a viewer's menu is the Profile)
+    const rosterEdit = !isNonBoardView() || can("emplist", "edit");
+    if (!rosterEdit) return;
     if (lending) addItem("Lend to board…", () => guardEdit(() => openLendModal(ids)), null, "swap");
     else if (targetBoards.length) addSub("Move to board", "boards", "arrow-right");
     if (loan) {
@@ -2763,9 +2772,17 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
         () => guardEdit(() => assignEmployeesTo(ids, null)), null, "return");
     }
     addSep();
+    if (!many && emp.active === false) {
+      addItem("Activate employee", () => safely(async () => {
+        await cloud.setEmployeesActive([emp.id], true);
+        await refreshAndRender();
+        toast(`${emp.name} is active again — back on today's and future boards.`, "info");
+      }), null, "return");
+      return;
+    }
     addItem(many ? `Deactivate ${ids.length} employees` : "Deactivate employee", () => {
       askDeactivate("Deactivate employee" + (many ? "s" : "") + "?",
-        `Deactivate ${who}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column in the Manpower List.`,
+        `Deactivate ${who}? Hidden from today's and future boards; past dates keep them. Turn back on from the ⋯ menu in the Manpower List or from the profile.`,
         (reason) => safely(async () => { await cloud.setEmployeesActive(ids, false, reason); clearSelection(); await refreshAndRender(); }));
     }, "ctx-danger", "ban");
   }
@@ -3528,6 +3545,8 @@ function renderStats() {
       issueChip("en", "", act.filter(e => !(e.nameEn || "").trim()).length, "no English name"),
       // grey: for information. The Board column says where and until when.
       issueChip("loan", "", feat().loans ? act.filter(e => loanOf(e)).length : 0, "on loan"),
+      // a leave share above 20% in the period on screen (red above 30%); only for a role that sees Worked · Leave
+      issueChip("leave", "amber", emplistShowsWl() ? act.filter(e => empAlerts(e).some(x => x.kind === "leave")).length : 0, "high leave"),
     ]);
     for (const c of $$("#board-status .status-chip")) c.classList.toggle("sc-on", c.title.startsWith("Click again"));
     const onN = emps.length - permN;
@@ -3581,11 +3600,19 @@ function renderStats() {
     wireAreaFilterChips(hostAreaBar, state.hostlist.filters, () => { renderHostlistFilterOptions(); renderHostRows(); renderStats(); });
     const noLoc = rows.filter(r => !r.archived && !(r.location || r.mapUrl)).length;
     const on = state.hostlist.filters.location.length === 1 && state.hostlist.filters.location[0] === "missing";
-    statusGroup(bar, [noLoc ? statusChip("amber", noLoc, "without a location", () => {
+    const atRiskN = state.hostlist.dir ? rows.filter(r => hostAlerts(r).some(a => a.kind === "risk")).length : 0;
+    const risk = state.hostlist.atRisk;
+    const chips = [noLoc ? statusChip("amber", noLoc, "without a location", () => {
       state.hostlist.filters.location = on ? [] : ["missing"];
       renderHostlistFilterOptions(); renderHostRows(); renderStats();
-    }, on ? "Click again to show every host" : "Show only active hosts with no location or Maps link") : null]);
-    if (on) $("#board-status .status-chip").classList.add("sc-on");
+    }, on ? "Click again to show every host" : "Show only active hosts with no location or Maps link") : null,
+    // too few experienced people left (Settings → Host experience): the same rule as the Skills matrix's at-risk
+    atRiskN || risk ? statusChip("red", atRiskN, "at risk", () => {
+      state.hostlist.atRisk = !state.hostlist.atRisk;
+      renderHostRows(); renderStats();
+    }, risk ? "Click again to show every host" : "Show only the hosts with too few experienced people left") : null];
+    statusGroup(bar, chips);
+    chips.forEach((c) => { if (c) c.classList.toggle("sc-on", c.classList.contains("sc-red") ? risk : on); });
     renderPhoneViewCard({
       head: `<b>${rows.length}</b><span class="ms-w"> hosts</span>`,
       label: `${rows.length} hosts: ${withLoc} with a location, ${rows.length - withLoc} without, ${archived} archived`,
@@ -3718,6 +3745,121 @@ function serviceShortHtml(startIso, todayIso) {
   if (!parts.length) parts.push(`${p.days}d`);
   return `<span title="${escapeHtml(ManpowerXlsx.serviceLength(startIso, todayIso))}">`
     + parts.map(x => `<span class="el-nw">${x}</span>`).join(" ") + `</span>`;
+}
+/* ---------- the three list tables: two-line rows and the Columns button ----------
+   Manpower, Host and Missions share one row shape (design/handover-list-tabs.md, section 5): every row is two
+   lines high, and the first columns are the same on every tab: a checkbox, the identity, the status pill with
+   the alert under it, then the board and the service area. ltCell draws one cell: line 1 (bold or plain) and
+   line 2 (muted). On a phone the table is cards, and a card shows every field once, so a second line that only
+   repeats a column of its own (.lt-l2) is left out there and that column (.lt-opt, off by default on a
+   computer) is shown instead; a second line a card has no other place for (the alert, a loan) is .lt-keep. */
+function ltCell(l1, l2, { keep = false, title = "" } = {}) {
+  return `<div class="lt-c"${title ? ` title="${escapeHtml(title)}"` : ""}><span class="lt-l1">${l1}</span>`
+    + (l2 ? `<span class="lt-l2${keep ? " lt-keep" : ""}">${l2}</span>` : "") + `</div>`;
+}
+/* a missing value's "+ Add": navy text, shown when the row is hovered or focused (always on a touch screen) */
+function ltAddBtn(label, attrs, title) {
+  return `<button type="button" class="lt-act lt-add" ${attrs}${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(label)}</button>`;
+}
+/* "Feb 2019" from an ISO date */
+function fmtMonYear(iso) {
+  const m = /^(\d{4})-(\d{2})/.exec(String(iso || ""));
+  return m ? `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+m[2] - 1]} ${m[1]}` : "";
+}
+/* Columns: which of a table's columns show. A fixed column cannot be switched off; an optional one (opt) is one of
+   the facts that now sit on a second line, offered as a column of its own, off until it is chosen. The choice is
+   kept on this device, per tab: { column key: shown (true) or hidden (false) } for the columns the person changed. */
+const LIST_COLS = {
+  emplist: {
+    table: "#emplist-table", key: "manpower.emplistCols", noun: "people", render: () => renderEmployeeRows(),
+    cols: [{ k: "person", l: "Person", fixed: 1 }, { k: "status", l: "Status", fixed: 1 }, { k: "boardarea", l: "Board and area" }, { k: "contract", l: "Contract" },
+      { k: "phone", l: "Mobile" }, { k: "util", l: "Utilization" }, { k: "wl", l: "Worked · Leave", wl: 1 },
+      { k: "trigoId", l: "TRIGO ID", opt: 1 }, { k: "position", l: "Position", opt: 1 }, { k: "startDate", l: "Start date", opt: 1 }, { k: "service", l: "Years of service", opt: 1 },
+      { k: "areaId", l: "Service area", opt: 1 }, { k: "worked", l: "Worked", opt: 1, wl: 1 }, { k: "leaveDays", l: "Leave", opt: 1, wl: 1 }, { k: "leaveShare", l: "Leave share", opt: 1, wl: 1 }],
+  },
+  hostlist: {
+    table: "#hostlist-table", key: "manpower.hostlistCols", noun: "hosts", render: () => renderHostRows(),
+    cols: [{ k: "host", l: "Host", fixed: 1 }, { k: "status", l: "Status", fixed: 1 }, { k: "boardarea", l: "Board and area" }, { k: "people", l: "People who know the site" },
+      { k: "lastWorked", l: "Last worked" }, { k: "note", l: "Note" },
+      { k: "location", l: "Location", opt: 1 }, { k: "area", l: "Service area", opt: 1 }, { k: "inspectors", l: "People (count)", opt: 1 }],
+  },
+  missions: {
+    table: "#missions-table", key: "manpower.missionsCols", noun: "missions", render: () => renderMissionList(),
+    cols: [{ k: "mission", l: "Mission", fixed: 1 }, { k: "status", l: "Status", fixed: 1 }, { k: "boardarea", l: "Board and area" }, { k: "host", l: "Host and responsible" },
+      { k: "shift", l: "Shift" }, { k: "onboard", l: "On the board" }, { k: "crew", l: "Crew" }, { k: "note", l: "Note" },
+      { k: "customer", l: "Customer", opt: 1 }, { k: "engineer", l: "Trigo responsible", opt: 1 }, { k: "startTime", l: "Time", opt: 1 }, { k: "openedOn", l: "Start date", opt: 1 },
+      { k: "lastOn", l: "Last on board", opt: 1 }, { k: "avgCrew", l: "Avg crew", opt: 1 }, { k: "ppe", l: "PPE", opt: 1 }, { k: "remark", l: "Remark", opt: 1 }],
+  },
+};
+/* what an earlier release kept for Missions: the keys of the hidden columns. Those that still exist as a column are
+   carried over; the rest are dropped (an unknown key is never an error). */
+const MISSION_OLD_COLS = { shift: "shift", host: "host", crew: "crew" };
+function loadListColumns() {
+  state.listCols = { emplist: {}, hostlist: {}, missions: {} };
+  for (const tab of Object.keys(LIST_COLS)) {
+    const cfg = LIST_COLS[tab];
+    try {
+      const v = JSON.parse(localStorage.getItem(cfg.key) || "null");
+      if (v && typeof v === "object" && !Array.isArray(v)) for (const c of cfg.cols) if (!c.fixed && typeof v[c.k] === "boolean") state.listCols[tab][c.k] = v[c.k];
+    } catch (e) { /* not remembered */ }
+  }
+  try {
+    const old = JSON.parse(localStorage.getItem("manpower.missionsHiddenCols") || "[]");
+    if (Array.isArray(old) && localStorage.getItem(LIST_COLS.missions.key) === null) {
+      for (const k of old) if (MISSION_OLD_COLS[k]) state.listCols.missions[MISSION_OLD_COLS[k]] = false;
+      saveListColumns("missions");
+    }
+  } catch (e) { /* nothing to carry over */ }
+}
+function saveListColumns(tab) {
+  try { localStorage.setItem(LIST_COLS[tab].key, JSON.stringify(state.listCols[tab])); } catch (e) { /* remembering is a courtesy */ }
+}
+function listColShown(tab, k) {
+  const c = LIST_COLS[tab].cols.find(x => x.k === k);
+  if (!c) return true;
+  const o = state.listCols[tab][k];
+  return c.fixed ? true : o !== undefined ? o : !c.opt;
+}
+/* after every render: switch each column on or off (its header and its cells carry data-col), and keep the
+   button and its list up to date. A phone's cards ignore this and show every field. */
+function renderListColumns(tab) {
+  const cfg = LIST_COLS[tab], table = $(cfg.table), over = state.listCols[tab];
+  const usable = cfg.cols.filter(c => !c.fixed && (!c.wl || emplistShowsWl()));
+  for (const c of cfg.cols) {
+    const off = !listColShown(tab, c.k);
+    for (const el of table.querySelectorAll(`[data-col="${c.k}"]`)) el.classList.toggle("lt-col-off", off);
+  }
+  const changed = usable.filter(c => over[c.k] !== undefined && over[c.k] !== !c.opt).length;
+  const btn = $(`#btn-${tab}-cols`), count = $(`#${tab}-cols-count`), pop = $(`#${tab}-cols-pop`);
+  count.textContent = changed;
+  count.classList.toggle("hidden", !changed);
+  btn.classList.toggle("ms-active", changed > 0);
+  const sig = usable.map(c => c.k).join();
+  if (pop.dataset.built !== sig) {
+    pop.dataset.built = sig;
+    pop.innerHTML = usable.map(c => `<label class="ms-opt"><input type="checkbox" data-col="${c.k}"> <span>${escapeHtml(c.l)}</span></label>`).join("")
+      + `<button type="button" class="btn btn-small" data-cols-reset>Reset columns</button>`;
+    pop.addEventListener("change", (e) => {
+      const box = e.target.closest("input[data-col]");
+      if (!box) return;
+      const c = cfg.cols.find(x => x.k === box.dataset.col);
+      if (box.checked === !c.opt) delete state.listCols[tab][c.k]; else state.listCols[tab][c.k] = box.checked;
+      saveListColumns(tab);
+      cfg.render();
+    });
+    pop.addEventListener("click", (e) => {
+      if (!e.target.closest("[data-cols-reset]")) return;
+      state.listCols[tab] = {};
+      saveListColumns(tab);
+      cfg.render();
+    });
+  }
+  for (const box of pop.querySelectorAll("input[data-col]")) box.checked = listColShown(tab, box.dataset.col);
+}
+/* a click on a row (not on a link, a button, a checkbox or a field) opens its record */
+function rowClickOpens(ev) {
+  // (the second click of a double click is not a second request: the first one already opened the record)
+  return ev.detail <= 1 && !ev.target.closest("a, button, input, select, textarea, label, .lt-add");
 }
 /* the board's name as the one chip Manpower, Host and Missions share: a square neutral tag */
 function boardChipHtml(name, title) {
@@ -7816,7 +7958,7 @@ function emplistFilteredSorted() {
     if (f.status.length && !f.status.includes(empStatus(e))) return false;
     // a status chip narrowing the list: active people missing one thing, or (loan) on loan on the date on screen
     const issue = state.emplist.issue;
-    if (issue === "loan" ? !loanOf(e) : issue && (e.active === false || (issue === "trigo" ? e.trigoId : issue === "en" ? (e.nameEn || "").trim() : D().areas.some(a => a.id === e.areaId)))) return false;
+    if (issue === "loan" ? !loanOf(e) : issue === "leave" ? !empAlerts(e).some(x => x.kind === "leave") : issue && (e.active === false || (issue === "trigo" ? e.trigoId : issue === "en" ? (e.nameEn || "").trim() : D().areas.some(a => a.id === e.areaId)))) return false;
     if (q && !e.name.toLowerCase().includes(q) && !(e.nameEn || "").toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q) && !(e.trigoId || "").toLowerCase().includes(q)) return false;
     return true;
   });
@@ -7824,13 +7966,15 @@ function emplistFilteredSorted() {
   const sortVal = (e) => {
     switch (sortKey) {
       case "contract": return e.contract === "oncall" ? "On-call" : "Permanent";
-      case "position": return e.position ? POSITIONS[e.position].label : "";
+      case "position": return e.position && POSITIONS[e.position] ? POSITIONS[e.position].label : "";   // a position the list does not know sorts with "none"
       case "phone": return e.phone || "";
       case "trigoId": return e.trigoId ? "T" + e.trigoId.slice(1).padStart(6, "0") : "";   // T9 sorts before T10; people with none sort first
       case "startDate": return e.startDate || "";   // ISO text sorts in date order; people with none sort first
       case "areaId": return D().areas.find(a => a.id === e.areaId)?.name || "";
       case "boardId": return D().boards.find(b => b.id === e.boardId)?.name || "";
       case "active": return EMP_STATUS_LABEL[empStatus(e)];
+      // status, then how bad its alert is (an active person with a red alert last, so a descending sort brings it first)
+      case "status": return String({ active: 0, inactive: 1, resigned: 2 }[empStatus(e)]) + String(empAlerts(e).reduce((m, x) => Math.max(m, x.level), 0));
       default: return emplistShownName(e);
     }
   };
@@ -7876,13 +8020,6 @@ function emplistWlOf(e) {
   const w = state.emplist.wl && state.emplist.wl[e.id];
   if (!w) return {};
   return { worked: w.worked, leaveDays: w.leave, leaveShare: w.share };
-}
-function emplistWlCells(e) {
-  const w = state.emplist.wl && state.emplist.wl[e.id];
-  if (!w) return `<td data-label="Worked" class="el-wl r">…</td><td data-label="Leave" class="el-wl r">…</td><td data-label="Leave share" class="el-wl r">…</td>`;
-  const cls = w.share == null ? "" : w.share > OV_LEAVE_RED ? "bad" : w.share > OV_LEAVE_AMBER ? "warn" : "ok";
-  return `<td data-label="Worked" class="el-wl r">${w.worked}</td><td data-label="Leave" class="el-wl r">${w.leave}</td>
-    <td data-label="Leave share" class="el-wl r">${w.share == null ? "—" : `<span class="ov-share ov-share-${cls}" title="Leave share ${fmt1(w.share)}% of ${w.working} working days">${fmt1(w.share)}%</span>`}</td>`;
 }
 /* the period in the utilization header, and the three Worked / Leave / Leave share headers shown or not */
 function emplistHeads() {
@@ -8236,72 +8373,100 @@ function updateEmplistBulkBar() {
 
 /* redraws just the table body + counts + bulk bar — cheap enough to call on every
    search keystroke, filter tick, sort click, or checkbox toggle */
+/* What needs a look on a person (active people only), worst first, then in this order: no TRIGO ID, no service
+   area, a leave share above 20% (red above 30%) in the period on screen. {kind, level (2 red, 1 amber), text, title} */
+function empAlerts(e) {
+  if (e.active === false) return [];
+  const out = [];
+  if (!e.trigoId) out.push({ kind: "trigo", level: 1, text: "No TRIGO ID", title: "This person has no TRIGO ID yet" });
+  if (!D().areas.some(a => a.id === e.areaId)) out.push({ kind: "area", level: 1, text: "No service area", title: "This person has no service area yet" });
+  const w = emplistShowsWl() && state.emplist.wl ? state.emplist.wl[e.id] : null;
+  if (w && w.share != null && w.share > OV_LEAVE_AMBER) {
+    out.push({ kind: "leave", level: w.share > OV_LEAVE_RED ? 2 : 1, text: `Leave ${Math.round(w.share)}%`,
+      title: `Leave is ${fmt1(w.share)}% of ${w.working} working days in the period` });
+  }
+  return out.sort((x, y) => y.level - x.level);
+}
+/* the worst alert as an icon and a short text, then a muted +N when there are more (the tooltip lists them all) */
+function alertsLineHtml(alerts) {
+  if (!alerts.length) return "";
+  return alertHtml(alerts[0].level, alerts[0].text, alerts.map(x => x.title).join("\n"), alerts.length - 1);
+}
+function empStatusPill(e) {
+  const st = empStatus(e);
+  return statusPillHtml(st === "active" ? "ok" : st === "resigned" ? "bad" : "off", EMP_STATUS_LABEL[st]);
+}
+function empRowMenu(e, btn) {
+  const r = btn.getBoundingClientRect();
+  openEmpMenu(e, r.left, r.bottom + 4);
+}
 function renderEmployeeRows() {
   const emps = emplistFilteredSorted();
   const body = $("#emplist-body");
   body.innerHTML = "";
+  const showWl = emplistShowsWl();
+  const today = todayStr();
+  const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);
   for (const e of emps) {
     const area = D().areas.find(a => a.id === e.areaId);
     const board = D().boards.find(b => b.id === e.boardId);
     const pos = e.position ? POSITIONS[e.position] : null;
     const isActive = e.active !== false;   // undefined (pre-migration) counts as active
     const util = state.emplist.util ? state.emplist.util[e.id] : undefined;
-    // what an alert pill counts as missing gets a "+ Add …" button in its own
-    // column (as Host does for a location), for active people a user may edit
+    const w = showWl && state.emplist.wl ? state.emplist.wl[e.id] : null;
+    // a missing value gets a "+ Add …" text button where the value would be (on hover; always on a touch screen), for
+    // active people a user may edit; it opens the form on that field, as before
     const fixable = isActive && can("emplist", "edit");
-    const add = (field, what) => fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="${field}" title="Add ${what}">+ Add</button>` : emptyCell();
+    const add = (field, what, label = "+ Add") => fixable ? ltAddBtn(label, `data-fix="${field}"`, `Add ${what}`).replace('class="lt-act lt-add"', 'class="lt-act lt-add el-fix"') : emptyCell();
+    const addOrNone = (field, what, label) => fixable ? add(field, what, label) : "";
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
-    // data-label feeds the phone breakpoint's ::before (styles.css) — below
-    // 640px each <tr> becomes a card and each <td> grows its column header as
-    // an inline label, so the same markup works as a table on desktop and a
-    // card list on phone with no separate render path
+    const alerts = empAlerts(e);
+    const tid = e.trigoId ? `<span class="el-tid" data-no-i18n>${escapeHtml(e.trigoId)}</span>` : addOrNone("trigoId", "TRIGO ID", "+ Add TRIGO ID");
+    // "T213 · Inspector"; a missing position is a "+ Add position" shown on hover, with no dot before it
+    const second = tid ? tid + (pos ? ` · ${escapeHtml(pos.label)}` : addOrNone("position", "position", "+ Add position") ? " " + addOrNone("position", "position", "+ Add position") : "")
+      : pos ? escapeHtml(pos.label) : addOrNone("position", "position", "+ Add position");
+    const loan = loanOf(e);
+    const since = e.startDate
+      ? `since <span>${escapeHtml(fmtMonYear(e.startDate))}</span> · ${serviceShortHtml(e.startDate, today)}`
+      : addOrNone("startDate", "start date", "+ Add start date");
+    // data-label feeds the phone breakpoint's ::before (styles.css): below 640px each <tr> becomes a card and each
+    // <td> grows its column header as an inline label, so the same markup works as a table on desktop and a card
+    // list on phone. data-col names the column for the Columns button (renderListColumns).
     tr.innerHTML = `
-      <td class="el-check"><input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""}></td>
-      <td data-label="Name" class="el-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? " " + add("nameEn", "English name") : ""}</td>
-      <td data-label="TRIGO ID" class="el-tid m-x">${e.trigoId ? escapeHtml(e.trigoId) : add("trigoId", "TRIGO ID")}</td>
-      <td data-label="Contract type">${e.contract === "oncall" ? "On-call" : "Permanent"}</td>
-      <td data-label="Position" class="m-x el-wrap">${pos ? pos.label : add("position", "position")}</td>
-      <td data-label="Mobile number">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
-      <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
-      <td data-label="Years of service" class="m-x el-svc">${e.startDate ? serviceShortHtml(e.startDate, todayStr()) : emptyCell()}</td>
-      <td data-label="Service area">${area ? areaMarkHtml(area) : add("areaId", "service area")}</td>
-      <td data-label="Current board" class="el-board">${board ? boardChipHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
-      <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" class="el-util">${utilCell(util)}</td>${emplistShowsWl() ? emplistWlCells(e) : ""}
-      <td data-label="Status" class="el-status">
-        <button type="button" class="m-fold" aria-expanded="false">More details</button>
-        <label class="toggle toggle-active${empStatus(e) === "resigned" ? " is-resigned" : ""}">
-          <input type="checkbox" ${isActive ? "checked" : ""} ${can("emplist", "edit") ? "" : "disabled"}>
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-text">${EMP_STATUS_LABEL[empStatus(e)]}</span>
-        </label>
-      </td>`;
+      <td class="el-check" data-col="check">${can("emplist", "edit") ? `<input type="checkbox" ${state.selectedEmps.has(e.id) ? "checked" : ""} aria-label="${lbl("Select")}">` : ""}</td>
+      <td data-label="Name" data-col="person" class="el-name">${ltCell(`<b class="lt-name">${emplistNameHtml(e)}${fixable && state.emplist.issue === "en" && !(e.nameEn || "").trim() ? " " + add("nameEn", "English name") : ""}</b>`, second)}</td>
+      <td data-label="Status" data-col="status" class="el-status">${ltCell(empStatusPill(e), alertsLineHtml(alerts), { keep: true })}</td>
+      <td data-label="Current board" data-col="boardarea" class="el-board">${ltCell(
+        board ? boardChipHtml(board.name) : add("boardId", "current board"),
+        loan ? loanCellHtml(e).trim() : area ? areaMarkHtml(area) : addOrNone("areaId", "service area", "+ Add service area") || emptyCell(),
+        { keep: !!loan, title: loan && area ? `Service area: ${area.name}` : "" })}</td>
+      <td data-label="Contract type" data-col="contract">${ltCell(e.contract === "oncall" ? "On-call" : "Permanent", since)}</td>
+      <td data-label="Mobile number" data-col="phone">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
+      <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" data-col="util" class="el-util">${utilCell(util)}</td>
+      <td data-label="Worked · Leave" data-col="wl" class="el-wl r lt-ph-off${showWl ? "" : " hidden"}">${!w ? ltCell("…") : ltCell(`${w.worked} · ${w.leave}`,
+        w.share == null ? "" : `<span class="ov-share-t ov-share-t-${w.share > OV_LEAVE_RED ? "bad" : w.share > OV_LEAVE_AMBER ? "warn" : "ok"}">${fmt1(w.share)}% leave</span>`)}</td>
+      <td data-label="TRIGO ID" data-col="trigoId" class="m-x el-tid lt-opt">${e.trigoId ? escapeHtml(e.trigoId) : add("trigoId", "TRIGO ID")}</td>
+      <td data-label="Position" data-col="position" class="m-x el-wrap lt-opt">${pos ? pos.label : add("position", "position")}</td>
+      <td data-label="Start date" data-col="startDate" class="m-x lt-opt">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
+      <td data-label="Years of service" data-col="service" class="m-x el-svc lt-opt">${e.startDate ? serviceShortHtml(e.startDate, today) : emptyCell()}</td>
+      <td data-label="Service area" data-col="areaId" class="lt-opt">${area ? areaMarkHtml(area) : add("areaId", "service area")}</td>
+      ${emplistWlOptCells(e, showWl)}
+      <td class="el-act" data-col="actions"><button type="button" class="m-fold" aria-expanded="false">More details</button>${
+        `<button type="button" class="btn btn-small lt-dots" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`}</td>`;
     tr.classList.toggle("row-inactive", !isActive);
-    // Turning on is one click (it is as easy to undo). Turning off asks why first (Resigned or
-    // Inactive for now); cancelling puts the switch back. No guardEdit either — the roster is
-    // employee master data, not the day's plan (the existing bulk actions in this table take the same line).
-    tr.querySelector(".el-status input").onchange = (ev) => {
-      const on = ev.target.checked;
-      const apply = (reason) => safely(async () => {
-        await cloud.setEmployeesActive([e.id], on, reason);
-        await refreshAndRender();
-        toast(on
-          ? `${e.name} is active again — back on today's and future boards.`
-          : reason === "resigned"
-            ? `${e.name} marked as resigned — hidden from today's and future boards. Past dates keep them.`
-            : `${e.name} deactivated — hidden from today's and future boards. Past dates keep them.`, "info");
-      });
-      if (on) apply(); else askDeactivate("Deactivate employee?", `Deactivate ${e.name}? Hidden from today's and future boards; past dates keep them.`, apply, () => renderEmployeeRows());
-    };
-    tr.querySelector(".el-check input").onchange = (ev) => {
+    const empBox = tr.querySelector(".el-check input");
+    if (empBox) empBox.onchange = (ev) => {
       ev.target.checked ? state.selectedEmps.add(e.id) : state.selectedEmps.delete(e.id);
       tr.classList.toggle("selected", ev.target.checked);
       updateEmplistBulkBar();
       $("#emplist-select-all").checked = emps.length > 0 && emps.every(x => state.selectedEmps.has(x.id));
     };
-    for (const b of tr.querySelectorAll(".el-fix")) b.onclick = (ev) => { ev.stopPropagation(); openEmployeeModal(e.id, b.dataset.fix); };   // roster master data: no day lock, as with Status
-    tr.addEventListener("dblclick", () => openEmployeeModal(e.id));
+    for (const b of tr.querySelectorAll(".el-fix")) b.onclick = (ev) => { ev.stopPropagation(); openEmployeeModal(e.id, b.dataset.fix); };   // roster master data: no day lock
+    tr.querySelector(".lt-dots").onclick = (ev) => { ev.stopPropagation(); empRowMenu(e, ev.currentTarget); };
+    // a click on the row opens the person's record (a double click did, and still does)
+    tr.addEventListener("click", (ev) => { if (rowClickOpens(ev)) openEmployeeModal(e.id); });
     tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); openEmpMenu(e, ev.clientX, ev.clientY); });
     attachLongPress(tr, (x, y) => openEmpMenu(e, x, y));
     body.appendChild(tr);
@@ -8312,12 +8477,23 @@ function renderEmployeeRows() {
   $("#emplist-count").textContent = `${emps.length} of ${D().employees.length}`
     + (inactiveN ? ` · ${inactiveN} inactive` : "") + (resignedN ? ` · ${resignedN} resigned` : "");
   $("#emplist-select-all").checked = emps.length > 0 && emps.every(e => state.selectedEmps.has(e.id));
+  $("#emplist-select-all").classList.toggle("hidden", !can("emplist", "edit"));
   updateEmplistBulkBar();
   for (const th of $$("#emplist-table th[data-sort]")) {
     th.classList.toggle("sorted-asc", th.dataset.sort === state.emplist.sortKey && state.emplist.sortDir === 1);
     th.classList.toggle("sorted-desc", th.dataset.sort === state.emplist.sortKey && state.emplist.sortDir === -1);
   }
+  renderListColumns("emplist");
   quietTable("#emplist-table");
+}
+/* the optional Worked, Leave and Leave share columns (the three facts of Worked · Leave, each with its own header) */
+function emplistWlOptCells(e, showWl) {
+  const w = showWl && state.emplist.wl ? state.emplist.wl[e.id] : null;
+  const cls = `el-wl r lt-opt${showWl ? "" : " hidden"}`;
+  if (!w) return ["worked|Worked", "leaveDays|Leave", "leaveShare|Leave share"].map(x => `<td data-label="${x.split("|")[1]}" data-col="${x.split("|")[0]}" class="${cls}">${showWl ? "…" : ""}</td>`).join("");
+  const sh = w.share == null ? "—" : `<span class="ov-share ov-share-${w.share > OV_LEAVE_RED ? "bad" : w.share > OV_LEAVE_AMBER ? "warn" : "ok"}" title="Leave share ${fmt1(w.share)}% of ${w.working} working days">${fmt1(w.share)}%</span>`;
+  return `<td data-label="Worked" data-col="worked" class="${cls}">${w.worked}</td><td data-label="Leave" data-col="leaveDays" class="${cls}">${w.leave}</td>`
+    + `<td data-label="Leave share" data-col="leaveShare" class="${cls}">${sh}</td>`;
 }
 
 /* The Manpower and Host tables read quietly: a column in which every row is empty (or "—")
@@ -8696,6 +8872,7 @@ function hostlistFilteredSorted() {
     if (f.empId.length && !r.inspectors.some(i => f.empId.includes(i.id))) return false;
     if (f.location.length && !f.location.includes((r.location || r.mapUrl) ? "has" : "missing")) return false;
     if (f.status.length && !f.status.includes(r.archived ? "archived" : "active")) return false;
+    if (state.hostlist.atRisk && !hostAlerts(r).some(a => a.kind === "risk")) return false;
     if (q) {
       // search covers everything the row shows, so typing an inspector's name
       // answers "where has this person been" from the host side too
@@ -8718,8 +8895,8 @@ function hostlistFilteredSorted() {
   const { sortKey, sortDir } = state.hostlist;
   // the two list columns sort by how many entries they hold (the useful
   // question: best-known site, most-shared host), not alphabetically
-  if (sortKey === "inspectors" || sortKey === "boards") {
-    const n = (r) => (sortKey === "inspectors" ? r.inspectors.length : r.boards.length);
+  if (sortKey === "inspectors" || sortKey === "boards" || sortKey === "exp") {
+    const n = (r) => (sortKey === "inspectors" ? r.inspectors.length : sortKey === "exp" ? hostExpOf(r).experienced.length : r.boards.length);
     rows.sort((a, b) => (n(a) - n(b)) * sortDir || a.name.localeCompare(b.name));
     return rows;
   }
@@ -8728,54 +8905,14 @@ function hostlistFilteredSorted() {
     if (sortKey === "location") return r.location || safeHttpUrl(r.mapUrl) || "";
     if (sortKey === "area") return r.area ? r.area.name : "";
     if (sortKey === "note") return r.note || "";
-    if (sortKey === "status") return r.archived ? "Archived" : "Active";
+    // status, then how bad its alert is
+    if (sortKey === "status") return (r.archived ? "1" : "0") + hostAlerts(r).reduce((m, a) => Math.max(m, a.level), 0);
+    if (sortKey === "boardFirst") return r.boards.length ? r.boards[0].name : "";
+    if (sortKey === "lastWorked") return r.lastWorked || "";   // ISO text sorts in date order; no date sorts first
     return r.name;
   };
   rows.sort((a, b) => val(a).localeCompare(val(b)) * sortDir || a.name.localeCompare(b.name));
   return rows;
-}
-
-function hostLocationCell(r) {
-  const href = safeHttpUrl(r.mapUrl);
-  const text = r.location || (href ? "Open in Google Maps" : "");
-  if (!text) return `<button type="button" class="hl-add-loc" title="Add location">+ Add</button>`;
-  return href
-    ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"
-         title="Open in Google Maps" onclick="event.stopPropagation()">${icon("pin")}${escapeHtml(text)}</a>`
-    : `<span class="hl-loc">${escapeHtml(text)}</span>`;
-}
-
-/* The note gets its own column rather than riding under the location: it is
-   its own fact about the site (and the one that reaches the board, at the
-   front of every mission card's PPE line), so it sorts, reads and gets filled
-   in on its own terms — including for a host that has no location yet. */
-function hostNoteCell(r) {
-  if (!r.note) return `<button type="button" class="hl-add-loc hl-add-note" title="Add note">+ Add</button>`;
-  return `<span class="hl-note">${escapeHtml(r.note)}</span>`;
-}
-
-function hostInspectorCell(r) {
-  if (!state.hostlist.dir) return `<span class="hl-empty">…</span>`;
-  if (!r.inspectors.length) return emptyCell("No one deployed yet");
-  const expanded = state.hostlist.expanded.has(r.name);
-  const shown = expanded ? r.inspectors : r.inspectors.slice(0, HOSTLIST_INSPECTOR_CAP);
-  const chips = shown.map(i =>
-    `<span class="hl-insp" title="${escapeHtml(i.name)} — ${i.days} day${i.days === 1 ? "" : "s"} at ${escapeHtml(r.name)}">`
-    + `${escapeHtml(i.name)}<b>${i.days}d</b></span>`).join("");
-  const rest = r.inspectors.length - shown.length;
-  const more = rest > 0
-    ? `<button type="button" class="hl-more">+${rest} more</button>`
-    : (expanded && r.inspectors.length > HOSTLIST_INSPECTOR_CAP ? `<button type="button" class="hl-more">Show less</button>` : "");
-  return `<span class="hl-chips">`
-    + `<span class="hl-count" title="${r.inspectors.length} inspector${r.inspectors.length === 1 ? "" : "s"} ever deployed here">`
-    + `${r.inspectors.length}</span>${chips}${more}</span>`;
-}
-
-function hostBoardCell(r) {
-  if (!state.hostlist.dir) return `<span class="hl-empty">…</span>`;
-  if (!r.boards.length) return emptyCell("Not on a board yet");
-  return `<span class="hl-chips">` + r.boards.map(b =>
-    boardChipHtml(b.name, `${b.name} — ${b.missions} mission${b.missions === 1 ? "" : "s"} for this host`)).join("") + `</span>`;
 }
 
 /* The Missions tab's Host link lands here: the host's row is marked and scrolled to the middle once, and
@@ -8814,81 +8951,143 @@ function openHostFromMission(r) {
 
 /* redraws just the table body + count — cheap enough for every keystroke,
    filter tick, sort click or "+N more" toggle */
+/* The experienced people at a host and whether it is at risk (Settings → Host experience), as the Skills matrix has it */
+function hostExpOf(r) {
+  return hostExperience(Object.fromEntries(r.inspectors.map(i => [i.id, i.days])), todayStr());
+}
+/* What needs a look on a host (active ones only), worst first: too few experienced people left, then no location */
+function hostAlerts(r) {
+  if (r.archived) return [];
+  const out = [];
+  if (state.hostlist.dir) {
+    const x = hostExpOf(r);
+    if (x.atRisk) out.push({ kind: "risk", level: 2, text: `${x.active.length} experienced`,
+      title: `At risk: ${x.active.length} of the ${x.experienced.length} experienced people are still on the roster (at risk at ${hostAtRiskMax()} or fewer)` });
+  }
+  if (!r.location && !r.mapUrl) out.push({ kind: "noloc", level: 1, text: "No location", title: "This host has no location and no Maps link yet" });
+  return out;
+}
+function hostStatusPill(r) {
+  return r.archived ? statusPillHtml("off", "Archived", "Archived: kept with its history, but not offered when creating a mission")
+    : statusPillHtml("ok", "Active");
+}
+/* Archive or make active, one host or many: the rest of the record goes back through, because saveHost upserts the
+   whole row (sending only `archived` would blank the location). Master data, not a day's plan: no guardEdit. */
+async function setHostsArchived(names, archived) {
+  const byName = new Map(allHostRows().map(r => [r.name, r]));
+  let skipped = false, done = 0;
+  for (const n of names) {
+    const r = byName.get(n);
+    if (!r || r.archived === archived) continue;
+    const res = await cloud.saveHost({ name: r.name, location: r.location, mapUrl: r.mapUrl, areaId: r.area ? r.area.id : "", archived, note: r.note });
+    if (res && res.skipped && res.skipped.includes("archived")) skipped = true; else done++;
+  }
+  await refreshAndRender();
+  if (skipped) { toast(`Archiving needs a one-time database update (migration-2026-09-04-host-archive.sql) before it can be used.`, "warn"); return; }
+  if (names.length === 1) {
+    toast(archived ? `${names[0]} archived — kept here with its history, but no longer offered on new missions.`
+      : `${names[0]} is active again — offered when creating a mission.`, "info");
+  } else if (done) {
+    toast(archived ? `${done} hosts archived — kept here with their history, but no longer offered on new missions.`
+      : `${done} hosts are active again — offered when creating a mission.`, "info");
+  }
+}
+/* the ⋯ menu of a host row: Edit, Open map (when there is a link) and Archive / Make active; a role that may only read
+   has Open map alone, or no menu at all */
+function hostRowMenuItems(r) {
+  const items = [];
+  const canEdit = can("hostlist", "edit");
+  if (canEdit) items.push({ label: "Edit", ico: "edit", fn: () => openHostModal(r.name) });
+  const href = hostMapLink(r);
+  if (href) items.push({ label: "Open map", ico: "pin", fn: () => window.open(href, "_blank", "noopener,noreferrer") });
+  if (canEdit) items.push(r.archived ? { label: "Make active", ico: "return", fn: () => safely(() => setHostsArchived([r.name], false)) }
+    : { label: "Archive", ico: "ban", fn: () => safely(() => setHostsArchived([r.name], true)) });
+  return items;
+}
+/* the link a host's map button opens: the pasted Maps link, else a Maps search for the written address */
+function hostMapLink(r) {
+  return hostMapHref(r);
+}
+function openRowMenu(items, btn, title) {
+  const r = btn.getBoundingClientRect();
+  ctxMenu = { items, title, x: r.left, y: r.bottom + 4 };
+  renderCtxMenu("root");
+}
+function updateHostBulkBar() {
+  const bar = $("#hostlist-bulkbar");
+  if (!bar) return;
+  const n = state.selectedHosts.size;
+  bar.classList.toggle("hidden", n === 0 || !can("hostlist", "edit"));
+  $("#hostlist-bulk-count").textContent = n === 1 ? "1 selected" : `${n} selected`;
+}
 function renderHostRows() {
   const rows = hostlistFilteredSorted();
   const all = allHostRows();
   const dups = hostDuplicateGroups(all);
   const body = $("#hostlist-body");
   body.innerHTML = "";
+  const canEdit = can("hostlist", "edit");
+  const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);
+  // a ticked host that a search or filter now hides is no longer ticked: the bulk bar acts on what the list shows
+  const known = new Set(rows.map(r => r.name));
+  for (const n of [...state.selectedHosts]) if (!known.has(n)) state.selectedHosts.delete(n);
   for (const r of rows) {
     const tr = document.createElement("tr");
     tr.dataset.host = r.name;
     if (r.archived) tr.classList.add("row-archived");
     if (state.hostlist.focus === r.name) tr.classList.add("row-focus");
-    // data-label feeds the phone breakpoint's ::before, same responsive-table
-    // pattern the Manpower List uses (see renderEmployeeRows)
+    if (state.selectedHosts.has(r.name)) tr.classList.add("selected");
+    const dir = !!state.hostlist.dir;
+    const x = dir ? hostExpOf(r) : null;
+    const href = safeHttpUrl(r.mapUrl);
+    const locText = r.location || (href ? "Open in Google Maps" : "");
+    // line 2 of the host: its location, as the Maps link when there is one
+    const where = locText
+      ? (href ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="Open in Google Maps">${icon("pin")}${escapeHtml(locText)}</a>` : `<span class="hl-loc">${escapeHtml(locText)}</span>`)
+      : `<span class="lt-muted">No location yet</span>${canEdit ? " " + ltAddBtn("+ Add location", 'data-add="loc"', "Add location") : ""}`;
+    const boards = r.boards.length
+      ? r.boards.slice(0, r.boards.length > 2 ? 1 : 2).map(b => boardChipHtml(b.name, `${b.name} — ${b.missions} mission${b.missions === 1 ? "" : "s"} for this host`)).join(" ")
+        + (r.boards.length > 2 ? ` <span class="lt-more" title="${escapeHtml(r.boards.map(b => b.name).join(", "))}">+${r.boards.length - 1}</span>` : "")
+      : emptyCell("Not on a board yet");
+    const addArea = canEdit ? ltAddBtn("+ Add service area", 'data-add="area"', "Set service area") : "";
+    // data-label feeds the phone breakpoint's ::before, same responsive-table pattern the Manpower List uses
     tr.innerHTML = `
-      <td data-label="Host name" class="hl-name">
-        <span class="hl-host">${escapeHtml(r.name)}</span>
-        ${r.archived ? `<span class="hl-tag hl-tag-arch" title="Archived — kept with its history, but not offered when creating a mission">archived</span>` : ""}
-        ${dups.byName.has(r.name) ? `<span class="hl-tag hl-tag-dup" title="Another host has a very similar name — open this row to merge them">similar</span>` : ""}
-        <button type="button" class="hl-edit" title="Edit name, location, area, note — or merge this host into another">${icon("edit")}</button>
-      </td>
-      <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
-      <td data-label="Service area" class="hl-area-cell">${r.area
-        ? areaMarkHtml(r.area)
-        : `<button type="button" class="hl-add-loc hl-add-area" title="Set service area">+ Add</button>`}</td>
-      <td data-label="Note" class="hl-note-cell m-x">${hostNoteCell(r)}</td>
-      <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
-      <td data-label="Appear on board" class="hl-board-cell m-x">${hostBoardCell(r)}</td>
-      <td data-label="Status" class="hl-status">
-        <button type="button" class="m-fold" aria-expanded="false">More details</button>
-        <label class="toggle toggle-active">
-          <input type="checkbox" ${r.archived ? "" : "checked"} ${can("hostlist", "edit") ? "" : "disabled"}>
-          <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          <span class="toggle-text">${r.archived ? "Archived" : "Active"}</span>
-        </label>
-      </td>`;
+      <td class="el-check" data-col="check">${canEdit ? `<input type="checkbox" ${state.selectedHosts.has(r.name) ? "checked" : ""} aria-label="${lbl("Select")}">` : ""}</td>
+      <td data-label="Host name" data-col="host" class="hl-name">${ltCell(`<span class="hl-host">${escapeHtml(r.name)}</span>${dups.byName.has(r.name) ? ` <span class="hl-tag hl-tag-dup" title="Another host has a very similar name — open this row to merge them">similar</span>` : ""}`, where)}</td>
+      <td data-label="Status" data-col="status" class="hl-status">${ltCell(hostStatusPill(r), alertsLineHtml(hostAlerts(r)), { keep: true })}</td>
+      <td data-label="Appear on board" data-col="boardarea" class="hl-board-cell">${ltCell(boards, r.area ? areaMarkHtml(r.area) : addArea || emptyCell())}</td>
+      <td data-label="People who know the site" data-col="people" class="hl-insp-cell">${!dir ? `<span class="hl-empty">…</span>` : !r.inspectors.length ? emptyCell("No one deployed yet")
+        : ltCell(`<b>${x.experienced.length}</b> experienced`, `${r.inspectors.length} ${r.inspectors.length === 1 ? "person" : "people"} · ${r.deployedDays} ${r.deployedDays === 1 ? "day" : "days"} in all`)}</td>
+      <td data-label="Last worked" data-col="lastWorked" class="m-x">${r.lastWorked ? escapeHtml(fmtDate(r.lastWorked)) : emptyCell()}</td>
+      <td data-label="Note" data-col="note" class="hl-note-cell m-x">${r.note ? `<span class="hl-note lt-l1" title="${escapeHtml(r.note)}">${escapeHtml(r.note)}</span>` : canEdit ? ltAddBtn("+ Add", 'data-add="note"', "Add note") : emptyCell()}</td>
+      <td data-label="Location" data-col="location" class="hl-loc-cell lt-opt">${locText ? (href ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="Open in Google Maps">${icon("pin")}${escapeHtml(locText)}</a>` : `<span class="hl-loc">${escapeHtml(locText)}</span>`) : canEdit ? ltAddBtn("+ Add", 'data-add="loc"', "Add location") : emptyCell()}</td>
+      <td data-label="Service area" data-col="area" class="hl-area-cell lt-opt">${r.area ? areaMarkHtml(r.area) : canEdit ? ltAddBtn("+ Add", 'data-add="area"', "Set service area") : emptyCell()}</td>
+      <td data-label="People" data-col="inspectors" class="hl-count-cell m-x lt-opt">${!dir ? "…" : r.inspectors.length ? r.inspectors.length : emptyCell("No one deployed yet")}</td>
+      <td class="hl-act" data-col="actions"><button type="button" class="m-fold" aria-expanded="false">More details</button>${
+        hostRowMenuItems(r).length ? `<button type="button" class="btn btn-small lt-dots" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>` : ""}</td>`;
     const lastLine = r.lastDate ? ` · last seen ${fmtDate(r.lastDate)}` : "";
     tr.querySelector(".hl-host").title =
       `${r.name} — ${r.missionCount} mission${r.missionCount === 1 ? "" : "s"}, `
       + `${r.deployedDays} deployment day${r.deployedDays === 1 ? "" : "s"}${lastLine}`;
-    tr.querySelector(".hl-edit").onclick = () => openHostModal(r.name);
-    // both "+ Add location" and "+ Set area" open the same record, which is the
-    // one place all of a host's details are edited
-    for (const add of tr.querySelectorAll(".hl-add-loc")) add.onclick = () => openHostModal(r.name);
-    const more = tr.querySelector(".hl-more");
-    if (more) more.onclick = () => {
-      state.hostlist.expanded.has(r.name)
-        ? state.hostlist.expanded.delete(r.name)
-        : state.hostlist.expanded.add(r.name);
-      renderHostRows();
+    // every "+ Add" (location, service area, note) opens the same record, the one place a host's details are edited
+    for (const add of tr.querySelectorAll(".lt-add")) add.onclick = (ev) => { ev.stopPropagation(); openHostModal(r.name); };
+    for (const link of tr.querySelectorAll(".hl-map")) link.onclick = (ev) => ev.stopPropagation();
+    const dots = tr.querySelector(".lt-dots");
+    if (dots) dots.onclick = (ev) => { ev.stopPropagation(); openRowMenu(hostRowMenuItems(r), ev.currentTarget, r.name); };
+    const hostBox = tr.querySelector(".el-check input");
+    if (hostBox) hostBox.onchange = (ev) => {
+      ev.target.checked ? state.selectedHosts.add(r.name) : state.selectedHosts.delete(r.name);
+      tr.classList.toggle("selected", ev.target.checked);
+      updateHostBulkBar();
+      $("#hostlist-select-all").checked = rows.length > 0 && rows.every(x => state.selectedHosts.has(x.name));
     };
-    /* Same one-click, no-confirm treatment as the Manpower List's Status
-       column: archiving is reversible from the same switch, and a host record
-       is master data rather than a day's plan, so no guardEdit either. The
-       rest of the record is passed back through because saveHost upserts the
-       whole row — sending only `archived` would blank the location. */
-    tr.querySelector(".hl-status input").onchange = (ev) => {
-      const active = ev.target.checked;
-      safely(async () => {
-        const res = await cloud.saveHost({
-          name: r.name, location: r.location, mapUrl: r.mapUrl,
-          areaId: r.area ? r.area.id : "", archived: !active, note: r.note,
-        });
-        await refreshAndRender();
-        if (res && res.skipped && res.skipped.includes("archived")) {
-          toast(`Archiving needs a one-time database update (migration-2026-09-04-host-archive.sql) before it can be used.`, "warn");
-          return;
-        }
-        toast(active
-          ? `${r.name} is active again — offered when creating a mission.`
-          : `${r.name} archived — kept here with its history, but no longer offered on new missions.`, "info");
-      });
-    };
-    tr.addEventListener("dblclick", () => openHostModal(r.name));
+    tr.addEventListener("click", (ev) => { if (rowClickOpens(ev)) openHostModal(r.name); });
+    tr.addEventListener("contextmenu", (ev) => { const it = hostRowMenuItems(r); if (!it.length) return; ev.preventDefault(); ctxMenu = { items: it, title: r.name, x: ev.clientX, y: ev.clientY }; renderCtxMenu("root"); });
     body.appendChild(tr);
   }
+  $("#hostlist-select-all").checked = rows.length > 0 && rows.every(r => state.selectedHosts.has(r.name));
+  $("#hostlist-select-all").classList.toggle("hidden", !canEdit);
+  updateHostBulkBar();
   showFocusedHost(body);
   const archived = rows.filter(r => r.archived).length;
   // the amber chip beside the tiles counts the hosts without a location; the count does not say it twice
@@ -8914,6 +9113,7 @@ function renderHostRows() {
     th.classList.toggle("sorted-asc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === 1);
     th.classList.toggle("sorted-desc", th.dataset.sort === state.hostlist.sortKey && state.hostlist.sortDir === -1);
   }
+  renderListColumns("hostlist");
   quietTable("#hostlist-table");
   renderHostView();
 }
@@ -9163,10 +9363,7 @@ function missionHighlightChip(day) {
 /* the worst alert as an icon and a short text (not a pill, not a button: Close… is the row's hover action and its
    ⋯ menu), then a muted +N when the row has more; the tooltip lists every one, a line each */
 function missionAlertsHtml(r, info) {
-  const al = info.alerts;
-  if (!al.length) return "";
-  const tip = al.map(x => x.title).join("\n");
-  return alertHtml(al[0].level, al[0].text, tip, al.length - 1);
+  return info.alerts.length ? `<span class="ml-alerts">${alertsLineHtml(info.alerts)}</span>` : "";
 }
 /* The Filters button on the Missions tab (the same pattern as Host's): Shift, Trigo responsible,
    Customer, Host and "On the board". The Board picker and Open / Closed / All stay beside the
@@ -9368,20 +9565,24 @@ function renderMissionList() {
   const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit"), canHost = can("hostlist");
   const body = $("#missions-body");
   const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);   // an attribute the translator does not walk
+  // a ticked mission that a search or filter now hides is no longer ticked: Close… acts on what the list shows
+  const known = new Set(rows.map(r => r.id));
+  for (const id of [...state.selectedMissions]) if (!known.has(id)) state.selectedMissions.delete(id);
   body.innerHTML = rows.map(r => {
     const prev = cloud.previousNumber(r.number);
     const info = missionInfo(r);
-    // quiet until the row is hovered or focused (always there on a phone and on a touch screen): Close…, Reopen and the ⋯ menu
+    // quiet until the row is hovered or focused (always there on a phone and on a touch screen): Close…, Reopen, Add to board and the ⋯ menu
     const acts = [];
     if (r.status === "open" && canClose) acts.push(`<button type="button" class="btn btn-small ml-hov" data-act="close" title="The job has ended: take it off the board from the day after its last working day">Close…</button>`);
     if (r.status === "closed" && canReopen) acts.push(`<button type="button" class="btn btn-small ml-hov" data-act="reopen">Reopen</button>`);
-    acts.push(`<button type="button" class="btn btn-small ml-hov ml-more" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`);
-    // Add to board sits on the state it fixes: a mission that is not on its board (registered with no day, or off it)
-    const addBtn = r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")
-      ? `<button type="button" class="lt-act" data-act="add" title="Put this mission on a day of its board">Add to board</button>` : "";
+    // Add to board sits with the state it fixes: a mission that is not on its board (registered with no day, or off it)
+    if (r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")) acts.push(`<button type="button" class="lt-act ml-hov" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
+    acts.push(`<button type="button" class="btn btn-small ml-hov ml-more lt-dots" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`);
     const host = r.host ? (canHost
       ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Show this host in the Host tab") : "Show this host in the Host tab")}">${escapeHtml(r.host)}</button>`
       : escapeHtml(r.host)) : emptyCell();
+    const area = hostAreaOf(r.host);
+    const eng = r.engineerId ? escapeHtml(engineerLabelFor(r.engineerId)) : emptyCell();
     const avg = info.avg == null || r.status === "closed" ? emptyCell()
       : `<span title="${escapeHtml(`Average number of people on it each working day over the last 4 weeks (${info.p.a.avgDays} days)`)}">${info.avg.toFixed(1)}</span>`;
     // the crew on the day on screen, from the mission's own board
@@ -9389,26 +9590,45 @@ function renderMissionList() {
     const crew = r.status === "closed" ? emptyCell() : !info.day ? emptyCell("Not on its board that day")
       : info.day.hidden ? `<span class="ml-muted" title="${dayTitle("Hidden on its board that day")}">${dayTitle("Hidden")}</span>`
       : info.day.crew ? `<b>${info.day.crew}</b>` : `<span class="ml-zero" title="${dayTitle("Nobody is on it that day")}">0</span>`;
-    // data-label: the phone shows each row as a card with these as its field names
-    return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
-      <td class="ml-first mcol-number"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
-      <td data-label="${lbl("Board and status")}" class="ml-status mcol-status"><span class="ml-stack"><span class="ml-board-line">${boardChipHtml(boardNameOf(r.boardId))}</span><span class="ml-chips">${missionStatusHtml(r, info.p)}${addBtn}${r.status === "closed" ? "" : missionHighlightChip(info.day)}<span class="ml-alerts">${missionAlertsHtml(r, info)}</span></span></span></td>
-      <td data-label="${lbl("Shift")}" class="mcol-shift">${r.shift === "night" ? `<span class="ml-night">${icon("moon")}Night</span>` : "Day"}</td>
-      <td data-label="${lbl("Time")}" class="ml-time mcol-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : emptyCell()}</td>
-      <td data-label="${lbl("Customer")}" class="mcol-customer">${r.customer ? escapeHtml(r.customer) : emptyCell()}</td>
-      <td data-label="${lbl("Host")}" class="ml-host-cell mcol-host">${host}</td>
-      <td data-label="${lbl("Trigo responsible")}" class="mcol-engineer">${r.engineerId ? escapeHtml(engineerLabelFor(r.engineerId)) : emptyCell()}</td>
-      <td data-label="${lbl("Start date")}" class="ml-date mcol-openedOn">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : emptyCell()}</td>
-      <td data-label="${lbl("Last on board")}" class="ml-date mcol-lastOn">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : emptyCell()}</td>
-      <td data-label="${lbl("Crew")}" class="ml-crew num mcol-crew">${crew}</td>
-      <td data-label="${lbl("Avg crew / week")}" class="ml-avg num mcol-avgCrew">${avg}</td>
-      <td data-label="${lbl("PPE")}" class="ml-text mcol-ppe">${missionTextCell(r.ppe)}</td>
-      <td data-label="${lbl("Remark")}" class="ml-text mcol-remark">${missionTextCell(r.remark)}</td>
-      <td class="ml-actions">${acts.join("")}</td></tr>`;
+    // a gold star before the number when the day on screen is highlighted on the board (the tooltip is the highlight's label)
+    const hl = r.status !== "closed" && info.day && info.day.highlight ? info.day : null;
+    const star = hl ? `<span class="ml-star" title="${escapeHtml(highlightLabel({ highlight: hl.highlight, highlightNote: hl.note }))}">${icon("star")}</span>` : "";
+    const when = r.openedOn || r.lastOn
+      ? ltCell(`${r.openedOn ? fmtDayMon(r.openedOn) : ""} → ${r.lastOn ? fmtDayMon(r.lastOn) : ""}`.trim(),
+        (() => { const ya = (r.openedOn || "").slice(0, 4), yb = (r.lastOn || "").slice(0, 4); return ya && yb && ya !== yb ? `${ya} → ${yb}` : yb || ya; })())
+      : emptyCell();
+    const note = [missionText(r.ppe), missionText(r.remark)].filter(Boolean).join(" · ");
+    const timeText = r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : "";
+    const mine = can("missions", "edit") && state.selectedMissions.has(r.id);
+    // data-label: the phone shows each row as a card with these as its field names; data-col names the column for Columns
+    return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}${mine ? " selected" : ""}">
+      <td class="el-check" data-col="check">${canClose ? `<input type="checkbox" ${mine ? "checked" : ""} aria-label="${lbl("Select")}">` : ""}</td>
+      <td data-col="mission" class="ml-first">${ltCell(`${star}<b class="ml-num">${escapeHtml(r.number)}</b>`, r.customer ? escapeHtml(r.customer) : emptyCell(), { title: prev ? `was ${prev}` : "" })}${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
+      <td data-label="${lbl("Status")}" data-col="status" class="ml-status">${ltCell(missionStatusHtml(r, info.p), missionAlertsHtml(r, info), { keep: true })}</td>
+      <td data-label="${lbl("Board")}" data-col="boardarea" class="ml-board-cell">${ltCell(boardChipHtml(boardNameOf(r.boardId)), area ? areaMarkHtml(area) : emptyCell())}</td>
+      <td data-label="${lbl("Host")}" data-col="host" class="ml-host-cell">${ltCell(host, eng)}</td>
+      <td data-label="${lbl("Shift")}" data-col="shift">${ltCell(r.shift === "night" ? `<span class="ml-night">${icon("moon")}Night</span>` : "Day", timeText)}</td>
+      <td data-col="onboard" class="ml-date lt-ph-off">${when}</td>
+      <td data-label="${lbl("Crew")}" data-col="crew" class="ml-crew num">${ltCell(crew, avg === emptyCell() ? "" : `avg ${avg}`)}</td>
+      <td data-label="${lbl("Note")}" data-col="note" class="ml-text lt-ph-off">${note ? `<span class="ml-clamp lt-l1" title="${escapeHtml(note)}">${escapeHtml(note)}</span>` : emptyCell()}</td>
+      <td data-label="${lbl("Customer")}" data-col="customer" class="mcol-customer lt-opt">${r.customer ? escapeHtml(r.customer) : emptyCell()}</td>
+      <td data-label="${lbl("Trigo responsible")}" data-col="engineer" class="mcol-engineer lt-opt">${eng}</td>
+      <td data-label="${lbl("Time")}" data-col="startTime" class="ml-time lt-opt">${timeText || emptyCell()}</td>
+      <td data-label="${lbl("Start date")}" data-col="openedOn" class="ml-date lt-opt">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : emptyCell()}</td>
+      <td data-label="${lbl("Last on board")}" data-col="lastOn" class="ml-date lt-opt">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : emptyCell()}</td>
+      <td data-label="${lbl("Avg crew / week")}" data-col="avgCrew" class="ml-avg num lt-opt">${avg}</td>
+      <td data-label="${lbl("PPE")}" data-col="ppe" class="ml-text lt-opt">${missionTextCell(r.ppe)}</td>
+      <td data-label="${lbl("Remark")}" data-col="remark" class="ml-text lt-opt">${missionTextCell(r.remark)}</td>
+      <td class="ml-actions" data-col="actions">${acts.join("")}</td></tr>`;
   }).join("");
   $("#missions-crew-date").textContent = fmtDayMon(state.date);
-  renderMissionColumns();
+  renderListColumns("missions");
   quietTable("#missions-table");
+  const canSelect = can("missions", "edit");
+  $("#missions-select-all").classList.toggle("hidden", !canSelect);
+  const openRows = rows;
+  $("#missions-select-all").checked = canSelect && openRows.length > 0 && openRows.every(r => state.selectedMissions.has(r.id));
+  updateMissionBulkBar();
   const empty = $("#missions-empty");
   const none = !(D().register || []).length;
   empty.classList.toggle("hidden", rows.length > 0);
@@ -9417,50 +9637,12 @@ function renderMissionList() {
     : st.status === "closed" ? "No closed missions match." : "No missions match.";
   $("#missions-list-wrap").classList.toggle("hidden", !rows.length);
 }
-/* Columns: which of the table's columns show. The mission number and "Board and status" always do; the rest
-   can be switched off, and the choice is kept on this device. A phone's cards show every field. */
-const MISSION_COLUMNS = [["shift", "Shift"], ["time", "Time"], ["customer", "Customer"], ["host", "Host"], ["engineer", "Trigo responsible"], ["openedOn", "Start date"], ["lastOn", "Last on board"], ["crew", "Crew"], ["avgCrew", "Avg crew / week"], ["ppe", "PPE"], ["remark", "Remark"]];
-const MISSION_COLS_KEY = "manpower.missionsHiddenCols";
-function loadMissionColumns() {
-  try {
-    const v = JSON.parse(localStorage.getItem(MISSION_COLS_KEY) || "[]");
-    state.missions.hiddenCols = Array.isArray(v) ? v.filter(k => MISSION_COLUMNS.some(c => c[0] === k)) : [];
-  } catch (e) { state.missions.hiddenCols = []; }
-}
-function saveMissionColumns() {
-  try { localStorage.setItem(MISSION_COLS_KEY, JSON.stringify(state.missions.hiddenCols)); } catch (e) { /* remembering is a courtesy */ }
-}
-function renderMissionColumns() {
-  const hidden = state.missions.hiddenCols;
-  const table = $("#missions-table");
-  table.dataset.hide = hidden.join(" ");
-  const n = hidden.length;
-  $("#missions-cols-count").textContent = n;
-  $("#missions-cols-count").classList.toggle("hidden", !n);
-  $("#btn-missions-cols").classList.toggle("ms-active", n > 0);
-  const pop = $("#missions-cols-pop");
-  if (pop.dataset.built !== String(MISSION_COLUMNS.length)) {
-    pop.dataset.built = String(MISSION_COLUMNS.length);
-    pop.innerHTML = MISSION_COLUMNS.map(([k, label]) =>
-      `<label class="ms-opt"><input type="checkbox" data-col="${k}"> <span>${escapeHtml(label)}</span></label>`).join("")
-      + `<button type="button" class="btn btn-small" id="btn-missions-cols-reset">Show all columns</button>`;
-    pop.addEventListener("change", (e) => {
-      const box = e.target.closest("input[data-col]");
-      if (!box) return;
-      const set = new Set(state.missions.hiddenCols);
-      box.checked ? set.delete(box.dataset.col) : set.add(box.dataset.col);
-      state.missions.hiddenCols = MISSION_COLUMNS.map(c => c[0]).filter(k => set.has(k));
-      saveMissionColumns();
-      renderMissionList();
-    });
-    pop.addEventListener("click", (e) => {
-      if (!e.target.closest("#btn-missions-cols-reset")) return;
-      state.missions.hiddenCols = [];
-      saveMissionColumns();
-      renderMissionList();
-    });
-  }
-  for (const box of pop.querySelectorAll("input[data-col]")) box.checked = !hidden.includes(box.dataset.col);
+function updateMissionBulkBar() {
+  const bar = $("#missions-bulkbar");
+  if (!bar) return;
+  const n = state.selectedMissions.size;
+  bar.classList.toggle("hidden", n === 0 || !can("missions", "edit"));
+  $("#missions-bulk-count").textContent = n === 1 ? "1 selected" : `${n} selected`;
 }
 /* the ⋯ menu on a row: the actions of the mission's panel, which opens (the board it borrows is the same one
    the double click uses) and runs the one chosen, so the board's own checks and dialogs apply */
@@ -9490,10 +9672,12 @@ function missionFromRow(el) {
 
 /* Close: the last working day. Opened from the Missions tab and from a mission card. */
 let _closingMission = null;
+let _closingMissions = null;   // the bulk bar's Close…: several missions closed on the same last working day
 function openCloseMissionModal(r, defaultDate) {
   if (!r) return;
   if (!can("missions", "edit")) { toast("Your role cannot close missions.", "info"); return; }
   _closingMission = r;
+  _closingMissions = null;
   $("#close-mission-title").textContent = `Close mission ${r.number}`;
   $("#close-mission-what").textContent = `${boardNameOf(r.boardId)} · ${r.shift === "night" ? "Night" : "Day"} · ${r.host || "—"} → ${r.customer || "—"}`;
   let def = defaultDate || todayStr();
@@ -9502,6 +9686,23 @@ function openCloseMissionModal(r, defaultDate) {
   const d = $("#close-mission-date");
   d.min = r.openedOn || "";
   d.value = def;
+  $("#close-mission-note").value = "";
+  updateCloseMissionEffect();
+  openModal("#modal-close-mission");
+}
+/* Close… from the bulk bar: the same dialog for every ticked open mission, one last working day and one note for all */
+function openCloseMissionsModal(rows) {
+  const open = rows.filter(r => r.status === "open");
+  if (!open.length) { toast("Only open missions can be closed.", "info"); return; }
+  if (open.length === 1) { openCloseMissionModal(open[0]); return; }
+  if (!can("missions", "edit")) { toast("Your role cannot close missions.", "info"); return; }
+  _closingMission = null;
+  _closingMissions = open;
+  $("#close-mission-title").textContent = `Close ${open.length} missions`;
+  $("#close-mission-what").textContent = open.map(r => r.number).join(", ");
+  const d = $("#close-mission-date");
+  d.min = "";
+  d.value = todayStr();
   $("#close-mission-note").value = "";
   updateCloseMissionEffect();
   openModal("#modal-close-mission");
@@ -9515,8 +9716,22 @@ function updateCloseMissionEffect() {
 }
 function submitCloseMission(ev) {
   ev.preventDefault();
-  const r = _closingMission;
   const date = $("#close-mission-date").value;
+  if (_closingMissions && date) {
+    const many = _closingMissions.slice();
+    // one that only started after that day cannot end before it: it is left open and said so
+    const late = many.filter(x => x.openedOn && date < x.openedOn), ok = many.filter(x => !late.includes(x));
+    safely(async () => {
+      for (const x of ok) await cloud.closeMission(x.id, date, $("#close-mission-note").value.trim());
+      closeModal();
+      state.selectedMissions = new Set();
+      toast(`Closed ${ok.length} ${ok.length === 1 ? "mission" : "missions"}. Their last working day is ${fmtDate(date)}.`
+        + (late.length ? ` ${late.map(x => x.number).join(", ")} started later, so ${late.length === 1 ? "it was" : "they were"} left open.` : ""), late.length ? "warn" : "info");
+      await refreshAndRender();
+    });
+    return;
+  }
+  const r = _closingMission;
   if (!r || !date) return;
   if (r.openedOn && date < r.openedOn) { toast(`${r.number} only started on ${fmtDate(r.openedOn)}.`, "warn"); return; }
   safely(async () => {
@@ -10079,7 +10294,11 @@ function bindDropzones() {
 
 /* ---------- modals ---------- */
 let _modalReturnFocus = null;   // where focus goes back to when a dialog over Settings closes
+/* A row now opens its record on a click, so the second click of a quick double click lands on the backdrop of the
+   record the first one opened: a click on the backdrop right after a dialog opened is that, not a wish to close it. */
+let _modalOpenedAt = 0;
 function openModal(id) {
+  _modalOpenedAt = Date.now();
   const backdrop = $("#modal-backdrop");
   // Settings is a page, so the dialogs it opens (review, password, add…) are the
   // only modal-over-content case that needs a focus story: name the dialog,
@@ -18714,7 +18933,7 @@ function wireApp() {
   $("#btn-emplist-bulk").onclick = () => openBulkModal("employees");
   $("#btn-hostlist-bulk").onclick = () => openBulkModal("hosts");
   // Missions tab (migration-2026-11-09)
-  loadMissionColumns();
+  loadListColumns();
   $("#missions-search").addEventListener("input", (e) => { state.missions.search = e.target.value; renderMissionList(); renderStats(); });
   $("#missions-board").addEventListener("change", (e) => { state.missions.boardId = e.target.value; render(); });
   $("#missions-status").addEventListener("change", (e) => { state.missions.status = e.target.value; render(); });
@@ -18737,13 +18956,27 @@ function wireApp() {
     else if (b.dataset.act === "reopen") reopenMissionRow(r);
     else if (b.dataset.act === "add") openMissionAddModal(r);
   });
-  $("#missions-body").addEventListener("dblclick", (e) => {
-    if (e.target.closest("button, a, input, select")) return;
+  $("#missions-body").addEventListener("click", (e) => {
+    if (e.target.closest("button, a, input, select, label, .lt-add") || e.detail > 1) return;
     const r = missionFromRow(e.target);
-    if (!r) return;
-    if (window.getSelection) window.getSelection().removeAllRanges();   // the double click selected a word
-    openMissionFromList(r);
+    if (r) openMissionFromList(r);
   });
+  $("#missions-body").addEventListener("change", (e) => {
+    const box = e.target.closest(".el-check input");
+    const r = box && missionFromRow(box);
+    if (!r) return;
+    box.checked ? state.selectedMissions.add(r.id) : state.selectedMissions.delete(r.id);
+    box.closest("tr").classList.toggle("selected", box.checked);
+    updateMissionBulkBar();
+    const all = missionRows();
+    $("#missions-select-all").checked = all.length > 0 && all.every(x => state.selectedMissions.has(x.id));
+  });
+  $("#missions-select-all").onchange = (ev) => {
+    for (const r of missionRows()) ev.target.checked ? state.selectedMissions.add(r.id) : state.selectedMissions.delete(r.id);
+    renderMissionList();
+  };
+  $("#missions-bulk-close").onclick = () => openCloseMissionsModal((D().register || []).filter(r => state.selectedMissions.has(r.id)));
+  $("#missions-bulk-clear").onclick = () => { state.selectedMissions = new Set(); renderMissionList(); };
   $("#form-close-mission").onsubmit = submitCloseMission;
   $("#close-mission-date").addEventListener("input", updateCloseMissionEffect);
   $("#form-mission-add").onsubmit = submitMissionAdd;
@@ -18792,7 +19025,7 @@ function wireApp() {
     state.emplist.util = null; state.emplist.wl = null; state.emplist.utilCacheKey = null;
     emplistHeads();
     renderEmployeeRows();
-    safely(async () => { await ensureEmplistUtilLoaded(); renderEmployeeRows(); });
+    safely(async () => { await ensureEmplistUtilLoaded(); renderEmployeeRows(); renderStats(); });
   });
   $("#emplist-search").addEventListener("input", (e) => { state.emplist.search = e.target.value; renderEmployeeRows(); });
   for (const th of $$("#emplist-table th[data-sort]")) {
@@ -18836,7 +19069,7 @@ function wireApp() {
     const ids = [...state.selectedEmps];
     if (!ids.length) return;
     askDeactivate("Deactivate employees?",
-      `Deactivate ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? Hidden from today's and future boards; past dates keep them. Turn back on from the Status column.`,
+      `Deactivate ${ids.length} selected employee${ids.length === 1 ? "" : "s"}? Hidden from today's and future boards; past dates keep them. Turn back on from the ⋯ menu.`,
       (reason) => safely(async () => { await cloud.setEmployeesActive(ids, false, reason); state.selectedEmps = new Set(); await refreshAndRender(); }));
   };
   $("#emplist-bulk-clear").onclick = clearSelection;
@@ -18864,6 +19097,13 @@ function wireApp() {
       renderHostRows();
     };
   }
+  $("#hostlist-select-all").onchange = (ev) => {
+    for (const tr of $$("#hostlist-body tr")) ev.target.checked ? state.selectedHosts.add(tr.dataset.host) : state.selectedHosts.delete(tr.dataset.host);
+    renderHostRows();
+  };
+  $("#hostlist-bulk-archive").onclick = () => { const n = [...state.selectedHosts]; if (n.length) safely(async () => { await setHostsArchived(n, true); state.selectedHosts = new Set(); renderHostRows(); }); };
+  $("#hostlist-bulk-activate").onclick = () => { const n = [...state.selectedHosts]; if (n.length) safely(async () => { await setHostsArchived(n, false); state.selectedHosts = new Set(); renderHostRows(); }); };
+  $("#hostlist-bulk-clear").onclick = () => { state.selectedHosts = new Set(); renderHostRows(); };
   $("#form-host").addEventListener("submit", saveHostForm);
   $("#btn-delete-host").onclick = deleteHostRecord;
   $("#btn-host-merge").onclick = mergeHostFromModal;
@@ -18958,7 +19198,7 @@ function wireApp() {
   });
 
   // close modals
-  $("#modal-backdrop").addEventListener("click", (ev) => { if (ev.target.id === "modal-backdrop") closeModal(); });
+  $("#modal-backdrop").addEventListener("click", (ev) => { if (ev.target.id === "modal-backdrop" && Date.now() - _modalOpenedAt > 450) closeModal(); });
   for (const b of $$("[data-close]")) b.onclick = closeModal;
 }
 
