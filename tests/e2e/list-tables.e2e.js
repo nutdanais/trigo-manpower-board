@@ -288,13 +288,16 @@ const TABS = {
       await vp.keyboard.press("Escape");
       await vp.evaluate(() => hideContextMenu());
       await go(vp, "hostlist");
-      const withMenu = vp.locator("#hostlist-body tr .lt-dots");
-      if (await withMenu.count()) {
-        await withMenu.first().click();
-        const hi = (await vp.locator("#context-menu .ctx-item").allInnerTexts()).map((t) => t.trim());
-        assert.deepEqual(hi, ["Open map"], "Host: Open map only");
+      // every host has a ⋯ with Open (its record, read-only for a viewer), and Open map when it has a link: nothing that edits
+      const menus = [];
+      for (const tr of await vp.locator("#hostlist-body tr").all()) {
+        await tr.locator(".lt-dots").click();
+        menus.push((await vp.locator("#context-menu .ctx-item").allInnerTexts()).map((t) => t.trim()));
+        await vp.keyboard.press("Escape");
+        await vp.evaluate(() => hideContextMenu());
       }
-      assert.equal(await vp.locator("#hostlist-body tr").evaluateAll((trs) => trs.filter((t) => !t.querySelector(".lt-dots")).length) >= 1, true, "a host with no map link has no ⋯ at all");
+      assert.ok(menus.length >= 5 && menus.every((m) => m[0] === "Open" && m.every((x) => ["Open", "Open map"].includes(x))), "Host: Open and Open map only: " + JSON.stringify(menus));
+      assert.ok(menus.some((m) => m.length === 1), "a host with no map link has Open alone");
       assert.deepEqual(v.errors, []);
       await v.ctx.close();
     });

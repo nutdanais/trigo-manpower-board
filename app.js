@@ -532,8 +532,6 @@ const state = {
     filters: { areaId: [], boardId: [], empId: [], location: [], status: [] },
     atRisk: false,       // the "at risk" chip: only the hosts with too few experienced people
     dupOnly: false,      // "Review duplicates" — show only names that look like duplicates of each other
-    focus: null,         // a host name to mark and scroll to (the Missions tab's Host link); cleared after a few seconds
-    focusScroll: false,  // scroll to it once, on the next draw
     sortKey: "name",
     sortDir: 1,
     dir: null,           // cloud.getHostDirectory() result; null = not fetched yet
@@ -9071,38 +9069,12 @@ function hostlistFilteredSorted() {
   return rows;
 }
 
-/* The Missions tab's Host link lands here: the host's row is marked and scrolled to the middle once, and
-   the mark fades after a few seconds so it does not sit there for good. */
-let hostFocusTimer = 0;
-function showFocusedHost(body) {
-  const hl = state.hostlist;
-  if (!hl.focus || !hl.focusScroll) return;
-  hl.focusScroll = false;
-  const row = body.querySelector("tr.row-focus");
-  if (!row) { toast(`${hl.focus} is not in the Host list.`, "info"); hl.focus = null; return; }
-  requestAnimationFrame(() => row.scrollIntoView({ block: "center" }));
-  clearTimeout(hostFocusTimer);
-  hostFocusTimer = setTimeout(() => {
-    hl.focus = null;
-    for (const x of $$("#hostlist-body tr.row-focus")) x.classList.remove("row-focus");
-  }, 8000);
-}
-/* The Host column of the Missions tab: open the Host tab with that host's row marked. The search and
-   filters are cleared so the row is on the list. */
+/* A host link on the Missions tab or in the mission panel: open that host's record, over the tab it was clicked on. */
 function openHostFromMission(r) {
   const name = missionText(r.host);
   if (!name) return;
   if (!can("hostlist")) { toast("Your role cannot open the Host tab.", "info"); return; }
-  clearSelection();
-  const hl = state.hostlist;
-  hl.search = "";
-  for (const k of Object.keys(hl.filters)) hl.filters[k] = [];
-  hl.dupOnly = false;
-  hl.view = "list";
-  hl.focus = name;
-  hl.focusScroll = true;
-  D().activeBoardId = HOSTLIST_ID;
-  refreshAndRender();
+  safely(() => openHostRecord(name));
 }
 
 /* redraws just the table body + count — cheap enough for every keystroke,
@@ -9148,10 +9120,10 @@ async function setHostsArchived(names, archived) {
       : `${done} hosts are active again — offered when creating a mission.`, "info");
   }
 }
-/* the ⋯ menu of a host row: Edit, Open map (when there is a link) and Archive / Make active; a role that may only read
-   has Open map alone, or no menu at all */
+/* the ⋯ menu of a host row: Open (its record), Edit, Open map (when there is a link) and Archive / Make active; a role
+   that may only read has Open and Open map */
 function hostRowMenuItems(r) {
-  const items = [];
+  const items = [{ label: "Open", ico: "clipboard", fn: () => safely(() => openHostRecord(r.name)) }];
   const canEdit = can("hostlist", "edit");
   if (canEdit) items.push({ label: "Edit", ico: "edit", fn: () => openHostModal(r.name) });
   const href = hostMapLink(r);
@@ -9191,7 +9163,6 @@ function renderHostRows() {
     const tr = document.createElement("tr");
     tr.dataset.host = r.name;
     if (r.archived) tr.classList.add("row-archived");
-    if (state.hostlist.focus === r.name) tr.classList.add("row-focus");
     if (state.selectedHosts.has(r.name)) tr.classList.add("selected");
     const dir = !!state.hostlist.dir;
     const x = dir ? hostExpOf(r) : null;
@@ -9225,8 +9196,8 @@ function renderHostRows() {
     tr.querySelector(".hl-host").title =
       `${r.name} — ${r.missionCount} mission${r.missionCount === 1 ? "" : "s"}, `
       + `${r.deployedDays} deployment day${r.deployedDays === 1 ? "" : "s"}${lastLine}`;
-    // every "+ Add" (location, service area, note) opens the same record, the one place a host's details are edited
-    for (const add of tr.querySelectorAll(".lt-add")) add.onclick = (ev) => { ev.stopPropagation(); openHostModal(r.name); };
+    // every "+ Add" (location, service area, note) opens the form of the record on that field, the one place a host's details are edited
+    for (const add of tr.querySelectorAll(".lt-add")) add.onclick = (ev) => { ev.stopPropagation(); openHostModal(r.name, { focus: { loc: "location", area: "areaId", note: "note" }[add.dataset.add] }); };
     for (const link of tr.querySelectorAll(".hl-map")) link.onclick = (ev) => ev.stopPropagation();
     const dots = tr.querySelector(".lt-dots");
     if (dots) dots.onclick = (ev) => { ev.stopPropagation(); openRowMenu(hostRowMenuItems(r), ev.currentTarget, r.name); };
@@ -9237,14 +9208,13 @@ function renderHostRows() {
       updateHostBulkBar();
       $("#hostlist-select-all").checked = rows.length > 0 && rows.every(x => state.selectedHosts.has(x.name));
     };
-    tr.addEventListener("click", (ev) => { if (rowClickOpens(ev)) openHostModal(r.name); });
+    tr.addEventListener("click", (ev) => { if (rowClickOpens(ev)) safely(() => openHostRecord(r.name)); });
     tr.addEventListener("contextmenu", (ev) => { const it = hostRowMenuItems(r); if (!it.length) return; ev.preventDefault(); ctxMenu = { items: it, title: r.name, x: ev.clientX, y: ev.clientY }; renderCtxMenu("root"); });
     body.appendChild(tr);
   }
   $("#hostlist-select-all").checked = rows.length > 0 && rows.every(r => state.selectedHosts.has(r.name));
   $("#hostlist-select-all").classList.toggle("hidden", !canEdit);
   updateHostBulkBar();
-  showFocusedHost(body);
   const archived = rows.filter(r => r.archived).length;
   // the amber chip beside the tiles counts the hosts without a location; the count does not say it twice
   $("#hostlist-count").textContent = `${rows.length} of ${all.length}`
@@ -9735,7 +9705,7 @@ function renderMissionList() {
     if (r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")) acts.push(`<button type="button" class="lt-act ml-hov" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
     acts.push(`<button type="button" class="btn btn-small ml-hov ml-more lt-dots" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`);
     const host = r.host ? (canHost
-      ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Show this host in the Host tab") : "Show this host in the Host tab")}">${escapeHtml(r.host)}</button>`
+      ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Open this host") : "Open this host")}">${escapeHtml(r.host)}</button>`
       : escapeHtml(r.host)) : emptyCell();
     const area = hostAreaOf(r.host);
     const eng = r.engineerId ? escapeHtml(engineerLabelFor(r.engineerId)) : emptyCell();
@@ -10123,28 +10093,186 @@ async function exportHostlistXlsx() {
   toast(`Exported ${rows.length} ${rows.length === 1 ? "host" : "hosts"}.`, "info");
 }
 
-/* Host modal — the location/map-link record for one host. The name is editable
-   like everything else here, but it is not an ordinary field: it is the key
+/* ---------- The Host record ----------
+   A host opens read-first, in the same panel as the Mission and the Employee (design/handover-list-tabs.md, section 7):
+   the header (the name, the status, "Host" with its boards and its service area, and the actions), the alert box, the
+   Site fields, the key numbers, the people who worked here and the missions at this host. Edit swaps the form in; Save
+   or Cancel come back to the record. A new host goes straight to the form. */
+let hostRecState = { fromRecord: false };   // true while the form was opened on an existing host: Cancel and Save return to its record
+function hostPanelHead(r) {
+  if (!r) { rpFillHead("host-modal", { title: "New Host" }); return; }
+  const boards = r.boards.map(b => boardChipHtml(b.name, `${b.name} — ${b.missions} mission${b.missions === 1 ? "" : "s"} for this host`)).join("");
+  rpFillHead("host-modal", {
+    title: r.name,
+    statusHtml: hostStatusPill(r),
+    subHtml: [`<span>Host</span>`, boards, r.area ? areaMarkHtml(r.area) : ""].filter(Boolean).join(""),
+  });
+}
+function setHostView(view) {
+  const detail = view === "detail";
+  $("#host-detail").classList.toggle("hidden", !detail);
+  $("#form-host").classList.toggle("hidden", detail);
+  if (!detail) $("#host-modal-acts").classList.add("hidden");
+}
+/* the host's row, by its name or by the same name in other letters (a mission may spell it differently) */
+function hostRowByName(name) {
+  const rows = allHostRows(), key = String(name || "").trim().toLowerCase();
+  return rows.find(r => r.name === name) || rows.find(r => r.name.trim().toLowerCase() === key) || null;
+}
+/* Open a host's record. Any role that can see the Host tab may read it; Edit and More are for the roles that can edit. */
+async function openHostRecord(name) {
+  if (!can("hostlist")) { toast("Your role cannot open the Host tab.", "info"); return; }
+  await ensureHostDirectoryLoaded();
+  const r = hostRowByName(name);
+  if (!r) { toast(`${name} is not in the Host list.`, "warn"); return; }
+  state.hostlist.editingHost = r.name;
+  state.hostlist.returnToMission = false;
+  hostRecState = { fromRecord: true };
+  $("#modal-host .modal-close").onclick = closeModal;
+  hostPanelHead(r);
+  setHostView("detail");
+  $("#host-detail").replaceChildren();
+  openModal("#modal-host");
+  await renderHostRecord(r.name);
+}
+/* the record of a host, drawn into #host-detail; called again when something on it changes */
+async function renderHostRecord(name) {
+  const r = hostRowByName(name);
+  const body = $("#host-detail");
+  const stillHere = () => state.hostlist.editingHost === name && !$("#modal-host").classList.contains("hidden") && !body.classList.contains("hidden");
+  if (!r || !stillHere()) return;
+  const canEdit = can("hostlist", "edit");
+  const rec = D().hosts.find(h => h.name === r.name) || null;
+  const x = hostExpOf(r);
+  hostPanelHead(r);
+
+  // the actions: Edit, Open map and More (Archive / Make active, Merge into another host…, Clear record…)
+  const acts = $("#host-modal-acts");
+  acts.replaceChildren();
+  if (canEdit) acts.appendChild(rpButton("btn-hr-edit", "Edit", "edit", () => openHostModal(r.name), "btn btn-edit"));
+  const href = hostMapLink(r);
+  if (href) acts.appendChild(rpButton("btn-hr-map", "Open map", "pin", () => window.open(href, "_blank", "noopener,noreferrer")));
+  if (canEdit) {
+    const more = [r.archived
+      ? { id: "btn-hr-activate", label: "Make active", icon: "return", fn: () => safely(async () => { await setHostsArchived([r.name], false); await renderHostRecord(r.name); }) }
+      : { id: "btn-hr-archive", label: "Archive", icon: "ban", fn: () => safely(async () => { await setHostsArchived([r.name], true); await renderHostRecord(r.name); }) }];
+    more.push({ id: "btn-hr-merge", label: "Merge into another host…", icon: "merge", fn: () => openHostModal(r.name, { merge: true }) });
+    if (rec) more.push("-", { id: "btn-hr-clear", label: "Clear record…", icon: "trash", danger: true, fn: () => deleteHostRecord() });
+    acts.appendChild(rpMoreButton(more, "btn-hr-more"));
+  }
+  acts.classList.toggle("hidden", !acts.children.length);
+
+  // what needs a look, with its one fix
+  const peopleBox = document.createElement("div");
+  peopleBox.className = "ov-prof-block hr-people-box";
+  const alertBox = rpAlertBox(hostAlerts(r).map(a => ({ ...a,
+    fix: a.kind === "noloc" && canEdit ? { label: "+ Add location", fn: () => openHostModal(r.name, { focus: "location" }) }
+      : a.kind === "risk" ? { label: "See who", fn: () => peopleBox.scrollIntoView({ block: "start", behavior: "smooth" }) } : null })));
+
+  const locText = r.location || (safeHttpUrl(r.mapUrl) ? "Open in Google Maps" : "");
+  const where = !locText ? emptyCell()
+    : href && (r.mapUrl || r.location) ? `<a class="hl-map" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" title="Open in Google Maps">${icon("pin")}${escapeHtml(locText)}</a>`
+    : `<span data-no-i18n>${escapeHtml(locText)}</span>`;
+  const boards = r.boards.length
+    ? `<span class="hr-boards">${r.boards.map(b => boardChipHtml(b.name, `${b.name} — ${b.missions} mission${b.missions === 1 ? "" : "s"} for this host`)).join("")}</span>`
+    : emptyCell("Not on a board yet");
+  const fields = rpGroupEls([["Site", [
+    ["Location", where],
+    ["Boards", boards],
+    ["Note for the crew", r.note ? `<span data-no-i18n>${escapeHtml(r.note)}</span>` : emptyCell(), true],
+  ]]]);
+  body.replaceChildren(...[alertBox, ...fields].filter(Boolean));
+
+  // key numbers: the only cards (the same numbers as the Skills matrix row of this host)
+  const tiles = document.createElement("div");
+  tiles.className = "ov-htiles ov-prof-tiles";
+  const need = hostExperiencedDays();
+  const tile = (t) => { const d = document.createElement("div"); d.className = "ov-htile ov-htile-static"; d.innerHTML = ovTileInner(t); tiles.appendChild(d); };
+  tile({ label: "Experienced", value: x.experienced.length, sub: `${need} ${need === 1 ? "day" : "days"} or more` });
+  tile({ label: "People", value: r.inspectors.length, sub: "ever worked here" });
+  tile({ label: "Days", value: r.deployedDays, sub: "in all" });
+  tile({ label: "Last worked", value: r.lastWorked ? escapeHtml(fmtDate(r.lastWorked)) : "—", sub: "" });
+  body.appendChild(tiles);
+
+  // everyone who has worked here, most days first, the experienced ones outlined; all of them, wrapping
+  const seeProfile = can("emplist");
+  const expSet = new Set(x.experienced);
+  const chips = r.inspectors.map(i => {
+    const e = D().employees.find(m => m.id === i.id);
+    const gone = e && empStatus(e) !== "active";
+    const tip = `${i.name}: ${i.days} ${i.days === 1 ? "day" : "days"} at ${r.name}${i.last ? `, last ${fmtDate(i.last)}` : ""}${expSet.has(i.id) ? " · experienced" : ""}${gone ? " · not active now" : ""}`;
+    const cls = `lt-pc${expSet.has(i.id) ? " lt-exp" : ""}${gone ? " lt-gone" : ""}`;
+    return seeProfile
+      ? `<button type="button" class="${cls} hr-person" data-emp="${escapeHtml(i.id)}" data-no-i18n title="${escapeHtml(tip)}">${escapeHtml(i.name)} <small>${i.days}d</small></button>`
+      : `<span class="${cls}" data-no-i18n title="${escapeHtml(tip)}">${escapeHtml(i.name)} <small>${i.days}d</small></span>`;
+  }).join("");
+  peopleBox.innerHTML = `<div class="ov-eng-foot-h">People who worked here <span class="ov-muted">days at this host, most days first</span></div>`
+    + (chips ? `<div class="rp-people" id="hr-people">${chips}</div>` : `<p class="ov-muted">Nobody has worked at this host yet.</p>`);
+  for (const b of peopleBox.querySelectorAll(".hr-person")) b.onclick = () => openProfile(b.dataset.emp);
+  body.appendChild(peopleBox);
+
+  // the missions at this host: the open ones from the register, then a "Closed (N)" line that expands
+  if (!(missionsOn() && can("missions"))) return;
+  const box = document.createElement("div");
+  box.className = "ov-prof-block hr-missions";
+  box.innerHTML = `<div class="ov-eng-foot-h">Missions at this host</div><p class="ov-muted">Loading…</p>`;
+  body.appendChild(box);
+  await ensureMissionActivityLoaded();
+  if (!stillHere()) return;
+  const key = missionText(r.name).toLowerCase();
+  const mine = (D().register || []).filter(m => missionText(m.host).toLowerCase() === key);
+  const open = mine.filter(m => m.status !== "closed").sort((a, b) => a.number.localeCompare(b.number) || a.shift.localeCompare(b.shift));
+  const closed = mine.filter(m => m.status === "closed").sort((a, b) => String(b.closedOn || "").localeCompare(String(a.closedOn || "")) || a.number.localeCompare(b.number));
+  const line = (m) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "hr-mission"; b.dataset.mission = m.id || `${m.boardId}|${m.number}|${m.shift}`;
+    b.innerHTML = `<b class="hr-m-no" data-no-i18n>${escapeHtml(m.number)}</b>`
+      + `<span class="hr-m-cust">${m.customer ? `<span data-no-i18n>${escapeHtml(m.customer)}</span>` : emptyCell()}</span>`
+      + `<span class="hr-m-shift">${m.shift === "night" ? "Night" : "Day"}</span>`
+      + `<span class="hr-m-st">${missionStatusHtml(m)}</span>`;
+    b.onclick = () => openMissionFromList(m);
+    return b;
+  };
+  box.querySelector("p").remove();
+  const list = document.createElement("div");
+  list.className = "hr-m-list";
+  if (open.length) list.append(...open.map(line));
+  else list.appendChild(Object.assign(document.createElement("p"), { className: "ov-muted", textContent: closed.length ? "No open missions at this host." : "No missions at this host." }));
+  box.appendChild(list);
+  if (closed.length) {
+    const toggle = document.createElement("button");
+    toggle.type = "button"; toggle.className = "lt-act hr-m-closed"; toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = `Closed (${closed.length})`;
+    const older = document.createElement("div");
+    older.className = "hr-m-list hidden";
+    older.append(...closed.map(line));
+    toggle.onclick = () => { const show = older.classList.toggle("hidden") === false; toggle.setAttribute("aria-expanded", String(show)); };
+    box.append(toggle, older);
+  }
+}
+
+/* The form of the host record. `name` names an existing host (the form opens inside its panel; Save and Cancel come back
+   to its record). opts.prefillName seeds a NEW host's name — that's the New Mission hand-off, where the planner
+   has already typed a host that isn't in the list yet; opts.returnToMission sends them back to the mission form
+   afterwards with the host filled in. opts.focus names the field to put the cursor in ("+ Add location"); opts.merge
+   opens the Merge section.
+
+   The name is editable like everything else here, but it is not an ordinary field: it is the key
    tying this record to the mission and deployment rows carrying the same text,
    so changing it goes through cloud.renameHost, which rewrites those rows too.
    That is why saveHostForm always confirms a rename before it runs. */
-/* `name` names an existing host. opts.prefillName
-   seeds a NEW host's name — that's the New Mission hand-off, where the planner
-   has already typed a host that isn't in the list yet; opts.returnToMission
-   sends them back to the mission form afterwards with the host filled in. */
 function openHostModal(name, opts = {}) {
   if (!can("hostlist", "edit")) { toast("Your role can view the host list but not change it.", "info"); return; }
   const rec = name ? D().hosts.find(h => h.name === name) : null;
+  const row = name ? hostRowByName(name) : null;
   state.hostlist.editingHost = name || null;
   state.hostlist.returnToMission = !!opts.returnToMission;
+  hostRecState = { fromRecord: !!name };
   const form = $("#form-host");
   form.reset();
-  // the record's name is the title and what it is goes underneath, as on the
-  // Employee panel (it read "Host — Host Alpha")
-  $("#host-modal-title").textContent = name || "New Host";
-  const hostArea = rec && rec.areaId ? (D().areas.find(a => a.id === rec.areaId) || {}).name : "";
-  $("#host-modal-sub").textContent = rec ? ["Host", hostArea, rec.archived ? "archived" : ""].filter(Boolean).join(" · ") : "";
-  $("#host-modal-sub").classList.toggle("hidden", !rec);
+  // the same header as the record's, without the action row
+  hostPanelHead(row || (name ? { name, boards: [], area: null, archived: !!(rec && rec.archived) } : null));
+  setHostView("form");
   form.name.value = name || opts.prefillName || "";
   $("#host-name-note").classList.toggle("hidden", !name);
   form.location.value = rec ? rec.location : "";
@@ -10156,15 +10284,18 @@ function openHostModal(name, opts = {}) {
   form.archived.checked = !!(rec && rec.archived);
   $("#btn-delete-host").classList.toggle("hidden", !rec);
   renderHostMergeSection(name);
+  $("#host-merge").open = !!opts.merge;
   // Cancel out of the hand-off and the half-finished mission is still waiting —
   // its form keeps its values, nothing has reset it
-  $("#modal-host [data-close]").onclick = () => {
+  $("#modal-host .modal-close").onclick = () => {
     const back = state.hostlist.returnToMission;
     state.hostlist.returnToMission = false;
     closeModal();
     if (back) openModal("#modal-mission");
   };
   openModal("#modal-host");
+  if (opts.merge) { const m = $("#host-merge"); m.scrollIntoView({ block: "center" }); $("#host-merge-target").focus({ preventScroll: true }); }
+  else if (opts.focus && form[opts.focus]) { try { form[opts.focus].focus({ preventScroll: true }); } catch (e) { /* a picker: no cursor */ } }
 }
 
 /* The merge half of the Host modal: fold this host into another one. Only
@@ -10288,6 +10419,7 @@ function saveHostForm(ev) {
 function runHostSave(vals, from) {
   const { name } = vals;
   const renamed = !!from;
+  const existing = !!state.hostlist.editingHost;   // an existing host goes back to its record, a new one just closes
   const back = state.hostlist.returnToMission;
   state.hostlist.returnToMission = false;
   safely(async () => {
@@ -10302,6 +10434,7 @@ function runHostSave(vals, from) {
     const res = await cloud.saveHost(vals);
     closeModal();
     await refreshAndRender();
+    if (existing && !back) await openHostRecord(name);
     if (back) {
       // straight back to the mission the planner was in the middle of writing,
       // with the host they just created now filled in and recognised
@@ -10338,7 +10471,8 @@ function deleteHostRecord() {
       await cloud.deleteHost(rec.id);
       closeModal();
       await refreshAndRender();
-    }));
+    }),
+    () => openModal("#modal-host"));   // "Cancel" → back to the host, in its record or its form
 }
 
 /* where is this employee assigned right now on the current plan?
@@ -11329,11 +11463,13 @@ function updateMissionEngineerNote() {
 /* "+ Mission" on the Missions tab: the board's own New Mission form, with a Board box. The form works on
    the active board and the day on screen, so the chosen board is made the active one while the form is
    open (enterMissionListBoard) and the Missions tab is put back when it closes (leaveMissionListBoard). */
-let missionFromList = { open: false, swapped: false, date: null, prevDate: null };
+let missionFromList = { open: false, swapped: false, date: null, prevDate: null, home: MISSIONS_ID };
 function enterMissionListBoard() {
-  if (!missionFromList.open || missionFromList.swapped || !isMissionList()) return;
+  // from the Missions tab, or from a Host record (its list of missions at the host): the tab it came from is put back
+  if (!missionFromList.open || missionFromList.swapped || !(isMissionList() || isHostList())) return;
   const id = $("#mission-board").value;
   if (!id) return;
+  missionFromList.home = D().activeBoardId;
   D().activeBoardId = id;
   // opening an existing mission may need a day other than the one on screen: that day is used while the form is open
   if (missionFromList.date && missionFromList.date !== state.date) { missionFromList.prevDate = state.date; state.date = missionFromList.date; }
@@ -11341,7 +11477,7 @@ function enterMissionListBoard() {
 }
 function leaveMissionListBoard() {
   if (!missionFromList.swapped) return;
-  D().activeBoardId = MISSIONS_ID;
+  D().activeBoardId = missionFromList.home || MISSIONS_ID;
   if (missionFromList.prevDate) { state.date = missionFromList.prevDate; missionFromList.prevDate = null; }
   missionFromList.swapped = false;
   state.missions.activityKey = null;   // the crew and the status may have changed
@@ -19259,6 +19395,15 @@ function wireApp() {
   $("#hostlist-bulk-activate").onclick = () => { const n = [...state.selectedHosts]; if (n.length) safely(async () => { await setHostsArchived(n, false); state.selectedHosts = new Set(); renderHostRows(); }); };
   $("#hostlist-bulk-clear").onclick = () => { state.selectedHosts = new Set(); renderHostRows(); };
   $("#form-host").addEventListener("submit", saveHostForm);
+  $("#btn-host-cancel").onclick = () => {
+    // Edit, then Cancel: back to the record; a new host just closes (or goes back to the half-finished mission)
+    const name = state.hostlist.editingHost;
+    if (name && hostRecState.fromRecord) { safely(() => openHostRecord(name)); return; }
+    const back = state.hostlist.returnToMission;
+    state.hostlist.returnToMission = false;
+    closeModal();
+    if (back) openModal("#modal-mission");
+  };
   $("#btn-delete-host").onclick = deleteHostRecord;
   $("#btn-host-merge").onclick = mergeHostFromModal;
   $("#btn-hostlist-dups").onclick = () => {

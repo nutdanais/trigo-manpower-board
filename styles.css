@@ -3053,12 +3053,7 @@ body.exporting #app-root { margin-right: 0; }
 #hostlist-table th.sorted-desc::after { content: " \25BC"; }
 #hostlist-table tbody tr:hover, #missions-table tbody tr:hover { background: var(--hover-tint); }
 #hostlist-table td.hl-name { white-space: nowrap; }
-/* the row the Missions tab's Host link opened: tinted, with an edge, and a short pulse (app.js showFocusedHost) */
 #hostlist-table tbody tr { scroll-margin-top: 140px; }
-#hostlist-table tbody tr.row-focus td { background: rgba(0, 58, 102, .10); animation: hl-focus-pulse 1.8s ease-out 1; }
-#hostlist-table tbody tr.row-focus td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
-@keyframes hl-focus-pulse { from { background: rgba(245, 158, 11, .32); } to { background: rgba(0, 58, 102, .10); } }
-@media (max-width: 640px) { #hostlist-table tbody tr.row-focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--hover-tint); } }
 .hl-host { font-weight: 700; }
 /* the edit affordance rides the row's hover on a mouse; on touch there is no
    hover to reveal it, so it stays visible there */
@@ -7726,4 +7721,28 @@ form.rp-form { display: flex; flex-direction: column; min-height: 0; }
   .rp-grid .form-row { flex-wrap: wrap; }
   .rp-grid .form-row > label { flex: 1 1 100px; }
   .rp-danger { min-height: 44px; }
+}
+
+/* ===== The Host record (design/handover-list-tabs.md, section 7): the record panel with a host's own blocks ===== */
+.hr-boards { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; }
+#modal-host .rp-fields .rp-grid .toggle-archived { margin-bottom: 4px; }
+/* a person who is no longer active keeps the chip, a little quieter; the tooltip says so */
+.lt-pc.lt-gone { color: var(--muted); }
+.lt-pc.lt-gone.lt-exp { color: var(--text); opacity: .7; }
+/* the missions at this host: one line each (number, customer, shift, status), the whole line opens the mission */
+.hr-m-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+.hr-m-list.hidden { display: none; }
+.hr-m-list > p { margin: 0; padding: 9px 12px; }
+.hr-mission { display: grid; grid-template-columns: minmax(84px, auto) minmax(0, 1fr) auto auto; align-items: center; gap: 4px 14px; width: 100%; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--border); background: none; font: inherit; font-size: 13px; text-align: left; color: var(--text); cursor: pointer; }
+.hr-mission:last-child { border-bottom: 0; }
+.hr-mission:hover, .hr-mission:focus-visible { background: var(--hover-tint); outline: none; }
+.hr-m-no { font-weight: 700; white-space: nowrap; }
+.hr-m-cust { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.hr-m-shift { color: var(--muted); white-space: nowrap; }
+.hr-m-st { display: inline-flex; justify-content: flex-end; min-width: 108px; }
+.hr-m-closed { margin: 0 0 8px; }
+@media (max-width: 640px) {
+  .hr-mission { grid-template-columns: minmax(0, 1fr) auto; }
+  .hr-m-cust { grid-column: 1 / -1; grid-row: 2; }
+  .hr-m-shift { display: none; }
 }
