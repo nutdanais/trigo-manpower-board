@@ -73,7 +73,12 @@ const X = require("../../xlsx-export.js");
     const rowsText = async () => p.locator("#emplist-body tr td[data-label=Name]").allTextContents();
     const cell = (name, label) => p.locator(`#emplist-body tr:has(td:text-is("${name}")) td[data-label="${label}"]`).textContent();
 
-    assert.equal(await cell("Dated Person", "Years of service"), X.serviceLength(ago(3, 5, 12), T));
+    // the table keeps it short ("3y 5m", days dropped); the whole length is the tooltip
+    const full = X.serviceLength(ago(3, 5, 12), T), parts = X.serviceParts(ago(3, 5, 12), T);
+    assert.equal(await cell("Dated Person", "Years of service"), `${parts.years}y ${parts.months}m`);
+    assert.equal(await p.locator('#emplist-body tr:has(td:text-is("Dated Person")) td[data-label="Years of service"] [title]').first().getAttribute("title"), full, "the full text is the tooltip");
+    // under a month it is the days alone; a whole number of years has no months
+    assert.deepEqual(await p.evaluate(([a, b]) => [a, b].map((d) => { const el = document.createElement("div"); el.innerHTML = serviceShortHtml(d, todayStr()); return el.textContent; }), [ago(0, 0, 26), ago(2, 0, 0)]), ["26d", "2y"]);
     assert.equal(await cell("Undated Person", "Years of service"), "—");
     console.log("ok - the Manpower List shows Years of service");
 

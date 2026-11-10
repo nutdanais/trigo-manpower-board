@@ -73,7 +73,7 @@ async function step(name, fn) {
     });
 
     await step("a mission still on last year's number is flagged; an engineer cannot enter the new one", async () => {
-      assert.match(await row(p, OLD, "Board One").locator(".ml-alerts").innerText(), new RegExp(`No 20${YY} number|Waiting for 20${YY} number`), "the new-year number is an alert pill");
+      assert.match(await row(p, OLD, "Board One").locator(".ml-alerts").innerText(), new RegExp(`Needs 20${YY} number`), "the new-year number is an alert");
       assert.equal(await p.locator("#missions-alert").isVisible(), true);
       assert.equal(await p.locator("#missions-alert button").count(), 0, "no button for an engineer");
       assert.equal(await p.locator("#btn-missions-newyear").isVisible(), false);
@@ -168,25 +168,30 @@ async function step(name, fn) {
       ]);
       await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister().then(refreshAndRender); });
       const alerts = (n) => row(p, n).locator(".ml-alerts").innerText();
-      // on the board, nobody on it for 8 working days in a row: red, and the pill offers Close
+      // on the board, nobody on it for 8 working days in a row: a red alert with the short text; Close… is the row's own action
       assert.match(await row(p, "108").innerText(), /On board/);
-      assert.match(await alerts("108"), /No crew · 8 days · Close\?/);
-      assert.equal(await row(p, "108").locator(".ml-alerts button[data-act=suggest-close]").count(), 1);
-      assert.equal(await row(p, "108").locator(".ml-alerts .ml-late").count(), 1, "over 5 working days is red");
+      assert.match(await alerts("108"), /^No crew, 8 days$/);
+      assert.doesNotMatch(await alerts("108"), /Close\?/, "the alert states the problem and asks nothing");
+      assert.equal(await row(p, "108").locator(".lt-st").count(), 1, "exactly one status pill");
+      assert.equal(await row(p, "108").locator(".lt-al").count(), 1, "exactly one alert");
+      assert.equal(await row(p, "108").locator(".lt-al").evaluate((el) => !el.closest("button") && el.tagName !== "BUTTON"), true, "the alert is not a button");
+      assert.equal(await row(p, "108").locator(".ml-alerts button, .ml-alerts .ml-tag").count(), 0, "no pill, no button in the alert");
+      assert.equal(await row(p, "108").locator(".lt-al-bad").count(), 1, "over 5 working days is red");
+      assert.equal(await row(p, "108").locator("button[data-act=close]").count(), 1, "Close… stays on the row");
       assert.match(await row(p, "108").locator('td[data-label="Board and status"]').innerText(), /Board \w+[\s\S]*On board[\s\S]*No crew/, "the board, the state and the alerts share one cell");
-      assert.equal(await row(p, "108").locator("td.ml-status .hl-board").count(), 1, "the board is the chip Host uses");
+      assert.equal(await row(p, "108").locator("td.ml-status .lt-bd").count(), 1, "the board is the square tag");
       assert.equal(await p.locator("#missions-table th", { hasText: /^Alerts$/ }).count(), 0, "no separate Alerts column");
       // one day with nobody on it is amber and has no Close
-      assert.match(await alerts(M7), /No crew · 1 day\b/);
-      assert.equal(await row(p, M7).locator(".ml-alerts .ml-warn").count(), 1);
+      assert.match(await alerts(M7), /No crew, 1 day\b/);
+      assert.equal(await row(p, M7).locator(".lt-al-warn").count(), 1);
       assert.equal(await row(p, M7).locator(".ml-alerts button").count(), 0);
       // hidden on every one of its days
       assert.match(await row(p, "109").locator("td.ml-status").innerText(), /Hidden/);
-      assert.match(await alerts("109"), /Hidden · 8 days · Close\?/);
+      assert.match(await alerts("109"), /^Hidden 8 days$/);
       // off the board: it had days and has none on the latest working day
       assert.match(await row(p, "110").locator("td.ml-status").innerText(), /Off the board/);
-      assert.match(await alerts("110"), /Off the board · 6 days · Close\?/);
-      assert.equal(await row(p, "110").locator("button[data-act=add]").count(), 1, "Add to board is only offered off the board");
+      assert.match(await alerts("110"), /^Off 6 days$/);
+      assert.equal(await row(p, "110").locator("button.lt-act[data-act=add]").count(), 1, "Add to board is only offered off the board, as a text action");
       assert.equal(await row(p, "108").locator("button[data-act=add]").count(), 0, "not for a mission already on its board");
       // the average crew: (0 + 1 + 2) / 3 people a day on its three days
       assert.equal((await row(p, "112").locator(".ml-avg").innerText()).trim(), "1.0");
@@ -227,8 +232,8 @@ async function step(name, fn) {
       assert.equal(await row(p, "109").count(), 1);
       await p.locator("#missions-filters .ms[data-filter=placement] .ms-clear").click();
       await p.keyboard.press("Escape");
-      // the suggestion opens Close for that mission
-      await row(p, "108").locator(".ml-alerts button").click();
+      // Close… on the row opens the close dialog for that mission
+      await row(p, "108").locator("button[data-act=close]").click();
       await p.locator("#modal-close-mission:not(.hidden)").waitFor();
       assert.match(await p.locator("#close-mission-title").innerText(), /Close mission 108/);
       await p.evaluate(() => closeModal());
@@ -331,7 +336,9 @@ async function step(name, fn) {
       await p.locator("#form-mission").waitFor();
       assert.equal(await p.locator("#form-mission").isVisible(), true);
       assert.equal(await p.inputValue("#form-mission [name=number]"), M7);
-      assert.match(await p.locator("#mission-modal-title").innerText(), /Edit Mission/);
+      assert.equal((await p.locator("#mission-modal-title").innerText()).trim(), M7, "the form's title is the mission number, as on the Host and Employee forms");
+      assert.equal((await p.locator("#mission-modal-sub").innerText()).trim(), "Edit mission", "with Edit mission under it");
+      assert.equal(await p.locator("#mission-modal-sub").isVisible(), true);
       await p.click("#btn-mission-cancel");
       await p.locator("#mission-detail:not(.hidden)").waitFor();
       await p.click("#btn-md-edit");
@@ -390,11 +397,37 @@ async function step(name, fn) {
       assert.equal(await p.locator('#missions-filters .ms[data-filter="areaId"]').count(), 1);
       await p.evaluate(() => closeFilterPops());
       await p.keyboard.press("Escape");
+      // chips: the service area is one drawing on the three tabs and the mission panel; an empty cell is a muted dash
+      const e1Area = await p.evaluate(() => { const e = D().employees.find((x) => x.id === "e1"), was = e.areaId; e.areaId = "ar-t1"; return was; });
+      await p.evaluate(() => refreshAndRender());
+      // Missions: a row with no customer / responsible shows a dash, not a blank
+      await goMissions(p);
+      const dashes = await p.locator("#missions-body td .lt-empty").count();
+      assert.ok(dashes > 0, "an empty cell in the Missions table shows a muted dash");
+      assert.equal((await p.locator("#missions-body td .lt-empty").first().innerText()).trim(), "\u2014");
+      // the mission panel
+      await row(p, M7).locator("td").first().dblclick();
+      await p.locator("#mission-detail:not(.hidden)").waitFor();
+      const panelArea = p.locator("#mission-detail .lt-ar");
+      assert.equal(await panelArea.count(), 1, "the panel draws the service area with lt-ar");
+      assert.match(await panelArea.innerText(), /Area One/);
+      assert.equal(await p.locator("#mission-detail .lt-bd").count(), 1, "and the board as the square tag");
+      assert.equal(await p.locator("#mission-detail .area-pill, #mission-detail .ml-tag").count(), 0, "no solid pill left");
+      assert.equal(await p.locator("#mission-detail .lt-st").count(), 1, "the status is the pill with a dot");
+      await p.evaluate(() => closeModal());
+      // Host and Manpower tables draw it the same way
+      await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
+      assert.ok(await p.locator('#hostlist-body tr[data-host="Host Beta"] td.hl-area-cell .lt-ar').count() === 1, "Host table: lt-ar");
+      await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
+      assert.ok(await p.locator("#emplist-body td .lt-ar").count() > 0, "Manpower table: lt-ar");
+      assert.equal(await p.locator("#emplist-body .area-pill").count(), 0);
+      await goMissions(p);
       await p.evaluate(() => {
         D().areas = D().areas.filter((a) => !a.id.startsWith("ar-t"));
         for (const n of ["Host Beta", "Host Gamma"]) D().hosts.find((x) => x.name === n).areaId = null;
         return refreshAndRender();
       });
+      await p.evaluate((was) => { D().employees.find((x) => x.id === "e1").areaId = was; }, e1Area);
     });
 
     await step("the detail panel shows who last edited it, Duplicate, Move or copy, and who has worked on it", async () => {

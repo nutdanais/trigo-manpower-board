@@ -209,14 +209,14 @@ async function step(name, fn) {
       await p.evaluate((d) => { state.date = d; D().activeBoardId = EMPLIST_ID; return refreshAndRender(); }, SRC);
       const emp = await p.evaluate(() => {
         const th = document.querySelector("#emplist-table th[data-sort=name]");
-        const pill = document.querySelector("#emplist-table .area-pill");
-        return { tt: getComputedStyle(th).textTransform, top: getComputedStyle(th).position, key: getComputedStyle(pill, "::before").width, bg: getComputedStyle(pill).backgroundColor, ac: pill.style.getPropertyValue("--ac"), box: getComputedStyle(document.querySelector("#emplist-panel .table-wrap")).borderTopWidth };
+        const mark = document.querySelector("#emplist-table .lt-ar"), key = mark.querySelector("i");
+        return { tt: getComputedStyle(th).textTransform, top: getComputedStyle(th).position, key: getComputedStyle(key).width, bg: getComputedStyle(mark).backgroundColor, ac: key.style.backgroundColor, box: getComputedStyle(document.querySelector("#emplist-panel .table-wrap")).borderTopWidth };
       });
       assert.equal(emp.tt, "none");
       assert.equal(emp.top, "sticky");
-      assert.equal(emp.key, "10px");
+      assert.equal(emp.key, "9px");
       assert.equal(emp.bg, "rgba(0, 0, 0, 0)");
-      assert.ok(emp.ac, "the area colour is handed to CSS");
+      assert.ok(emp.ac, "the area's colour is the square beside the name");
       assert.equal(emp.box, "0px");
       await p.evaluate(() => { D().activeBoardId = HOSTLIST_ID; return refreshAndRender(); });
       const hidden = await p.evaluate(() => [...document.querySelectorAll("#hostlist-table th.col-off")].map((t) => t.textContent.trim()));

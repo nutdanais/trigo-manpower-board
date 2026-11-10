@@ -29,6 +29,15 @@
   --warn-surface: #fdf8ef;
   --warn-line: #e0c9a4;
   --danger-text: #a3271f;
+  /* List-tab chips (design/handover-list-tabs.md, section 3): the dots, greys and link line the lt-* chips use */
+  --ok-dot: #7fa32a;
+  --warn-dot: #d98a00;
+  --danger-dot: #d33a30;
+  --lt-off-text: #4b5563;
+  --lt-off-dot: #8b949e;
+  --lt-bd-text: #374151;
+  --lt-link-line: #9db4c8;
+  --lt-dash: #a3abb5;
 
   --bg-soft: #eef1f5;        /* subtle fills: inactive tabs, stat chips, zone labels */
   --hover-tint: #eef3fb;     /* hover highlight for menu/dropdown rows */
@@ -2653,7 +2662,7 @@ body.fp-pools-empty { --fp-w: 264px; }
 .ov-eng-hosts > span { font-size: 12px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
 .ov-eng-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ov-eng-facts > div { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; min-width: 0; }
-.ov-eng-facts span { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.ov-eng-facts > div > span { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .ov-eng-facts b { font-size: 17px; font-variant-numeric: tabular-nums; }
 /* the Leave view's calendar: a month grid per month, Monday first, weekends narrow */
 .ov-cal-wrap { overflow-x: auto; margin-top: 6px; }
@@ -3068,8 +3077,6 @@ body.exporting #app-root { margin-right: 0; }
 body.touch-mode .hl-edit { opacity: 1; }
 #missions-table tbody tr { cursor: default; }
 
-.hl-map { color: var(--primary-text); text-decoration: none; border-bottom: 1px dotted currentColor; }
-.hl-map:hover { border-bottom-style: solid; }
 /* the host's note: its own column, printed rather than hidden behind a hover
    marker — this board is read on tablets, where there is no hover at all */
 #hostlist-table td.hl-note-cell { max-width: 260px; }
@@ -3199,21 +3206,6 @@ body.touch-mode .hl-edit { opacity: 1; }
   white-space: nowrap;
 }
 .hl-insp b { font-size: 10.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
-/* Square-ish, tinted and navy-inked so a board reads differently from a
-   (pill-shaped, neutral) inspector chip at a glance. Both tokens flip with the
-   theme — pairing the tint with the fixed --card-ink used elsewhere would put
-   near-black text on a dark navy pill in dark mode. */
-.hl-board {
-  display: inline-block;
-  background: var(--pool-tint);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px 9px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--primary-text);
-  white-space: nowrap;
-}
 .hl-more {
   border: none;
   background: none;
@@ -5656,7 +5648,7 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
      narrow, instead of every cell holding one line and pushing the page wider than the header. */
   /* wide enough that they take two lines at most ("7 years 8 months / 4 days", "Assistant Site / Engineer") */
   #emplist-table td.el-wrap { white-space: normal; min-width: 8.6em; line-height: 1.3; }
-  #emplist-table td.el-svc { min-width: 9.8em; }   /* "7 years" kept together: serviceCellHtml in app.js */
+  #emplist-table td.el-svc { white-space: nowrap; }   /* "7y 8m": serviceShortHtml in app.js */
   #emplist-table td.el-svc .el-nw { white-space: nowrap; }
   /* someone lent out: "LCB Port → Rayong", and "until Mon 30 Nov 2026" under it, so one loan doesn't
      widen the column for everyone */
@@ -5668,14 +5660,6 @@ body.board-view:not(.exporting) #status-zones .zone-leave.lz-on .zone-empty-hint
      its top, since a box that scrolls can't hold them under the page's top bar */
   :is(#emplist-panel, #hostlist-panel, #missions-panel) .table-wrap.tw-scroll { overflow-x: auto; }
   :is(#emplist-panel, #hostlist-panel, #missions-panel) .table-wrap.tw-scroll :is(#emplist-table, #hostlist-table, #missions-table) th { position: static; }
-  :is(#emplist-table, #hostlist-table, #missions-table) .area-pill {
-    background: transparent !important; color: var(--text) !important; padding: 0; font-weight: 550; letter-spacing: 0; font-size: 13.5px;
-    display: inline-flex; align-items: center; gap: 7px; box-shadow: none; border-radius: 0; border: 0;
-  }
-  :is(#emplist-table, #hostlist-table, #missions-table) .area-pill::before {
-    content: ""; width: 10px; height: 10px; border-radius: 4px; flex: none; display: inline-block;
-    background: var(--ac, #999); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14);
-  }
   :is(#emplist-table, #hostlist-table, #missions-table) .toggle-track { width: 30px; height: 18px; border-radius: 9px; }
   :is(#emplist-table, #hostlist-table, #missions-table) .toggle-thumb { width: 14px; height: 14px; top: 2px; left: 2px; }
   :is(#emplist-table, #hostlist-table, #missions-table) .toggle input:checked + .toggle-track .toggle-thumb { left: 14px; }
@@ -7370,17 +7354,6 @@ label > .pk { margin-top: 5px; }
 .ml-actions { white-space: nowrap; text-align: right; }
 .ml-actions .btn + .btn { margin-left: 6px; }
 .ml-tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; line-height: 1.5; }
-.ml-tag.ml-open { background: var(--ok-surface); color: var(--ok-text); border: 1px solid var(--ok-line); }
-.ml-tag.ml-wait { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
-.ml-tag.ml-late { background: var(--danger-tint); color: var(--danger-text); border: 1px solid var(--danger-line); }
-.ml-tag.ml-closed { background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border); }
-.ml-tag.ml-hidden { background: var(--bg-soft); color: var(--muted); border: 1px dashed var(--border); }
-.ml-tag.ml-warn, .ml-tag.ml-off { background: var(--warn-tint); color: var(--warn-text); border: 1px solid var(--warn-line); }
-/* an alert that offers Close… is a button: the same pill, with a pointer */
-.ml-pill-btn { font-family: inherit; cursor: pointer; transition: filter .15s ease, transform .1s ease; }
-.ml-pill-btn:hover { filter: brightness(.95); }
-.ml-pill-btn:active { transform: translateY(1px); }
-.ml-pill-btn:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
 /* Status and alerts share one cell as small chips: the state first, then what needs a look */
 td.ml-status { min-width: 132px; }
 .ml-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
@@ -7398,8 +7371,7 @@ td.ml-crew .ml-zero { color: var(--warn-text); font-weight: 600; }
 td.ml-crew .ml-muted { color: var(--muted); font-size: 12.5px; }
 .ml-th-date { font-weight: 400; opacity: .8; }
 /* the host name opens its row in the Host tab */
-.ml-host-link { padding: 0; border: 0; border-bottom: 1px dotted currentColor; background: none; color: var(--primary-text); font: inherit; text-align: left; cursor: pointer; }
-.ml-host-link:hover { border-bottom-style: solid; }
+.ml-host-link { padding: 0; border: 0; background: none; font: inherit; text-align: left; }
 .ml-host-link:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 2px; }
 @media (min-width: 641px) {
   /* quiet row actions, like the Host rows' edit button: text, with a tint on hover */
@@ -7561,8 +7533,6 @@ body.presenting-board.pres-hide-names .emp-name::before { content: "•••"; 
 .md-facts .wide { grid-column: 1 / -1; }
 @media (max-width: 640px) { .md-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .md-facts b { font-size: 13.5px; } }
 /* a pill or a tag inside a fact keeps its own width (the facts grid makes every span a block) */
-.md-facts b span, .md-facts b .ml-tag, .md-facts b .area-pill { display: inline-block; }
-.md-facts .ml-tag { font-size: 12px; }
 .md-crew { display: flex; flex-wrap: wrap; gap: 6px; }
 .md-bars { display: flex; align-items: flex-end; gap: 3px; height: 88px; border-bottom: 1px solid var(--border); }
 .md-bar { flex: 1 1 0; min-width: 4px; height: max(var(--h), 3px); border-radius: 2px 2px 0 0; background: var(--stat-asg); }
@@ -7584,7 +7554,6 @@ body.presenting-board.pres-hide-names .emp-name::before { content: "•••"; 
 
 /* Board and status in one cell: the board's chip (the one Host uses), the state and what needs a look under it */
 td.ml-status .ml-board-line { display: block; }
-td.ml-status .hl-board { padding: 0 8px; line-height: 1.6; }
 td.ml-status { min-width: 150px; max-width: 280px; }
 /* row actions stay out of sight until the row is hovered or focused; a touch screen and a phone always show them */
 @media (min-width: 641px) and (hover: hover) {
@@ -7616,3 +7585,41 @@ td.ml-status { min-width: 150px; max-width: 280px; }
 }
 .ml-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 @media (max-width: 640px) { .ml-stack { align-items: flex-end; } }
+
+/* ===== List-tab chips: Manpower, Host and Missions (design/handover-list-tabs.md, section 3) =====
+   Five meanings, five shapes, and a shape never carries a second meaning:
+   status = pill with a dot (lt-st), alert = warning icon + coloured bold text, no pill (lt-al),
+   category = square neutral board tag (lt-bd) or a colour square + plain text for the service area (lt-ar),
+   person = square neutral chip, in panels only (lt-pc), action = navy bold text (lt-act). */
+.lt-st { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.lt-st i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.lt-st-ok { background: var(--ok-surface); color: var(--ok-text); border-color: var(--ok-line); }
+.lt-st-ok i { background: var(--ok-dot); }
+.lt-st-off { background: var(--bg-soft); color: var(--lt-off-text); border-color: var(--border); }
+.lt-st-off i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--lt-off-dot); }
+.lt-st-warn { background: var(--warn-surface); color: var(--warn-text); border-color: var(--warn-line); }
+.lt-st-warn i { background: var(--warn-dot); }
+.lt-st-bad { background: var(--danger-tint); color: var(--danger-text); border-color: var(--danger-line); }
+.lt-st-bad i { background: var(--danger-dot); }
+.lt-al { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; white-space: nowrap; max-width: 100%; }
+.lt-al .ic { width: 14px; height: 14px; flex: none; }
+.lt-al-warn { color: var(--warn-text); }
+.lt-al-bad { color: var(--danger-text); }
+.lt-al-info { color: var(--muted); }
+.lt-more { color: var(--muted); font-size: 12px; font-weight: 600; margin-left: 4px; }
+.lt-ar { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-weight: 400; }
+.lt-ar i { width: 9px; height: 9px; border-radius: 3px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
+.lt-bd { display: inline-block; padding: 0 7px; height: 20px; line-height: 19px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; font-weight: 500; color: var(--lt-bd-text); background: var(--panel); white-space: nowrap; vertical-align: middle; }
+.lt-pc { display: inline-flex; gap: 6px; align-items: baseline; padding: 1px 8px; border-radius: 4px; background: var(--bg-soft); font-size: 12.5px; white-space: nowrap; }
+.lt-pc small { color: var(--muted); font-size: 11px; }
+.lt-pc.lt-exp { box-shadow: inset 0 0 0 1.5px var(--primary-text); background: var(--panel); }
+.lt-act { color: var(--primary-text); font: inherit; font-weight: 600; font-size: 12.5px; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+.lt-act:hover { text-decoration: underline; text-underline-offset: 3px; }
+.lt-act:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 2px; }
+/* hosts and locations: one link style, navy with a thin solid underline */
+.lt-link, .hl-map, .ml-host-link { color: var(--primary-text); text-decoration: underline; text-decoration-color: var(--lt-link-line); text-decoration-thickness: 1px; text-underline-offset: 3px; border-bottom: 0; cursor: pointer; }
+.lt-link:hover, .hl-map:hover, .ml-host-link:hover { text-decoration-color: currentColor; }
+/* an empty value: a muted dash, in every cell of the three tables and every field of their panels */
+.lt-empty { color: var(--lt-dash); }
+/* inside a profile or mission fact tile, the service area takes the tile's weight like its neighbours */
+.ov-eng-facts b .lt-ar { font-weight: inherit; }

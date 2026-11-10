@@ -2372,13 +2372,6 @@ function cardNamesSaved() {   // also called while `state` is built, so the key 
   try { const v = localStorage.getItem("manpower.cardNames"); return v === "en" ? v : "th"; } catch (e) { return "th"; }
 }
 
-/* the Manpower List's Years of service: each "7 years" stays on one line, so a cell that has to wrap reads
-   "7 years 8 months / 4 days" (the spaces stay plain, for copying and for tools) */
-function serviceCellHtml(text) {
-  if (!text) return "\u2014";
-  return text.split(/ (?=\d)/).map(part => `<span class="el-nw">${escapeHtml(part)}</span>`).join(" ");
-}
-
 /* the Manpower List's board cell: "→ Rayong until Fri 24 Oct" while someone is
    lent out on the date on screen (their own board stays in front of it) */
 function loanCellHtml(e) {
@@ -3690,9 +3683,45 @@ function wireAreaFilterChips(barEl, filters, redraw, multi = false) {
     redraw();
   };
 }
-/* the board's name as the one chip Host, Missions and Manpower share */
+/* ---------- the chip shapes of the Manpower, Host and Missions tabs ----------
+   Five meanings, five shapes (design/handover-list-tabs.md, section 3; CSS under "List-tab chips"):
+   a status is a pill with a dot (statusPillHtml), an alert is a warning icon with coloured text and no pill
+   (alertHtml), a category is the square board tag (boardChipHtml) or a colour square with plain text for the
+   service area (areaMarkHtml), and an action is navy text (class lt-act). */
+/* an empty value in a cell or a field of the panels: one muted dash */
+function emptyCell(title) {
+  return `<span class="lt-empty"${title ? ` title="${escapeHtml(title)}"` : ""}>\u2014</span>`;
+}
+/* kind: ok (green, live), off (grey, parked), warn (amber, drifting), bad (red, ended) */
+function statusPillHtml(kind, text, title) {
+  return `<span class="lt-st lt-st-${kind}"${title ? ` title="${escapeHtml(title)}"` : ""}><i></i>${escapeHtml(text)}</span>`;
+}
+/* level: 2 red, 1 amber, 0 grey (information); the long sentence is the tooltip; more: how many others the row has */
+function alertHtml(level, text, title, more = 0) {
+  const cls = level >= 2 ? "lt-al-bad" : level === 1 ? "lt-al-warn" : "lt-al-info";
+  return `<span class="lt-al ${cls}"${title ? ` title="${escapeHtml(title)}"` : ""}>${icon(level === 0 ? "info" : "alert")}<span>${escapeHtml(text)}</span></span>`
+    + (more > 0 ? `<span class="lt-more"${title ? ` title="${escapeHtml(title)}"` : ""}>+${more}</span>` : "");
+}
+/* the service area: its colour as a small square, then its name in plain text */
+function areaMarkHtml(area) {
+  if (!area) return "";
+  return `<span class="lt-ar"><i style="background:${escapeHtml(area.color)}"></i>${escapeHtml(area.name)}</span>`;
+}
+/* Years of service in a table: "7y 8m" (days dropped), or "26d" under a month; the whole length is its tooltip.
+   Each part is its own text node so the Thai pattern turns it into "7 ปี 8 ด." */
+function serviceShortHtml(startIso, todayIso) {
+  const p = ManpowerXlsx.serviceParts(startIso, todayIso);
+  if (!p) return emptyCell();
+  const parts = [];
+  if (p.years) parts.push(`${p.years}y`);
+  if (p.months) parts.push(`${p.months}m`);
+  if (!parts.length) parts.push(`${p.days}d`);
+  return `<span title="${escapeHtml(ManpowerXlsx.serviceLength(startIso, todayIso))}">`
+    + parts.map(x => `<span class="el-nw">${x}</span>`).join(" ") + `</span>`;
+}
+/* the board's name as the one chip Manpower, Host and Missions share: a square neutral tag */
 function boardChipHtml(name, title) {
-  return `<span class="hl-board"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(name)}</span>`;
+  return `<span class="lt-bd"${title ? ` title="${escapeHtml(title)}"` : ""}><span data-no-i18n>${escapeHtml(name)}</span></span>`;   // the name is data; the tooltip is translated
 }
 
 /* Phone header (styles.css, Phone header): the same numbers as the tiles above,
@@ -6520,16 +6549,16 @@ function profileDetails(e, ctx) {
     const grid = document.createElement("div");
     grid.className = "ov-eng-facts ov-prof-id";
     grid.innerHTML = [
-      fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : "—"),
+      fact("TRIGO ID", e.trigoId ? sc(e.trigoId) : emptyCell()),
       fact("Contract", e.contract === "oncall" ? "On-call" : "Permanent"),
-      fact("Position", pos ? pos.label : "—"),
-      fact("Service area", area ? sc(area.name) : "—"),
-      fact("Board", (board ? sc(board.name) : "—") + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
-      fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : "—"),
+      fact("Position", pos ? pos.label : emptyCell()),
+      fact("Service area", area ? areaMarkHtml(area) : emptyCell()),
+      fact("Board", (board ? boardChipHtml(board.name) : emptyCell()) + (loanNow ? ` <small class="ov-muted">→ ${sc(loanTo)} <span>until ${escapeHtml(fmtDayMon(loanNow.endDate))}</span></small>` : "")),
+      fact("Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small class="ov-muted">${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : emptyCell()),
       fact("Status", e.active === false ? `<span>${EMP_STATUS_LABEL[empStatus(e)]}</span>${e.deactivatedOn ? ` <small class="ov-muted"><span>since ${escapeHtml(fmtDate(e.deactivatedOn))}</span></small>` : ""}` : "Active"),
-      fact("English name", e.nameEn ? sc(e.nameEn) : "—"),
-      fact("Mobile number", e.phone ? telLink(e.phone) : "—"),
-      fact("On the board from", e.addedOn ? escapeHtml(fmtDate(e.addedOn)) : "—"),
+      fact("English name", e.nameEn ? sc(e.nameEn) : emptyCell()),
+      fact("Mobile number", e.phone ? telLink(e.phone) : emptyCell()),
+      fact("On the board from", e.addedOn ? escapeHtml(fmtDate(e.addedOn)) : emptyCell()),
     ].join("");
     box.appendChild(grid);
   }
@@ -8220,7 +8249,7 @@ function renderEmployeeRows() {
     // what an alert pill counts as missing gets a "+ Add …" button in its own
     // column (as Host does for a location), for active people a user may edit
     const fixable = isActive && can("emplist", "edit");
-    const add = (field, what) => fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="${field}" title="Add ${what}">+ Add</button>` : "—";
+    const add = (field, what) => fixable ? `<button type="button" class="hl-add-loc el-fix" data-fix="${field}" title="Add ${what}">+ Add</button>` : emptyCell();
     const tr = document.createElement("tr");
     tr.dataset.empId = e.id;
     if (state.selectedEmps.has(e.id)) tr.classList.add("selected");
@@ -8236,8 +8265,8 @@ function renderEmployeeRows() {
       <td data-label="Position" class="m-x el-wrap">${pos ? pos.label : add("position", "position")}</td>
       <td data-label="Mobile number">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
       <td data-label="Start date" class="m-x">${e.startDate ? fmtDate(e.startDate) : add("startDate", "start date")}</td>
-      <td data-label="Years of service" class="m-x el-wrap el-svc">${e.startDate ? serviceCellHtml(ManpowerXlsx.serviceLength(e.startDate, todayStr())) : "—"}</td>
-      <td data-label="Service area">${area ? `<span class="area-pill" style="background:${escapeHtml(area.color)};color:${inkOn(area.color)}">${escapeHtml(area.name)}</span>` : add("areaId", "service area")}</td>
+      <td data-label="Years of service" class="m-x el-svc">${e.startDate ? serviceShortHtml(e.startDate, todayStr()) : emptyCell()}</td>
+      <td data-label="Service area">${area ? areaMarkHtml(area) : add("areaId", "service area")}</td>
       <td data-label="Current board" class="el-board">${board ? boardChipHtml(board.name) + loanCellHtml(e) : add("boardId", "current board")}</td>
       <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" class="el-util">${utilCell(util)}</td>${emplistShowsWl() ? emplistWlCells(e) : ""}
       <td data-label="Status" class="el-status">
@@ -8292,9 +8321,8 @@ function renderEmployeeRows() {
 }
 
 /* The Manpower and Host tables read quietly: a column in which every row is empty (or "—")
-   is left out, and a lone "—" is drawn blank, so what is on screen is only what carries
-   information. Each table's service-area pill also hands its colour to CSS as --ac, which
-   draws it as a small colour key beside plain text. Re-run after every row render; the
+   is left out, so what is on screen is only what carries information. (A cell's own empty value is
+   the muted dash of emptyCell().) Re-run after every row render; the
    header cells are static, so their marks are reset first. */
 /* empty for this purpose: nothing but a "none" marker ("+ Add" buttons count as content) */
 function quietCellEmpty(td) {
@@ -8312,7 +8340,6 @@ function quietTable(sel) {
       td.classList.remove("col-off");
       td.classList.toggle("q-dash", !td.children.length && td.textContent.trim() === "\u2014");   // drawn blank, still there for tools and tests
     }
-    for (const pill of r.querySelectorAll(".area-pill")) pill.style.setProperty("--ac", pill.style.backgroundColor || "#999");
   }
   if (rows.length) ths.forEach((th, i) => {
     if (th.classList.contains("el-check") || th.hasAttribute("data-keep")) return;
@@ -8729,7 +8756,7 @@ function hostNoteCell(r) {
 
 function hostInspectorCell(r) {
   if (!state.hostlist.dir) return `<span class="hl-empty">…</span>`;
-  if (!r.inspectors.length) return `<span class="hl-empty">No one deployed yet</span>`;
+  if (!r.inspectors.length) return emptyCell("No one deployed yet");
   const expanded = state.hostlist.expanded.has(r.name);
   const shown = expanded ? r.inspectors : r.inspectors.slice(0, HOSTLIST_INSPECTOR_CAP);
   const chips = shown.map(i =>
@@ -8746,10 +8773,9 @@ function hostInspectorCell(r) {
 
 function hostBoardCell(r) {
   if (!state.hostlist.dir) return `<span class="hl-empty">…</span>`;
-  if (!r.boards.length) return `<span class="hl-empty">Not on a board yet</span>`;
+  if (!r.boards.length) return emptyCell("Not on a board yet");
   return `<span class="hl-chips">` + r.boards.map(b =>
-    `<span class="hl-board" title="${escapeHtml(b.name)} — ${b.missions} mission${b.missions === 1 ? "" : "s"} for this host">`
-    + `${escapeHtml(b.name)}</span>`).join("") + `</span>`;
+    boardChipHtml(b.name, `${b.name} — ${b.missions} mission${b.missions === 1 ? "" : "s"} for this host`)).join("") + `</span>`;
 }
 
 /* The Missions tab's Host link lands here: the host's row is marked and scrolled to the middle once, and
@@ -8810,7 +8836,7 @@ function renderHostRows() {
       </td>
       <td data-label="Location" class="hl-loc-cell">${hostLocationCell(r)}</td>
       <td data-label="Service area" class="hl-area-cell">${r.area
-        ? areaPillHtml(r.area, "area-pill")
+        ? areaMarkHtml(r.area)
         : `<button type="button" class="hl-add-loc hl-add-area" title="Set service area">+ Add</button>`}</td>
       <td data-label="Note" class="hl-note-cell m-x">${hostNoteCell(r)}</td>
       <td data-label="Inspectors deployed" class="hl-insp-cell">${hostInspectorCell(r)}</td>
@@ -8864,10 +8890,9 @@ function renderHostRows() {
     body.appendChild(tr);
   }
   showFocusedHost(body);
-  const noLoc = rows.filter(r => !r.location && !r.mapUrl).length;
   const archived = rows.filter(r => r.archived).length;
+  // the amber chip beside the tiles counts the hosts without a location; the count does not say it twice
   $("#hostlist-count").textContent = `${rows.length} of ${all.length}`
-    + (noLoc ? ` · ${noLoc} without a location` : "")
     + (archived ? ` · ${archived} archived` : "");
   // the duplicate banner counts across the whole list, not the filtered view —
   // it's what tells you there is cleaning up to do in the first place
@@ -9066,31 +9091,32 @@ function missionPlacement(r) {
   return { kind: r.lastOn ? "off" : "notstarted", a };
 }
 const MISSION_PLACEMENT_RANK = { on: 0, hidden: 1, off: 2, notstarted: 3, closed: 4 };
-/* the pills in the Alerts column, worst first: { kinds (what the Alerts filter matches), level
-   (2 red, 1 amber, 0 grey), text, title, close (offers Close…) } */
+/* what needs a look on a mission, worst first: { kinds (what the Alerts filter matches), level
+   (2 red, 1 amber, 0 grey), text (short, for the second line of a cell), title (the whole sentence), close }.
+   The text states the problem only; it never asks a question or offers an action. */
 function missionAlerts(r, p) {
   if (r.status === "closed") return [];
   const out = [];
   const today = todayStr(), a = p.a, limit = MissionActivity.NO_CREW_ALERT_AFTER;
-  const days = (n, capped) => `${n}${capped ? "+" : ""} ${n === 1 && !capped ? "day" : "days"}`;
+  const days = (n, capped) => `${n}${capped ? "+" : ""} ${n === 1 && !capped ? "day" : "days"}`;   // "3 days", "25+ days"
   const count = (n, capped) => `${n}${capped ? "+" : ""}`;
   if (p.kind === "on" && a && a.noCrewDays > 0) {
     const long = a.noCrewDays > limit, d = days(a.noCrewDays, a.noCrewCapped), n = count(a.noCrewDays, a.noCrewCapped);
     out.push({
-      kinds: long ? ["noCrew", "noCrewLong"] : ["noCrew"], level: long ? 2 : 1, close: long, text: `No crew · ${d}`,
+      kinds: long ? ["noCrew", "noCrewLong"] : ["noCrew"], level: long ? 2 : 1, close: long, text: `No crew, ${d}`,
       title: long ? `Nobody has been on ${r.number} for more than 5 working days in a row (${n}). If the job has ended, close it.`
         : `Nobody is on ${r.number}. Working days in a row: ${n}.`,
     });
   }
   if (p.kind === "hidden" && a && a.hiddenDays > limit) {
     const d = days(a.hiddenDays, a.hiddenCapped), n = count(a.hiddenDays, a.hiddenCapped);
-    out.push({ kinds: ["hidden"], level: 1, close: true, text: `Hidden · ${d}`,
+    out.push({ kinds: ["hidden"], level: 1, close: true, text: `Hidden ${d}`,
       title: `${r.number} has been hidden on its board for more than 5 working days in a row (${n}). If the job has ended, close it; otherwise unhide it from the board's Hide/Unhide.` });
   }
   if (p.kind === "off" && r.lastOn) {
     const gap = MissionActivity.workingDaysBetween(r.lastOn, today, (d) => isNonWorkingDate(d, r.boardId));
     if (gap > limit) {
-      out.push({ kinds: ["offBoard"], level: 1, close: true, text: `Off the board · ${gap} days`,
+      out.push({ kinds: ["offBoard"], level: 1, close: true, text: `Off ${gap} days`,
         title: `${r.number} was last on the board on ${fmtDate(r.lastOn)}. Close it if the job has ended, or add it back with Add to board.` });
     }
   }
@@ -9098,10 +9124,10 @@ function missionAlerts(r, p) {
     const year = today.slice(0, 4), d = MissionNumber.daysWaiting(today);
     const late = d > MissionNumber.ALERT_AFTER_DAYS;
     out.push({ kinds: ["number"], level: late ? 2 : 0, close: false,
-      text: late ? `No ${year} number · ${d} days` : `Waiting for ${year} number`,
+      text: `Needs ${year} number`,
       title: late ? `Still on last year's number after ${d} days` : "The board keeps running on last year's number until the new one is entered" });
   }
-  if (!r.engineerId) out.push({ kinds: ["noEngineer"], level: 1, close: false, text: "No Trigo responsible", title: "Nobody is named as this mission's Trigo responsible" });
+  if (!r.engineerId) out.push({ kinds: ["noEngineer"], level: 1, close: false, text: "No responsible", title: "Nobody is named as this mission's Trigo responsible" });
   return out.sort((x, y) => y.level - x.level);
 }
 /* everything the table, its sort and its filters ask about one row */
@@ -9113,18 +9139,18 @@ function missionInfo(r) {
 /* a long text (PPE, remark) keeps to two lines in the table; the whole text is its tooltip */
 function missionTextCell(text) {
   const t = missionText(text);
-  return t ? `<span class="ml-clamp" title="${escapeHtml(t)}">${escapeHtml(t)}</span>` : "—";
+  return t ? `<span class="ml-clamp" title="${escapeHtml(t)}">${escapeHtml(t)}</span>` : emptyCell();
 }
 function missionStatusHtml(r, p = missionPlacement(r)) {
   if (p.kind === "closed") {
     const t = `Closed${r.closedBy ? " by " + r.closedBy : ""}${r.closeNote ? ": " + r.closeNote : ""}`;
-    return `<span class="ml-tag ml-closed" title="${escapeHtml(t)}">Closed ${escapeHtml(r.closedOn ? fmtDate(r.closedOn) : "")}</span>`;
+    return statusPillHtml("off", `Closed ${r.closedOn ? fmtDate(r.closedOn) : ""}`.trim(), t);
   }
   const board = boardNameOf(r.boardId);
-  if (p.kind === "on") return `<span class="ml-tag ml-open" title="${escapeHtml(`On the ${board} board today`)}">On board</span>`;
-  if (p.kind === "hidden") return `<span class="ml-tag ml-hidden" title="${escapeHtml(`Open, but hidden on the ${board} board`)}">Hidden</span>`;
-  if (p.kind === "off") return `<span class="ml-tag ml-off" title="${escapeHtml(`It was on the ${board} board until ${r.lastOn ? fmtDate(r.lastOn) : "earlier"} and is not there now`)}">Off the board</span>`;
-  return `<span class="ml-tag ml-wait" title="${escapeHtml(p.startsOn ? `It starts on ${fmtDate(p.startsOn)}` : "Registered, with no day on a board yet")}">Not started</span>`;
+  if (p.kind === "on") return statusPillHtml("ok", "On board", `On the ${board} board today`);
+  if (p.kind === "hidden") return statusPillHtml("off", "Hidden", `Open, but hidden on the ${board} board`);
+  if (p.kind === "off") return statusPillHtml("warn", "Off the board", `It was on the ${board} board until ${r.lastOn ? fmtDate(r.lastOn) : "earlier"} and is not there now`);
+  return statusPillHtml("off", "Not started", p.startsOn ? `It starts on ${fmtDate(p.startsOn)}` : "Registered, with no day on a board yet");
 }
 /* the gold highlight a mission has on the board on the day on screen (the card's Highlight), as a chip; what was
    typed for "Other" is data and is not translated */
@@ -9134,12 +9160,13 @@ function missionHighlightChip(day) {
   const typed = day.highlight === "other" && day.note;
   return `<span class="ml-tag ml-hl" title="${escapeHtml(window.I18N ? I18N.t("Highlighted on the board") : "Highlighted on the board")}">${icon("star")}<span${typed ? " data-no-i18n" : ""}>${escapeHtml(label)}</span></span>`;
 }
-function missionAlertsHtml(r, info, canClose) {
-  return info.alerts.map((x) => {
-    const cls = `ml-tag ${x.level === 2 ? "ml-late" : x.level === 1 ? "ml-warn" : "ml-wait"}`;
-    if (x.close && canClose) return `<button type="button" class="${cls} ml-pill-btn" data-act="suggest-close" title="${escapeHtml(x.title)}">${escapeHtml(x.text)} · Close?</button>`;
-    return `<span class="${cls}" title="${escapeHtml(x.title)}">${escapeHtml(x.text)}</span>`;
-  }).join("");
+/* the worst alert as an icon and a short text (not a pill, not a button: Close… is the row's hover action and its
+   ⋯ menu), then a muted +N when the row has more; the tooltip lists every one, a line each */
+function missionAlertsHtml(r, info) {
+  const al = info.alerts;
+  if (!al.length) return "";
+  const tip = al.map(x => x.title).join("\n");
+  return alertHtml(al[0].level, al[0].text, tip, al.length - 1);
 }
 /* The Filters button on the Missions tab (the same pattern as Host's): Shift, Trigo responsible,
    Customer, Host and "On the board". The Board picker and Open / Closed / All stay beside the
@@ -9351,28 +9378,28 @@ function renderMissionList() {
     acts.push(`<button type="button" class="btn btn-small ml-hov ml-more" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`);
     // Add to board sits on the state it fixes: a mission that is not on its board (registered with no day, or off it)
     const addBtn = r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")
-      ? `<button type="button" class="ml-tag ml-wait ml-pill-btn" data-act="add" title="Put this mission on a day of its board">Add to board</button>` : "";
+      ? `<button type="button" class="lt-act" data-act="add" title="Put this mission on a day of its board">Add to board</button>` : "";
     const host = r.host ? (canHost
       ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Show this host in the Host tab") : "Show this host in the Host tab")}">${escapeHtml(r.host)}</button>`
-      : escapeHtml(r.host)) : "—";
-    const avg = info.avg == null || r.status === "closed" ? "—"
+      : escapeHtml(r.host)) : emptyCell();
+    const avg = info.avg == null || r.status === "closed" ? emptyCell()
       : `<span title="${escapeHtml(`Average number of people on it each working day over the last 4 weeks (${info.p.a.avgDays} days)`)}">${info.avg.toFixed(1)}</span>`;
     // the crew on the day on screen, from the mission's own board
     const dayTitle = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);
-    const crew = r.status === "closed" ? "—" : !info.day ? `<span title="${dayTitle("Not on its board that day")}">—</span>`
+    const crew = r.status === "closed" ? emptyCell() : !info.day ? emptyCell("Not on its board that day")
       : info.day.hidden ? `<span class="ml-muted" title="${dayTitle("Hidden on its board that day")}">${dayTitle("Hidden")}</span>`
       : info.day.crew ? `<b>${info.day.crew}</b>` : `<span class="ml-zero" title="${dayTitle("Nobody is on it that day")}">0</span>`;
     // data-label: the phone shows each row as a card with these as its field names
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}">
       <td class="ml-first mcol-number"><b class="ml-num">${escapeHtml(r.number)}</b>${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
-      <td data-label="${lbl("Board and status")}" class="ml-status mcol-status"><span class="ml-stack"><span class="ml-board-line">${boardChipHtml(boardNameOf(r.boardId))}</span><span class="ml-chips">${missionStatusHtml(r, info.p)}${addBtn}${r.status === "closed" ? "" : missionHighlightChip(info.day)}<span class="ml-alerts">${missionAlertsHtml(r, info, canClose)}</span></span></span></td>
+      <td data-label="${lbl("Board and status")}" class="ml-status mcol-status"><span class="ml-stack"><span class="ml-board-line">${boardChipHtml(boardNameOf(r.boardId))}</span><span class="ml-chips">${missionStatusHtml(r, info.p)}${addBtn}${r.status === "closed" ? "" : missionHighlightChip(info.day)}<span class="ml-alerts">${missionAlertsHtml(r, info)}</span></span></span></td>
       <td data-label="${lbl("Shift")}" class="mcol-shift">${r.shift === "night" ? `<span class="ml-night">${icon("moon")}Night</span>` : "Day"}</td>
-      <td data-label="${lbl("Time")}" class="ml-time mcol-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : "—"}</td>
-      <td data-label="${lbl("Customer")}" class="mcol-customer">${escapeHtml(r.customer || "—")}</td>
+      <td data-label="${lbl("Time")}" class="ml-time mcol-time">${r.startTime && r.endTime ? `${escapeHtml(r.startTime)}–${escapeHtml(r.endTime)}` : emptyCell()}</td>
+      <td data-label="${lbl("Customer")}" class="mcol-customer">${r.customer ? escapeHtml(r.customer) : emptyCell()}</td>
       <td data-label="${lbl("Host")}" class="ml-host-cell mcol-host">${host}</td>
-      <td data-label="${lbl("Trigo responsible")}" class="mcol-engineer">${escapeHtml(r.engineerId ? engineerLabelFor(r.engineerId) : "—")}</td>
-      <td data-label="${lbl("Start date")}" class="ml-date mcol-openedOn">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : "—"}</td>
-      <td data-label="${lbl("Last on board")}" class="ml-date mcol-lastOn">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : "—"}</td>
+      <td data-label="${lbl("Trigo responsible")}" class="mcol-engineer">${r.engineerId ? escapeHtml(engineerLabelFor(r.engineerId)) : emptyCell()}</td>
+      <td data-label="${lbl("Start date")}" class="ml-date mcol-openedOn">${r.openedOn ? escapeHtml(fmtDate(r.openedOn)) : emptyCell()}</td>
+      <td data-label="${lbl("Last on board")}" class="ml-date mcol-lastOn">${r.lastOn ? escapeHtml(fmtDate(r.lastOn)) : emptyCell()}</td>
       <td data-label="${lbl("Crew")}" class="ml-crew num mcol-crew">${crew}</td>
       <td data-label="${lbl("Avg crew / week")}" class="ml-avg num mcol-avgCrew">${avg}</td>
       <td data-label="${lbl("PPE")}" class="ml-text mcol-ppe">${missionTextCell(r.ppe)}</td>
@@ -10996,10 +11023,8 @@ function openMissionModal(missionId, opts = {}) {
   state.editingMissionId = missionId || null;
   renderMissionHostOptions();
   renderMissionEngineerOptions();
-  $("#mission-modal-title").textContent = missionId ? "Edit Mission" : "New Mission";
   $("#btn-delete-mission").classList.toggle("hidden", !missionId);
   $("#btn-hide-mission").classList.toggle("hidden", !missionId || isForecastView());
-  $("#mission-modal-title").textContent = (missionId ? "Edit" : "New") + (isForecastView() ? " Forecast Mission" : " Mission");
   const src = missionId ? getPlan().missions.find(x => x.id === missionId) : opts.from;
   fillMissionForm(src, missionId, opts);
   const isHidden = !!(missionId && src && src.hidden);
@@ -11022,6 +11047,8 @@ function openMissionModal(missionId, opts = {}) {
   const detailView = !!missionId && !opts.edit && !isForecastView();
   mdState = { fromDetail: detailView };
   setMissionView(detailView ? "detail" : "form");
+  if (!detailView) setMissionFormTitle(missionId && src ? src.number : "");
+  else if (src) $("#mission-modal-title").textContent = src.number;
   openModal("#modal-mission");
   if (detailView) renderMissionDetail();
 }
@@ -11031,6 +11058,20 @@ function openMissionModal(missionId, opts = {}) {
    needs a look, how it has been staffed and who is on it that day. Hide and Close mission sit in the
    Details header; Edit details swaps the form in, and Save or Cancel come back here. */
 let mdState = { fromDetail: false };
+/* the form's title, as the Host and Employee forms have it: the mission's number, with "Edit mission" under it;
+   a new mission has no number yet, so it is "New Mission" alone */
+function setMissionFormTitle(number) {
+  const sub = $("#mission-modal-sub");
+  const kind = isForecastView() ? "forecast mission" : "mission";
+  if (number) {
+    $("#mission-modal-title").textContent = number;
+    sub.textContent = `Edit ${kind}`;
+    sub.classList.remove("hidden");
+  } else {
+    $("#mission-modal-title").textContent = isForecastView() ? "New Forecast Mission" : "New Mission";
+    sub.classList.add("hidden");
+  }
+}
 function setMissionView(view) {
   const detail = view === "detail";
   $("#mission-detail").classList.toggle("hidden", !detail);
@@ -11064,7 +11105,7 @@ function editMissionDetails() {
   if (!m) return;
   fillMissionForm(m, m.id);
   setMissionView("form");
-  $("#mission-modal-title").textContent = "Edit Mission";
+  setMissionFormTitle(m.number);
   $("#form-mission").number.focus();
 }
 const MISSION_PEOPLE_CAP = 12;   // names shown before "+N more", as on the Host tab
@@ -11127,29 +11168,29 @@ async function renderMissionDetail() {
   missionPanelThen = null;
   if (then) setTimeout(() => { const b = document.getElementById(then); if (b && !$("#mission-detail").classList.contains("hidden")) b.click(); }, 0);
 
-  const hostLink = m.host && can("hostlist") ? `<button type="button" class="ml-host-link" id="btn-md-host">${escapeHtml(m.host)}</button>` : escapeHtml(m.host || "-");
+  const hostLink = m.host && can("hostlist") ? `<button type="button" class="ml-host-link" id="btn-md-host">${escapeHtml(m.host)}</button>` : m.host ? escapeHtml(m.host) : emptyCell();
   const dayNote = missionFromList.prevDate ? ` <small class="ov-muted">its latest day on the board</small>` : "";
   const earlier = reg ? cloud.numberChain(m.number).slice(0, -1) : [];
   const grid = document.createElement("div");
   grid.className = "ov-eng-facts ov-prof-id md-facts";
   grid.innerHTML = [
-    mdFact("Board", escapeHtml(board ? board.name : "-")),
+    mdFact("Board", board ? boardChipHtml(board.name) : emptyCell()),
     mdFact("Day", `${escapeHtml(fmtDow(state.date))} ${escapeHtml(fmtDate(state.date))}${dayNote}`),
     mdFact("Shift", `${night ? "Night" : "Day"} <small class="ov-muted">${escapeHtml(m.startTime)}-${escapeHtml(m.endTime)}</small>`),
     mdFact("Host", hostLink),
-    mdFact("Service area", area ? areaPillHtml(area, "area-pill") : "-"),
-    mdFact("Customer", escapeHtml(m.customer || "-")),
-    mdFact("Trigo responsible", eng ? `${escapeHtml(eng.name)}${eng.phone ? " " + telLink(eng.phone) : ""}` : "-"),
-    mdFact("Status", reg ? missionStatusHtml(reg) : (m.hidden ? "Hidden" : "On board")),
-    ...(!forecast && feat().highlight ? [mdFact("Highlight", m.highlight ? `<span${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span>` : "-")] : []),
+    mdFact("Service area", area ? areaMarkHtml(area) : emptyCell()),
+    mdFact("Customer", m.customer ? escapeHtml(m.customer) : emptyCell()),
+    mdFact("Trigo responsible", eng ? `${escapeHtml(eng.name)}${eng.phone ? " " + telLink(eng.phone) : ""}` : emptyCell()),
+    mdFact("Status", reg ? missionStatusHtml(reg) : m.hidden ? statusPillHtml("off", "Hidden") : statusPillHtml("ok", "On board")),
+    ...(!forecast && feat().highlight ? [mdFact("Highlight", m.highlight ? `<span${m.highlight === "other" && m.highlightNote ? " data-no-i18n" : ""}>${escapeHtml(highlightLabel(m))}</span>` : emptyCell())] : []),
     ...(reg ? [
-      mdFact("First day on board", reg.openedOn ? escapeHtml(fmtDate(reg.openedOn)) : "-"),
-      mdFact("Last on board", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : "-"),
+      mdFact("First day on board", reg.openedOn ? escapeHtml(fmtDate(reg.openedOn)) : emptyCell()),
+      mdFact("Last on board", reg.lastOn ? escapeHtml(fmtDate(reg.lastOn)) : emptyCell()),
     ] : []),
     ...(earlier.length ? [mdFact("Earlier numbers", escapeHtml(earlier.join(", ")))] : []),
     ...(m.updatedBy || m.updatedAt ? [mdFact("Last edited", `${escapeHtml(who(m.updatedBy))}${m.updatedAt ? ` <small class="ov-muted">${escapeHtml(fmtStamp(m.updatedAt))}</small>` : ""}`)] : []),
-    mdFact("PPE", m.ppe ? escapeHtml(m.ppe) : "-", (m.ppe || "").length > 36 ? "wide" : ""),
-    mdFact("Remark", m.remark ? escapeHtml(m.remark) : "-", (m.remark || "").length > 36 ? "wide" : ""),
+    mdFact("PPE", m.ppe ? escapeHtml(m.ppe) : emptyCell(), (m.ppe || "").length > 36 ? "wide" : ""),
+    mdFact("Remark", m.remark ? escapeHtml(m.remark) : emptyCell(), (m.remark || "").length > 36 ? "wide" : ""),
   ].join("");
   box.appendChild(grid);
   const hostBtn = grid.querySelector("#btn-md-host");
@@ -11198,7 +11239,7 @@ async function renderMissionDetail() {
   flags.className = "ov-prof-flags";
   const alerts = missionAlerts(reg, missionPlacement(reg));
   flags.innerHTML = `<b>Flags</b> ${alerts.length
-    ? alerts.map(x => `<span class="ml-tag ${x.level === 2 ? "ml-late" : x.level === 1 ? "ml-warn" : "ml-wait"}" title="${escapeHtml(x.title)}">${escapeHtml(x.text)}</span>`).join(" ")
+    ? alerts.map(x => alertHtml(x.level, x.text, x.title)).join(" ")
     : '<span class="ov-muted">None right now</span>'}`;
   body.appendChild(flags);
 
@@ -18691,7 +18732,7 @@ function wireApp() {
     const r = b && missionFromRow(b);
     if (!r) return;
     if (b.dataset.act === "more") { e.stopPropagation(); closeTopbarMenus(); openMissionRowMenu(r, b); }
-    else if (b.dataset.act === "close" || b.dataset.act === "suggest-close") openCloseMissionModal(r);
+    else if (b.dataset.act === "close") openCloseMissionModal(r);
     else if (b.dataset.act === "host") openHostFromMission(r);
     else if (b.dataset.act === "reopen") reopenMissionRow(r);
     else if (b.dataset.act === "add") openMissionAddModal(r);

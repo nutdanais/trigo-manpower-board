@@ -82,6 +82,38 @@ async function step(name, fn) {
       assert.deepEqual(await p.evaluate(() => state.hostlist.filters.areaId), []);
     });
 
+    await step("chips: the service area, the board and an empty value are drawn the same way in the Manpower and Host tables", async () => {
+      await p.evaluate(() => {
+        D().employees.find((e) => e.id === "e1").areaId = "area-1";
+        D().employees.find((e) => e.id === "e2").phone = "";
+        D().hosts.find((h) => h.name === "Host Alpha").areaId = "area-1";
+        return refreshAndRender();
+      });
+      // Host: the area is a colour square and plain text (the same lt-ar as Manpower and the mission panel), no pill
+      const hostArea = p.locator('#hostlist-body tr[data-host="Host Alpha"] td.hl-area-cell .lt-ar');
+      assert.equal(await hostArea.count(), 1);
+      assert.equal(await p.locator("#hostlist-body .area-pill").count(), 0);
+      assert.equal(await hostArea.locator("i").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(127, 184, 236)", "the square carries the area's colour");
+      assert.equal(await hostArea.evaluate((el) => getComputedStyle(el).fontWeight), "400", "the name is normal weight");
+      assert.equal(await p.locator("#hostlist-body .hl-board").count(), 0, "the old board chip is gone");
+      // the count does not repeat the amber chip beside the tiles
+      assert.doesNotMatch(await p.locator("#hostlist-count").innerText(), /without a location/);
+      // Host and location links share one style: navy, thin solid underline
+      const link = await p.evaluate(() => { const a = document.createElement("a"); a.className = "lt-link"; document.body.appendChild(a); const c = getComputedStyle(a); const o = [c.textDecorationLine, c.textDecorationStyle, c.textUnderlineOffset]; a.remove(); return o; });
+      assert.deepEqual(link, ["underline", "solid", "3px"]);
+      await go("EMPLIST_ID");
+      assert.ok(await p.locator('#emplist-body tr[data-emp-id="e1"] td[data-label="Service area"] .lt-ar').count() === 1, "Manpower: lt-ar");
+      assert.equal(await p.locator("#emplist-body .area-pill").count(), 0);
+      assert.equal(await p.locator('#emplist-body tr[data-emp-id="e1"] td[data-label="Current board"] .lt-bd').count(), 1, "Manpower: the board is the square tag");
+      // an empty value is a visible muted dash (a viewer with nothing to add, or a field with no + Add)
+      assert.equal(await p.locator("#emplist-body td .lt-empty").first().innerText(), "\u2014");
+      // the table headers stay on one line
+      const heads = await p.locator("#emplist-table thead th:not(.col-off)").evaluateAll((ths) => ths.map((t) => t.textContent.trim()));
+      assert.ok(heads.includes("Mobile") && heads.includes("Contract"), "shortened headers: " + heads.join(", "));
+      assert.ok(!heads.includes("Mobile number") && !heads.includes("Contract type"), "no longer wrapping headers");
+      assert.equal(await p.locator('#emplist-table thead th[data-sort="phone"]').getAttribute("title"), "Mobile number", "the full name stays as the tooltip");
+    });
+
     await step("Org chart: Board dropdown instead of a Board filter; a lead shows their account role", async () => {
       await go("ORGCHART_ID");
       assert.equal(await p.isVisible("#btn-ov-board"), true);
