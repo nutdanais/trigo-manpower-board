@@ -39,6 +39,7 @@ list (1–11) that says, per section, what changes and why.
 "who has worked at this host, and for how many days" should live (a People view on the
 Host record, and Find crew on the Board), nine more helpers for assigning people with an
 Approve / Later / No control each, and the Missions tiles' year rule. Sample data only.
+Its Status box says what was approved and built (H1, H2, A1 to A4) and what was not.
 
 ## Re-seeding the canvas
 

@@ -1176,7 +1176,7 @@ body.exporting .mission-header .m-line2 .m-cust { white-space: normal; overflow:
 }
 .m-empty-hint { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); }
 .m-empty-hint b { color: var(--warn-text); font-weight: 700; }
-.m-empty-hide {
+.m-empty-hide, .m-empty-find {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -1192,14 +1192,14 @@ body.exporting .mission-header .m-line2 .m-cust { white-space: normal; overflow:
   font-weight: 600;
   cursor: pointer;
 }
-.m-empty-hide .ic { width: 14px; height: 14px; }
-.m-empty-hide:hover { background: var(--hover-tint); }
-body.touch-mode .m-empty-hide { height: 36px; }
+.m-empty-hide .ic, .m-empty-find .ic { width: 14px; height: 14px; }
+.m-empty-hide:hover, .m-empty-find:hover { background: var(--hover-tint); }
+body.touch-mode .m-empty-hide, body.touch-mode .m-empty-find { height: 36px; }
 .mission-card.night .m-empty { border-color: #5b80b3; }
 .mission-card.night .m-empty-hint { color: #d3e1f2; }
 .mission-card.night .m-empty-hint b { color: #f3c98a; }
-.mission-card.night .m-empty-hide { background: transparent; color: #eaf2fb; border-color: #6a8ebf; }
-.mission-card.night .m-empty-hide:hover { background: rgba(255,255,255,.08); }
+.mission-card.night .m-empty-hide, .mission-card.night .m-empty-find { background: transparent; color: #eaf2fb; border-color: #6a8ebf; }
+.mission-card.night .m-empty-hide:hover, .mission-card.night .m-empty-find:hover { background: rgba(255,255,255,.08); }
 /* never in a JPG / PDF / print: the export also drops cards with no crew
    (hideEmptyMissionsForExport), this covers the row on its own */
 body.exporting .m-empty { display: none; }
@@ -7748,3 +7748,62 @@ form.rp-form { display: flex; flex-direction: column; min-height: 0; }
   .hr-m-cust { grid-column: 1 / -1; grid-row: 2; }
   .hr-m-shift { display: none; }
 }
+
+/* ===== Crew by host history (app.js "Crew by host history"; design/host-crew-finder-proposal.html) ===== */
+/* Host record: the people as a list, with their days, their last day and where they are on the day on screen */
+.hr-p-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin-bottom: 8px; }
+.hr-p-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.hr-p-count { font-size: 12.5px; }
+.hr-p-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 8px; }
+.hr-p-list > p { margin: 0; padding: 9px 12px; }
+.hr-p-row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(88px, auto) minmax(92px, auto) minmax(0, 1fr) minmax(0, auto); align-items: center; gap: 2px 14px; padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.hr-p-row:last-child { border-bottom: 0; }
+.hr-p-head { font-size: 11.5px; font-weight: 600; color: var(--muted); padding-block: 6px; }
+.hr-p-who { display: flex; flex-direction: column; min-width: 0; }
+.hr-p-who .lt-act, .hr-p-who b { text-align: left; overflow-wrap: anywhere; white-space: normal; }
+.hr-p-who small { color: var(--muted); font-size: 11.5px; }
+.hr-p-days { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hr-p-days small { color: var(--muted); font-size: 11.5px; }
+.hr-p-exp { display: block; font-size: 11px; font-weight: 700; color: var(--ok-text); }
+.hr-p-last { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hr-p-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; min-width: 0; }
+.hr-p-st i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.hr-st-free { color: var(--ok-text); }
+.hr-st-busy { color: var(--primary-text); }
+.hr-st-leave { color: var(--warn-text); }
+.hr-st-off { color: var(--muted); }
+.hr-p-act { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.hr-p-row.is-gone .hr-p-who .lt-act, .hr-p-row.is-gone .hr-p-who b, .hr-p-row.is-gone .hr-p-days, .hr-p-row.is-gone .hr-p-last { color: var(--muted); }
+@media (max-width: 639px) {
+  .hr-p-head { display: none; }
+  .hr-p-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .hr-p-last { display: none; }
+  .hr-p-days { text-align: right; }
+  .hr-p-act { align-items: flex-start; grid-column: 1 / -1; }
+  .hr-p-act:empty { display: none; }
+  .hr-p-st { justify-content: flex-start; }
+}
+
+/* The people panel sorted by days at one host (Find crew): the bar that says so, and the days on each card */
+.fp-lens { display: flex; align-items: center; gap: 6px; margin-top: 7px; padding: 4px 4px 4px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--hover-tint); color: var(--primary-text); font-size: 12px; font-weight: 600; }
+.fp-lens.hidden { display: none; }
+.fp-lens-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.fp-lens button { flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 4px; background: none; color: inherit; cursor: pointer; }
+.fp-lens button:hover { background: rgba(0,0,0,.07); }
+.fp-lens button .ic { width: 13px; height: 13px; }
+body.touch-mode .fp-lens button { width: 34px; height: 34px; }
+/* the days hang below the card's right corner, as the loan pill hangs below its middle */
+.emp-card .emp-hostdays { position: absolute; right: 5px; bottom: -8px; z-index: 1; pointer-events: none; font-size: 10px; font-weight: 700; line-height: 1.5; padding: 0 6px; border-radius: 999px; background: var(--panel); color: var(--muted); box-shadow: 0 0 0 1px var(--border); font-variant-numeric: tabular-nums; }
+.fp-body:has(.emp-hostdays) { row-gap: 12px; padding-bottom: 6px; }
+.emp-card .emp-hostdays.is-exp { background: var(--ok-surface); color: var(--ok-text); box-shadow: 0 0 0 1px var(--ok-line); }
+.emp-card .emp-hostdays.is-new { font-weight: 600; }
+body.exporting .emp-hostdays { display: none; }
+
+/* Find crew on an empty mission, and the line under a crew that is all new to the host */
+.m-empty-find { color: var(--primary-text); border-color: var(--primary-text); }
+.m-newcrew { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: var(--warn-text); text-align: left; }
+button.m-newcrew { cursor: pointer; }
+button.m-newcrew:hover span { text-decoration: underline; text-underline-offset: 3px; }
+.m-newcrew .ic { width: 13px; height: 13px; flex: none; }
+.mission-card.night .m-newcrew { color: #f3c98a; }
+body.exporting .m-newcrew { display: none; }

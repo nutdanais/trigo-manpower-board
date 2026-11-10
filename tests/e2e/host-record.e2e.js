@@ -121,11 +121,11 @@ async function step(name, fn) {
         assert.equal(Number(tiles[2].value), mx.days, `${n}: Days`);
         assert.equal(tiles[3].value, mx.last, `${n}: Last worked`);
         // every person, all of them (no "+N more"), most days first
-        const chips = await p.locator("#host-detail .rp-people .lt-pc").evaluateAll((cs) => cs.map((c) => ({ days: Number(c.querySelector("small").textContent.replace("d", "")), exp: c.classList.contains("lt-exp") })));
+        const chips = await p.locator("#hr-people .hr-p-row:not(.hr-p-head)").evaluateAll((cs) => cs.map((c) => ({ days: Number(c.querySelector(".hr-p-days b").textContent), exp: c.classList.contains("is-exp") })));
         assert.equal(chips.length, mx.people, `${n}: every person is listed`);
         assert.deepEqual(chips.map((c) => c.days), chips.map((c) => c.days).slice().sort((x, y) => y - x), `${n}: most days first`);
-        assert.equal(chips.filter((c) => c.exp).length, mx.exp, `${n}: the experienced ones are outlined`);
-        assert.equal(await p.locator("#host-detail .rp-people [data-more]").count(), 0, "no +N more");
+        assert.equal(chips.filter((c) => c.exp).length, mx.exp, `${n}: the experienced ones are marked`);
+        assert.equal(await p.locator("#host-detail .hr-people-box [data-more]").count(), 0, "no +N more");
         // an at-risk host shows the red alert with its fix
         assert.equal(await p.locator("#host-detail .rp-alert .lt-al-bad").count(), mx.atRisk && mx.people ? 1 : 0, `${n}: at-risk alert`);
         await p.evaluate(() => closeModal());

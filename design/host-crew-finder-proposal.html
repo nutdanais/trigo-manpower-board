@@ -161,6 +161,18 @@ ul.plain { padding-left: 18px; display: grid; gap: 6px; }
     </nav>
   </header>
 
+  <section class="part" id="status">
+    <div class="answer">
+      <h2>Status on 10 Nov 2026</h2>
+      <p><b>Built:</b> H1, H2, A1, A2, A3, A4, and the Missions tiles rule (S1 confirmed). <b>Declined:</b> A8. <b>Not decided:</b> A5, A6, A7, A9.</p>
+      <ul class="plain">
+        <li><b>Assign in the Host record</b> takes you to that person's board and places them there, so the board's own checks and Undo apply.</li>
+        <li><b>Find crew</b> opens a short menu: sort the people panel by days at the host, bring back the last crew, or suggest a crew.</li>
+        <li><b>Suggest crew</b> breaks ties by the last 30 days of work, the figure the Manpower List already has, in place of this week's.</li>
+      </ul>
+    </div>
+  </section>
+
   <section class="part" id="answer">
     <div class="answer">
       <h2>Short answer</h2>
@@ -434,16 +446,16 @@ ul.plain { padding-left: 18px; display: grid; gap: 6px; }
 
   /* ---- decisions ---- */
   var ASKS = [
-    ["H1", "Host record with a People view", "ready", "Data ready", "The lookup itself, on the Host tab: who worked there, days, last day, free or not, Assign.", "Size: medium · the first PR"],
-    ["H2", "Find crew on the Board", "ready", "Data ready", "The same list from a mission: the available-people panel sorted by days at that host.", "Size: small, after H1"],
-    ["A1", "Bring back the last crew", "ready", "Data ready", "A mission added back to the board arrives with no crew. One button offers the people who were on it last time and says who is free today.", "Where: the empty mission card · Size: small"],
-    ["A2", "Find a replacement", "ready", "Data ready", "When someone on a mission goes on leave, offer Find replacement: free people who know that host, most days first.", "Where: the leave move and the mission panel · Size: small, after H1"],
-    ["A3", "Warn when a whole crew is new to the host", "ready", "Data ready", "Overview flags newcomer-only missions afterwards. This shows it on the card while planning, when nobody on the crew has the days to count as experienced there.", "Where: the mission card's alert line · Size: small"],
-    ["A4", "Suggest crew for an empty mission", "ready", "Data ready", "Suggest crew proposes people for the usual crew size: days at the host first, then the host's service area, then who has worked least this week. The engineer accepts, changes or ignores it.", "Where: the empty mission card · Size: medium, after H2"],
+    ["H1", "Host record with a People view", "done", "Built", "The lookup itself, on the Host tab: who worked there, days, last day, free or not, Assign.", "Size: medium · the first PR"],
+    ["H2", "Find crew on the Board", "done", "Built", "The same list from a mission: the available-people panel sorted by days at that host.", "Size: small, after H1"],
+    ["A1", "Bring back the last crew", "done", "Built", "A mission added back to the board arrives with no crew. One button offers the people who were on it last time and says who is free today.", "Where: the empty mission card · Size: small"],
+    ["A2", "Find a replacement", "done", "Built", "When someone on a mission goes on leave, offer Find replacement: free people who know that host, most days first.", "Where: the leave move and the mission panel · Size: small, after H1"],
+    ["A3", "Warn when a whole crew is new to the host", "done", "Built", "Overview flags newcomer-only missions afterwards. This shows it on the card while planning, when nobody on the crew has the days to count as experienced there.", "Where: the mission card's alert line · Size: small"],
+    ["A4", "Suggest crew for an empty mission", "done", "Built", "Suggest crew proposes people for the usual crew size: days at the host first, then the host's service area, then who has worked least in the last 30 days. The engineer accepts or cancels it.", "Where: the empty mission card · Size: medium, after H2"],
     ["A5", "Build cover at an at-risk host", "ready", "Data ready", "A mission at a host with too few experienced people suggests one free person who is close to the mark (3 of 5 days), so cover grows on normal working days.", "Where: the mission card and Overview's Host coverage · Size: small to medium"],
     ["A6", "Show workload when choosing", "some", "Needs one extra read", "Small marks on available people: days in a row and nights this week, so work is spread and long runs are seen before they are made longer.", "Where: the available-people panel · Size: medium"],
     ["A7", "Borrow from another board", "ready", "Data ready", "The finder also lists free, experienced people on other boards, with Lend to this board, which opens the Lend dialog the app already has.", "Where: the People view and Find crew · Size: medium"],
-    ["A8", "Customer history", "ready", "Data ready", "The same lookup by customer: who has worked for this customer, at any host, with days. Useful when a customer opens a job at a new site.", "Where: the mission panel · Size: small, after H1"],
+    ["A8", "Customer history", "", "Declined", "The same lookup by customer: who has worked for this customer, at any host, with days. Useful when a customer opens a job at a new site.", "Where: the mission panel · Size: small, after H1"],
     ["A9", "My gaps for tomorrow", "ready", "Data ready", "For the engineer signed in: their missions on the next working day with no crew, or fewer people than their average, as a short list with Find crew on each.", "Where: the Board's status row, and the phone's summary card · Size: medium"],
     ["S1", "Missions tiles: open missions on an old number stay counted", "ready", "Built", "Confirm the rule as built: no cut-off date for an open mission still waiting for its new-year number.", "Approve to keep · No to add a cut-off (say after how many days)"]
   ];

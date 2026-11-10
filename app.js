@@ -2422,6 +2422,17 @@ function empCard(emp, opts = {}) {
       (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select, click again to unselect · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
+  // Find crew: this person's days at the host the people panel is sorted by
+  if (opts.hostDays != null) {
+    const n = opts.hostDays, exp = n >= hostExperiencedDays();
+    const hd = document.createElement("span");
+    hd.className = "emp-hostdays" + (exp ? " is-exp" : n ? "" : " is-new");
+    hd.textContent = n ? `${n}d` : "new";
+    if (n) hd.dataset.noI18n = "";
+    hd.title = n ? `${n} ${n === 1 ? "day" : "days"} at this host${exp ? " · experienced" : ""}` : "Has not worked at this host";
+    card.appendChild(hd);
+    card.title += ` • ${n ? `${n} ${n === 1 ? "day" : "days"} at this host` : "new to this host"}`;
+  }
   // a loan (employee_loans): someone borrowed from another board, or this
   // board's person working elsewhere today (opts.lentOut); the badge names the
   // other board, the tooltip the dates
@@ -2834,6 +2845,12 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       addSep();
       addItem("Remove highlight", () => guardEdit(() => setMissionHighlight(m, null)), null, "close");
     }
+  } else if (view === "findcrew") {
+    addBack("Find crew");
+    const on = !!crewState.lens && crewState.lens.boardId === D().activeBoardId && crewState.lens.host === m.host;
+    addItem("Sort people by days at this host", () => (on ? clearCrewLens() : setCrewLens(m)), on ? "ctx-on" : null, on ? "check" : "users");
+    addItem("Bring back the last crew…", () => bringBackLastCrew(m), null, "return");
+    addItem("Suggest crew…", () => suggestCrew(m), null, "plus");
   } else if (view === "crew") {
     addBack("Crew");
     addItem(`Select crew (${crew.length})`, () => {
@@ -2851,6 +2868,7 @@ function renderMissionCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep
       addItem("Duplicate mission", () => guardEdit(() => openMissionModal(null, { from: m })), null, "copy");
       if (!fc && otherBoards.length) addSub("Move or copy to board", "move", "swap");
       if (sel.length) addItem(`Place ${sel.length} selected here`, () => guardEdit(() => assignEmployeesTo(sel, { missionId: m.id })), null, "plus");
+      addSub("Find crew", "findcrew", "search");
       if (crew.length) addSub("Crew", "crew", "users");
       // the confirmed board only (a forecast is a sketch), and only once the
       // database has the columns (migration-2026-10-28)
@@ -3079,12 +3097,17 @@ function renderFloatPool() {
   $("#standby-label").textContent = holiday ? "Holiday" : "Standby";
   $("#standby-sub").textContent = holiday ? "permanent, on holiday" : "permanent, unassigned";
   let standbyN = 0, oncallN = 0;
-  for (const emp of sortEmployeesDisplay(unassignedEmployees())) {
+  // Find crew (the lens): most days at the mission's host first, the count on each card; the usual order within a tie
+  const lens = crewLensNow();
+  renderCrewLensBar();
+  let pool = sortEmployeesDisplay(unassignedEmployees());
+  if (lens) pool = pool.map((e, i) => [e, i]).sort((a, b) => (lens.days[b[0].id] || 0) - (lens.days[a[0].id] || 0) || a[1] - b[1]).map(x => x[0]);
+  for (const emp of pool) {
     const isOncall = emp.contract === "oncall";
     if (isOncall) oncallN++; else standbyN++;                       // counts always reflect the true total
     if (q && !emp.name.toLowerCase().includes(q)) continue;
     if (state.poolAreas.size && !state.poolAreas.has(emp.areaId)) continue;
-    (isOncall ? oncallBody : standbyBody).appendChild(empCard(emp));
+    (isOncall ? oncallBody : standbyBody).appendChild(empCard(emp, lens ? { hostDays: lens.days[emp.id] || 0 } : {}));
   }
   $("#standby-count").textContent = standbyN;
   $("#oncall-count").textContent = oncallN;
@@ -3309,6 +3332,18 @@ function renderMissions() {
     empRow.className = "mission-emps";
     for (const emp of sortEmployeesDisplay(memberEmps)) empRow.appendChild(empCard(emp));
     body.appendChild(empRow);
+    const crewEdit = fcView ? can("forecast", "edit") : can("board", "edit");
+    // a crew with nobody experienced at this host (Settings → Host experience), while someone else is: Find crew shows who
+    if (crewAllNewToHost(m, memberEmps)) {
+      const need = hostExperiencedDays();
+      const warn = document.createElement(crewEdit ? "button" : "div");
+      if (crewEdit) warn.type = "button";
+      warn.className = "m-newcrew";
+      warn.innerHTML = `${icon("alert")}<span>Crew new to this host</span>`;
+      warn.title = `Nobody on this crew has worked ${need} ${need === 1 ? "day" : "days"} or more at this host.` + (crewEdit ? " Click to see who has." : "");
+      if (crewEdit) warn.onclick = (ev) => { ev.stopPropagation(); setCrewLens(m); };
+      body.appendChild(warn);
+    }
     // No crew: say so where the people would be, and offer to take the mission
     // off the board. Only for someone who could hide it right now (no prompt),
     // and never in an export (body.exporting hides it).
@@ -3316,6 +3351,20 @@ function renderMissions() {
       const empty = document.createElement("div");
       empty.className = "m-empty";
       empty.innerHTML = `<span class="m-empty-hint"><b>No crew yet</b> · drag people here</span>`;
+      // Find crew: the people panel in order of days at this host, the last crew, a suggestion
+      const findBtn = document.createElement("button");
+      findBtn.type = "button";
+      findBtn.className = "m-empty-find";
+      findBtn.title = "Who knows this host, the last crew, or a suggestion";
+      findBtn.setAttribute("aria-label", `Find crew for mission ${m.number}`);
+      findBtn.innerHTML = `${icon("users")}<span>Find crew</span>`;
+      findBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        const r = findBtn.getBoundingClientRect();
+        ctxMenu = { mission: m, x: r.left, y: r.bottom + 4 };
+        renderCtxMenu("findcrew");
+      };
+      empty.appendChild(findBtn);
       const hideBtn = document.createElement("button");
       hideBtn.type = "button";
       hideBtn.className = "m-empty-hide";
@@ -3339,6 +3388,13 @@ function renderMissions() {
   }
   bindDropzones();
   layoutMasonry();   // masonry-position the cards (on screen; re-run at export width during export)
+  // days at each host of the day, read in the background once per host: the "Crew new to this host" line needs them
+  if (missions.length && !document.body.classList.contains("exporting")) {
+    const boardId = D().activeBoardId, date = state.date;
+    ensureCrewDays(missions.map(m => m.host)).then(fresh => {
+      if (fresh && !isNonBoardView() && D().activeBoardId === boardId && state.date === date) { renderMissions(); renderFloatPool(); }
+    });
+  }
 }
 
 /* stats for one board on the current date (reads cache only, never fetches) */
@@ -10101,6 +10157,142 @@ async function exportHostlistXlsx() {
   toast(`Exported ${rows.length} ${rows.length === 1 ? "host" : "hosts"}.`, "info");
 }
 
+/* ---------- Crew by host history (design/host-crew-finder-proposal.html) ----------
+   Who knows a host, shown where people are assigned. One count everywhere: a day worked at the host is a
+   row of the Host Record (deployment_history), all time, the same days as the Host tab's skills matrix,
+   and "experienced" is hostExperiencedDays() of them.
+     - the Host record lists the people with where each one is on the day on screen, and assigns a free one;
+     - Find crew on a mission sorts the available-people panel by days at its host (the lens);
+     - Bring back the last crew and Suggest crew fill a mission from the people who are free;
+     - a mission whose whole crew is new to its host says so on its card;
+     - moving someone from a mission to leave offers Find replacement.
+   The board reads the days once per host and session (crewState.days), in the background, so a board never
+   waits for them; turning the lens on reads that host again. */
+const crewState = { days: {}, asked: new Map(), lens: null, recFilter: "all" };
+const sameHost = (a, b) => missionText(a).toLowerCase() === missionText(b).toLowerCase();
+/* the plan a board has for the day on screen: its forecast while that day is still one, else the confirmed plan */
+function planOn(boardId) {
+  if (isForecastDateFor(boardId, state.date)) return forecastPlanOf(boardId, state.date);
+  return (D().plans[boardId] && D().plans[boardId][state.date]) || emptyPlan();
+}
+/* Where one person is on the day on screen: { kind, label, boardId, missionId }.
+   free (Standby, or on-call and not called in), busy (on a mission), leave, off (not on the roster that day). */
+function empDayStatus(e) {
+  if (!onRoster(e)) return { kind: "off", label: "Off the roster", boardId: null };
+  const boardId = planBoardOf(e);
+  const plan = planOn(boardId);
+  const m = plan.missions.find(x => !x.hidden && x.members.includes(e.id));
+  if (m) return { kind: "busy", label: `On ${m.number}`, number: m.number, boardId, missionId: m.id };
+  const z = Object.keys(plan.zones).find(k => plan.zones[k].includes(e.id));
+  if (z) return { kind: "leave", label: ZONE_LABELS[z] || z, boardId };
+  return { kind: "free", label: e.contract === "oncall" ? "On-call, free" : "Standby", boardId };
+}
+/* days per person at each of `hosts` (the names as the missions spell them), read once per host; `fresh` reads again.
+   Resolves true when something new arrived. A failed read is forgotten, so the next call tries again. */
+async function ensureCrewDays(hosts, fresh = false) {
+  const want = [...new Set(hosts.filter(Boolean))];
+  const missing = want.filter(h => fresh || !crewState.asked.has(h));
+  if (missing.length) {
+    const job = cloud.getHostCoverageForHosts(missing).then(cov => {
+      for (const h of missing) crewState.days[h] = (cov[h] || {}).days || {};
+      return true;
+    }).catch(() => { for (const h of missing) if (crewState.asked.get(h) === job) crewState.asked.delete(h); return false; });
+    for (const h of missing) crewState.asked.set(h, job);
+  }
+  await Promise.all(want.map(h => crewState.asked.get(h)));
+  return missing.length > 0;
+}
+/* the lens, while it belongs to the board on screen and its days have arrived: { host, number, days } */
+function crewLensNow() {
+  const l = crewState.lens;
+  if (!l || l.boardId !== D().activeBoardId || !crewState.days[l.host]) return null;
+  return { ...l, days: crewState.days[l.host] };
+}
+/* Find crew: sort the available-people panel by days at this mission's host, the count on every card */
+function setCrewLens(m) {
+  safely(async () => {
+    crewState.lens = { boardId: D().activeBoardId, host: m.host, number: m.number };
+    await ensureCrewDays([m.host], true);
+    renderFloatPool();
+    const fp = $("#float-pool");
+    for (const b of fp.querySelectorAll(".fp-body")) b.scrollTop = 0;
+    if (window.matchMedia("(max-width: 639px)").matches) setPoolDrawer(true);
+  });
+}
+function clearCrewLens() {
+  crewState.lens = null;
+  renderFloatPool();
+}
+function renderCrewLensBar() {
+  const bar = $("#crew-lens");
+  if (!bar) return;
+  const l = crewLensNow();
+  bar.classList.toggle("hidden", !l);
+  if (!l) return;
+  $("#crew-lens-host").textContent = l.host;
+  bar.title = `The people below are in order of their days at ${l.host}, most first. ${hostExperiencedDays()} days or more is experienced.`;
+}
+/* the people who are free on the board on screen, best first for this mission: days at its host, then the
+   host's service area, then who has worked least in the last 30 days, then permanent before on-call */
+function crewCandidates(m) {
+  const days = crewState.days[m.host] || {};
+  const area = hostAreaOf(m.host);
+  const util = state.emplist.util || {};
+  return unassignedEmployees().map(e => ({ e, days: days[e.id] || 0, area: !!area && e.areaId === area.id, util: util[e.id] == null ? 0 : util[e.id] }))
+    .sort((a, b) => b.days - a.days || (b.area - a.area) || a.util - b.util
+      || (a.e.contract === "oncall") - (b.e.contract === "oncall") || a.e.name.localeCompare(b.e.name));
+}
+const crewDaysText = (n) => (n ? `${n} ${n === 1 ? "day" : "days"} here` : "new here");
+/* Bring back the last crew: the people this mission had the last time it had any, and which of them are free today */
+function bringBackLastCrew(m) {
+  safely(async () => {
+    const last = await cloud.getMissionLastCrew(D().activeBoardId, cloud.numberChain(m.number), m.shift, state.date);
+    const people = last ? last.employeeIds.map(id => D().employees.find(e => e.id === id)).filter(Boolean) : [];
+    if (!people.length) { toast(`${m.number} had no crew before ${fmtDate(state.date)}.`, "info"); return; }
+    const free = new Set(unassignedEmployees().map(e => e.id));
+    const line = (e) => `${e.name}: ${m.members.includes(e.id) ? "already on it" : free.has(e.id) ? "free" : worksOn(e, D().activeBoardId) && onRoster(e) ? empDayStatus(e).label : "not on this board today"}`;
+    const add = people.filter(e => free.has(e.id));
+    const head = `${m.number} last had a crew on ${fmtDate(last.date)}.`;
+    if (!add.length) {
+      showConfirm(`Last crew of ${m.number}`, `${head}\n${people.map(line).join("\n")}\n\nNobody from it is free to add.`, () => {}, null, "OK");
+      return;
+    }
+    showConfirm(`Bring back the last crew of ${m.number}?`, `${head}\n${people.map(line).join("\n")}`,
+      () => guardEdit(() => assignEmployeesTo(add.map(e => e.id), { missionId: m.id })), null,
+      add.length === 1 ? "Add 1 person" : `Add ${add.length} people`);
+  });
+}
+/* Suggest crew: the best free people for this mission, up to the size of its last crew (2 when it never had one) */
+function suggestCrew(m) {
+  safely(async () => {
+    const [last] = await Promise.all([
+      cloud.getMissionLastCrew(D().activeBoardId, cloud.numberChain(m.number), m.shift, state.date).catch(() => null),
+      ensureCrewDays([m.host], true),
+      ensureEmplistUtilLoaded().catch(() => {}),
+    ]);
+    const size = last ? last.employeeIds.length : 2;
+    const have = missionCrew(m).length;
+    if (have >= size) { toast(`${m.number} already has ${have === 1 ? "1 person" : `${have} people`}, as many as its last crew.`, "info"); return; }
+    const pick = crewCandidates(m).slice(0, size - have);
+    if (!pick.length) { toast("Nobody is free to suggest.", "info"); return; }
+    const need = hostExperiencedDays();
+    const lines = pick.map(c => `${c.e.name}: ${crewDaysText(c.days)}${c.days >= need ? " · experienced" : ""}${c.area ? " · same service area" : ""}`);
+    const why = last ? `Its last crew, on ${fmtDate(last.date)}, was ${size === 1 ? "1 person" : `${size} people`}.` : `It has had no crew before, so 2 people are suggested.`;
+    showConfirm(`Suggested crew for ${m.number}`, `${why}\n${lines.join("\n")}`,
+      () => guardEdit(() => assignEmployeesTo(pick.map(c => c.e.id), { missionId: m.id })), null,
+      pick.length === 1 ? "Add 1 person" : `Add ${pick.length} people`);
+  });
+}
+/* true when a mission has a crew and nobody on it is experienced at its host, while somebody else on the
+   roster is: the card says so. Unknown (the days have not arrived) is false. */
+function crewAllNewToHost(m, crew) {
+  const days = crewState.days[m.host];
+  if (!days || !crew.length) return false;
+  const need = hostExperiencedDays();
+  if (crew.some(e => (days[e.id] || 0) >= need)) return false;
+  return D().employees.some(e => (days[e.id] || 0) >= need && onRoster(e));
+}
+
 /* ---------- The Host record ----------
    A host opens read-first, in the same panel as the Mission and the Employee (design/handover-list-tabs.md, section 7):
    the header (the name, the status, "Host" with its boards and its service area, and the actions), the alert box, the
@@ -10149,6 +10341,11 @@ async function renderHostRecord(name) {
   const body = $("#host-detail");
   const stillHere = () => state.hostlist.editingHost === name && !$("#modal-host").classList.contains("hidden") && !body.classList.contains("hidden");
   if (!r || !stillHere()) return;
+  // where each person is on the day on screen: every board's plan for that day (its forecast while the day is one)
+  await Promise.all(D().boards.map(b => (isForecastDateFor(b.id, state.date)
+    ? (feat().forecast ? cloud.ensureForecastLoaded(b.id, state.date) : null)
+    : cloud.ensurePlanLoaded(b.id, state.date)))).catch(() => {});
+  if (!stillHere()) return;
   const canEdit = can("hostlist", "edit");
   const rec = D().hosts.find(h => h.name === r.name) || null;
   const x = hostExpOf(r);
@@ -10202,22 +10399,55 @@ async function renderHostRecord(name) {
   tile({ label: "Last worked", value: r.lastWorked ? escapeHtml(fmtDate(r.lastWorked)) : "—", sub: "" });
   body.appendChild(tiles);
 
-  // everyone who has worked here, most days first, the experienced ones outlined; all of them, wrapping
+  // Everyone who has worked here, most days first: their days, their last day, where they are on the day on
+  // screen, and Assign for someone who is free while this host has a mission on their board that day.
   const seeProfile = can("emplist");
   const expSet = new Set(x.experienced);
   const empById = new Map(D().employees.map(m => [m.id, m]));
-  const chips = r.inspectors.map(i => {
+  const dayLabel = fmtDayMon(state.date);
+  const people = r.inspectors.map(i => {
     const e = empById.get(i.id);
-    const gone = e && empStatus(e) !== "active";
-    const tip = `${i.name}: ${i.days} ${i.days === 1 ? "day" : "days"} at ${r.name}${i.last ? `, last ${fmtDate(i.last)}` : ""}${expSet.has(i.id) ? " · experienced" : ""}${gone ? " · not active now" : ""}`;
-    const cls = `lt-pc${expSet.has(i.id) ? " lt-exp" : ""}${gone ? " lt-gone" : ""}`;
-    return seeProfile
-      ? `<button type="button" class="${cls} hr-person" data-emp="${escapeHtml(i.id)}" data-no-i18n title="${escapeHtml(tip)}">${escapeHtml(i.name)} <small>${i.days}d</small></button>`
-      : `<span class="${cls}" data-no-i18n title="${escapeHtml(tip)}">${escapeHtml(i.name)} <small>${i.days}d</small></span>`;
-  }).join("");
-  peopleBox.innerHTML = `<div class="ov-eng-foot-h">People who worked here <span class="ov-muted">days at this host, most days first</span></div>`
-    + (chips ? `<div class="rp-people" id="hr-people">${chips}</div>` : `<p class="ov-muted">Nobody has worked at this host yet.</p>`);
-  for (const b of peopleBox.querySelectorAll(".hr-person")) b.onclick = () => openProfile(b.dataset.emp);
+    const st = e ? empDayStatus(e) : { kind: "off", label: "Off the roster", boardId: null };
+    // the missions at this host on that person's board that day, for a role that may place people there
+    const mayPlace = st.boardId && (isForecastDateFor(st.boardId, state.date) ? can("forecast", "edit") : can("board", "edit"));
+    const targets = st.kind === "free" && mayPlace ? planOn(st.boardId).missions.filter(m => !m.hidden && sameHost(m.host, r.name)) : [];
+    return { i, e, st, targets, exp: expSet.has(i.id), gone: !!e && empStatus(e) !== "active" };
+  });
+  const freeN = people.filter(p => p.st.kind === "free").length;
+  const drawPeople = () => {
+    const f = crewState.recFilter;
+    const shown = people.filter(p => f === "all" || (f === "free" && p.st.kind === "free") || (f === "exp" && p.exp));
+    const chip = (k, label) => `<button type="button" class="btn btn-small${f === k ? " active" : ""}" data-pf="${k}" aria-pressed="${f === k}">${label}</button>`;
+    const rows = shown.map(p => {
+      const { i, e, st } = p;
+      const board = e ? boardNameOf(st.boardId || e.boardId) : "";
+      const sub = [board && board !== "—" ? `<span data-no-i18n>${escapeHtml(board)}</span>` : "", e && e.contract === "oncall" ? "On-call" : "", p.gone ? EMP_STATUS_LABEL[empStatus(e)] : ""].filter(Boolean).join(" · ");
+      const tip = `${i.name}: ${i.days} ${i.days === 1 ? "day" : "days"} at ${r.name}${i.last ? `, last ${fmtDate(i.last)}` : ""}${p.exp ? " · experienced" : ""}${p.gone ? " · not active now" : ""}`;
+      const who = seeProfile
+        ? `<button type="button" class="lt-act hr-person" data-emp="${escapeHtml(i.id)}" data-no-i18n title="${escapeHtml(tip)}">${escapeHtml(i.name)}</button>`
+        : `<b data-no-i18n title="${escapeHtml(tip)}">${escapeHtml(i.name)}</b>`;
+      const twoShifts = new Set(p.targets.map(m => m.number)).size < p.targets.length;
+      const acts = p.targets.map(m => `<button type="button" class="lt-act hr-assign" data-emp="${escapeHtml(i.id)}" data-board="${escapeHtml(st.boardId)}" data-mission="${escapeHtml(m.id)}">`
+        + `<span>Assign to</span> <span data-no-i18n>${escapeHtml(m.number)}</span>${twoShifts ? ` <span>${m.shift === "night" ? "Night" : "Day"}</span>` : ""}</button>`).join("");
+      return `<div class="hr-p-row${p.exp ? " is-exp" : ""}${p.gone ? " is-gone" : ""}" data-emp="${escapeHtml(i.id)}" data-kind="${st.kind}">`
+        + `<span class="hr-p-who">${who}${sub ? `<small>${sub}</small>` : ""}</span>`
+        + `<span class="hr-p-days"><b>${i.days}</b> <small>${i.days === 1 ? "day" : "days"}</small>${p.exp ? `<span class="hr-p-exp">experienced</span>` : ""}</span>`
+        + `<span class="hr-p-last">${i.last ? escapeHtml(fmtDate(i.last)) : emptyCell()}</span>`
+        + `<span class="hr-p-st hr-st-${st.kind}"><i></i><span>${st.number ? `<span>On mission</span> <span data-no-i18n>${escapeHtml(st.number)}</span>` : escapeHtml(st.label)}</span></span>`
+        + `<span class="hr-p-act">${acts}</span></div>`;
+    }).join("");
+    peopleBox.innerHTML = `<div class="ov-eng-foot-h">People who worked here <span class="ov-muted">days at this host, most days first</span></div>`
+      + (people.length
+        ? `<div class="hr-p-bar"><span class="ov-trend-btns hr-p-chips" role="group" aria-label="Show">${chip("all", "Everyone")}${chip("free", `Free on ${dayLabel}`)}${chip("exp", "Experienced")}</span>`
+          + `<span class="ov-muted hr-p-count">${people.length} ${people.length === 1 ? "person" : "people"} · ${freeN} free on ${dayLabel}</span></div>`
+          + `<div class="hr-p-list" id="hr-people"><div class="hr-p-row hr-p-head" aria-hidden="true"><span>Person</span><span>Days here</span><span>Last worked</span><span>On ${dayLabel}</span><span></span></div>`
+          + (rows || `<p class="ov-muted">Nobody matches.</p>`) + `</div>`
+        : `<p class="ov-muted">Nobody has worked at this host yet.</p>`);
+    for (const b of peopleBox.querySelectorAll(".hr-person")) b.onclick = () => openProfile(b.dataset.emp);
+    for (const b of peopleBox.querySelectorAll("[data-pf]")) b.onclick = () => { crewState.recFilter = b.dataset.pf; drawPeople(); };
+    for (const b of peopleBox.querySelectorAll(".hr-assign")) b.onclick = () => assignFromHostRecord(b.dataset.emp, b.dataset.board, b.dataset.mission);
+  };
+  drawPeople();
   body.appendChild(peopleBox);
 
   // the missions at this host: the open ones from the register, then a "Closed (N)" line that expands
@@ -10260,6 +10490,17 @@ async function renderHostRecord(name) {
   }
 }
 
+/* Assign from the Host record: go to that person's board for the day on screen and place them there, through the
+   board's own checks (a read-only or locked day asks first, a forecast is a hold) and with its Undo. */
+function assignFromHostRecord(empId, boardId, missionId) {
+  closeModal();
+  clearSelection();
+  D().activeBoardId = boardId;
+  safely(async () => {
+    await refreshAndRender();
+    guardEdit(() => assignEmployeesTo([empId], { missionId }));
+  });
+}
 /* A change somebody else made (or this browser's own write coming back) redraws the Host record that is open in read view */
 function refreshOpenHostRecord() {
   const name = state.hostlist.editingHost;
@@ -10531,7 +10772,20 @@ function assignEmployeesTo(empIds, payload) {
     clearSelection();
     await refreshAndRender();
     updateUndoButton();
+    if (gone) {
+      const m = getPlan().missions.find(x => x.id === gone.missionId && !x.hidden);
+      if (m) toast(`${gone.n === 1 ? gone.name : `${gone.n} people`} left ${m.number} for ${ZONE_LABELS[payload.zone] || "leave"}.`, "info",
+        { action: { label: "Find replacement", run: () => setCrewLens(m) } });
+    }
   });
+  // someone taken off a mission for a leave tab: the mission is a person short, so offer who else knows its host
+  let gone = null;
+  if (payload && payload.zone) {
+    const left = entries.filter(e => e.prior && e.prior.missionId);
+    if (left.length && left.every(e => e.prior.missionId === left[0].prior.missionId)) {
+      gone = { missionId: left[0].prior.missionId, n: left.length, name: (D().employees.find(x => x.id === left[0].empId) || {}).name || "1 person" };
+    }
+  }
   if (!forecast) { run(); return; }
   /* D3: taking someone out of ANOTHER engineer's forecast is allowed, but not
      silently — say whose hold it is first; the database records the loss and
@@ -19187,6 +19441,7 @@ function wireApp() {
   }
   $("#btn-touch-clear").onclick = clearSelection;
   $("#fp-drawer-handle").onclick = () => setPoolDrawer(!$("#float-pool").classList.contains("fp-open"));
+  $("#crew-lens-off").onclick = clearCrewLens;
   document.addEventListener("click", (ev) => { if (!ev.target.closest("#more-menu, #btn-bn-more")) closeMoreMenu(); });
   // phone header: summary card, Filter sheet, ⋯ menu, and folding to one line on scroll
   $("#m-summary").onclick = () => {
