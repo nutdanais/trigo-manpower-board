@@ -71,7 +71,7 @@ const text = (p, sel) => p.$eval(sel, (e) => e.textContent.trim());
       // Each view and panel is drawn in Thai and its visible text and title /
       // placeholder / aria-label are read back. What may stay in Latin letters is
       // data people typed (names, hosts, customers, AREA1), IDs and brand words.
-      const DATA = /^(Person [A-Z]|Host (Alpha|Beta|Gamma)|Cust (Alpha|Beta)|Eng (One|Two)|AREA1|Board (One|Two)|TRIGO.*|Excel|PDF|JPG|PPE|OC|KPI|Ctrl.*|Maps|[a-z]+\.[a-z]+|BANGN.*|Hayashi|Somchai.*|Jaidee|Fortune|Amata.*|Rayong|Google Maps|T\d+|[0-9A-F]{6}|.*@.*|[A-Z]{1,2}|\.xlsx|.*\.xlsx|e\.g\. .*|https?:.*)$/;
+      const DATA = /^(Person [A-Z]|Host (Alpha|Beta|Gamma)|Cust (Alpha|Beta)|Eng (One|Two)|AREA1|Board (One|Two)|TRIGO.*|Excel|Etraq|PDF|JPG|PPE|OC|KPI|Ctrl.*|Maps|[a-z]+\.[a-z]+|BANGN.*|Hayashi|Somchai.*|Jaidee|Fortune|Amata.*|Rayong|Google Maps|T\d+|[0-9A-F]{6}|.*@.*|[A-Z]{1,2}|\.xlsx|.*\.xlsx|e\.g\. .*|https?:.*)$/;
       const english = () => p.evaluate((src) => {
         const re = new RegExp(src), out = [];
         const vis = (e) => { const st = e && getComputedStyle(e); if (!st || st.display === "none" || st.visibility === "hidden") return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };

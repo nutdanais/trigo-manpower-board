@@ -4,7 +4,7 @@
      NODE_PATH=$(npm root -g) node tests/e2e/mission-menu.e2e.js
    Seed: harness.seedBase (Board One: 101 day with A and B, 102 day with C, 103
    night with D; E on annual leave; F standby) plus 104 with nobody on it; Board
-   Two with 201 and a hidden 202; Board Three with nothing on the day but a plan
+   Two with TSTTH.YY.0201 and a hidden TSTTH.YY.0202; Board Three with nothing on the day but a plan
    on the working day before; Board Four, which never works. Exits non-zero on
    the first failed check. */
 "use strict";
@@ -15,6 +15,9 @@ const h = require("./harness");
 const T = h.iso(new Date());
 const SRC = h.isWeekend(T) ? h.prevWorking(T) : T;
 const PREV = h.prevWorking(SRC);
+// Board Two's missions and the number typed in Move: Etraq numbers, as the Move dialog requires a new one to be
+const YY = String(new Date().getFullYear()).slice(2);
+const N201 = `TSTTH.${YY}.0201`, N202 = `TSTTH.${YY}.0202`, N205 = `TSTTH.${YY}.0205`;
 const FC = h.nextWorking(h.nextWorking(h.nextWorking(T)));   // past the confirm horizon: a forecast date
 
 async function step(name, fn) {
@@ -34,8 +37,8 @@ async function step(name, fn) {
     ]);
     db.seed("missions", [
       { id: "s104", board_id: "b1", plan_date: SRC, number: "104", host: "Host Beta", customer: "Cust Gamma", shift: "day", engineer_id: "eng-2" },
-      { id: "s201", board_id: "b2", plan_date: SRC, number: "201", host: "Host Alpha", customer: "Cust Alpha", shift: "day", engineer_id: "eng-1" },
-      { id: "s202", board_id: "b2", plan_date: SRC, number: "202", host: "Host Alpha", customer: "Cust Alpha", shift: "day", engineer_id: "eng-1", hidden: true },
+      { id: "s201", board_id: "b2", plan_date: SRC, number: N201, host: "Host Alpha", customer: "Cust Alpha", shift: "day", engineer_id: "eng-1" },
+      { id: "s202", board_id: "b2", plan_date: SRC, number: N202, host: "Host Alpha", customer: "Cust Alpha", shift: "day", engineer_id: "eng-1", hidden: true },
       { id: "s301", board_id: "b3", plan_date: PREV, number: "301", host: "Host Gamma", customer: "Cust Gamma", shift: "day", engineer_id: "eng-2" },
     ]);
     db.seed("forecast_missions", [
@@ -196,28 +199,31 @@ async function step(name, fn) {
       await p.waitForFunction(() => !document.querySelector("#btn-move-mission").disabled);
       assert.match(await p.locator("#move-mission-summary").innerText(), /Move 101 to Board Two · 2 people return to Standby/);
       assert.match(await p.locator("#move-mission-crew-hint").innerText(), /Person, Person return to Standby on Board One/);
-      await p.fill("#move-mission-number", "201");
-      assert.match(await note.innerText(), /201 is already on Board Two's Day shift/);
-      assert.equal(await go.isDisabled(), true);
-      await p.fill("#move-mission-number", "202");
-      assert.match(await note.innerText(), /202 is a hidden mission on Board Two/);
-      assert.equal(await go.isDisabled(), true);
       await p.fill("#move-mission-number", "205");
+      assert.match(await note.innerText(), /looks like BANGN\.26\.0007/, "a new number must be an Etraq number");
+      assert.equal(await go.isDisabled(), true);
+      await p.fill("#move-mission-number", N201.toLowerCase());
+      assert.match(await note.innerText(), new RegExp(`${N201.replace(/\./g, "\\.")} is already on Board Two's Day shift`));
+      assert.equal(await go.isDisabled(), true);
+      await p.fill("#move-mission-number", N202);
+      assert.match(await note.innerText(), new RegExp(`${N202.replace(/\./g, "\\.")} is a hidden mission on Board Two`));
+      assert.equal(await go.isDisabled(), true);
+      await p.fill("#move-mission-number", N205);
       assert.match(await note.innerText(), /Free on Board Two's Day shift/);
       assert.equal(await go.isDisabled(), false);
     });
 
     await step("Move takes the mission to the other board, renamed, crew back to Standby", async () => {
       await go.click();
-      await p.locator(".toast", { hasText: "205 moved to Board Two" }).waitFor();
+      await p.locator(".toast", { hasText: `${N205} moved to Board Two` }).waitFor();
       assert.equal(mission("s101").board_id, "b2");
-      assert.equal(mission("s101").number, "205");
+      assert.equal(mission("s101").number, N205);
       assert.equal(assigned("e1"), undefined);
       assert.equal(assigned("e2"), undefined);
       assert.equal(await card("101").count(), 0);
       await p.locator(".toast .toast-action", { hasText: "Go to Board Two" }).click();
-      await card("205").waitFor();
-      assert.equal(await card("205").locator(".emp-card").count(), 0);
+      await card(N205).waitFor();
+      assert.equal(await card(N205).locator(".emp-card").count(), 0);
       await goBoard("b1");
     });
 
@@ -294,7 +300,7 @@ async function step(name, fn) {
       const v = await env.openAs(db, h.USERS.v);
       // Board One has been emptied by now; Board Two still has 201
       await v.page.evaluate((d) => { state.date = d; D().activeBoardId = "b2"; return refreshAndRender(); }, SRC);
-      await v.page.locator("#missions-grid .mission-card", { hasText: "201" }).first().locator(".mission-header .m-line2").click({ button: "right" });
+      await v.page.locator("#missions-grid .mission-card", { hasText: N201 }).first().locator(".mission-header .m-line2").click({ button: "right" });
       const labels = (await v.page.locator("#context-menu .ctx-item").allInnerTexts()).map((s) => s.trim());
       assert.deepEqual(labels, ["Mission details", "Copy as text", "Open host location"]);
       assert.deepEqual(v.errors, []);
@@ -305,7 +311,7 @@ async function step(name, fn) {
       const ph = await env.openAs(db, h.USERS.a, { viewport: { width: 390, height: 844 }, touch: true });
       await ph.page.evaluate((d) => { state.date = d; state.unlockedDates.add(d); D().activeBoardId = "b2"; return refreshAndRender(); }, SRC);
       await ph.page.waitForSelector("#splash", { state: "detached" });   // the loading screen catches a touch while it fades
-      const head = ph.page.locator("#missions-grid .mission-card", { hasText: "201" }).first().locator(".mission-header");
+      const head = ph.page.locator("#missions-grid .mission-card", { hasText: N201 }).first().locator(".mission-header");
       await head.scrollIntoViewIfNeeded();
       const box = await head.boundingBox();
       const x = box.x + 8, y = box.y + box.height / 2;   // the middle of the header: Chrome nudges a touch near its edge to the nearest clickable element
@@ -314,7 +320,7 @@ async function step(name, fn) {
       await ph.page.waitForTimeout(700);
       await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       await ph.page.locator("#context-menu:not(.hidden)").waitFor();
-      assert.match(await ph.page.locator("#context-menu .ctx-title").innerText(), /201/);
+      assert.match(await ph.page.locator("#context-menu .ctx-title").innerText(), new RegExp(N201.replace(/\./g, "\\.")));
       assert.equal(await ph.page.locator("#modal-mission:not(.hidden)").count(), 0, "the release did not also open Edit");
       await ph.close();
     });
@@ -323,7 +329,7 @@ async function step(name, fn) {
       await goBoard("b2");
       const before = new Set(await p.evaluate(() => I18N.missing()));
       await p.evaluate(() => I18N.setLang("th"));
-      await card("201").locator(".mission-header .m-line2").click({ button: "right" });
+      await card(N201).locator(".mission-header .m-line2").click({ button: "right" });
       await menu.waitFor();
       assert.match(await menu.innerText(), /แก้ไขมิชชั่น/);
       await menu.locator(".ctx-sub").first().click();   // Move or copy to board
@@ -331,7 +337,7 @@ async function step(name, fn) {
       await p.keyboard.press("Escape");
       await p.evaluate(() => openMoveMissionModal("s201", "b1"));
       await p.waitForFunction(() => !document.querySelector("#btn-move-mission").disabled);
-      await p.fill("#move-mission-number", "205");   // a clash on Board One? no: a free number
+      await p.fill("#move-mission-number", N205);   // a clash on Board One? no: a free number
       await p.fill("#move-mission-number", "");
       await p.fill("#move-mission-number", "9");
       await dlg.locator("input[name=det][value=edit]").check();
@@ -344,7 +350,8 @@ async function step(name, fn) {
         return el.innerText + "\n" + attrs.join("\n");
       });
       console.log(shown);
-      const english = shown.replace(/Board (One|Two|Three|Four)|Host (Alpha|Beta|Gamma)|Cust (Alpha|Beta|Gamma)|Eng (One|Two)|PPE|LINE|undefined|null/g, "")
+      // mission numbers (TSTTH.26.0205, the example BANGN.26.0007) are data, and Etraq is a name
+      const english = shown.replace(/[A-Z][A-Z0-9]{4}\.\d{2}\.(\d{4}|TMP\d{3})|Etraq|Board (One|Two|Three|Four)|Host (Alpha|Beta|Gamma)|Cust (Alpha|Beta|Gamma)|Eng (One|Two)|PPE|LINE|undefined|null/g, "")
         .match(/[A-Za-z]{2,}/g) || [];
       assert.deepEqual(english, []);
       await p.keyboard.press("Escape");

@@ -2651,6 +2651,8 @@ const cloud = {
       ppe: r.ppe || "", remark: r.remark || "", status: r.status, openedOn: r.opened_on || null, lastOn: r.last_on || null,
       closedOn: r.closed_on || null, closedBy: r.closed_by || "", closedAt: r.closed_at || null, closeNote: r.close_note || "",
       source: r.source || "board", updatedAt: r.updated_at || null,
+      // when the mission was first registered: a temporary number's three days count from here
+      createdAt: r.created_at || null,
     };
   },
   /* ---------- shared settings (migration-2026-11-09b) ----------
@@ -2831,6 +2833,23 @@ const cloud = {
   async renumberMissions(items, validFrom) {
     const { data, error } = await sb.rpc("renumber_missions", { p_items: items, p_valid_from: validFrom });
     if (error) throw error;
+    this._invalidatePlans();
+    this._invalidateForecast && this._invalidateForecast();
+    await this.loadMissionRegister();
+    return data || 0;
+  },
+  /* A wrong or temporary mission number corrected on every day: the Missions list rows (all boards,
+     both shifts), the board and forecast days and the Host Record (migration-2026-11-11). Engineer and
+     up, and Site Admin. Returns how many Missions list rows changed. */
+  async replaceMissionNumber(oldNumber, newNumber) {
+    const { data, error } = await sb.rpc("replace_mission_number", { p_old: oldNumber, p_new: newNumber });
+    if (error) {
+      // a database without the migration: PostgREST cannot find the function
+      if (error.code === "PGRST202" || error.code === "42883" || /replace_mission_number/.test(error.message || "") && /find|exist/i.test(error.message || "")) {
+        throw new Error("The database needs a one-time update before a mission number can be corrected: run supabase/migration-2026-11-11-mission-number-rules.sql in the Supabase SQL Editor.");
+      }
+      throw error;
+    }
     this._invalidatePlans();
     this._invalidateForecast && this._invalidateForecast();
     await this.loadMissionRegister();

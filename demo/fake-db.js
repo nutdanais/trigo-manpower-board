@@ -71,6 +71,8 @@ class FakeDb {
     this.missions = opts.missions !== false;
     // migration-2026-11-09b (app_settings: shared settings such as the days that make someone experienced); { appSettings: false } is a database without it
     this.appSettings = opts.appSettings !== false;
+    // migration-2026-11-11 (replace_mission_number); { numberFix: false } is a database without it
+    this.numberFix = this.missions && opts.numberFix !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -397,7 +399,7 @@ class FakeDb {
 
   /* ---------- RPCs ---------- */
   _rpc(q, user) {
-    const fn = this.rpcs[q.fn];
+    const fn = q.fn === "replace_mission_number" && !this.numberFix ? null : this.rpcs[q.fn];
     if (!fn) return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${q.fn} in the schema cache` } };
     if (this._missing({ stamp_carry: "plan_day_stamps", stamp_forecast_merge: "plan_day_stamps", set_forecast_assignment: "forecast_assignments", acknowledge_hold_events: "forecast_hold_events", record_forecast_merge: "forecast_merge_decisions",
       close_mission: "mission_register", reopen_mission: "mission_register", renumber_missions: "mission_register" }[q.fn] || "")) {
@@ -532,7 +534,7 @@ class FakeDb {
       const items = (a.p_items || []).map((it) => ({ old: String(it.old || "").trim().toUpperCase(), new: String(it.new || "").trim().toUpperCase() }));
       const reg = () => this.t("mission_register");
       for (const it of items) {
-        if (!/^[A-Z]{2,10}\.[0-9]{2}\.[0-9]{4}$/.test(it.new)) fail(`Mission number ${it.new} is not in the form PREFIX.YY.NNNN.`, "23514");
+        if (!/^[A-Z][A-Z0-9]{4}\.[0-9]{2}\.[0-9]{4}$/.test(it.new)) fail(`Mission number ${it.new} is not in the form PREFIX.YY.NNNN.`, "23514");
         if (it.new === it.old) continue;
         if (!reg().some((r) => r.number === it.old)) fail(`Mission ${it.old} is not in the Missions list.`, "P0002");
         if (reg().some((r) => r.number === it.new) || items.filter((x) => x.new === it.new).length > 1) fail(`Mission number ${it.new} is already used.`, "23505");
@@ -554,6 +556,32 @@ class FakeDb {
       } finally { this._renumbering = false; }
       this.tables.plan_day_stamps = stamps;
       return n;
+    };
+    /* mirrors public.replace_mission_number (migration-2026-11-11): a wrong or temporary number corrected on
+       every day, every board and shift, the forecast days and the Host Record; the history written; stamps kept */
+    this.rpcs.replace_mission_number = (a, u) => {
+      if (!this._can(u, "missions", "edit")) fail("Your role cannot change mission numbers.", "42501");
+      const from = String(a.p_old || "").trim(), to = String(a.p_new || "").replace(/\s/g, "").toUpperCase();
+      if (!/^[A-Z][A-Z0-9]{4}\.[0-9]{2}\.([0-9]{4}|TMP[0-9]{3})$/.test(to)) fail(`Mission number ${to} is not in the form PREFIX.YY.NNNN (or a temporary PREFIX.YY.TMPNNN).`, "23514");
+      if (to === from) return 0;
+      if (/\.TMP[0-9]{3}$/.test(to) && /^[A-Z][A-Z0-9]{4}\.[0-9]{2}\.[0-9]{4}$/.test(from)) fail(`Mission ${from} already has its Etraq number.`, "23514");
+      const reg = this.t("mission_register").filter((r) => r.number === from);
+      if (!reg.length) fail(`Mission ${from} is not in the Missions list.`, "P0002");
+      if (this.t("mission_register").some((r) => r.number === to) || this.t("missions").some((m) => m.number === to)
+        || this.t("mission_number_history").some((h) => h.old_number === to)) fail(`Mission number ${to} is already used.`, "23505");
+      const firstOn = reg.map((r) => r.opened_on).filter(Boolean).sort()[0] || this.now().slice(0, 10);
+      const stamps = clone(this.t("plan_day_stamps"));
+      this._renumbering = true;
+      try {
+        for (const r of reg) { const prev = clone(r); r.number = to; r.updated_at = this.now(); r.updated_by = email(u); this._emit("mission_register", "UPDATE", r, prev); }
+        for (const t of ["missions"].concat(this.forwardPlanning ? ["forecast_missions"] : [])) {
+          for (const m of this.t(t).filter((m) => m.number === from)) { const prev = clone(m); m.number = to; this._emit(t, "UPDATE", m, prev); }
+        }
+        for (const h of this.t("deployment_history").filter((h) => h.mission_number === from)) h.mission_number = to;
+        this._insertRow("mission_number_history", { old_number: from, new_number: to, valid_from: firstOn, entered_by: email(u), entered_at: this.now() }, u);
+      } finally { this._renumbering = false; }
+      this.tables.plan_day_stamps = stamps;
+      return reg.length;
     };
     this.rpcs.acknowledge_hold_events = (a, u) => {
       let n = 0;

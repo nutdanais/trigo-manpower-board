@@ -7826,3 +7826,25 @@ button.stat-tile.st-click { font: inherit; color: inherit; text-align: left; cur
 .md-t[role="button"] { cursor: pointer; }
 .md-t[role="button"][aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--primary); }
 .md-t[role="button"]:focus-visible { outline: 2px solid var(--primary-text); outline-offset: -2px; }
+
+/* ---------- Wrong and temporary mission numbers (missionNumberIssue in app.js) ---------- */
+/* the flag on a mission card: red for a wrong number and for a temporary one from its third day, quiet before.
+   Plain colours, no color-mix(): the card is inside the JPG capture, but the flag is left out of it. */
+.mission-header .m-num-flag { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font-size: 11.5px; margin-bottom: 3px; color: var(--muted); }
+.mission-header .m-num-flag .ic { width: 12px; height: 12px; margin-right: 3px; vertical-align: -2px; }
+.mission-header .m-num-tag { border-radius: 999px; padding: 0 7px; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .3px;
+  background: var(--bg-soft); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.mission-header .m-num-flag.bad, .mission-header .m-num-flag.late { color: var(--danger-text); }
+.mission-header .m-num-flag.bad .m-num-tag, .mission-header .m-num-flag.late .m-num-tag { background: var(--danger-tint); border-color: var(--danger-line); color: var(--danger-text); }
+.mission-header .m-num-fix { margin-left: auto; border: 1px solid currentColor; background: var(--panel); color: inherit; border-radius: 6px;
+  padding: 0 7px; font: inherit; font-weight: 600; line-height: 18px; cursor: pointer; }
+.mission-header .m-num-flag.temp .m-num-fix { color: var(--primary); }
+.mission-header .m-num-fix:hover { background: var(--hover-tint); }
+body.exporting .mission-header .m-num-flag { display: none; }   /* never baked into an exported JPG or PDF */
+/* the mission form and Fix number: the Etraq number, or a temporary one */
+.num-mode { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.num-mode.hidden { display: none; }
+label.num-opt { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; cursor: pointer; }
+label.num-opt input[type="radio"] { width: auto; flex: none; margin: 0; accent-color: var(--primary); }
+.import-note.fix-bad { color: var(--danger-text); }
+#modal-fix-number form > * + * { margin-top: 10px; }
