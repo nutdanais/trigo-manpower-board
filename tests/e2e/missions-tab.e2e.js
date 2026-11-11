@@ -23,6 +23,8 @@ const SRC = h.isWeekend(T) ? h.prevWorking(T) : T;
 const NEXT = h.nextWorking(T);
 const YY = String(new Date().getFullYear()).slice(2);
 const LY = String(new Date().getFullYear() - 1).slice(2);
+// the Status-and-alerts fixtures, in Etraq's form so the only alerts are the ones each checks
+const Q108 = `TSTTH.${YY}.0108`, Q109 = `TSTTH.${YY}.0109`, Q110 = `TSTTH.${YY}.0110`, Q112 = `TSTTH.${YY}.0112`;
 const OLD = `TSTTH.${LY}.0005`, NEW = `TSTTH.${YY}.0050`, M7 = `TSTTH.${YY}.0007`, M90 = `TSTTH.${YY}.0090`;
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "missions-"));
 const SITE = { id: "00000000-0000-0000-0000-00000000000d", email: "site.d@example.com", role: "siteadmin" };
@@ -160,10 +162,10 @@ async function step(name, fn) {
       for (let i = 0; i < 7; i++) wd.push(h.prevWorking(wd[wd.length - 1]));
       const mk = (id, num, day, extra = {}) => ({ id: `${id}-${day}`, board_id: "b2", plan_date: day, number: num, host: "Host Delta", customer: "Cust " + num, shift: "day", engineer_id: "eng-1", ...extra });
       db.seed("missions", [
-        ...wd.map((d) => mk("q8", "108", d)),
-        ...wd.map((d) => mk("q9", "109", d, { hidden: true })),
-        mk("q10", "110", wd[7]), mk("q10", "110", wd[6]),
-        ...[0, 1, 2].map((i) => mk("q12", "112", wd[i], { ppe: "Helmet and gloves", remark: "Check the labels", start_time: "07:30:00", end_time: "16:30:00" })),
+        ...wd.map((d) => mk("q8", Q108, d)),
+        ...wd.map((d) => mk("q9", Q109, d, { hidden: true })),
+        mk("q10", Q110, wd[7]), mk("q10", Q110, wd[6]),
+        ...[0, 1, 2].map((i) => mk("q12", Q112, wd[i], { ppe: "Helmet and gloves", remark: "Check the labels", start_time: "07:30:00", end_time: "16:30:00" })),
       ]);
       db.seed("assignments", [
         { employee_id: "e1", plan_date: wd[1], mission_id: `q12-${wd[1]}`, zone: null },
@@ -173,51 +175,51 @@ async function step(name, fn) {
       await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister().then(refreshAndRender); });
       const alerts = (n) => row(p, n).locator(".ml-alerts").innerText();
       // on the board, nobody on it for 8 working days in a row: a red alert with the short text; Close… is the row's own action
-      assert.match(await row(p, "108").innerText(), /On board/);
-      assert.match(await alerts("108"), /^No crew, 8 days$/);
-      assert.doesNotMatch(await alerts("108"), /Close\?/, "the alert states the problem and asks nothing");
-      assert.equal(await row(p, "108").locator(".lt-st").count(), 1, "exactly one status pill");
-      assert.equal(await row(p, "108").locator(".lt-al").count(), 1, "exactly one alert");
-      assert.equal(await row(p, "108").locator(".lt-al").evaluate((el) => !el.closest("button") && el.tagName !== "BUTTON"), true, "the alert is not a button");
-      assert.equal(await row(p, "108").locator(".ml-alerts button, .ml-alerts .ml-tag").count(), 0, "no pill, no button in the alert");
-      assert.equal(await row(p, "108").locator(".lt-al-bad").count(), 1, "over 5 working days is red");
-      assert.equal(await row(p, "108").locator("button[data-act=close]").count(), 1, "Close… stays on the row");
-      assert.match(await row(p, "108").locator("td.ml-status").innerText(), /On board[\s\S]*No crew/, "the state and the alert share one cell, the pill on line 1 and the alert under it");
-      assert.equal(await row(p, "108").locator("td.ml-status .lt-l1 .lt-st").count(), 1);
-      assert.equal(await row(p, "108").locator("td.ml-status .lt-l2 .lt-al").count(), 1);
-      assert.equal(await row(p, "108").locator("td.ml-board-cell .lt-bd").count(), 1, "the board is the square tag, in the Board and area cell");
+      assert.match(await row(p, Q108).innerText(), /On board/);
+      assert.match(await alerts(Q108), /^No crew, 8 days$/);
+      assert.doesNotMatch(await alerts(Q108), /Close\?/, "the alert states the problem and asks nothing");
+      assert.equal(await row(p, Q108).locator(".lt-st").count(), 1, "exactly one status pill");
+      assert.equal(await row(p, Q108).locator(".lt-al").count(), 1, "exactly one alert");
+      assert.equal(await row(p, Q108).locator(".lt-al").evaluate((el) => !el.closest("button") && el.tagName !== "BUTTON"), true, "the alert is not a button");
+      assert.equal(await row(p, Q108).locator(".ml-alerts button, .ml-alerts .ml-tag").count(), 0, "no pill, no button in the alert");
+      assert.equal(await row(p, Q108).locator(".lt-al-bad").count(), 1, "over 5 working days is red");
+      assert.equal(await row(p, Q108).locator("button[data-act=close]").count(), 1, "Close… stays on the row");
+      assert.match(await row(p, Q108).locator("td.ml-status").innerText(), /On board[\s\S]*No crew/, "the state and the alert share one cell, the pill on line 1 and the alert under it");
+      assert.equal(await row(p, Q108).locator("td.ml-status .lt-l1 .lt-st").count(), 1);
+      assert.equal(await row(p, Q108).locator("td.ml-status .lt-l2 .lt-al").count(), 1);
+      assert.equal(await row(p, Q108).locator("td.ml-board-cell .lt-bd").count(), 1, "the board is the square tag, in the Board and area cell");
       assert.equal(await p.locator("#missions-table th", { hasText: /^Alerts$/ }).count(), 0, "no separate Alerts column");
       // one day with nobody on it is amber and has no Close
       assert.match(await alerts(M7), /No crew, 1 day\b/);
       assert.equal(await row(p, M7).locator(".lt-al-warn").count(), 1);
       assert.equal(await row(p, M7).locator(".ml-alerts button").count(), 0);
       // hidden on every one of its days
-      assert.match(await row(p, "109").locator("td.ml-status").innerText(), /Hidden/);
-      assert.match(await alerts("109"), /^Hidden 8 days$/);
+      assert.match(await row(p, Q109).locator("td.ml-status").innerText(), /Hidden/);
+      assert.match(await alerts(Q109), /^Hidden 8 days$/);
       // off the board: it had days and has none on the latest working day
-      assert.match(await row(p, "110").locator("td.ml-status").innerText(), /Off the board/);
-      assert.match(await alerts("110"), /^Off 6 days$/);
-      assert.equal(await row(p, "110").locator("button.lt-act[data-act=add]").count(), 1, "Add to board is only offered off the board, as a text action");
-      assert.equal(await row(p, "108").locator("button[data-act=add]").count(), 0, "not for a mission already on its board");
+      assert.match(await row(p, Q110).locator("td.ml-status").innerText(), /Off the board/);
+      assert.match(await alerts(Q110), /^Off 6 days$/);
+      assert.equal(await row(p, Q110).locator("button.lt-act[data-act=add]").count(), 1, "Add to board is only offered off the board, as a text action");
+      assert.equal(await row(p, Q108).locator("button[data-act=add]").count(), 0, "not for a mission already on its board");
       // the average crew: (0 + 1 + 2) / 3 people a day on its three days
-      assert.equal((await row(p, "112").locator(".ml-avg").innerText()).trim(), "1.0");
-      assert.equal((await row(p, "112").locator(".ml-crew .lt-l2").innerText()).trim(), "avg 1.0", "the average is under the crew");
+      assert.equal((await row(p, Q112).locator(".ml-avg").innerText()).trim(), "1.0");
+      assert.equal((await row(p, Q112).locator(".ml-crew .lt-l2").innerText()).trim(), "avg 1.0", "the average is under the crew");
       // the Crew column: the people on it on the day on screen, from its own board
       const original = await p.evaluate(() => state.date);
       const crewOn = async (day, num) => { await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, day); return (await row(p, num).locator(".ml-crew .lt-l1").innerText()).trim(); };
-      assert.equal(await crewOn(wd[2], "112"), "2");
-      assert.equal(await crewOn(wd[1], "112"), "1");
-      assert.equal(await crewOn(wd[2], "108"), "0", "on the board with nobody on it");
-      assert.equal(await crewOn(wd[2], "110"), "\u2014", "not on its board that day");
-      assert.match(await crewOn(wd[2], "109"), /Hidden/i);
-      assert.equal(await crewOn(NEXT, "112"), "\u2014", "a day with no plan yet, outside the six weeks, is read on its own");
+      assert.equal(await crewOn(wd[2], Q112), "2");
+      assert.equal(await crewOn(wd[1], Q112), "1");
+      assert.equal(await crewOn(wd[2], Q108), "0", "on the board with nobody on it");
+      assert.equal(await crewOn(wd[2], Q110), "\u2014", "not on its board that day");
+      assert.match(await crewOn(wd[2], Q109), /Hidden/i);
+      assert.equal(await crewOn(NEXT, Q112), "\u2014", "a day with no plan yet, outside the six weeks, is read on its own");
       assert.match(await p.locator("#missions-crew-date").innerText(), /\d/, "the header names the day");
       await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, original);
       // the Time, PPE and Remark columns come from the mission's latest day; search finds a remark
       const cell = async (num, label) => (await row(p, num).locator(`td[data-label="${label}"]`).innerText()).trim();
-      assert.equal(await cell("112", "Time"), "07:30\u201316:30");
-      assert.equal(await cell("112", "PPE"), "Helmet and gloves");
-      assert.equal(await cell("112", "Remark"), "Check the labels");
+      assert.equal(await cell(Q112, "Time"), "07:30\u201316:30");
+      assert.equal(await cell(Q112, "PPE"), "Helmet and gloves");
+      assert.equal(await cell(Q112, "Remark"), "Check the labels");
       await p.fill("#missions-search", "check the labels");
       await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length === 1);
       await p.fill("#missions-search", "");
@@ -230,19 +232,19 @@ async function step(name, fn) {
       await p.locator("#missions-filters .ms[data-filter=alerts] .ms-btn").click();
       await p.locator("#missions-filters .ms[data-filter=alerts] .ms-opt", { hasText: /^No crew for over 5 working days$/ }).locator("input").check();
       await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length === 1);
-      assert.equal(await row(p, "108").count(), 1);
+      assert.equal(await row(p, Q108).count(), 1);
       await p.locator("#missions-filters .ms[data-filter=alerts] .ms-clear").click();
       await p.evaluate(() => closeFilterPops());
       await p.locator("#missions-filters .ms[data-filter=placement] .ms-btn").click();
       await p.locator("#missions-filters .ms[data-filter=placement] .ms-opt", { hasText: "Hidden" }).locator("input").check();
       await p.waitForFunction(() => document.querySelectorAll("#missions-body tr").length === 1);
-      assert.equal(await row(p, "109").count(), 1);
+      assert.equal(await row(p, Q109).count(), 1);
       await p.locator("#missions-filters .ms[data-filter=placement] .ms-clear").click();
       await p.keyboard.press("Escape");
       // Close… on the row opens the close dialog for that mission
-      await row(p, "108").locator("button[data-act=close]").click();
+      await row(p, Q108).locator("button[data-act=close]").click();
       await p.locator("#modal-close-mission:not(.hidden)").waitFor();
-      assert.match(await p.locator("#close-mission-title").innerText(), /Close mission 108/);
+      assert.match(await p.locator("#close-mission-title").innerText(), new RegExp(`Close mission ${Q108.replace(/\./g, "\\.")}`));
       await p.evaluate(() => closeModal());
       // the Host name opens that host's record (Batch D), over the Missions tab: the Host tab is not switched to
       await row(p, M7).locator(".ml-host-link").click();
@@ -254,7 +256,7 @@ async function step(name, fn) {
       const drop = (t, f) => { const a = db.t(t); for (let i = a.length - 1; i >= 0; i--) if (f(a[i])) a.splice(i, 1); };
       drop("assignments", (x) => String(x.mission_id || "").startsWith("q12-"));
       drop("missions", (x) => /^q\d+-/.test(x.id));
-      drop("mission_register", (x) => ["108", "109", "110", "112"].includes(x.number));
+      drop("mission_register", (x) => [Q108, Q109, Q110, Q112].includes(x.number));
       await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister().then(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); }); });
       assert.equal(await p.locator("#missions-body tr").count(), 7);
     });
@@ -428,7 +430,14 @@ async function step(name, fn) {
       await p.locator("#modal-profile:not(.hidden) .rp-group").first().waitFor();
       assert.equal(await widthOf("#modal-profile"), 760, "the profile and the mission panel are one width");
       await p.evaluate(() => closeModal());
-      // a mission with no alert has no box and no Flags line
+      // a mission with no alert has no box and no Flags line. The seed's 101-103 now carry a Wrong number alert, so a clean
+      // one (an Etraq number, a crew, a responsible) is put on the day for this check and taken off after it
+      const CLEAN = `TSTTH.${YY}.0444`;
+      if (!db.t("assignments").some((x) => x.employee_id === "e6" && x.plan_date === SRC)) {
+        db.seed("missions", [{ id: "clean1", board_id: "b1", plan_date: SRC, number: CLEAN, host: "Host Beta", customer: "Cust Clean", shift: "day", engineer_id: "eng-1" }]);
+        db.seed("assignments", [{ employee_id: "e6", plan_date: SRC, mission_id: "clean1", zone: null }]);
+      }
+      await p.evaluate(() => { state.missions.activityKey = null; return cloud.loadMissionRegister(); });
       await goMissions(p);
       const clean = await p.evaluate(() => { const r = D().register.find((x) => x.status === "open" && missionAlerts(x, missionPlacement(x)).length === 0 && missionPlacement(x).kind === "on"); return r && r.number; });
       assert.ok(clean, "some open mission has no alert");
@@ -438,6 +447,10 @@ async function step(name, fn) {
       assert.equal(await p.locator("#mission-detail .rp-alert").count(), 0, "no alert, no box: " + clean + " " + await p.locator("#mission-detail .rp-alert").allInnerTexts());
       assert.equal(await p.locator("#mission-detail").innerText().then((t) => /Flags/.test(t)), false);
       await p.evaluate(() => closeModal());
+      db.tables.assignments = db.t("assignments").filter((x) => x.mission_id !== "clean1");
+      db.tables.missions = db.t("missions").filter((x) => x.id !== "clean1");
+      db.tables.mission_register = db.t("mission_register").filter((x) => x.number !== CLEAN);
+      await p.evaluate(() => { state.missions.activityKey = null; cloud.data.plans = {}; return cloud.loadMissionRegister().then(refreshAndRender); });
       // the form's footer stays in view with the fields scrolled to the end, on a desktop and at 390px
       const footer = () => p.evaluate(() => {
         const f = document.querySelector("#form-mission .rp-foot").getBoundingClientRect(), m = document.querySelector("#modal-mission").getBoundingClientRect();

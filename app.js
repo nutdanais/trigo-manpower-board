@@ -477,7 +477,7 @@ const state = {
   settingsReturn: null,       // {scrollY} of the page underneath, put back on "Back to board"
   settingsStale: false,       // a live update arrived while a field had focus: redraw once it leaves
   settingsSave: { phase: "clean" },   // clean | dirty | saving | saved | error, per the open section
-  settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, hostexp: {}, roles: {} },   // staged edits, by section
+  settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, hostexp: {}, missionnum: {}, roles: {} },   // staged edits, by section
   rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
   svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
@@ -3289,8 +3289,19 @@ function renderMissions() {
     // a new-year number: the old one stays beside it for two weeks (cloud.recentOldNumber)
     const oldNumber = missionsOn() ? cloud.recentOldNumber(m.number, todayStr()) : null;
     const wasLine = oldNumber
-      ? `<div class="m-was-line" title="This mission's number changed for the new year. The old number is shown here for two weeks after the change."><span class="m-was-tag">New number</span> was <b data-no-i18n>${escapeHtml(oldNumber)}</b></div>` : "";
-    header.innerHTML = `${hlTag}${wasLine}
+      ? `<div class="m-was-line" title="This mission's number changed (a new-year number, or a corrected one). The old number is shown here for two weeks after the change."><span class="m-was-tag">New number</span> was <b data-no-i18n>${escapeHtml(oldNumber)}</b></div>` : "";
+    // a wrong number, or a temporary one: a flag until somebody corrects it (missionNumberIssue; never in an export)
+    const numIssue = !fcView ? missionNumberIssue(m.number) : null;
+    const canFixNumber = numIssue && can("missions", "edit");
+    const numLine = !numIssue ? ""
+      : `<div class="m-num-flag ${numIssue.kind === "bad" ? "bad" : numIssue.overdue ? "late" : "temp"}" title="${escapeHtml(numIssue.kind === "bad"
+          ? `This number is not in the Etraq format (${MissionNumber.EXAMPLE}). Correct it on the board or on the Missions tab.`
+          : numIssue.overdue ? `Still on a temporary number ${numIssue.days} days after the mission was created. Enter the Etraq number.`
+          : "A temporary number until the Site Admin registers the mission in Etraq.")}">`
+        + `<span class="m-num-tag">${numIssue.kind === "temp" && !numIssue.overdue ? "" : icon("alert")}${numIssue.kind === "bad" ? "Wrong number" : "Temporary number"}</span>`
+        + `<span class="m-num-text">${numIssue.kind === "bad" ? "Not in Etraq format" : numIssue.overdue ? `${numIssue.days} days: enter the Etraq number` : "Etraq number to follow"}</span>`
+        + (canFixNumber ? `<button type="button" class="m-num-fix">Fix number</button>` : "") + `</div>`;
+    header.innerHTML = `${hlTag}${wasLine}${numLine}
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>
@@ -3313,6 +3324,11 @@ function renderMissions() {
     // double-click, like a person's card, a Manpower row, a Host row and a Missions row; a long press (or a
     // right-click) opens the quick panel, whose first item is Edit mission, so a touch screen has it too
     header.ondblclick = () => openMissionModal(m.id);
+    const fixBtn = header.querySelector(".m-num-fix");
+    if (fixBtn) {
+      fixBtn.onclick = (ev) => { ev.stopPropagation(); openFixNumberModal(m.number); };
+      fixBtn.ondblclick = (ev) => ev.stopPropagation();
+    }
     // the quick panel: right-click anywhere on the card (a person's card inside
     // it keeps its own menu), or hold the header on a phone
     card.addEventListener("contextmenu", (ev) => {
@@ -9510,6 +9526,16 @@ function missionAlerts(r, p) {
       text: `Needs ${year} number`,
       title: late ? `Still on last year's number after ${d} days` : "The board keeps running on last year's number until the new one is entered" });
   }
+  // a wrong number, or a temporary one (red from the third day after the mission was created)
+  const ni = missionNumberIssue(r.number);
+  if (ni && ni.kind === "bad") {
+    out.push({ kinds: ["numberBad", "numberFix"], level: 2, close: false, fixNumber: true, text: "Wrong number",
+      title: `Not in the Etraq format (${MissionNumber.EXAMPLE}): a typo or extra characters` });
+  } else if (ni) {
+    out.push({ kinds: ni.overdue ? ["numberTemp", "numberFix"] : ["numberTemp"], level: ni.overdue ? 2 : 0, close: false, fixNumber: true,
+      text: ni.overdue ? `Temporary number, ${ni.days} days` : "Temporary number",
+      title: ni.overdue ? `Still on a temporary number ${ni.days} days after the mission was created` : "Started before Etraq had a number for it" });
+  }
   if (!r.engineerId) out.push({ kinds: ["noEngineer"], level: 1, close: false, text: "No responsible", title: "Nobody is named as this mission's Trigo responsible" });
   return out.sort((x, y) => y.level - x.level);
 }
@@ -9590,7 +9616,9 @@ function missionFilterOptions(key) {
   if (key === "alerts") return [
     { value: "noCrew", label: "No crew" }, { value: "noCrewLong", label: "No crew for over 5 working days" },
     { value: "hidden", label: "Hidden for over 5 working days" }, { value: "offBoard", label: "Off the board for over 5 working days" },
-    { value: "number", label: "New-year number" }, { value: "noEngineer", label: "No Trigo responsible" },
+    { value: "number", label: "New-year number" }, { value: "numberFix", label: "Mission number to fix" },
+    { value: "numberBad", label: "Wrong mission number" }, { value: "numberTemp", label: "Temporary number" },
+    { value: "noEngineer", label: "No Trigo responsible" },
     { value: "highlighted", label: "Highlighted on the board" },
   ];
   const rows = missionScopeRows();
@@ -9680,6 +9708,7 @@ function renderMissionStats(bar) {
   const closed = all.length - open;
   const waiting = newYearWaiting().filter(w => w.rows.some(r => !state.missions.boardId || r.boardId === state.missions.boardId)).length;
   const late = MissionNumber.daysWaiting(todayStr()) > MissionNumber.ALERT_AFTER_DAYS;
+  const toFix = missionNumbersToFix(state.missions.boardId).length;
   // By area: the service area of each mission's host, counted over what the Board picker and Open / Closed / All leave
   const areaBar = $("#area-bar");
   const scope = missionScopeRows();
@@ -9711,6 +9740,7 @@ function renderMissionStats(bar) {
   bar.innerHTML = `<div class="stat-lead" data-stat="Total" title="${leadTitle}"><span class="st-l">Total</span><b>${all.length}</b><small class="st-year">${withEarlier ? "all years" : `in ${year}`}</small></div>` +
     pickTile("Open", open, "perm", "open") + pickTile("Closed", closed, "inactive", "closed") + (noCrew ? tile("No crew", noCrew, "noloc") : "") +
     (waiting ? tile("No new-year number", waiting, late ? "standby" : "leave") : "") +
+    (toFix ? tile("Number to fix", toFix, "standby") : "") +
     // the proportion bar under the tiles, as on Manpower and Host: open and closed missions
     `<div class="st-split" aria-hidden="true">${[["perm", open], ["inactive", closed]].filter(([, n]) => n > 0)
       .map(([k, n]) => `<i class="st-${k}" style="flex:${n}"></i>`).join("")}</div>`;
@@ -9725,9 +9755,11 @@ function renderMissionStats(bar) {
     head: `<b>${open}</b><span class="ms-w"> open</span>`,
     label: withEarlier ? `${all.length} missions: ${open} open, ${closed} closed` : `${all.length} missions in ${year}: ${open} open, ${closed} closed`,
     // the head already says how many are open; the dots after it carry their names
-    keys: [["inactive", closed, "Closed", false, true]].concat(noCrew ? [["noloc", noCrew, "No crew", true, true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    keys: [["inactive", closed, "Closed", false, true]].concat(noCrew ? [["noloc", noCrew, "No crew", true, true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : [])
+      .concat(toFix ? [["standby", toFix, "Number to fix", true]] : []),
     bar: [["perm", open], ["inactive", closed]],
-    tiles: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : []),
+    tiles: [["perm", open, "Open"], ["inactive", closed, "Closed"]].concat(noCrew ? [["noloc", noCrew, "No crew", true]] : []).concat(waiting ? [["standby", waiting, "No new-year number", late]] : [])
+      .concat(toFix ? [["standby", toFix, "Number to fix", true]] : []),
     areaHtml,
     filterCount: (state.missions.search ? 1 : 0) + (state.missions.boardId ? 1 : 0) + missionFilterCount(),
   });
@@ -9782,6 +9814,24 @@ function renderMissionList() {
       alertBox.appendChild(b);
     }
   }
+  // wrong and temporary numbers: a banner while any needs correcting, with the way to the rows
+  const fixList = missionNumbersToFix(st.boardId);
+  const fixBox = $("#missions-numfix");
+  fixBox.className = fixList.length ? "ml-alert ml-alert-late" : "hidden";
+  if (fixList.length) {
+    const bad = fixList.filter(f => f.issue.kind === "bad").length, temp = fixList.length - bad;
+    // a sentence each, so each is translated whole
+    const sentences = [bad ? plural(bad, "mission has a wrong number.", "missions have a wrong number.") : "",
+      temp ? plural(temp, "mission is still on a temporary number after 3 days.", "missions are still on a temporary number after 3 days.") : "",
+      can("missions", "edit") ? "Correct them with the Etraq number, so the board, the Host Record and the reports match Etraq."
+        : "An engineer or a Site Admin corrects them with the Etraq number."].filter(Boolean);
+    fixBox.innerHTML = `<span class="ml-alert-ic">${icon("alert")}</span><span class="ml-alert-text">${sentences.map(t => `<span>${escapeHtml(t)}</span>`).join(" ")}</span>`;
+    const showing = st.filters.alerts.length === 1 && st.filters.alerts[0] === "numberFix";
+    const b = Object.assign(document.createElement("button"), { type: "button", className: "btn btn-small" + (showing ? "" : " btn-primary") });
+    b.textContent = showing ? "Show all" : "Show them";
+    b.onclick = () => { st.filters.alerts = showing ? [] : ["numberFix"]; renderMissionList(); renderStats(); };
+    fixBox.appendChild(b);
+  }
   // the table
   const rows = missionRows();
   $("#missions-count").textContent = plural(rows.length, "mission", "missions");
@@ -9818,6 +9868,9 @@ function renderMissionList() {
       : info.day.hidden ? `<span class="ml-muted" title="${dayTitle("Hidden on its board that day")}">${dayTitle("Hidden")}</span>`
       : info.day.crew ? `<b>${info.day.crew}</b>` : `<span class="ml-zero" title="${dayTitle("Nobody is on it that day")}">0</span>`;
     // a gold star before the number when the day on screen is highlighted on the board (the tooltip is the highlight's label)
+    // a wrong number, or a temporary one from its third day: the number itself in bold red with a warning mark
+    const numFix = r.status === "open" && info.alerts.some(a => a.kinds.includes("numberFix"));
+    const numMark = numFix ? `<span class="ml-num-mark" title="${escapeHtml(lbl(info.alerts.some(a => a.kinds.includes("numberBad")) ? "Wrong number" : "Temporary number"))}">${icon("alert")}</span>` : "";
     const hl = r.status !== "closed" && info.day && info.day.highlight ? info.day : null;
     const star = hl ? `<span class="ml-star" title="${escapeHtml(highlightLabel({ highlight: hl.highlight, highlightNote: hl.note }))}">${icon("star")}</span>` : "";
     const when = r.openedOn || r.lastOn
@@ -9830,7 +9883,7 @@ function renderMissionList() {
     // data-label: the phone shows each row as a card with these as its field names; data-col names the column for Columns
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}${mine ? " selected" : ""}">
       <td class="el-check" data-col="check">${canClose ? `<input type="checkbox" ${mine ? "checked" : ""} aria-label="${lbl("Select")}">` : ""}</td>
-      <td data-col="mission" class="ml-first">${ltCell(`${star}<b class="ml-num">${escapeHtml(r.number)}</b>`, r.customer ? escapeHtml(r.customer) : emptyCell(), { title: prev ? `was ${prev}` : "" })}${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
+      <td data-col="mission" class="ml-first">${ltCell(`${star}${numMark}<b class="ml-num${numFix ? " ml-num-fix" : ""}">${escapeHtml(r.number)}</b>`, r.customer ? escapeHtml(r.customer) : emptyCell(), { title: prev ? `was ${prev}` : "" })}${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
       <td data-label="${lbl("Status")}" data-col="status" class="ml-status">${ltCell(missionStatusHtml(r, info.p), missionAlertsHtml(r, info), { keep: true })}</td>
       <td data-label="${lbl("Board")}" data-col="boardarea" class="ml-board-cell">${ltCell(boardChipHtml(boardNameOf(r.boardId)), area ? areaMarkHtml(area) : emptyCell())}</td>
       <td data-label="${lbl("Host")}" data-col="host" class="ml-host-cell">${ltCell(host, eng)}</td>
@@ -9886,6 +9939,7 @@ function renderMissionRowMenu({ addTitle, addItem }) {
   const hasDay = r.status === "open" && p.kind !== "notstarted";
   addTitle(`${r.number} · ${r.shift === "night" ? "Night" : "Day"}`);
   addItem("Mission details", () => openMissionFromList(r), null, "clipboard");
+  if (r.status === "open" && can("missions", "edit") && missionNumberIssue(r.number)) addItem("Fix mission number…", () => openFixNumberModal(r.number), null, "edit");
   if (canPlan && onBoard && feat().highlight) addItem("Highlight…", () => openMissionFromList(r, { then: "btn-md-hl" }), null, "star");
   if (canPlan && hasDay) addItem("Duplicate", () => openMissionFromList(r, { then: "btn-md-dup" }), null, "copy");
   if (canPlan && hasDay && D().boards.length > 1) addItem("Move or copy…", () => openMissionFromList(r, { then: "btn-md-move" }), null, "swap");
@@ -10102,6 +10156,132 @@ function closeWaitingMission(oldNumber) {
       await refreshAndRender();
       openNewYearModal();
     }), () => openModal("#modal-newyear"));
+}
+
+/* ---------- Wrong and temporary mission numbers (mission-number.js, migration-2026-11-11) ----------
+   A mission number is the Etraq number, PREFIX.YY.NNNN. A number typed before the rule was strict (a typo,
+   extra characters, "108") is flagged on its card and on the Missions tab until somebody corrects it; a
+   mission started before Etraq had a number runs on a temporary PREFIX.YY.TMPNNN, flagged from the third
+   day after it was created. Fix number replaces either on every day (cloud.replaceMissionNumber). */
+
+/* every number the app knows, the replaced ones included: a temporary number is never given out twice */
+function knownMissionNumbers() {
+  const out = new Set();
+  for (const r of D().register || []) out.add(r.number);
+  for (const h of D().numberHistory || []) { out.add(h.oldNumber); out.add(h.newNumber); }
+  for (const m of getPlan().missions || []) out.add(m.number);
+  return out;
+}
+/* the site codes in use, most used first; `boardId` puts that board's own first */
+function knownMissionPrefixes(boardId) {
+  const count = new Map();
+  for (const r of D().register || []) {
+    const p = MissionNumber.prefixOf(r.number);
+    if (p) count.set(p, (count.get(p) || 0) + (r.boardId === boardId ? 1000 : 1));
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([p]) => p);
+}
+function renderMissionPrefixOptions(boardId) {
+  const dl = $("#mission-prefix-options");
+  if (dl) dl.innerHTML = knownMissionPrefixes(boardId).map(p => `<option value="${escapeHtml(p)}"></option>`).join("");
+}
+/* What a number needs: null for an Etraq number (or before the Missions list exists); { kind: "bad" } for a wrong
+   one; { kind: "temp", days, overdue } for a temporary one, its days counted from when the mission was first
+   registered (its earliest row: Day and Night, and every board, share the number). */
+function missionNumberIssue(number) {
+  if (!missionsOn()) return null;
+  const kind = MissionNumber.kindOf(number);
+  if (kind === "real") return null;
+  if (kind === "bad") return { kind };
+  const since = (D().register || []).filter(r => r.number === number).map(r => r.createdAt || r.openedOn).filter(Boolean).sort()[0] || null;
+  const today = todayStr();
+  return { kind, days: since ? MissionNumber.daysSince(since, today) : 0, overdue: !!since && MissionNumber.tempOverdue(since, today) };
+}
+/* the open missions whose number needs correcting now: wrong ones, and temporary ones from the third day.
+   One entry per number, with its rows; `boardId` keeps the ones on that board. */
+function missionNumbersToFix(boardId) {
+  if (!missionsOn()) return [];
+  const by = new Map();
+  for (const r of D().register || []) {
+    if (r.status !== "open" || (boardId && r.boardId !== boardId)) continue;
+    const issue = missionNumberIssue(r.number);
+    if (!issue || (issue.kind === "temp" && !issue.overdue)) continue;
+    if (!by.has(r.number)) by.set(r.number, { number: r.number, issue, rows: [] });
+    by.get(r.number).rows.push(r);
+  }
+  return [...by.values()].sort((a, b) => a.number.localeCompare(b.number));
+}
+
+/* Fix number: one mission number corrected on every day, from a card's flag, a Missions row or the mission panel */
+let _fixingNumber = null;
+function openFixNumberModal(number) {
+  if (!can("missions", "edit")) { toast("Your role cannot change mission numbers. An engineer or a Site Admin can.", "info"); return; }
+  const rows = (D().register || []).filter(r => r.number === number);
+  if (!rows.length) { toast(`${number} is not in the Missions list yet. Save the day first, then fix its number.`, "info"); return; }
+  const issue = missionNumberIssue(number) || { kind: MissionNumber.kindOf(number) };
+  _fixingNumber = { number, rows, issue };
+  const first = rows[0];
+  const boards = [...new Set(rows.map(r => boardNameOf(r.boardId)))].join(", ");
+  const shifts = [...new Set(rows.map(r => r.shift === "night" ? "Night" : "Day"))].join(" + ");
+  $("#fix-number-title").textContent = `Fix mission number ${number}`;
+  $("#fix-number-what").textContent = `${boards} · ${shifts} · ${first.host || "—"} → ${first.customer || "—"}`;
+  $("#fix-number-why").textContent = issue.kind === "temp"
+    ? `${number} is a temporary number${issue.days ? `, made ${issue.days === 1 ? "1 day" : issue.days + " days"} ago` : ""}. Type the number Etraq gave this mission once the Site Admin has registered it.`
+    : `${number} is not an Etraq number. A mission number looks like ${MissionNumber.EXAMPLE}: the ${MissionNumber.prefixLength}-character site code, the year's two digits and four digits.`;
+  const form = $("#form-fix-number");
+  form.reset();
+  // a wrong number may become a temporary one while Etraq has none yet; a temporary one only takes the Etraq number
+  $("#fix-number-mode").classList.toggle("hidden", issue.kind !== "bad");
+  const prefix = MissionNumber.prefixOf(number) || knownMissionPrefixes(first.boardId)[0] || "";
+  form.sitecode.value = prefix;
+  form.sitecode.maxLength = MissionNumber.prefixLength;
+  form.sitecode.placeholder = `e.g. ${MissionNumber.SITE_EXAMPLE}`;
+  form.number.placeholder = `e.g. ${(prefix || MissionNumber.SITE_EXAMPLE)}.${todayStr().slice(2, 4)}.0007`;
+  renderMissionPrefixOptions(first.boardId);
+  updateFixNumberState();
+  openModal("#modal-fix-number");
+  setTimeout(() => form.number.focus(), 0);
+}
+/* { ok, number, error } for what the dialog would save */
+function fixNumberChoice() {
+  const form = $("#form-fix-number"), f = _fixingNumber;
+  if (!f) return { ok: false, error: null };
+  const temp = f.issue.kind === "bad" && form.numMode.value === "temp";
+  if (temp) {
+    const pc = MissionNumber.checkPrefix(form.sitecode.value);
+    if (!pc.ok) return { ok: false, error: form.sitecode.value.trim() ? pc.error : null };
+    const n = MissionNumber.nextTemp(pc.prefix, todayStr(), knownMissionNumbers());
+    return n ? { ok: true, number: n, temp: true } : { ok: false, error: `${pc.prefix} has used every temporary number this year.` };
+  }
+  if (!form.number.value.trim()) return { ok: false, error: null };
+  const c = MissionNumber.checkReplacement(f.number, form.number.value);
+  if (!c.ok) return c;
+  if (knownMissionNumbers().has(c.number)) return { ok: false, number: c.number, error: `${c.number} is already used by another mission.` };
+  return c;
+}
+function updateFixNumberState() {
+  const form = $("#form-fix-number");
+  const temp = !$("#fix-number-mode").classList.contains("hidden") && form.numMode.value === "temp";
+  $("#fix-number-etraq-row").classList.toggle("hidden", temp);
+  $("#fix-number-prefix-row").classList.toggle("hidden", !temp);
+  const c = fixNumberChoice();
+  const note = $("#fix-number-preview");
+  note.textContent = c.error || (c.ok ? (c.temp ? `It gets the temporary number ${c.number}.` : `${_fixingNumber.number} becomes ${c.number}.`) : "");
+  note.classList.toggle("fix-bad", !!c.error);
+  $("#btn-fix-number-go").disabled = !c.ok;
+}
+function submitFixNumber(ev) {
+  ev.preventDefault();
+  const f = _fixingNumber, c = fixNumberChoice();
+  if (!f || !c.ok) { if (c.error) toast(c.error, "warn"); return; }
+  safely(async () => {
+    await cloud.replaceMissionNumber(f.number, c.number);
+    closeModal();
+    toast(`${f.number} is now ${c.number} on every day of the mission.`, "info");
+    _fixingNumber = null;
+    state.missions.activityKey = null;   // the crew facts are read by number
+    await refreshAndRender();
+  });
 }
 
 /* Before a mission is saved with a new number: the Missions list's rules. A number is unique
@@ -11910,6 +12090,55 @@ function fillMissionForm(src, missionId, opts = {}) {
   }
   updateMissionHostNote();
   updateMissionEngineerNote();
+  // a new mission: the Etraq number, or a temporary one from the site code (the board's own code first)
+  const newOne = !missionId && missionsOn();
+  $("#mission-number-mode").classList.toggle("hidden", !newOne);
+  form.sitecode.value = newOne ? (knownMissionPrefixes(D().activeBoardId)[0] || "") : "";
+  // the examples follow the site code length (Settings -> Mission numbers)
+  form.sitecode.maxLength = MissionNumber.prefixLength;
+  form.sitecode.placeholder = `e.g. ${MissionNumber.SITE_EXAMPLE}`;
+  form.number.placeholder = `e.g. ${MissionNumber.EXAMPLE}`;
+  renderMissionPrefixOptions(D().activeBoardId);
+  updateMissionNumberMode();
+}
+/* "etraq" or "temp": how a new mission gets its number */
+function missionNumberMode() {
+  const form = $("#form-mission");
+  return !$("#mission-number-mode").classList.contains("hidden") && form.numMode.value === "temp" ? "temp" : "etraq";
+}
+function updateMissionNumberMode() {
+  const form = $("#form-mission");
+  const temp = missionNumberMode() === "temp";
+  $("#mission-number-row").classList.toggle("hidden", temp);
+  $("#mission-prefix-row").classList.toggle("hidden", !temp);
+  form.number.required = !temp;
+  form.sitecode.required = temp;
+  updateMissionNumberNote();
+}
+/* under the number: the temporary number it will get, what is wrong with what is typed, or (editing a wrong or
+   temporary number) that a new number changes every day of the mission */
+function updateMissionNumberNote() {
+  const form = $("#form-mission"), note = $("#mission-number-note");
+  if (!note) return;
+  let text = "", bad = false;
+  if (missionsOn()) {
+    const editing = state.editingMissionId ? getPlan().missions.find(x => x.id === state.editingMissionId) : null;
+    if (missionNumberMode() === "temp") {
+      const pc = MissionNumber.checkPrefix(form.sitecode.value);
+      const t = pc.ok ? MissionNumber.nextTemp(pc.prefix, state.date, knownMissionNumbers()) : null;
+      text = t ? `It gets the temporary number ${t}. Change it to the Etraq number once the Site Admin has registered the mission.`
+        : form.sitecode.value.trim() ? pc.error : `Type the site code: the first part of the mission number, like ${MissionNumber.SITE_EXAMPLE}.`;
+      bad = !t && !!form.sitecode.value.trim();
+    } else if (editing && MissionNumber.kindOf(editing.number) !== "real" && !isForecastView()) {
+      const changed = MissionNumber.tidy(form.number.value) !== MissionNumber.tidy(editing.number);
+      text = MissionNumber.kindOf(editing.number) === "temp"
+        ? (changed ? "The new number replaces the temporary one on every day of this mission." : "This is a temporary number. Type the Etraq number to replace it on every day of this mission.")
+        : (changed ? "The new number replaces the wrong one on every day of this mission." : `This number is not in the Etraq format (${MissionNumber.EXAMPLE}). Type the right number to correct it on every day of this mission.`);
+    }
+  }
+  note.textContent = text;
+  note.classList.toggle("hidden", !text);
+  note.classList.toggle("fix-bad", bad);
 }
 function editMissionDetails(focus = "number") {
   // "Edit today's board?" and the like are confirms that close the panel (and, from the Missions tab, leave the
@@ -11985,6 +12214,7 @@ async function renderMissionDetail() {
   const alerts = reg && actv ? missionAlerts(reg, missionPlacement(reg)) : [];
   const alertBox = rpAlertBox(alerts.map(a => ({ ...a,
     fix: a.close && reg.status === "open" && can("missions", "edit") ? { label: "Close mission…", fn: () => openCloseMissionModal(reg, state.date) }
+      : a.fixNumber && reg.status === "open" && can("missions", "edit") ? { label: "Fix number…", fn: () => openFixNumberModal(reg.number) }
       : a.kinds.includes("noEngineer") && canPlan ? { label: "+ Add responsible", fn: () => guardEdit(() => editMissionDetails("engineer")) } : null })));
 
   const hostLink = m.host && can("hostlist") ? `<button type="button" class="ml-host-link" id="btn-md-host">${escapeHtml(m.host)}</button>` : m.host ? escapeHtml(m.host) : emptyCell();
@@ -12144,15 +12374,29 @@ function saveMission(ev) {
     return;
   }
   // the mission number's form (PREFIX.YY.NNNN, no monthly suffix), checked when it is new or
-  // changed, on the confirmed board once the Missions list exists (migration-2026-11-09)
+  // changed, on the confirmed board once the Missions list exists (migration-2026-11-09), and on a
+  // forecast day too: the forecast becomes the board. A new mission without its Etraq number yet gets
+  // the next temporary number for the site code typed (PREFIX.YY.TMPNNN, migration-2026-11-11).
   const editing = state.editingMissionId ? getPlan().missions.find(x => x.id === state.editingMissionId) : null;
-  const numberRules = missionsOn() && !isForecastView();
+  const numberRules = missionsOn();
+  const tempMode = numberRules && !editing && missionNumberMode() === "temp";
+  if (tempMode) {
+    const pc = MissionNumber.checkPrefix(form.sitecode.value);
+    if (!pc.ok) { toast(pc.error, "warn"); form.sitecode.focus(); return; }
+    const t = MissionNumber.nextTemp(pc.prefix, state.date, knownMissionNumbers());
+    if (!t) { toast(`${pc.prefix} has used every temporary number for ${state.date.slice(0, 4)}. Ask the Site Admin for the Etraq number.`, "warn"); return; }
+    vals.number = t;
+  }
   const newNumber = !editing || MissionNumber.tidy(editing.number) !== MissionNumber.tidy(vals.number);
-  if (numberRules && newNumber) {
+  if (numberRules && newNumber && !tempMode) {
     const c = MissionNumber.check(vals.number);
     if (!c.ok) { toast(c.error, "warn"); return; }
     vals.number = c.number;
   }
+  // a wrong or temporary number changed in the form is corrected on every day of the mission, not this day only
+  const fixFrom = numberRules && editing && newNumber && !isForecastView() && MissionNumber.kindOf(editing.number) !== "real"
+    && (D().register || []).some(r => r.number === editing.number) ? editing.number : null;
+  if (fixFrom && knownMissionNumbers().has(vals.number)) { toast(`${vals.number} is already used by another mission.`, "warn"); return; }
   // instant client-side check (same number + shift, excluding the mission being edited);
   // scans hidden missions too — the DB unique constraint covers them regardless —
   // this just avoids a round trip and points at the hidden one if that's the clash
@@ -12172,6 +12416,7 @@ function saveMission(ev) {
     // the first time somebody is picked they have no engineer record yet, so
     // one is made here — that is where their mission colour lives
     vals.engineerId = eng.engineerId || await cloud.ensureEngineerForProfile(eng.profileId);
+    if (fixFrom) { await cloud.replaceMissionNumber(fixFrom, vals.number); state.missions.activityKey = null; }
     if (forecast) await cloud.saveForecastMission(boardId, state.date, editingId, vals);
     else await cloud.saveMission(boardId, state.date, editingId, vals);
     if (editingId && mdState.fromDetail && !forecast) {
@@ -12187,8 +12432,14 @@ function saveMission(ev) {
     closeModal();
     await refreshAndRender();
   });
+  if (fixFrom) {
+    showConfirm("Change the number on every day?",
+      `${fixFrom} becomes ${vals.number} on every day of this mission, on every board and shift, in the Host Record and in reports. The board shows the old number beside the new one for two weeks.`,
+      save, () => { state.editingMissionId = editingId; openModal("#modal-mission"); }, "Change number");
+    return;
+  }
   // a number (or shift) new on this board: closed? used on another board? (checkMissionNumberUse)
-  if (numberRules && (newNumber || (editing && editing.shift !== vals.shift))) {
+  if (numberRules && !isForecastView() && (newNumber || (editing && editing.shift !== vals.shift))) {
     checkMissionNumberUse(vals.number, vals.shift, save, () => { state.editingMissionId = editingId; openModal("#modal-mission"); });
   } else {
     save();
@@ -12405,6 +12656,7 @@ const SETTINGS_SECTIONS = {
   areas:     { label: "Service areas",       group: "Board setup",    hint: "Labels used across people, missions and hosts." },
   boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and working days." },
   hostexp:   { label: "Host experience",     group: "Board setup",    hint: "How many days make someone experienced at a host, and how few experienced people make a host at risk." },
+  missionnum: { label: "Mission numbers",    group: "Board setup",    hint: "How many characters the site code at the start of a mission number has." },
   users:     { label: "Users",               group: "Administration", hint: "Accounts, access requests and status." },
   roles:     { label: "Roles & permissions", group: "Administration", hint: "Review what each role can see and change." },
 };
@@ -12579,6 +12831,7 @@ function applySettingsTab() {
   if (state.settingsTab === "users") renderUsersPane();
   if (state.settingsTab === "roles") renderRolesPane();
   if (state.settingsTab === "hostexp") renderHostExpPane();
+  if (state.settingsTab === "missionnum") renderMissionNumPane();
   renderRailMeta();
   renderSettingsFooter();
 }
@@ -12700,6 +12953,7 @@ function svHomeMeta(tab) {
   if (tab === "engineers") return { count: engineerPaneRows().length, sub: n("person", "people", engineerPaneRows().length) };
   if (tab === "areas") return { count: D().areas.length, sub: n("area", "areas", D().areas.length) };
   if (tab === "boards") return { count: D().boards.length, sub: n("board", "boards", D().boards.length) };
+  if (tab === "missionnum") return { sub: `Site code: ${MissionNumber.prefixLength} characters (${MissionNumber.EXAMPLE})` };
   if (tab === "hostexp") return { sub: `${hostExperiencedDays()}+ ${hostExperiencedDays() === 1 ? "day" : "days"} at a host · at risk at ${hostAtRiskMax()} or fewer` };
   if (tab === "users") {
     const all = D().users || [];
@@ -12897,6 +13151,15 @@ function settingsSaveOps(section) {
     }
   }
 
+  if (section === "missionnum") {
+    const f = MISSIONNUM_FIELD;
+    if (d[f.draft]) {
+      const n = parseWholeNumber(d[f.draft].after, f.min(), f.max());
+      if (n === null) errors.push(`${f.errorName} must be a whole number from ${f.min()} to ${f.max()}.`);
+      else if (!cloud.data.features.appSettings) errors.push("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
+      else ops.push({ keys: [f.draft], label: f.label, run: () => f.save(n) });
+    }
+  }
   if (section === "hostexp") {
     for (const f of Object.values(HOSTEXP_FIELDS)) {
       if (!d[f.draft]) continue;
@@ -15163,12 +15426,14 @@ function updateMoveMission() {
     : c.mode === "move" ? `${shortNameList(crew)} ${crew.length === 1 ? "returns" : "return"} to Standby on ${from}.`
     : `${shortNameList(crew)} ${crew.length === 1 ? "stays" : "stay"} on ${m.number} on ${from}.`;
 
-  // the number: free on the target's same shift, hidden missions included
-  const number = c.num === "change" ? c.newNumber : m.number;
+  // the number: an Etraq number when it is changed (moveMissionNumber), free on the target's same shift, hidden missions included
+  const numChk = moveMissionNumber(c, m);
+  const number = numChk.number;
   const note = $("#move-mission-num-note");
   let blocked = !targetId, msg = null;
   if (!targetPlan) { blocked = true; if (targetId) msg = ["host-note-info", "info", `Checking ${to}…`]; }
   else if (!number) { blocked = true; msg = ["host-note-info", "info", "Type the new number."]; }
+  else if (numChk.error) { blocked = true; msg = ["host-note-new", "alert", numChk.error]; }
   else {
     const clash = targetPlan.missions.find(x => x.shift === m.shift && x.number.trim().toLowerCase() === number.toLowerCase());
     if (clash) {
@@ -15194,12 +15459,20 @@ function updateMoveMission() {
   go.disabled = blocked || badUntil;
 }
 
+/* The number a moved or copied mission takes: its own, or the new one typed, which must be an Etraq number once the
+   Missions list exists (mission-number.js). { number, error } */
+function moveMissionNumber(c, m) {
+  if (c.num !== "change") return { number: m.number, error: null };
+  if (!c.newNumber || !missionsOn()) return { number: c.newNumber, error: null };
+  const chk = MissionNumber.check(c.newNumber);
+  return { number: chk.number, error: chk.ok ? null : chk.error };
+}
 function saveMoveMission(ev) {
   ev.preventDefault();
   if (!moveUi || $("#btn-move-mission").disabled) return;
   const { mission: m, targetId, date, carrySrc } = moveUi;
   const c = moveMissionChoice();
-  const number = c.num === "change" ? c.newNumber : m.number;
+  const number = moveMissionNumber(c, m).number;
   const copy = c.mode === "copy";
   const carry = !!carrySrc && $("#move-mission-carry-box").checked;
   const to = D().boards.find(b => b.id === targetId);
@@ -18442,6 +18715,50 @@ function wireHostExpPane() {
   }
 }
 
+/* ----- Settings -> Mission numbers: how many characters a mission number's site code has (mission-number.js,
+   app_settings 'mission_prefix_length'). One number, a draft like Host experience's; the note says what a number
+   then looks like and how many open missions it would flag as wrong. ----- */
+const MISSIONNUM_FIELD = {
+  input: "#missionnum-length", note: "#missionnum-note", draft: "length",
+  min: () => MissionNumber.PREFIX_MIN, max: () => MissionNumber.PREFIX_MAX, saved: () => MissionNumber.prefixLength,
+  label: "Site code length", errorName: "The site code length", save: (n) => cloud.saveMissionPrefixLength(n),
+};
+/* how many open missions (one per number) have a wrong number with a site code of `len` characters */
+function wrongNumbersAtLength(len) {
+  const re = new RegExp(`^[A-Z][A-Z0-9]{${len - 1}}\\.[0-9]{2}\\.([0-9]{4}|TMP[0-9]{3})$`);
+  return new Set((D().register || []).filter(r => r.status === "open" && !re.test(MissionNumber.tidy(r.number))).map(r => r.number)).size;
+}
+function renderMissionNumPane() {
+  const f = MISSIONNUM_FIELD, input = $(f.input);
+  if (!input) return;
+  const ready = !!cloud.data.features.appSettings;
+  $("#missionnum-migrate").classList.toggle("hidden", ready);
+  const shown = sdVal("missionnum", f.draft, String(f.saved()));
+  if (input.value !== String(shown)) input.value = shown;
+  input.disabled = !ready;
+  const n = parseWholeNumber(shown, f.min(), f.max());
+  input.setAttribute("aria-invalid", n === null ? "true" : "false");
+  const site = "BANGN12345".slice(0, n || 5);
+  $(f.note).textContent = n === null ? `Enter a whole number from ${f.min()} to ${f.max()}.`
+    : `A mission number looks like ${site}.26.0007, and a temporary one like ${site}.26.TMP001.`;
+  // what a change would do to the missions already on the boards
+  const effect = $("#missionnum-effect");
+  const now = missionsOn() ? wrongNumbersAtLength(f.saved()) : 0, then = n !== null && missionsOn() ? wrongNumbersAtLength(n) : now;
+  effect.textContent = n === null || !missionsOn() ? ""
+    : n === f.saved() ? (now ? `${now === 1 ? "1 open mission has" : now + " open missions have"} a wrong number now.` : "Every open mission has a number in this form.")
+    : `With ${n}, ${then === 1 ? "1 open mission would have" : then + " open missions would have"} a wrong number (${now} now).`;
+  effect.classList.toggle("fix-bad", n !== null && n !== f.saved() && then > now);
+}
+function wireMissionNumPane() {
+  const f = MISSIONNUM_FIELD, input = $(f.input);
+  if (!input) return;
+  input.oninput = () => {
+    sdSet("missionnum", f.draft, input.value, f.label, () => String(f.saved()));
+    renderMissionNumPane();
+  };
+  input.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); saveSettingsSection(); } };
+}
+
 function renderAccountPane() {
   const me = D().me;
   const box = $("#account-identity");
@@ -19103,6 +19420,7 @@ function wireUserManagement() {
   }
   wireAccountPane();
   wireHostExpPane();
+  wireMissionNumPane();
 }
 
 /* ---------- login ---------- */
@@ -19311,6 +19629,10 @@ function wireApp() {
   $("#btn-new-mission").onclick = () => guardEdit(() => openMissionModal(null));
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
+  // the number: the Etraq one, or a temporary one from the site code (missionNumberMode)
+  for (const r of $$("#form-mission [name=numMode]")) r.onchange = updateMissionNumberMode;
+  $("#form-mission [name=sitecode]").addEventListener("input", updateMissionNumberNote);
+  $("#form-mission [name=number]").addEventListener("input", updateMissionNumberNote);
   initSegmented();
   initPickers();
   $("#btn-delete-mission").onclick = () => deleteMission();
@@ -19575,6 +19897,9 @@ function wireApp() {
   $("#missions-bulk-close").onclick = () => openCloseMissionsModal((D().register || []).filter(r => state.selectedMissions.has(r.id)));
   $("#missions-bulk-clear").onclick = () => { state.selectedMissions = new Set(); renderMissionList(); };
   $("#form-close-mission").onsubmit = submitCloseMission;
+  $("#form-fix-number").onsubmit = submitFixNumber;
+  $("#form-fix-number").addEventListener("input", updateFixNumberState);
+  $("#form-fix-number").addEventListener("change", updateFixNumberState);
   $("#close-mission-date").addEventListener("input", updateCloseMissionEffect);
   $("#form-mission-add").onsubmit = submitMissionAdd;
   $("#btn-newyear-save").onclick = saveNewYearNumbers;

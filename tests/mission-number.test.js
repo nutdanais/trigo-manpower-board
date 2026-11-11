@@ -16,6 +16,53 @@ test("a mission number is PREFIX.YY.NNNN: tidied, and a suffix is refused with t
   assert.match(MN.check("").error, /Type the mission number/);
 });
 
+test("the prefix is the 5-character site code: capital letters or digits, starting with a letter", () => {
+  for (const good of ["BANGN.26.0001", "AMATA.27.0002", "ESIE1.26.0123", "esie2.26.0001", "LCBTH.26.0005"]) assert.equal(MN.check(good).ok, true, good);
+  for (const bad of ["BANG.26.0001", "BANGNA.26.0001", "1BANG.26.0001", "LCB.26.0005", "BANGN.26.0001X", "BANGN..26.0001", "BANGN.26.00012"]) assert.equal(MN.check(bad).ok, false, bad);
+  assert.match(MN.check("BANG.26.0001").error, /5-character site code/);
+  assert.match(MN.check("BANGN.26.TMP001").error, /is a temporary number/);
+});
+
+test("a number is an Etraq one, a temporary one or a wrong one", () => {
+  assert.equal(MN.kindOf("BANGN.26.0001"), "real");
+  assert.equal(MN.kindOf(" bangn.26.tmp001 "), "temp");
+  for (const bad of ["108", "RYGTH.26.104", "BANGN.26.TMP01", "BANGN.26.TEMP01", "BANGN.26.0001.AA", ""]) assert.equal(MN.kindOf(bad), "bad", bad);
+  assert.equal(MN.isTemp("BANGN.26.TMP001"), true);
+  assert.equal(MN.yearOf("BANGN.26.TMP001"), null, "a temporary number never waits for a new-year number");
+  assert.equal(MN.needsNewYearNumber("BANGN.26.TMP001", "2027-01-20"), false);
+  assert.equal(MN.prefixOf("ESIE1.26.TMP002"), "ESIE1");
+  assert.equal(MN.prefixOf("108"), null);
+});
+
+test("the site code for a temporary number", () => {
+  assert.deepEqual(MN.checkPrefix(" esie1 "), { ok: true, prefix: "ESIE1", error: null });
+  for (const bad of ["", "BANG", "BANGNA", "1BANG", "BAN-G"]) assert.equal(MN.checkPrefix(bad).ok, false, bad);
+});
+
+test("the next temporary number: one more than the site's highest that year, never one given out before", () => {
+  const used = ["BANGN.26.TMP001", "BANGN.26.TMP004", "BANGN.25.TMP009", "AMATA.26.TMP007", "BANGN.26.0042"];
+  assert.equal(MN.nextTemp("bangn", "2026-11-11", used), "BANGN.26.TMP005");
+  assert.equal(MN.nextTemp("BANGN", "2027-01-04", used), "BANGN.27.TMP001", "a new year starts again at 001");
+  assert.equal(MN.nextTemp("ESIE2", "2026-11-11", []), "ESIE2.26.TMP001");
+  assert.equal(MN.nextTemp("BANGN", "2026-11-11", ["BANGN.26.TMP999"]), null, "999 is the last");
+});
+
+test("a temporary number is flagged from the third day after the mission was created", () => {
+  assert.equal(MN.daysSince("2026-11-08T23:30:00Z", "2026-11-11"), 3);
+  assert.equal(MN.daysSince("2026-11-11", "2026-11-11"), 0);
+  assert.equal(MN.tempOverdue("2026-11-09", "2026-11-11"), false, "two days: not yet");
+  assert.equal(MN.tempOverdue("2026-11-08", "2026-11-11"), true, "made on Sunday, flagged on Wednesday");
+  assert.equal(MN.TEMP_ALERT_AFTER_DAYS, 3);
+});
+
+test("what a wrong or temporary number may be replaced with", () => {
+  assert.equal(MN.checkReplacement("BANGN.26.TMP001", "bangn.26.0042").number, "BANGN.26.0042");
+  assert.equal(MN.checkReplacement("BANGN.26.TMP001", "BANGN.26.TMP002").ok, false, "a temporary one takes the Etraq number");
+  assert.equal(MN.checkReplacement("108", "BANGN.26.TMP002", { allowTemp: true }).ok, true, "a wrong one may become temporary");
+  assert.match(MN.checkReplacement("BANGN.26.0042", "BANGN.26.0042").error, /number it has now/);
+  assert.equal(MN.checkReplacement("108", "RYGTH.26.108").ok, false);
+});
+
 test("the year of a number, and which numbers are waiting for the new year", () => {
   assert.equal(MN.yearOf("LCBTH.26.0005"), 2026);
   assert.equal(MN.yearOf("101"), null);
@@ -143,4 +190,26 @@ test("the Missions tiles count a mission that runs this year: every open one, an
   assert.equal(MN.runsInYear({ status: "closed", closedAt: "2027-01-03T02:00:00Z" }, T), true);
   // nothing to place it by: kept
   assert.equal(MN.runsInYear({ status: "closed" }, T), true);
+});
+
+test("the site code length follows Settings -> Mission numbers (5 until changed, 2 to 10)", () => {
+  try {
+    assert.equal(MN.prefixLength, 5);
+    assert.equal(MN.setPrefixLength(4), 4);
+    assert.equal(MN.check("BANG.26.0001").ok, true);
+    assert.equal(MN.check("BANGN.26.0001").ok, false, "a 5-character code is now wrong");
+    assert.equal(MN.kindOf("BANGN.26.0001"), "bad");
+    assert.equal(MN.kindOf("BANG.26.TMP001"), "temp");
+    assert.equal(MN.yearOf("BANG.27.0001"), 2027);
+    assert.equal(MN.EXAMPLE, "BANG.26.0007", "the examples follow it");
+    assert.match(MN.check("x").error, /the 4-character site code/);
+    assert.match(MN.checkPrefix("BANGN").error, /4 capital letters or digits.*like BANG\./);
+    assert.equal(MN.nextTemp("bang", "2026-11-11", ["BANG.26.TMP002"]), "BANG.26.TMP003");
+    assert.equal(MN.setPrefixLength(6), 6);
+    assert.equal(MN.check("ESIE12.26.0001").ok, true);
+    assert.equal(MN.SITE_EXAMPLE, "BANGN1");
+    for (const bad of [1, 11, 4.5, "4", null]) assert.equal(MN.setPrefixLength(bad), 5, `${bad} falls back to 5`);
+  } finally {
+    MN.setPrefixLength(5);
+  }
 });
