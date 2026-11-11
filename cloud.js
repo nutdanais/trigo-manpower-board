@@ -67,6 +67,8 @@ async function fetchAllPages(buildQuery) {
 const APP_SETTINGS = {
   host_experienced_days: { prop: "hostExperiencedDays", min: 1, max: 365, label: "Days" },
   host_at_risk_max:      { prop: "hostAtRiskMax",       min: 0, max: 99,  label: "The number of people" },
+  // the mission number's site code length (Settings -> Mission numbers, migration-2026-11-11)
+  mission_prefix_length: { prop: "missionPrefixLength", min: 2, max: 10,  label: "Site code length" },
 };
 
 const cloud = {
@@ -2670,6 +2672,8 @@ const cloud = {
       if (rule && Number.isInteger(r.value) && r.value >= rule.min && r.value <= rule.max) out[rule.prop] = r.value;
     }
     this.data.settings = out;
+    // the mission number rules follow the site code length (mission-number.js); 5 until it is changed
+    if (typeof MissionNumber !== "undefined") MissionNumber.setPrefixLength(out.missionPrefixLength);
   },
   /* one known setting, for everyone. Needs Edit on Settings. */
   async _saveSetting(key, value) {
@@ -2686,6 +2690,8 @@ const cloud = {
   saveHostExperiencedDays(days) { return this._saveSetting("host_experienced_days", days); },
   /* a host is at risk when this many or fewer ACTIVE people are experienced there */
   saveHostAtRiskMax(n) { return this._saveSetting("host_at_risk_max", n); },
+  /* how many characters a mission number's site code has (BANGN: 5) */
+  saveMissionPrefixLength(n) { return this._saveSetting("mission_prefix_length", n); },
   async loadMissionRegister() {
     if (!this.data.features.missions) { this.data.register = []; this.data.numberHistory = []; return; }
     const [reg, hist] = await Promise.all([

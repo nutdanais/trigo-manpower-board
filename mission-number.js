@@ -2,7 +2,8 @@
 
    A mission number is the yearly number Etraq gives a job, PREFIX.YY.NNNN (BANGN.26.0005),
    without the monthly suffix (.AA, .AB…) that stays in the admins' workbook. The prefix is the
-   site code: five capital letters or digits, starting with a letter (BANGN, AMATA, LCBTH, ESIE1).
+   site code: capital letters or digits, starting with a letter, as many as Settings -> Mission numbers
+   says (5 until changed: BANGN, AMATA, LCBTH, ESIE1; setPrefixLength).
    At the turn of the year a running mission gets a new number from Etraq (BANGN.26.0005 ->
    BANGN.27.0001), entered by a Site Admin; until then the board keeps running on last year's number.
 
@@ -18,13 +19,24 @@
 (function (root) {
   "use strict";
 
-  const PREFIX = "[A-Z][A-Z0-9]{4}";
-  const FORMAT = new RegExp("^" + PREFIX + "\\.[0-9]{2}\\.[0-9]{4}$");
-  const TEMP = new RegExp("^(" + PREFIX + ")\\.([0-9]{2})\\.TMP([0-9]{3})$");
-  const WITH_SUFFIX = new RegExp("^(" + PREFIX + "\\.[0-9]{2}\\.[0-9]{4})\\.[A-Z]{2}$");
-  const PREFIX_ONLY = new RegExp("^" + PREFIX + "$");
-  const EXAMPLE = "BANGN.26.0007";
-  const TEMP_EXAMPLE = "BANGN.26.TMP001";
+  /* The site code's length is a shared setting (app_settings 'mission_prefix_length', 2 to 10, 5 until
+     changed). Everything below reads it through these, rebuilt by setPrefixLength. */
+  const PREFIX_DEFAULT = 5, PREFIX_MIN = 2, PREFIX_MAX = 10;
+  let LEN, PREFIX, FORMAT, TEMP, WITH_SUFFIX, PREFIX_ONLY, SITE, EXAMPLE, TEMP_EXAMPLE;
+  function setPrefixLength(n) {
+    LEN = Number.isInteger(n) && n >= PREFIX_MIN && n <= PREFIX_MAX ? n : PREFIX_DEFAULT;
+    PREFIX = "[A-Z][A-Z0-9]{" + (LEN - 1) + "}";
+    FORMAT = new RegExp("^" + PREFIX + "\\.[0-9]{2}\\.[0-9]{4}$");
+    TEMP = new RegExp("^(" + PREFIX + ")\\.([0-9]{2})\\.TMP([0-9]{3})$");
+    WITH_SUFFIX = new RegExp("^(" + PREFIX + "\\.[0-9]{2}\\.[0-9]{4})\\.[A-Z]{2}$");
+    PREFIX_ONLY = new RegExp("^" + PREFIX + "$");
+    // an example site code of the right length, for messages and placeholders: BANGN at 5, BANG at 4, BANGN1 at 6
+    SITE = "BANGN12345".slice(0, LEN);
+    EXAMPLE = SITE + ".26.0007";
+    TEMP_EXAMPLE = SITE + ".26.TMP001";
+    return LEN;
+  }
+  setPrefixLength(PREFIX_DEFAULT);
   const TEMP_ALERT_AFTER_DAYS = 3;
 
   /* what the person meant: upper case, no spaces */
@@ -40,7 +52,7 @@
     const m = n.match(WITH_SUFFIX);
     if (m) return { ok: false, number: n, error: `Leave the monthly suffix off: type ${m[1]}, not ${n}.` };
     if (TEMP.test(n)) return { ok: false, number: n, error: `${n} is a temporary number. Type the number Etraq gave the mission, like ${EXAMPLE}.` };
-    return { ok: false, number: n, error: `A mission number looks like ${EXAMPLE}: the 5-character site code, the year's two digits and four digits.` };
+    return { ok: false, number: n, error: `A mission number looks like ${EXAMPLE}: the ${LEN}-character site code, the year's two digits and four digits.` };
   }
 
   /* "real": an Etraq number; "temp": a temporary one; "bad": anything else (a typo, extra characters) */
@@ -53,9 +65,9 @@
   /* the site code a person typed for a temporary number: { ok, prefix, error } */
   function checkPrefix(s) {
     const p = tidy(s);
-    if (!p) return { ok: false, prefix: "", error: "Type the site code, like BANGN." };
+    if (!p) return { ok: false, prefix: "", error: `Type the site code, like ${SITE}.` };
     if (PREFIX_ONLY.test(p)) return { ok: true, prefix: p, error: null };
-    return { ok: false, prefix: p, error: "The site code is 5 capital letters or digits, starting with a letter, like BANGN or ESIE1." };
+    return { ok: false, prefix: p, error: `The site code is ${LEN} capital letters or digits, starting with a letter, like ${SITE}.` };
   }
   /* the site code of any number that starts with one (BANGN for BANGN.26.0005 and BANGN.26.TMP002) */
   function prefixOf(number) {
@@ -100,7 +112,7 @@
   /* 2026 for BANGN.26.0005; null for a number that isn't in the format */
   function yearOf(number) {
     const n = tidy(number);
-    return FORMAT.test(n) ? 2000 + Number(n.slice(6, 8)) : null;
+    return FORMAT.test(n) ? 2000 + Number(n.split(".")[1]) : null;
   }
 
   /* true when a number from an earlier year is still in use on `today` (YYYY-MM-DD): the
@@ -158,8 +170,16 @@
     return !end || end >= String(today).slice(0, 4) + "-01-01";
   }
 
-  const api = { tidy, check, kindOf, isTemp, checkPrefix, prefixOf, nextTemp, daysSince, tempOverdue, checkReplacement,
-    TEMP_ALERT_AFTER_DAYS, TEMP_EXAMPLE, yearOf, needsNewYearNumber, daysWaiting, ALERT_AFTER_DAYS, validFrom, checkNewYear, EXAMPLE, SHOW_OLD_DAYS, showsOldNumber, runsInYear };
+  const api = { tidy, check, kindOf, isTemp, checkPrefix, prefixOf, nextTemp, daysSince, tempOverdue, checkReplacement, setPrefixLength,
+    PREFIX_DEFAULT, PREFIX_MIN, PREFIX_MAX, TEMP_ALERT_AFTER_DAYS, yearOf, needsNewYearNumber, daysWaiting, ALERT_AFTER_DAYS, validFrom, checkNewYear,
+    SHOW_OLD_DAYS, showsOldNumber, runsInYear };
+  // follow the setting: read each time, never copied
+  Object.defineProperties(api, {
+    prefixLength: { get: () => LEN, enumerable: true },
+    EXAMPLE: { get: () => EXAMPLE, enumerable: true },
+    TEMP_EXAMPLE: { get: () => TEMP_EXAMPLE, enumerable: true },
+    SITE_EXAMPLE: { get: () => SITE, enumerable: true },
+  });
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.MissionNumber = api;
 })(typeof window !== "undefined" ? window : globalThis);

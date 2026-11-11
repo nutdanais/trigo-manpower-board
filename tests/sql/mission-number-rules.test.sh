@@ -72,4 +72,16 @@ eq "select string_agg(old_number || '>' || new_number, ',' order by entered_at) 
 
 case "$(qa site.b@example.com "select public.renumber_missions('[{\"old\":\"TSTTH.26.0110\",\"new\":\"TST.27.0001\"}]', '2027-01-01')")" in *"PREFIX.YY.NNNN"*) ok "the new-year number needs the 5-character prefix too";; *) fail "renumber accepted a short prefix";; esac
 
+# ---------- the site code length (Settings -> Mission numbers) ----------
+eq "select public.mission_prefix_length()" 5 "the site code is 5 characters until the setting is changed"
+case "$(q "insert into app_settings (key, value) values ('mission_prefix_length', '11')" 2>&1 || true)" in *app_settings_value_ok*) ok "a length of 11 is refused";; *) fail "a length of 11 was accepted";; esac
+case "$(q "insert into app_settings (key, value) values ('mission_prefix_length', '1')" 2>&1 || true)" in *app_settings_value_ok*) ok "a length of 1 is refused";; *) fail "a length of 1 was accepted";; esac
+q "insert into app_settings (key, value) values ('mission_prefix_length', '4')" >/dev/null
+eq "select public.mission_prefix_length()" 4 "the length follows the setting"
+q "insert into missions (board_id, plan_date, number, host, customer, shift) values ('$(B 1)', '2026-11-05', 'X-9', 'Host Y', 'Cust Y', 'day')" >/dev/null
+case "$(qa eng.a@example.com "select public.replace_mission_number('X-9', 'TSTTH.26.0200')")" in *"not in the form"*) ok "with 4, a 5-character site code is refused";; *) fail "a 5-character code was accepted at 4";; esac
+eq "$(as eng.a@example.com) select public.replace_mission_number('X-9', 'TSTH.26.0200')" 1 "with 4, a 4-character site code is accepted"
+q "delete from app_settings where key = 'mission_prefix_length'" >/dev/null
+eq "select public.mission_prefix_length()" 5 "back to 5 when the setting is removed"
+
 echo "all mission number rule checks passed"

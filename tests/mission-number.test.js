@@ -191,3 +191,25 @@ test("the Missions tiles count a mission that runs this year: every open one, an
   // nothing to place it by: kept
   assert.equal(MN.runsInYear({ status: "closed" }, T), true);
 });
+
+test("the site code length follows Settings -> Mission numbers (5 until changed, 2 to 10)", () => {
+  try {
+    assert.equal(MN.prefixLength, 5);
+    assert.equal(MN.setPrefixLength(4), 4);
+    assert.equal(MN.check("BANG.26.0001").ok, true);
+    assert.equal(MN.check("BANGN.26.0001").ok, false, "a 5-character code is now wrong");
+    assert.equal(MN.kindOf("BANGN.26.0001"), "bad");
+    assert.equal(MN.kindOf("BANG.26.TMP001"), "temp");
+    assert.equal(MN.yearOf("BANG.27.0001"), 2027);
+    assert.equal(MN.EXAMPLE, "BANG.26.0007", "the examples follow it");
+    assert.match(MN.check("x").error, /the 4-character site code/);
+    assert.match(MN.checkPrefix("BANGN").error, /4 capital letters or digits.*like BANG\./);
+    assert.equal(MN.nextTemp("bang", "2026-11-11", ["BANG.26.TMP002"]), "BANG.26.TMP003");
+    assert.equal(MN.setPrefixLength(6), 6);
+    assert.equal(MN.check("ESIE12.26.0001").ok, true);
+    assert.equal(MN.SITE_EXAMPLE, "BANGN1");
+    for (const bad of [1, 11, 4.5, "4", null]) assert.equal(MN.setPrefixLength(bad), 5, `${bad} falls back to 5`);
+  } finally {
+    MN.setPrefixLength(5);
+  }
+});

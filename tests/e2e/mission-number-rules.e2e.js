@@ -208,6 +208,67 @@ function seed(opts) {
       await v.close();
     });
 
+    await step("the Missions tab shows a number to fix in bold red with a warning mark; an Etraq number stays plain", async () => {
+      await goMissions(p);
+      const n103 = row(p, "103").locator(".ml-num");
+      assert.ok(await n103.evaluate((e) => e.classList.contains("ml-num-fix")), "103 is marked");
+      assert.equal(await n103.evaluate((e) => getComputedStyle(e).fontWeight), "800");
+      assert.equal(await row(p, "103").locator(".ml-num-mark").count(), 1);
+      assert.equal(await row(p, M7).locator(".ml-num-fix, .ml-num-mark").count(), 0);
+      assert.equal(await row(p, TMP2).locator(".ml-num-fix").count(), 0, "a new temporary number is not red yet");
+    });
+
+    await step("the crew never see the warnings: not in the PDF (print) nor in Present mode", async () => {
+      await goDay(p);
+      const shown = () => card(p, "103").locator(".m-num-flag").evaluate((e) => getComputedStyle(e).display);
+      assert.notEqual(await shown(), "none");
+      await p.emulateMedia({ media: "print" });
+      assert.equal(await shown(), "none", "print / PDF");
+      await p.emulateMedia({ media: "screen" });
+      await p.evaluate(() => document.body.classList.add("presenting"));
+      assert.equal(await shown(), "none", "Present mode");
+      await p.evaluate(() => document.body.classList.remove("presenting"));
+    });
+
+    await step("Settings › Mission numbers: the site code length, a draft that says what it would flag, saved for everyone", async () => {
+      await p.click("#btn-avatar");
+      await p.click("#btn-settings");
+      await p.waitForSelector("#settings-view:not(.hidden)");
+      await p.click("#settings-tabs [data-tab=missionnum]");
+      await p.waitForFunction(() => state.settingsTab === "missionnum");
+      assert.equal(await p.inputValue("#missionnum-length"), "5");
+      assert.match(await p.locator("#missionnum-note").innerText(), /BANGN\.26\.0007.*BANGN\.26\.TMP001/);
+      await p.fill("#missionnum-length", "11");
+      assert.equal(await p.getAttribute("#missionnum-length", "aria-invalid"), "true");
+      await p.fill("#missionnum-length", "4");
+      assert.match(await p.locator("#missionnum-note").innerText(), /BANG\.26\.0007/);
+      assert.match(await p.locator("#missionnum-effect").innerText(), /With 4, \d+ open missions would have a wrong number/);
+      await p.click("#btn-sv-save");
+      await p.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
+      assert.equal(db.t("app_settings").find((r) => r.key === "mission_prefix_length").value, 4);
+      assert.equal(await p.evaluate(() => MissionNumber.prefixLength), 4);
+      await p.click("#btn-settings-back");
+      await p.waitForSelector("#settings-view", { state: "hidden" });
+      await goDay(p);
+      assert.match(await card(p, M7).locator(".m-num-flag").innerText(), /Wrong number/i, "a 5-character code is wrong at 4");
+      // a change reaches another browser that is open
+      const b = await env.openAs(db, h.USERS.b);
+      await goDay(b.page);
+      assert.equal(await b.page.evaluate(() => MissionNumber.prefixLength), 4);
+      await b.close();
+      // and back to 5
+      await p.click("#btn-avatar");
+      await p.click("#btn-settings");
+      await p.waitForSelector("#settings-view:not(.hidden)");
+      await p.fill("#missionnum-length", "5");
+      await p.click("#btn-sv-save");
+      await p.waitForFunction(() => /All changes saved/.test(document.querySelector("#sv-status").textContent));
+      await p.click("#btn-settings-back");
+      await p.waitForSelector("#settings-view", { state: "hidden" });
+      await goDay(p);
+      assert.equal(await card(p, M7).locator(".m-num-flag").count(), 0);
+    });
+
     await step("Thai: the flag and the banner are translated", async () => {
       await p.evaluate(() => I18N.setLang("th"));
       await goDay(p);

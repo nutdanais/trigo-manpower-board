@@ -7840,7 +7840,13 @@ button.stat-tile.st-click { font: inherit; color: inherit; text-align: left; cur
   padding: 0 7px; font: inherit; font-weight: 600; line-height: 18px; cursor: pointer; }
 .mission-header .m-num-flag.temp .m-num-fix { color: var(--primary); }
 .mission-header .m-num-fix:hover { background: var(--hover-tint); }
-body.exporting .mission-header .m-num-flag { display: none; }   /* never baked into an exported JPG or PDF */
+/* the crew never see these warnings: not in the JPG (body.exporting), the PDF (print) or Present mode */
+body.exporting .mission-header .m-num-flag, body.presenting .mission-header .m-num-flag { display: none; }
+@media print { .mission-header .m-num-flag { display: none !important; } }
+/* the Missions tab: a number to fix is bold red with a warning mark */
+#missions-table .ml-num.ml-num-fix { color: var(--danger-text); font-weight: 800; }
+.ml-num-mark { display: inline-flex; vertical-align: -2px; margin-right: 4px; color: var(--danger-text); }
+.ml-num-mark .ic { width: 13px; height: 13px; }
 /* the mission form and Fix number: the Etraq number, or a temporary one */
 .num-mode { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .num-mode.hidden { display: none; }

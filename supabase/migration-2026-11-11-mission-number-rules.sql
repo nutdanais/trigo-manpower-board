@@ -18,9 +18,27 @@
 --     (missions = edit). The new number must be an Etraq number, or a temporary one when the
 --     wrong number is being replaced before Etraq has given one; it must not be in use.
 --   * renumber_missions() — the same as before, with the stricter format for the new number.
+--   * The site code's length is a setting: Settings -> Mission numbers, app_settings key
+--     'mission_prefix_length', a whole number from 2 to 10 (5 until changed). Both functions read it
+--     through mission_prefix_length(); without the app_settings table (migration-2026-11-09b) it is 5.
 --
 -- No check constraint is added on missions.number: the wrong numbers already saved carry over
 -- every day until somebody corrects them, and a constraint would stop that carry over.
+
+/* How many characters a mission number's site code has: Settings -> Mission numbers (app_settings
+   'mission_prefix_length', 2 to 10), 5 until it is changed or while there is no app_settings table. */
+create or replace function public.mission_prefix_length()
+returns int language plpgsql stable security definer set search_path = public, pg_temp as $fn$
+declare
+  v int;
+begin
+  if to_regclass('public.app_settings') is null then return 5; end if;
+  select case when (value #>> '{}') ~ '^[0-9]{1,2}$' then (value #>> '{}')::int end into v
+    from app_settings where key = 'mission_prefix_length';
+  return case when v between 2 and 10 then v else 5 end;
+end;
+$fn$;
+grant execute on function public.mission_prefix_length() to authenticated;
 
 create or replace function public.replace_mission_number(p_old text, p_new text)
 returns int language plpgsql security definer set search_path = public, pg_temp as $fn$
@@ -31,15 +49,16 @@ declare
   v_from date;
   v_rows int;
   v_stamps boolean := to_regclass('public.plan_day_stamps') is not null;
+  v_site text := '[A-Z][A-Z0-9]{' || (public.mission_prefix_length() - 1) || '}';
 begin
   if not (select public.can('missions', 'edit')) then
     raise exception 'Your role cannot change mission numbers.' using errcode = 'insufficient_privilege';
   end if;
-  if v_new !~ '^[A-Z][A-Z0-9]{4}\.[0-9]{2}\.([0-9]{4}|TMP[0-9]{3})$' then
+  if v_new !~ ('^' || v_site || '\.[0-9]{2}\.([0-9]{4}|TMP[0-9]{3})$') then
     raise exception 'Mission number % is not in the form PREFIX.YY.NNNN (or a temporary PREFIX.YY.TMPNNN).', v_new using errcode = 'check_violation';
   end if;
   if v_new = v_old then return 0; end if;
-  if v_new ~ '\.TMP[0-9]{3}$' and v_old ~ '^[A-Z][A-Z0-9]{4}\.[0-9]{2}\.[0-9]{4}$' then
+  if v_new ~ '\.TMP[0-9]{3}$' and v_old ~ ('^' || v_site || '\.[0-9]{2}\.[0-9]{4}$') then
     raise exception 'Mission % already has its Etraq number.', v_old using errcode = 'check_violation';
   end if;
   if not exists (select 1 from mission_register where number = v_old) then
@@ -92,6 +111,7 @@ declare
   v_count int := 0;
   v_by text := coalesce(auth.jwt() ->> 'email', 'system');
   v_stamps boolean := to_regclass('public.plan_day_stamps') is not null;
+  v_site text := '[A-Z][A-Z0-9]{' || (public.mission_prefix_length() - 1) || '}';
 begin
   if not (select public.can('missionadmin', 'edit')) then
     raise exception 'Your role cannot enter new mission numbers.' using errcode = 'insufficient_privilege';
@@ -110,7 +130,7 @@ begin
   for it in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
     v_old := upper(btrim(it ->> 'old'));
     v_new := upper(btrim(it ->> 'new'));
-    if v_new !~ '^[A-Z][A-Z0-9]{4}\.[0-9]{2}\.[0-9]{4}$' then
+    if v_new !~ ('^' || v_site || '\.[0-9]{2}\.[0-9]{4}$') then
       raise exception 'Mission number % is not in the form PREFIX.YY.NNNN.', v_new using errcode = 'check_violation';
     end if;
     if v_new = v_old then continue; end if;
@@ -140,3 +160,26 @@ begin
   return v_count;
 end;
 $fn$;
+
+-- The site code length may only be a whole number from 2 to 10. app_settings' check is dropped and added
+-- again with every known key (as migration-2026-11-09b does), when that table exists.
+do $$
+begin
+  if to_regclass('public.app_settings') is not null then
+    alter table app_settings drop constraint if exists app_settings_value_ok;
+    alter table app_settings add constraint app_settings_value_ok check (
+      case key
+        when 'host_experienced_days' then
+          jsonb_typeof(value) = 'number'
+          and case when (value #>> '{}') ~ '^[0-9]{1,3}$' then (value #>> '{}')::int between 1 and 365 else false end
+        when 'host_at_risk_max' then
+          jsonb_typeof(value) = 'number'
+          and case when (value #>> '{}') ~ '^[0-9]{1,2}$' then (value #>> '{}')::int between 0 and 99 else false end
+        when 'mission_prefix_length' then
+          jsonb_typeof(value) = 'number'
+          and case when (value #>> '{}') ~ '^[0-9]{1,2}$' then (value #>> '{}')::int between 2 and 10 else false end
+        else true
+      end
+    );
+  end if;
+end $$;

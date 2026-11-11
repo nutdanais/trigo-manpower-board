@@ -477,7 +477,7 @@ const state = {
   settingsReturn: null,       // {scrollY} of the page underneath, put back on "Back to board"
   settingsStale: false,       // a live update arrived while a field had focus: redraw once it leaves
   settingsSave: { phase: "clean" },   // clean | dirty | saving | saved | error, per the open section
-  settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, hostexp: {}, roles: {} },   // staged edits, by section
+  settingsDraft: { account: {}, engineers: {}, areas: {}, boards: {}, hostexp: {}, missionnum: {}, roles: {} },   // staged edits, by section
   rolesDiffOnly: false,       // Roles & permissions: only the areas where the roles differ
   svOpen: { engineers: null, areas: null, boards: null },   // the row open for editing in each Settings list
   cardNames: cardNamesSaved(),   // names on the board's employee cards: "th" | "en" | "both"
@@ -9868,6 +9868,9 @@ function renderMissionList() {
       : info.day.hidden ? `<span class="ml-muted" title="${dayTitle("Hidden on its board that day")}">${dayTitle("Hidden")}</span>`
       : info.day.crew ? `<b>${info.day.crew}</b>` : `<span class="ml-zero" title="${dayTitle("Nobody is on it that day")}">0</span>`;
     // a gold star before the number when the day on screen is highlighted on the board (the tooltip is the highlight's label)
+    // a wrong number, or a temporary one from its third day: the number itself in bold red with a warning mark
+    const numFix = r.status === "open" && info.alerts.some(a => a.kinds.includes("numberFix"));
+    const numMark = numFix ? `<span class="ml-num-mark" title="${escapeHtml(lbl(info.alerts.some(a => a.kinds.includes("numberBad")) ? "Wrong number" : "Temporary number"))}">${icon("alert")}</span>` : "";
     const hl = r.status !== "closed" && info.day && info.day.highlight ? info.day : null;
     const star = hl ? `<span class="ml-star" title="${escapeHtml(highlightLabel({ highlight: hl.highlight, highlightNote: hl.note }))}">${icon("star")}</span>` : "";
     const when = r.openedOn || r.lastOn
@@ -9880,7 +9883,7 @@ function renderMissionList() {
     // data-label: the phone shows each row as a card with these as its field names; data-col names the column for Columns
     return `<tr data-id="${r.id}" class="${r.status === "closed" ? "ml-row-closed" : ""}${mine ? " selected" : ""}">
       <td class="el-check" data-col="check">${canClose ? `<input type="checkbox" ${mine ? "checked" : ""} aria-label="${lbl("Select")}">` : ""}</td>
-      <td data-col="mission" class="ml-first">${ltCell(`${star}<b class="ml-num">${escapeHtml(r.number)}</b>`, r.customer ? escapeHtml(r.customer) : emptyCell(), { title: prev ? `was ${prev}` : "" })}${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
+      <td data-col="mission" class="ml-first">${ltCell(`${star}${numMark}<b class="ml-num${numFix ? " ml-num-fix" : ""}">${escapeHtml(r.number)}</b>`, r.customer ? escapeHtml(r.customer) : emptyCell(), { title: prev ? `was ${prev}` : "" })}${prev ? `<small class="ml-was">was ${escapeHtml(prev)}</small>` : ""}</td>
       <td data-label="${lbl("Status")}" data-col="status" class="ml-status">${ltCell(missionStatusHtml(r, info.p), missionAlertsHtml(r, info), { keep: true })}</td>
       <td data-label="${lbl("Board")}" data-col="boardarea" class="ml-board-cell">${ltCell(boardChipHtml(boardNameOf(r.boardId)), area ? areaMarkHtml(area) : emptyCell())}</td>
       <td data-label="${lbl("Host")}" data-col="host" class="ml-host-cell">${ltCell(host, eng)}</td>
@@ -10224,14 +10227,16 @@ function openFixNumberModal(number) {
   $("#fix-number-what").textContent = `${boards} · ${shifts} · ${first.host || "—"} → ${first.customer || "—"}`;
   $("#fix-number-why").textContent = issue.kind === "temp"
     ? `${number} is a temporary number${issue.days ? `, made ${issue.days === 1 ? "1 day" : issue.days + " days"} ago` : ""}. Type the number Etraq gave this mission once the Site Admin has registered it.`
-    : `${number} is not an Etraq number. A mission number looks like ${MissionNumber.EXAMPLE}: the 5-character site code, the year's two digits and four digits.`;
+    : `${number} is not an Etraq number. A mission number looks like ${MissionNumber.EXAMPLE}: the ${MissionNumber.prefixLength}-character site code, the year's two digits and four digits.`;
   const form = $("#form-fix-number");
   form.reset();
   // a wrong number may become a temporary one while Etraq has none yet; a temporary one only takes the Etraq number
   $("#fix-number-mode").classList.toggle("hidden", issue.kind !== "bad");
   const prefix = MissionNumber.prefixOf(number) || knownMissionPrefixes(first.boardId)[0] || "";
   form.sitecode.value = prefix;
-  form.number.placeholder = `e.g. ${(prefix || "BANGN")}.${todayStr().slice(2, 4)}.0007`;
+  form.sitecode.maxLength = MissionNumber.prefixLength;
+  form.sitecode.placeholder = `e.g. ${MissionNumber.SITE_EXAMPLE}`;
+  form.number.placeholder = `e.g. ${(prefix || MissionNumber.SITE_EXAMPLE)}.${todayStr().slice(2, 4)}.0007`;
   renderMissionPrefixOptions(first.boardId);
   updateFixNumberState();
   openModal("#modal-fix-number");
@@ -12089,6 +12094,10 @@ function fillMissionForm(src, missionId, opts = {}) {
   const newOne = !missionId && missionsOn();
   $("#mission-number-mode").classList.toggle("hidden", !newOne);
   form.sitecode.value = newOne ? (knownMissionPrefixes(D().activeBoardId)[0] || "") : "";
+  // the examples follow the site code length (Settings -> Mission numbers)
+  form.sitecode.maxLength = MissionNumber.prefixLength;
+  form.sitecode.placeholder = `e.g. ${MissionNumber.SITE_EXAMPLE}`;
+  form.number.placeholder = `e.g. ${MissionNumber.EXAMPLE}`;
   renderMissionPrefixOptions(D().activeBoardId);
   updateMissionNumberMode();
 }
@@ -12118,7 +12127,7 @@ function updateMissionNumberNote() {
       const pc = MissionNumber.checkPrefix(form.sitecode.value);
       const t = pc.ok ? MissionNumber.nextTemp(pc.prefix, state.date, knownMissionNumbers()) : null;
       text = t ? `It gets the temporary number ${t}. Change it to the Etraq number once the Site Admin has registered the mission.`
-        : form.sitecode.value.trim() ? pc.error : "Type the site code: the first part of the mission number, like BANGN.";
+        : form.sitecode.value.trim() ? pc.error : `Type the site code: the first part of the mission number, like ${MissionNumber.SITE_EXAMPLE}.`;
       bad = !t && !!form.sitecode.value.trim();
     } else if (editing && MissionNumber.kindOf(editing.number) !== "real" && !isForecastView()) {
       const changed = MissionNumber.tidy(form.number.value) !== MissionNumber.tidy(editing.number);
@@ -12647,6 +12656,7 @@ const SETTINGS_SECTIONS = {
   areas:     { label: "Service areas",       group: "Board setup",    hint: "Labels used across people, missions and hosts." },
   boards:    { label: "Boards",              group: "Board setup",    hint: "Board names and working days." },
   hostexp:   { label: "Host experience",     group: "Board setup",    hint: "How many days make someone experienced at a host, and how few experienced people make a host at risk." },
+  missionnum: { label: "Mission numbers",    group: "Board setup",    hint: "How many characters the site code at the start of a mission number has." },
   users:     { label: "Users",               group: "Administration", hint: "Accounts, access requests and status." },
   roles:     { label: "Roles & permissions", group: "Administration", hint: "Review what each role can see and change." },
 };
@@ -12821,6 +12831,7 @@ function applySettingsTab() {
   if (state.settingsTab === "users") renderUsersPane();
   if (state.settingsTab === "roles") renderRolesPane();
   if (state.settingsTab === "hostexp") renderHostExpPane();
+  if (state.settingsTab === "missionnum") renderMissionNumPane();
   renderRailMeta();
   renderSettingsFooter();
 }
@@ -12942,6 +12953,7 @@ function svHomeMeta(tab) {
   if (tab === "engineers") return { count: engineerPaneRows().length, sub: n("person", "people", engineerPaneRows().length) };
   if (tab === "areas") return { count: D().areas.length, sub: n("area", "areas", D().areas.length) };
   if (tab === "boards") return { count: D().boards.length, sub: n("board", "boards", D().boards.length) };
+  if (tab === "missionnum") return { sub: `Site code: ${MissionNumber.prefixLength} characters (${MissionNumber.EXAMPLE})` };
   if (tab === "hostexp") return { sub: `${hostExperiencedDays()}+ ${hostExperiencedDays() === 1 ? "day" : "days"} at a host · at risk at ${hostAtRiskMax()} or fewer` };
   if (tab === "users") {
     const all = D().users || [];
@@ -13139,6 +13151,15 @@ function settingsSaveOps(section) {
     }
   }
 
+  if (section === "missionnum") {
+    const f = MISSIONNUM_FIELD;
+    if (d[f.draft]) {
+      const n = parseWholeNumber(d[f.draft].after, f.min(), f.max());
+      if (n === null) errors.push(`${f.errorName} must be a whole number from ${f.min()} to ${f.max()}.`);
+      else if (!cloud.data.features.appSettings) errors.push("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-09b-app-settings.sql in the Supabase SQL Editor.");
+      else ops.push({ keys: [f.draft], label: f.label, run: () => f.save(n) });
+    }
+  }
   if (section === "hostexp") {
     for (const f of Object.values(HOSTEXP_FIELDS)) {
       if (!d[f.draft]) continue;
@@ -18694,6 +18715,50 @@ function wireHostExpPane() {
   }
 }
 
+/* ----- Settings -> Mission numbers: how many characters a mission number's site code has (mission-number.js,
+   app_settings 'mission_prefix_length'). One number, a draft like Host experience's; the note says what a number
+   then looks like and how many open missions it would flag as wrong. ----- */
+const MISSIONNUM_FIELD = {
+  input: "#missionnum-length", note: "#missionnum-note", draft: "length",
+  min: () => MissionNumber.PREFIX_MIN, max: () => MissionNumber.PREFIX_MAX, saved: () => MissionNumber.prefixLength,
+  label: "Site code length", errorName: "The site code length", save: (n) => cloud.saveMissionPrefixLength(n),
+};
+/* how many open missions (one per number) have a wrong number with a site code of `len` characters */
+function wrongNumbersAtLength(len) {
+  const re = new RegExp(`^[A-Z][A-Z0-9]{${len - 1}}\\.[0-9]{2}\\.([0-9]{4}|TMP[0-9]{3})$`);
+  return new Set((D().register || []).filter(r => r.status === "open" && !re.test(MissionNumber.tidy(r.number))).map(r => r.number)).size;
+}
+function renderMissionNumPane() {
+  const f = MISSIONNUM_FIELD, input = $(f.input);
+  if (!input) return;
+  const ready = !!cloud.data.features.appSettings;
+  $("#missionnum-migrate").classList.toggle("hidden", ready);
+  const shown = sdVal("missionnum", f.draft, String(f.saved()));
+  if (input.value !== String(shown)) input.value = shown;
+  input.disabled = !ready;
+  const n = parseWholeNumber(shown, f.min(), f.max());
+  input.setAttribute("aria-invalid", n === null ? "true" : "false");
+  const site = "BANGN12345".slice(0, n || 5);
+  $(f.note).textContent = n === null ? `Enter a whole number from ${f.min()} to ${f.max()}.`
+    : `A mission number looks like ${site}.26.0007, and a temporary one like ${site}.26.TMP001.`;
+  // what a change would do to the missions already on the boards
+  const effect = $("#missionnum-effect");
+  const now = missionsOn() ? wrongNumbersAtLength(f.saved()) : 0, then = n !== null && missionsOn() ? wrongNumbersAtLength(n) : now;
+  effect.textContent = n === null || !missionsOn() ? ""
+    : n === f.saved() ? (now ? `${now === 1 ? "1 open mission has" : now + " open missions have"} a wrong number now.` : "Every open mission has a number in this form.")
+    : `With ${n}, ${then === 1 ? "1 open mission would have" : then + " open missions would have"} a wrong number (${now} now).`;
+  effect.classList.toggle("fix-bad", n !== null && n !== f.saved() && then > now);
+}
+function wireMissionNumPane() {
+  const f = MISSIONNUM_FIELD, input = $(f.input);
+  if (!input) return;
+  input.oninput = () => {
+    sdSet("missionnum", f.draft, input.value, f.label, () => String(f.saved()));
+    renderMissionNumPane();
+  };
+  input.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); saveSettingsSection(); } };
+}
+
 function renderAccountPane() {
   const me = D().me;
   const box = $("#account-identity");
@@ -19355,6 +19420,7 @@ function wireUserManagement() {
   }
   wireAccountPane();
   wireHostExpPane();
+  wireMissionNumPane();
 }
 
 /* ---------- login ---------- */
