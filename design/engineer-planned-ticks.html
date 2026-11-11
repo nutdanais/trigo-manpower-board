@@ -1,0 +1,384 @@
+<meta charset="utf-8">
+<title>Engineer Planned Ticks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;600&display=swap">
+<style>
+/* Design collateral, not app code. Four places for a "my part is planned" tick per
+   engineer, drawn with the board's own palette (styles.css) so they read like the app.
+   Layout: findings → shared rules → four options (desktop + phone mock each) → compare. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --primary-dark: #002a4a; --brand-green: #a8c855; --bg-soft: #eef1f5;
+  --ok-surface: #f7faef; --ok-line: #cfdcae; --ok-text: #4d6810; --ok-dot: #7fa32a;
+  --warn-surface: #fdf8ef; --warn-line: #e0c9a4; --warn-text: #8a4f10; --warn-dot: #d98a00;
+  --danger-tint: #fef2f2; --danger-line: #e6c2be; --danger-text: #a3271f;
+  --stat-asg: #2a78d6; --stat-leave: #b87800; --stat-standby: #cf3a39; --stat-free: #78808a;
+  --hover-tint: #eef3fb; --night: #1c2430;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.45; font-size: 14px; }
+button { font: inherit; color: inherit; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+h1 { font-size: 28px; letter-spacing: -.5px; text-wrap: balance; }
+h2 { font-size: 20px; letter-spacing: -.25px; text-wrap: balance; }
+h3 { font-size: 14px; }
+p, li { max-width: 72ch; }
+.lede { color: var(--muted); margin-top: 6px; font-size: 15px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+ul.plain { padding-left: 18px; display: grid; gap: 4px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px; }
+.cols > div { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; background: var(--panel); }
+.cols b { display: block; margin-bottom: 2px; }
+
+/* reviewer controls */
+.tools { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,42,74,.07); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.tools .lab { font-size: 12.5px; color: var(--muted); }
+.tg { font-size: 12.5px; font-weight: 600; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; transition: background .15s; }
+.tg:hover { background: var(--hover-tint); }
+.tg:active { transform: translateY(1px); }
+.tg[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tools .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* option heads */
+.opt { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; scroll-margin-top: 70px; }
+.opt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.opt-head h2 span { color: var(--muted); margin-right: 6px; }
+.rec { font-size: 11px; font-weight: 700; color: #fff; background: var(--primary); border-radius: 4px; padding: 2px 8px; letter-spacing: .3px; text-transform: uppercase; }
+.why { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 6px 28px; font-size: 13px; }
+.why .lbl { font-weight: 700; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
+.why ul { padding-left: 18px; }
+.stage { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.scroll { overflow-x: auto; max-width: 100%; flex: 1 1 640px; min-width: 0; padding-bottom: 4px; }
+.cap { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
+
+/* ===== desktop mock ===== */
+.desk { width: 860px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--bg); box-shadow: 0 6px 20px rgba(0,42,74,.08); position: relative; }
+.topbar { background: var(--primary); color: #fff; display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 13px; }
+.topbar .brand { font-weight: 700; font-size: 14px; display: flex; gap: 7px; align-items: center; }
+.topbar .brand i { width: 20px; height: 20px; border-radius: 5px; background: linear-gradient(135deg, var(--brand-green) 50%, #fff 50%); display: inline-block; }
+.topbar .tab { background: #fff; color: var(--primary); font-weight: 600; padding: 3px 10px; border-radius: 5px; font-size: 12px; }
+.topbar .sp { flex: 1; }
+.pill { position: relative; font-size: 11px; font-weight: 600; border-radius: 6px; padding: 3px 9px; border: 1px dashed #e0b25a; background: #fff6e0; color: var(--warn-text); white-space: nowrap; }
+.pill.ok { border: 1px solid var(--ok-line); background: var(--ok-surface); color: var(--ok-text); }
+button.pill { cursor: pointer; }
+.topbar .date { border: 1px solid rgba(255,255,255,.35); padding: 3px 12px; border-radius: 6px; font-weight: 600; }
+.topbar .me { width: 26px; height: 26px; border-radius: 6px; background: var(--brand-green); color: var(--primary); font-weight: 700; font-size: 11px; display: grid; place-items: center; }
+.row1 { background: var(--panel); display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.row1 span { border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-weight: 600; }
+.row1 .main { background: var(--primary); color: #fff; border-color: var(--primary); }
+.row1 .r { margin-left: auto; }
+.statsrow { background: var(--panel); display: flex; align-items: center; gap: 0; padding: 8px 12px 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; row-gap: 8px; }
+.st { padding: 0 12px; border-left: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+.st:first-child { border-left: 0; padding-left: 0; }
+.st b { display: block; font-size: 18px; color: var(--text); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.st .d { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+.body { display: grid; grid-template-columns: 1fr 230px; }
+.body.full { grid-template-columns: 1fr; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; align-content: start; }
+.side { background: var(--panel); border-left: 1px solid var(--border); padding: 10px; display: grid; gap: 10px; align-content: start; font-size: 12px; }
+.side .search { border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; color: var(--muted); background: var(--bg-soft); }
+.side .grp b { font-size: 12px; }
+.side .emp { border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; margin-top: 5px; width: 88px; font-size: 11px; }
+
+/* mission card (header + a strip of crew) */
+.mc { background: var(--panel); border: 1px solid var(--border); border-top: 4px solid var(--c); border-radius: 8px; overflow: hidden; }
+.mh { padding: 7px 9px; background: color-mix(in srgb, var(--c) 12%, #fff); border-bottom: 1px solid var(--border); font-size: 11px; }
+.mh .l1 { display: flex; gap: 6px; align-items: baseline; }
+.mh .n { font-weight: 700; font-size: 14px; }
+.mh .h { font-weight: 700; font-size: 14px; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mh .sh { margin-left: auto; font-size: 9px; font-weight: 700; border: 1px solid rgba(0,73,131,.3); border-radius: 3px; padding: 0 4px; color: var(--primary); background: #fff; }
+.mh .sh.night { background: var(--night); color: #fff; border-color: var(--night); }
+.mh .l2 { color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.mh .eng { color: var(--text); font-weight: 700; }
+.crew { display: flex; gap: 5px; padding: 7px 9px; }
+.crew i { width: 62px; height: 30px; border: 1px solid var(--border); border-radius: 5px; background: #fff; display: block; }
+
+/* ===== the tick itself (shared by every option) ===== */
+.tk { --c: #888; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px 0 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background .15s, border-color .15s; }
+.tk:hover { background: var(--hover-tint); }
+.tk:active { transform: translateY(1px); }
+.box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #9aa3ad; background: #fff; display: grid; place-items: center; flex: none; transition: background .15s, border-color .15s; }
+.box svg { width: 11px; height: 11px; opacity: 0; transition: opacity .15s; }
+.on > .box, .box.on { background: var(--ok-dot); border-color: var(--ok-dot); }
+.on > .box svg, .box.on svg { opacity: 1; }
+.tk.on { border-color: var(--ok-line); background: var(--ok-surface); }
+.tk .sw { width: 8px; height: 8px; border-radius: 2px; background: var(--c); flex: none; }
+.tk .you { font-weight: 500; color: var(--muted); }
+.tk.me:not(.on) { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+.count { font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ready { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+.ready::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok-dot); }
+.pend { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--warn-text); white-space: nowrap; }
+.pend::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--warn-dot); }
+
+/* A: strip in the stats row */
+.a-strip { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-left: 12px; border-left: 1px solid var(--border); }
+.a-strip .t { font-size: 11px; color: var(--muted); font-weight: 600; margin-right: 2px; }
+
+/* B: pill popover */
+.pop { position: absolute; top: 40px; right: 120px; width: 270px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,42,74,.18); padding: 10px; z-index: 3; display: grid; gap: 6px; }
+.pop h4, .sheet h4 { font-size: 12.5px; display: flex; justify-content: space-between; align-items: baseline; }
+.pop .tk, .sheet .tk, .c-list .tk { width: 100%; justify-content: flex-start; height: 34px; }
+.tk .meta { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--muted); }
+.pop .foot, .sheet .foot { font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 6px; }
+
+/* C: side panel section */
+.c-sec { border: 1px solid var(--border); border-radius: 8px; padding: 8px; display: grid; gap: 5px; background: var(--panel); }
+.c-sec h4 { font-size: 12px; display: flex; justify-content: space-between; align-items: baseline; }
+.c-list { display: grid; gap: 4px; }
+.c-list .tk { white-space: normal; text-align: left; height: auto; padding: 5px 7px 5px 6px; align-items: flex-start; flex-wrap: wrap; row-gap: 0; }
+.c-list .tk .sub { flex-basis: 100%; padding-left: 22px; font-size: 10.5px; font-weight: 500; color: var(--muted); }
+
+/* D: tick on the card */
+.dtk { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); background: #fff; border-radius: 5px; padding: 1px 6px 1px 3px; cursor: pointer; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+.dtk .box { width: 13px; height: 13px; }
+.dtk .box svg { width: 9px; height: 9px; }
+.dtk.on { color: var(--ok-text); border-color: var(--ok-line); background: var(--ok-surface); }
+.dots { display: inline-flex; gap: 3px; vertical-align: middle; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--c); background: #fff; }
+.dots i.on { background: var(--c); }
+
+/* ===== phone mock ===== */
+.phone { width: 330px; max-width: 100%; flex: none; border: 1px solid var(--border); border-radius: 22px; overflow: hidden; background: var(--bg); box-shadow: 0 6px 20px rgba(0,42,74,.08); position: relative; height: 600px; display: flex; flex-direction: column; }
+.ph-head { background: var(--panel); padding: 12px 12px 10px; display: grid; gap: 8px; border-bottom: 1px solid var(--border); }
+.ph-top { display: flex; align-items: center; gap: 8px; }
+.ph-top .bd { font-weight: 700; font-size: 17px; }
+.ph-top .dt { margin-left: auto; border: 1px solid var(--border); background: var(--bg-soft); border-radius: 8px; padding: 2px 10px; text-align: center; font-size: 10px; color: var(--muted); line-height: 1.2; }
+.ph-top .dt b { display: block; font-size: 13px; color: var(--text); }
+.ph-sum { border: 1px solid var(--border); background: var(--bg-soft); border-radius: 9px; padding: 6px 9px; font-size: 12px; display: grid; gap: 6px; }
+.ph-sum .bar { height: 4px; border-radius: 3px; background: linear-gradient(90deg, var(--stat-asg) 0 70%, var(--stat-leave) 70% 82%, var(--stat-standby) 82% 87%, var(--stat-free) 87%); }
+.ph-sum .tks { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding-top: 6px; border-top: 1px dashed var(--border); }
+.ph-sum .tk { height: 26px; font-size: 11.5px; }
+.ph-body { flex: 1; padding: 10px; display: grid; gap: 10px; align-content: start; overflow: hidden; }
+.ph-body .mc .crew i { width: 70px; height: 34px; }
+.ph-nav { background: var(--primary); color: #cfdbe6; display: flex; justify-content: space-around; padding: 9px 0 12px; font-size: 10.5px; }
+.ph-nav b { color: #fff; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 38px; background: var(--panel); border-radius: 14px 14px 0 0; box-shadow: 0 -8px 24px rgba(0,42,74,.16); padding: 8px 12px 12px; display: grid; gap: 6px; }
+.sheet::before { content: ""; width: 36px; height: 4px; border-radius: 2px; background: #c9cfd6; justify-self: center; }
+.sheet .tabs { display: flex; gap: 6px; font-size: 12px; font-weight: 600; }
+.sheet .tabs span { padding: 3px 9px; border-radius: 6px; background: var(--bg-soft); color: var(--muted); }
+.sheet .tabs span.cur { background: var(--primary); color: #fff; }
+
+/* compare table */
+.tbl { overflow-x: auto; max-width: 100%; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13px; background: var(--panel); }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+td.g { color: var(--ok-text); font-weight: 600; }
+td.w { color: var(--warn-text); }
+.q { display: grid; gap: 10px; }
+.q div { border-left: 3px solid var(--primary); background: var(--panel); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 13.5px; }
+.q div b { display: block; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>“My part is planned” ticks</h1>
+    <p class="lede">A light check-in on the board: every engineer with a mission on today's board gets a tick box by their name. Tick it when your missions are planned. When every name is ticked, the board says it is ready to share with the crew. Nobody is blocked by it. It only lets the others know.</p>
+  </header>
+
+  <section class="panel">
+    <h2>What the board already gives us</h2>
+    <div class="cols">
+      <div><b>The list builds itself</b>The names are the engineers on this board's missions for this date. Add a mission for a new engineer and their name appears. Remove their last mission and the name goes.</div>
+      <div><b>The app knows which name is yours</b>Engineer records are linked to login accounts (Settings → Engineers), so your own name can be highlighted and is the one you tick.</div>
+      <div><b>One plan per board per day</b>Ticks belong to “Rayong, Thu 12 Nov”. Tomorrow starts with no ticks, and Carry over does not copy them.</div>
+      <div><b>Live for everyone</b>Missions and crew already sync between people in real time. Ticks would use the same sync, so the last engineer sees the others' ticks without reloading.</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Rules for every option</h2>
+    <ul class="plain">
+      <li><b>Tick your own name.</b> Admins and managers can also tick for someone, for example an engineer on site with no signal. The tooltip then says who ticked and when.</li>
+      <li><b>Untick anytime.</b> It is a flag, not an approval. Nothing is locked, and Export and Present keep working with or without ticks.</li>
+      <li><b>Ready to share</b> shows when every listed engineer has ticked. Before that it shows “1 of 3 planned”.</li>
+      <li><b>On screen only.</b> The ticks never appear in the exported JPG, PDF or Excel the crew receives.</li>
+      <li><b>Past days and locked days</b> show their ticks but cannot be changed, like the rest of the board.</li>
+    </ul>
+  </section>
+
+  <div class="tools" role="group" aria-label="Try the mockups">
+    <span class="lab">Try it: you are <b>Kittipong.W</b>. Every mockup shares the same ticks.</span>
+    <button type="button" class="tg" id="t-reset">1 of 3 (start)</button>
+    <button type="button" class="tg" id="t-all">All ticked</button>
+    <span class="hint">Jump to <a href="#a">A</a> · <a href="#b">B</a> · <a href="#c">C</a> · <a href="#d">D</a> · <a href="#compare">Compare</a></span>
+  </div>
+
+  <!-- ============ A ============ -->
+  <section class="opt" id="a">
+    <div class="opt-head"><h2><span>A</span>A strip in the numbers row</h2><span class="rec">Recommended</span></div>
+    <div class="why">
+      <div><p class="lbl">Where</p><p>On the right of the row with Total, Assigned, Leave and Standby. On a phone it sits under the summary card at the top.</p></div>
+      <div><p class="lbl">Why it works</p><ul><li>Every name is always in view, so the last engineer sees who is left at a glance.</li><li>Ticking takes one tap and needs no menu.</li><li>It sits with the day's numbers, the place people check before sharing.</li></ul></div>
+      <div><p class="lbl">Watch out</p><ul><li>With 6 or more engineers on one board the strip wraps onto a second line. It still works, but takes height.</li></ul></div>
+    </div>
+    <div class="stage">
+      <div class="scroll"><p class="cap">Desktop</p><div class="desk" data-mock="a"></div></div>
+      <div><p class="cap">Phone</p><div class="phone" data-mock="a-ph"></div></div>
+    </div>
+  </section>
+
+  <!-- ============ B ============ -->
+  <section class="opt" id="b">
+    <div class="opt-head"><h2><span>B</span>Inside the day's status pill</h2></div>
+    <div class="why">
+      <div><p class="lbl">Where</p><p>The pill beside the date, which today says “Draft · Not reviewed”, would read “Draft · 1/3 planned”. Click it for the list. On a phone the list opens from the bottom.</p></div>
+      <div><p class="lbl">Why it works</p><ul><li>It takes no new space, and the pill is already where the day's status lives.</li><li>The pill turns green with “Ready to share” when everyone has ticked.</li></ul></div>
+      <div><p class="lbl">Watch out</p><ul><li>The names are hidden until someone clicks, so it is less obvious who is left.</li><li>The pill is already busy (Draft, Forecast, Locked, Read-only, Holiday), and this adds one more thing to it.</li></ul></div>
+    </div>
+    <div class="stage">
+      <div class="scroll"><p class="cap">Desktop, pill clicked</p><div class="desk" data-mock="b"></div></div>
+      <div><p class="cap">Phone, pill tapped</p><div class="phone" data-mock="b-ph"></div></div>
+    </div>
+  </section>
+
+  <!-- ============ C ============ -->
+  <section class="opt" id="c">
+    <div class="opt-head"><h2><span>C</span>A section in the side panel</h2></div>
+    <div class="why">
+      <div><p class="lbl">Where</p><p>The first section of the right-hand panel, above Search employee, Standby and On-call. On a phone it is a tab in the bottom panel that already holds Standby and On-call.</p></div>
+      <div><p class="lbl">Why it works</p><ul><li>There is room for detail: each engineer's missions and crew count, plus when they ticked.</li><li>The board's top rows stay unchanged.</li></ul></div>
+      <div><p class="lbl">Watch out</p><ul><li>The panel can be collapsed, and on a phone it is closed by default, so people can miss it.</li><li>It mixes a status with the panel people use to drag crew.</li></ul></div>
+    </div>
+    <div class="stage">
+      <div class="scroll"><p class="cap">Desktop</p><div class="desk" data-mock="c"></div></div>
+      <div><p class="cap">Phone, bottom panel opened</p><div class="phone" data-mock="c-ph"></div></div>
+    </div>
+  </section>
+
+  <!-- ============ D ============ -->
+  <section class="opt" id="d">
+    <div class="opt-head"><h2><span>D</span>On each mission card, next to the engineer</h2></div>
+    <div class="why">
+      <div><p class="lbl">Where</p><p>A small “Planned” box beside the engineer's name on every one of their mission cards. Ticking one card ticks all of that engineer's cards. A dot per engineer in the numbers row gives the total.</p></div>
+      <div><p class="lbl">Why it works</p><ul><li>You tick right where you just finished planning.</li><li>Scrolling the board shows which cards are still waiting.</li></ul></div>
+      <div><p class="lbl">Watch out</p><ul><li>Adds a control to every card header, which is already dense.</li><li>One tick on several cards can look like a per-mission tick. It is not.</li></ul></div>
+    </div>
+    <div class="stage">
+      <div class="scroll"><p class="cap">Desktop</p><div class="desk" data-mock="d"></div></div>
+      <div><p class="cap">Phone</p><div class="phone" data-mock="d-ph"></div></div>
+    </div>
+  </section>
+
+  <section class="panel" id="compare">
+    <h2>Side by side</h2>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>A · Numbers row</th><th>B · Status pill</th><th>C · Side panel</th><th>D · On the cards</th></tr></thead>
+      <tbody>
+        <tr><th>Who is left, at a glance</th><td class="g">Always visible</td><td class="w">One click away</td><td>Visible on desktop, hidden on phone</td><td>Scroll the cards; dots show the count</td></tr>
+        <tr><th>Taps to tick</th><td class="g">1</td><td>2</td><td>1 desktop, 2 phone</td><td class="g">1</td></tr>
+        <tr><th>New space on screen</th><td>Part of one row</td><td class="g">None</td><td>One panel section</td><td class="w">A box on every card</td></tr>
+        <tr><th>Phone</th><td class="g">Fits under the summary</td><td class="g">Bottom sheet</td><td class="w">Behind a tab</td><td>Same as desktop</td></tr>
+        <tr><th>Build size</th><td>Small</td><td>Small</td><td>Small</td><td>Medium (touches the card header)</td></tr>
+      </tbody>
+    </table></div>
+    <p><b>My pick is A.</b> It matches what you asked for most closely: a small section with every name, always visible, one tap to tick. If the row feels too full on boards with many engineers, B is the fallback with the same list behind the pill.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Behind the scenes (any option)</h2>
+    <ul class="plain">
+      <li>One small new table: <b>board, date, engineer, ticked by, ticked at</b>. Unticking deletes the row. A short SQL migration adds it with the same access rules as the board.</li>
+      <li>Live sync uses the board's existing real-time updates, so a tick appears for others within a second or two.</li>
+      <li>The <code>/?demo</code> sample board gets the same table, with one engineer already ticked, so the Netlify preview shows it working.</li>
+    </ul>
+  </section>
+
+  <section class="panel">
+    <h2>Three questions for you</h2>
+    <div class="q">
+      <div><b>1. Can others tick for an engineer?</b>My suggestion: you tick your own name, and Admins and managers can also tick for others, with the name of whoever ticked shown in the tooltip.</div>
+      <div><b>2. If an engineer changes a mission after ticking, should the tick stay?</b>My suggestion: keep it, so nothing nags people. A small “changed since” dot could come later if it turns out to matter.</div>
+      <div><b>3. Should the ticks stay out of the export?</b>My suggestion: yes, on screen only. The crew receives the plan and does not need the check-in.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ENG = [
+  { id: "s", name: "Somchai.P",  color: "#2a78d6", m: ["101", "103"], crew: 7, at: "16:42" },
+  { id: "k", name: "Kittipong.W", color: "#e07b39", m: ["102", "105"], crew: 5, me: true },
+  { id: "p", name: "Pimchanok.R", color: "#4d9a3a", m: ["104", "106"], crew: 6 },
+];
+const MISSIONS = [
+  { n: "101", host: "Siam Auto Parts", e: "s", sh: "DAY" }, { n: "102", host: "Rayong Precision", e: "k", sh: "DAY" },
+  { n: "103", host: "Eastern Seaboard Motors", e: "s", sh: "NIGHT" }, { n: "104", host: "Pluak Daeng Plastics", e: "p", sh: "DAY" },
+];
+const ticked = new Set(["s"]);
+const CHECK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 6.3l2.4 2.4 5.2-5.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const byId = (id) => ENG.find(e => e.id === id);
+const done = () => ENG.every(e => ticked.has(e.id));
+const now = () => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+
+function tick(e, opts = {}) {
+  const on = ticked.has(e.id);
+  const meta = opts.meta ? `<span class="meta">${on ? "Ticked " + (e.at || "") : "Not yet"}</span>` : "";
+  const sub = opts.sub ? `<span class="sub">${e.m.length} missions · ${e.crew} crew${on ? " · ticked " + (e.at || "") : ""}</span>` : "";
+  return `<button type="button" class="tk${on ? " on" : ""}${e.me ? " me" : ""}" style="--c:${e.color}" data-e="${e.id}" aria-pressed="${on}" title="${on ? e.name + " ticked at " + (e.at || "") : "Tick when " + (e.me ? "your" : e.name + "'s") + " missions are planned"}"><span class="box">${CHECK}</span><span class="sw"></span>${e.name}${e.me ? ' <span class="you">(you)</span>' : ""}${meta}${sub}</button>`;
+}
+const summary = () => done() ? `<span class="ready">Ready to share with crew</span>` : `<span class="pend">${[...ticked].length} of ${ENG.length} planned</span>`;
+const pill = (open) => done()
+  ? `<button type="button" class="pill ok" data-pill aria-expanded="${!!open}">Planned · Ready to share</button>`
+  : `<button type="button" class="pill" data-pill aria-expanded="${!!open}">Draft · ${ticked.size}/${ENG.length} planned</button>`;
+
+function card(m, opt) {
+  const e = byId(m.e);
+  const on = ticked.has(e.id);
+  const d = opt === "d" ? `<button type="button" class="dtk${on ? " on" : ""}" data-e="${e.id}" aria-pressed="${on}" title="Ticks all of ${e.name}'s missions"><span class="box${on ? " on" : ""}">${CHECK}</span>Planned</button>` : "";
+  return `<div class="mc" style="--c:${e.color}"><div class="mh"><div class="l1"><span class="n">${m.n}</span><span class="h">${m.host}</span><span class="sh${m.sh === "NIGHT" ? " night" : ""}">${m.sh}</span></div><div class="l2">08:00–17:00 · <span class="eng">${e.name}</span>${d}</div></div><div class="crew"><i></i><i></i><i></i></div></div>`;
+}
+const dots = () => `<span class="dots">${ENG.map(e => `<i class="${ticked.has(e.id) ? "on" : ""}" style="--c:${e.color}" title="${e.name}"></i>`).join("")}</span>`;
+
+function stats(extra) {
+  return `<div class="statsrow"><div class="st">Total<b>25</b></div><div class="st"><span class="d" style="background:var(--stat-asg)"></span>Assigned<b>18</b></div><div class="st"><span class="d" style="background:var(--stat-leave)"></span>Leave<b>3</b></div><div class="st"><span class="d" style="background:var(--stat-standby)"></span>Standby<b>1</b></div><div class="st"><span class="d" style="background:var(--stat-free)"></span>On-call free<b>3</b></div>${extra || ""}</div>`;
+}
+function desk(opt) {
+  const pillHtml = opt === "b" ? pill(true) : `<span class="pill">Draft · Not reviewed</span>`;
+  let statExtra = "";
+  if (opt === "a") statExtra = `<div class="a-strip"><span class="t">Planned by</span>${ENG.map(e => tick(e)).join("")}${summary()}</div>`;
+  if (opt === "d") statExtra = `<div class="a-strip"><span class="t">Planned</span>${dots()}${summary()}</div>`;
+  const side = opt === "c"
+    ? `<aside class="side"><div class="c-sec"><h4>Planning check-in ${done() ? "" : `<span class="count">${ticked.size}/${ENG.length}</span>`}</h4><div class="c-list">${ENG.map(e => tick(e, { sub: true })).join("")}</div>${done() ? summary() : ""}</div><div class="search">Search employee…</div><div class="grp"><b>Standby 1</b><div class="emp">ปิยะนุช</div></div><div class="grp"><b>Available On-call 3</b><div class="emp">มาลี</div></div></aside>`
+    : `<aside class="side"><div class="search">Search employee…</div><div class="grp"><b>Standby 1</b><div class="emp">ปิยะนุช</div></div><div class="grp"><b>Available On-call 3</b><div class="emp">มาลี</div><div class="emp">สมศักดิ์</div></div></aside>`;
+  const pop = opt === "b" ? `<div class="pop" role="dialog" aria-label="Planned by engineer"><h4>Planned by engineer <span class="count">${ticked.size}/${ENG.length}</span></h4>${ENG.map(e => tick(e, { meta: true })).join("")}<div class="foot">${done() ? "Everyone has ticked. Ready to share with the crew." : "Tick your name when your missions are planned. Nothing is locked."}</div></div>` : "";
+  return `<div class="topbar"><span class="brand"><i></i>Manpower Board</span><span class="tab">Board</span><span class="sp"></span>${pillHtml}<span class="date">Thu 12 Nov</span><span class="me">KW</span></div>${pop}<div class="row1"><span>Board Rayong 25</span><span class="main">+ New Mission</span><span>+ New Employee</span><span>Filter &amp; sort</span><span class="r">Export</span></div>${stats(statExtra)}<div class="body"><div class="grid">${MISSIONS.map(m => card(m, opt)).join("")}</div>${side}</div>`;
+}
+function phone(opt) {
+  const p = opt === "b" ? pill(true) : `<span class="pill">Draft</span>`;
+  let sumExtra = "";
+  if (opt === "a") sumExtra = `<div class="tks">${ENG.map(e => tick(e)).join("")}${summary()}</div>`;
+  if (opt === "d") sumExtra = `<div class="tks"><span class="count">Planned</span>${dots()}${summary()}</div>`;
+  const ms = MISSIONS.slice(0, opt === "a" || opt === "d" ? 2 : 3).map(m => card(m, opt)).join("");
+  let sheet = "";
+  if (opt === "b") sheet = `<div class="sheet"><h4>Planned by engineer <span class="count">${ticked.size}/${ENG.length}</span></h4>${ENG.map(e => tick(e, { meta: true })).join("")}<div class="foot">${done() ? "Everyone has ticked. Ready to share." : "Tick your name when your missions are planned."}</div></div>`;
+  if (opt === "c") sheet = `<div class="sheet"><div class="tabs"><span>Standby 1</span><span>On-call 3</span><span class="cur">Check-in ${ticked.size}/${ENG.length}</span></div><div class="c-list">${ENG.map(e => tick(e, { sub: true })).join("")}</div>${done() ? summary() : ""}</div>`;
+  return `<div class="ph-head"><div class="ph-top"><span class="bd">Rayong ▾</span>${p}<span class="dt">THU<b>12 Nov</b></span></div><div class="ph-sum"><div><b>18</b> (95%) assigned · 3 leave · 1 standby</div><div class="bar"></div>${sumExtra}</div></div><div class="ph-body">${ms}</div>${sheet}<div class="ph-nav"><b>Board</b><span>Overview</span><span>Manpower</span><span>Host</span><span>Me</span></div>`;
+}
+function render() {
+  document.querySelectorAll("[data-mock]").forEach(el => {
+    const k = el.dataset.mock;
+    el.innerHTML = k.endsWith("-ph") ? phone(k[0]) : desk(k);
+  });
+  document.getElementById("t-reset").setAttribute("aria-pressed", String(ticked.size === 1 && ticked.has("s")));
+  document.getElementById("t-all").setAttribute("aria-pressed", String(done()));
+}
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-e]");
+  if (!b) return;
+  const e = byId(b.dataset.e);
+  if (ticked.has(e.id)) ticked.delete(e.id); else { ticked.add(e.id); e.at = now(); }
+  render();
+});
+document.getElementById("t-reset").onclick = () => { ticked.clear(); ticked.add("s"); render(); };
+document.getElementById("t-all").onclick = () => { ENG.forEach(e => { if (!ticked.has(e.id)) e.at = now(); ticked.add(e.id); }); render(); };
+render();
+</script>
