@@ -2053,6 +2053,47 @@ begin
 exception when duplicate_object then null;
 end $$;
 
+-- ===== "My part is planned" ticks (plan_day_ready) =====
+-- Also shipped as migration-2026-11-12-plan-day-ready.sql, for a project that already has data;
+-- see that file for what it is for. One row per ticked engineer per board per day.
+
+create table if not exists plan_day_ready (
+  board_id    uuid not null references boards(id) on delete cascade,
+  plan_date   date not null,
+  engineer_id uuid not null references engineers(id) on delete cascade,
+  ticked_by   text,
+  ticked_at   timestamptz not null default now(),
+  primary key (board_id, plan_date, engineer_id)
+);
+
+/* May the signed-in account tick (or untick) this engineer? Their own engineer record, or any
+   engineer for an Admin or a Manager — and only with Edit on the Board. */
+create or replace function public.can_tick_ready(p_engineer_id uuid)
+returns boolean language sql stable security definer set search_path = public, pg_temp as $fn$
+  select (select public.can('board', 'edit'))
+     and (coalesce((select public.my_role()) in ('admin', 'manager'), false)
+          or exists (select 1 from engineers e where e.id = p_engineer_id and e.profile_id = auth.uid()));
+$fn$;
+grant execute on function public.can_tick_ready(uuid) to authenticated;
+
+alter table plan_day_ready enable row level security;
+
+drop policy if exists "plan_day_ready read" on plan_day_ready;
+create policy "plan_day_ready read" on plan_day_ready
+  for select using ((select public.is_active()));
+drop policy if exists "plan_day_ready insert" on plan_day_ready;
+create policy "plan_day_ready insert" on plan_day_ready
+  for insert with check (public.can_tick_ready(engineer_id));
+drop policy if exists "plan_day_ready delete" on plan_day_ready;
+create policy "plan_day_ready delete" on plan_day_ready
+  for delete using (public.can_tick_ready(engineer_id));
+
+do $$
+begin
+  alter publication supabase_realtime add table plan_day_ready;
+exception when duplicate_object then null;
+end $$;
+
 -- ===== Bootstrap: make yourself the first admin =====
 -- A fresh project has no accounts yet, so this cannot be seeded. After running
 -- this file:

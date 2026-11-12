@@ -93,7 +93,11 @@ const rect = (p, sel) => p.$eval(sel, (e) => { const r = e.getBoundingClientRect
       const c = await p.evaluate(() => ({ s: boardStats(D().activeBoardId), t: document.querySelector("#m-summary .ms-t").textContent }));
       const want = c.s.assigned + c.s.standby > 0 ? Math.round(c.s.assigned / (c.s.assigned + c.s.standby) * 100) : 0;
       assert.equal(c.t, `${c.s.assigned} (${want}%) assigned`);
-      assert.ok((await rect(p, "#sticky-header")).height < 130, "two compact lines, got " + (await rect(p, "#sticky-header")).height);
+      // the "Planned" ticks (planned-ticks.e2e.js) add their own two rows under the summary card when the
+      // day has engineers on its missions; the header without them stays two compact lines
+      const ready = await p.evaluate(() => { const r = document.querySelector("#m-ready"); return r && r.innerHTML ? r.getBoundingClientRect().height + 8 : 0; });
+      assert.ok(ready <= 72, "the Planned line is two short rows, got " + ready);
+      assert.ok((await rect(p, "#sticky-header")).height - ready < 130, "two compact lines, got " + ((await rect(p, "#sticky-header")).height - ready));
       await shot(p, "1-board");
     });
 
