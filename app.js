@@ -10403,6 +10403,17 @@ function fixNumberChoice() {
   if (knownMissionNumbers().has(c.number)) return { ok: false, number: c.number, error: `${c.number} is already used by another mission.` };
   return c;
 }
+/* An input event on a mission number or site code field: upper case what was typed, keeping the cursor where it was
+   (the form listens once, so the Fix number dialog's two fields and the mission form's two share it). */
+function capitalsAsTyped(ev) {
+  const el = ev.target;
+  if (!el || el.tagName !== "INPUT" || (el.name !== "number" && el.name !== "sitecode")) return;
+  const v = el.value, up = v.toUpperCase();
+  if (v === up) return;
+  const at = el.selectionStart, end = el.selectionEnd;
+  el.value = up;
+  if (at != null) { try { el.setSelectionRange(v.slice(0, at).toUpperCase().length, v.slice(0, end).toUpperCase().length); } catch (e) { /* a field without a selection */ } }
+}
 function updateFixNumberState() {
   const form = $("#form-fix-number");
   const temp = !$("#fix-number-mode").classList.contains("hidden") && form.numMode.value === "temp";
@@ -19775,8 +19786,12 @@ function wireApp() {
   $("#form-mission").onsubmit = saveMission;
   // the number: the Etraq one, or a temporary one from the site code (missionNumberMode)
   for (const r of $$("#form-mission [name=numMode]")) r.onchange = updateMissionNumberMode;
-  $("#form-mission [name=sitecode]").addEventListener("input", updateMissionNumberNote);
-  $("#form-mission [name=number]").addEventListener("input", updateMissionNumberNote);
+  // a mission number and a site code are capitals: typed (or pasted) lower case turns into capitals in place,
+  // before the note under the field reads it (the database does the same, migration-2026-11-12b)
+  for (const f of ["sitecode", "number"]) {
+    $("#form-mission [name=" + f + "]").addEventListener("input", capitalsAsTyped);
+    $("#form-mission [name=" + f + "]").addEventListener("input", updateMissionNumberNote);
+  }
   initSegmented();
   initPickers();
   $("#btn-delete-mission").onclick = () => deleteMission();
@@ -20042,6 +20057,7 @@ function wireApp() {
   $("#missions-bulk-clear").onclick = () => { state.selectedMissions = new Set(); renderMissionList(); };
   $("#form-close-mission").onsubmit = submitCloseMission;
   $("#form-fix-number").onsubmit = submitFixNumber;
+  $("#form-fix-number").addEventListener("input", capitalsAsTyped);
   $("#form-fix-number").addEventListener("input", updateFixNumberState);
   $("#form-fix-number").addEventListener("change", updateFixNumberState);
   $("#close-mission-date").addEventListener("input", updateCloseMissionEffect);
