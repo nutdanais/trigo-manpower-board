@@ -5956,6 +5956,54 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
    - New Mission becomes a floating button above the bar.
    - The available-people panel is a drawer that peeks above the bar.
    - Record dialogs (.modal-side) open full screen with Save pinned. */
+/* ===== "My part is planned" ticks (renderReadyBar in app.js; design/engineer-planned-ticks.html, A2) =====
+   The end of the board's "By area" line: your own tick, the count, who is still left, and "All n"
+   with the full list. On a phone the same line sits under the summary card as two fixed rows. It is
+   in the toolbar, never in #board-capture, so no export carries it. */
+.rd-bar { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 8px; position: relative; min-width: 0; }
+.rd-cap { font-size: 12px; font-weight: 600; color: var(--muted); }
+.rd-tk {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px 0 6px; min-width: 0;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text);
+  font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.rd-tk:hover:not(:disabled) { background: var(--hover-tint); }
+.rd-tk:active:not(:disabled) { transform: translateY(1px); }
+.rd-tk:disabled { cursor: default; }
+.rd-tk.me:not(.on):not(:disabled) { border-color: var(--primary-text); box-shadow: inset 0 0 0 1px var(--primary-text); }
+.rd-tk.on { border-color: var(--ok-line); background: var(--ok-surface); }
+.rd-box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--track-off); background: var(--panel); display: grid; place-items: center; flex: none; }
+.rd-box .ic { width: 11px; height: 11px; color: #fff; opacity: 0; }
+.rd-tk.on .rd-box { background: var(--ok-dot); border-color: var(--ok-dot); }
+.rd-tk.on .rd-box .ic { opacity: 1; }
+.rd-sw { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.rd-name { overflow: hidden; text-overflow: ellipsis; }
+.rd-you { font-weight: 500; color: var(--muted); }
+.rd-count { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--warn-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rd-count::before, .rd-ready::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--warn-dot); flex: none; }
+.rd-count.rd-done { color: var(--ok-text); }
+.rd-count.rd-done::before, .rd-ready::before { background: var(--ok-dot); }
+.rd-left { font-size: 12px; color: var(--muted); min-width: 0; }
+.rd-left b { color: var(--text); font-weight: 600; }
+.rd-ready { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+.rd-all {
+  display: inline-flex; align-items: center; gap: 3px; height: 28px; padding: 0 7px 0 10px; flex: none;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text);
+  font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.rd-all:hover { background: var(--hover-tint); }
+.rd-all .ic { width: 13px; height: 13px; transition: transform .2s; }
+.rd-all[aria-expanded="true"] .ic { transform: rotate(180deg); }
+.rd-list {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 80; width: min(360px, calc(100vw - 32px));
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding: 8px;
+  background: var(--panel); border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0, 38, 70, .10), 0 14px 34px -8px rgba(0, 38, 70, .35);
+}
+.rd-list .rd-tk { width: 100%; }
+.rd-note { grid-column: 1 / -1; margin: 2px 2px 0; font-size: 11px; color: var(--muted); }
+#m-ready { display: none; }
 #bottom-nav, #fp-drawer-handle, #m-count, #m-row2, #m-details, #m-more-menu { display: none; }
 #more-menu.hidden { display: none; }
 
@@ -6033,6 +6081,19 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
     order: 11; flex: 1 0 100%; display: flex; flex-direction: column; gap: 8px;
     padding: 8px 10px 9px; border-radius: 11px; background: var(--bg-soft); font-size: 12px; color: var(--muted);
   }
+  /* the "Planned" ticks: always two rows — your tick and the count, then who is left beside
+     All. Nothing wraps: the names shorten with "…", so All never drops to a third row. */
+  #ready-bar { display: none !important; }
+  body.board-view #m-ready:not(:empty) {
+    order: 11; flex: 1 0 100%; display: flex; flex-direction: column; gap: 4px; min-width: 0;
+    padding: 5px 8px 6px; border-radius: 11px; background: var(--bg-soft);
+  }
+  .rd-r1, .rd-r2 { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; }
+  .rd-r2 .rd-left { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rd-r2 .rd-ready { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .rd-r2 .rd-all { margin-left: auto; height: 26px; }
+  #m-ready .rd-tk { height: 26px; font-size: 12px; }
+  #m-ready .rd-list { position: static; width: auto; box-shadow: none; border: 1px solid var(--border); }
   /* opened: one row of status counts, one line of Total / Day / Night / utilization,
      then status and area chips in one run */
   .md-grid { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); }
@@ -6109,7 +6170,8 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   body.board-view.hdr-compact #btn-date-prev,
   body.board-view.hdr-compact #btn-date-next,
   body.board-view.hdr-compact #m-summary,
-  body.board-view.hdr-compact #m-details { display: none !important; }
+  body.board-view.hdr-compact #m-details,
+  body.board-view.hdr-compact #m-ready { display: none !important; }
   body.board-view.hdr-compact #btn-board-dd { font-size: 15px; height: 36px; min-height: 36px; }
   body.board-view.hdr-compact #m-row2 { display: contents; }
   body.board-view.hdr-compact #topbar .topbar-right { order: 3; margin-left: 0; }
@@ -6134,9 +6196,11 @@ th.ov-mcell .ov-mgrid > :first-child { text-align: right; grid-column: 1 / -1; j
   #mode-pill { grid-area: 1 / 2; }
   #topbar .topbar-right { grid-area: 1 / 4; justify-self: end; }
   body:not(.board-view) #topbar .topbar-right { grid-column: 1 / -1; justify-self: start; }
-  #btn-hold-alerts { grid-area: 4 / 1 / 5 / -1; justify-self: start; }
+  #btn-hold-alerts { grid-area: 5 / 1 / 6 / -1; justify-self: start; }
   body.board-view #m-row2 { grid-area: 2 / 1 / 3 / -1; }
-  body.board-view #m-details:not(.hidden) { grid-area: 3 / 1 / 4 / -1; }
+  /* the "Planned" ticks under the summary card, then the opened details */
+  body.board-view #m-ready:not(:empty) { grid-area: 3 / 1 / 4 / -1; }
+  body.board-view #m-details:not(.hidden) { grid-area: 4 / 1 / 5 / -1; }
   body.board-view.hdr-compact #topbar {
     grid-template-columns: minmax(0, max-content) max-content minmax(0, 1fr) max-content max-content max-content;
   }

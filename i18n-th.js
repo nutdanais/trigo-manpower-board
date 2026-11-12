@@ -3315,3 +3315,27 @@ I18N.add({
   "{num} day or more": "{num} วันขึ้นไป",
   "Closed ({num})": "ปิดแล้ว ({num})",
 });
+/* the "my part is planned" ticks on the board (renderReadyBar in app.js) */
+I18N.add({
+  "Ready to share with crew": "พร้อมส่งให้ทีมงาน",
+  "(you)": "(คุณ)",
+  "Waiting for": "รอ",
+  "Waiting:": "รอ:",
+  "Only you left": "เหลือคุณคนเดียว",
+  "Not ticked yet": "ยังไม่ได้ติ๊ก",
+  "Tick when your missions for this day are planned": "ติ๊กเมื่อวางแผนมิชชั่นของคุณสำหรับวันนี้เสร็จแล้ว",
+  "Engineers on this day's missions who have ticked their part as planned": "วิศวกรในมิชชั่นของวันนี้ที่ติ๊กว่าวางแผนส่วนของตนเสร็จแล้ว",
+  "Every engineer on this day's missions": "วิศวกรทุกคนในมิชชั่นของวันนี้",
+  "Planned, by engineer": "วางแผนแล้ว แยกตามวิศวกร",
+  "This day can no longer be changed.": "วันนี้แก้ไขไม่ได้แล้ว",
+  "Tick your name when your missions are planned. Nothing is locked by it.": "ติ๊กชื่อของคุณเมื่อวางแผนมิชชั่นเสร็จแล้ว การติ๊กไม่ได้ล็อกอะไร",
+  "You can tick for any engineer. Nothing is locked by it.": "คุณติ๊กแทนวิศวกรคนใดก็ได้ การติ๊กไม่ได้ล็อกอะไร",
+  "Each engineer ticks their own name when their missions are planned.": "วิศวกรแต่ละคนติ๊กชื่อของตนเมื่อวางแผนมิชชั่นเสร็จแล้ว",
+}, {
+  "+{a} more": "+อีก {a} คน",
+  "Waiting for {a}": "รอ {a}",
+  "Tick for {a}": "ติ๊กแทน {a}",
+  "Ticked by {a} at {b}": "ติ๊กโดย {a} เวลา {b}",
+  "Ticked by {a} at {b}. Click to untick": "ติ๊กโดย {a} เวลา {b} คลิกเพื่อยกเลิกการติ๊ก",
+  "Couldn't save the tick: {a}": "บันทึกการติ๊กไม่สำเร็จ: {a}",
+});

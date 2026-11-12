@@ -361,7 +361,9 @@ const cloud = {
     const missions = (await probe("mission_register", "id")) && (await probe("mission_number_history", "id"));
     // shared settings, e.g. the days that make someone experienced at a host (migration-2026-11-09b)
     const appSettings = await probe("app_settings", "key");
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions, appSettings };
+    // the "my part is planned" ticks on a board's day (migration-2026-11-12)
+    const ready = await probe("plan_day_ready", "board_id");
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions, appSettings, ready };
   },
 
   async _loadAreas() {
@@ -2684,6 +2686,37 @@ const cloud = {
   saveHostExperiencedDays(days) { return this._saveSetting("host_experienced_days", days); },
   /* a host is at risk when this many or fewer ACTIVE people are experienced there */
   saveHostAtRiskMax(n) { return this._saveSetting("host_at_risk_max", n); },
+  /* ---------- "my part is planned" ticks (migration-2026-11-12) ----------
+     One row per ticked engineer per board per day in plan_day_ready. Read per board and day, the
+     first time that day is shown, and kept until Realtime says a tick changed somewhere. Without
+     the table there are no ticks and the board shows no "Planned" line. */
+  async ensureReadyLoaded(boardId, date) {
+    if (!this.data.features.ready || !boardId || !date) return;
+    const cache = this.data.ready || (this.data.ready = {});
+    const key = boardId + "|" + date;
+    if (cache[key]) return;
+    const { data, error } = await sb.from("plan_day_ready").select("engineer_id, ticked_by, ticked_at").eq("board_id", boardId).eq("plan_date", date);
+    if (error) { console.warn("plan_day_ready unavailable:", error.message || error); return; }
+    const out = {};
+    for (const r of data || []) out[r.engineer_id] = { by: r.ticked_by || "", at: r.ticked_at || "" };
+    cache[key] = out;
+  },
+  /* { [engineerId]: { by, at } } for a board's day, or null before it has been read */
+  readyOn(boardId, date) { return (this.data.ready || {})[boardId + "|" + date] || null; },
+  /* tick (on) or untick an engineer for a board's day. Ticking twice is not an error: the tick
+     is there either way. The database decides who may (public.can_tick_ready). */
+  async setReady(boardId, date, engineerId, on) {
+    if (!this.data.features.ready) throw new Error("The database needs a one-time update before this can be saved: run supabase/migration-2026-11-12-plan-day-ready.sql in the Supabase SQL Editor.");
+    if (on) {
+      const { error } = await sb.from("plan_day_ready").insert({ board_id: boardId, plan_date: date, engineer_id: engineerId, ticked_by: await this._currentEmail() });
+      if (error && error.code !== "23505") throw error;
+    } else {
+      const { error } = await sb.from("plan_day_ready").delete().eq("board_id", boardId).eq("plan_date", date).eq("engineer_id", engineerId);
+      if (error) throw error;
+    }
+    if (this.data.ready) delete this.data.ready[boardId + "|" + date];
+    await this.ensureReadyLoaded(boardId, date);
+  },
   async loadMissionRegister() {
     if (!this.data.features.missions) { this.data.register = []; this.data.numberHistory = []; return; }
     const [reg, hist] = await Promise.all([
@@ -2958,6 +2991,10 @@ const cloud = {
     if (this.data.features.appSettings) {
       // a changed rule redraws the Host tab, Overview and the report for everybody
       ch.on("postgres_changes", { event: "*", schema: "public", table: "app_settings" }, async () => { await this._loadSettings(); this.notify({ settings: true }); });
+    }
+    if (this.data.features.ready) {
+      // somebody ticked or unticked: drop what was read, the day on screen is read again
+      ch.on("postgres_changes", { event: "*", schema: "public", table: "plan_day_ready" }, () => { this.data.ready = {}; this.notify({ ready: true }); });
     }
     if (this.data.features.capacity) {
       ch.on("postgres_changes", { event: "*", schema: "public", table: "capacity_demand" }, async () => {

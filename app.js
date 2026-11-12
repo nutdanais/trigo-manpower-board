@@ -1104,7 +1104,7 @@ async function refreshData() {
       await cloud.ensureForecastLoaded(boardId, date);
     } else {
       await cloud.ensurePlanLoaded(boardId, date);
-      await refreshPlanSignals(boardId, date);
+      await Promise.all([refreshPlanSignals(boardId, date), cloud.ensureReadyLoaded(boardId, date)]);
     }
   }
 }
@@ -3504,6 +3504,7 @@ function renderStats() {
   bar.classList.remove("stats-tiles");
   $("#board-status").classList.add("hidden");   // the board path below fills and shows it
   areaBar.innerHTML = "";
+  if ($("#m-ready")) $("#m-ready").innerHTML = "";   // the board path below fills it (renderReadyBar)
   // Overview: the day across every board — same rule as the board tiles
   if (isOverview()) {
     let assigned = 0, total = 0, leave = 0, hol = 0, free = 0, standby = 0, unstaffed = 0, standbyBoards = 0, day = 0, night = 0;
@@ -3743,8 +3744,151 @@ function renderStats() {
   const noArea = roster.filter(e => !known.has(e.areaId)).length;
   if (noArea) areaHtml += areaChip("No area", noArea, "");
   areaBar.innerHTML = areaHtml ? `<span class="ar-cap">By area</span>${areaHtml}` : "";
+  renderReadyBar(areaBar);
   renderPhoneSummary(s, areaHtml, loans);
 }
+
+/* ---------- "my part is planned" ticks (design/engineer-planned-ticks.html, A2) ----------
+   Every engineer with a visible mission on the board's day can tick their name once their
+   missions are planned, so the last one knows whether the plan is ready to share with the crew.
+   A flag, not an approval: nothing is locked, Export and Present work either way. One line at the
+   end of "By area" (desktop) or under the summary card (phone): your own tick, the count, who is
+   still left by name, and "All n" with the full list. When everyone has ticked it says "Ready to
+   share with crew". It is in the toolbar, so it never reaches an exported JPG, PDF or Excel.
+   Who may tick: the engineer whose account the record is linked to, or an Admin or a Manager for
+   anyone (public.can_tick_ready in the database is the rule; this only decides what to offer). */
+function readyEngineers(boardId) {
+  const ids = new Set(peekPlan(boardId).missions.filter(m => !m.hidden && m.engineerId).map(m => m.engineerId));
+  return D().engineers.filter(e => ids.has(e.id)).sort((a, b) => a.name.localeCompare(b.name));
+}
+/* the engineer record linked to the signed-in account, if there is one */
+function myEngineer() {
+  const me = D().me;
+  return me && me.id ? D().engineers.find(e => e.profileId && e.profileId === me.id) || null : null;
+}
+/* ticks stay as they are on a past or a locked day */
+function readyFrozen(boardId = D().activeBoardId, date = state.date) {
+  return date < todayStr() || !!lockInfo(boardId, date);
+}
+function canTickReady(eng) {
+  if (!feat().ready || !can("board", "edit") || readyFrozen()) return false;
+  const me = D().me;
+  if (!me) return false;
+  if (me.legacy || me.roleKey === "admin" || me.roleKey === "manager") return true;
+  const mine = myEngineer();
+  return !!mine && mine.id === eng.id;
+}
+/* "16:42", or "Wed 11-Nov 16:42" when it was ticked on another day */
+function readyWhen(at) {
+  const d = new Date(at);
+  if (isNaN(d)) return "";
+  const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  const day = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  return day === todayStr() ? hm : fmtShort(day) + " " + hm;
+}
+function readyTitle(eng, t, mineOne) {
+  if (!t) return canTickReady(eng) ? (mineOne ? "Tick when your missions for this day are planned" : `Tick for ${eng.name}`) : "Not ticked yet";
+  return `Ticked by ${who(t.by)} at ${readyWhen(t.at)}` + (canTickReady(eng) ? ". Click to untick" : "");
+}
+/* one engineer's tick: a checkbox, their colour and their name */
+function readyTick(eng, ticks, mineOne) {
+  const t = ticks[eng.id];
+  const able = canTickReady(eng);
+  return `<button type="button" class="rd-tk${t ? " on" : ""}${mineOne ? " me" : ""}" data-ready="${escapeHtml(eng.id)}" aria-pressed="${!!t}"` +
+    `${able ? "" : " disabled"} title="${escapeHtml(readyTitle(eng, t, mineOne))}">` +
+    `<span class="rd-box">${icon("check")}</span><i class="rd-sw" style="background:${/^#[0-9a-f]{3,8}$/i.test(eng.color || "") ? eng.color : "var(--muted)"}"></i>` +
+    `<span class="rd-name" data-no-i18n>${escapeHtml(eng.name)}</span>${mineOne ? ` <span class="rd-you">(you)</span>` : ""}</button>`;
+}
+function readyHtml(boardId, phone) {
+  const engs = readyEngineers(boardId);
+  const ticks = cloud.readyOn(boardId, state.date);
+  if (!engs.length || !ticks) return "";
+  const mine = myEngineer();
+  const mineOn = mine && engs.some(e => e.id === mine.id) ? mine : null;
+  const n = engs.filter(e => ticks[e.id]).length;
+  const done = n === engs.length;
+  const waiting = engs.filter(e => !ticks[e.id] && (!mineOn || e.id !== mineOn.id));
+  const max = phone ? 2 : 3;
+  const names = waiting.slice(0, max).map(e => `<b data-no-i18n>${escapeHtml(e.name)}</b>`).join(", ");
+  const more = waiting.length > max ? (phone ? ` <span class="rd-more">+${waiting.length - max}</span>` : `, <span class="rd-more">+${waiting.length - max} more</span>`) : "";
+  const left = done ? `<span class="rd-ready">Ready to share with crew</span>`
+    : waiting.length ? `<span class="rd-left" title="${escapeHtml("Waiting for " + waiting.map(e => e.name).join(", "))}"><span>${phone ? "Waiting:" : "Waiting for"}</span> ${names}${more}</span>`
+    : `<span class="rd-left">Only you left</span>`;
+  const count = `<span class="rd-count${done ? " rd-done" : ""}" title="Engineers on this day's missions who have ticked their part as planned">${n} of ${engs.length} planned</span>`;
+  const open = state.readyOpen === (phone ? "phone" : "desk");
+  const all = `<button type="button" class="rd-all" data-ready-all aria-expanded="${open}" title="Every engineer on this day's missions">All ${engs.length} ${icon("chevron-down")}</button>`;
+  const list = open ? `<div class="rd-list" role="group" aria-label="Planned, by engineer">${engs.map(e => readyTick(e, ticks, mineOn && e.id === mineOn.id)).join("")}` +
+    `<p class="rd-note">${readyNote(engs, mineOn)}</p></div>` : "";
+  const mineHtml = mineOn ? readyTick(mineOn, ticks, true) : "";
+  // a phone: always two rows (your tick and the count; who is left and All), the names shorten with "…"
+  if (phone) return `<div class="rd-r1">${mineHtml}${count}</div><div class="rd-r2">${left}${all}</div>${list}`;
+  return `<span class="rd-cap">Planned</span>${mineHtml}${count}${left}${all}${list}`;
+}
+/* the line under the All list: what this person can do here */
+function readyNote(engs, mineOn) {
+  if (readyFrozen()) return "This day can no longer be changed.";
+  const others = engs.some(e => (!mineOn || e.id !== mineOn.id) && canTickReady(e));
+  if (others) return "You can tick for any engineer. Nothing is locked by it.";
+  if (mineOn && canTickReady(mineOn)) return "Tick your name when your missions are planned. Nothing is locked by it.";
+  return "Each engineer ticks their own name when their missions are planned.";
+}
+let readySaving = false;   // one save at a time: a double click must not tick and untick at once
+async function toggleReady(engineerId) {
+  const eng = D().engineers.find(e => e.id === engineerId);
+  if (!eng || !canTickReady(eng) || readySaving) return;
+  const boardId = D().activeBoardId, date = state.date;
+  const ticks = cloud.readyOn(boardId, date) || {};
+  readySaving = true;
+  try {
+    await cloud.setReady(boardId, date, engineerId, !ticks[engineerId]);
+  } catch (e) {
+    toast("Couldn't save the tick: " + (e.message || e), "error");
+  } finally {
+    readySaving = false;
+  }
+  renderStats();
+}
+/* draws the line on the desktop "By area" row and under the phone's summary card */
+function renderReadyBar(areaBar) {
+  const boardId = D().activeBoardId;
+  const show = feat().ready && !isForecastView() && boardId;
+  const desk = show ? readyHtml(boardId, false) : "";
+  if (desk) {
+    const box = document.createElement("div");
+    box.id = "ready-bar";
+    box.className = "rd-bar";
+    box.innerHTML = desk;
+    areaBar.appendChild(box);
+  }
+  const ph = $("#m-ready");
+  if (ph) ph.innerHTML = show ? readyHtml(boardId, true) : "";
+  for (const root of [$("#ready-bar"), ph]) {
+    if (!root) continue;
+    root.onclick = (ev) => {
+      const allBtn = ev.target.closest("[data-ready-all]");
+      if (allBtn) {
+        ev.stopPropagation();
+        const which = root === ph ? "phone" : "desk";
+        state.readyOpen = state.readyOpen === which ? null : which;
+        renderStats();
+        return;
+      }
+      const tk = ev.target.closest("[data-ready]");
+      if (tk && !tk.disabled) { ev.stopPropagation(); toggleReady(tk.dataset.ready); }
+    };
+  }
+}
+/* the "All" list closes on a click elsewhere or Escape */
+document.addEventListener("click", (ev) => {
+  if (!state.readyOpen || ev.target.closest("#ready-bar, #m-ready")) return;
+  state.readyOpen = null;
+  renderStats();
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape" || !state.readyOpen) return;
+  state.readyOpen = null;
+  renderStats();
+});
 
 /* Manpower and Host: the "By area" chips double as a one-click area filter.
    A click shows only that area (the same filter as Filters → Service area);

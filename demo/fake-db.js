@@ -38,14 +38,16 @@ const UNIQUE = {
   profiles: ["id"],
   mission_register: ["board_id", "number", "shift"],
   app_settings: ["key"],
+  plan_day_ready: ["board_id", "plan_date", "engineer_id"],
 };
-const NO_ID = new Set(["plan_days", "plan_day_stamps", "day_overrides", "role_permissions", "roles", "app_settings"]);
+const NO_ID = new Set(["plan_days", "plan_day_stamps", "day_overrides", "role_permissions", "roles", "app_settings", "plan_day_ready"]);
 const FORWARD_TABLES = new Set(["plan_day_stamps", "capacity_demand", "forecast_missions", "forecast_assignments", "forecast_hold_events"]);
 const DEFAULTS = {
   missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", hidden: false, ppe: null, remark: null, engineer_id: null }),
   forecast_missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", ppe: null, remark: null, engineer_id: null }),
   employees: () => ({ active: true, position: null, phone: null, start_date: null, added_on: null }),
   boards: () => ({ weekend_days: [0, 6] }),
+  plan_day_ready: () => ({ ticked_at: new Date().toISOString() }),
   mission_register: () => ({ status: "open", source: "board", host: null, customer: null, start_time: null, end_time: null, engineer_id: null,
     ppe: null, remark: null, opened_on: null, last_on: null, closed_on: null, closed_by: null, closed_at: null, close_note: null, updated_by: null }),
 };
@@ -71,6 +73,8 @@ class FakeDb {
     this.missions = opts.missions !== false;
     // migration-2026-11-09b (app_settings: shared settings such as the days that make someone experienced); { appSettings: false } is a database without it
     this.appSettings = opts.appSettings !== false;
+    // migration-2026-11-12 (plan_day_ready: the "my part is planned" ticks); { ready: false } is a database without it
+    this.ready = opts.ready !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -98,7 +102,19 @@ class FakeDb {
     return (!this.forwardPlanning && FORWARD_TABLES.has(table)) || (!this.mergeLog && table === "forecast_merge_decisions")
       || (!this.loans && table === "employee_loans")
       || (!this.missions && (table === "mission_register" || table === "mission_number_history"))
-      || (!this.appSettings && table === "app_settings");
+      || (!this.appSettings && table === "app_settings")
+      || (!this.ready && table === "plan_day_ready");
+  }
+
+  /* plan_day_ready's row level security (migration-2026-11-12, public.can_tick_ready): ticking or
+     unticking an engineer needs Edit on the Board, and either that engineer's own account or the
+     Admin or Manager role. A refused delete removes nothing and says nothing, as in Postgres. */
+  _canTick(user, engineerId) {
+    if (!this._can(user, "board", "edit")) return false;
+    const p = this.t("profiles").find((x) => x.id === user.id || (x.email || "").toLowerCase() === (user.email || "").toLowerCase());
+    if (p && (p.role_key === "admin" || p.role_key === "manager")) return true;
+    const e = this.t("engineers").find((x) => x.id === engineerId);
+    return !!(e && p && e.profile_id === p.id);
   }
 
   /* app_settings' row level security and check constraint (migration-2026-11-09b): changing a
@@ -144,6 +160,15 @@ class FakeDb {
       if (q.table === "app_settings") {
         const refused = this._appSettingsGuard(q, user);
         if (refused) return { data: null, error: refused };
+      }
+      if (q.table === "plan_day_ready" && (q.op === "insert" || q.op === "upsert")
+          && [].concat(q.values || []).some((v) => !this._canTick(user, v && v.engineer_id))) {
+        return { data: null, error: { code: "42501", message: 'new row violates row-level security policy for table "plan_day_ready"' } };
+      }
+      if (q.table === "plan_day_ready" && q.op === "delete") {
+        const allowed = this.t("plan_day_ready").filter((r) => this._match(r, q.filters) && this._canTick(user, r.engineer_id));
+        for (const r of allowed) this._deleteRow("plan_day_ready", r, user);
+        return { data: null, error: null };
       }
       if (!this.highlightShort && q.table === "missions" && [].concat(q.values || []).some((v) => v && v.highlight === "short")) {
         return { data: null, error: { code: "23514", message: 'new row for relation "missions" violates check constraint "missions_highlight_kind"' } };
@@ -326,11 +351,12 @@ class FakeDb {
       cascade("forecast_hold_events", (r) => r.from_forecast_mission_id === row.id);
       for (const r of this.t("forecast_hold_events")) if (r.to_forecast_mission_id === row.id) r.to_forecast_mission_id = null;
     }
+    if (table === "engineers") cascade("plan_day_ready", (r) => r.engineer_id === row.id);
     if (table === "employees") {
       for (const t of ["assignments", "deployment_history", "forecast_assignments", "forecast_hold_events"]) cascade(t, (r) => r.employee_id === row.id);
     }
     if (table === "boards") {
-      for (const t of ["missions", "employees", "plan_days", "plan_day_stamps", "capacity_demand", "forecast_missions", "day_overrides", "mission_register"]) cascade(t, (r) => r.board_id === row.id);
+      for (const t of ["missions", "employees", "plan_days", "plan_day_stamps", "capacity_demand", "forecast_missions", "day_overrides", "mission_register", "plan_day_ready"]) cascade(t, (r) => r.board_id === row.id);
     }
   }
 

@@ -274,6 +274,9 @@ function seed(db) {
     c = nextWorking(c);
   }
   db.seed("capacity_demand", cap);
+  // "my part is planned": on Rayong's next working day Somchai has ticked his part, the others not yet
+  db.seed("plan_day_ready", [{ board_id: "b1", plan_date: NEXT, engineer_id: "eng-1", ticked_by: PROFILES[1].email,
+    ticked_at: new Date(Date.now() - 40 * 60e3).toISOString() }]);
   return { emps };
 }
 
