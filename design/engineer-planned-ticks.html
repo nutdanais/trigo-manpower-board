@@ -206,6 +206,13 @@ td.w { color: var(--warn-text); }
 .ph9 .inis { gap: 4px; }
 .ph9 .all9 { grid-template-columns: 1fr 1fr; padding: 6px; }
 .ph9 .all9 .tk { font-size: 11px; padding: 0 6px 0 5px; gap: 5px; }
+/* A2 on a phone: two fixed rows. Row 1 = your tick + count, row 2 = who's left + All.
+   Nothing wraps: the names shorten with "…" so All never drops to a third row. */
+.r1, .r2 { flex-basis: 100%; display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: nowrap; }
+.r1 .pend, .r1 .ready { white-space: nowrap; }
+.r2 .left { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r2 .ready { flex: 1 1 auto; min-width: 0; }
+.r2 .allbtn { flex: none; margin-left: auto; height: 26px; }
 .measure { font-size: 12.5px; font-weight: 600; color: var(--danger-text); }
 .measure.ok { color: var(--ok-text); }
 .var { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
@@ -266,7 +273,7 @@ td.w { color: var(--warn-text); }
     </div>
     <div class="var">
       <h3>A2 · Who's left, by name <span class="rec">New pick</span> <span class="measure" data-measure="left"></span></h3>
-      <p class="small muted">Your own tick, the count, and the full names of the engineers who have <i>not</i> ticked yet: three at most (two on a phone), then “+2 more”. The line gets shorter as people tick, until it says “Ready to share with crew”. “All 9” opens the full list, where you can see or change any tick. It answers the last engineer's real question: who are we still waiting for?</p>
+      <p class="small muted">Your own tick, the count, and the full names of the engineers who have <i>not</i> ticked yet: three at most on desktop, then “+2 more”. On a phone it is always two rows: your tick and the count, then “Waiting: Kanya.T, Prasert.B +1” beside “All 9”. On a narrow phone the names shorten with “…”, so the button never drops to a third row. The line gets shorter as people tick, until it says “Ready to share with crew”. “All 9” opens the full list, where you can see or change any tick. It answers the last engineer's real question: who are we still waiting for?</p>
       <div class="stage"><div class="scroll"><div class="desk9" data-m9="left"></div></div><div class="ph9" data-m9="left-ph"></div></div>
     </div>
   </section>
@@ -462,6 +469,14 @@ function widget(kind, ph) {
   const names = waiting.slice(0, max).map(e => `<b>${e.name}</b>`).join(", ") + (waiting.length > max ? `, +${waiting.length - max} more` : "");
   const leftTxt = done9() ? "" : waiting.length ? `<span class="left">Waiting for ${names}</span>` : `<span class="left">Only you left</span>`;
   const key = ph ? "left-ph" : "left";
+  const allBtn = `<button type="button" class="allbtn" data-all9="${key}" aria-expanded="${all9open[key]}">All ${ENG9.length} ${all9open[key] ? "▴" : "▾"}</button>`;
+  const list = all9open[key] ? `<div class="all9">${ENG9.map(tk9).join("")}</div>` : "";
+  if (ph) {
+    const short = waiting.slice(0, 2).map(e => `<b>${e.name}</b>`).join(", ") + (waiting.length > 2 ? ` +${waiting.length - 2}` : "");
+    const row2 = done9() ? `<span class="ready">Ready to share with crew</span>`
+      : `<span class="left" title="Waiting for ${waiting.map(e => e.name).join(", ")}">${waiting.length ? "Waiting: " + short : "Only you left"}</span>`;
+    return `<div class="r1">${tk9(me)}<span class="pend"${done9() ? ' style="color:var(--ok-text)"' : ""}>${t9.size} of ${ENG9.length} planned</span></div><div class="r2">${row2}${allBtn}</div>${list}`;
+  }
   return `${tk9(me)}${sum9()}${leftTxt}<button type="button" class="allbtn" data-all9="${key}" aria-expanded="${all9open[key]}">All ${ENG9.length} ${all9open[key] ? "▴" : "▾"}</button>${all9open[key] ? `<div class="all9">${ENG9.map(tk9).join("")}</div>` : ""}`;
 }
 function desk9(kind) {
