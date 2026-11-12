@@ -77,6 +77,8 @@ class FakeDb {
     this.ready = opts.ready !== false;
     // migration-2026-11-11 (replace_mission_number); { numberFix: false } is a database without it
     this.numberFix = this.missions && opts.numberFix !== false;
+    // migration-2026-11-12b (the capitals trigger on mission numbers); { numberCaps: false } is a database without it
+    this.numberCaps = this.missions && opts.numberCaps !== false;
     this.tables = {};
     this.listeners = new Set();
     this.rpcs = {};
@@ -255,8 +257,15 @@ class FakeDb {
     return this.t(table).find((r) => keyCols.every((c) => String(r[c]) === String(row[c]))) || null;
   }
 
+  /* the trigger aaa_uppercase_mission_number: a mission number is saved in capitals, before anything else
+     looks at it (so an upsert on a lower-case number meets the capital row) */
+  _caps(table, row) {
+    if (this.numberCaps && (table === "missions" || table === "forecast_missions" || table === "mission_register") && typeof row.number === "string") row.number = row.number.toUpperCase();
+    return row;
+  }
+
   _insertRow(table, values, user) {
-    const row = { ...(DEFAULTS[table] ? DEFAULTS[table]() : {}), ...clone(values) };
+    const row = this._caps(table, { ...(DEFAULTS[table] ? DEFAULTS[table]() : {}), ...clone(values) });
     // skip_closed_mission (migration-2026-11-09): a closed mission is never put on a day after it closed
     if (table === "missions" && this.missions && this.t("mission_register").some((r) => r.board_id === row.board_id && r.number === row.number
         && r.shift === row.shift && r.status === "closed" && r.closed_on && row.plan_date > r.closed_on)) return null;
@@ -287,11 +296,11 @@ class FakeDb {
     const conflictCols = q.onConflict ? q.onConflict.split(",").map((s) => s.trim()) : null;
     const written = [];
     for (const v of rows) {
-      const existing = isUpsert ? this._findConflict(q.table, v, conflictCols) : null;
+      const existing = isUpsert ? this._findConflict(q.table, this._caps(q.table, { ...v }), conflictCols) : null;
       if (existing) {
         if (q.ignoreDuplicates) continue;
         const old = clone(existing);
-        Object.assign(existing, clone(v));
+        Object.assign(existing, this._caps(q.table, clone(v)));
         if (TIMESTAMPS.has(q.table) && existing.updated_at !== undefined && !("updated_at" in v)) existing.updated_at = this.now();
         this._afterWrite(q.table, "UPDATE", existing, old, user);
         written.push(existing);
@@ -325,7 +334,7 @@ class FakeDb {
     const hits = this.t(q.table).filter((r) => this._match(r, q.filters));
     for (const r of hits) {
       const old = clone(r);
-      Object.assign(r, clone(q.values));
+      Object.assign(r, this._caps(q.table, clone(q.values)));
       try { this._checkLoanOverlap(q.table, r); } catch (e) { Object.assign(r, old); throw e; }
       this._afterWrite(q.table, "UPDATE", r, old, user);
     }

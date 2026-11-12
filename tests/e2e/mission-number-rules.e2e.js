@@ -112,6 +112,37 @@ function seed(opts) {
       await p.evaluate(() => closeModal());
     });
 
+    await step("a mission number and a site code turn into capitals as they are typed, and are saved in capitals", async () => {
+      await goDay(p);
+      await p.evaluate(() => openMissionModal(null));
+      await p.locator("#modal-mission:not(.hidden)").waitFor();
+      const num = p.locator("#form-mission [name=number]");
+      await num.pressSequentially("esie1.26.04");
+      assert.equal(await num.inputValue(), "ESIE1.26.04", "typed lower case, shown in capitals");
+      await num.press("Home"); await num.press("ArrowRight");
+      await num.pressSequentially("xy");
+      assert.equal(await num.inputValue(), "EXYSIE1.26.04", "typed in the middle: the cursor stays after what was typed");
+      await p.check("#form-mission [name=numMode][value=temp]");
+      const site = p.locator("#form-mission [name=sitecode]");
+      await site.fill("esie1");
+      assert.equal(await site.inputValue(), "ESIE1", "the site code too");
+      assert.match(await p.locator("#mission-number-note").innerText(), new RegExp(`temporary number ESIE1\\.${YY}\\.TMP001`), "the note reads the capitals");
+      await p.check("#form-mission [name=numMode][value=etraq]");
+      await num.fill(`esie1.${YY}.0417`);
+      assert.equal(await num.inputValue(), `ESIE1.${YY}.0417`);
+      await p.fill("#form-mission [name=host]", "Host Alpha");
+      await p.fill("#form-mission [name=customer]", "Cust Capitals");
+      await p.fill("#form-mission [name=engineer]", "Eng One");
+      await p.click("#form-mission button[type=submit]");
+      await card(p, `ESIE1.${YY}.0417`).waitFor();
+      assert.ok(db.t("missions").some((m) => m.number === `ESIE1.${YY}.0417` && m.customer === "Cust Capitals"));
+      assert.ok(!numbers("missions").some((n) => n !== n.toUpperCase()), "no lower-case number is saved");
+      assert.equal(await card(p, `ESIE1.${YY}.0417`).locator(".m-num-flag").count(), 0, "an Etraq number: no flag");
+      // a pasted lower-case number from a script or a file lands in capitals too (the database's trigger)
+      await p.evaluate(async ([d, y]) => { await cloud.saveMission(D().activeBoardId, d, null, { number: "amata." + y + ".0042", host: "Host Alpha", customer: "Cust Pasted", shift: "day", startTime: "08:00", endTime: "17:00", engineerId: "eng-1" }); }, [SRC, YY]);
+      assert.ok(db.t("missions").some((m) => m.number === `AMATA.${YY}.0042`), "the trigger capitalises on the way in");
+    });
+
     await step("Fix number on a card replaces a temporary number on every day, and the card shows the old one beside it", async () => {
       await card(p, TMP1).locator(".m-num-fix").click();
       await p.locator("#modal-fix-number:not(.hidden)").waitFor();
