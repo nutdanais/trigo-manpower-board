@@ -34,7 +34,12 @@ q "insert into boards (id, name) values ('$(B 1)', 'Board One'), ('$(B 2)', 'Boa
    ('$(B 1)', '2026-11-03', 'Bangna.26.0007', 'Host B', 'Cust B', 'day'),
    ('$(B 1)', '2026-11-03', 'TSTTH.26.0005', 'Host R', 'Cust R', 'day'),
    ('$(B 2)', '2026-11-03', 'Dup01.26.0001', 'Host D', 'Cust D', 'day'),
-   ('$(B 2)', '2026-11-03', 'DUP01.26.0001', 'Host D', 'Cust D', 'day');
+   ('$(B 2)', '2026-11-03', 'DUP01.26.0001', 'Host D', 'Cust D', 'day'),
+   ('$(B 2)', '2026-11-04', 'Amata new mission', 'Host M', 'Cust M', 'day'),
+   ('$(B 2)', '2026-11-05', 'AMATA NEW MISSION', 'Host M', 'Cust M', 'day'),
+   ('$(B 2)', '2026-11-06', 'amata new mission', 'Host M', 'Cust M', 'day'),
+   ('$(B 2)', '2026-11-07', 'Free Text One', 'Host F', 'Cust F', 'day'),
+   ('$(B 2)', '2026-11-08', 'free text one', 'Host F', 'Cust F', 'day');
    insert into forecast_missions (board_id, plan_date, number, host, customer, shift) values
    ('$(B 1)', '2026-11-10', 'Esie1.26.0417', 'Host A', 'Cust A', 'day');
    insert into deployment_history (employee_id, plan_date, mission_number, host, customer, board_id) values
@@ -68,18 +73,28 @@ eq "select count(*) from plan_day_stamps where board_id = '$(B 2)'" 0 "a day tha
 eq "select count(*) from missions where board_id = '$(B 2)' and number = 'Dup01.26.0001'" 1 "a lower-case number whose capital twin is on the same day is left alone"
 eq "select count(*) from missions where board_id = '$(B 2)' and number = 'DUP01.26.0001'" 1 "and the twin stays"
 
+# case variants of one number, a free-text one with spaces (the real data that broke the first version): rows of
+# the Missions list that differ only by case are one mission, folded into one capital row
+eq "select count(*) from mission_register where board_id = '$(B 2)' and upper(number) = 'AMATA NEW MISSION'" 1 "the Missions list: three case variants of one mission become one row"
+eq "select number from mission_register where board_id = '$(B 2)' and upper(number) = 'AMATA NEW MISSION'" "AMATA NEW MISSION" "in capitals"
+eq "select opened_on || ' ' || last_on from mission_register where board_id = '$(B 2)' and number = 'AMATA NEW MISSION'" "2026-11-04 2026-11-06" "it covers all three days"
+eq "select count(*) from missions where board_id = '$(B 2)' and number = 'AMATA NEW MISSION'" 3 "every day of it is in capitals, none lost"
+eq "select count(*) from mission_register where board_id = '$(B 2)' and number = 'FREE TEXT ONE'" 1 "two lower-case variants and no capital row: one capital row"
+eq "select count(*) from missions where board_id = '$(B 2)' and number = 'FREE TEXT ONE'" 2 "both of its days are in capitals"
+eq "select count(*) from mission_register where board_id = '$(B 2)' and upper(number) = 'DUP01.26.0001'" 1 "a lower-case Missions list row next to its capital twin is folded into it"
+
 # the trigger
-q "insert into missions (board_id, plan_date, number, host, customer, shift) values ('$(B 1)', '2026-11-04', 'amata.26.0042', 'Host N', 'Cust N', 'day')" >/dev/null
-eq "select number from missions where plan_date = '2026-11-04'" "AMATA.26.0042" "a new number is saved in capitals"
+q "insert into missions (board_id, plan_date, number, host, customer, shift) values ('$(B 1)', '2026-12-04', 'amata.26.0042', 'Host N', 'Cust N', 'day')" >/dev/null
+eq "select number from missions where plan_date = '2026-12-04'" "AMATA.26.0042" "a new number is saved in capitals"
 eq "select count(*) from mission_register where number = 'AMATA.26.0042'" 1 "its Missions list row is in capitals"
-q "update missions set number = 'lcbth.26.0001' where plan_date = '2026-11-04'" >/dev/null
-eq "select number from missions where plan_date = '2026-11-04'" "LCBTH.26.0001" "a changed number is saved in capitals"
+q "update missions set number = 'lcbth.26.0001' where plan_date = '2026-12-04'" >/dev/null
+eq "select number from missions where plan_date = '2026-12-04'" "LCBTH.26.0001" "a changed number is saved in capitals"
 q "insert into mission_register (board_id, number, shift, source) values ('$(B 2)', 'esie2.26.0003', 'day', 'list')" >/dev/null
 eq "select count(*) from mission_register where board_id = '$(B 2)' and number = 'ESIE2.26.0003'" 1 "a Missions list row added by hand is in capitals"
-q "insert into missions (board_id, plan_date, number, host, customer, shift) values ('$(B 2)', '2026-11-05', 'esie2.26.0003', 'Host E', 'Cust E', 'day')" >/dev/null
+q "insert into missions (board_id, plan_date, number, host, customer, shift) values ('$(B 2)', '2026-12-05', 'esie2.26.0003', 'Host E', 'Cust E', 'day')" >/dev/null
 eq "select count(*) from mission_register where board_id = '$(B 2)' and number ilike 'esie2.26.0003'" 1 "a day typed in lower case lands on the capital Missions list row"
-q "update missions set host = 'Host Z' where plan_date = '2026-11-05'" >/dev/null
-eq "select host from missions where plan_date = '2026-11-05'" "Host Z" "changing another column still works"
+q "update missions set host = 'Host Z' where plan_date = '2026-12-05'" >/dev/null
+eq "select host from missions where plan_date = '2026-12-05'" "Host Z" "changing another column still works"
 
 q "drop database $DB" >/dev/null 2>&1 || true
 echo "all mission number capital checks passed"

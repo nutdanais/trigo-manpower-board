@@ -16,8 +16,10 @@
 --     number is not a change to its plan), like replace_mission_number does.
 --   * Only the letters change. A number that was wrong stays wrong: Bangna.26.0007 becomes BANGNA.26.0007
 --     and is still flagged, because the site code has 6 characters.
---   * If the capital version already exists next to the lower-case one (the same board, day and shift),
---     the lower-case row is left alone and counted in the notice at the end: merge those two by hand.
+--   * Missions list rows that differ only by case (Amata new mission, AMATA NEW MISSION: one board, shift)
+--     are one mission and are folded into one row (latest day kept, dates joined, open if any is open).
+--   * Two days of one board and shift that would get the same number (a lower-case day next to its capital
+--     twin) are left alone and listed in a notice at the end: merge those two by hand.
 
 create or replace function public.uppercase_mission_number()
 returns trigger language plpgsql as $fn$
@@ -54,6 +56,7 @@ declare
   v_stamps boolean := to_regclass('public.plan_day_stamps') is not null;
   v_left int := 0;
   n int;
+  v_row record;
 begin
   -- the days that will be renamed: their stamps are put back afterwards (has_stamp: the day had one)
   if v_stamps then
@@ -65,30 +68,67 @@ begin
         left join plan_day_stamps s on s.board_id = d.board_id and s.plan_date = d.plan_date;
   end if;
 
-  -- the Missions list first, so the register trigger on missions finds each capital row waiting
+  -- The Missions list first, so the register trigger on missions finds each capital row waiting.
+  -- Rows that differ only by case (Amata new mission / AMATA NEW MISSION) are one mission: the one with the
+  -- latest day is kept (a capital row first among equals), the dates and the status are folded into it
+  -- (open if any of them is open) and the others are removed. Two of them cannot both be renamed anyway:
+  -- the list has one row per board, number and shift.
   if to_regclass('public.mission_register') is not null then
-    update mission_register r set number = upper(r.number)
-     where r.number <> upper(r.number)
-       and not exists (select 1 from mission_register o
-                        where o.board_id = r.board_id and o.shift = r.shift and o.number = upper(r.number));
-    select count(*) into n from mission_register where number <> upper(number);
-    v_left := v_left + n;
+    create temp table if not exists _caps_reg_keep (id uuid, opened_on date, last_on date, any_open boolean, closed_on date) on commit drop;
+    create temp table if not exists _caps_reg_drop (id uuid) on commit drop;
+    delete from _caps_reg_keep;
+    delete from _caps_reg_drop;
+    insert into _caps_reg_keep
+      select t.id, g.opened_on, g.last_on, g.any_open, g.closed_on
+        from (select id, row_number() over (partition by board_id, shift, upper(number)
+                                            order by last_on desc nulls last, (number = upper(number)) desc, created_at, id) as rn,
+                     count(*) over (partition by board_id, shift, upper(number)) as c,
+                     board_id, shift, upper(number) as un
+                from mission_register) t
+        join (select board_id, shift, upper(number) as un, min(opened_on) as opened_on, max(last_on) as last_on,
+                     bool_or(status = 'open') as any_open, max(closed_on) as closed_on
+                from mission_register group by board_id, shift, upper(number)) g
+          on g.board_id = t.board_id and g.shift = t.shift and g.un = t.un
+       where t.rn = 1 and t.c > 1;
+    insert into _caps_reg_drop
+      select t.id
+        from (select id, row_number() over (partition by board_id, shift, upper(number)
+                                            order by last_on desc nulls last, (number = upper(number)) desc, created_at, id) as rn
+                from mission_register) t
+        join mission_register r on r.id = t.id
+        join (select board_id, shift, upper(number) as un from mission_register group by 1, 2, 3 having count(*) > 1) d
+          on d.board_id = r.board_id and d.shift = r.shift and d.un = upper(r.number)
+       where t.rn > 1;
+    delete from mission_register where id in (select id from _caps_reg_drop);
+    get diagnostics n = row_count;
+    update mission_register r
+       set opened_on = k.opened_on, last_on = k.last_on,
+           status = case when k.any_open then 'open' else r.status end,
+           closed_on = case when k.any_open then null else k.closed_on end,
+           closed_by = case when k.any_open then null else r.closed_by end,
+           closed_at = case when k.any_open then null else r.closed_at end,
+           close_note = case when k.any_open then null else r.close_note end
+      from _caps_reg_keep k where k.id = r.id;
+    if n > 0 then
+      raise notice '% Missions list row(s) that differed only by upper/lower case were folded into one row each.', n;
+    end if;
+    update mission_register set number = upper(number) where number <> upper(number);
   end if;
 
+  -- the days: one per board, day, shift and number. Two lower-case days that become the same number, or a
+  -- lower-case day next to its capital twin, are two missions on one day: left alone, listed below.
   update missions m set number = upper(m.number)
-   where m.number <> upper(m.number)
-     and not exists (select 1 from missions o
-                      where o.board_id = m.board_id and o.plan_date = m.plan_date and o.shift = m.shift and o.number = upper(m.number));
-  select count(*) into n from missions where number <> upper(number);
-  v_left := v_left + n;
+    from (select id from (select id, row_number() over (partition by board_id, plan_date, shift, upper(number)
+                                                         order by (number = upper(number)) desc, created_at, id) as rn
+                            from missions) t where t.rn = 1) k
+   where m.id = k.id and m.number <> upper(m.number);
 
   if to_regclass('public.forecast_missions') is not null then
     update forecast_missions m set number = upper(m.number)
-     where m.number <> upper(m.number)
-       and not exists (select 1 from forecast_missions o
-                        where o.board_id = m.board_id and o.plan_date = m.plan_date and o.shift = m.shift and o.number = upper(m.number));
-    select count(*) into n from forecast_missions where number <> upper(number);
-    v_left := v_left + n;
+      from (select id from (select id, row_number() over (partition by board_id, plan_date, shift, upper(number)
+                                                           order by (number = upper(number)) desc, created_at, id) as rn
+                              from forecast_missions) t where t.rn = 1) k
+     where m.id = k.id and m.number <> upper(m.number);
   end if;
 
   update deployment_history set mission_number = upper(mission_number) where mission_number <> upper(mission_number);
@@ -109,7 +149,11 @@ begin
        and exists (select 1 from _caps_stamps t where not t.has_stamp and t.board_id = s.board_id and t.plan_date = s.plan_date);
   end if;
 
-  if v_left > 0 then
-    raise notice '% row(s) still have lower-case letters in the mission number because the capital number is already on the same board, day and shift. Merge them by hand.', v_left;
-  end if;
+  for v_row in select 'board day' as kind, board_id, plan_date, shift, number from missions where number <> upper(number)
+           union all
+           select 'forecast day', board_id, plan_date, shift, number from forecast_missions where number <> upper(number)
+           order by 1, 2, 3, 5 limit 50 loop
+    v_left := v_left + 1;
+    raise notice 'Left in lower case: % % % % "%": the same number in capitals is already on that day. Merge the two by hand.', v_row.kind, v_row.board_id, v_row.plan_date, v_row.shift, v_row.number;
+  end loop;
 end $$;
