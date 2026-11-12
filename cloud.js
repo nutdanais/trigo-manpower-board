@@ -67,6 +67,8 @@ async function fetchAllPages(buildQuery) {
 const APP_SETTINGS = {
   host_experienced_days: { prop: "hostExperiencedDays", min: 1, max: 365, label: "Days" },
   host_at_risk_max:      { prop: "hostAtRiskMax",       min: 0, max: 99,  label: "The number of people" },
+  // the mission number's site code length (Settings -> Mission numbers, migration-2026-11-11)
+  mission_prefix_length: { prop: "missionPrefixLength", min: 2, max: 10,  label: "Site code length" },
 };
 
 const cloud = {
@@ -2653,6 +2655,8 @@ const cloud = {
       ppe: r.ppe || "", remark: r.remark || "", status: r.status, openedOn: r.opened_on || null, lastOn: r.last_on || null,
       closedOn: r.closed_on || null, closedBy: r.closed_by || "", closedAt: r.closed_at || null, closeNote: r.close_note || "",
       source: r.source || "board", updatedAt: r.updated_at || null,
+      // when the mission was first registered: a temporary number's three days count from here
+      createdAt: r.created_at || null,
     };
   },
   /* ---------- shared settings (migration-2026-11-09b) ----------
@@ -2670,6 +2674,8 @@ const cloud = {
       if (rule && Number.isInteger(r.value) && r.value >= rule.min && r.value <= rule.max) out[rule.prop] = r.value;
     }
     this.data.settings = out;
+    // the mission number rules follow the site code length (mission-number.js); 5 until it is changed
+    if (typeof MissionNumber !== "undefined") MissionNumber.setPrefixLength(out.missionPrefixLength);
   },
   /* one known setting, for everyone. Needs Edit on Settings. */
   async _saveSetting(key, value) {
@@ -2717,6 +2723,8 @@ const cloud = {
     if (this.data.ready) delete this.data.ready[boardId + "|" + date];
     await this.ensureReadyLoaded(boardId, date);
   },
+  /* how many characters a mission number's site code has (BANGN: 5) */
+  saveMissionPrefixLength(n) { return this._saveSetting("mission_prefix_length", n); },
   async loadMissionRegister() {
     if (!this.data.features.missions) { this.data.register = []; this.data.numberHistory = []; return; }
     const [reg, hist] = await Promise.all([
@@ -2864,6 +2872,23 @@ const cloud = {
   async renumberMissions(items, validFrom) {
     const { data, error } = await sb.rpc("renumber_missions", { p_items: items, p_valid_from: validFrom });
     if (error) throw error;
+    this._invalidatePlans();
+    this._invalidateForecast && this._invalidateForecast();
+    await this.loadMissionRegister();
+    return data || 0;
+  },
+  /* A wrong or temporary mission number corrected on every day: the Missions list rows (all boards,
+     both shifts), the board and forecast days and the Host Record (migration-2026-11-11). Engineer and
+     up, and Site Admin. Returns how many Missions list rows changed. */
+  async replaceMissionNumber(oldNumber, newNumber) {
+    const { data, error } = await sb.rpc("replace_mission_number", { p_old: oldNumber, p_new: newNumber });
+    if (error) {
+      // a database without the migration: PostgREST cannot find the function
+      if (error.code === "PGRST202" || error.code === "42883" || /replace_mission_number/.test(error.message || "") && /find|exist/i.test(error.message || "")) {
+        throw new Error("The database needs a one-time update before a mission number can be corrected: run supabase/migration-2026-11-11-mission-number-rules.sql in the Supabase SQL Editor.");
+      }
+      throw error;
+    }
     this._invalidatePlans();
     this._invalidateForecast && this._invalidateForecast();
     await this.loadMissionRegister();

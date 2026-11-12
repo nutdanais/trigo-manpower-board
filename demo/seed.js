@@ -112,23 +112,26 @@ const ENGINEERS = [
 ];
 
 /* number, host, customer, shift, engineer, crew size, PPE */
+/* Mission numbers in Etraq's form (PREFIX.YY.NNNN), except two typed wrongly before the rule was strict
+   ("RYGTH.YY.104", three digits, and "203"): their cards and Missions rows carry the Wrong number flag. */
+const N = (prefix, n) => `${prefix}.${YY}.${n}`;
 const MISSIONS = {
   b1: [
-    ["101", "Siam Auto Parts", "Tier-1 Seating", "day", "eng-1", 4, "Gloves"],
-    ["102", "Rayong Precision", "Brake Systems Ltd.", "day", "eng-2", 3, ""],
-    ["103", "Eastern Seaboard Motors", "EV Battery Co.", "night", "eng-1", 3, "Reflective vest"],
-    ["104", "Pluak Daeng Plastics", "Interior Trim Co.", "day", "eng-3", 4, ""],
-    ["105", "Map Ta Phut Steel", "Chassis Works", "day", "eng-2", 2, "Helmet"],
-    ["106", "Rayong Precision", "Brake Systems Ltd.", "night", "eng-3", 2, ""],
-    ["107", "Siam Auto Parts", "Door Module Co.", "day", "eng-1", 0, ""],
+    [N("RYGTH", "0101"), "Siam Auto Parts", "Tier-1 Seating", "day", "eng-1", 4, "Gloves"],
+    [N("RYGTH", "0102"), "Rayong Precision", "Brake Systems Ltd.", "day", "eng-2", 3, ""],
+    [N("RYGTH", "0103"), "Eastern Seaboard Motors", "EV Battery Co.", "night", "eng-1", 3, "Reflective vest"],
+    [N("RYGTH", "104"), "Pluak Daeng Plastics", "Interior Trim Co.", "day", "eng-3", 4, ""],
+    [N("RYGTH", "0105"), "Map Ta Phut Steel", "Chassis Works", "day", "eng-2", 2, "Helmet"],
+    [N("RYGTH", "0106"), "Rayong Precision", "Brake Systems Ltd.", "night", "eng-3", 2, ""],
+    [N("RYGTH", "0107"), "Siam Auto Parts", "Door Module Co.", "day", "eng-1", 0, ""],
   ],
   b2: [
-    ["201", "Laem Chabang Logistics", "Export Packing Co.", "day", "eng-2", 4, ""],
-    ["202", "Amata Components", "Wiring Harness Co.", "day", "eng-3", 3, ""],
+    [N("CHBTH", "0201"), "Laem Chabang Logistics", "Export Packing Co.", "day", "eng-2", 4, ""],
+    [N("CHBTH", "0202"), "Amata Components", "Wiring Harness Co.", "day", "eng-3", 3, ""],
     ["203", "Bowin Glass", "Glazing Partners", "night", "eng-2", 2, ""],
   ],
   b3: [
-    ["301", "Rojana Electronics", "Sensor Tech", "day", "eng-3", 3, ""],
+    [N("AYTTH", "0301"), "Rojana Electronics", "Sensor Tech", "day", "eng-3", 3, ""],
     // a mission number in Etraq's form, renumbered for this year three days ago (see seed():
     // the card shows "New number · was …" for two weeks)
     [`AYTTH.${YY}.0302`, "Hi-Tech Bearings", "Motion Parts", "day", "eng-1", 2, ""],
@@ -136,7 +139,7 @@ const MISSIONS = {
 };
 const TIMES = { day: ["08:00:00", "17:00:00"], night: ["20:00:00", "05:00:00"] };
 /* a remark on a few missions, so the Missions tab's Remark column has something to show */
-const REMARKS = { "107": "Waiting for the customer's PO before the crew is booked", "203": "Night crew enters by gate 2", "301": "Sorting and rework of door seals" };
+const REMARKS = { [N("RYGTH", "0107")]: "Waiting for the customer's PO before the crew is booked", "203": "Night crew enters by gate 2", [N("AYTTH", "0301")]: "Sorting and rework of door seals" };
 const LEAVE_PATTERN = ["annual", "sick", "business"];
 
 /* One day's plan for one board: missions plus who goes where. `k` rotates the
@@ -223,25 +226,30 @@ function seed(db) {
   // closed on its last day (the register rows are made by the database as the days are saved)
   const ended = days.slice(0, 10);
   for (const date of ended) {
-    missions.push({ id: `m-b2-209-${date}`, board_id: "b2", plan_date: date, number: "209", host: "Amata Components", customer: "Seat Belt Co.",
+    missions.push({ id: `m-b2-209-${date}`, board_id: "b2", plan_date: date, number: N("CHBTH", "0209"), host: "Amata Components", customer: "Seat Belt Co.",
       shift: "day", start_time: TIMES.day[0], end_time: TIMES.day[1], engineer_id: "eng-3", ppe: null, remark: null, hidden: false });
   }
   // ...a Chonburi job that was running and has been hidden on the board for its last ten days, so it is
   // open but on no board (Status: Hidden, with a pill suggesting Close)...
   const mk = (id, board, num, host, customer, eng, date, hidden) => ({ id: `${id}-${date}`, board_id: board, plan_date: date, number: num, host, customer,
     shift: "day", start_time: TIMES.day[0], end_time: TIMES.day[1], engineer_id: eng, ppe: null, remark: null, hidden });
-  days.forEach((date, i) => missions.push(mk("m-b2-204", "b2", "204", "Amata Components", "Cable Assembly Co.", "eng-3", date, i >= days.length - 10)));
+  days.forEach((date, i) => missions.push(mk("m-b2-204", "b2", N("CHBTH", "0204"), "Amata Components", "Cable Assembly Co.", "eng-3", date, i >= days.length - 10)));
   // ...an Ayutthaya job that stopped being planned nine working days ago (Status: Off the board, with Add to board)
-  days.slice(0, days.length - 9).forEach((date) => missions.push(mk("m-b3-303", "b3", "303", "Rojana Electronics", "Optic Parts Ltd.", "eng-1", date, false)));
+  days.slice(0, days.length - 9).forEach((date) => missions.push(mk("m-b3-303", "b3", N("AYTTH", "0303"), "Rojana Electronics", "Optic Parts Ltd.", "eng-1", date, false)));
+  // ...two jobs started before Etraq had a number for them (temporary numbers, PREFIX.YY.TMPNNN): a Rayong one
+  // made five days ago, flagged red from its third day, and a Chonburi one made today for the next working day
+  const tempDays = days.filter((x) => x >= addDays(TODAY, -5));
+  tempDays.forEach((date) => missions.push(mk("m-b1-tmp1", "b1", N("RYGTH", "TMP001"), "Pluak Daeng Plastics", "Bumper Line Co.", "eng-2", date, false)));
+  missions.push(mk("m-b2-tmp1", "b2", N("CHBTH", "TMP001"), "Laem Chabang Logistics", "Pallet Repair Co.", "eng-3", NEXT, false));
   db.seed("missions", missions);
   // ...and a mission registered in Bulk edit that has no day on a board yet (Status: Not started)
-  db.seed("mission_register", [{ board_id: "b1", number: "108", shift: "day", source: "list", status: "open", host: "Map Ta Phut Steel", customer: "Gear Works Ltd.", engineer_id: "eng-2", updated_by: ME.email }]);
+  db.seed("mission_register", [{ board_id: "b1", number: N("RYGTH", "0108"), shift: "day", source: "list", status: "open", host: "Map Ta Phut Steel", customer: "Gear Works Ltd.", engineer_id: "eng-2", updated_by: ME.email }]);
   // ...and a Rayong job that ended in December of last year: off the list until "from earlier years" is on
   const LAST = String(+TODAY.slice(0, 4) - 1);
   db.seed("mission_register", [{ board_id: "b1", number: `RAYTH.${LY}.0091`, shift: "day", source: "list", status: "closed", host: "Rayong Precision", customer: "Brake Systems Ltd.",
     engineer_id: "eng-2", opened_on: `${LAST}-09-01`, last_on: `${LAST}-12-18`, closed_on: `${LAST}-12-18`, closed_by: PROFILES[3].email, closed_at: `${LAST}-12-18T10:00:00.000Z`,
     close_note: "Contract ended", updated_by: ME.email }]);
-  const closed = db.t("mission_register").find((r) => r.board_id === "b2" && r.number === "209");
+  const closed = db.t("mission_register").find((r) => r.board_id === "b2" && r.number === N("CHBTH", "0209"));
   if (closed) Object.assign(closed, { status: "closed", closed_on: ended[ended.length - 1], closed_by: PROFILES[3].email, closed_at: new Date().toISOString(), close_note: "Contract ended" });
   // ...and the new-year number of Ayutthaya's bearing job, entered three days ago
   db.seed("mission_number_history", [{ id: "mnh-1", old_number: `AYTTH.${LY}.0157`, new_number: `AYTTH.${YY}.0302`, valid_from: TODAY.slice(0, 4) + "-01-01",
@@ -253,7 +261,10 @@ function seed(db) {
   // the first forecast day on Rayong, held by Somchai
   const fc = dayPlan("b1", FORECAST, 3, emps, { loanOut: LOANED });
   const fmap = {};
-  db.seed("forecast_missions", fc.missions.filter((m) => m.number !== "107").map((m) => {
+  // the temporary number's three days count from when it was first registered
+  const temp = db.t("mission_register").find((r) => r.number === N("RYGTH", "TMP001"));
+  if (temp) temp.created_at = new Date(Date.now() - 5 * 86400e3).toISOString();
+  db.seed("forecast_missions", fc.missions.filter((m) => m.number !== N("RYGTH", "0107")).map((m) => {
     const id = m.id.replace("m-", "f-"); fmap[m.id] = id;
     return { id, board_id: m.board_id, plan_date: m.plan_date, number: m.number, host: m.host, customer: m.customer, shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id, created_by: PROFILES[1].email };
   }));
