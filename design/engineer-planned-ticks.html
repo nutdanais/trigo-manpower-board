@@ -176,6 +176,43 @@ td.w { color: var(--warn-text); }
 .q { display: grid; gap: 10px; }
 .q div { border-left: 3px solid var(--primary); background: var(--panel); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 13.5px; }
 .q div b { display: block; }
+/* ===== 9 engineers: drawn at the real width of the numbers row (1136px at a 1400px screen) ===== */
+.desk9 { width: 1136px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); box-shadow: 0 6px 20px rgba(0,42,74,.08); }
+.l1row, .l2row { display: flex; flex-wrap: wrap; align-items: center; padding: 8px 12px; }
+.l1row { row-gap: 8px; }
+.l2row { border-top: 1px dashed var(--border); gap: 6px; }
+.alert { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--warn-text); background: var(--warn-surface); border: 1px solid var(--warn-line); border-radius: 6px; padding: 5px 10px; }
+.area { font-size: 12px; font-weight: 600; background: var(--bg-soft); border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+.area i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.l2row .lab9 { font-size: 11.5px; color: var(--muted); margin-right: 2px; }
+.w9 { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; justify-content: flex-end; }
+.w9.wide { margin-left: 0; flex-basis: 100%; justify-content: flex-start; padding-top: 4px; }
+.ini { --c: #888; width: 28px; height: 28px; border-radius: 7px; border: 1.5px solid var(--c); background: #fff; color: var(--text); font-size: 10.5px; font-weight: 700; display: grid; place-items: center; position: relative; cursor: pointer; padding: 0; }
+.ini.on { background: var(--c); color: #fff; }
+.ini.on::after { content: ""; position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--ok-dot) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 6.2l2 2 4-4.2' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px no-repeat; border: 1.5px solid #fff; }
+.ini.me { outline: 2px solid var(--primary); outline-offset: 1px; }
+.inis { display: flex; gap: 5px; flex-wrap: wrap; }
+.left { font-size: 12px; color: var(--muted); }
+.left b { color: var(--text); font-weight: 600; }
+.allbtn { font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--panel); border-radius: 6px; height: 28px; padding: 0 9px; cursor: pointer; white-space: nowrap; }
+.allbtn:hover { background: var(--hover-tint); }
+.all9 { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-soft); }
+.all9 .tk { width: 100%; }
+.ph9 { width: 330px; max-width: 100%; flex: none; border: 1px solid var(--border); border-radius: 22px; overflow: hidden; background: var(--bg); box-shadow: 0 6px 20px rgba(0,42,74,.08); }
+.ph9 .ph-head { border-bottom: 1px solid var(--border); }
+.ph9 .tks { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding-top: 6px; border-top: 1px dashed var(--border); }
+.ph9 .tk { height: 26px; font-size: 11.5px; }
+.ph9 .ini { width: 26px; height: 26px; font-size: 10px; }
+.ph9 .inis { gap: 4px; }
+.ph9 .all9 { grid-template-columns: 1fr 1fr; padding: 6px; }
+.ph9 .all9 .tk { font-size: 11px; padding: 0 6px 0 5px; gap: 5px; }
+.measure { font-size: 12.5px; font-weight: 600; color: var(--danger-text); }
+.measure.ok { color: var(--ok-text); }
+.var { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+.var.first { border-top: 0; padding-top: 4px; }
+#nine .stage { flex-direction: column; }
+#nine .scroll { flex: none; width: 100%; }
+.var h3 { font-size: 15px; display: flex; gap: 6px 10px; align-items: baseline; flex-wrap: wrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -210,12 +247,33 @@ td.w { color: var(--warn-text); }
     <span class="lab">Try it: you are <b>Kittipong.W</b>. Every mockup shares the same ticks.</span>
     <button type="button" class="tg" id="t-reset">1 of 3 (start)</button>
     <button type="button" class="tg" id="t-all">All ticked</button>
-    <span class="hint">Jump to <a href="#a">A</a> · <a href="#b">B</a> · <a href="#c">C</a> · <a href="#d">D</a> · <a href="#compare">Compare</a></span>
+    <span class="hint">Jump to <a href="#nine">9 engineers</a> · <a href="#a">A</a> · <a href="#b">B</a> · <a href="#c">C</a> · <a href="#d">D</a> · <a href="#compare">Compare</a></span>
   </div>
+
+  <!-- ============ 9 engineers ============ -->
+  <section class="panel" id="nine">
+    <h2>With 9 engineers on one board</h2>
+    <p>A name chip is about 125px wide, so 9 chips need about 1,150px. On a 1400px screen the numbers row is about 1,130px wide, and the stats already fill half of it. The mockups below are drawn at that real width, with 9 engineers and 5 of them already ticked. You are <b>Kittipong.W</b>, and you can click to tick or untick.</p>
+    <div class="var first">
+      <h3>A as first drawn: every name as a chip <span class="measure" data-measure="raw"></span></h3>
+      <p class="small muted">The chips no longer fit beside the numbers. They get a line of their own and still wrap. On a phone they take 5 rows and push the first mission card well down.</p>
+      <div class="stage"><div class="scroll"><div class="desk9" data-m9="raw"></div></div><div class="ph9" data-m9="raw-ph"></div></div>
+    </div>
+    <div class="var">
+      <h3>A1 · Initials tiles <span class="measure" data-measure="ini"></span></h3>
+      <p class="small muted">Nine small tiles in the engineers' own colours. A tile fills in and gets a green check when that engineer ticks. Your tile is outlined, and your own tick button keeps your full name. Hover over a tile (or long-press on a phone) to see the name. It fits on the “By area” line. The drawback is that people have to recognise each other by initials and colour.</p>
+      <div class="stage"><div class="scroll"><div class="desk9" data-m9="ini"></div></div><div class="ph9" data-m9="ini-ph"></div></div>
+    </div>
+    <div class="var">
+      <h3>A2 · Who's left, by name <span class="rec">New pick</span> <span class="measure" data-measure="left"></span></h3>
+      <p class="small muted">Your own tick, the count, and the full names of the engineers who have <i>not</i> ticked yet: three at most (two on a phone), then “+2 more”. The line gets shorter as people tick, until it says “Ready to share with crew”. “All 9” opens the full list, where you can see or change any tick. It answers the last engineer's real question: who are we still waiting for?</p>
+      <div class="stage"><div class="scroll"><div class="desk9" data-m9="left"></div></div><div class="ph9" data-m9="left-ph"></div></div>
+    </div>
+  </section>
 
   <!-- ============ A ============ -->
   <section class="opt" id="a">
-    <div class="opt-head"><h2><span>A</span>A strip in the numbers row</h2><span class="rec">Recommended</span></div>
+    <div class="opt-head"><h2><span>A</span>A strip in the numbers row</h2><span class="muted small">With many engineers on a board, see A2 above</span></div>
     <div class="why">
       <div><p class="lbl">Where</p><p>On the right of the row with Total, Assigned, Leave and Standby. On a phone it sits under the summary card at the top.</p></div>
       <div><p class="lbl">Why it works</p><ul><li>Every name is always in view, so the last engineer sees who is left at a glance.</li><li>Ticking takes one tap and needs no menu.</li><li>It sits with the day's numbers, the place people check before sharing.</li></ul></div>
@@ -281,7 +339,7 @@ td.w { color: var(--warn-text); }
         <tr><th>Build size</th><td>Small</td><td>Small</td><td>Small</td><td>Medium (touches the card header)</td></tr>
       </tbody>
     </table></div>
-    <p><b>My pick is A.</b> It matches what you asked for most closely: a small section with every name, always visible, one tap to tick. If the row feels too full on boards with many engineers, B is the fallback with the same list behind the pill.</p>
+    <p><b>My pick is A2, “who’s left, by name”.</b> It keeps A’s place in the numbers row, but shows your own tick and only the engineers still missing, instead of every name. That way it fits 9 engineers, or 15, on one line on desktop and in the phone header. The full list is one click away under “All 9”. With 3 or 4 engineers it looks almost the same as A. B is still the fallback if you want nothing new in the numbers row.</p>
   </section>
 
   <section class="panel">
@@ -380,5 +438,63 @@ document.addEventListener("click", (ev) => {
 });
 document.getElementById("t-reset").onclick = () => { ticked.clear(); ticked.add("s"); render(); };
 document.getElementById("t-all").onclick = () => { ENG.forEach(e => { if (!ticked.has(e.id)) e.at = now(); ticked.add(e.id); }); render(); };
+/* ---- 9 engineers ---- */
+const ENG9 = [
+  ["s", "Somchai.P", "#2a78d6"], ["k", "Kittipong.W", "#e07b39", 1], ["p", "Pimchanok.R", "#4d9a3a"],
+  ["a", "Arthit.C", "#8e5bd0"], ["t", "Kanya.T", "#d0457a"], ["w", "Wanchai.S", "#1f9aa8"],
+  ["n", "Nattaya.K", "#b8892a"], ["b", "Prasert.B", "#5b6b82"], ["l", "Supaporn.L", "#c0562f"],
+].map(([id, name, color, me], i) => ({ id, name, color, me: !!me, at: "15:" + String(12 + i * 4) }));
+const t9 = new Set(["s", "p", "a", "w", "n"]);
+const all9open = { left: false, "left-ph": false };
+const done9 = () => ENG9.every(e => t9.has(e.id));
+const initials = (n) => (n.split(".")[0][0] || "") + ((n.split(".")[1] || "")[0] || "");
+function tk9(e) {
+  const on = t9.has(e.id);
+  return `<button type="button" class="tk${on ? " on" : ""}${e.me ? " me" : ""}" style="--c:${e.color}" data-e9="${e.id}" aria-pressed="${on}" title="${on ? e.name + " ticked at " + e.at : e.name + ": not yet"}"><span class="box">${CHECK}</span><span class="sw"></span>${e.name}${e.me ? ' <span class="you">(you)</span>' : ""}</button>`;
+}
+const sum9 = () => done9() ? `<span class="ready">Ready to share with crew</span>` : `<span class="pend">${t9.size} of ${ENG9.length} planned</span>`;
+function widget(kind, ph) {
+  const me = ENG9.find(e => e.me);
+  if (kind === "raw") return ENG9.map(tk9).join("") + sum9();
+  if (kind === "ini") return `${tk9(me)}${sum9()}<span class="inis">${ENG9.map(e => `<button type="button" class="ini${t9.has(e.id) ? " on" : ""}${e.me ? " me" : ""}" style="--c:${e.color}" data-e9="${e.id}" title="${e.name}${t9.has(e.id) ? ": planned " + e.at : ": not yet"}" aria-label="${e.name}" aria-pressed="${t9.has(e.id)}">${initials(e.name)}</button>`).join("")}</span>`;
+  const waiting = ENG9.filter(e => !t9.has(e.id) && !e.me);
+  const max = ph ? 2 : 3;
+  const names = waiting.slice(0, max).map(e => `<b>${e.name}</b>`).join(", ") + (waiting.length > max ? `, +${waiting.length - max} more` : "");
+  const leftTxt = done9() ? "" : waiting.length ? `<span class="left">Waiting for ${names}</span>` : `<span class="left">Only you left</span>`;
+  const key = ph ? "left-ph" : "left";
+  return `${tk9(me)}${sum9()}${leftTxt}<button type="button" class="allbtn" data-all9="${key}" aria-expanded="${all9open[key]}">All ${ENG9.length} ${all9open[key] ? "▴" : "▾"}</button>${all9open[key] ? `<div class="all9">${ENG9.map(tk9).join("")}</div>` : ""}`;
+}
+function desk9(kind) {
+  return `<div class="l1row"><div class="st">Total<b>48</b></div><div class="st"><span class="d" style="background:var(--stat-asg)"></span>Assigned<b>41</b></div><div class="st">Day · Night<b>33 · 8</b></div><div class="st"><span class="d" style="background:var(--stat-leave)"></span>Leave<b>4</b></div><div class="st"><span class="d" style="background:var(--stat-standby)"></span>Standby<b>2</b></div><div class="st"><span class="d" style="background:var(--stat-free)"></span>On-call free<b>1</b></div><span class="alert">1 mission with no crew</span></div>` +
+    `<div class="l2row"><span class="lab9">By area</span><span class="area"><i style="background:#5b8fd6"></i>Inspection 19</span><span class="area"><i style="background:#a77bd4"></i>Resident 9</span><span class="area"><i style="background:#e68a52"></i>Rework 8</span><span class="area"><i style="background:#7fb85a"></i>Sorting 5</span><div class="w9${kind === "raw" ? " wide" : ""}">${widget(kind)}</div></div>`;
+}
+function ph9(kind) {
+  return `<div class="ph-head"><div class="ph-top"><span class="bd">Rayong ▾</span><span class="pill">Draft</span><span class="dt">THU<b>12 Nov</b></span></div><div class="ph-sum"><div><b>41</b> (85%) assigned · 4 leave · 2 standby</div><div class="bar"></div><div class="tks">${widget(kind, true)}</div></div></div><div class="ph-body">${card(MISSIONS[0], "a")}</div>`;
+}
+function render9() {
+  document.querySelectorAll("[data-m9]").forEach(el => { const k = el.dataset.m9; el.innerHTML = k.endsWith("-ph") ? ph9(k.replace("-ph", "")) : desk9(k); });
+  /* measure what was actually drawn, so the verdict follows the mockup */
+  const rows = (el) => { if (!el) return 0; const mids = [...el.children].filter(c => !c.classList.contains("all9")).map(c => { const r = c.getBoundingClientRect(); return (r.top + r.bottom) / 2; }).sort((x, y) => x - y); let n = 0, last = -1e9; for (const m of mids) { if (m - last > 12) { n++; last = m; } } return n; };
+  document.querySelectorAll("[data-measure]").forEach(el => {
+    const k = el.dataset.measure;
+    const dl = rows(document.querySelector(`.desk9[data-m9="${k}"] .w9`));
+    const pl = rows(document.querySelector(`[data-m9="${k}-ph"] .tks`));
+    const ok = k !== "raw";
+    el.className = "measure" + (ok ? " ok" : "");
+    el.textContent = ok ? `Fits: shares the “By area” line on desktop · ${pl} row${pl === 1 ? "" : "s"} on a phone`
+      : `Doesn't fit: ${dl} extra line${dl === 1 ? "" : "s"} on desktop · ${pl} rows on a phone`;
+  });
+}
+document.addEventListener("click", (ev) => {
+  const a = ev.target.closest("[data-all9]");
+  if (a) { all9open[a.dataset.all9] = !all9open[a.dataset.all9]; render9(); return; }
+  const b = ev.target.closest("[data-e9]");
+  if (!b) return;
+  const id = b.dataset.e9;
+  if (t9.has(id)) t9.delete(id); else t9.add(id);
+  render9();
+});
 render();
+render9();
+if (document.fonts) document.fonts.ready.then(render9);
 </script>
