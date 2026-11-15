@@ -12768,6 +12768,15 @@ function saveEmployee(ev) {
       await refreshAndRender();
     }
   });
+  // An on-call person made permanent with no TRIGO ID yet: ask for it now (it can still be saved without one).
+  // Cancel goes back to the form with the TRIGO ID field focused.
+  const becomesPermanent = !!editing && editing.contract === "oncall" && vals.contract === "permanent" && !tid;
+  const goOn = () => becomesPermanent
+    ? showConfirm("Add a TRIGO ID?", "This person is becoming permanent and has no TRIGO ID yet. Cancel to go back and add it, or save without one for now.", doSave, () => {
+        openModal(inProfile ? "#modal-profile" : "#modal-employee");
+        requestAnimationFrame(() => form.trigoId.focus());
+      }, "Save without an ID")
+    : doSave();
   // A name typed into the wrong field: no Thai letters in the Thai name, or Thai letters in the English
   // name. A warning, not a block (a Thai name may be spelled in English for now), and on an edit only
   // for a field that was changed, so a person whose Thai column still holds the English copy from the
@@ -12782,10 +12791,10 @@ function saveEmployee(ev) {
   }
   if (mixUps.length) {
     // Cancel goes back to the form with everything still typed in
-    showConfirm("Check the names", mixUps.join("\n\n") + "\n\nSave anyway?", doSave, () => openModal(inProfile ? "#modal-profile" : "#modal-employee"), "Save anyway");
+    showConfirm("Check the names", mixUps.join("\n\n") + "\n\nSave anyway?", goOn, () => openModal(inProfile ? "#modal-profile" : "#modal-employee"), "Save anyway");
     return;
   }
-  doSave();
+  goOn();
 }
 
 /* ---------- Settings: a full page below the top bar ----------
