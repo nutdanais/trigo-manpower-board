@@ -3612,7 +3612,7 @@ function renderStats() {
       renderEmployeeRows(); renderStats();
     }, state.emplist.issue === key ? "Click again to show everyone" : "Show only these people") : null;
     statusGroup(bar, [
-      issueChip("trigo", "amber", act.filter(e => !e.trigoId).length, "missing TRIGO ID"),
+      issueChip("trigo", "amber", act.filter(needsTrigoId).length, "missing TRIGO ID"),
       issueChip("area", "amber", act.filter(e => !knownAreas.has(e.areaId)).length, "no service area"),
       issueChip("en", "", act.filter(e => !(e.nameEn || "").trim()).length, "no English name"),
       // grey: for information. The Board column says where and until when.
@@ -6709,7 +6709,7 @@ document.addEventListener("keydown", (ev) => {
 function employeeAlerts(e, share, cur = null) {
   if (e.active === false) return [];
   const out = [];
-  if (!e.trigoId) out.push({ level: 1, text: "No TRIGO ID", title: "Two people with the same name can only be told apart by their TRIGO ID.", focus: "trigoId", fixLabel: "+ Add TRIGO ID" });
+  if (needsTrigoId(e)) out.push({ level: 1, text: "No TRIGO ID", title: "Two people with the same name can only be told apart by their TRIGO ID.", focus: "trigoId", fixLabel: "+ Add TRIGO ID" });
   if (!D().areas.some(a => a.id === e.areaId)) out.push({ level: 1, text: "No service area", title: "This person is not in a service area, so no area chip or filter counts them.", focus: "areaId", fixLabel: "+ Add service area" });
   if (share != null && share > OV_LEAVE_AMBER) {
     out.push({ level: share > OV_LEAVE_RED ? 2 : 1, text: `Leave ${Math.round(share)}%`, title: `Leave is ${fmt1(share)}% of the working days in this period.` });
@@ -8329,7 +8329,7 @@ function emplistFilteredSorted() {
     if (f.status.length && !f.status.includes(empStatus(e))) return false;
     // a status chip narrowing the list: active people missing one thing, or (loan) on loan on the date on screen
     const issue = state.emplist.issue;
-    if (issue === "loan" ? !loanOf(e) : issue === "leave" ? !empAlerts(e).some(x => x.kind === "leave") : issue && (e.active === false || (issue === "trigo" ? e.trigoId : issue === "en" ? (e.nameEn || "").trim() : D().areas.some(a => a.id === e.areaId)))) return false;
+    if (issue === "loan" ? !loanOf(e) : issue === "leave" ? !empAlerts(e).some(x => x.kind === "leave") : issue && (e.active === false || (issue === "trigo" ? !needsTrigoId(e) : issue === "en" ? (e.nameEn || "").trim() : D().areas.some(a => a.id === e.areaId)))) return false;
     if (q && !e.name.toLowerCase().includes(q) && !(e.nameEn || "").toLowerCase().includes(q) && !(e.phone || "").toLowerCase().includes(q) && !(e.trigoId || "").toLowerCase().includes(q)) return false;
     return true;
   });
@@ -8746,10 +8746,12 @@ function updateEmplistBulkBar() {
    search keystroke, filter tick, sort click, or checkbox toggle */
 /* What needs a look on a person (active people only), worst first, then in this order: no TRIGO ID, no service
    area, a leave share above 20% (red above 30%) in the period on screen. {kind, level (2 red, 1 amber), text, title} */
+/* A permanent person needs a TRIGO ID; an on-call person is fine without one, so no alert, chip or filter flags them. */
+function needsTrigoId(e) { return !e.trigoId && e.contract !== "oncall"; }
 function empAlerts(e) {
   if (e.active === false) return [];
   const out = [];
-  if (!e.trigoId) out.push({ kind: "trigo", level: 1, text: "No TRIGO ID", title: "This person has no TRIGO ID yet" });
+  if (needsTrigoId(e)) out.push({ kind: "trigo", level: 1, text: "No TRIGO ID", title: "This person has no TRIGO ID yet" });
   if (!D().areas.some(a => a.id === e.areaId)) out.push({ kind: "area", level: 1, text: "No service area", title: "This person has no service area yet" });
   const w = emplistShowsWl() && state.emplist.wl ? state.emplist.wl[e.id] : null;
   if (w && w.share != null && w.share > OV_LEAVE_AMBER) {
