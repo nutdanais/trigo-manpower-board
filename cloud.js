@@ -2333,84 +2333,29 @@ const cloud = {
     return summary;
   },
 
-  /* ---------- Capacity tab ---------- */
-  /* the grid's range is cached in data.capacity (Realtime reloads it);
-     getCapacityDemand reads any other range without touching that cache */
-  async getCapacityDemand(fromDate, toDate) {
-    return fetchAllPages(() => sb.from("capacity_demand").select("*")
-      .gte("plan_date", fromDate).lte("plan_date", toDate).order("plan_date"));
-  },
-  async loadCapacityDemand(fromDate, toDate) {
-    const rows = await this.getCapacityDemand(fromDate, toDate);
-    this.data.capacity = { from: fromDate, to: toDate, rows };
-    return rows;
-  },
+  /* ---------- Capacity tab ----------
+     A private what-if: the tab only READS the board. A person's requests are
+     kept in their own browser (app.js, capSandbox) and never written here.
+     The capacity_demand table of the earlier shared sheet is left as it is
+     in the database; the app no longer reads or writes it. */
 
-  /* cells: [{boardId, date, host, shift, headcount}] — a null/blank
-     headcount clears that cell (deletes its row). */
-  async setCapacityCells(cells) {
-    const updatedBy = await this._currentEmail();
-    const now = new Date().toISOString();
-    const upserts = cells.filter((c) => c.headcount !== null && c.headcount !== "" && c.headcount !== undefined)
-      .map((c) => ({ board_id: c.boardId, plan_date: c.date, host: c.host, shift: c.shift,
-                     headcount: Math.max(0, Math.round(Number(c.headcount))), updated_by: updatedBy, updated_at: now }));
-    if (upserts.length) {
-      const { error } = await sb.from("capacity_demand").upsert(upserts, { onConflict: "board_id,plan_date,host,shift" });
-      if (error) throw error;
-    }
-    // clears: one delete per host x shift row, not one per cell (a pasted
-    // block of blanks can clear dozens of cells at once)
-    const clears = new Map();
-    for (const c of cells.filter((x) => x.headcount === null || x.headcount === "" || x.headcount === undefined)) {
-      const k = [c.boardId, c.host, c.shift].join("\u0001");
-      if (!clears.has(k)) clears.set(k, { boardId: c.boardId, host: c.host, shift: c.shift, dates: [] });
-      clears.get(k).dates.push(c.date);
-    }
-    for (const c of clears.values()) {
-      const { error } = await sb.from("capacity_demand").delete()
-        .eq("board_id", c.boardId).eq("host", c.host).eq("shift", c.shift).in("plan_date", c.dates);
-      if (error) throw error;
-    }
-    if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
-  },
-
-  /* Removes a host x shift row from the Capacity grid: every number it has on
-     fromDate or later. Earlier dates are history and are left alone. */
-  async deleteCapacityRow(boardId, host, shift, fromDate) {
-    const { error } = await sb.from("capacity_demand").delete()
-      .eq("board_id", boardId).eq("host", host).eq("shift", shift).gte("plan_date", fromDate);
-    if (error) throw error;
-    if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
-  },
-
-  /* "Reset to 0": every number this board has on fromDate or later becomes 0,
-     whatever range the grid happens to show. The rows stay (as zeros), so the
-     host rows stay on the grid; dates before fromDate are history and untouched. */
-  async resetCapacityDemand(boardId, fromDate) {
-    const updatedBy = await this._currentEmail();
-    const { error } = await sb.from("capacity_demand")
-      .update({ headcount: 0, updated_by: updatedBy, updated_at: new Date().toISOString() })
-      .eq("board_id", boardId).gte("plan_date", fromDate).neq("headcount", 0);
-    if (error) throw error;
-    if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
-  },
-
-  /* The raw rows the Capacity grid derives Leave and "Named on board" from:
-     confirmed rows and forecast rows over the whole range. Which of the two
+  /* The raw rows the Capacity grid derives everything from: confirmed rows
+     and forecast rows over the whole range (who is on leave, who is named,
+     and how many people each mission has: Sandbox.baseline). Which of the two
      counts for a given date is decided per board by Capacity.aggregate — the
      horizon is a working-day rule only the app knows. Read-only. */
   async getCapacityInputs(fromDate, toDate) {
     const [cAssign, cMissions, fAssign, fMissions] = await Promise.all([
       fetchAllPages(() => sb.from("assignments").select("employee_id, plan_date, mission_id, zone")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
-      fetchAllPages(() => sb.from("missions").select("id, board_id, hidden")
+      fetchAllPages(() => sb.from("missions").select("id, board_id, plan_date, number, shift, host, customer, hidden")
         .gte("plan_date", fromDate).lte("plan_date", toDate)),
       this.data.features.forecast
         ? fetchAllPages(() => sb.from("forecast_assignments").select("employee_id, plan_date, forecast_mission_id, zone")
             .gte("plan_date", fromDate).lte("plan_date", toDate))
         : Promise.resolve([]),
       this.data.features.forecast
-        ? fetchAllPages(() => sb.from("forecast_missions").select("id, board_id")
+        ? fetchAllPages(() => sb.from("forecast_missions").select("id, board_id, plan_date, number, shift, host, customer")
             .gte("plan_date", fromDate).lte("plan_date", toDate))
         : Promise.resolve([]),
     ]);
@@ -3065,12 +3010,6 @@ const cloud = {
     if (this.data.features.ready) {
       // somebody ticked or unticked: drop what was read, the day on screen is read again
       ch.on("postgres_changes", { event: "*", schema: "public", table: "plan_day_ready" }, () => { this.data.ready = {}; this.notify({ ready: true }); });
-    }
-    if (this.data.features.capacity) {
-      ch.on("postgres_changes", { event: "*", schema: "public", table: "capacity_demand" }, async () => {
-        if (this.data.capacity) await this.loadCapacityDemand(this.data.capacity.from, this.data.capacity.to);
-        this.notify({ capacity: true });
-      });
     }
     ch
       .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, async () => { await this._loadEmployees(); this.notify(); })

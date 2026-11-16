@@ -1,7 +1,7 @@
 // node --test tests/
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { PlanDiff, Horizon, PlanStatus, Capacity } = require("../planning.js");
+const { PlanDiff, Horizon, PlanStatus, Capacity, Sandbox } = require("../planning.js");
 
 const zones = (o = {}) => ({ annual: [], sick: [], business: [], unpaid: [], exchange: [], ...o });
 const mission = (number, members, extra = {}) => ({
@@ -128,24 +128,97 @@ test("capacity: demand totals and fill-right dates", () => {
   assert.equal(Capacity.weekEnd("2026-09-21"), "2026-09-27");
 });
 
-test("capacity seed: a confirmed day's deployment becomes demand per host x shift, filling only empty cells", () => {
-  const plan = { missions: [
-    mission("101", ["a", "b", "gone"], { host: "Host A" }),
-    mission("102", ["c"], { host: "Host A" }),                      // same host + shift: adds up
-    mission("103", ["d"], { host: "Host A", shift: "night" }),
-    mission("104", ["e"], { host: "Host B", hidden: true }),         // hidden: ignored
-    mission("105", [], { host: "Host C" }),                          // nobody on it: no row
-  ], zones: zones() };
-  const seed = Capacity.seedFromPlan(plan, new Set(["a", "b", "c", "d", "e"]));
-  assert.deepEqual(seed, [
-    { host: "Host A", shift: "day", headcount: 3 },
-    { host: "Host A", shift: "night", headcount: 1 },
-  ]);
-  const kept = new Set(["2026-09-25|Host A|day"]);
-  const cells = Capacity.fillEmpty(seed, ["2026-09-24", "2026-09-25"], (d, h, s) => kept.has(d + "|" + h + "|" + s));
-  assert.deepEqual(cells.map((c) => `${c.date} ${c.host} ${c.shift} ${c.headcount}`), [
-    "2026-09-24 Host A day 3", "2026-09-24 Host A night 1", "2026-09-25 Host A night 1",
-  ]);
+/* ----- Sandbox: the Capacity tab's private what-if ----- */
+const SBX_DATES = ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"];   // Mon..Fri
+const sbxInputs = () => {
+  const cm = (id, date, number, extra = {}) => ({ id, board_id: "b1", plan_date: date, number, shift: "day", host: "Host A", customer: "Cust A", hidden: false, ...extra });
+  const on = (missionField, id, date, emps) => emps.map((e) => ({ employee_id: e, plan_date: date, [missionField]: id }));
+  return {
+    boardId: "b1", dates: SBX_DATES, isForecast: (d) => d > "2026-09-22",
+    activeIds: new Set(["a", "b", "c", "d", "e", "f", "g"]),
+    confirmed: {
+      missions: [
+        cm("m1", "2026-09-21", "S.26.0001"), cm("m2", "2026-09-21", "S.26.0002", { host: "Host B" }),
+        cm("m3", "2026-09-22", "S.26.0001"), cm("m4", "2026-09-22", "S.26.0002", { host: "Host B" }),
+        cm("m5", "2026-09-22", "S.26.0003", { hidden: true }),                    // hidden: ignored
+        cm("mx", "2026-09-22", "S.26.0009", { board_id: "b2" }),                  // another board
+      ],
+      assignments: [
+        ...on("mission_id", "m1", "2026-09-21", ["a", "b", "gone"]), ...on("mission_id", "m2", "2026-09-21", ["c"]),
+        ...on("mission_id", "m3", "2026-09-22", ["a", "b", "d"]), ...on("mission_id", "m4", "2026-09-22", ["c", "e"]),
+        ...on("mission_id", "m5", "2026-09-22", ["f"]), ...on("mission_id", "mx", "2026-09-22", ["g"]),
+      ],
+    },
+    forecast: {
+      missions: [{ id: "f1", board_id: "b1", plan_date: "2026-09-24", number: "S.26.0001", shift: "day", host: "Host A", customer: "Cust A" }],
+      assignments: on("forecast_mission_id", "f1", "2026-09-24", ["a"]),
+    },
+    closed: [{ number: "S.26.0002", shift: "day", closedOn: "2026-09-24" }],
+  };
+};
+const sbxRow = (rows, number) => rows.find((r) => r.number === number);
+
+test("sandbox baseline: placed days show their crew, empty days repeat the latest confirmed day, a closed mission stops", () => {
+  const b = Sandbox.baseline(sbxInputs());
+  assert.deepEqual(b.source, { "2026-09-21": "confirmed", "2026-09-22": "confirmed", "2026-09-23": "repeat", "2026-09-24": "forecast", "2026-09-25": "repeat" });
+  assert.equal(b.repeatDate, "2026-09-22");
+  assert.deepEqual(b.rows.map((r) => r.number), ["S.26.0001", "S.26.0002"], "hidden and other boards' missions are not rows");
+  // "gone" is not on the roster, so Monday counts 2
+  assert.deepEqual(sbxRow(b.rows, "S.26.0001").base, { "2026-09-21": 2, "2026-09-22": 3, "2026-09-23": 3, "2026-09-24": 1, "2026-09-25": 3 });
+  // Thursday has a forecast (without this mission); Friday is after its closing date
+  assert.deepEqual(sbxRow(b.rows, "S.26.0002").base, { "2026-09-21": 1, "2026-09-22": 2, "2026-09-23": 2 });
+});
+
+test("sandbox baseline: with nobody placed in the range, the latest earlier day is repeated", () => {
+  const inp = sbxInputs();
+  inp.confirmed = { missions: [], assignments: [] };
+  inp.forecast = { missions: [], assignments: [] };
+  inp.closed = [];
+  assert.deepEqual(Sandbox.baseline(inp).rows, [], "nothing to repeat");
+  inp.fallback = { date: "2026-09-18", missions: [mission("S.26.0001", ["a", "b", "gone"]), mission("S.26.0004", ["c"], { hidden: true }), mission("S.26.0005", [])] };
+  const b = Sandbox.baseline(inp);
+  assert.equal(b.repeatDate, "2026-09-18");
+  assert.deepEqual(b.rows.map((r) => r.number), ["S.26.0001"]);
+  assert.deepEqual(Object.values(b.rows[0].base), [2, 2, 2, 2, 2]);
+});
+
+test("sandbox apply: new missions, crew changes and typed cells stack; off and orphaned requests do nothing", () => {
+  const b = Sandbox.baseline(sbxInputs());
+  const key1 = Sandbox.sandboxKey({ number: "S.26.0001", shift: "day" });
+  const reqs = [
+    { id: "q1", kind: "new", host: "Host C", customer: "Cust C", shift: "night", headcount: 4, from: "2026-09-23", to: null, on: true },
+    { id: "q2", kind: "change", key: key1, headcount: 5, from: "2026-09-22", to: "2026-09-23", on: true },
+    { id: "q3", kind: "cells", key: key1, cells: { "2026-09-23": 9 }, on: true },
+    { id: "q4", kind: "change", key: key1, headcount: 0, from: "2026-09-21", to: null, on: false },
+    { id: "q5", kind: "change", key: "m\u0001GONE\u0001day", headcount: 2, from: "2026-09-21", to: null, on: true },
+  ];
+  const out = Sandbox.apply(b.rows, reqs, SBX_DATES);
+  assert.deepEqual([...out.orphans], ["q5"]);
+  assert.deepEqual(sbxRow(out.rows, "S.26.0001").values, { "2026-09-21": 2, "2026-09-22": 5, "2026-09-23": 9, "2026-09-24": 1, "2026-09-25": 3 });
+  const added = out.rows.find((r) => r.isNew);
+  assert.equal(added.key, Sandbox.requestKey("q1"));
+  assert.deepEqual(added.values, { "2026-09-23": 4, "2026-09-24": 4, "2026-09-25": 4 });
+  assert.deepEqual(Sandbox.totals(out.rows, SBX_DATES, "values"), [3, 7, 15, 5, 7]);
+  assert.deepEqual(Sandbox.totals(out.rows, SBX_DATES, "base"), [3, 5, 5, 1, 3]);
+  assert.deepEqual(Sandbox.byHost(out.rows).map((g) => g.host + ":" + g.rows.length), ["Host A:1", "Host B:1", "Host C:1"]);
+  assert.deepEqual(sbxRow(b.rows, "S.26.0001").base["2026-09-22"], 3, "the baseline rows are not changed");
+});
+
+test("sandbox setCells: a typed number is kept as one request per row; typing the board's number back removes it", () => {
+  const b = Sandbox.baseline(sbxInputs());
+  const key1 = Sandbox.sandboxKey({ number: "S.26.0001", shift: "day" });
+  let n = 0;
+  const id = () => "c" + (++n);
+  let reqs = Sandbox.setCells([], [{ key: key1, date: "2026-09-21", value: 6 }, { key: key1, date: "2026-09-22", value: 3 }], b.rows, SBX_DATES, id);
+  assert.deepEqual(reqs, [{ id: "c1", kind: "cells", key: key1, cells: { "2026-09-21": 6 }, on: true }], "3 is already the board's number");
+  reqs = Sandbox.setCells(reqs, [{ key: key1, date: "2026-09-25", value: 0 }], b.rows, SBX_DATES, id);
+  assert.deepEqual(reqs[0].cells, { "2026-09-21": 6, "2026-09-25": 0 });
+  reqs = Sandbox.setCells(reqs, [{ key: key1, date: "2026-09-21", value: null }, { key: key1, date: "2026-09-25", value: 3 }], b.rows, SBX_DATES, id);
+  assert.deepEqual(reqs, [], "an empty request goes");
+  // on top of a crew change, the number to beat is the changed one
+  const change = { id: "q", kind: "change", key: key1, headcount: 5, from: "2026-09-21", to: null, on: true };
+  assert.deepEqual(Sandbox.setCells([change], [{ key: key1, date: "2026-09-21", value: 5 }], b.rows, SBX_DATES, id), [change]);
+  assert.equal(Sandbox.setCells([change], [{ key: key1, date: "2026-09-21", value: 2 }], b.rows, SBX_DATES, id)[1].cells["2026-09-21"], 2);
 });
 
 test("capacity paste: Excel-style clipboard text parses to whole numbers, blanks clear", () => {

@@ -600,29 +600,31 @@ footer { color: var(--muted); font-size: 14px; text-align: center; margin-top: 2
     <!-- ===================== CAPACITY ===================== -->
     <section id="capacity">
       <h2><span class="th">กำลังรองรับ</span><span class="en">Capacity</span></h2>
-      <p class="lede"><span class="th">เป็นตัวเลข ไม่ใช่รายชื่อ: แต่ละโฮสต์ต้องการกี่คนต่อกะต่อวัน เทียบกับคนที่มี ทีละบอร์ด</span><span class="en">Numbers, not names: how many people each host needs per shift and day, against how many are available, one board at a time.</span></p>
+      <p class="lede"><span class="th">เป็นตัวเลข ไม่ใช่รายชื่อ: ลองวางแผนล่วงหน้าแบบส่วนตัว โดยเริ่มจากจำนวนคนบนบอร์ดที่ใช้งานอยู่ เทียบกับคนที่มี</span><span class="en">Numbers, not names: a private place to plan ahead, starting from the people on the running board, against how many are available.</span></p>
       <div class="th">
         <ol class="steps">
-          <li><div>เลือกบอร์ดจากแถบเครื่องมือ (บอร์ดที่มีวันขาดคนจะมีตัวเลขสีแดง) และช่วง 1–8 สัปดาห์</div></li>
-          <li><div>กด <span class="btn">เริ่มจากแผนที่ยืนยันแล้ว</span> เพื่อเติมตัวเลขจากแผนจริงล่าสุด</div></li>
-          <li><div>แก้ตัวเลขในช่องของโฮสต์ที่คุณดูแล เพิ่มโฮสต์ใหม่ที่แถวล่างสุด <b>+ Add host…</b></div></li>
+          <li><div>เลือกบอร์ดจากแถบเครื่องมือ (บอร์ดที่มีวันขาดคนจะมีตัวเลขสีแดง) และช่วง 1–8 สัปดาห์ ตารางจะ<b>เติมตัวเลขจากบอร์ดที่ใช้งานอยู่ให้เอง</b>: หนึ่งแถวต่อมิชชั่น จัดกลุ่มตามโฮสต์</div></li>
+          <li><div>กด <span class="btn">+ เพิ่มคำขอ</span> เพื่อเพิ่ม<b>มิชชั่นใหม่</b> (โฮสต์ จำนวนคน วันที่เริ่ม) <b>เปลี่ยนจำนวนคน</b>ของมิชชั่นที่ดำเนินอยู่ หรือกำหนด<b>วันสิ้นสุด</b> หรือพิมพ์ตัวเลขลงในช่องได้โดยตรง</div></li>
+          <li><div>ติ๊กเปิด/ปิดแต่ละคำขอในรายการ <b>คำขอของฉัน</b> เพื่อเทียบผลแบบมีและไม่มีคำขอนั้น ตัวเลขของฉันเป็นสีเขียวอมฟ้า โดยมีตัวเลขของบอร์ดขีดฆ่าอยู่ด้านล่าง</div></li>
           <li><div>ดูแถว <b>Gap</b>: <span class="chip red">▼ ขาด</span> <span class="chip amber">● พอดี</span> <span class="chip green">▲ เหลือ</span> กดตัวเลข Available เพื่อดูที่มา</div></li>
+          <li><div>เลือก <b>ทุกบอร์ด</b> ในตัวเลือกบอร์ดเพื่อดูส่วนต่างของทุกบอร์ดพร้อมกัน และ<b>ส่งออก</b>เพื่อแชร์แผนให้ผู้อื่น</div></li>
         </ol>
-        <p>ใช้งานเหมือน Excel: ลากเลือกหลายช่อง <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> (คัดลอกจาก/ไป Excel ได้) <kbd>Delete</kbd> ล้างช่อง คลิกขวาที่ช่องเพื่อเติมถึงสิ้นสัปดาห์ หน้านี้<b>ไม่เปลี่ยนแปลงบอร์ดจริง</b></p>
-        <div class="warn"><b>Reset to 0</b> (ในเมนู ⋯) ตั้งตัวเลขทั้งหมดจากวันนี้เป็น 0 ย้อนกลับไม่ได้ ควรส่งออกก่อน</div>
+        <p>ใช้งานเหมือน Excel: ลากเลือกหลายช่อง <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> (คัดลอกจาก/ไป Excel ได้) <kbd>Delete</kbd> นำตัวเลขของฉันออก คลิกขวาที่ช่องเพื่อเติมถึงสิ้นสัปดาห์</p>
+        <div class="warn">หน้านี้เป็น<b>แซนด์บ็อกซ์ส่วนตัว</b>: ไม่มีผู้อื่นเห็น ไม่บันทึกลงฐานข้อมูล และ<b>ไม่เปลี่ยนบอร์ด</b> คำขอเก็บไว้ในอุปกรณ์นี้จนกว่าจะกด <b>รีเซ็ตแซนด์บ็อกซ์ของฉัน</b> (ในเมนู ⋯) ซึ่งย้อนกลับไม่ได้ ควรส่งออกก่อน</div>
       </div>
       <div class="en">
         <ol class="steps">
-          <li><div>Pick the board in the toolbar (a board with short days carries a red count) and a range of 1–8 weeks.</div></li>
-          <li><div>Press <span class="btn">Start from confirmed plan</span> to fill the cells from the latest real plan.</div></li>
-          <li><div>Adjust the hosts you look after. Add a new host on the last row, <b>+ Add host…</b></div></li>
+          <li><div>Pick the board in the toolbar (a board with short days carries a red count) and a range of 1–8 weeks. The grid is <b>already filled from the running board</b>: one row per mission, grouped by host.</div></li>
+          <li><div>Press <span class="btn">+ Add request</span> for a <b>new mission</b> (host, people, start date), a <b>different crew</b> on a running mission, or an <b>end date</b>. Or type a number straight into a cell.</div></li>
+          <li><div>Tick each request off and on in <b>My requests</b> to compare the plan with and without it. My numbers are teal, with the board's number struck through under them.</div></li>
           <li><div>Read the <b>Gap</b>: <span class="chip red">▼ short</span> <span class="chip amber">● tight</span> <span class="chip green">▲ spare</span>. Click an Available number to see why.</div></li>
+          <li><div>Pick <b>All boards</b> in the board switch to see every board's gap side by side, and <b>Export</b> to share the plan.</div></li>
         </ol>
-        <p>It works like a spreadsheet: drag to select, <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> (to and from Excel), <kbd>Delete</kbd> to clear, right-click a cell to fill to the end of the week. Nothing here <b>changes a board</b>.</p>
-        <div class="warn"><b>Reset to 0</b> (in the ⋯ menu) sets every number from today on to 0. It can't be undone, so export first.</div>
+        <p>It works like a spreadsheet: drag to select, <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> (to and from Excel), <kbd>Delete</kbd> to take my numbers out, right-click a cell to fill to the end of the week.</p>
+        <div class="warn">This tab is a <b>private sandbox</b>: nobody else sees it, nothing is saved to the database, and it never <b>changes a board</b>. Your requests are kept on this device until you press <b>Reset my sandbox</b> (in the ⋯ menu). That can't be undone, so export first.</div>
       </div>
-    
-      <figure class="shot" data-shot="capacity"><figcaption><span class="th">กำลังรองรับ: แถบ Gap ด้านบน และตัวเลขต่อโฮสต์ต่อวันด้านล่าง</span><span class="en">Capacity: the gap drawn on top, and each host's numbers per day below</span></figcaption></figure>
+
+      <figure class="shot" data-shot="capacity"><figcaption><span class="th">กำลังรองรับ: คำขอของฉันทางซ้าย แถบ Gap ด้านบน และตัวเลขต่อมิชชั่นต่อวันด้านล่าง</span><span class="en">Capacity: my requests on the left, the gap drawn on top, and each mission's numbers per day below</span></figcaption></figure>
     </section>
 
     <!-- ===================== ORG CHART ===================== -->

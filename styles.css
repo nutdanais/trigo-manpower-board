@@ -5121,21 +5121,59 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-hostrow:hover .cap-row-menu, .cap-row-menu:focus-visible, body.touch-mode .cap-row-menu { opacity: 1; }
 .cap-row-menu:hover { color: var(--text); border-color: var(--border); background: var(--panel); }
 .ctx-item.ctx-danger { color: var(--danger-text); }
-.cap-add { border-top: 1px solid var(--bg-soft); }
-.cap-add .cap-left { padding: 6px 10px; }
-.cap-add { display: flex; gap: 6px; align-items: center; min-width: 0; }
-.cap-add input, .cap-add select {
-  height: var(--ctl-h-sm);
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font: inherit;
-  font-size: 12.5px;
-}
-.cap-add input { flex: 1 1 auto; min-width: 0; width: 120px; }
-.cap-add input::placeholder { color: var(--primary-text); font-weight: 600; }
+/* ----- The sandbox: my requests beside the grid, hosts opening to their
+   missions, and every number of mine in teal. Teal means "only I see this" and
+   is used for nothing else (violet is loans, amber a tight day). ----- */
+:root { --mine: #0b7285; --mine-tint: #e7f5f7; --mine-line: #a6d5dc; }
+.cap-sbx { --cap-left: 290px; display: grid; grid-template-columns: 280px minmax(0, 1fr); border-top: 1px solid var(--border); }
+.cap-sbx > .cap-scroll { border-top: 0; }
+.cap-reqs { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg-soft); border-right: 1px solid var(--border); min-width: 0; overflow-y: auto; max-height: max(380px, calc(100dvh - 140px)); }
+.cap-reqs h4 { margin: 4px 0 0; font-size: 11.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); }
+.cap-base { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: 8px; background: var(--panel); font-size: 12.5px; }
+.cap-base b { font-size: 13px; }
+.cap-base-read { color: var(--muted); }
+.cap-linkbtn { padding: 0; border: 0; background: none; color: var(--primary-text); font: inherit; font-size: 12.5px; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.cap-linkbtn:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+.cap-reqs-empty, .cap-reqs-foot { margin: 0; color: var(--muted); font-size: 12.5px; }
+.cap-req { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; padding: 8px 10px; border: 1px solid var(--mine-line); border-radius: 8px; background: var(--panel); }
+.cap-req input[type="checkbox"] { grid-row: span 2; width: 18px; height: 18px; min-height: 0; margin: 2px 0 0; accent-color: var(--mine); }
+.cap-req-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.cap-req-text b { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.cap-req-text small { font-size: 12px; color: var(--muted); }
+.cap-req-text .cap-req-warn { color: var(--warn-text); }
+.cap-req-acts { display: flex; gap: 12px; }
+.cap-req.off { border-color: var(--border); }
+.cap-req.off .cap-req-text { opacity: .6; }
+.cap-req.orphan { border-color: var(--warn-line); background: var(--warn-surface); }
+.cap-reqs-add { justify-content: center; }
+/* a number of mine, with the board's number struck through under it */
+.cap-day.cap-chg { background-color: var(--mine-tint); color: var(--mine); box-shadow: inset 0 0 0 1px var(--mine-line); }
+.cap-cell.cap-chg input { color: var(--mine); font-weight: 700; height: 24px; }
+.cap-day.cap-chg { flex-direction: column; }
+.cap-was { display: block; font-size: 10.5px; font-weight: 500; line-height: 1; color: var(--muted); text-decoration: line-through; }
+.cap-demrow .cap-day.cap-chg { font-weight: 700; }
+.cap-dayhead .cap-repeat .cap-dow::after { content: " ↻"; color: var(--muted); }
+/* host rows are totals; their missions sit under them */
+.cap-grouprow { border-top: 1px solid var(--border); background: var(--panel); }
+.cap-grouprow .cap-day { font-size: 14px; font-weight: 700; }
+.cap-fold { flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.cap-fold:hover { background: var(--bg-soft); color: var(--text); }
+.cap-fold:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 1px; }
+.cap-mscount { flex: none; margin-left: auto; padding: 0 6px; border-radius: 8px; background: var(--bg-soft); color: var(--muted); font-size: 11px; font-weight: 700; line-height: 16px; }
+.cap-mshead { padding-left: 44px; }
+.cap-mswho { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.25; }
+.cap-msno { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.cap-mscust { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.cap-msrow .cap-cell { font-weight: 500; }
+.cap-msrow { min-height: 42px; }
+.cap-new .cap-msno { padding: 0 6px; border: 1px solid var(--mine-line); border-radius: 4px; background: var(--mine-tint); color: var(--mine); font-size: 11px; font-weight: 700; line-height: 18px; }
+.cap-sum-before { color: var(--mine); }
+/* All boards side by side */
+.cap-boardhead { align-items: flex-start; }
+.cap-boardopen { padding: 0; border: 0; background: none; color: var(--primary-text); font: inherit; font-size: 13.5px; font-weight: 700; text-align: left; text-decoration: underline; cursor: pointer; }
+.cap-boardopen:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+.cap-boardrow { min-height: 46px; }
+.cap-day.cap-off { color: var(--muted); }
 .cap-card-foot { padding: 10px 16px; border-top: 1px solid var(--border); }
 .cap-note { margin: 0; color: var(--muted); font-size: 12px; }
 
@@ -5163,12 +5201,14 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 .cap-stepper input { width: 44px; border: 0; border-inline: 1px solid var(--border); background: transparent; color: var(--text); font: inherit; font-size: 16px; font-weight: 700; text-align: center; -moz-appearance: textfield; }
 .cap-stepper input:focus { outline: 2px solid var(--primary-text); outline-offset: -2px; }
 .cap-ph-next { margin: 10px 12px 0; width: calc(100% - 24px); justify-content: center; min-height: 42px; }
-.cap-ph-add { padding: 12px; }
-.cap-ph-add .cap-add input, .cap-ph-add .cap-add select, .cap-ph-add .cap-add .btn { height: 40px; font-size: 14px; }
+.cap-ph-day.cap-chg { background: var(--mine-tint); box-shadow: none; }
+.cap-ph-when .cap-ph-was { color: var(--mine); }
 #capacity-panel > .cap-note { padding: 0 4px; }
 @media (max-width: 640px) {
-  /* the two actions move into ⋯ so the toolbar stays one row */
-  #btn-cap-seed, #btn-cap-copy-week { display: none; }
+  /* + Add request is in the requests list here, so the toolbar stays one row */
+  #btn-cap-add { display: none; }
+  .cap-reqs { max-height: none; margin-bottom: 10px; border: 1px solid var(--border); border-radius: var(--r-box); }
+  .cap-all { --cap-left: 150px; }
   #cap-board-dd { flex: 1 1 100%; }
   #btn-cap-board { width: 100%; }
   /* the summary wraps here, so the separating dots would start lines */
@@ -5289,6 +5329,7 @@ table.merge-log tr.not-used td { background: var(--danger-tint); }
 #cap-export-sheet .ce-shift.night { background: #e4e5f7; color: #31357d; }
 #cap-export-sheet .ce-area { display: inline-block; padding: 1px 8px; border-radius: 9px; font-size: 11px; font-weight: 600; }
 #cap-export-sheet a { color: #0563c1; }
+#cap-export-sheet .ce-reqs { margin: 6px 0 0; max-width: 900px; color: #24323d; font-size: 11.5px; }
 #cap-export-sheet .ce-note { margin-top: 14px; max-width: 900px; color: #5c707f; font-size: 11px; }
 
 @media print {
@@ -6572,8 +6613,8 @@ label > .pk { margin-top: 5px; }
 /* in toolbars the picker sizes to its content */
 .cap-field .pk, .oc-levelctl .pk { display: inline-block; width: auto; margin-top: 0; }
 .cap-field .pk-btn, .oc-levelctl .pk-btn { width: auto; min-width: 140px; height: 32px; font-size: 13px; }
-.cap-add .pk, .cap-ph .pk { display: inline-block; width: auto; }
-.cap-add .pk-btn, .cap-ph .pk-btn { width: auto; min-width: 84px; height: 30px; }
+.cap-ph .pk { display: inline-block; width: auto; }
+.cap-ph .pk-btn { width: auto; min-width: 84px; height: 30px; }
 
 /* 03 · Host panel: Merge is a section inside the panel, above the footer */
 #modal-host #host-merge { margin: 6px 0 14px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
@@ -6963,14 +7004,6 @@ label > .pk { margin-top: 5px; }
 /* ===== Capacity: one Range control, and an Add-host row with room ===== */
 .cap-field { gap: 8px; padding-left: 0; border: 0; background: none; }   /* no box around the dropdown's own box */
 .cap-tool-label { font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; }
-.cap-add { flex-wrap: wrap; }
-.cap-add input { flex: 1 1 100%; }
-.cap-add .pk { flex: 1 1 auto; }
-.cap-add .pk-btn { width: 100%; }
-.cap-add .btn { flex: none; }
-.cap-ph-add .cap-add { flex-wrap: nowrap; }
-.cap-ph-add .cap-add input { flex: 1 1 auto; }
-.cap-ph-add .cap-add .pk { flex: none; }
 
 /* ===== Release review 2026-10-16 (design/release-review/) ===== */
 
@@ -7098,7 +7131,7 @@ label > .pk { margin-top: 5px; }
 
 /* Move/Copy mission: a side panel like Edit Mission. Boards are picked from a
    grid of tiles; the choices below are radio rows with a one-line hint. */
-#move-mission-sub, #lend-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+#move-mission-sub, #lend-sub, #cap-req-sub { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .mm-boards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
 .mm-board {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0;

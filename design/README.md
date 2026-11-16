@@ -184,3 +184,5 @@ plan stays in their own browser (per board), and the shared Team plan stays
 beside it. Three options (a switch on the grid, requests on top of the running
 board, one question and one answer), a comparison, and the open questions.
 Option B's tick boxes work on invented sample numbers.
+Option B was built (requests on top of the running board), with the shared
+Team plan dropped and an All boards view added.
