@@ -1,0 +1,449 @@
+<meta charset="utf-8">
+<title>Crew Head Marker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: options for marking one person as the head of a
+   mission's crew, set from the employee card's right-click menu. Card, mission and
+   menu styles are copied from styles.css (light theme, white cards) so the boards
+   look like the real one. .ld- is the crew-head mark; each option is one class
+   (.opt-a … .opt-e) on the board wrapper. Light only, like the app. */
+:root {
+  /* layout: one column of option panels, each a live sample board + its trade-offs */
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --hover-tint: #eef3fb; --danger: #dc2626; --warn-text: #8a4f10;
+  --emp-bg: #ffffff; --emp-perm-border: #dfe4ea; --emp-oncall-bg: #fffaf2; --emp-oncall-border: #c9a878;
+  --emp-ink: #1a1a1a; --emp-sub: #545c66; --emp-pos-bg: rgba(0,73,131,.09); --night: #1c2430;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  /* crew-head accent, switched by the toolbar (data-accent on body) */
+  --ld: #0f766e; --ld-ink: #ffffff; --ld-soft: rgba(15,118,110,.22); --ld-wash: #e6f4f2;
+  color-scheme: light;
+}
+body[data-accent="green"] { --ld: #6f9420; --ld-ink: #ffffff; --ld-soft: rgba(111,148,32,.26); --ld-wash: #eff6e0; }
+body[data-accent="charcoal"] { --ld: #33383f; --ld-ink: #ffffff; --ld-soft: rgba(51,56,63,.22); --ld-wash: #eceef1; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.45; font-size: 14px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 24px; }
+h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
+h2 { font-size: 19px; letter-spacing: -.2px; text-wrap: balance; }
+h3 { font-size: 14px; }
+p { max-width: 72ch; }
+.lede { color: var(--muted); margin-top: 6px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.small { font-size: 12.5px; }
+.muted { color: var(--muted); }
+
+/* toolbar */
+.tools { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 14px rgba(8,28,56,.06); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.tools .lab { font-size: 12px; color: var(--muted); }
+.tg { font: inherit; font-size: 12.5px; font-weight: 600; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background .15s, border-color .15s; }
+.tg:hover { background: var(--hover-tint); }
+.tg:active { transform: translateY(1px); }
+.tg i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.tg[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tg:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tools .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* findings */
+.find { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+.find div { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.find b { display: block; margin-bottom: 2px; }
+.taken { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; margin: 3px 8px 0 0; }
+.taken i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+/* options */
+.opt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.opt-head h2 span { color: var(--muted); margin-right: 6px; }
+.rec { font-size: 11px; font-weight: 700; color: #fff; background: var(--primary); border-radius: 999px; padding: 1px 9px; letter-spacing: .2px; }
+.opt-why { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 6px 24px; font-size: 13px; }
+.opt-why ul { padding-left: 18px; }
+.opt-why li { margin: 2px 0; }
+.opt-why .lbl { font-weight: 700; font-size: 12px; color: var(--muted); }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px; align-items: start; padding: 16px 14px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+
+/* ===== the app's mission card + employee card (from styles.css) ===== */
+.mission-card { border: 1px solid var(--border); border-top-width: 5px; border-radius: 8px; background: var(--panel); overflow: hidden; }
+.mission-header { padding: 7px 9px; font-size: 11.5px; border-bottom: 1px solid var(--border); }
+.m-line1 { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.m-number { font-weight: 700; font-size: 14px; line-height: 1.1; flex: none; }
+.m-host { font-weight: 700; font-size: 14px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-decoration: underline; text-underline-offset: 2px; }
+.m-pills { margin-left: auto; flex: none; display: flex; gap: 4px; }
+.m-shift { font-weight: 700; font-size: 9px; line-height: 1.7; letter-spacing: .3px; padding: 0 4px; border-radius: 3px; background: rgba(255,255,255,.72); color: var(--primary); border: 1px solid rgba(0,73,131,.30); }
+.m-shift.night { background: var(--night); color: #fff; border-color: var(--night); }
+.m-line2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--muted); min-width: 0; }
+.m-line2 .m-eng { font-weight: 600; color: var(--text); white-space: nowrap; }
+.m-line2 .m-cust { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-count { margin-left: auto; font-weight: 700; font-size: 9px; line-height: 1.7; background: rgba(255,255,255,.72); border-radius: 999px; padding: 0 6px; flex: none; }
+.m-headline { display: none; }
+.mission-body { padding: 8px; }
+.mission-card.night .mission-body { background-color: #1a4478; background-image: linear-gradient(180deg, #0f2c52 0%, #2f5f9e 100%); }
+.mission-emps { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.emp-card { width: 116px; height: 70px; border-radius: 6px; padding: 5px 6px 6px; box-shadow: 0 1px 2px rgba(8,28,56,.08); background: var(--emp-bg); border: 1px solid var(--emp-perm-border); display: flex; flex-direction: column; position: relative; color: var(--emp-ink); cursor: context-menu; user-select: none; transition: box-shadow .2s, background .2s, border-color .2s; }
+.emp-card.oncall { border-style: dashed; border-color: var(--emp-oncall-border); background: var(--emp-oncall-bg); }
+.emp-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.emp-row1 { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.emp-name { flex: 1 1 auto; min-width: 0; font-size: 12.5px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-surname { font-size: 11px; font-weight: 500; line-height: 1.3; color: var(--emp-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emp-tid { flex: none; font-variant-numeric: tabular-nums; font-size: 10px; font-weight: 700; line-height: 1.6; padding: 0 4px; border-radius: 4px; background: var(--emp-pos-bg); color: var(--primary); }
+.oncall .emp-tid { background: rgba(0,0,0,.07); color: var(--emp-ink); }
+.emp-meta { margin-top: auto; display: flex; align-items: center; gap: 3px; min-width: 0; }
+.emp-pos, .emp-oc, .emp-area, .ld-chip { font-size: 9.5px; font-weight: 700; line-height: 1.6; letter-spacing: .2px; padding: 0 5px; border-radius: 999px; flex: none; }
+.emp-pos { color: var(--primary); background: var(--emp-pos-bg); }
+.emp-oc { background: #fff1dd; color: #8a4f10; box-shadow: inset 0 0 0 1px #efd2ab; padding: 0 4px; }
+.emp-area { margin-left: auto; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-card.selected { z-index: 2; outline: 2.5px solid var(--primary); outline-offset: 1px; box-shadow: 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.28); }
+.emp-card.selected::after { content: "✓"; position: absolute; top: -6px; right: -6px; width: 15px; height: 15px; background: var(--primary); color: #fff; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff; z-index: 3; }
+.ic { width: 1em; height: 1em; display: inline-block; flex: none; }
+
+/* ===== the crew-head mark: hidden pieces, each option turns some on ===== */
+.ld-badge, .ld-chip, .ld-tab, .ld-crown { display: none; }
+.ld-crown .ic, .ld-chip .ic, .ld-tab .ic, .ld-badge .ic { fill: currentColor; stroke: none; }
+
+/* A. Corner badge: a round crown badge hanging off the top-left corner, the
+   mirror of the selection tick (top-right). Nothing inside the card moves. */
+.opt-a .lead .ld-badge { display: grid; place-items: center; position: absolute; top: -7px; left: -7px; width: 18px; height: 18px; border-radius: 50%; background: var(--ld); color: var(--ld-ink); border: 1.5px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); z-index: 3; }
+.opt-a .lead .ld-badge .ic { width: 10px; height: 10px; }
+.opt-a .lead .emp-name { padding-left: 6px; }
+
+/* B. Head chip: the role chip becomes a filled "Head" chip with a crown. The
+   position (TL, Ins…) moves into the tooltip and the Profile. */
+.opt-b .lead .emp-pos, .opt-b .lead .emp-oc { display: none; }
+.opt-b .lead .ld-chip { display: inline-flex; align-items: center; gap: 2px; background: var(--ld); color: var(--ld-ink); }
+.opt-b .lead .ld-chip .ic { width: 9px; height: 9px; }
+
+/* C. Top cap: a thick top edge in the accent, the same language as the mission
+   card's engineer edge, and a crown before the first name. */
+.opt-c .lead { border-top: 4px solid var(--ld); padding-top: 3px; border-top-left-radius: 5px; border-top-right-radius: 5px; }
+.opt-c .lead .ld-crown { display: inline-flex; color: var(--ld); }
+.opt-c .lead .ld-crown .ic { width: 12px; height: 12px; }
+
+/* D. Filled card: the whole card turns the accent colour with white text. */
+.opt-d .lead { background: var(--ld); border-color: var(--ld); border-style: solid; color: var(--ld-ink); }
+.opt-d .lead .emp-surname { color: var(--ld-ink); opacity: .82; }
+.opt-d .lead .emp-tid, .opt-d .lead .emp-pos, .opt-d .lead .emp-oc { background: rgba(255,255,255,.92); color: var(--ld); box-shadow: none; }
+.opt-d .lead .ld-crown { display: inline-flex; }
+.opt-d .lead .ld-crown .ic { width: 12px; height: 12px; }
+
+/* E. Frame + name tab (recommended): an accent frame drawn inside the card (so
+   its size and the selection outline are untouched) and a small "HEAD" tab
+   sitting on its top edge. The head is placed first, so the tab always lands
+   in the mission body's top padding, never on another card. */
+.opt-e .lead { border-color: var(--ld); border-style: solid; box-shadow: inset 0 0 0 1px var(--ld), 0 0 0 3px var(--ld-soft); background: #fff; }
+.opt-e .lead.selected { box-shadow: inset 0 0 0 1px var(--ld), 0 0 0 2px #fff, 0 2px 6px rgba(0,0,0,.28); }
+.opt-e .lead .ld-tab { display: inline-flex; align-items: center; gap: 3px; position: absolute; top: -8px; left: 6px; height: 14px; padding: 0 6px 0 5px; border-radius: 4px; background: var(--ld); color: var(--ld-ink); font-size: 8.5px; font-weight: 700; letter-spacing: .5px; line-height: 1; z-index: 3; box-shadow: 0 0 0 1.5px #fff; }
+.opt-e .lead .ld-tab .ic { width: 9px; height: 9px; }
+.opt-e .mission-body { padding-top: 10px; }
+
+/* add-on shown in E: the head's name in the mission header, line 2 */
+.opt-e .m-headline { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: var(--ld); white-space: nowrap; flex: none; }
+.opt-e .m-headline .ic { width: 10px; height: 10px; fill: currentColor; }
+
+/* turning it on: one soft pulse */
+@media (prefers-reduced-motion: no-preference) {
+  .emp-card.just { animation: ld-pop .4s cubic-bezier(.16,1,.3,1); }
+  @keyframes ld-pop { 0% { transform: scale(.94); } 100% { transform: none; } }
+}
+
+/* ===== context menu (from styles.css) ===== */
+#ctx { position: fixed; z-index: 200; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); min-width: 230px; padding: 4px; }
+.ctx-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 5px; cursor: pointer; font-size: 13px; color: var(--text); width: 100%; border: 0; background: none; font-family: inherit; text-align: left; }
+.ctx-item .ic { width: 15px; height: 15px; color: var(--muted); stroke: currentColor; fill: none; }
+.ctx-item .ic.crown { fill: currentColor; stroke: none; color: var(--ld); }
+.ctx-item:hover, .ctx-item:focus-visible { background: var(--hover-tint); outline: none; }
+.ctx-item small { margin-left: auto; font-size: 11px; color: var(--muted); padding-left: 10px; white-space: nowrap; }
+.ctx-sep { border-top: 1px solid var(--border); margin: 4px 0; }
+.ctx-title { padding: 5px 12px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.ctx-sub::after { content: "\203A"; margin-left: auto; font-size: 15px; line-height: 1; color: var(--muted); }
+.ctx-danger { color: var(--danger); font-weight: 600; }
+.ctx-danger .ic { color: var(--danger); }
+.ctx-new { margin-left: auto; font-size: 9.5px; font-weight: 700; color: var(--ld-ink); background: var(--ld); border-radius: 999px; padding: 0 6px; line-height: 1.6; }
+
+.menus { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.menus figure { display: grid; gap: 8px; max-width: 260px; }
+.menus figcaption { font-size: 12.5px; color: var(--muted); }
+.menu-static { position: static; display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(31,41,55,.12); }
+
+/* compare table */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; vertical-align: top; }
+thead th { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+tbody tr + tr td, tbody tr + tr th { border-top: 1px solid #eceff3; }
+tbody th { white-space: nowrap; }
+.y { color: #4d6810; font-weight: 700; }
+.n { color: #a3271f; font-weight: 700; }
+.m { color: var(--warn-text); font-weight: 700; }
+tr.best { background: #f5f8fc; }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px 28px; font-size: 13px; }
+.rules b { display: block; font-size: 13.5px; margin-bottom: 2px; }
+.q { padding-left: 18px; font-size: 13.5px; display: grid; gap: 6px; }
+@media (max-width: 640px) { .tools .hint { margin-left: 0; width: 100%; } h1 { font-size: 22px; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M2.5 7.5l5 4.2L12 4l4.5 7.7 5-4.2-2 11.5h-15z"/><rect x="4.5" y="20" width="15" height="2" rx="1"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M3 7h18"/><path d="M7 21l-4-4 4-4"/><path d="M21 17H3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-leave" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8c2-3 12-3 14 0"/></symbol>
+  <symbol id="i-return" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-5-5 5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+</svg>
+
+<div class="wrap" id="wrap" data-accent="teal">
+  <header>
+    <h1>Mark the head of a crew</h1>
+    <p class="lede">Five ways to show which person leads a mission's crew on the day's board. The head is set from the employee card's right-click menu (on a phone, hold the card). Every board on this page works: right-click any card in a crew to make that person the head, or to remove it.</p>
+  </header>
+
+  <div class="tools" role="toolbar" aria-label="Preview settings">
+    <span class="lab">Accent</span>
+    <button type="button" class="tg" data-accent="teal" aria-pressed="true"><i style="background:#0f766e"></i>Teal</button>
+    <button type="button" class="tg" data-accent="green" aria-pressed="false"><i style="background:#6f9420"></i>TRIGO green</button>
+    <button type="button" class="tg" data-accent="charcoal" aria-pressed="false"><i style="background:#33383f"></i>Charcoal</button>
+    <span class="lab" style="margin-left:6px">Show</span>
+    <button type="button" class="tg" id="t-sel" aria-pressed="false">Head also selected</button>
+    <span class="hint">Right-click a crew card to change the head</span>
+  </div>
+
+  <section class="panel" aria-labelledby="h-find">
+    <h2 id="h-find">What the mark has to work around</h2>
+    <div class="find">
+      <div><b>The card is full</b>116 × 70 px with three rows: first name and TRIGO ID, surname, role and area. Three cards must still fit a mission column, so the mark can't make the card bigger.</div>
+      <div><b>Most colours already mean something</b>
+        <span class="taken"><i style="background:#003a66"></i>Navy: selected</span>
+        <span class="taken"><i style="background:#e3a008"></i>Gold: highlighted mission</span>
+        <span class="taken"><i style="background:#a8c855"></i>Green flash: search hit</span>
+        <span class="taken"><i style="background:#c9a878"></i>Tan dashed: on-call</span><br>
+        Area chips use blue, purple, orange and green, so the default accent here is teal.</div>
+      <div><b>"Team Leader" already exists</b>TL is a <i>position</i>, fixed in the profile. Crew head is a <i>role for the day on one mission</i>: a Senior Inspector can lead today and a TL can be a crew member tomorrow. The mark must not look like the TL chip.</div>
+      <div><b>It must survive the JPG export</b>Crews see the board as a picture in LINE, so the mark can't rely on hover or a tooltip, and it must read on the night missions' dark blue body.</div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-menu">
+    <h2 id="h-menu">In the right-click menu</h2>
+    <p class="small">One new item, just under Profile, only for someone placed on a mission. It isn't shown for Standby, leave, on-call pools, forecasts or a multi-selection, and anyone who can only view the board doesn't get it.</p>
+    <div class="menus">
+      <figure><div class="menu-static" id="mm-1"></div><figcaption>The crew has no head yet.</figcaption></figure>
+      <figure><div class="menu-static" id="mm-2"></div><figcaption>Someone else leads this crew. The new head replaces them, and the menu says who.</figcaption></figure>
+      <figure><div class="menu-static" id="mm-3"></div><figcaption>This person is the head.</figcaption></figure>
+    </div>
+  </section>
+
+  <div id="options" style="display:grid;gap:24px"></div>
+
+  <section class="panel" aria-labelledby="h-cmp">
+    <h2 id="h-cmp">Side by side</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Option</th><th>Seen across the room</th><th>Says "head" in words</th><th>Position chip kept</th><th>Clear of selected / on-call</th><th>Night missions</th><th>Card size</th></tr></thead>
+        <tbody>
+          <tr><th>A. Corner badge</th><td class="m">Small</td><td class="n">Icon only</td><td class="y">Yes</td><td class="y">Yes (opposite corner from the tick)</td><td class="y">Good</td><td class="y">Same</td></tr>
+          <tr><th>B. Head chip</th><td class="m">Medium</td><td class="y">Yes</td><td class="n">No, moves to tooltip</td><td class="y">Yes</td><td class="y">Good</td><td class="y">Same</td></tr>
+          <tr><th>C. Top cap</th><td class="y">Good</td><td class="n">Icon only</td><td class="y">Yes</td><td class="m">Close to the mission's engineer edge</td><td class="y">Good</td><td class="y">Same</td></tr>
+          <tr><th>D. Filled card</th><td class="y">Strongest</td><td class="n">Icon only</td><td class="y">Yes</td><td class="m">On-call dashed edge is lost</td><td class="m">Dark on dark</td><td class="y">Same</td></tr>
+          <tr class="best"><th>E. Frame + tab</th><td class="y">Good</td><td class="y">Yes, "HEAD"</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Good (white card, tab on top)</td><td class="y">Same</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-rules">
+    <h2 id="h-rules">How it would behave (any option)</h2>
+    <div class="rules">
+      <div><b>One head per crew, for that day</b>Making someone head replaces the current one. Moving the head off the mission, or to leave or Standby, clears it. Carry over to the next day keeps it, like the crew itself.</div>
+      <div><b>Head first in the crew</b>The head's card moves to the front of the mission's people. All boards on this page do this. It also keeps option E's tab clear of other cards.</div>
+      <div><b>Head's name in the mission header</b>Shown in option E as an add-on: "<span style="color:var(--ld);font-weight:600">♛ ณัฐพล</span>" after the engineer, so the header alone says who to call. It can go with any option.</div>
+      <div><b>Where it is stored</b>One field on the mission (the head's employee), so a crew can never have two heads. The demo at <code>/?demo</code> would get the same field in its sample data, so the preview shows it.</div>
+      <div><b>Thai</b>Menu: ตั้งเป็นหัวหน้าทีม / ยกเลิกหัวหน้าทีม. Tab and chip: หัวหน้า (fits the same width as HEAD at this size).</div>
+      <div><b>Exports</b>Shown in the board's JPG and PDF exports. The Excel export could add a "Head" column.</div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-q">
+    <h2 id="h-q">To decide</h2>
+    <ol class="q">
+      <li>Which option, A to E? My pick is <b>E. Frame + tab</b>: it says "HEAD" in words, keeps every chip the card has today, and doesn't clash with selection, on-call or the gold mission highlight.</li>
+      <li>Which accent: teal, TRIGO green or charcoal? Green is the brand colour, but the search flash and the Sorting area are green too.</li>
+      <li>Exactly one head per crew, or allow more than one on large crews?</li>
+      <li>Add the head's name to the mission header too?</li>
+    </ol>
+  </section>
+</div>
+
+<div id="ctx" role="menu" hidden></div>
+
+<script>
+(function () {
+  const AREAS = {
+    Inspection: "background:#dbe8f7;color:#1d4f8a",
+    Resident: "background:#ece3f6;color:#5b3a86",
+    Rework: "background:#fbe3d6;color:#8a3d12",
+    Sorting: "background:#e5f0d3;color:#3f5a12",
+  };
+  // sample day: three missions, crews as on the demo board
+  const MISSIONS = [
+    { id: "m1", num: "RYGTH.26.0101", host: "Siam Auto Parts", cust: "Tier-1 Seating", eng: "Somchai.P", color: "#4a8fd8", wash: "#eaf2fb", shift: "DAY",
+      crew: [
+        { id: "e1", n: "ณัฐพล", s: "ศรีสุข", t: "T219", pos: "TL", a: "Inspection" },
+        { id: "e2", n: "ธนากร", s: "บุญมา", t: "T228", pos: "SI", a: "Inspection" },
+        { id: "e3", n: "วรรณา", s: "ทองดี", t: "T222", pos: "Ins", a: "Resident" },
+        { id: "e4", n: "อนุชา", s: "แก้วมณี", t: "T225", pos: "Tec", a: "Inspection" },
+      ], head: "e2" },
+    { id: "m2", num: "RYGTH.26.0102", host: "Rayong Precision", cust: "Brake Systems Ltd.", eng: "Kittipong.W", color: "#e8833a", wash: "#fdf0e6", shift: "DAY",
+      crew: [
+        { id: "e5", n: "จิราพร", s: "สายทอง", t: "T237", pos: "Ins", a: "Resident" },
+        { id: "e6", n: "ประเสริฐ", s: "ชัยวัฒน์", t: "T234", pos: "SI", a: "Sorting" },
+        { id: "e7", n: "สุภาพร", s: "มีสุข", t: "T231", oc: true, a: "Rework" },
+      ], head: null },
+    { id: "m3", num: "RYGTH.26.0106", host: "Map Ta Phut Steel", cust: "Chassis Works", eng: "Pimchanok.R", color: "#6aa84f", wash: "#edf6e8", shift: "NIGHT",
+      crew: [
+        { id: "e8", n: "ดวงใจ", s: "วิเศษ", t: "T267", pos: "Ins", a: "Resident" },
+        { id: "e9", n: "ธีรวัฒน์", s: "จันทร์เพ็ญ", t: "T270", pos: "TL", a: "Inspection" },
+        { id: "e10", n: "มาลี", s: "ศักดิ์ดี", t: "T285", oc: true, a: "Inspection" },
+      ], head: "e10" },
+  ];
+  const OPTIONS = [
+    { key: "a", name: "Corner badge", lede: "A round crown badge hangs off the card's top-left corner, the mirror of the selection tick on the right. Nothing inside the card changes.",
+      good: ["Smallest change; the card reads exactly as today", "Never collides with the selection tick", "Works on white, on-call and night cards"],
+      bad: ["Small: easy to miss across the room or in a shrunken JPG", "An icon only, so new staff have to learn what the crown means"] },
+    { key: "b", name: "Head chip", lede: "The role chip becomes a filled chip with a crown and the word Head. The person's position (TL, SI, Ins) moves to the tooltip and the Profile.",
+      good: ["Says Head in words, in the row people already read for the role", "No extra shapes on the card"],
+      bad: ["Loses the position chip on that card", "A chip is a small target to spot among many chips", "Right next to the area chip, so colour does most of the work"] },
+    { key: "c", name: "Top cap", lede: "The card gets a thick accent top edge, the same idea as the mission card's engineer edge, and a crown before the first name.",
+      good: ["Easy to scan along a row of cards", "Keeps every chip; the card stays the same size"],
+      bad: ["Reads like the mission's own coloured edge, a little too close in meaning", "Crown is the only thing saying head"] },
+    { key: "d", name: "Filled card", lede: "The whole card turns the accent colour with white text and a crown before the name.",
+      good: ["The strongest mark: unmistakable from across the room and in a JPG"],
+      bad: ["Heavy: a dark block in every crew pulls the eye away from the missions", "On-call's tan dashed card is lost on the head's card", "Dark card on the night missions' dark blue body"] },
+    { key: "e", name: "Frame + tab", rec: true, lede: "An accent frame round the card, and a small HEAD tab sitting on its top edge. The head is placed first in the crew, so the tab always sits in the mission's top padding. The add-on puts the head's name in the mission header.",
+      good: ["Says HEAD in words and keeps every chip the card has today", "Same pattern as the mission highlight (frame + tag), so the board feels like one system", "Clear of selection, on-call and the gold highlight; reads on night missions"],
+      bad: ["The tab needs the head to be first in the crew (that ordering is proposed anyway)", "Two pieces (frame and tab) instead of one"] },
+  ];
+
+  const svg = (id, cls) => `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  let showSel = false;
+  let justId = null;
+
+  function card(e, isHead) {
+    const role = e.oc ? `<span class="emp-oc">OC</span>` : `<span class="emp-pos">${e.pos}</span>`;
+    return `<div class="emp-card${e.oc ? " oncall" : ""}${isHead ? " lead" : ""}${isHead && showSel ? " selected" : ""}${isHead && justId === e.id ? " just" : ""}" tabindex="0" data-emp="${e.id}"
+      title="${esc(e.n + " " + e.s)} (${e.t})${isHead ? " • Crew head" : ""} • ${e.oc ? "On-call" : e.pos}">
+      <span class="ld-badge">${svg("crown")}</span>
+      <span class="ld-tab">${svg("crown")}HEAD</span>
+      <span class="emp-row1"><span class="ld-crown">${svg("crown")}</span><span class="emp-name">${esc(e.n)}</span><span class="emp-tid">${e.t}</span></span>
+      <span class="emp-surname">${esc(e.s)}</span>
+      <span class="emp-meta">${role}<span class="ld-chip">${svg("crown")}Head</span><span class="emp-area" style="${AREAS[e.a]}">${e.a}</span></span>
+    </div>`;
+  }
+  function mission(m) {
+    const head = m.crew.find(e => e.id === m.head);
+    const crew = head ? [head, ...m.crew.filter(e => e !== head)] : m.crew;
+    const night = m.shift === "NIGHT";
+    return `<div class="mission-card${night ? " night" : ""}" style="border-top-color:${m.color}">
+      <div class="mission-header" style="background:${m.wash}">
+        <div class="m-line1"><span class="m-number">${m.num}</span><span class="m-host">${esc(m.host)}</span>
+          <span class="m-pills"><span class="m-shift${night ? " night" : ""}">${m.shift}</span></span></div>
+        <div class="m-line2"><span class="m-cust">${esc(m.cust)}</span><span class="m-eng">${m.eng}</span>
+          ${head ? `<span class="m-headline" title="Crew head">${svg("crown")}${esc(head.n)}</span>` : ""}
+          <span class="m-count">${m.crew.length}</span></div>
+      </div>
+      <div class="mission-body"><div class="mission-emps">${crew.map(e => card(e, e === head)).join("")}</div></div>
+    </div>`;
+  }
+  function renderBoards() {
+    for (const b of document.querySelectorAll(".board")) b.innerHTML = MISSIONS.map(mission).join("");
+    justId = null;
+  }
+
+  // option panels
+  document.getElementById("options").innerHTML = OPTIONS.map(o => `
+    <section class="panel opt" aria-labelledby="h-${o.key}">
+      <div class="opt-head"><h2 id="h-${o.key}"><span>${o.key.toUpperCase()}.</span>${o.name}</h2>${o.rec ? `<span class="rec">Recommended</span>` : ""}</div>
+      <p class="small">${o.lede}</p>
+      <div class="board opt-${o.key}" aria-label="Sample board, option ${o.key.toUpperCase()}"></div>
+      <div class="opt-why">
+        <div><div class="lbl">Good</div><ul>${o.good.map(x => `<li>${x}</li>`).join("")}</ul></div>
+        <div><div class="lbl">Watch out</div><ul>${o.bad.map(x => `<li>${x}</li>`).join("")}</ul></div>
+      </div>
+    </section>`).join("");
+  renderBoards();
+
+  // menu content: the app's employee menu plus the new item
+  function menuHtml(e, m, live) {
+    const cur = m.crew.find(x => x.id === m.head);
+    const isHead = m.head === e.id;
+    const headItem = isHead
+      ? `<button class="ctx-item" role="menuitem" data-act="unset">${svg("close")}Remove as crew head</button>`
+      : `<button class="ctx-item" role="menuitem" data-act="set">${svg("crown", "crown")}Make crew head${cur ? `<small>replaces ${esc(cur.n)}</small>` : `<span class="ctx-new">New</span>`}</button>`;
+    return `<div class="ctx-title">${esc(e.n + " " + e.s)}</div>
+      <button class="ctx-item" role="menuitem" data-act="x">${svg("person")}Profile</button>
+      ${headItem}
+      <button class="ctx-item" role="menuitem" data-act="x">${svg("swap")}Lend to board…</button>
+      <button class="ctx-item ctx-sub" role="menuitem" data-act="x">${svg("plus")}Assign to mission</button>
+      <button class="ctx-item ctx-sub" role="menuitem" data-act="x">${svg("leave")}Leave</button>
+      <button class="ctx-item" role="menuitem" data-act="x">${svg("return")}Return to Standby</button>
+      <div class="ctx-sep"></div>
+      <button class="ctx-item ctx-danger" role="menuitem" data-act="x">${svg("ban")}Deactivate employee</button>`;
+  }
+  // static illustrations
+  document.getElementById("mm-1").innerHTML = menuHtml(MISSIONS[1].crew[0], { crew: MISSIONS[1].crew, head: null });
+  document.getElementById("mm-2").innerHTML = menuHtml(MISSIONS[0].crew[0], { crew: MISSIONS[0].crew, head: "e2" });
+  document.getElementById("mm-3").innerHTML = menuHtml(MISSIONS[0].crew[1], { crew: MISSIONS[0].crew, head: "e2" });
+  for (const b of document.querySelectorAll(".menu-static button")) { b.tabIndex = -1; b.setAttribute("aria-disabled", "true"); }
+
+  // live menu
+  const ctx = document.getElementById("ctx");
+  let target = null;
+  function find(empId) { for (const m of MISSIONS) { const e = m.crew.find(x => x.id === empId); if (e) return { m, e }; } return null; }
+  function openMenu(empId, x, y) {
+    const hit = find(empId); if (!hit) return;
+    target = hit;
+    ctx.innerHTML = menuHtml(hit.e, hit.m, true);
+    ctx.hidden = false;
+    const r = ctx.getBoundingClientRect();
+    ctx.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + "px";
+    ctx.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + "px";
+    const first = ctx.querySelector('[data-act="set"],[data-act="unset"]');
+    if (first) first.focus();
+  }
+  function closeMenu() { ctx.hidden = true; target = null; }
+  document.addEventListener("contextmenu", (ev) => {
+    const c = ev.target.closest(".board .emp-card"); if (!c) return;
+    ev.preventDefault(); openMenu(c.dataset.emp, ev.clientX, ev.clientY);
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") return closeMenu();
+    const c = ev.target.closest && ev.target.closest(".board .emp-card");
+    if (c && (ev.key === "Enter" || ev.key === "ContextMenu" || (ev.shiftKey && ev.key === "F10"))) {
+      ev.preventDefault(); const r = c.getBoundingClientRect(); openMenu(c.dataset.emp, r.left, r.bottom + 4);
+    }
+  });
+  ctx.addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b || !target) return;
+    if (b.dataset.act === "set") { target.m.head = target.e.id; justId = target.e.id; renderBoards(); }
+    else if (b.dataset.act === "unset") { target.m.head = null; renderBoards(); }
+    closeMenu();
+  });
+  document.addEventListener("pointerdown", (ev) => { if (!ctx.hidden && !ctx.contains(ev.target)) closeMenu(); });
+  addEventListener("scroll", () => { if (!ctx.hidden) closeMenu(); }, { passive: true });
+
+  // toolbar
+  const wrap = document.getElementById("wrap");
+  for (const b of document.querySelectorAll(".tg[data-accent]")) {
+    b.addEventListener("click", () => {
+      document.body.dataset.accent = b.dataset.accent;
+      for (const o of document.querySelectorAll(".tg[data-accent]")) o.setAttribute("aria-pressed", o === b ? "true" : "false");
+    });
+  }
+  const tSel = document.getElementById("t-sel");
+  tSel.addEventListener("click", () => { showSel = !showSel; tSel.setAttribute("aria-pressed", String(showSel)); renderBoards(); });
+})();
+</script>
