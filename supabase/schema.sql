@@ -150,7 +150,7 @@ create table if not exists assignments (
 );
 create index if not exists assignments_date_idx on assignments(plan_date);
 
--- ===== The head of a mission's crew (migration-2026-11-16-mission-crew-head.sql) =====
+-- ===== The Leader of a mission's crew (migration-2026-11-16-mission-crew-head.sql) =====
 -- One column on the mission, so a crew has at most one head. The head must be on the
 -- mission that day, and is cleared when they leave it (moved, leave, Standby, lent, deleted).
 alter table missions add column if not exists lead_employee_id uuid references employees(id) on delete set null;
@@ -162,7 +162,7 @@ begin
     select 1 from assignments a
     where a.employee_id = new.lead_employee_id and a.plan_date = new.plan_date and a.mission_id = new.id
   ) then
-    raise exception 'The crew head must be on this mission''s crew (missions_lead_on_crew)'
+    raise exception 'The Leader must be on this mission''s crew (missions_lead_on_crew)'
       using errcode = '23514';
   end if;
   return new;

@@ -1,8 +1,9 @@
-/* Acceptance run for the head of a mission's crew: right-click a person on a
-   mission → Make crew head / Make crew head (replaces …) / Remove as crew head,
+/* Acceptance run for the Leader of a mission's crew: right-click a person on a
+   mission → Make Leader / Make Leader (replaces …) / Remove as Leader,
    the teal crown badge on their card, the head first in the crew, one head per
    mission, the head cleared when they leave the mission, live sync to a second
-   user, Carry over, who gets the menu item, Thai, and a database without
+   user, Carry over, who gets the menu item, Thai, the Org Chart (and its
+   PowerPoint), and a database without
    migration-2026-11-16. Real app in Chromium against the shared fake backend.
      NODE_PATH=$(npm root -g) node tests/e2e/crew-head.e2e.js
    Seed: harness.seedBase (Board One: 101 day with A and B, 102 day with C, 103
@@ -49,18 +50,18 @@ async function step(name, fn) {
       assert.equal(await badges(), 0);
     });
 
-    await step("a person on a mission gets Make crew head, right after Profile", async () => {
+    await step("a person on a mission gets Make Leader, right after Profile", async () => {
       await rightClick(person("101", "e2"));
       const labels = await menuLabels();
       assert.equal(labels[0], "Profile");
-      assert.equal(labels[1], "Make crew head");
+      assert.equal(labels[1], "Make Leader");
       await p.keyboard.press("Escape");
     });
 
-    await step("Make crew head: saved on the mission, a teal crown badge, and they move to the front", async () => {
+    await step("Make Leader: saved on the mission, a teal crown badge, and they move to the front", async () => {
       assert.deepEqual(await crewOrder("101"), ["e1", "e2"]);
       await rightClick(person("101", "e2"));
-      await item("Make crew head").click();
+      await item("Make Leader").click();
       await person("101", "e2").locator(".emp-lead").waitFor();
       assert.equal(lead("s101"), "e2");
       assert.deepEqual(await crewOrder("101"), ["e2", "e1"], "the head goes first");
@@ -72,19 +73,19 @@ async function step(name, fn) {
       assert.equal(look.bg, "rgb(15, 118, 110)");
       assert.ok(look.left < 0 && look.top < 0, "the badge hangs off the top-left corner");
       assert.equal(look.svg, true, "a crown icon");
-      assert.match(await person("101", "e2").getAttribute("title"), /Crew head/);
+      assert.match(await person("101", "e2").getAttribute("title"), /Leader/);
     });
 
-    await step("the head's own menu offers Remove as crew head", async () => {
+    await step("the head's own menu offers Remove as Leader", async () => {
       await rightClick(person("101", "e2"));
-      assert.equal((await menuLabels())[1], "Remove as crew head");
+      assert.equal((await menuLabels())[1], "Remove as Leader");
       await p.keyboard.press("Escape");
     });
 
     await step("one head per mission: a new head replaces the old one, and the menu says whom", async () => {
       await rightClick(person("101", "e1"));
-      assert.equal((await menuLabels())[1], "Make crew head (replaces Person)");
-      await item("Make crew head").click();
+      assert.equal((await menuLabels())[1], "Make Leader (replaces Person)");
+      await item("Make Leader").click();
       await person("101", "e1").locator(".emp-lead").waitFor();
       assert.equal(lead("s101"), "e1");
       assert.equal(await person("101", "e2").locator(".emp-lead").count(), 0);
@@ -97,16 +98,16 @@ async function step(name, fn) {
       await openDay(b.page, SRC);
       await person("101", "e1", b.page).locator(".emp-lead").waitFor();
       await rightClick(person("101", "e2"));
-      await item("Make crew head").click();
+      await item("Make Leader").click();
       await person("101", "e2", b.page).locator(".emp-lead").waitFor();
       assert.equal(await badges(b.page), 1);
       assert.deepEqual(b.errors, []);
       await b.close();
     });
 
-    await step("Remove as crew head clears it", async () => {
+    await step("Remove as Leader clears it", async () => {
       await rightClick(person("101", "e2"));
-      await item("Remove as crew head").click();
+      await item("Remove as Leader").click();
       await person("101", "e2").locator(".emp-lead").waitFor({ state: "detached" });
       assert.equal(lead("s101"), null);
       assert.equal(await badges(), 0);
@@ -114,7 +115,7 @@ async function step(name, fn) {
 
     await step("moving the head to another mission clears the head", async () => {
       await rightClick(person("101", "e1"));
-      await item("Make crew head").click();
+      await item("Make Leader").click();
       await person("101", "e1").locator(".emp-lead").waitFor();
       await rightClick(person("101", "e1"));
       await menu.locator(".ctx-sub", { hasText: "Assign to mission" }).click();
@@ -127,7 +128,7 @@ async function step(name, fn) {
 
     await step("sending the head back to Standby clears it", async () => {
       await rightClick(person("102", "e3"));
-      await item("Make crew head").click();
+      await item("Make Leader").click();
       await person("102", "e3").locator(".emp-lead").waitFor();
       await rightClick(person("102", "e3"));
       await item("Return to Standby").click();
@@ -136,22 +137,22 @@ async function step(name, fn) {
       assert.equal(await badges(), 0);
     });
 
-    await step("Standby, leave and a multi-selection get no Make crew head", async () => {
+    await step("Standby, leave and a multi-selection get no Make Leader", async () => {
       for (const id of ["e3", "e5"]) {
         await rightClick(anywhere(id));
-        assert.equal((await menuLabels()).some((l) => /crew head/.test(l)), false, id);
+        assert.equal((await menuLabels()).some((l) => /Leader/.test(l)), false, id);
         await p.keyboard.press("Escape");
       }
       await p.evaluate(() => { state.selectedEmps = new Set(["e1", "e2"]); markSelectedCards(); });
       await rightClick(person("101", "e2"));
-      assert.equal((await menuLabels()).some((l) => /crew head/.test(l)), false, "two people selected");
+      assert.equal((await menuLabels()).some((l) => /Leader/.test(l)), false, "two people selected");
       await p.keyboard.press("Escape");
       await p.evaluate(() => clearSelection());
     });
 
     await step("a night mission's head gets the same badge", async () => {
       await rightClick(person("103", "e4"));
-      await item("Make crew head").click();
+      await item("Make Leader").click();
       await person("103", "e4").locator(".emp-lead").waitFor();
       assert.equal(await card("103").evaluate((el) => el.classList.contains("night")), true);
       assert.equal(lead("s103"), "e4");
@@ -177,13 +178,13 @@ async function step(name, fn) {
       await openDay(p, SRC);
     });
 
-    await step("a viewer sees the badge, but no Make crew head", async () => {
+    await step("a viewer sees the badge, but no Make Leader", async () => {
       const v = await env.openAs(db, h.USERS.v);
       await openDay(v.page, SRC);
       await person("103", "e4", v.page).locator(".emp-lead").waitFor();
       await person("103", "e4", v.page).click({ button: "right" });
       await v.page.locator("#context-menu").waitFor();
-      assert.equal((await menuLabels(v.page)).some((l) => /crew head/.test(l)), false);
+      assert.equal((await menuLabels(v.page)).some((l) => /Leader/.test(l)), false);
       assert.deepEqual(v.errors, []);
       await v.close();
     });
@@ -200,12 +201,46 @@ async function step(name, fn) {
       await p.evaluate(() => I18N.setLang("en"));
     });
 
+    await step("the Org Chart marks the Leader: a teal Leader chip, the crown on their tile, first in the crew", async () => {
+      // 101 gets a crew of two, B and C, with C (second by name) as its Leader
+      await p.evaluate(async () => {
+        await assignEmployeesTo(["e3"], { missionId: getPlan().missions.find((m) => m.number === "101").id });
+        await setMissionLead(getPlan().missions.find((m) => m.number === "101"), D().employees.find((e) => e.id === "e3"));
+      });
+      assert.equal(lead("s101"), "e3");
+      await p.click(".tab-orgchart");
+      await p.waitForSelector("#oc-outline .oc-ol-row");
+      await p.selectOption("#oc-level", "all");
+      const row = (name) => p.locator("#oc-outline .oc-ol-row.l-employee", { hasText: name });
+      await row("Person C").locator(".oc-chip.oc-lead").waitFor();
+      assert.equal((await row("Person C").locator(".oc-chip.oc-lead").innerText()).trim(), "Leader");
+      assert.equal(await row("Person C").locator(".oc-chip.oc-lead").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(15, 118, 110)");
+      assert.equal(await row("Person C").locator(".oc-lead-badge").count(), 1, "the crown on the tile");
+      assert.equal(await row("Person D").locator(".oc-chip.oc-lead").count(), 1, "the night mission's Leader too");
+      assert.equal(await row("Person B").locator(".oc-chip.oc-lead, .oc-lead-badge").count(), 0);
+      const names = await p.locator("#oc-outline .oc-ol-row.l-employee").allInnerTexts();
+      const at = (n) => names.findIndex((t) => t.includes(n));
+      assert.ok(at("Person C") < at("Person B"), "the Leader comes first in 101's crew");
+      // the PowerPoint is built from the same tree: the Leader's line starts with Leader
+      const pp = await p.evaluate(() => {
+        const out = [];
+        const walk = (n) => { if (n.type === "employee") out.push({ name: n.name, lead: n.lead, line: OrgPptx.cardText(n).line }); (n.children || []).forEach(walk); };
+        orgPptxBoards().forEach(walk);
+        return out;
+      });
+      assert.match(pp.find((x) => x.name.includes("Person C")).line, /^Leader · /);
+      assert.equal(pp.find((x) => x.name.includes("Person B")).lead, false);
+      await p.evaluate(() => I18N.setLang("th"));
+      await p.waitForFunction(() => document.querySelector("#oc-outline .oc-chip.oc-lead")?.textContent.trim() === "หัวหน้าทีม");
+      await p.evaluate(() => I18N.setLang("en"));
+    });
+
     await step("no page errors", async () => {
       // the refused head above is a 400 from the fake database, on purpose
       assert.deepEqual(a.errors.filter((e) => !/missions_lead_on_crew|23514|400/.test(e)), []);
     });
 
-    await step("a database without migration-2026-11-16: the board works, no Make crew head", async () => {
+    await step("a database without migration-2026-11-16: the board works, no Make Leader", async () => {
       const old = new h.FakeDb({ lead: false });
       h.seedBase(old, { src: SRC });
       const o = await env.openAs(old, h.USERS.a);
@@ -214,7 +249,7 @@ async function step(name, fn) {
       await o.page.locator("#context-menu").waitFor();
       const labels = await menuLabels(o.page);
       assert.equal(labels.includes("Profile"), true);
-      assert.equal(labels.some((l) => /crew head/.test(l)), false);
+      assert.equal(labels.some((l) => /Leader/.test(l)), false);
       await o.page.keyboard.press("Escape");
       assert.equal(await badges(o.page), 0);
       // Carry over still works without the column

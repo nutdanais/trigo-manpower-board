@@ -164,7 +164,7 @@ function dayPlan(board, date, k, emps, { loanOut } = {}) {
     const size = short && crew > 2 ? crew - 1 : crew;
     const first = w;
     for (let i = 0; i < size && w < workers.length; i++) assignments.push({ employee_id: workers[w++].id, plan_date: date, mission_id: id, zone: null });
-    // the head of the crew (right-click → Make crew head): on Rayong, every other mission
+    // the head of the crew (right-click → Make Leader): on Rayong, every other mission
     // with two or more people, so the board shows missions with a head and without one
     if (board === "b1" && w - first >= 2 && missions.length % 2 === 1) missions[missions.length - 1].lead_employee_id = workers[first].id;
   }

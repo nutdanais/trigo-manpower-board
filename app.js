@@ -1411,14 +1411,14 @@ function buildOrgTree() {
   // a loan (employee_loans) rides along as text: "↔ Board One" on someone
   // borrowed from it, "→ Board Two" on this board's person working there today
   // (status "lent": listed under Lent out, never counted as this board's crew)
-  const empNode = (parentId, e, status, boardId) => {
+  const empNode = (parentId, e, status, boardId, lead) => {
     const area = e.areaId ? areaById.get(e.areaId) : null;
     const loan = status === "lent" ? `→ ${boardName(boardOf(e, date))}` : boardId && e.boardId !== boardId ? `↔ ${boardName(e.boardId)}` : "";
     return {
       type: "employee", _id: parentId + "/emp:" + e.id, name: e.name,
       position: POSITIONS[e.position] ? POSITIONS[e.position].label : "",
       contract: e.contract, areaName: area ? area.name : "", areaColor: area ? area.color : "#c3ccd6",
-      phone: e.phone || "", status: status || "", loan, children: [],
+      phone: e.phone || "", status: status || "", loan, lead: !!lead, children: [],
     };
   };
 
@@ -1467,9 +1467,11 @@ function buildOrgTree() {
         type: "mission", _id: an._id + "/m:" + m.id, name: m.number, sub: m.host || "",
         shift: m.shift, color: an.color, children: [],
       };
+      // the mission's Leader (right-click → Make Leader) first, as on the board
+      const leadId = missionLeadId(m);
       const crew = m.members.map(id => empById.get(id)).filter(Boolean)
-        .sort((a, c) => (a.contract === "oncall") - (c.contract === "oncall") || a.name.localeCompare(c.name));
-      for (const e of crew) mNode.children.push(empNode(mNode._id, e, "", b.id));
+        .sort((a, c) => (c.id === leadId) - (a.id === leadId) || (a.contract === "oncall") - (c.contract === "oncall") || a.name.localeCompare(c.name));
+      for (const e of crew) mNode.children.push(empNode(mNode._id, e, "", b.id, e.id === leadId));
       an.children.push(mNode);
     }
 
@@ -1535,7 +1537,8 @@ function orgTag(n) {
   if (n.type === "root") return tile("var(--primary)", icon("orgchart"), " oc-tag-ic");
   if (n.type === "board") return tile("var(--primary)", icon("board"), " oc-tag-ic");
   if (n.type === "bucket") return tile("var(--bg-soft)", icon("users"), " oc-tag-ic oc-tag-soft");
-  if (n.type === "employee") return tile(n.areaColor, orgInitials(n.name));
+  // the mission's Leader: the board card's teal crown badge on the tile's corner
+  if (n.type === "employee") return tile(n.areaColor, orgInitials(n.name) + (n.lead ? `<span class="oc-lead-badge" title="Leader">${icon("crown")}</span>` : ""), n.lead ? " oc-tag-lead" : "");
   if (n.type === "engineer") return tile(n.color, orgInitials(n.name));
   if (n.type === "area") return tile(n.color, n.none ? "–" : escapeHtml(n.name).slice(0, 3));
   if (n.type === "mission") return tile(n.color, "M");
@@ -1555,7 +1558,8 @@ function orgEmpChips(n) {
   if (n.status && n.status !== "standby" && n.status !== "lent") st = `<span class="oc-chip oc-leave">${escapeHtml(ZONE_STATUS[n.status] || n.status)}</span>`;
   else if (n.status === "standby") st = '<span class="oc-chip oc-standby">Standby</span>';
   const loan = n.loan ? `<span class="oc-chip oc-loan">${escapeHtml(n.loan)}</span>` : "";
-  return pos + contract + area + st + loan;
+  const lead = n.lead ? `<span class="oc-chip oc-lead">${icon("crown")}Leader</span>` : "";
+  return lead + pos + contract + area + st + loan;
 }
 
 /* Which board / engineer / service area appear in this snapshot — the lists
@@ -2423,7 +2427,7 @@ function empCard(emp, opts = {}) {
       (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select, click again to unselect · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
-  // the head of this mission's crew (right-click → Make crew head): a teal crown
+  // the head of this mission's crew (right-click → Make Leader): a teal crown
   // badge on the top-left corner, the mirror of the selection tick on the right
   // (design/crew-head-options.html, option A)
   if (opts.lead) {
@@ -2431,7 +2435,7 @@ function empCard(emp, opts = {}) {
     badge.className = "emp-lead";
     badge.innerHTML = icon("crown");
     card.prepend(badge);
-    card.title += " • Crew head";
+    card.title += " • Leader";
   }
   // Find crew: this person's days at the host the people panel is sorted by
   if (opts.hostDays != null) {
@@ -2783,10 +2787,10 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
     if (leadMission) {
       const head = missionLeadId(leadMission);
       if (head === emp.id) {
-        addItem("Remove as crew head", () => guardEdit(() => setMissionLead(leadMission, null)), null, "close");
+        addItem("Remove as Leader", () => guardEdit(() => setMissionLead(leadMission, null)), null, "close");
       } else {
         const was = head && D().employees.find(e => e.id === head);
-        const label = was ? `Make crew head (replaces ${splitFullName(was.name)[0]})` : "Make crew head";
+        const label = was ? `Make Leader (replaces ${splitFullName(was.name)[0]})` : "Make Leader";
         addItem(label, () => guardEdit(() => setMissionLead(leadMission, emp)), null, "crown");
       }
     }
@@ -3371,7 +3375,7 @@ function renderMissions() {
     body.dataset.drop = "mission:" + m.id;
     const empRow = document.createElement("div");
     empRow.className = "mission-emps";
-    // the crew head (if they are still on it) goes first, with the crown badge
+    // the Leader (if they are still on it) goes first, with the crown badge
     const leadId = missionLeadId(m);
     const crewSorted = sortEmployeesDisplay(memberEmps);
     if (leadId) crewSorted.sort((x, y) => (y.id === leadId) - (x.id === leadId));
@@ -12686,7 +12690,7 @@ function missionLeadId(m) {
   return m && m.leadId && m.members.includes(m.leadId) ? m.leadId : null;
 }
 /* Make someone the head of their mission's crew, or clear it with emp = null
-   (the employee card's right-click → Make crew head / Remove as crew head). */
+   (the employee card's right-click → Make Leader / Remove as Leader). */
 function setMissionLead(m, emp) {
   return safely(async () => {
     try {
@@ -14636,7 +14640,7 @@ function runBoardExport() {
 function orgPptxBoards() {
   const cut = (n) => ({
     type: n.type, name: n.name, sub: n.sub || "", role: n.role || "", color: n.color, shift: n.shift,
-    position: n.position, contract: n.contract, areaColor: n.areaColor, status: n.status, loan: n.loan || "",
+    position: n.position, contract: n.contract, areaColor: n.areaColor, status: n.status, loan: n.loan || "", lead: !!n.lead,
     count: n.type === "employee" ? "" : orgCountText(n),
     children: org.collapsed.has(n._id) ? [] : n.children.map(cut),
   });

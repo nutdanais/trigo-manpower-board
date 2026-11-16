@@ -332,12 +332,12 @@ class FakeDb {
     }
   }
 
-  /* missions_lead_on_crew (migration-2026-11-16): a crew head must be on the mission that day */
+  /* missions_lead_on_crew (migration-2026-11-16): a Leader must be on the mission that day */
   _checkMissionLead(table, row, old) {
     if (table !== "missions" || !this.lead || !row.lead_employee_id) return;
     if (old && old.lead_employee_id === row.lead_employee_id && old.plan_date === row.plan_date) return;
     if (!this.t("assignments").some((a) => a.employee_id === row.lead_employee_id && a.plan_date === row.plan_date && a.mission_id === row.id)) {
-      const e = new Error("The crew head must be on this mission's crew (missions_lead_on_crew)"); e.code = "23514"; throw e;
+      const e = new Error("The Leader must be on this mission's crew (missions_lead_on_crew)"); e.code = "23514"; throw e;
     }
   }
 

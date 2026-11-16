@@ -50,3 +50,8 @@ test("a long crew list wraps into columns under its mission", () => {
   const xs = new Set(d.slides[0].boxes.filter(b => b.kind === "row").map(b => b.x.toFixed(3)));
   assert.ok(xs.size >= 3);
 });
+
+test("a mission's Leader reads Leader first on their card line", () => {
+  assert.match(O.cardText({ ...emp(1), lead: true }).line, /^Leader · Inspector · Permanent$/);
+  assert.equal(O.cardText(emp(2)).line, "Inspector · Permanent");
+});

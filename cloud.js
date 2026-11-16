@@ -891,15 +891,15 @@ const cloud = {
       const { error } = await sb.from("deployment_history").upsert(historyInserts, { onConflict: "employee_id,plan_date" });
       if (error) console.error("deployment_history bulk write failed (Host Record may be missing these entries):", error);
     }
-    // the crew head comes across with the crew: once they are placed (the database
+    // the Leader comes across with the crew: once they are placed (the database
     // refuses a head who is not on the mission), and never over a head the day already has
     for (const [missionId, empId] of this._carryLeads(placements)) {
       const { error } = await sb.from("missions").update({ lead_employee_id: empId }).eq("id", missionId).is("lead_employee_id", null);
-      if (error) console.error("carrying the crew head failed:", error);
+      if (error) console.error("carrying the Leader failed:", error);
     }
   },
 
-  /* The crew heads a carry brings across: [destMissionId, employeeId] for each source mission
+  /* The Leaders a carry brings across: [destMissionId, employeeId] for each source mission
      whose head the carry places on the matching destination mission. Shared by the preview and
      the real carry, so they agree. Nothing without the column (migration-2026-11-16). */
   _carryLeads(placements) {
@@ -1183,11 +1183,11 @@ const cloud = {
     }
     if (error) {
       if (this._missingColumnFromError(error) === "lead_employee_id") {
-        throw new Error("Setting a crew head needs a one-time database update (migration-2026-11-16-mission-crew-head.sql) before it can be used.");
+        throw new Error("Setting a Leader needs a one-time database update (migration-2026-11-16-mission-crew-head.sql) before it can be used.");
       }
       if (error.code === "23514" && /missions_lead_on_crew/.test(error.message || "")) {
         this._invalidatePlans();
-        throw new Error("They are no longer on this mission's crew, so they can't be its head. The board has been refreshed.");
+        throw new Error("They are no longer on this mission's crew, so they can't be its Leader. The board has been refreshed.");
       }
       throw error;
     }

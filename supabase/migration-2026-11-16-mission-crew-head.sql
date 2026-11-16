@@ -1,6 +1,6 @@
--- Migration 2026-11-16: the head of a mission's crew
+-- Migration 2026-11-16: the Leader of a mission's crew
 -- Run once in the Supabase SQL Editor (safe to re-run), then redeploy the app. Until it has run the
--- app works as before: the employee card's right-click menu offers no "Make crew head".
+-- app works as before: the employee card's right-click menu offers no "Make Leader".
 --
 -- Why: a mission's crew needs one person the others (and the engineer) go to on site. The head is
 -- set from the employee card's right-click menu, and their card carries a teal crown badge on its
@@ -27,7 +27,7 @@ begin
     select 1 from assignments a
     where a.employee_id = new.lead_employee_id and a.plan_date = new.plan_date and a.mission_id = new.id
   ) then
-    raise exception 'The crew head must be on this mission''s crew (missions_lead_on_crew)'
+    raise exception 'The Leader must be on this mission''s crew (missions_lead_on_crew)'
       using errcode = '23514';
   end if;
   return new;
