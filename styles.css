@@ -1316,6 +1316,31 @@ body.exporting .m-empty { display: none; }
   z-index: 3;
 }
 
+/* the head of a mission's crew (right-click → Make crew head): a teal crown badge
+   hanging off the top-left corner, the mirror of the selection tick on the right
+   (design/crew-head-options.html, option A). The head is placed first in the crew,
+   so the badge always hangs into the mission body's padding, never over another
+   card. Fixed hex like the night body and the gold highlight: the JPG export
+   renders in the light theme and teal has to read on the white card and on the
+   night missions' dark blue. Teal because navy (selected), gold (highlighted
+   mission), green (search hit) and the area colours already mean something. */
+.emp-card .emp-lead {
+  position: absolute;
+  top: -7px; left: -7px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #0f766e;
+  color: #fff;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.3);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 3;
+  pointer-events: none;
+}
+.emp-card .emp-lead .ic { width: 10px; height: 10px; fill: currentColor; stroke-width: 1.5; }
+/* the first name steps right, clear of the badge */
+.emp-card.lead .emp-row1 { padding-left: 5px; }
+
 /* search flash — the top-right search box only ever filtered the two
    unassigned pools; a hit already on the board (mission or leave zone) pulses
    here instead of the search silently reading "No match". */
@@ -4291,6 +4316,14 @@ td.rm-changed .rm-cell { box-shadow: 0 0 0 2px var(--warn-surface), 0 0 0 3.5px 
 .oc-sub { font-weight: 500; color: var(--muted); font-size: 12px; }
 .oc-ol-row .oc-sub { margin-left: 6px; }   /* "101  Host Alpha", not "101Host Alpha" */
 .oc-tag.oc-tag-ic { color: #fff; }
+/* the mission's Leader (right-click → Make Leader): the board card's teal crown
+   badge, on the tile's top-left corner, and a teal Leader chip first in the row */
+.oc-tag.oc-tag-lead { position: relative; }
+.oc-lead-badge { position: absolute; top: -6px; left: -6px; width: 14px; height: 14px; border-radius: 50%;
+  background: #0f766e; color: #fff; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; }
+.oc-lead-badge .ic { width: 8px; height: 8px; fill: currentColor; stroke-width: 1.5; }
+.oc-chip.oc-lead { background: #0f766e; color: #fff; }
+.oc-chip.oc-lead .ic { width: 11px; height: 11px; fill: currentColor; stroke-width: 1.5; }
 .oc-tag.oc-tag-ic .ic { width: 14px; height: 14px; }
 .oc-tag.oc-tag-soft { color: var(--muted); box-shadow: inset 0 0 0 1px var(--border); }
 .oc-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

@@ -92,7 +92,7 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, missions: false, appSettings: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, lead: false, missions: false, appSettings: false },
           /* shared settings (migration-2026-11-09b, table app_settings): { hostExperiencedDays, hostAtRiskMax }.
              A setting nobody has changed is absent here, and app.js uses its own default. */
           settings: {},
@@ -357,6 +357,8 @@ const cloud = {
     // highlighting a mission (migration-2026-10-28): a column, not a table, but
     // a missing column fails the same way, so the same probe tells
     const highlight = await probe("missions", "highlight");
+    // the head of a mission's crew (migration-2026-11-16): a column too
+    const lead = await probe("missions", "lead_employee_id");
     // why someone left the roster (migration-2026-11-04): the Resigned choice needs the column
     const exitReason = await probe("employees", "exit_reason");
     // the Missions tab: the register, its number history and the Site Admin role (migration-2026-11-09)
@@ -365,7 +367,7 @@ const cloud = {
     const appSettings = await probe("app_settings", "key");
     // the "my part is planned" ticks on a board's day (migration-2026-11-12)
     const ready = await probe("plan_day_ready", "board_id");
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, exitReason, missions, appSettings, ready };
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, lead, exitReason, missions, appSettings, ready };
   },
 
   async _loadAreas() {
@@ -673,6 +675,7 @@ const cloud = {
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
         ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
         highlight: m.highlight || null, highlightNote: m.highlight_note || "",
+        leadId: m.lead_employee_id || null,   // the head of the crew (migration-2026-11-16)
         updatedBy: m.updated_by || "", updatedAt: m.updated_at || null,
       };
       missionMap[m.id] = obj;
@@ -818,15 +821,18 @@ const cloud = {
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
         ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
         highlight: null, highlightNote: "",   // a carry never copies a highlight (setMissionHighlight)
+        leadId: null,   // set below, once the crew is placed (_carryLeads)
       };
       if (byId[obj.id]) continue;   // a duplicate number+shift (pre-2026-07-15 data) carries once
       byId[obj.id] = obj;
       plan.missions.push(obj);
     }
-    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, virtualDest, destDate)) {
+    const placements = this._carryPlacements(boardId, srcMissions, srcAssignments, virtualDest, destDate);
+    for (const p of placements) {
       if (p.missionId) byId[p.missionId].members.push(p.employeeId);
       else if (plan.zones[p.zone]) plan.zones[p.zone].push(p.employeeId);
     }
+    for (const [missionId, empId] of this._carryLeads(placements)) byId[missionId].leadId = empId;
     return plan;
   },
 
@@ -860,7 +866,8 @@ const cloud = {
 
     const assignInserts = [];
     const historyInserts = [];
-    for (const p of this._carryPlacements(boardId, srcMissions, srcAssignments, destMissions, destDate)) {
+    const placements = this._carryPlacements(boardId, srcMissions, srcAssignments, destMissions, destDate);
+    for (const p of placements) {
       assignInserts.push({ employee_id: p.employeeId, plan_date: destDate, mission_id: p.missionId, zone: p.zone, updated_by: updatedBy });
       // same content as the source mission (it was just cloned onto destDate),
       // so no extra lookup needed — see cloud.js's _writeDeploymentHistory for
@@ -884,6 +891,21 @@ const cloud = {
       const { error } = await sb.from("deployment_history").upsert(historyInserts, { onConflict: "employee_id,plan_date" });
       if (error) console.error("deployment_history bulk write failed (Host Record may be missing these entries):", error);
     }
+    // the Leader comes across with the crew: once they are placed (the database
+    // refuses a head who is not on the mission), and never over a head the day already has
+    for (const [missionId, empId] of this._carryLeads(placements)) {
+      const { error } = await sb.from("missions").update({ lead_employee_id: empId }).eq("id", missionId).is("lead_employee_id", null);
+      if (error) console.error("carrying the Leader failed:", error);
+    }
+  },
+
+  /* The Leaders a carry brings across: [destMissionId, employeeId] for each source mission
+     whose head the carry places on the matching destination mission. Shared by the preview and
+     the real carry, so they agree. Nothing without the column (migration-2026-11-16). */
+  _carryLeads(placements) {
+    if (!this.data.features.lead) return [];
+    return placements.filter((p) => p.missionId && p.srcMission && p.srcMission.lead_employee_id === p.employeeId)
+      .map((p) => [p.missionId, p.employeeId]);
   },
 
   /* ---------- mutations ---------- */
@@ -1143,6 +1165,29 @@ const cloud = {
       // a database that has the columns but not this reason yet (check_violation)
       if (error.code === "23514" && /missions_highlight_kind/.test(error.message || "")) {
         throw new Error("This reason needs a one-time database update (migration-2026-10-28b-highlight-not-enough-manpower.sql) before it can be used.");
+      }
+      throw error;
+    }
+    this._invalidatePlans();
+  },
+
+  /* Make one person the head of a mission's crew, or clear it with employeeId = null. One column,
+     so a new head replaces the old one. The database refuses a head who is not on the mission that
+     day, and clears the head when they leave it (migration-2026-11-16-mission-crew-head.sql). */
+  async setMissionLead(missionId, employeeId) {
+    const row = { lead_employee_id: employeeId || null };
+    const updatedBy = await this._currentEmail();
+    let { error } = await sb.from("missions").update({ ...row, updated_by: updatedBy }).eq("id", missionId);
+    if (error && this._missingColumnFromError(error) === "updated_by") {
+      ({ error } = await sb.from("missions").update(row).eq("id", missionId));
+    }
+    if (error) {
+      if (this._missingColumnFromError(error) === "lead_employee_id") {
+        throw new Error("Setting a Leader needs a one-time database update (migration-2026-11-16-mission-crew-head.sql) before it can be used.");
+      }
+      if (error.code === "23514" && /missions_lead_on_crew/.test(error.message || "")) {
+        this._invalidatePlans();
+        throw new Error("They are no longer on this mission's crew, so they can't be its Leader. The board has been refreshed.");
       }
       throw error;
     }

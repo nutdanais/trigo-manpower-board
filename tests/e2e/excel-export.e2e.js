@@ -44,13 +44,13 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     const p = a.page;
     await p.evaluate((d) => { state.date = d; return refreshAndRender(); }, SRC);
 
-    await step("the Export button is on a board, Excel is a file type, and the dialog lists all 16 columns ticked", async () => {
+    await step("the Export button is on a board, Excel is a file type, and the dialog lists all 17 columns ticked", async () => {
       assert.equal(await p.locator("#btn-export").isVisible(), true);
       await openBoardXlsx(p);
       const labels = await p.locator("#xlsx-cols .import-info").allTextContents();
-      assert.deepEqual(labels, ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
-      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 16);
-      assert.match(await p.textContent("#xlsx-count"), /16 of 16/);
+      assert.deepEqual(labels, ["Name", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Leader", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
+      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 17);
+      assert.match(await p.textContent("#xlsx-count"), /17 of 17/);
       assert.match(await p.textContent("#xlsx-summary"), /Board One .* 4 employees on 3 missions/);
       const sheets = await p.locator("#xlsx-sheets .import-row").allTextContents();
       assert.deepEqual(sheets.map((t) => t.replace(/\s+/g, " ").trim()), [
@@ -62,7 +62,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     await step("Untick all disables Export; ticking one re-enables it", async () => {
       await p.click("#btn-xlsx-none");
       assert.equal(await p.locator("#btn-xlsx-go").isDisabled(), true);
-      assert.match(await p.textContent("#xlsx-count"), /0 of 16/);
+      assert.match(await p.textContent("#xlsx-count"), /0 of 17/);
       await p.click("#btn-xlsx-all");
       assert.equal(await p.locator("#btn-xlsx-go").isDisabled(), false);
     });
@@ -70,7 +70,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
     let file;
     await step("exporting with Shift, Start and End unticked downloads a sheet without them", async () => {
       for (const k of ["shift", "start", "end"]) await p.uncheck(`#xlsx-cols input[value=${k}]`);
-      assert.match(await p.textContent("#xlsx-count"), /13 of 16/);
+      assert.match(await p.textContent("#xlsx-count"), /14 of 17/);
       const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
       assert.equal(dl.suggestedFilename(), `Board_One_${SRC}.xlsx`);
       file = "/tmp/xlsx-e2e.xlsx";
@@ -79,9 +79,9 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       await p.waitForSelector("#modal-xlsx", { state: "hidden" });
     });
 
-    await step("the file has the banner, the thirteen chosen columns and one row per person", async () => {
+    await step("the file has the banner, the fourteen chosen columns and one row per person", async () => {
       const ws = await readSheet(file);
-      assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Engineer", "Remark"]);
+      assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Leader", "Host", "Customer", "PPE", "Engineer", "Remark"]);
       const banner = [];
       ws.eachRow((r, n) => { if (n <= 3) r.eachCell((c) => banner.push(String(c.value))); });
       assert.ok(banner.includes("Manpower Board") && banner.includes("OPERATIONS PLANNING") && banner.includes("Board One"));
@@ -101,9 +101,10 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       assert.equal(ws.getCell(8, 6).value, "", "no start date on file = empty cell");
       assert.equal(ws.getCell(8, 7).value, "");
       assert.equal(ws.getCell(7, 9).value, "101");
-      assert.equal(ws.getCell(7, 12).value, "Helmet, Boots");
-      assert.equal(ws.getCell(7, 14).value, "Bring torque tools");
-      assert.equal(ws.getCell(7, 13).value, "Eng One");
+      assert.equal(ws.getCell(7, 10).value, "", "nobody is Leader in this file");
+      assert.equal(ws.getCell(7, 13).value, "Helmet, Boots");
+      assert.equal(ws.getCell(7, 15).value, "Bring torque tools");
+      assert.equal(ws.getCell(7, 14).value, "Eng One");
       assert.equal(ws.getCell(11, 1).value.richText.map((x) => x.text).join("").includes("TOTAL EMPLOYEES: 4"), true);
       assert.equal(ws.getImages().length, 1, "TRIGO logo embedded");
     });
@@ -140,7 +141,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       await wb.xlsx.load(fs.readFileSync("/tmp/xlsx-e2e-th.xlsx"));
       assert.deepEqual(wb.worksheets.map((w) => w.name), ["Board One", "ลาและสลับวันหยุด", "สแตนด์บาย", "ออนคอลที่ว่าง"]);
       const ws = wb.worksheets[0];
-      assert.deepEqual(headerOf(ws), ["ชื่อ", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "วิศวกร", "หมายเหตุ"]);
+      assert.deepEqual(headerOf(ws), ["ชื่อ", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "หัวหน้าทีม", "โฮสต์", "ลูกค้า", "PPE", "วิศวกร", "หมายเหตุ"]);
       assert.equal(ws.getCell(7, 1).value, "Person A");
       assert.equal(ws.getCell(7, 3).value, "ประจำ");
       assert.match(ws.getCell(7, 7).value, /^\d+ ปี \d+ เดือน \d+ วัน$/);
@@ -151,7 +152,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
 
     await step("the column choice is remembered next time the dialog opens", async () => {
       await openBoardXlsx(p);
-      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 13);
+      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 14);
       assert.equal(await p.locator("#xlsx-cols input[value=shift]").isChecked(), false);
       await p.check("#xlsx-lang input[value=en]");   // the Thai choice was remembered; this step checks the English sheet names
       await p.uncheck("#xlsx-sheets input[value=standby]");
@@ -168,6 +169,25 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
       await p.click("#modal-xlsx [data-close].btn");
     });
 
+    await step("a column choice saved before the Leader column existed gets Leader ticked once; unticking it then sticks", async () => {
+      await p.evaluate(() => {
+        localStorage.setItem("manpower.xlsxColumns", JSON.stringify(["name", "mission", "host"]));
+        localStorage.removeItem("manpower.xlsxColumns.leaderSeen");
+      });
+      await openBoardXlsx(p);
+      assert.equal(await p.locator("#xlsx-cols input[value=leader]").isChecked(), true, "ticked for a choice saved before it existed");
+      assert.equal(await p.locator("#xlsx-cols input:checked").count(), 4);
+      await p.uncheck("#xlsx-cols input[value=leader]");
+      const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#btn-xlsx-go")]);
+      await dl.saveAs("/tmp/xlsx-e2e-leader.xlsx");
+      await p.waitForSelector("#modal-xlsx", { state: "hidden" });
+      await openBoardXlsx(p);
+      assert.equal(await p.locator("#xlsx-cols input[value=leader]").isChecked(), false, "unticked on purpose stays unticked");
+      await p.keyboard.press("Escape");
+      // back to the choice the next step expects
+      await p.evaluate(() => localStorage.setItem("manpower.xlsxColumns",
+        JSON.stringify(ManpowerXlsx.ALL_KEYS.filter((k) => !["shift", "start", "end"].includes(k)))));
+    });
     await step("Excel is not offered on Overview; a non-working day with nobody on leave says Excel has nothing to write", async () => {
       await p.evaluate(() => { D().activeBoardId = OVERVIEW_ID; return refreshAndRender(); });
       await p.click("#btn-export");
