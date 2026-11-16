@@ -1,0 +1,451 @@
+<meta charset="utf-8">
+<meta name="color-scheme" content="light">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Capacity Sandbox Options</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Noto+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not loaded by the app. Light only, like the app. Tokens mirror
+   styles.css. Layout: one reading column; each option is a wide app frame that
+   scrolls sideways inside itself, followed by its trade-offs. */
+:root {
+  --page: #eef1f4; --surface: #ffffff; --line: #d8dde4; --ink: #1f2937; --mut: #5f6773; --soft: #f3f5f8;
+  --navy: #003a66; --navy-d: #002a4a; --navy-tint: rgba(0,58,102,.07); --navy-line: rgba(0,58,102,.28);
+  --green: #a8c855;
+  --warn-text: #8a4f10; --warn-surface: #fdf8ef; --warn-line: #e0c9a4;
+  --ok-text: #4d6810; --ok-surface: #f7faef; --ok-line: #cfdcae;
+  --bad: #d0342c; --bad-text: #a3271f; --bad-surface: #fef2f2; --bad-line: #e6c2be;
+  --mine: #6d3fc4; --mine-surface: #f4effc; --mine-line: #cdbcec;   /* "only you see this" */
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", "Noto Sans", sans-serif;
+  --f-body: "Noto Sans", "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r: 10px; --shadow: 0 1px 2px rgba(6,42,68,.08), 0 6px 18px rgba(6,42,68,.08);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; display: flex; flex-direction: column; gap: 44px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(30px, 4.4vw, 44px); }
+h2 { font-size: 28px; }
+h3 { font-size: 20px; }
+p { margin: 0; max-width: 72ch; }
+ul { margin: 0; padding-left: 20px; max-width: 72ch; display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--navy); }
+.mut { color: var(--mut); }
+.num, td, th { font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.hero { background: var(--navy); color: #fff; }
+.hero-in { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 36px 32px; display: flex; flex-direction: column; gap: 12px; }
+.hero .eyebrow { color: var(--green); }
+.hero p { color: #dbe6ef; font-size: 17px; }
+.jump { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.jump a { color: #fff; text-decoration: none; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 5px 14px; font-size: 14px; font-weight: 600; }
+.jump a:hover { background: rgba(255,255,255,.12); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card h3 { font-size: 18px; }
+
+/* how it fits together */
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.step b { font-family: var(--f-display); font-size: 17px; }
+.step small { color: var(--mut); font-size: 13px; line-height: 1.4; }
+.step .where { font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--navy); }
+.step.mine { border-color: var(--mine-line); background: var(--mine-surface); }
+.step.mine .where { color: var(--mine); }
+
+/* tables of text */
+.tw { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table.t { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+table.t th, table.t td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+table.t thead th { background: var(--soft); font-size: 12px; letter-spacing: .5px; text-transform: uppercase; color: var(--mut); }
+table.t tr:last-child td { border-bottom: 0; }
+table.t td:first-child { font-weight: 600; white-space: nowrap; }
+.pick { background: var(--ok-surface); }
+
+/* option header */
+.opt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+.letter { font-family: var(--f-display); font-weight: 700; font-size: 20px; background: var(--navy); color: #fff; border-radius: 8px; padding: 2px 12px; }
+.rec { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); border-radius: 999px; padding: 2px 10px; }
+
+/* app frame */
+.frame { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; min-width: 0; }
+.bar { background: var(--navy); color: #fff; display: flex; gap: 4px; padding: 8px 12px 0; font-size: 13px; overflow-x: auto; }
+.bar span { padding: 6px 12px; border-radius: 6px 6px 0 0; white-space: nowrap; opacity: .75; }
+.bar span.on { background: var(--surface); color: var(--navy); font-weight: 700; opacity: 1; }
+.tool { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 7px; padding: 5px 11px; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: default; }
+.btn.fill { background: var(--navy); border-color: var(--navy); color: #fff; }
+.seg { display: inline-flex; border: 1px solid var(--navy-line); border-radius: 8px; overflow: hidden; font-size: 13px; font-weight: 600; }
+.seg span { padding: 5px 12px; white-space: nowrap; }
+.seg .on { background: var(--mine); color: #fff; }
+.grow { flex: 1 1 0; }
+.note-mine { background: var(--mine-surface); border-bottom: 1px solid var(--mine-line); color: #3d2378; font-size: 13px; padding: 7px 12px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.note-mine b { color: var(--mine); }
+.note-mine u { text-decoration: underline; font-weight: 600; }
+.sum { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.sum b { font-family: var(--f-display); font-size: 17px; }
+.sum .was { color: var(--mut); }
+
+/* capacity grid */
+.gw { overflow-x: auto; }
+table.g { border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 860px; width: 100%; }
+table.g th, table.g td { padding: 5px 6px; text-align: center; border-bottom: 1px solid #edf0f3; white-space: nowrap; }
+table.g .l { text-align: left; position: sticky; left: 0; background: var(--surface); min-width: 250px; max-width: 250px; white-space: normal; border-right: 1px solid var(--line); }
+table.g thead th { font-size: 12px; color: var(--mut); font-weight: 600; }
+table.g .band th { font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase; }
+table.g .band .cf { color: var(--navy); border-bottom: 2px solid var(--navy); }
+table.g .band .fc { color: var(--mut); border-bottom: 2px dashed var(--navy-line); }
+table.g .wk { border-left: 2px solid var(--line); }
+table.g .tot td { font-weight: 700; background: var(--soft); }
+table.g .tot .l { background: var(--soft); font-family: var(--f-display); font-size: 15px; }
+table.g .host td { font-weight: 700; border-top: 1px solid var(--line); }
+table.g .host .l::before { content: "▾ "; color: var(--mut); }
+table.g .ms .l { padding-left: 24px; font-size: 12.5px; }
+table.g .ms .l small { display: block; color: var(--mut); font-size: 11.5px; }
+table.g .ms td { color: #374151; }
+table.g td.chg { background: var(--mine-surface); color: var(--mine); font-weight: 700; box-shadow: inset 0 0 0 1px var(--mine-line); }
+table.g td.chg small { display: block; font-size: 10px; font-weight: 500; color: var(--mut); text-decoration: line-through; line-height: 1; }
+table.g .new .l { color: var(--mine); font-weight: 600; }
+table.g .zero { color: #b6bcc5; }
+.chip { display: inline-block; min-width: 40px; border-radius: 999px; padding: 1px 7px; font-weight: 700; font-size: 12.5px; border: 1px solid; }
+.chip.ok { background: var(--ok-surface); color: var(--ok-text); border-color: var(--ok-line); }
+.chip.tight { background: var(--warn-surface); color: var(--warn-text); border-color: var(--warn-line); }
+.chip.short { background: var(--bad-surface); color: var(--bad-text); border-color: var(--bad-line); }
+.chip.crit { background: var(--bad); color: #fff; border-color: var(--bad); }
+.tag { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; border-radius: 4px; padding: 0 5px; background: var(--mine-surface); color: var(--mine); border: 1px solid var(--mine-line); }
+.night { font-size: 10.5px; font-weight: 700; background: #1c2430; color: #fff; border-radius: 4px; padding: 0 5px; }
+
+/* option B: requests beside the grid */
+.split { display: grid; grid-template-columns: 290px minmax(0, 1fr); }
+.reqs { border-right: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--soft); }
+.reqs h4 { margin: 0; font-size: 12px; letter-spacing: .5px; text-transform: uppercase; color: var(--mut); }
+.req { background: var(--surface); border: 1px solid var(--mine-line); border-radius: 8px; padding: 8px 10px; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 13px; cursor: pointer; }
+.req input { grid-row: span 2; margin-top: 3px; accent-color: var(--mine); width: 16px; height: 16px; }
+.req b { font-weight: 600; }
+.req small { color: var(--mut); font-size: 12px; }
+.req.off { border-color: var(--line); opacity: .7; }
+.base { border: 1px dashed var(--navy-line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; background: var(--surface); }
+.base b { display: block; font-size: 13px; }
+@media (max-width: 760px) { .split { grid-template-columns: 1fr; } .reqs { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+/* option C: ask one question */
+.ask { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; }
+.form { padding: 16px; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--line); }
+.fld { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--mut); font-weight: 600; }
+.fld div { border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; font-size: 14px; color: var(--ink); font-weight: 500; background: var(--surface); }
+.frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.answer { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.verdict { border: 1px solid var(--bad-line); background: var(--bad-surface); border-radius: 8px; padding: 10px 12px; }
+.verdict b { font-family: var(--f-display); font-size: 20px; color: var(--bad-text); display: block; }
+.strip { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.strip div { text-align: center; font-size: 11px; color: var(--mut); display: flex; flex-direction: column; gap: 2px; }
+.strip i { font-style: normal; font-weight: 700; font-size: 12px; border-radius: 5px; padding: 3px 0; border: 1px solid; }
+.strip .ok { background: var(--ok-surface); color: var(--ok-text); border-color: var(--ok-line); }
+.strip .short { background: var(--bad-surface); color: var(--bad-text); border-color: var(--bad-line); }
+.strip .crit { background: var(--bad); color: #fff; border-color: var(--bad); }
+.ways { font-size: 13.5px; }
+
+.pc { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.pc h4 { margin: 0; font-size: 12px; letter-spacing: .5px; text-transform: uppercase; }
+.pc .good h4 { color: var(--ok-text); } .pc .cost h4 { color: var(--warn-text); }
+.q { counter-reset: q; list-style: none; padding: 0; }
+.q li { counter-increment: q; padding-left: 34px; position: relative; }
+.q li::before { content: counter(q); position: absolute; left: 0; top: 1px; width: 24px; height: 24px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+</style>
+
+<div class="hero"><div class="hero-in">
+  <span class="eyebrow">Capacity tab · design options · 16 Nov 2026</span>
+  <h1>A private what-if sandbox on the Capacity tab</h1>
+  <p>Yes, this is possible, and it needs no new database table. The numbers an engineer has to collect by hand today are already on the running board, so the tab can fill itself. Each person's plan stays in their own browser, so two people planning the same board never touch each other's numbers.</p>
+  <div class="jump"><a href="#a">Option A</a><a href="#b">Option B (recommended)</a><a href="#c">Option C</a><a href="#compare">Compare</a><a href="#decide">Questions for you</a></div>
+</div></div>
+
+<div class="wrap">
+
+<section style="margin-top:32px">
+  <span class="eyebrow">Where we are</span>
+  <h2>Today's tab is a shared sheet, not a sandbox</h2>
+  <div class="two">
+    <div class="card">
+      <h3>How it works today</h3>
+      <ul>
+        <li>One sheet per board, saved in the database. Everyone sees and edits the same numbers live.</li>
+        <li>A row is a host and shift. The people count has to be typed, or filled once with <b>Start from confirmed plan</b>, which only fills empty cells.</li>
+        <li>A what-if by one engineer overwrites what colleagues see. <b>Reset to 0</b> exists so "the next planner" gets a clean sheet.</li>
+        <li>One engineer rarely knows the crew at every host, so the sheet is often incomplete and the gap is not trusted.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>What you asked for, with your answers</h3>
+      <ul>
+        <li><b>Opens already filled</b> with the running missions of the board the person picks.</li>
+        <li><b>Private.</b> Edits are only for that person. Sharing is by Export.</li>
+        <li><b>One sandbox per board.</b> Switching board shows that board's numbers only.</li>
+        <li><b>Kept on this device</b> until the person resets it.</li>
+        <li><b>Rows are hosts with their missions inside.</b></li>
+        <li><b>A new request</b> is entered as people × date range, and the day cells stay editable.</li>
+        <li><b>The shared team plan stays</b> beside the sandbox.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The same in every option</span>
+  <h2>How the sandbox fits together</h2>
+  <p>All three options below share this mechanism. They differ only in how a person works with it on screen.</p>
+  <div class="flow">
+    <div class="step"><span class="where">Database · read only</span><b>Running board</b><small>Missions, crew per mission, leave, loans and the roster of the chosen board.</small></div>
+    <div class="step mine"><span class="where">This browser</span><b>Starting point</b><small>A copy of the board's crew per mission, with the time it was pulled.</small></div>
+    <div class="step mine"><span class="where">This browser</span><b>My changes</b><small>Requests and edited numbers, kept per person and per board.</small></div>
+    <div class="step mine"><span class="where">This browser</span><b>Outcome</b><small>Demand, Available and Gap per day, recalculated on every change.</small></div>
+    <div class="step"><span class="where">File</span><b>Export</b><small>Excel, JPG or PDF, marked as a personal what-if with the person's name and date.</small></div>
+  </div>
+  <div class="two">
+    <div class="card">
+      <h3>Where the starting numbers come from</h3>
+      <ul>
+        <li><b>Confirmed days:</b> the people actually placed on each mission that day.</li>
+        <li><b>Forecast days that have a forecast:</b> the people placed in the forecast.</li>
+        <li><b>Later days:</b> the latest confirmed day repeated, since running missions normally continue.</li>
+        <li><b>A mission closed on the Missions tab</b> stops on its closing date.</li>
+        <li><b>Available</b> is calculated as today: roster minus leave, with loans counted on the borrowing board.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Why people cannot collide</h3>
+      <ul>
+        <li>The sandbox never writes to the database. It is stored in the browser under the person and the board.</li>
+        <li>Because nothing is written, a viewer can use the sandbox too. Today a viewer can only read.</li>
+        <li>It works in the <b>?demo</b> preview with no change to the fake database.</li>
+        <li>The sandbox shows when its starting point was pulled. If the board changed since, it offers <b>Refresh</b>.</li>
+        <li>The limit: it does not follow the person to another computer or phone. Export covers that for now.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ A ============ -->
+<section id="a">
+  <div class="opt-head"><span class="letter">A</span><h2>A switch on the same grid</h2></div>
+  <p>The tab gets a switch: <b>Team plan</b> (shared, as today) or <b>My sandbox</b>. The sandbox is the grid people already know, pre-filled, with hosts opening to their missions. A request is a small form that writes numbers into the cells. Changed cells are tinted and show the old number.</p>
+  <div class="frame">
+    <div class="bar"><span>Board</span><span>Overview</span><span>Manpower</span><span>Host</span><span class="on">Capacity</span></div>
+    <div class="tool">
+      <span class="btn">Board: Rayong ▾</span>
+      <span class="seg"><span>Team plan</span><span class="on">My sandbox</span></span>
+      <span class="btn">2 weeks ▾</span>
+      <span class="grow"></span>
+      <span class="btn fill">+ Add request</span><span class="btn">⬇ Export</span><span class="btn">⋯</span>
+    </div>
+    <div class="note-mine"><span><b>My sandbox · Rayong.</b> Only you see this. Kept on this device.</span><span>Started from the board, Mon 16 Nov 08:40</span><span><u>Refresh from board</u> · <u>Reset</u></span></div>
+    <div class="sum" id="sumA"></div>
+    <div class="gw" id="gridA"></div>
+  </div>
+  <div class="pc">
+    <div class="card good"><h4>Good</h4><ul><li>Smallest change. The grid, copy and paste, phone layout and export are reused.</li><li>Nothing new to learn for people who use the tab today.</li></ul></div>
+    <div class="card cost"><h4>Cost</h4><ul><li>A request becomes plain numbers once entered. It cannot be switched off to compare, only undone by hand.</li><li><b>Refresh from board</b> has to choose, cell by cell, between the board's new number and the person's edit.</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ B ============ -->
+<section id="b">
+  <div class="opt-head"><span class="letter">B</span><h2>Requests on top of the running board</h2><span class="rec">Recommended</span></div>
+  <p>The sandbox keeps two layers apart: the running board as the starting point, and a list of the person's <b>requests</b> on top. Each request can be ticked on or off, and the grid shows the outcome with before and after. Cells can still be edited; an edit is saved as one more change in the list. <b>Try the tick boxes below.</b></p>
+  <div class="frame">
+    <div class="bar"><span>Board</span><span>Overview</span><span>Manpower</span><span>Host</span><span class="on">Capacity</span></div>
+    <div class="tool">
+      <span class="btn">Board: Rayong ▾</span>
+      <span class="seg"><span>Team plan</span><span class="on">My sandbox</span></span>
+      <span class="btn">2 weeks ▾</span>
+      <span class="grow"></span>
+      <span class="btn">⬇ Export</span><span class="btn">⋯</span>
+    </div>
+    <div class="split">
+      <div class="reqs">
+        <div class="base"><b>Starting point: Rayong board</b>5 running missions, 35 people. Pulled Mon 16 Nov 08:40. <u>Refresh</u></div>
+        <h4>My requests</h4>
+        <label class="req" id="lr1"><input type="checkbox" id="r1" checked><b>New: Amata Components, 9 people</b><small>Seat Belt Co. · Day · from Mon 23 Nov</small></label>
+        <label class="req" id="lr2"><input type="checkbox" id="r2" checked><b>Brake Systems Ltd. asks for 2 more</b><small>RYGTH.26.0114 · 6 → 8 · from Wed 25 Nov</small></label>
+        <label class="req" id="lr3"><input type="checkbox" id="r3"><b>Night mission ends Fri 20 Nov</b><small>RYGTH.26.0121 · 4 → 0 · from Mon 23 Nov</small></label>
+        <span class="btn fill" style="text-align:center">+ Add request</span>
+        <small class="mut">Only you see this. Kept on this device until you press Reset.</small>
+      </div>
+      <div style="min-width:0">
+        <div class="sum" id="sumB"></div>
+        <div class="gw" id="gridB"></div>
+      </div>
+    </div>
+  </div>
+  <div class="pc">
+    <div class="card good"><h4>Good</h4><ul><li>Answers the real question, "what happens if we accept this request", by ticking it on and off.</li><li><b>Refresh</b> is safe: the starting point is replaced and the requests are laid over it again.</li><li>The export can list the requests, so a reader sees what was assumed.</li><li>The same request list could later be saved to an account or published to the team plan.</li></ul></div>
+    <div class="cost card"><h4>Cost</h4><ul><li>More to build than A: the request list, and the rule that a cell edit becomes a change in the list.</li><li>On a phone the list and the grid are two screens.</li></ul></div>
+  </div>
+</section>
+
+<!-- ============ C ============ -->
+<section id="c">
+  <div class="opt-head"><span class="letter">C</span><h2>Ask one question, get one answer</h2></div>
+  <p>For the person who only wants to know whether a request fits. A short form on top of the tab; the answer is one sentence, the days that are short, and the ways to cover them. <b>Open in grid</b> leads to the full sandbox for anything more. It works well on a phone.</p>
+  <div class="frame">
+    <div class="bar"><span>Board</span><span>Overview</span><span>Manpower</span><span>Host</span><span class="on">Capacity</span></div>
+    <div class="ask">
+      <div class="form">
+        <h3>Can we take this request?</h3>
+        <div class="fld">Board<div>Rayong</div></div>
+        <div class="fld">Host<div>Amata Components</div></div>
+        <div class="frow"><div class="fld">People<div>9</div></div><div class="fld">Shift<div>Day</div></div></div>
+        <div class="frow"><div class="fld">From<div>Mon 23 Nov</div></div><div class="fld">Until<div>Fri 27 Nov</div></div></div>
+        <span class="btn fill" style="text-align:center">Check</span>
+      </div>
+      <div class="answer">
+        <div class="verdict"><b>Not with the current roster</b>Short on 5 of 5 days. Worst day Tue 24 Nov, 4 short.</div>
+        <div>
+          <div class="strip" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+            <div><i class="short">−2</i>Mon 23</div><div><i class="crit">−4</i>Tue 24</div><div><i class="short">−2</i>Wed 25</div><div><i class="short">−2</i>Thu 26</div><div><i class="crit">−3</i>Fri 27</div>
+          </div>
+        </div>
+        <div class="ways"><b>Ways to cover it</b>
+          <ul>
+            <li>Start with 7 people: fits on 3 of 5 days.</li>
+            <li>3 on-call staff are free on those days.</li>
+            <li>Chonburi board has 5 or more spare on all 5 days (lend).</li>
+          </ul>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="btn">Open in grid</span><span class="btn">⬇ Export answer</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="pc">
+    <div class="card good"><h4>Good</h4><ul><li>Fastest path for a sales call or a manager's question. No grid to read.</li><li>Suggests what to do, using data the app already has: on-call staff and other boards' spare people.</li></ul></div>
+    <div class="card cost"><h4>Cost</h4><ul><li>One request at a time. Several requests or edited crews still need the grid of A or B.</li><li>Seeing another board's spare people needs that board's numbers, which a role may not be allowed to read.</li></ul></div>
+  </div>
+</section>
+
+<section id="compare">
+  <span class="eyebrow">Side by side</span>
+  <h2>How the options compare</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th></th><th>A · Switch on the grid</th><th>B · Requests on top</th><th>C · One question</th></tr></thead>
+    <tbody>
+      <tr><td>Opens pre-filled from the board</td><td>Yes</td><td class="pick">Yes</td><td>Yes, behind the form</td></tr>
+      <tr><td>Private, no collisions</td><td>Yes</td><td class="pick">Yes</td><td>Yes</td></tr>
+      <tr><td>Compare with and without a request</td><td>No, edits are final numbers</td><td class="pick">Yes, tick on or off</td><td>One request only</td></tr>
+      <tr><td>Board changed after you started</td><td>Refresh must merge cell by cell</td><td class="pick">Refresh keeps your requests</td><td>Always fresh</td></tr>
+      <tr><td>Export explains the assumptions</td><td>Changed cells are marked</td><td class="pick">Lists every request</td><td>One sentence and the days</td></tr>
+      <tr><td>New to learn</td><td>Almost nothing</td><td class="pick">The request list</td><td>Nothing</td></tr>
+      <tr><td>Size of the work</td><td>Small</td><td class="pick">Medium</td><td>Small, on top of A or B</td></tr>
+      <tr><td>Database change</td><td>None</td><td class="pick">None</td><td>None</td></tr>
+    </tbody>
+  </table></div>
+  <div class="card">
+    <h3>My recommendation</h3>
+    <p><b>Build B, in two steps, and add C later as its front door.</b> Step 1 is the part A and B share: the sandbox switch, the automatic fill from the running board, hosts opening to missions, storage per person and board on the device, and the export label. That step alone removes the number collecting. Step 2 adds the request list with its tick boxes. C can follow as a short form that creates one request in the same sandbox.</p>
+    <p class="mut">What a preview on <b>?demo</b> will show: all of the above, since nothing touches the database. What it will not prove: the numbers on your real boards, and how large real boards look in the grid.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Practice elsewhere</span>
+  <h2>What other planning tools do</h2>
+  <div class="tw"><table class="t">
+    <thead><tr><th>Practice</th><th>Where it is common</th><th>How it is used here</th></tr></thead>
+    <tbody>
+      <tr><td>Tentative work as a layer</td><td>Resource planners such as Float and Runn mark unconfirmed work as tentative and let the planner include or leave it out of the capacity totals.</td><td>Option B's tick boxes.</td></tr>
+      <tr><td>Baseline and scenarios</td><td>Excel's Scenario Manager and financial planning tools keep one baseline and named what-if versions beside it, never editing the baseline.</td><td>The running board is the baseline and is read only in the sandbox.</td></tr>
+      <tr><td>Private copy, then publish</td><td>Design and code tools work on a private branch and merge it when agreed.</td><td>My sandbox beside the Team plan. Publishing is an open question below.</td></tr>
+      <tr><td>Numbers before names</td><td>Planners book a placeholder role first and name the person later.</td><td>Already how Capacity works. Naming people stays on the board and its forecast.</td></tr>
+      <tr><td>Show the difference</td><td>What-if views show before and after together, so the effect of a change is visible.</td><td>Old number under each changed cell, and "was" in the summary line.</td></tr>
+      <tr><td>Stamp what is exported</td><td>Shared drafts carry who made them, when, and on which data.</td><td>Export header: personal what-if, name, date, board data time.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="decide">
+  <span class="eyebrow">Before building</span>
+  <h2>Questions for you</h2>
+  <ol class="q">
+    <li><b>Which option?</b> A, B, or B with C added later.</li>
+    <li><b>Publish to the team plan?</b> Should a person be able to send their sandbox numbers to the shared Team plan, or does the Team plan stay typed by hand?</li>
+    <li><b>Is the Team plan still needed?</b> If every sandbox fills itself from the board, the shared sheet may lose its purpose. It could be kept as is, or retired after a trial.</li>
+    <li><b>Changing Available?</b> Should the sandbox also allow "2 new hires from 1 Dec" or "borrow 3 from another board", or is demand enough for a first version?</li>
+    <li><b>Which mode opens first?</b> My sandbox or Team plan when someone opens the Capacity tab.</li>
+    <li><b>Managers with several boards:</b> is one board at a time enough, or is a view across boards needed later?</li>
+  </ol>
+  <div class="card">
+    <h3>What I would revisit as use grows</h3>
+    <ul>
+      <li><b>Saving to the account</b> (private rows in the database) if people want their sandbox on phone and computer. Your choice of "this device" avoids a migration for now.</li>
+      <li><b>Sending a sandbox to a colleague</b> as a file they can open in their own sandbox, if Export proves too static.</li>
+      <li><b>Skills and qualifications</b>: the gap counts heads only, so 5 spare people may not be the 5 a customer needs.</li>
+    </ul>
+  </div>
+</section>
+</div>
+
+<script>
+/* Sample numbers, invented. Rayong board, 10 working days from Mon 16 Nov 2026. */
+const DAYS = ["Mon 16","Tue 17","Wed 18","Thu 19","Fri 20","Mon 23","Tue 24","Wed 25","Thu 26","Fri 27"];
+const AVAIL = [42,42,41,42,42,42,40,42,42,41];
+const HOSTS = [
+  { host: "Map Ta Phut Steel", ms: [
+    { id: "0108", no: "RYGTH.26.0108", cust: "Gear Works Ltd.", n: 8 },
+    { id: "0114", no: "RYGTH.26.0114", cust: "Brake Systems Ltd.", n: 6 },
+    { id: "0121", no: "RYGTH.26.0121", cust: "Gear Works Ltd.", n: 4, night: true } ] },
+  { host: "Rayong Precision", ms: [{ id: "0097", no: "RYGTH.26.0097", cust: "Brake Systems Ltd.", n: 10 }] },
+  { host: "Eastern Seat Plant", ms: [{ id: "0130", no: "RYGTH.26.0130", cust: "Seat Belt Co.", n: 7 }] },
+];
+function model(on) {
+  const hosts = HOSTS.map(h => ({ host: h.host, ms: h.ms.map(m => {
+    const base = DAYS.map(() => m.n), vals = base.slice();
+    if (m.id === "0114" && on.r2) for (let i = 7; i < 10; i++) vals[i] = 8;
+    if (m.id === "0121" && on.r3) for (let i = 5; i < 10; i++) vals[i] = 0;
+    return { ...m, base, vals };
+  }) }));
+  if (on.r1) hosts.push({ host: "Amata Components", isNew: true, ms: [{ no: "New request", cust: "Seat Belt Co.", isNew: true, base: DAYS.map(() => 0), vals: DAYS.map((_, i) => (i >= 5 ? 9 : 0)) }] });
+  const sum = (k) => DAYS.map((_, i) => hosts.reduce((s, h) => s + h.ms.reduce((t, m) => t + m[k][i], 0), 0));
+  const demand = sum("vals"), before = sum("base");
+  return { hosts, demand, before, gap: demand.map((d, i) => AVAIL[i] - d), gapBefore: before.map((d, i) => AVAIL[i] - d) };
+}
+const chip = (g) => `<span class="chip ${g < 0 ? (g <= -3 ? "crit" : "short") : g <= 1 ? "tight" : "ok"}">${g < 0 ? "▼ " + (-g) : g <= 1 ? "● " + g : "▲ " + g}</span>`;
+const wk = (i) => (i === 5 ? ' class="wk"' : "");
+function cell(v, b, i) {
+  const c = [i === 5 ? "wk" : "", v !== b ? "chg" : "", v === 0 && b === 0 ? "zero" : ""].filter(Boolean).join(" ");
+  return `<td class="${c}">${v === 0 && b === 0 ? "·" : v}${v !== b && b ? `<small>${b}</small>` : ""}</td>`;
+}
+function grid(m) {
+  let h = `<table class="g"><thead><tr class="band"><th class="l"></th><th colspan="2" class="cf">Confirmed</th><th colspan="8" class="fc">Forecast</th></tr>`;
+  h += `<tr><th class="l">Host and missions</th>${DAYS.map((d, i) => `<th${wk(i)}>${d}</th>`).join("")}</tr></thead><tbody>`;
+  h += `<tr class="tot"><td class="l">Gap</td>${m.gap.map((g, i) => `<td${wk(i)}>${chip(g)}</td>`).join("")}</tr>`;
+  h += `<tr class="tot"><td class="l">Demand</td>${m.demand.map((v, i) => cell(v, m.before[i], i)).join("")}</tr>`;
+  h += `<tr class="tot"><td class="l">Available</td>${AVAIL.map((v, i) => `<td${wk(i)}>${v}</td>`).join("")}</tr>`;
+  for (const host of m.hosts) {
+    const tot = DAYS.map((_, i) => host.ms.reduce((t, x) => t + x.vals[i], 0));
+    const totB = DAYS.map((_, i) => host.ms.reduce((t, x) => t + x.base[i], 0));
+    h += `<tr class="host${host.isNew ? " new" : ""}"><td class="l">${host.host}${host.isNew ? ' <span class="tag">Mine</span>' : ""}</td>${tot.map((v, i) => cell(v, totB[i], i)).join("")}</tr>`;
+    for (const x of host.ms) {
+      h += `<tr class="ms${x.isNew ? " new" : ""}"><td class="l">${x.no}${x.night ? ' <span class="night">Night</span>' : ""}<small>${x.cust}</small></td>${x.vals.map((v, i) => cell(v, x.base[i], i)).join("")}</tr>`;
+    }
+  }
+  return h + "</tbody></table>";
+}
+function summary(m) {
+  const stat = (g) => { const s = g.filter(x => x < 0).length, w = Math.min(...g), wi = g.indexOf(w); return { s, text: s ? `${s} short day${s === 1 ? "" : "s"}, worst ${DAYS[wi]} (${-w} short)` : `No short days, tightest ${DAYS[wi]} (${w} spare)` }; };
+  const a = stat(m.gap), b = stat(m.gapBefore);
+  const changed = m.demand.some((v, i) => v !== m.before[i]);
+  return `<span><b>${a.text}</b></span><span>Peak demand <b>${Math.max(...m.demand)}</b></span>` + (changed ? `<span class="was">Without my changes: ${b.text.charAt(0).toLowerCase() + b.text.slice(1)}</span>` : `<span class="was">Same as the running board</span>`);
+}
+function draw(id, on) { const m = model(on); document.getElementById("grid" + id).innerHTML = grid(m); document.getElementById("sum" + id).innerHTML = summary(m); }
+draw("A", { r1: true, r2: true, r3: false });
+function drawB() {
+  const on = {};
+  for (const k of ["r1", "r2", "r3"]) { on[k] = document.getElementById(k).checked; document.getElementById("l" + k).classList.toggle("off", !on[k]); }
+  draw("B", on);
+}
+for (const k of ["r1", "r2", "r3"]) document.getElementById(k).addEventListener("change", drawB);
+drawB();
+</script>
