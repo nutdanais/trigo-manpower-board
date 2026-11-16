@@ -18481,7 +18481,7 @@ function capRequestText(q, m) {
   const row = m.rows.find(r => r.key === q.key) || m.baseRows.find(r => r.key === q.key);
   const label = row ? (row.isNew ? `New request at ${row.host}` : (row.number || row.host)) : (q.label || "A mission");
   if (q.kind === "new") {
-    return { title: `New mission at ${q.host} · ${plural(q.headcount, "person", "people")}`,
+    return { title: `New mission at ${q.host} · crew of ${q.headcount}`,
       sub: [q.customer, q.shift === "night" ? "Night" : "Day", capRange(q)].filter(Boolean).join(" · ") };
   }
   if (q.kind === "change") {
@@ -18515,7 +18515,7 @@ function capRequestsPanel(boardId, board, m) {
   b1.textContent = `Starting point: the ${board.name} board`;
   const sp = document.createElement("span");
   sp.textContent = m.baseRows.length
-    ? `${plural(m.baseRows.length, "running mission", "running missions")}${first ? ` · ${plural(first.before, "person", "people")} on ${fmtShort(first.date)}` : ""}`
+    ? `${plural(m.baseRows.length, "running mission", "running missions")}${first ? ` · ${plural(first.before, "person", "people")} placed on ${fmtShort(first.date)}` : ""}`
     : "Nobody is placed on a mission in these weeks.";
   const rd = document.createElement("span");
   rd.className = "cap-base-read";

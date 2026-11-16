@@ -492,7 +492,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         // F: 8 people, 4 running + 3 new
         assert.equal(await gapChip(pa, F), "● +1");
         assert.equal(await gapChip(pa, H), "▼ −6", "days before it starts are unchanged");
-        assert.deepEqual(await requests(pa), ["101: 1 typed number", "New mission at Host Beta · 3 people"]);
+        assert.deepEqual(await requests(pa), ["101: 1 typed number", "New mission at Host Beta · crew of 3"]);
         assert.match(await pa.locator(".cap-req", { hasText: "New mission at Host Beta" }).textContent(), /Night · starts /);
         await pa.locator(".cap-req", { hasText: "New mission at Host Beta" }).locator('input[type="checkbox"]').uncheck();
         await until(async () => (await gapChip(pa, F)) === "▲ +4", "switched off");
@@ -889,7 +889,7 @@ function asUser(db, user) { return (q) => { const r = db.exec(q, user); if (r.er
         await pa.fill("#cap-req-host", "Host Gamma");
         await pa.fill("#cap-req-people", "2");
         await pa.click("#btn-cap-req-save");
-        await until(async () => /New mission at Host Gamma · 2 people/.test(await pa.textContent(".cap-reqs")), "request listed");
+        await until(async () => /New mission at Host Gamma · crew of 2/.test(await pa.textContent(".cap-reqs")), "request listed");
         assert.ok(await v.page.locator(".cap-stepper").count() > 0, "a viewer may play in their own sandbox");
         assert.ok(await v.page.isVisible(".cap-reqs-add"));
       });
