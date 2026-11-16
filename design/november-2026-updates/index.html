@@ -1,0 +1,689 @@
+<title>Manpower Board in November</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: split hero on navy, a bento of highlights, a day-by-day release chart,
+   a teal band for Mission Leader, then one section per part of the app.
+   English and Thai on one page: every text element carries its Thai in data-th,
+   and each screenshot has a Thai twin in img/th/. Light only, like the app. */
+:root {
+  --navy: #003a66;
+  --navy-deep: #002a4a;
+  --green: #a8c855;
+  --green-ink: #4d6810;
+  --teal: #0f766e;
+  --teal-deep: #0b4f49;
+  --teal-text: #2b5b56;
+  --teal-tint: #e6f4f2;
+  --teal-line: #b7ddd8;
+  --ground: #eef1f4;
+  --paper: #ffffff;
+  --line: #d8dde4;
+  --ink: #1f2937;
+  --muted: #5b6573;
+  --on-navy-muted: #b9c8d8;
+  --amber-tint: #fdf8ef;
+  --amber-line: #e0c9a4;
+  --amber-ink: #8a4f10;
+  --red-tint: #fef2f2;
+  --red-ink: #a3271f;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --r: 14px;
+  --shadow: 0 1px 2px rgba(0, 42, 74, .06), 0 8px 24px rgba(0, 42, 74, .08);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-ui); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+html[lang="th"] body { line-height: 1.7; }
+html[lang="th"] h1, html[lang="th"] h2, html[lang="th"] h3 { letter-spacing: 0; line-height: 1.3; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { text-wrap: balance; margin: 0; letter-spacing: -0.02em; line-height: 1.15; }
+p { margin: 0; }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+.pr { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+button.shot { all: unset; cursor: zoom-in; display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1); }
+button.shot:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,42,74,.08), 0 14px 32px rgba(0,42,74,.14); }
+button.shot:focus-visible, a:focus-visible, .btn:focus-visible, .lang button:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+button.shot img { width: 100%; height: auto; }
+.tile button.shot { max-height: 280px; }
+.tile button.shot img { height: 100%; object-fit: cover; object-position: top left; }
+.t-missions button.shot { max-height: none; }
+
+/* Language switch */
+.lang { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); }
+.lang button { all: unset; cursor: pointer; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--on-navy-muted); }
+.lang button[aria-pressed="true"] { background: var(--paper); color: var(--navy); }
+.jump .lang { background: var(--paper); border-color: var(--line); margin-left: auto; flex: none; }
+.jump .lang button { color: var(--muted); padding: 5px 12px; }
+.jump .lang button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+
+/* Hero */
+.hero { background: var(--navy); color: #fff; padding-block: 40px 64px; position: relative; overflow: hidden; }
+.hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--green); }
+.hero-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 28px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: center; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--on-navy-muted); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; }
+.bars { display: grid; gap: 3px; }
+.bars i { display: block; width: 18px; height: 4px; background: var(--green); border-radius: 1px; }
+.hero h1 { font-size: clamp(36px, 5vw, 58px); font-weight: 800; color: #fff; }
+.hero .sub { margin-top: 18px; font-size: 19px; color: var(--on-navy-muted); max-width: 36ch; }
+.hero .sub b { color: #fff; font-weight: 600; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 999px; font-weight: 600; font-size: 15px; text-decoration: none; white-space: nowrap; transition: transform .2s cubic-bezier(.16,1,.3,1), background .2s; }
+.btn:active { transform: scale(.98); }
+.btn-green { background: var(--green); color: var(--navy-deep); }
+.btn-green:hover { background: #b8d66a; }
+.btn-ghost { color: #fff; border: 1.5px solid rgba(255,255,255,.4); }
+.btn-ghost:hover { border-color: #fff; }
+.hero-shot { transform: rotate(1.2deg); }
+.hero-shot button.shot { border-color: rgba(255,255,255,.18); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+
+/* Numbers */
+.numbers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--paper); border-radius: var(--r); box-shadow: var(--shadow); margin-top: -36px; position: relative; z-index: 1; }
+.numbers div { padding: 20px 24px; display: grid; gap: 2px; }
+.numbers div + div { border-left: 1px solid var(--line); }
+.numbers b { font-size: 34px; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.numbers span { color: var(--muted); font-size: 14px; }
+
+/* Jump nav */
+.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(238,241,244,.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); margin-top: 32px; }
+.jump .wrap { display: flex; gap: 6px; align-items: center; padding-block: 10px; }
+.jump .links { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.jump .links a { flex: none; text-decoration: none; font-size: 14px; font-weight: 600; color: var(--navy); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); white-space: nowrap; }
+.jump .links a:hover { border-color: var(--navy); }
+.jump .links a.teal { color: var(--teal); border-color: #9fd3cc; background: var(--teal-tint); }
+
+section { padding-block: 64px 8px; scroll-margin-top: 64px; }
+.sec-head { display: grid; gap: 10px; margin-bottom: 28px; max-width: 68ch; }
+.sec-head h2 { font-size: clamp(28px, 3.4vw, 38px); font-weight: 800; color: var(--navy-deep); display: flex; align-items: center; gap: 12px; }
+.sec-head h2::before { content: ""; flex: none; width: 5px; height: 26px; background: var(--green); border-radius: 1px; }
+.sec-head p { color: var(--muted); font-size: 17px; }
+
+/* Bento */
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.tile { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 20px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.tile h3 { font-size: 20px; font-weight: 700; color: var(--navy-deep); }
+.tile p { color: var(--muted); font-size: 15px; }
+.tile .who { font-size: 13px; font-weight: 600; color: var(--green-ink); }
+.t-missions { grid-column: span 4; grid-row: span 2; background: var(--navy); border-color: var(--navy); }
+.t-missions h3 { color: #fff; font-size: 26px; }
+.t-missions p { color: var(--on-navy-muted); font-size: 16px; }
+.t-missions .who { color: var(--green); }
+.t-crew, .t-planned, .t-report, .t-leader, .t-demo { grid-column: span 2; }
+.t-overview { grid-column: span 3; background: #f6f9ee; border-color: #cfdcae; }
+.t-present { grid-column: span 3; }
+.t-leader { background: var(--teal-tint); border-color: var(--teal-line); }
+.t-leader h3 { color: var(--teal-deep); }
+.t-leader p { color: var(--teal-text); }
+.t-leader .who { color: var(--teal); }
+.t-demo { background: var(--amber-tint); border-color: var(--amber-line); }
+.t-demo .who { color: var(--amber-ink); }
+.t-demo .btn { background: var(--navy); color: #fff; justify-self: start; }
+.t-demo .btn:hover { background: var(--navy-deep); }
+code { font-family: var(--font-mono); background: var(--paper); border: 1px solid var(--amber-line); border-radius: 6px; padding: 1px 6px; color: var(--amber-ink); font-size: 14px; }
+
+/* Release chart */
+.chart-card { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 24px 24px 16px; }
+.chart-scroll { overflow-x: auto; }
+.chart { display: grid; grid-template-columns: repeat(16, minmax(36px, 1fr)); gap: 6px; align-items: end; min-width: 640px; height: 240px; padding-top: 24px; }
+.day { display: grid; grid-template-rows: 1fr auto; height: 100%; text-align: center; }
+.col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; }
+.col .n { font-weight: 700; color: var(--navy); font-size: 14px; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.col i { display: block; height: 15px; border-radius: 3px; background: var(--navy); transform-origin: bottom; }
+.col i.lead { background: var(--teal); }
+.day .d { padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.day .d b { display: block; color: var(--ink); font-size: 14px; }
+.day.weekend .d, .day.weekend .d b { color: #9aa3ae; }
+.legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; font-size: 14px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 14px; height: 14px; border-radius: 3px; background: var(--navy); display: inline-block; }
+.legend i.lead { background: var(--teal); }
+.chart-notes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+.chart-notes div { border-top: 2px solid var(--navy); padding-top: 10px; font-size: 14px; color: var(--muted); }
+.chart-notes b { display: block; color: var(--ink); font-size: 15px; }
+
+/* Mission Leader band */
+.leaderband { background: var(--teal-tint); border-block: 1px solid var(--teal-line); margin-top: 64px; padding-block: 56px; scroll-margin-top: 56px; }
+.lb-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 40px; align-items: start; }
+.status { display: inline-flex; align-items: center; gap: 8px; background: var(--teal); color: #fff; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 999px; }
+.leaderband h2 { font-size: clamp(30px, 3.8vw, 44px); font-weight: 800; color: var(--teal-deep); margin-top: 16px; }
+.leaderband .lead { font-size: 18px; color: var(--teal-text); margin-top: 12px; max-width: 46ch; }
+.steps { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 14px; }
+.steps li { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 12px; align-items: start; }
+.steps .k { width: 32px; height: 32px; border-radius: 50%; background: var(--teal); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.steps b { color: var(--teal-deep); }
+.steps p { color: var(--teal-text); font-size: 15px; }
+.lb-shots { display: grid; gap: 16px; }
+.fact-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.fact-row span { background: var(--paper); border: 1px solid var(--teal-line); border-radius: 999px; padding: 5px 12px; font-size: 14px; color: var(--teal-deep); font-weight: 500; }
+.lb-note { margin-top: 20px; font-size: 15px; color: var(--teal-text); background: rgba(255,255,255,.6); border-radius: 10px; padding: 14px 16px; }
+
+/* Feature rows */
+.feature { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 36px; align-items: center; padding-block: 24px; }
+.feature + .feature { border-top: 1px solid var(--line); }
+.feature.flip { grid-template-columns: minmax(0, 6fr) minmax(0, 4fr); }
+.feature.flip .copy { order: 2; }
+.feature h3 { font-size: 24px; font-weight: 700; color: var(--navy-deep); }
+.copy { display: grid; gap: 12px; min-width: 0; align-content: start; }
+.copy > p { color: var(--muted); }
+.ticks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ticks li { padding-left: 26px; position: relative; font-size: 15px; }
+.ticks li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 12px; height: 7px; border-left: 2.5px solid var(--green-ink); border-bottom: 2.5px solid var(--green-ink); transform: rotate(-45deg); }
+.stack-shots { display: grid; gap: 14px; }
+.phone-pair { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; }
+.formats { display: grid; gap: 10px; }
+.fmt { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 15px; }
+.fmt code { border: 0; font-size: 15px; padding: 4px 10px; background: var(--ground); color: var(--navy-deep); }
+.fmt code.bad { background: var(--red-tint); color: var(--red-ink); }
+.fmt code.tmp { background: var(--amber-tint); color: var(--amber-ink); }
+
+/* Missions */
+.missions-wide { display: grid; gap: 20px; }
+.callouts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.callouts div { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+.callouts b { color: var(--navy-deep); font-size: 16px; }
+.callouts p { font-size: 14px; color: var(--muted); }
+.panel-strip { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; }
+.panel-strip > button.shot { max-height: 460px; }
+.panel-strip > button.shot img { height: 100%; object-fit: cover; object-position: top; }
+.panel-strip h3 { font-size: 22px; color: var(--navy-deep); }
+
+/* Overview gallery */
+.gallery { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 46%); gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 16px; }
+.gallery figure { margin: 0; scroll-snap-align: start; display: grid; gap: 12px; align-content: start; }
+.gallery figcaption { display: grid; gap: 4px; }
+.gallery figcaption b { color: var(--navy-deep); font-size: 17px; }
+.gallery figcaption span { color: var(--muted); font-size: 15px; }
+.frame { overflow: hidden; border-radius: 10px; }
+.frame button.shot { height: 100%; }
+.frame img { height: 100%; width: 100%; object-fit: cover; object-position: top left; }
+.gallery .frame { height: 300px; }
+.gallery-hint { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.ov-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 28px; margin-top: 28px; }
+.ov-list div { padding-block: 14px; border-top: 1px solid var(--line); display: grid; gap: 4px; align-content: start; }
+.ov-list b { color: var(--ink); font-size: 15px; }
+.ov-list p { font-size: 14px; color: var(--muted); }
+
+/* Records */
+.records { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.record { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.record .frame { height: 360px; }
+.record .frame img { object-position: top; }
+.record b { color: var(--navy-deep); font-size: 18px; }
+.record p { color: var(--muted); font-size: 15px; }
+
+/* Smaller changes */
+.small { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; }
+.small div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.small b { font-size: 15px; }
+.small p { grid-column: 1 / -1; font-size: 14px; color: var(--muted); }
+
+footer { margin-top: 72px; background: var(--navy-deep); color: var(--on-navy-muted); padding-block: 36px; font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 32px; justify-content: space-between; align-items: center; }
+footer b { color: #fff; }
+
+/* Lightbox */
+dialog { border: 0; padding: 0; background: transparent; max-width: min(96vw, 1500px); max-height: 92vh; }
+dialog::backdrop { background: rgba(0, 26, 46, .82); }
+dialog img { max-height: 84vh; width: auto; margin: 0 auto; border-radius: 10px; }
+dialog .cap { color: #fff; text-align: center; margin-top: 10px; font-size: 15px; }
+dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); width: 44px; height: 44px; border-radius: 50%; border: 0; background: #fff; color: var(--navy); font-size: 24px; line-height: 1; cursor: pointer; }
+
+/* Entry motion: everything is visible at rest; this only adds a short rise on load */
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1, .hero .sub, .hero .ctas { animation: rise .7s cubic-bezier(.16,1,.3,1) both; }
+  .hero .sub { animation-delay: .08s; } .hero .ctas { animation-delay: .16s; }
+  .hero-shot { animation: rise-tilt .7s cubic-bezier(.16,1,.3,1) .1s both; }
+  .col i { animation: grow .6s cubic-bezier(.16,1,.3,1) both; animation-delay: calc(var(--d, 0) * 40ms + 200ms); }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  @keyframes rise-tilt { from { opacity: 0; transform: translateY(14px) rotate(1.2deg); } to { transform: rotate(1.2deg); } }
+  @keyframes grow { from { transform: scaleY(0); } }
+}
+
+@media (max-width: 900px) {
+  .hero-grid, .lb-grid, .feature, .feature.flip, .panel-strip { grid-template-columns: minmax(0, 1fr); }
+  .feature.flip .copy { order: 0; }
+  .hero-shot { transform: none; }
+  .bento { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .t-missions, .t-overview, .t-present { grid-column: span 2; }
+  .t-crew, .t-planned, .t-report, .t-leader, .t-demo { grid-column: span 1; }
+  .callouts, .chart-notes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .records, .ov-list { grid-template-columns: minmax(0, 1fr); }
+  .gallery { grid-auto-columns: minmax(280px, 82%); }
+}
+@media (max-width: 640px) {
+  .numbers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .numbers div:nth-child(3) { border-left: 0; }
+  .numbers div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .bento, .callouts, .chart-notes, .small, .phone-pair { grid-template-columns: minmax(0, 1fr); }
+  .t-missions, .t-overview, .t-present, .t-crew, .t-planned, .t-report, .t-leader, .t-demo { grid-column: span 1; }
+  .hero { padding-block: 28px 60px; }
+  .jump .lang { display: none; }
+}
+</style>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-top">
+      <div class="brand"><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span data-th="Manpower Board · พฤศจิกายน 2026">Manpower Board · November 2026</span></div>
+      <div class="lang" role="group" aria-label="Language / ภาษา"><button type="button" data-lang="en" aria-pressed="true">EN</button><button type="button" data-lang="th" aria-pressed="false">ไทย</button></div>
+    </div>
+    <div class="hero-grid">
+      <div>
+        <h1 data-th="มีอะไรใหม่เดือนนี้">What's new this month</h1>
+        <p class="sub" data-th="<b>31 อัปเดต</b> ระหว่างวันที่ 3 ถึง 16 พฤศจิกายน รวมถึงฟีเจอร์ใหม่ <b>หัวหน้าทีม</b> ของมิชชั่น"><b>31 updates</b> from 3 to 16 November, including the new <b>Mission Leader</b>.</p>
+        <div class="ctas">
+          <a class="btn btn-green" href="#highlights" data-th="ดูไฮไลต์">See the highlights</a>
+          <a class="btn btn-ghost" href="#leader" data-th="หัวหน้าทีม">Mission Leader</a>
+        </div>
+      </div>
+      <div class="hero-shot">
+        <button class="shot" type="button" data-cap="The Overview: today's attention card, key numbers and every board at a glance." data-cap-th="ภาพรวม: การ์ดเรื่องที่ต้องดูวันนี้ ตัวเลขสำคัญ และทุกบอร์ดในหน้าเดียว"><img src="img/ov-top.jpg" alt="" width="1600" height="711"></button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="numbers" role="list">
+    <div role="listitem"><b>31</b><span data-th="อัปเดต">updates</span></div>
+    <div role="listitem"><b>1</b><span data-th="แท็บใหม่: มิชชั่น">new tab: Missions</span></div>
+    <div role="listitem"><b>1</b><span data-th="รายงานใหม่: รายงานประจำเดือน">new monthly report</span></div>
+    <div role="listitem"><b>7</b><span data-th="วันที่ออกอัปเดต">release days</span></div>
+  </div>
+</div>
+
+<nav class="jump" aria-label="Sections">
+  <div class="wrap">
+    <div class="links">
+      <a href="#highlights" data-th="ไฮไลต์">Highlights</a>
+      <a href="#timeline" data-th="รายวัน">Day by day</a>
+      <a href="#leader" class="teal" data-th="หัวหน้าทีม (ใหม่)">Mission Leader (new)</a>
+      <a href="#board" data-th="บอร์ด">Board</a>
+      <a href="#missions" data-th="มิชชั่น">Missions</a>
+      <a href="#overview" data-th="ภาพรวมและรายงาน">Overview &amp; reports</a>
+      <a href="#records" data-th="บุคลากรและโฮสต์">People &amp; hosts</a>
+      <a href="#more" data-th="อื่น ๆ">Smaller changes</a>
+    </div>
+    <div class="lang" role="group" aria-label="Language / ภาษา"><button type="button" data-lang="en" aria-pressed="true">EN</button><button type="button" data-lang="th" aria-pressed="false">ไทย</button></div>
+  </div>
+</nav>
+
+<main>
+<section id="highlights">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="สรุปทั้งเดือนใน 30 วินาที">The month in 30 seconds</h2>
+      <p data-th="สิ่งที่คุณน่าจะเห็นบ่อยที่สุด คลิกรูปเพื่อดูภาพใหญ่">The changes you are most likely to notice. Click any picture to see it larger.</p>
+    </div>
+    <div class="bento">
+      <article class="tile t-missions">
+        <span class="who" data-th="แท็บใหม่">New tab</span>
+        <h3 data-th="มิชชั่น: ทุกงานในรายการเดียว">Missions: every job in one list</h3>
+        <p data-th="ดูสถานะ ทีมงาน โฮสต์ และกะของทุกมิชชั่นได้ในทันที ปิดมิชชั่นเมื่องานจบ เปิดใหม่ได้ถ้างานกลับมา และกรองตามเปิดอยู่หรือปิดแล้ว">See each mission's status, crew, host and shift at a glance. Close a mission when the job ends, reopen it if it comes back, and filter by Open or Closed.</p>
+        <button class="shot" type="button" data-cap="Missions tab with Open and Closed counts, tiles that filter, and alerts under each status." data-cap-th="แท็บมิชชั่น: จำนวนเปิดอยู่และปิดแล้ว ไทล์ที่กดกรองได้ และการแจ้งเตือนใต้สถานะ"><img src="img/missions.jpg" alt="" loading="lazy" width="1600" height="622"></button>
+      </article>
+      <article class="tile t-crew">
+        <span class="who" data-th="สำหรับวิศวกร">For engineers</span>
+        <h3 data-th="หาทีมงานในคลิกเดียว">Find crew in one click</h3>
+        <p data-th="มิชชั่นที่ยังไม่มีทีมงาน นำทีมงานครั้งล่าสุดกลับมา หรือให้แอปแนะนำคนที่รู้จักโฮสต์นั้นได้">A mission with no crew can bring back its last crew, or suggest people who know the host.</p>
+        <button class="shot" type="button" data-cap="Find crew: sort people by days at this host, bring back the last crew, or suggest crew." data-cap-th="หาทีมงาน: เรียงคนตามจำนวนวันที่โฮสต์นี้ นำทีมงานครั้งล่าสุดกลับมา หรือแนะนำทีมงาน"><img src="img/find-crew.jpg" alt="" loading="lazy" width="1290" height="350"></button>
+      </article>
+      <article class="tile t-planned">
+        <span class="who" data-th="สำหรับวิศวกร">For engineers</span>
+        <h3 data-th="ติ๊กเมื่อวางแผนส่วนของคุณเสร็จ">Tick when your part is planned</h3>
+        <p data-th="ทุกคนเห็นว่าใครเสร็จแล้ว และบอร์ดยังรอใครอยู่">Everyone can see who has finished and who the board is waiting for.</p>
+        <button class="shot" type="button" data-cap="The Planned line: 1 of 3 planned, waiting for two engineers." data-cap-th="บรรทัดวางแผนแล้ว: 1 จาก 3 วางแผนแล้ว รออีกสองคน"><img src="img/planned-line.jpg" alt="" loading="lazy" width="940" height="72"></button>
+      </article>
+      <article class="tile t-overview">
+        <span class="who" data-th="สำหรับผู้จัดการ">For managers</span>
+        <h3 data-th="ภาพรวมเล่าเรื่องทั้งเดือน">Overview tells the month's story</h3>
+        <p data-th="ส่วนใหม่ บุคลากร และ กำลังคน ประวัติการลาและออนคอล และเปรียบเทียบกับช่วงก่อนหน้าหรือปีก่อน">New People and Workforce sections, leave and on-call history, and Compare with last period or last year.</p>
+        <button class="shot" type="button" data-cap="Overview, People: the workload spread, with one row per person underneath." data-cap-th="ภาพรวม ส่วนบุคลากร: การกระจายภาระงาน และรายชื่อทีละคนด้านล่าง"><img src="img/ov-people.jpg" alt="" loading="lazy" width="1600" height="964"></button>
+      </article>
+      <article class="tile t-present">
+        <span class="who" data-th="สำหรับการประชุม">For meetings</span>
+        <h3 data-th="โหมดนำเสนอ">Present mode</h3>
+        <p data-th="แสดงภาพรวมเต็มจอในที่ประชุม ตัวกรองยังใช้งานได้ระหว่างนำเสนอ">Show the Overview full screen in a meeting. The filters still work while you present.</p>
+        <button class="shot" type="button" data-cap="Present mode: the Overview's sections on a full-screen stage, with board chips at the top." data-cap-th="โหมดนำเสนอ: ส่วนต่าง ๆ ของภาพรวมแบบเต็มจอ พร้อมชิปเลือกบอร์ดด้านบน"><img src="img/present.jpg" alt="" loading="lazy" width="1600" height="1000"></button>
+      </article>
+      <article class="tile t-leader">
+        <span class="who" data-th="ใหม่">New</span>
+        <h3 data-th="หัวหน้าทีมของมิชชั่น">Mission Leader</h3>
+        <p data-th="คลิกขวาที่คนในมิชชั่น แล้วเลือก ตั้งเป็นหัวหน้าทีม การ์ดจะมีมงกุฎสีเขียวอมฟ้า">Right-click a person on a mission and choose Make Leader. Their card gets a teal crown.</p>
+        <button class="shot" type="button" data-cap="The Leader's card has a teal crown on its corner." data-cap-th="การ์ดของหัวหน้าทีมมีมงกุฎสีเขียวอมฟ้าที่มุม"><img src="img/leader-card.jpg" alt="" loading="lazy" width="1136" height="328"></button>
+      </article>
+      <article class="tile t-report">
+        <span class="who" data-th="สำหรับผู้จัดการ">For managers</span>
+        <h3 data-th="รายงานประจำเดือน">Monthly report</h3>
+        <p data-th="PDF หรือ Excel ภาษาอังกฤษหรือไทย เลือกได้ว่าจะใส่ส่วนไหน">PDF or Excel, in English or Thai. Pick the sections you need.</p>
+        <button class="shot" type="button" data-cap="The Report dialog: choose the month, the sections, PDF or Excel, English or Thai." data-cap-th="หน้าต่างรายงาน: เลือกเดือน ส่วนที่ต้องการ PDF หรือ Excel อังกฤษหรือไทย"><img src="img/report.jpg" alt="" loading="lazy" width="700" height="1109"></button>
+      </article>
+      <article class="tile t-demo">
+        <span class="who" data-th="สำหรับการฝึกอบรม">For training</span>
+        <h3 data-th="ลองทุกอย่างในโหมดเดโม">Try anything in the demo</h3>
+        <p data-th="เติม <code>?demo</code> ต่อท้ายที่อยู่ของแอป แอปจะเปิดด้วยข้อมูลตัวอย่าง สิ่งที่ทำจึงไม่กระทบบอร์ดจริง รีโหลดเพื่อเริ่มใหม่">Add <code>?demo</code> to the app's address. It opens on sample data, so nothing you do touches the real board. Reload to start again.</p>
+        <a class="btn" href="#more" data-th="วิธีใช้">How it works</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="timeline">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="รายวัน">Day by day</h2>
+      <p data-th="จำนวนอัปเดตในแต่ละวัน 1 ถึง 16 พฤศจิกายน (เวลาประเทศไทย)">How many updates arrived each day, 1 to 16 November (Thailand time).</p>
+    </div>
+    <div class="chart-card">
+      <div class="chart-scroll">
+        <div class="chart" id="chart" role="img" aria-label="3 Nov 1, 4 Nov 5, 5 Nov 9, 9 Nov 4, 10 Nov 7, 12 Nov 3, 16 Nov 2"></div>
+      </div>
+      <div class="legend"><span><i></i><span data-th="อัปเดต">Update</span></span><span><i class="lead"></i><span data-th="หัวหน้าทีม">Mission Leader</span></span></div>
+      <div class="chart-notes">
+        <div><b data-th="4 ถึง 5 พ.ย.">4 to 5 Nov</b><span data-th="ภาพรวมสำหรับผู้จัดการ โหมดนำเสนอ โปรไฟล์">Overview for managers, Present mode, the Profile</span></div>
+        <div><b data-th="9 พ.ย.">9 Nov</b><span data-th="แท็บมิชชั่น โหมดเดโม ตั้งค่าความชำนาญหน้างาน">Missions tab, demo mode, Settings for host experience</span></div>
+        <div><b data-th="10 พ.ย.">10 Nov</b><span data-th="ทุกรายการหน้าตาเดียวกัน ประวัติโฮสต์ หาทีมงาน">One look for every list, Host record, Find crew</span></div>
+        <div><b data-th="12 ถึง 16 พ.ย.">12 to 16 Nov</b><span data-th="กฎหมายเลขมิชชั่น ติ๊กวางแผนแล้ว TRIGO ID หัวหน้าทีม">Mission number rules, Planned ticks, TRIGO ID, Mission Leader</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="leaderband" id="leader">
+  <div class="wrap lb-grid">
+    <div>
+      <span class="status" data-th="ใหม่เดือนนี้">New this month</span>
+      <h2 data-th="หัวหน้าทีมของมิชชั่น">Mission Leader</h2>
+      <p class="lead" data-th="กำหนดว่าใครเป็นหัวหน้าทีมในแต่ละมิชชั่น หัวหน้าทีมจะมีมงกุฎสีเขียวอมฟ้าบนการ์ด และย้ายไปอยู่หน้าสุดของทีมงาน">Mark who leads the crew on each mission. The Leader gets a teal crown on their card and moves to the front of the crew.</p>
+      <ol class="steps">
+        <li><span class="k">1</span><div><b data-th="คลิกขวาที่คนในมิชชั่น">Right-click a person on a mission</b><p data-th="บนโทรศัพท์ ให้กดค้างที่การ์ด">On a phone, press and hold their card.</p></div></li>
+        <li><span class="k">2</span><div><b data-th="เลือก ตั้งเป็นหัวหน้าทีม">Choose Make Leader</b><p data-th="ถ้ามิชชั่นมีหัวหน้าทีมอยู่แล้ว เมนูจะบอกว่าจะแทนใคร หนึ่งมิชชั่นมีหัวหน้าทีมได้คนเดียว">If the mission already has one, the menu says who will be replaced. One Leader per mission.</p></div></li>
+        <li><span class="k">3</span><div><b data-th="มงกุฎติดไปกับทีม">The crown follows the crew</b><p data-th="ยกแผนมา จะพาหัวหน้าทีมไปด้วย ถ้าย้ายหัวหน้าทีมไปมิชชั่นอื่น ไปลา หรือกลับไปสแตนด์บาย มงกุฎจะหายไป">Carry over brings the Leader along. Moving the Leader to another mission, leave or Standby clears it.</p></div></li>
+      </ol>
+      <div class="fact-row">
+        <span data-th="ผังองค์กรแสดงป้าย หัวหน้าทีม">Org Chart shows a Leader chip</span>
+        <span data-th="PowerPoint ของผังองค์กร">Org Chart PowerPoint</span>
+        <span data-th="Excel: คอลัมน์ หัวหน้าทีม">Excel: new Leader column</span>
+        <span data-th="ส่งออก JPG และ PDF">JPG and PDF export</span>
+        <span data-th="ภาษาอังกฤษ: Leader">Thai: หัวหน้าทีม</span>
+      </div>
+      <p class="lb-note" data-th="ผู้ชม (Viewer) เห็นมงกุฎแต่เปลี่ยนไม่ได้ ถ้าต้องการยกเลิก คลิกขวาที่หัวหน้าทีมแล้วเลือก ยกเลิกหัวหน้าทีม โหมดนำเสนอยังไม่แสดงหัวหน้าทีม">Viewers see the crown but cannot change it. To undo, right-click the Leader and choose Remove as Leader. Present mode does not show the Leader yet.</p>
+    </div>
+    <div class="lb-shots">
+      <button class="shot" type="button" data-cap="A mission card with its Leader: the teal crown on the first person's card." data-cap-th="การ์ดมิชชั่นที่มีหัวหน้าทีม: มงกุฎสีเขียวอมฟ้าบนการ์ดคนแรก"><img src="img/leader-card.jpg" alt="" loading="lazy" width="1136" height="328"></button>
+      <button class="shot" type="button" data-cap="Right-click a person on a mission: Make Leader is the second item." data-cap-th="คลิกขวาที่คนในมิชชั่น: ตั้งเป็นหัวหน้าทีม เป็นรายการที่สอง"><img src="img/leader-menu.jpg" alt="" loading="lazy" width="1184" height="860"></button>
+    </div>
+  </div>
+</div>
+
+<section id="board">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="การวางแผนบอร์ด">Planning the board</h2>
+      <p data-th="หาคนง่ายขึ้น หมายเลขผิดน้อยลง และรู้ชัดเมื่อแผนของวันพร้อม">Less hunting for people, fewer wrong numbers, and a clear sign when the day is ready.</p>
+    </div>
+
+    <div class="feature">
+      <div class="copy">
+        <h3 data-th="ติ๊กเมื่อวางแผนส่วนของคุณเสร็จ">Tick when your part is planned</h3>
+        <p data-th="เมื่อวิศวกรหลายคนวางแผนบอร์ดเดียวกัน แต่ละคนติ๊กชื่อตัวเองเมื่อจัดมิชชั่นของตนเสร็จ">When several engineers plan one board, each ticks their own name once their missions are done.</p>
+        <ul class="ticks">
+          <li data-th="บรรทัดนี้แสดง <b>1 จาก 3 วางแผนแล้ว</b> และบอกชื่อคนที่ยังทำอยู่">The line shows <b>1 of 3 planned</b> and names who is still working on it.</li>
+          <li data-th="เมื่อทุกคนติ๊กแล้ว จะขึ้นว่า <b>พร้อมส่งให้ทีมงาน</b>">When everyone has ticked it reads <b>Ready to share with crew</b>.</li>
+          <li data-th="เป็นแค่สัญลักษณ์ ไม่มีอะไรถูกล็อก แอดมินและผู้จัดการติ๊กแทนใครก็ได้">It is a flag only. Nothing gets locked. Admins and managers can tick for anyone.</li>
+          <li data-th="แต่ละวันเริ่มต้นใหม่ และใช้บนโทรศัพท์ได้ด้วย">Each day starts empty, and it works on phones too.</li>
+        </ul>
+        <span class="pr">PR #131</span>
+      </div>
+      <div class="phone-pair">
+        <button class="shot" type="button" data-cap="Desktop: the Planned line at the end of By area." data-cap-th="คอมพิวเตอร์: บรรทัดวางแผนแล้ว อยู่ท้ายแถวตามพื้นที่"><img src="img/planned-line.jpg" alt="" loading="lazy" width="940" height="72"></button>
+        <button class="shot" type="button" data-cap="Phone: your tick and the count, then who the board is waiting for." data-cap-th="โทรศัพท์: ติ๊กของคุณกับจำนวน แล้วตามด้วยคนที่บอร์ดยังรอ"><img src="img/phone-planned.jpg" alt="" loading="lazy" width="700" height="754"></button>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="copy">
+        <h3 data-th="หาทีมงานที่รู้จักโฮสต์">Find crew who know the host</h3>
+        <p data-th="ตอนนี้แอปจำได้ว่าใครเคยทำงานที่โฮสต์ไหน และใช้ข้อมูลนี้ช่วยจัดทีมงาน">The app now remembers who has worked at each host, and uses it to help you staff a mission.</p>
+        <ul class="ticks">
+          <li data-th="<b>นำทีมงานครั้งล่าสุดกลับมา</b> เพิ่มคนจากครั้งก่อน ถ้าเขาว่าง"><b>Bring back the last crew</b> adds the people from the last time, if they are free.</li>
+          <li data-th="<b>แนะนำทีมงาน</b> เลือกคนที่ทำงานที่โฮสต์นั้นมาหลายวันที่สุด"><b>Suggest crew</b> picks people with the most days at that host.</li>
+          <li data-th="<b>เรียงคนตามจำนวนวันที่โฮสต์นี้</b> จัดลำดับรายชื่อคนใหม่"><b>Sort people by days at this host</b> reorders the people panel.</li>
+          <li data-th="บรรทัดสีเหลืองอำพัน <b>ทีมงานใหม่สำหรับโฮสต์นี้</b> เตือนเมื่อไม่มีใครในทีมเคยไปที่นั่น">An amber <b>Crew new to this host</b> line warns when nobody on the crew has been there before.</li>
+          <li data-th="<b>หาคนแทน</b> จะขึ้นมาเมื่อย้ายคนจากมิชชั่นไปลา"><b>Find replacement</b> appears when you move someone from a mission to leave.</li>
+        </ul>
+        <span class="pr">PR #127</span>
+      </div>
+      <button class="shot" type="button" data-cap="Find crew on a mission with no crew." data-cap-th="หาทีมงาน บนมิชชั่นที่ยังไม่มีทีมงาน"><img src="img/find-crew.jpg" alt="" loading="lazy" width="1290" height="350"></button>
+    </div>
+
+    <div class="feature">
+      <div class="copy">
+        <h3 data-th="หมายเลขมิชชั่นตรงกับ Etraq">Mission numbers match Etraq</h3>
+        <p data-th="หมายเลขมิชชั่นทุกหมายเลขต้องเป็นรูปแบบของ Etraq บอร์ด ประวัติโฮสต์ และรายงานจึงตรงกัน">Every mission number must follow the Etraq format, so the board, the Host record and reports agree.</p>
+        <ul class="ticks">
+          <li data-th="หมายเลขที่ผิดจะเป็นสีแดงบนการ์ด พร้อมปุ่ม <b>แก้หมายเลข</b>">Wrong numbers show in red on the card, with a <b>Fix number</b> button.</li>
+          <li data-th="ยังไม่มีใน Etraq? ใช้ <b>หมายเลขชั่วคราว</b> ได้ จะมีการเตือนเมื่อผ่านไป 3 วัน">Not in Etraq yet? Use a <b>temporary number</b>. It is flagged after 3 days as a reminder.</li>
+          <li data-th="หมายเลขถูกบันทึกเป็นตัวพิมพ์ใหญ่เสมอ ไม่ว่าจะพิมพ์แบบไหน">Numbers are always saved in capitals, however they are typed.</li>
+        </ul>
+        <span class="pr">PR #130, #132</span>
+      </div>
+      <div class="stack-shots">
+        <button class="shot" type="button" data-cap="A card with a wrong number: the red line and Fix number." data-cap-th="การ์ดที่หมายเลขผิด: บรรทัดสีแดงและปุ่มแก้หมายเลข"><img src="img/wrong-number.jpg" alt="" loading="lazy" width="1136" height="372"></button>
+        <div class="formats">
+          <div class="fmt"><code>RYGTH.26.0101</code><span data-th="ถูกต้อง: รหัสไซต์ ปี และเลข 4 หลัก">Correct: site code, year, four digits</span></div>
+          <div class="fmt"><code class="tmp">BANGN.26.TMP001</code><span data-th="ชั่วคราว จนกว่าจะมีหมายเลขใน Etraq">Temporary, until the Etraq number exists</span></div>
+          <div class="fmt"><code class="bad">RYGTH.26.104</code><span data-th="ผิด: เป็นสีแดงจนกว่าจะแก้">Wrong: flagged in red until fixed</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="missions">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="แท็บมิชชั่นใหม่">The new Missions tab</h2>
+      <p data-th="รายการเดียวของทุกมิชชั่นในบอร์ดของคุณ ตอบได้ว่างานไหนกำลังทำ งานไหนยังไม่มีทีมงาน และงานไหนต้องดู">One list of every mission across your boards. It answers which jobs are running, which have no crew, and which need attention.</p>
+    </div>
+    <div class="missions-wide">
+      <button class="shot" type="button" data-cap="The Missions tab." data-cap-th="แท็บมิชชั่น"><img src="img/missions.jpg" alt="" loading="lazy" width="1600" height="622"></button>
+      <div class="callouts">
+        <div><b data-th="เปิดอยู่และปิดแล้ว">Open and Closed</b><p data-th="ปิดมิชชั่นเมื่องานจบ เปิดใหม่ได้ถ้าจำเป็น จำนวนอยู่บนสวิตช์ และไทล์กดกรองได้">Close a mission when the job ends, reopen it if needed. Counts sit on the switch, and the tiles filter.</p></div>
+        <div><b data-th="การแจ้งเตือนใต้สถานะ">Alerts under the status</b><p data-th="ไม่มีทีมงาน 25 วัน ซ่อน 9 วัน ไม่อยู่บนบอร์ด หมายเลขผิด เห็นได้ทันทีว่าอะไรต้องดู">No crew for 25 days, hidden 9 days, off the board, wrong number. You see what needs a look.</p></div>
+        <div><b data-th="ปีนี้มาก่อน">This year first</b><p data-th="รายการเปิดที่มิชชั่นของปีนี้ ชิปหนึ่งตัวแสดงมิชชั่นของปีก่อน ๆ">The list opens on this year's missions. A chip brings back earlier years.</p></div>
+        <div><b data-th="เลือกคอลัมน์เองได้">Your columns</b><p data-th="คอลัมน์ ตัวกรอง แก้ไขเป็นกลุ่ม และส่งออก ชี้ที่แถวเพื่อปิดมิชชั่นหรือเปิดเมนู ⋯">Columns, Filters, Bulk edit and Export. Hover a row for Close and the ⋯ menu.</p></div>
+      </div>
+      <div class="panel-strip">
+        <button class="shot" type="button" data-cap="Double-click a mission for its panel: details, crew per day and who has worked on it." data-cap-th="ดับเบิลคลิกมิชชั่นเพื่อเปิดแผง: รายละเอียด ทีมงานต่อวัน และคนที่เคยทำมิชชั่นนี้"><img src="img/mission-panel.jpg" alt="" loading="lazy" width="1000" height="1184"></button>
+        <div class="copy">
+          <h3 data-th="ดับเบิลคลิกเพื่อดูทั้งหมด">Double-click for the whole story</h3>
+          <ul class="ticks">
+            <li data-th="ทีมงานในแต่ละวันทำงาน ทีมงานเฉลี่ย และทุกคนที่เคยทำมิชชั่นนี้">Crew per working day, average crew, and everyone who has worked on it.</li>
+            <li data-th="ไฮไลต์ ทำซ้ำ ย้ายหรือคัดลอก ซ่อน และปิด ได้จากที่เดียว">Highlight, Duplicate, Move or copy, Hide and Close from one place.</li>
+            <li data-th="หมายเลขปีใหม่: หมายเลขของปีที่แล้วจะแสดงข้างหมายเลขใหม่สองสัปดาห์">New-year numbers: last year's number stays beside the new one for two weeks.</li>
+            <li data-th="บทบาทใหม่ <b>ผู้ดูแลไซต์</b> สำหรับคนที่ดูแลรายการมิชชั่น">A new <b>Site Admin</b> role for the people who manage the mission list.</li>
+          </ul>
+          <span class="pr">PR #106, #120, #128, #129, #130</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="overview">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="ภาพรวมและรายงาน">Overview and reports</h2>
+      <p data-th="แท็บภาพรวมกลายเป็นภาพของทั้งเดือนสำหรับผู้จัดการ ใครทำงาน ใครลา และเทียบกับช่วงก่อนเป็นอย่างไร เลื่อนรูปไปด้านข้างได้">The Overview tab grew into a monthly picture for managers: who worked, who was on leave, and how that compares. Scroll the pictures sideways.</p>
+    </div>
+    <div class="gallery" tabindex="0" aria-label="Overview">
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="History: six tiles, each compared with the previous period. Group by Day, Week or Month." data-cap-th="ประวัติ: หกไทล์ แต่ละไทล์เทียบกับช่วงก่อนหน้า จัดกลุ่มตามวัน สัปดาห์ หรือเดือน"><img src="img/ov-history.jpg" alt="" loading="lazy" width="1600" height="640"></button></div>
+        <figcaption><b data-th="ประวัติ">History</b><span data-th="ไทล์ ลาต่อวัน และ ออนคอลต่อวัน เพิ่มเข้ามา แต่ละไทล์บอกการเปลี่ยนแปลงจากช่วงก่อนหน้า">Leave per day and on-call per day join the tiles. Each tile shows the change from the previous period.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="People: workload spread, leave, nights, on-call and alerts, one row per person." data-cap-th="บุคลากร: ภาระงาน การลา กะคืน ออนคอล และการแจ้งเตือน ทีละคน"><img src="img/ov-people.jpg" alt="" loading="lazy" width="1600" height="964"></button></div>
+        <figcaption><b data-th="บุคลากร">People</b><span data-th="ภาระงาน การลา กะคืน และออนคอลของแต่ละคน คลิกแท่งเพื่อกรองรายชื่อ">Workload, leave, nights and on-call for each person. Click a bar to filter the list.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="Workforce: headcount at the end of each month by years of service, with joiners and leavers." data-cap-th="กำลังคน: จำนวนคน ณ สิ้นเดือน แยกตามอายุงาน พร้อมคนเข้าและคนออก"><img src="img/ov-workforce.jpg" alt="" loading="lazy" width="1600" height="644"></button></div>
+        <figcaption><b data-th="กำลังคน">Workforce</b><span data-th="จำนวนคนแต่ละเดือนตามอายุงาน พร้อมคนเข้า คนออก และยอดรวมบนทุกแท่ง">Headcount each month by years of service, with joiners, leavers and a total on every bar.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="Present mode keeps the Overview's own filters working on stage." data-cap-th="โหมดนำเสนอ: ตัวกรองของภาพรวมยังใช้ได้ระหว่างนำเสนอ"><img src="img/present.jpg" alt="" loading="lazy" width="1600" height="1000"></button></div>
+        <figcaption><b data-th="โหมดนำเสนอ">Present mode</b><span data-th="สไลด์เต็มจอสำหรับการประชุม ปุ่มลัด: B บอร์ดถัดไป G จัดกลุ่ม C เปรียบเทียบ">Full-screen slides for meetings. Keys: B next board, G group by, C compare.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="The Report dialog." data-cap-th="หน้าต่างรายงาน"><img src="img/report.jpg" alt="" loading="lazy" width="700" height="1109"></button></div>
+        <figcaption><b data-th="รายงานประจำเดือน">Monthly report</b><span data-th="PDF หรือ Excel อังกฤษหรือไทย ไม่ใส่ชื่อคนเว้นแต่จะติ๊กเลือก">PDF or Excel, English or Thai. Names are left out unless you tick them.</span></figcaption>
+      </figure>
+    </div>
+    <p class="gallery-hint" data-th="ปัดหรือเลื่อนเพื่อดูครบทั้งห้ารูป">Swipe or scroll to see all five.</p>
+    <div class="ov-list">
+      <div><b data-th="เลือกได้หลายบอร์ด">Pick several boards</b><p data-th="ดูบอร์ดเดียว หลายบอร์ด หรือทั้งหมด แบบรวม เทียบเคียงกัน หรือ A เทียบ B">Show one board, a few, or all. View them combined, side by side, or A against B.</p></div>
+      <div><b data-th="เปรียบเทียบกับ">Compare with</b><p data-th="ช่วงก่อนหน้า หรือช่วงเวลาเดียวกันของปีก่อน">Previous period, or the same period last year.</p></div>
+      <div><b data-th="คลิกวันไหนก็ได้">Click any day</b><p data-th="คลิกวันบนกราฟ เพื่อเปิดบอร์ดนั้นในวันนั้น">Click a day on a chart to open that board on that date.</p></div>
+      <div><b data-th="ปฏิบัติงานต่อวัน แยกได้">Deployed per day, split</b><p data-th="แยกตามพนักงานประจำและออนคอล หรือตามพื้นที่บริการ แบบเส้น แท่ง หรือซ้อน พร้อมตัวเลขบนแท่ง">By permanent and on-call, or by service area. Line, bars or stacked, with the figure on each bar.</p></div>
+      <div><b data-th="สถานะลาออก">Resigned status</b><p data-th="เมื่อมีคนออก เลือกได้ว่า ลาออก หรือ ไม่ใช้งานชั่วคราว คนที่ลาออกมีตัวกรองของตัวเอง">When someone leaves, choose Resigned or Inactive for now. Resigned people get their own filter.</p></div>
+      <div><b data-th="ตารางทักษะของโฮสต์">Host skills matrix</b><p data-th="ใครชำนาญโฮสต์ไหน และโฮสต์ไหนมีความเสี่ยง">Who is experienced at each host, and which hosts are at risk.</p></div>
+    </div>
+    <p class="pr" style="margin-top:16px;display:block">PR #98, #101 to #105, #109, #111 to #115</p>
+  </div>
+</section>
+
+<section id="records">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="บุคลากร โฮสต์ และประวัติ">People, hosts and records</h2>
+      <p data-th="กำลังคน โฮสต์ และมิชชั่น ตอนนี้หน้าตาและการใช้งานเหมือนกัน คลิกแถวเพื่อเปิดข้อมูลไว้อ่านก่อน ปุ่มแก้ไขจะเปลี่ยนแผงเดิมให้เป็นฟอร์ม">Manpower, Host and Missions now look and work the same way. Click a row and a record opens to read first. Edit turns the same panel into the form.</p>
+    </div>
+    <div class="records">
+      <div class="record">
+        <div class="frame"><button class="shot" type="button" data-cap="Host record: experienced people, who is free today, and the host's missions." data-cap-th="ประวัติโฮสต์: คนที่ชำนาญ ใครว่างวันนี้ และมิชชั่นของโฮสต์"><img src="img/host-record.jpg" alt="" loading="lazy" width="1000" height="1184"></button></div>
+        <b data-th="ประวัติโฮสต์">Host record</b>
+        <p data-th="ทุกคนที่เคยทำงานที่โฮสต์ จำนวนวันที่นั่น และวันนี้อยู่ที่ไหน มอบหมายคนที่ว่างได้ในคลิกเดียว">Everyone who has worked at the host, their days there, and where they are today. Assign a free person in one click.</p>
+        <span class="pr">PR #126, #127</span>
+      </div>
+      <div class="record">
+        <div class="frame"><button class="shot" type="button" data-cap="Profile: every detail of a person, edited in the same place." data-cap-th="โปรไฟล์: ข้อมูลทุกอย่างของคน และแก้ไขได้ในที่เดียวกัน"><img src="img/profile.jpg" alt="" loading="lazy" width="1000" height="1184"></button></div>
+        <b data-th="โปรไฟล์">Profile</b>
+        <p data-th="ที่เดียวสำหรับดูและแก้ไขข้อมูลของคน รายละเอียด หมายเหตุ ประวัติการลา และโฮสต์ที่เคยไป">The one place to check and edit a person: details, notes, leave record, and the hosts they have worked at.</p>
+        <span class="pr">PR #108, #124</span>
+      </div>
+      <div class="record">
+        <div class="frame"><button class="shot" type="button" data-cap="Manpower list: two-line rows, status with the alert under it, and a Columns button." data-cap-th="รายการกำลังคน: แถวสองบรรทัด สถานะพร้อมการแจ้งเตือนข้างใต้ และปุ่มคอลัมน์"><img src="img/manpower.jpg" alt="" loading="lazy" width="1600" height="666"></button></div>
+        <b data-th="ทุกรายการหน้าตาเดียวกัน">One look for every list</b>
+        <p data-th="แถวสองบรรทัด สถานะพร้อมการแจ้งเตือนข้างใต้ และปุ่มคอลัมน์ ในกำลังคน โฮสต์ และมิชชั่น พอดีจอโดยไม่ต้องเลื่อนด้านข้าง">Two-line rows, the status with its alert under it, and a Columns button on Manpower, Host and Missions. Fits the screen without sideways scrolling.</p>
+        <span class="pr">PR #107, #123, #125</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="more">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="การเปลี่ยนแปลงอื่น ๆ">Smaller changes</h2>
+      <p data-th="ควรรู้ไว้ แม้จะไม่ได้เห็นทุกวัน">Worth knowing, even if you won't notice them every day.</p>
+    </div>
+    <div class="small">
+      <div><b data-th="โหมดเดโมสำหรับฝึกอบรม">Demo mode for training</b><span class="pr">#118</span><p data-th="เติม ?demo ต่อท้ายที่อยู่ เพื่อเปิดแอปด้วยข้อมูลตัวอย่าง ไม่มีอะไรถูกบันทึก ผู้ฝึกจึงลองได้ทุกอย่าง แต่ละคนได้ข้อมูลชุดของตัวเอง">Add ?demo to the address to open the app on sample data. Nothing is saved, so trainees can try anything. Each person gets their own copy.</p></div>
+      <div><b data-th="ไม่เตือน TRIGO ID สำหรับคนออนคอล">No TRIGO ID alert for on-call people</b><span class="pr">#133</span><p data-th="พนักงานออนคอลจะไม่ขึ้นเตือนว่าไม่มี ID อีกต่อไป เมื่อเปลี่ยนเป็นพนักงานประจำ แอปจะถามหา TRIGO ID">On-call staff no longer show a missing ID. When someone becomes permanent, the app asks for their TRIGO ID.</p></div>
+      <div><b data-th="ความชำนาญหน้างานตั้งค่าได้">Host experience is now a setting</b><span class="pr">#121</span><p data-th="ตั้งค่า &gt; ความชำนาญหน้างาน: ทำงานที่โฮสต์กี่วันจึงนับว่าชำนาญ (เริ่มต้น 5 วัน) และโฮสต์เสี่ยงเมื่อมีคนชำนาญเหลือเท่าไร (2 คนหรือน้อยกว่า)">Settings &gt; Host experience: how many days make someone experienced (5 to begin with) and when a host is at risk (2 or fewer).</p></div>
+      <div><b data-th="ความยาวรหัสไซต์ตั้งค่าได้">Site code length is a setting</b><span class="pr">#130</span><p data-th="ตั้งค่า &gt; หมายเลขมิชชั่น: รหัสไซต์มีกี่ตัวอักษร (เริ่มต้น 5)">Settings &gt; Mission numbers: how many letters the site code has (5 to begin with).</p></div>
+      <div><b data-th="ออนคอล: คนที่ถูกเรียกน้อยสุดขึ้นก่อน">On-call list: least called in first</b><span class="pr">#107</span><p data-th="ในมุมมองออนคอลของภาพรวม คนที่ถูกเรียกน้อยที่สุดอยู่ด้านบน">In the Overview's On-call view, the people called in least are at the top.</p></div>
+      <div><b data-th="แก้แล้ว: ตัวเลขในสไลด์วันนี้">Fixed: Today slide counts</b><span class="pr">#111</span><p data-th="สไลด์วันนี้ในโหมดนำเสนอ แสดงจำนวนมิชชั่นและทีมงานแยกกัน เหมือนการ์ดในภาพรวม">Present's Today slide now shows missions and crew separately, like the Overview card.</p></div>
+      <div><b data-th="แถบด้านบนแบบใหม่">New top bar</b><span class="pr">#97</span><p data-th="ไอคอนแอปและคำว่า Manpower Board ที่มุมซ้ายบน โลโก้ TRIGO ย้ายไปด้านล่างของหน้าตั้งค่า">The app icon and "Manpower Board" in the top left. The TRIGO logo moved to the bottom of Settings.</p></div>
+      <div><b data-th="ตัวกรองในกราฟกำลังคน">Workforce chart filters</b><span class="pr">#109</span><p data-th="คลิกกลุ่มอายุงานเพื่อแสดงหรือซ่อน ยอดรวมจะเปลี่ยนตาม">Click a years-of-service group to show or hide it. The totals follow.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span data-th="<b>Manpower Board</b> อัปเดตวันที่ 1 ถึง 16 พฤศจิกายน 2026"><b>Manpower Board</b> updates, 1 to 16 November 2026</span>
+    <span data-th="รูปทั้งหมดมาจากโหมดเดโม ชื่อและตัวเลขเป็นข้อมูลตัวอย่าง">Pictures are from the demo, with sample names and numbers.</span>
+  </div>
+</footer>
+
+<dialog id="lb" aria-label="Picture">
+  <button class="close" type="button" aria-label="Close">×</button>
+  <img id="lb-img" alt="">
+  <p class="cap" id="lb-cap"></p>
+</dialog>
+
+<script>
+(function () {
+  // Updates per day (Thailand time), from the pull requests. 16 Nov holds #133 and Mission Leader (#134).
+  var live = { 3: 1, 4: 5, 5: 9, 9: 4, 10: 7, 12: 3, 16: 1 };
+  var leader = { 16: 1 };
+  var DAYS = { en: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], th: ["อา.","จ.","อ.","พ.","พฤ.","ศ.","ส."] };
+  var lang = "en";
+
+  function drawChart() {
+    var html = "";
+    for (var d = 1; d <= 16; d++) {
+      var wd = new Date(2026, 10, d).getDay();
+      var n = (live[d] || 0) + (leader[d] || 0), bars = "";
+      for (var k = 0; k < (leader[d] || 0); k++) bars += '<i class="lead" style="--d:' + d + '"></i>';
+      for (var j = 0; j < (live[d] || 0); j++) bars += '<i style="--d:' + d + '"></i>';
+      html += '<div class="day' + (wd === 0 || wd === 6 ? ' weekend' : '') + '"><div class="col">' + (n ? '<span class="n">' + n + '</span>' : '') + bars + '</div><div class="d"><b>' + d + '</b>' + DAYS[lang][wd] + '</div></div>';
+    }
+    document.getElementById("chart").innerHTML = html;
+  }
+
+  var texts = document.querySelectorAll("[data-th]");
+  for (var i = 0; i < texts.length; i++) texts[i].setAttribute("data-en", texts[i].innerHTML);
+
+  function setLang(l) {
+    lang = l === "th" ? "th" : "en";
+    document.documentElement.lang = lang;
+    for (var i = 0; i < texts.length; i++) texts[i].innerHTML = texts[i].getAttribute("data-" + lang);
+    var imgs = document.querySelectorAll("button.shot img");
+    for (var j = 0; j < imgs.length; j++) {
+      var file = imgs[j].getAttribute("src").split("/").pop();
+      imgs[j].setAttribute("src", (lang === "th" ? "img/th/" : "img/") + file);
+      imgs[j].alt = imgs[j].parentNode.getAttribute(lang === "th" ? "data-cap-th" : "data-cap") || "";
+    }
+    var btns = document.querySelectorAll(".lang button");
+    for (var k = 0; k < btns.length; k++) btns[k].setAttribute("aria-pressed", btns[k].getAttribute("data-lang") === lang ? "true" : "false");
+    drawChart();
+    try { localStorage.setItem("nov26-lang", lang); } catch (e) {}
+  }
+
+  document.addEventListener("click", function (e) {
+    var lb = e.target.closest(".lang button");
+    if (lb) { setLang(lb.getAttribute("data-lang")); return; }
+    var b = e.target.closest("button.shot");
+    if (!b) return;
+    var img = b.querySelector("img"), dlg = document.getElementById("lb");
+    document.getElementById("lb-img").src = img.src;
+    document.getElementById("lb-img").alt = img.alt;
+    document.getElementById("lb-cap").textContent = b.getAttribute(lang === "th" ? "data-cap-th" : "data-cap") || "";
+    if (dlg.showModal) dlg.showModal();
+  });
+  document.getElementById("lb").addEventListener("click", function (e) {
+    if (e.target.id === "lb" || e.target.classList.contains("close")) e.currentTarget.close();
+  });
+
+  // Start in Thai for #th, a remembered choice, or a Thai browser; English otherwise.
+  var start = "en";
+  if (location.hash === "#th") start = "th";
+  else if (location.hash === "#en") start = "en";
+  else {
+    var saved = null;
+    try { saved = localStorage.getItem("nov26-lang"); } catch (e) {}
+    if (saved) start = saved;
+    else if (/^th/i.test(navigator.language || "")) start = "th";
+  }
+  setLang(start);
+})();
+</script>
