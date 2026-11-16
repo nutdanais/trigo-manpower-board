@@ -31,6 +31,7 @@ h2 { font-size: 19px; letter-spacing: -.2px; text-wrap: balance; }
 h3 { font-size: 14px; }
 p { max-width: 72ch; }
 .lede { color: var(--muted); margin-top: 6px; }
+.decided { margin-top: 10px; padding: 10px 12px; border: 1px solid #b7dcd7; background: var(--ld-wash); border-radius: 8px; font-size: 13.5px; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 12px; min-width: 0; }
 .small { font-size: 12.5px; }
 .muted { color: var(--muted); }
@@ -198,6 +199,7 @@ tr.best { background: #f5f8fc; }
 <div class="wrap" id="wrap" data-accent="teal">
   <header>
     <h1>Mark the head of a crew</h1>
+    <p class="decided"><b>Decided 16 Nov 2026:</b> option <b>A. Corner badge</b>, in <b>teal</b>, exactly <b>one head per mission</b>. Built in the app (right-click a person on a mission → Make crew head). The other options are kept below for the record.</p>
     <p class="lede">Five ways to show which person leads a mission's crew on the day's board. The head is set from the employee card's right-click menu (on a phone, hold the card). Every board on this page works: right-click any card in a crew to make that person the head, or to remove it.</p>
   </header>
 
@@ -366,7 +368,7 @@ tr.best { background: #f5f8fc; }
   // option panels
   document.getElementById("options").innerHTML = OPTIONS.map(o => `
     <section class="panel opt" aria-labelledby="h-${o.key}">
-      <div class="opt-head"><h2 id="h-${o.key}"><span>${o.key.toUpperCase()}.</span>${o.name}</h2>${o.rec ? `<span class="rec">Recommended</span>` : ""}</div>
+      <div class="opt-head"><h2 id="h-${o.key}"><span>${o.key.toUpperCase()}.</span>${o.name}</h2>${o.key === "a" ? `<span class="rec" style="background:#0f766e">Chosen</span>` : ""}${o.rec ? `<span class="rec">Recommended</span>` : ""}</div>
       <p class="small">${o.lede}</p>
       <div class="board opt-${o.key}" aria-label="Sample board, option ${o.key.toUpperCase()}"></div>
       <div class="opt-why">

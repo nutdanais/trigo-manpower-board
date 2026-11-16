@@ -150,6 +150,45 @@ create table if not exists assignments (
 );
 create index if not exists assignments_date_idx on assignments(plan_date);
 
+-- ===== The head of a mission's crew (migration-2026-11-16-mission-crew-head.sql) =====
+-- One column on the mission, so a crew has at most one head. The head must be on the
+-- mission that day, and is cleared when they leave it (moved, leave, Standby, lent, deleted).
+alter table missions add column if not exists lead_employee_id uuid references employees(id) on delete set null;
+
+create or replace function public.check_mission_lead() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $fn$
+begin
+  if new.lead_employee_id is not null and not exists (
+    select 1 from assignments a
+    where a.employee_id = new.lead_employee_id and a.plan_date = new.plan_date and a.mission_id = new.id
+  ) then
+    raise exception 'The crew head must be on this mission''s crew (missions_lead_on_crew)'
+      using errcode = '23514';
+  end if;
+  return new;
+end $fn$;
+
+drop trigger if exists missions_lead_on_crew on missions;
+create trigger missions_lead_on_crew
+  before insert or update of lead_employee_id, plan_date on missions
+  for each row execute function public.check_mission_lead();
+
+create or replace function public.clear_mission_lead() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $fn$
+begin
+  if old.mission_id is not null
+     and (tg_op = 'DELETE' or new.mission_id is distinct from old.mission_id or new.plan_date is distinct from old.plan_date) then
+    update missions set lead_employee_id = null
+    where id = old.mission_id and lead_employee_id = old.employee_id;
+  end if;
+  return null;
+end $fn$;
+
+drop trigger if exists assignments_clear_mission_lead on assignments;
+create trigger assignments_clear_mission_lead
+  after update or delete on assignments
+  for each row execute function public.clear_mission_lead();
+
 -- ===== Employee loans: lend someone to another board for a few days =====
 -- An employee still belongs to ONE board (employees.board_id); a loan says
 -- where they work on the dates it covers (both included). The day after it

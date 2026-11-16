@@ -2393,7 +2393,7 @@ function empCard(emp, opts = {}) {
   // contract type is the card's identity now (white = permanent, grey dashed = on-call);
   // service area is carried by the area code text, not colour
   card.className = "emp-card" + (emp.contract === "oncall" ? " oncall" : "")
-    + (state.selectedEmps.has(emp.id) ? " selected" : "");
+    + (state.selectedEmps.has(emp.id) ? " selected" : "") + (opts.lead ? " lead" : "");
   // Not draggable on touch: Android Chrome starts a native drag from a long
   // press on a draggable element, which is the same gesture that now opens the
   // context menu — the two would race for it. Nothing is lost, because HTML5
@@ -2423,6 +2423,16 @@ function empCard(emp, opts = {}) {
       (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
   card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select, click again to unselect · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
+  // the head of this mission's crew (right-click → Make crew head): a teal crown
+  // badge on the top-left corner, the mirror of the selection tick on the right
+  // (design/crew-head-options.html, option A)
+  if (opts.lead) {
+    const badge = document.createElement("span");
+    badge.className = "emp-lead";
+    badge.innerHTML = icon("crown");
+    card.prepend(badge);
+    card.title += " • Crew head";
+  }
   // Find crew: this person's days at the host the people panel is sorted by
   if (opts.hostDays != null) {
     const n = opts.hostDays, exp = n >= hostExperiencedDays();
@@ -2766,6 +2776,20 @@ function renderEmpCtxMenu(view, { addTitle, addItem, addSub, addBack, addSep }) 
     addTitle(many ? `${ids.length} employees selected` : emp.name);
     // the person's Profile: everything about them, and where they are edited (roster data, so no day lock)
     if (!many) addItem("Profile", () => openEmployeeModal(emp.id), null, "person");
+    // the head of the crew: one person on a mission of the confirmed board, for a
+    // role that may edit the board, once the database has the column (migration-2026-11-16)
+    const leadMission = current && current.missionId && !isForecastView() && feat().lead && can("board", "edit")
+      ? plan.missions.find(x => x.id === current.missionId) : null;
+    if (leadMission) {
+      const head = missionLeadId(leadMission);
+      if (head === emp.id) {
+        addItem("Remove as crew head", () => guardEdit(() => setMissionLead(leadMission, null)), null, "close");
+      } else {
+        const was = head && D().employees.find(e => e.id === head);
+        const label = was ? `Make crew head (replaces ${splitFullName(was.name)[0]})` : "Make crew head";
+        addItem(label, () => guardEdit(() => setMissionLead(leadMission, emp)), null, "crown");
+      }
+    }
     // on the Manpower List these change the roster: only for a role that may edit it (a viewer's menu is the Profile)
     const rosterEdit = !isNonBoardView() || can("emplist", "edit");
     if (!rosterEdit) return;
@@ -3347,7 +3371,11 @@ function renderMissions() {
     body.dataset.drop = "mission:" + m.id;
     const empRow = document.createElement("div");
     empRow.className = "mission-emps";
-    for (const emp of sortEmployeesDisplay(memberEmps)) empRow.appendChild(empCard(emp));
+    // the crew head (if they are still on it) goes first, with the crown badge
+    const leadId = missionLeadId(m);
+    const crewSorted = sortEmployeesDisplay(memberEmps);
+    if (leadId) crewSorted.sort((x, y) => (y.id === leadId) - (x.id === leadId));
+    for (const emp of crewSorted) empRow.appendChild(empCard(emp, emp.id === leadId ? { lead: true } : {}));
     body.appendChild(empRow);
     const crewEdit = fcView ? can("forecast", "edit") : can("board", "edit");
     // a crew with nobody experienced at this host (Settings → Host experience), while someone else is: Find crew shows who
@@ -12648,6 +12676,23 @@ function hideMission(missionId = state.editingMissionId) {
   } else {
     doHide();
   }
+}
+
+/* The head of a mission's crew, only while they are on it (the database clears it
+   when they leave; this also covers someone on it but not shown, e.g. lent out). */
+function missionLeadId(m) {
+  return m && m.leadId && m.members.includes(m.leadId) ? m.leadId : null;
+}
+/* Make someone the head of their mission's crew, or clear it with emp = null
+   (the employee card's right-click → Make crew head / Remove as crew head). */
+function setMissionLead(m, emp) {
+  return safely(async () => {
+    try {
+      await cloud.setMissionLead(m.id, emp ? emp.id : null);
+    } finally {
+      await refreshAndRender();   // also after a refusal: the board shows where everyone is now
+    }
+  });
 }
 
 /* Set or clear a mission's highlight (the card's right-click → Highlight). */

@@ -162,7 +162,11 @@ function dayPlan(board, date, k, emps, { loanOut } = {}) {
     missions.push({ id, board_id: board, plan_date: date, number: num, host, customer, shift, start_time: TIMES[shift][0], end_time: TIMES[shift][1], engineer_id: eng, ppe: ppe || null, remark: REMARKS[num] || null, hidden: false,
       updated_by: PROFILES[1 + (num.length % 3)].email, updated_at: date + "T0" + (3 + (num.length % 5)) + ":2" + (num.length % 10) + ":00Z" });
     const size = short && crew > 2 ? crew - 1 : crew;
+    const first = w;
     for (let i = 0; i < size && w < workers.length; i++) assignments.push({ employee_id: workers[w++].id, plan_date: date, mission_id: id, zone: null });
+    // the head of the crew (right-click → Make crew head): on Rayong, every other mission
+    // with two or more people, so the board shows missions with a head and without one
+    if (board === "b1" && w - first >= 2 && missions.length % 2 === 1) missions[missions.length - 1].lead_employee_id = workers[first].id;
   }
   onLeave.forEach((e, i) => assignments.push({ employee_id: e.id, plan_date: date, mission_id: null, zone: LEAVE_PATTERN[i % LEAVE_PATTERN.length] }));
   return { missions, assignments };

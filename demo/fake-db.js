@@ -67,6 +67,8 @@ class FakeDb {
     this.highlight = opts.highlight !== false;
     // migration-2026-10-28b ('short' allowed); { highlightShort: false } has the columns but the first list of reasons
     this.highlightShort = this.highlight && opts.highlightShort !== false;
+    // migration-2026-11-16 (missions.lead_employee_id and its two triggers); { lead: false } is a database without it
+    this.lead = opts.lead !== false;
     // migration-2026-11-04 (employees.exit_reason); { exitReason: false } is a database without it
     this.exitReason = opts.exitReason !== false;
     // migration-2026-11-09 (mission_register, mission_number_history and their RPCs); { missions: false } is a database without it
@@ -140,9 +142,9 @@ class FakeDb {
      for reading or writing a column that isn't there. Only the highlight columns and employees.exit_reason
      are emulated (the others predate every test). */
   _missingColumn(q) {
-    const cols = q.table === "missions" && !this.highlight ? ["highlight", "highlight_note"]
-      : q.table === "employees" && !this.exitReason ? ["exit_reason"] : null;
-    if (!cols) return null;
+    const cols = q.table === "missions" ? [].concat(this.highlight ? [] : ["highlight", "highlight_note"], this.lead ? [] : ["lead_employee_id"])
+      : q.table === "employees" && !this.exitReason ? ["exit_reason"] : [];
+    if (!cols.length) return null;
     const col = cols.find((c) =>
       (typeof q.select === "string" && q.select.split(",").map((x) => x.trim()).includes(c))
       || [].concat(q.values || []).some((v) => v && c in v));
@@ -330,12 +332,21 @@ class FakeDb {
     }
   }
 
+  /* missions_lead_on_crew (migration-2026-11-16): a crew head must be on the mission that day */
+  _checkMissionLead(table, row, old) {
+    if (table !== "missions" || !this.lead || !row.lead_employee_id) return;
+    if (old && old.lead_employee_id === row.lead_employee_id && old.plan_date === row.plan_date) return;
+    if (!this.t("assignments").some((a) => a.employee_id === row.lead_employee_id && a.plan_date === row.plan_date && a.mission_id === row.id)) {
+      const e = new Error("The crew head must be on this mission's crew (missions_lead_on_crew)"); e.code = "23514"; throw e;
+    }
+  }
+
   _update(q, user) {
     const hits = this.t(q.table).filter((r) => this._match(r, q.filters));
     for (const r of hits) {
       const old = clone(r);
       Object.assign(r, this._caps(q.table, clone(q.values)));
-      try { this._checkLoanOverlap(q.table, r); } catch (e) { Object.assign(r, old); throw e; }
+      try { this._checkLoanOverlap(q.table, r); this._checkMissionLead(q.table, r, old); } catch (e) { Object.assign(r, old); throw e; }
       this._afterWrite(q.table, "UPDATE", r, old, user);
     }
     if (!q.returning) return { data: null, error: null };
@@ -374,6 +385,16 @@ class FakeDb {
   /* ---------- triggers ---------- */
   _afterWrite(table, op, row, old, user) {
     this._emit(table, op, row, old);
+    // assignments_clear_mission_lead (migration-2026-11-16): the head left the mission
+    if (table === "assignments" && this.lead && old && old.mission_id
+        && (op === "DELETE" || row.mission_id !== old.mission_id || row.plan_date !== old.plan_date)) {
+      for (const m of this.t("missions").filter((x) => x.id === old.mission_id && x.lead_employee_id === old.employee_id)) {
+        const before = clone(m);
+        m.lead_employee_id = null;
+        m.updated_at = this.now();
+        this._afterWrite("missions", "UPDATE", m, before, user);
+      }
+    }
     if (table === "missions" && this.missions) this._syncRegister(op, row, old, user);
     if (!this.forwardPlanning) return;
     if (table !== "missions" && table !== "assignments") return;

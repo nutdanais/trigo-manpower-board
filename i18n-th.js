@@ -3419,3 +3419,13 @@ I18N.add({
   "{a} is now {b} on every day of the mission.": "{a} เปลี่ยนเป็น {b} แล้วในทุกวันของมิชชั่น",
   "{a} is not in the Missions list yet. Save the day first, then fix its number.": "{a} ยังไม่อยู่ในรายการมิชชั่น บันทึกวันก่อน แล้วจึงแก้หมายเลข",
 });
+
+/* The head of a mission's crew: right-click a person on a mission → Make crew head (2026-11-16) */
+I18N.add({
+  "Make crew head": "ตั้งเป็นหัวหน้าทีม",
+  "Make crew head (replaces {a})": "ตั้งเป็นหัวหน้าทีม (แทน {a})",
+  "Remove as crew head": "ยกเลิกหัวหน้าทีม",
+  "Crew head": "หัวหน้าทีม",
+  "Setting a crew head needs a one-time database update (migration-2026-11-16-mission-crew-head.sql) before it can be used.": "ต้องอัปเดตฐานข้อมูลหนึ่งครั้ง (migration-2026-11-16-mission-crew-head.sql) ก่อนจึงจะตั้งหัวหน้าทีมได้",
+  "They are no longer on this mission's crew, so they can't be its head. The board has been refreshed.": "คนนี้ไม่ได้อยู่ในทีมของมิชชั่นนี้แล้ว จึงตั้งเป็นหัวหน้าทีมไม่ได้ บอร์ดได้รีเฟรชแล้ว"
+});
