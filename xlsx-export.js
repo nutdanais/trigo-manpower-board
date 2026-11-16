@@ -11,7 +11,7 @@
 "use strict";
 
 (function (root) {
-  /* The sixteen exportable columns, in sheet order. `width` is Excel's
+  /* The seventeen exportable columns, in sheet order. `width` is Excel's
      character width. `center` columns are the short ones (shift, times). */
   const COLUMNS = [
     { key: "name",     label: "Name",          th: "ชื่อ",             width: 30 },
@@ -22,6 +22,8 @@
     { key: "service",  label: "Years of Service", th: "อายุงาน",      width: 26 },
     { key: "area",     label: "Service Area",  th: "พื้นที่บริการ",    width: 16 },
     { key: "mission",  label: "Mission",       th: "ภารกิจ",          width: 11 },
+    // the mission's Leader (right-click → Make Leader): "Leader" on their row, blank on the others
+    { key: "leader",   label: "Leader",        th: "หัวหน้าทีม",       width: 12, center: true },
     { key: "host",     label: "Host",          th: "โฮสต์",           width: 22 },
     { key: "customer", label: "Customer",      th: "ลูกค้า",          width: 24 },
     { key: "ppe",      label: "PPE",           th: "PPE",             width: 31 },
@@ -48,6 +50,7 @@
     paper: "FFF2F5F8", pale: "FFEAF1F7", onNavy: "FFB8CCDD", divider: "FF6F93B2",
     dayBg: "FFFFF3CC", dayFg: "FF7A5B00", nightBg: "FFE4E5F7", nightFg: "FF31357D", oncall: "FFB45309",
     okBg: "FFEAF4D5", okFg: "FF40610A",
+    lead: "FF0F766E", leadBg: "FFE6F4F2",   // the Leader's teal (styles.css .emp-lead)
   };
 
   const pxOf = (w) => w * 7 + 5;   // Excel column width (chars) -> approx. pixels
@@ -311,6 +314,8 @@
       v = say(col.key, v, lang);
     } else if (col.key === "leave") {
       v = leaveLabel(r, lang);
+    } else if (col.key === "leader") {
+      v = r.leader ? (lang === "th" ? "หัวหน้าทีม" : "Leader") : "";
     } else if (col.key === "status") {
       v = say("status", r.active !== false ? "Active" : r.exitReason === "resigned" ? "Resigned" : "Inactive", lang);
     } else if (col.key === "util") {
@@ -339,6 +344,10 @@
       cell.font = fontOf({ bold: true, color: { argb: t[1] } });
     }
     if (col.key === "remark") cell.font = fontOf({ italic: true, color: { argb: C.mut } });
+    if (col.key === "leader" && r.leader) {
+      cell.fill = fillOf(C.leadBg);
+      cell.font = fontOf({ bold: true, color: { argb: C.lead } });
+    }
   }
 
   /* The pale total row under a table: label (and a muted detail) merged over

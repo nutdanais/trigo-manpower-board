@@ -163,7 +163,7 @@
   const hex = (c, d) => /^#[0-9a-f]{6}$/i.test(c || "") ? c.slice(1).toUpperCase() : /^#[0-9a-f]{3}$/i.test(c || "") ? c.slice(1).split("").map(x => x + x).join("").toUpperCase() : d;
   function cardText(n) {
     if (n.type === "employee") {
-      const bits = [n.position, n.contract === "oncall" ? "On-call" : "Permanent", STATUS[n.status] || "", n.loan || ""].filter(Boolean);
+      const bits = [n.lead ? "Leader" : "", n.position, n.contract === "oncall" ? "On-call" : "Permanent", STATUS[n.status] || "", n.loan || ""].filter(Boolean);
       return { name: n.name, line: bits.join(" · ") };
     }
     const shift = n.type === "mission" ? (n.shift === "night" ? "Night" : "Day") : "";
