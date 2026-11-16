@@ -3,7 +3,7 @@
    the teal crown badge on their card, the head first in the crew, one head per
    mission, the head cleared when they leave the mission, live sync to a second
    user, Carry over, who gets the menu item, Thai, the Org Chart (and its
-   PowerPoint), and a database without
+   PowerPoint), the Excel rows, and a database without
    migration-2026-11-16. Real app in Chromium against the shared fake backend.
      NODE_PATH=$(npm root -g) node tests/e2e/crew-head.e2e.js
    Seed: harness.seedBase (Board One: 101 day with A and B, 102 day with C, 103
@@ -233,6 +233,16 @@ async function step(name, fn) {
       await p.evaluate(() => I18N.setLang("th"));
       await p.waitForFunction(() => document.querySelector("#oc-outline .oc-chip.oc-lead")?.textContent.trim() === "หัวหน้าทีม");
       await p.evaluate(() => I18N.setLang("en"));
+    });
+
+    await step("the Excel export: the Leader's row comes first in the mission and says Leader", async () => {
+      await p.click("#board-tabs .board-tab");
+      await card("101").waitFor();
+      const rows = await p.evaluate(() => xlsxRows().map((r) => ({ empId: r.empId, mission: r.mission, leader: r.leader })));
+      const m101 = rows.filter((r) => r.mission === "101");
+      assert.deepEqual(m101.map((r) => r.empId), ["e3", "e2"], "C (the Leader) before B");
+      assert.deepEqual(m101.map((r) => r.leader), [true, false]);
+      assert.equal(rows.find((r) => r.empId === "e4").leader, true, "the night mission's Leader");
     });
 
     await step("no page errors", async () => {

@@ -45,7 +45,7 @@ const headerOf = (ws) => { const out = []; ws.getRow(6).eachCell((c) => out.push
 
 test("all columns come out in the agreed order", async () => {
   const { ws } = await roundTrip({ columns: X.ALL_KEYS });
-  assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
+  assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Mission", "Leader", "Host", "Customer", "PPE", "Shift", "Start", "End", "Engineer", "Remark"]);
 });
 
 test("ticked columns only, always in sheet order whatever order they were passed in", async () => {
@@ -58,9 +58,9 @@ test("ticked columns only, always in sheet order whatever order they were passed
 test("dropping Shift, Start and End leaves a sheet with no gaps", async () => {
   const keys = X.ALL_KEYS.filter((k) => !["shift", "start", "end"].includes(k));
   const { ws } = await roundTrip({ columns: keys });
-  assert.equal(headerOf(ws).length, 14);
+  assert.equal(headerOf(ws).length, 15);
   assert.ok(!headerOf(ws).includes("Shift"));
-  assert.equal(ws.getCell(7, 13).value, "K. Wichai");   // Engineer moved up
+  assert.equal(ws.getCell(7, 14).value, "K. Wichai");   // Engineer moved up
 });
 
 test("banner carries board, date and the total number of employees", async () => {
@@ -258,7 +258,7 @@ test("Start Date is a real date cell and Years of Service reads from it, on ever
 });
 
 /* ---------- language: English / Thai ---------- */
-const THAI_HEAD = ["ชื่อ", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "โฮสต์", "ลูกค้า", "PPE", "กะ", "เริ่ม", "สิ้นสุด", "วิศวกร", "หมายเหตุ"];
+const THAI_HEAD = ["ชื่อ", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "ภารกิจ", "หัวหน้าทีม", "โฮสต์", "ลูกค้า", "PPE", "กะ", "เริ่ม", "สิ้นสุด", "วิศวกร", "หมายเหตุ"];
 
 test("serviceLength speaks Thai on request, and parts are exposed for filtering", () => {
   assert.equal(X.serviceLength("2023-04-20", "2026-10-02", "th"), "3 ปี 5 เดือน 12 วัน");
@@ -283,9 +283,9 @@ test("a Thai board file: Thai headers, values, banner, footer and sheet names �
   assert.equal(ws.getCell(7, 7).value, "3 ปี 5 เดือน 12 วัน");
   assert.equal(ws.getCell(7, 8).value, "FTM", "service area is the user's own data");
   assert.equal(ws.getCell(7, 9).value, "M-101");
-  assert.equal(ws.getCell(7, 10).value, "AAT Rayong");
-  assert.equal(ws.getCell(7, 13).value, "กลางวัน");
-  assert.equal(ws.getCell(8, 13).value, "กลางคืน");
+  assert.equal(ws.getCell(7, 11).value, "AAT Rayong");
+  assert.equal(ws.getCell(7, 14).value, "กลางวัน");
+  assert.equal(ws.getCell(8, 14).value, "กลางคืน");
   const banner = bannerTexts(ws);
   assert.ok(banner.includes("บอร์ดกำลังคน") && banner.includes("การวางแผนปฏิบัติการ") && banner.includes("พนักงานทั้งหมด"));
   assert.ok(banner.some((t) => t.includes("พฤหัสบดี") && !t.includes("Thu")), "Thai file: Thai date only");
@@ -525,4 +525,21 @@ test("Manpower List sheet: On Loan To / Loan From / Loan Until follow Current Bo
   assert.equal(plain.getCell(1, 11).value, "30D Utilization", "nobody on loan: the file is as before");
   const th = await X.buildListWorkbook(ExcelJS, { rows, today: "2026-10-20", lang: "th" });
   assert.equal(th.workbook.worksheets[0].getCell(1, 11).value, "ให้ยืมไปที่");
+});
+
+test("the Leader column: Leader on the mission's Leader, in teal, blank for the rest; Thai says หัวหน้าทีม", async () => {
+  const rows = [row({ name: "Somchai", leader: true }), row({ name: "Pichai" })];
+  const { ws } = await roundTrip({ columns: ["name", "mission", "leader"], rows });
+  assert.deepEqual(headerOf(ws), ["Name", "TRIGO ID", "Mission", "Leader"]);
+  assert.equal(ws.getCell(7, 4).value, "Leader");
+  assert.equal(ws.getCell(7, 4).font.color.argb, "FF0F766E");
+  assert.equal(ws.getCell(7, 4).font.bold, true);
+  assert.equal(ws.getCell(8, 4).value, "");
+  const th = await roundTrip({ lang: "th", columns: ["name", "leader"], rows });
+  assert.equal(th.ws.getCell(7, 3).value, "หัวหน้าทีม");
+});
+
+test("the Leader column stays off the leave, Standby and On-call sheets", async () => {
+  const { sheets } = await roundTripAll({ columns: X.ALL_KEYS, groups: GROUPS });
+  for (const w of sheets.slice(1)) assert.ok(!headerOf(w).includes("Leader"), w.name);
 });

@@ -14370,12 +14370,21 @@ function loadExcelJS() {
   return xlsxLibPromise;
 }
 
-/* remembered per device; anything unreadable or stale falls back to every column */
+/* remembered per device; anything unreadable or stale falls back to every column.
+   The Leader column came later (2026-11-16): a choice saved before it existed
+   gets it ticked once, the first time the dialog opens; after the next export
+   the saved choice says whether it is wanted. */
+const XLSX_LEADER_SEEN_KEY = "manpower.xlsxColumns.leaderSeen";
 function xlsxSavedColumns() {
   try {
     const saved = JSON.parse(localStorage.getItem(XLSX_PREF_KEY));
-    const keys = ManpowerXlsx.normalizeColumns(saved).map(c => c.key);
-    if (Array.isArray(saved) && keys.length) return keys;
+    let keys = ManpowerXlsx.normalizeColumns(saved).map(c => c.key);
+    if (Array.isArray(saved) && keys.length) {
+      if (!keys.includes("leader") && localStorage.getItem(XLSX_LEADER_SEEN_KEY) !== "1") {
+        keys = ManpowerXlsx.normalizeColumns(keys.concat("leader")).map(c => c.key);
+      }
+      return keys;
+    }
   } catch (e) { /* private mode / bad JSON */ }
   return ManpowerXlsx.ALL_KEYS;
 }
@@ -14396,7 +14405,7 @@ function takeXlsxLang(name) {
 }
 
 /* one row per person on a mission, missions in the order the board shows them,
-   people permanent-first then by name (same as the cards) */
+   the mission's Leader first, then permanent-first and by name (same as the cards) */
 function xlsxRows() {
   const boardId = D().activeBoardId;
   const missions = getPlan().missions.filter(m => !m.hidden);
@@ -14412,10 +14421,14 @@ function xlsxRows() {
     const emps = m.members
       .map(id => D().employees.find(e => e.id === id))
       .filter(e => e && worksOn(e, boardId) && onRoster(e));
-    for (const e of sortEmployeesDisplay(emps)) {
+    const leadId = missionLeadId(m);
+    const crew = sortEmployeesDisplay(emps);
+    if (leadId) crew.sort((x, y) => (y.id === leadId) - (x.id === leadId));
+    for (const e of crew) {
       const area = D().areas.find(a => a.id === e.areaId);
       const pos = e.position ? POSITIONS[e.position] : null;
       rows.push({
+        leader: e.id === leadId,
         empId: e.id, name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
         position: pos ? pos.label : "", phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", mission: m.number, host: m.host,
         customer: m.customer, ppe, shift: m.shift === "night" ? "Night" : "Day", start: m.startTime, end: m.endTime,
@@ -14712,6 +14725,7 @@ async function exportXlsx() {
     const picked = new Set(offered.filter(b => b.checked).map(b => b.value));
     try {
       localStorage.setItem(XLSX_PREF_KEY, JSON.stringify(keys));
+      localStorage.setItem(XLSX_LEADER_SEEN_KEY, "1");
       localStorage.setItem(XLSX_SHEETS_OFF_KEY, JSON.stringify(offered.filter(b => !b.checked).map(b => b.value)));
     } catch (e) { /* remembering is a courtesy */ }
     // read again: the board may have moved while the dialog was open
