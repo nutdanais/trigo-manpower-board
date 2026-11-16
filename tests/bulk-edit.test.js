@@ -218,7 +218,14 @@ test("the template carries ID and TRIGO ID, and reads back unchanged", async () 
   assert.equal(ws.getCell(2, 4).value, "T329");
   const p = B.planEmployees(B.readTable(B.rowsFromWorkbook(wb2, "employees"), B.EMP_COLUMNS), c);
   assert.deepEqual(p.rows.map((r) => r.kind), ["same", "same", "same", "same"]);
-  assert.equal(p.counts.noTrigoId, 2);
+  assert.equal(p.counts.noTrigoId, 1, "only the permanent person without an ID; the on-call one is fine without");
+});
+
+test("on-call people are not counted as missing a TRIGO ID, but become so when changed to permanent", () => {
+  const p = tplan("Name,Contract type\nMalee Sukjai,Permanent");
+  assert.equal(p.counts.noTrigoId, 1, "Malee turned permanent now lacks an ID");
+  const same = tplan("Name,Contract type\nMalee Sukjai,On-call");
+  assert.equal(same.counts.noTrigoId, 0, "Malee staying on-call is fine without an ID");
 });
 
 test("TRIGO ID identifies a row: rename by TRIGO ID, fill IDs in by name", () => {

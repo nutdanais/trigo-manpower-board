@@ -93,6 +93,42 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "tid-"));
     await p.evaluate(() => closeModal());
     console.log("ok - an existing short name is grandfathered until someone changes it");
 
+    // ---- on-call made permanent: asked for the TRIGO ID, but may save without ----
+    const setContract = (v) => p.evaluate((x) => { const f = document.querySelector("#form-employee"); f.contract.value = x; f.contract.dispatchEvent(new Event("change", { bubbles: true })); }, v);
+    const dbEmp = (id) => db.t("employees").find((e) => e.id === id);
+    assert.equal(dbEmp("e7").contract, "oncall");
+    await h.editEmployee(p, "e7");
+    await setContract("permanent");
+    await p.click("#form-employee button[type=submit]");
+    await p.waitForSelector("#modal-confirm:not(.hidden)");
+    assert.equal(await p.textContent("#confirm-title"), "Add a TRIGO ID?");
+    assert.equal(await p.textContent("#btn-confirm-yes"), "Save without an ID");
+    assert.equal(dbEmp("e7").contract, "oncall", "nothing is saved while the question is open");
+    await p.click("#btn-confirm-no");
+    await p.waitForSelector("#modal-confirm", { state: "hidden" });
+    await p.waitForFunction(() => document.activeElement && document.activeElement.name === "trigoId");
+    assert.equal(dbEmp("e7").contract, "oncall", "Cancel goes back to the form, saving nothing");
+    await p.click("#form-employee button[type=submit]");
+    await p.waitForSelector("#modal-confirm:not(.hidden)");
+    await p.click("#btn-confirm-yes");
+    await p.waitForFunction(() => !document.querySelector("#form-employee"));
+    assert.deepEqual([dbEmp("e7").contract, dbEmp("e7").trigo_id || null], ["permanent", null], "saved as permanent without an ID");
+    // changing nothing about the contract asks nothing, and neither does a TRIGO ID typed in with the change
+    await h.editEmployee(p, "e7");
+    await p.fill("#form-employee input[name=phone]", "081-333-3333");
+    await p.click("#form-employee button[type=submit]");
+    await p.waitForFunction(() => !document.querySelector("#form-employee"));
+    assert.equal(await p.locator("#modal-confirm:not(.hidden)").count(), 0, "a person already permanent is not asked");
+    await h.editEmployee(p, "e8");
+    await setContract("permanent");
+    await p.fill("#form-employee input[name=trigoId]", "T808");
+    await p.click("#form-employee button[type=submit]");
+    await p.waitForFunction(() => !document.querySelector("#form-employee"));
+    assert.equal(await p.locator("#modal-confirm:not(.hidden)").count(), 0, "no question when the ID is filled in");
+    assert.deepEqual([dbEmp("e8").contract, dbEmp("e8").trigo_id], ["permanent", "T808"]);
+    await p.evaluate(() => closeModal());   // the Profile stays open after a save
+    console.log("ok - making an on-call person permanent asks for the TRIGO ID, and can still be saved without");
+
     // ---- Manpower List ----
     await p.evaluate(() => { D().activeBoardId = EMPLIST_ID; return refreshAndRender(); });
     // the TRIGO ID is under the name; its own column is one of Columns' optional ones (off until chosen)
