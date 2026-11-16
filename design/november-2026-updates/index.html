@@ -1,0 +1,623 @@
+<title>Manpower Board in November</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500&family=Noto+Sans+Thai:wght@400;600&display=swap">
+<style>
+/* Layout: split hero on navy, then a bento of highlights, a day-by-day release chart,
+   a teal "on the way" band for PR #134, and one section per part of the app.
+   Light only, like the app. Colours are the app's own tokens. */
+:root {
+  --navy: #003a66;
+  --navy-deep: #002a4a;
+  --green: #a8c855;
+  --green-ink: #4d6810;
+  --teal: #0f766e;
+  --teal-tint: #e6f4f2;
+  --ground: #eef1f4;
+  --paper: #ffffff;
+  --line: #d8dde4;
+  --ink: #1f2937;
+  --muted: #5b6573;
+  --on-navy: #f3f6fa;
+  --on-navy-muted: #b9c8d8;
+  --amber-tint: #fdf8ef;
+  --amber-ink: #8a4f10;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --r: 14px;
+  --shadow: 0 1px 2px rgba(0, 42, 74, .06), 0 8px 24px rgba(0, 42, 74, .08);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-ui); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { text-wrap: balance; margin: 0; letter-spacing: -0.02em; line-height: 1.15; }
+p { margin: 0; }
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+.pr { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+button.shot { all: unset; cursor: zoom-in; display: block; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s cubic-bezier(.16,1,.3,1); }
+button.shot:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,42,74,.08), 0 14px 32px rgba(0,42,74,.14); }
+button.shot:focus-visible, a:focus-visible, .btn:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+button.shot img { width: 100%; height: auto; }
+.tile button.shot { max-height: 280px; }
+.tile button.shot img { height: 100%; object-fit: cover; object-position: top left; }
+.t-missions button.shot { max-height: none; }
+.num-strip > button.shot { max-height: 460px; }
+.num-strip > button.shot img { height: 100%; object-fit: cover; object-position: top; }
+
+/* Hero */
+.hero { background: var(--navy); color: var(--on-navy); padding-block: 56px 64px; position: relative; overflow: hidden; }
+.hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--green); }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: center; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--on-navy-muted); font-size: 14px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 20px; }
+.bars { display: grid; gap: 3px; }
+.bars i { display: block; width: 18px; height: 4px; background: var(--green); border-radius: 1px; }
+.hero h1 { font-size: clamp(36px, 5vw, 58px); font-weight: 800; color: #fff; }
+.hero .sub { margin-top: 18px; font-size: 19px; color: var(--on-navy-muted); max-width: 34ch; }
+.hero .sub b { color: #fff; font-weight: 600; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 999px; font-weight: 600; font-size: 15px; text-decoration: none; white-space: nowrap; transition: transform .2s cubic-bezier(.16,1,.3,1), background .2s; }
+.btn:active { transform: scale(.98); }
+.btn-green { background: var(--green); color: var(--navy-deep); }
+.btn-green:hover { background: #b8d66a; }
+.btn-ghost { color: #fff; border: 1.5px solid rgba(255,255,255,.4); }
+.btn-ghost:hover { border-color: #fff; }
+.hero-shot { transform: rotate(1.2deg); }
+.hero-shot button.shot { border-color: rgba(255,255,255,.18); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+
+/* Numbers */
+.numbers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--paper); border-radius: var(--r); box-shadow: var(--shadow); margin-top: -36px; position: relative; z-index: 1; }
+.numbers div { padding: 20px 24px; display: grid; gap: 2px; }
+.numbers div + div { border-left: 1px solid var(--line); }
+.numbers b { font-size: 34px; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.numbers span { color: var(--muted); font-size: 14px; }
+.numbers .wait b { color: var(--teal); }
+
+/* Jump nav */
+.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(238,241,244,.92); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); margin-top: 32px; }
+.jump .wrap { display: flex; gap: 6px; overflow-x: auto; padding-block: 10px; scrollbar-width: none; }
+.jump a { flex: none; text-decoration: none; font-size: 14px; font-weight: 600; color: var(--navy); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); white-space: nowrap; }
+.jump a:hover { border-color: var(--navy); }
+.jump a.teal { color: var(--teal); border-color: #9fd3cc; background: var(--teal-tint); }
+
+section { padding-block: 64px 8px; scroll-margin-top: 64px; }
+.sec-head { display: grid; gap: 10px; margin-bottom: 28px; max-width: 68ch; }
+.sec-head h2 { font-size: clamp(28px, 3.4vw, 38px); font-weight: 800; color: var(--navy-deep); display: flex; align-items: center; gap: 12px; }
+.sec-head h2::before { content: ""; flex: none; width: 5px; height: 26px; background: var(--green); border-radius: 1px; }
+.sec-head p { color: var(--muted); font-size: 17px; }
+
+/* Bento */
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.tile { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 20px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.tile h3 { font-size: 20px; font-weight: 700; color: var(--navy-deep); }
+.tile p { color: var(--muted); font-size: 15px; }
+.tile .who { font-size: 13px; font-weight: 600; color: var(--green-ink); }
+.t-missions { grid-column: span 4; grid-row: span 2; background: var(--navy); border-color: var(--navy); }
+.t-missions h3 { color: #fff; font-size: 26px; }
+.t-missions p { color: var(--on-navy-muted); font-size: 16px; }
+.t-missions .who { color: var(--green); }
+.t-crew, .t-planned { grid-column: span 2; }
+.t-overview { grid-column: span 3; background: #f6f9ee; border-color: #cfdcae; }
+.t-present { grid-column: span 3; }
+.t-report { grid-column: span 2; }
+.t-demo { grid-column: span 4; background: var(--amber-tint); border-color: #e0c9a4; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 20px; }
+.t-demo .btn { background: var(--navy); color: #fff; }
+.t-demo .btn:hover { background: var(--navy-deep); }
+.t-demo code { font-family: var(--font-mono); background: var(--paper); border: 1px solid #e0c9a4; border-radius: 6px; padding: 1px 6px; color: var(--amber-ink); font-size: 14px; }
+
+/* Release chart */
+.chart-card { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 24px 24px 16px; }
+.chart-scroll { overflow-x: auto; }
+.chart { display: grid; grid-template-columns: repeat(16, minmax(36px, 1fr)); gap: 6px; align-items: end; min-width: 640px; height: 240px; padding-top: 24px; }
+.day { display: grid; grid-template-rows: 1fr auto; height: 100%; text-align: center; }
+.col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; }
+.col .n { font-weight: 700; color: var(--navy); font-size: 14px; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.col i { display: block; height: 15px; border-radius: 3px; background: var(--navy); transform-origin: bottom; }
+.col i.wait { background: repeating-linear-gradient(135deg, var(--teal) 0 4px, #5fb3aa 4px 8px); }
+.day .d { padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.day .d b { display: block; color: var(--ink); font-size: 14px; }
+.day.weekend .d { color: #9aa3ae; }
+.day.weekend .d b { color: #9aa3ae; }
+.legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; font-size: 14px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 14px; height: 14px; border-radius: 3px; background: var(--navy); display: inline-block; }
+.legend i.wait { background: repeating-linear-gradient(135deg, var(--teal) 0 4px, #5fb3aa 4px 8px); }
+.chart-notes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+.chart-notes div { border-top: 2px solid var(--navy); padding-top: 10px; font-size: 14px; color: var(--muted); }
+.chart-notes b { display: block; color: var(--ink); font-size: 15px; }
+
+/* On the way */
+.ontheway { background: var(--teal-tint); border-block: 1px solid #b7ddd8; margin-top: 64px; padding-block: 56px; }
+.otw-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 40px; align-items: start; }
+.status { display: inline-flex; align-items: center; gap: 8px; background: var(--paper); border: 1.5px solid var(--teal); color: var(--teal); font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 999px; }
+.status::before { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--teal); }
+.ontheway h2 { font-size: clamp(30px, 3.8vw, 44px); font-weight: 800; color: #0b4f49; margin-top: 16px; }
+.ontheway .lead { font-size: 18px; color: #2b5b56; margin-top: 12px; max-width: 46ch; }
+.steps { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 14px; }
+.steps li { display: grid; grid-template-columns: 32px minmax(0,1fr); gap: 12px; align-items: start; }
+.steps .k { width: 32px; height: 32px; border-radius: 50%; background: var(--teal); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.steps b { color: #0b4f49; }
+.steps p { color: #2b5b56; font-size: 15px; }
+.otw-shots { display: grid; gap: 16px; }
+.otw-shots .pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.fact-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.fact-row span { background: var(--paper); border: 1px solid #b7ddd8; border-radius: 999px; padding: 5px 12px; font-size: 14px; color: #0b4f49; font-weight: 500; }
+.otw-note { margin-top: 20px; font-size: 15px; color: #2b5b56; background: rgba(255,255,255,.6); border-radius: 10px; padding: 14px 16px; }
+.otw-note a { color: var(--teal); font-weight: 600; }
+
+/* Feature rows */
+.feature { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 36px; align-items: center; padding-block: 24px; }
+.feature + .feature { border-top: 1px solid var(--line); }
+.feature.flip { grid-template-columns: minmax(0, 6fr) minmax(0, 4fr); }
+.feature.flip .copy { order: 2; }
+.feature h3 { font-size: 24px; font-weight: 700; color: var(--navy-deep); }
+.feature .copy { display: grid; gap: 12px; min-width: 0; }
+.feature .copy > p { color: var(--muted); }
+.ticks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ticks li { padding-left: 26px; position: relative; font-size: 15px; }
+.ticks li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 12px; height: 7px; border-left: 2.5px solid var(--green-ink); border-bottom: 2.5px solid var(--green-ink); transform: rotate(-45deg); }
+.stack-shots { display: grid; gap: 14px; }
+.phone-pair { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; }
+
+/* Missions band */
+.missions-wide { display: grid; gap: 20px; }
+.callouts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.callouts div { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+.callouts b { color: var(--navy-deep); font-size: 16px; }
+.callouts p { font-size: 14px; color: var(--muted); }
+.num-strip { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: center; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; }
+.formats { display: grid; gap: 10px; }
+.fmt { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 15px; }
+.fmt code { font-family: var(--font-mono); font-size: 15px; padding: 4px 10px; border-radius: 6px; background: var(--ground); color: var(--navy-deep); }
+.fmt .bad { background: #fef2f2; color: #a3271f; }
+.fmt .tmp { background: var(--amber-tint); color: var(--amber-ink); }
+
+/* Overview gallery */
+.gallery { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 46%); gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 16px; }
+.gallery figure { margin: 0; scroll-snap-align: start; display: grid; gap: 12px; align-content: start; }
+.gallery figcaption { display: grid; gap: 4px; }
+.gallery figcaption b { color: var(--navy-deep); font-size: 17px; }
+.gallery figcaption span { color: var(--muted); font-size: 15px; }
+.gallery .frame { height: 300px; overflow: hidden; border-radius: 10px; }
+.gallery .frame button.shot { height: 100%; }
+.gallery .frame img { height: 100%; width: 100%; object-fit: cover; object-position: top left; }
+.gallery-hint { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.ov-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 28px; margin-top: 28px; }
+.ov-list div { padding-block: 14px; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+.ov-list b { color: var(--ink); font-size: 15px; }
+.ov-list p { font-size: 14px; color: var(--muted); }
+
+/* Records */
+.records { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.record { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.record .frame { height: 360px; overflow: hidden; border-radius: 10px; }
+.record .frame button.shot { height: 100%; }
+.record .frame img { height: 100%; object-fit: cover; object-position: top; }
+.record b { color: var(--navy-deep); font-size: 18px; }
+.record p { color: var(--muted); font-size: 15px; }
+
+/* Smaller changes */
+.small { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; }
+.small div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.small b { font-size: 15px; }
+.small p { grid-column: 1 / -1; font-size: 14px; color: var(--muted); }
+
+footer { margin-top: 72px; background: var(--navy-deep); color: var(--on-navy-muted); padding-block: 36px; font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 32px; justify-content: space-between; align-items: center; }
+footer b { color: #fff; }
+
+/* Lightbox */
+dialog { border: 0; padding: 0; background: transparent; max-width: min(96vw, 1500px); max-height: 92vh; }
+dialog::backdrop { background: rgba(0, 26, 46, .82); }
+dialog img { max-height: 86vh; width: auto; margin: 0 auto; border-radius: 10px; }
+dialog .cap { color: #fff; text-align: center; margin-top: 10px; font-size: 15px; }
+dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); width: 44px; height: 44px; border-radius: 50%; border: 0; background: #fff; color: var(--navy); font-size: 24px; line-height: 1; cursor: pointer; }
+
+/* Entry motion: content is visible at rest; this only adds a short rise on load */
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1, .hero .sub, .hero .ctas, .hero-shot { animation: rise .7s cubic-bezier(.16,1,.3,1) both; }
+  .hero .sub { animation-delay: .08s; } .hero .ctas { animation-delay: .16s; } .hero-shot { animation-delay: .1s; }
+  .col i { animation: grow .6s cubic-bezier(.16,1,.3,1) both; animation-delay: calc(var(--d, 0) * 40ms + 200ms); }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  @keyframes grow { from { transform: scaleY(0); } }
+  .hero-shot { animation-name: rise-tilt; }
+  @keyframes rise-tilt { from { opacity: 0; transform: translateY(14px) rotate(1.2deg); } to { transform: rotate(1.2deg); } }
+}
+
+@media (max-width: 900px) {
+  .hero-grid, .otw-grid, .feature, .feature.flip, .num-strip { grid-template-columns: minmax(0, 1fr); }
+  .feature.flip .copy { order: 0; }
+  .hero-shot { transform: none; }
+  .bento { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .t-missions, .t-overview, .t-present, .t-demo { grid-column: span 2; }
+  .t-crew, .t-planned, .t-report { grid-column: span 1; }
+  .callouts, .chart-notes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .records, .ov-list { grid-template-columns: minmax(0, 1fr); }
+  .gallery { grid-auto-columns: minmax(280px, 82%); }
+}
+@media (max-width: 640px) {
+  .numbers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .numbers div:nth-child(3) { border-left: 0; }
+  .numbers div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .bento { grid-template-columns: minmax(0, 1fr); }
+  .t-missions, .t-overview, .t-present, .t-demo, .t-crew, .t-planned, .t-report { grid-column: span 1; }
+  .t-demo { grid-template-columns: minmax(0, 1fr); }
+  .callouts, .chart-notes, .small { grid-template-columns: minmax(0, 1fr); }
+  .phone-pair { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding-block: 40px 60px; }
+}
+</style>
+
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="brand"><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Manpower Board · November 2026</div>
+      <h1>What's new this month</h1>
+      <p class="sub"><b>30 updates</b> went live from 3 to 16 November. <b>Mission Leader</b> is built and waiting to go live.</p>
+      <div class="ctas">
+        <a class="btn btn-green" href="#highlights">See the highlights</a>
+        <a class="btn btn-ghost" href="#leader">Mission Leader</a>
+      </div>
+    </div>
+    <div class="hero-shot">
+      <button class="shot" type="button" data-cap="The Overview: today's attention card, key numbers and every board at a glance."><img src="img/ov-top.jpg" alt="The Overview tab with the attention card, utilization tiles and the By board table" width="1600" height="711"></button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="numbers" role="list">
+    <div role="listitem"><b>30</b><span>updates live</span></div>
+    <div role="listitem" class="wait"><b>1</b><span>waiting to go live</span></div>
+    <div role="listitem"><b>1</b><span>new tab: Missions</span></div>
+    <div role="listitem"><b>7</b><span>release days</span></div>
+  </div>
+</div>
+
+<nav class="jump" aria-label="Sections">
+  <div class="wrap">
+    <a href="#highlights">Highlights</a>
+    <a href="#timeline">Day by day</a>
+    <a href="#leader" class="teal">Mission Leader (coming)</a>
+    <a href="#board">Board</a>
+    <a href="#missions">Missions</a>
+    <a href="#overview">Overview &amp; reports</a>
+    <a href="#records">People &amp; hosts</a>
+    <a href="#more">Smaller changes</a>
+  </div>
+</nav>
+
+<main>
+<section id="highlights">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>The month in 30 seconds</h2>
+      <p>The changes you are most likely to notice. Click any picture to see it larger.</p>
+    </div>
+    <div class="bento">
+      <article class="tile t-missions">
+        <span class="who">New tab</span>
+        <h3>Missions: every job in one list</h3>
+        <p>See each mission's status, crew, host and shift at a glance. Close a mission when the job ends, reopen it if it comes back, and filter by Open or Closed.</p>
+        <button class="shot" type="button" data-cap="Missions tab with Open and Closed counts, tiles that filter, and alerts under each status."><img src="img/missions.jpg" alt="Missions tab" loading="lazy" width="1600" height="622"></button>
+      </article>
+      <article class="tile t-crew">
+        <span class="who">For engineers</span>
+        <h3>Find crew in one click</h3>
+        <p>A mission with no crew can bring back its last crew, or suggest people who know the host.</p>
+        <button class="shot" type="button" data-cap="Find crew menu: sort people by days at this host, bring back the last crew, or suggest crew."><img src="img/find-crew.jpg" alt="Find crew menu on a mission card" loading="lazy" width="1290" height="350"></button>
+      </article>
+      <article class="tile t-planned">
+        <span class="who">For engineers</span>
+        <h3>Tick when your part is planned</h3>
+        <p>Everyone can see who has finished and who the board is waiting for.</p>
+        <button class="shot" type="button" data-cap="The Planned line: 1 of 3 planned, waiting for two engineers."><img src="img/planned-line.jpg" alt="Planned line showing 1 of 3 planned" loading="lazy" width="940" height="72"></button>
+      </article>
+      <article class="tile t-overview">
+        <span class="who">For managers</span>
+        <h3>Overview tells the month's story</h3>
+        <p>New People and Workforce sections, leave and on-call history, and Compare with last period or last year.</p>
+        <button class="shot" type="button" data-cap="Overview, People section: the workload spread, with one row per person underneath."><img src="img/ov-people.jpg" alt="Overview People section chart" loading="lazy" width="1600" height="964"></button>
+      </article>
+      <article class="tile t-present">
+        <span class="who">For meetings</span>
+        <h3>Present mode</h3>
+        <p>Show the Overview full screen in a meeting. The filters still work while you present.</p>
+        <button class="shot" type="button" data-cap="Present mode: the Overview's sections on a full-screen stage, with board chips at the top."><img src="img/present.jpg" alt="Present mode slide" loading="lazy" width="1600" height="1000"></button>
+      </article>
+      <article class="tile t-report">
+        <span class="who">For managers</span>
+        <h3>Monthly report</h3>
+        <p>PDF or Excel, in English or Thai. Pick the sections you need.</p>
+        <button class="shot" type="button" data-cap="The Report dialog: choose the month, the sections, PDF or Excel, English or Thai."><img src="img/report.jpg" alt="Report dialog" loading="lazy" width="700" height="1109"></button>
+      </article>
+      <article class="tile t-demo">
+        <div style="display:grid;gap:8px">
+          <span class="who" style="color:var(--amber-ink)">For training</span>
+          <h3>Try anything in the demo</h3>
+          <p>Add <code>?demo</code> to the app's address. It opens on sample data, so nothing you do touches the real board. Reload to start again.</p>
+        </div>
+        <a class="btn" href="#more">How it works</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="timeline">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Day by day</h2>
+      <p>How many updates went live each day, 1 to 16 November (Thailand time).</p>
+    </div>
+    <div class="chart-card">
+      <div class="chart-scroll">
+        <div class="chart" id="chart" role="img" aria-label="Updates per day: 3 Nov 1, 4 Nov 5, 5 Nov 9, 9 Nov 4, 10 Nov 7, 12 Nov 3, 16 Nov 1 plus Mission Leader waiting."></div>
+      </div>
+      <div class="legend"><span><i></i>Went live</span><span><i class="wait"></i>Waiting to go live</span></div>
+      <div class="chart-notes">
+        <div><b>4 to 5 Nov</b>Overview for managers, Present mode, the Profile</div>
+        <div><b>9 Nov</b>Missions tab, demo mode, Settings for host experience</div>
+        <div><b>10 Nov</b>One look for every list, Host record, Find crew</div>
+        <div><b>12 to 16 Nov</b>Mission number rules, Planned ticks, TRIGO ID</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ontheway" id="leader">
+  <div class="wrap otw-grid">
+    <div>
+      <span class="status">Built and tested, not live yet</span>
+      <h2>Coming next: Mission Leader</h2>
+      <p class="lead">Mark who leads the crew on each mission. The Leader gets a teal crown on their card and moves to the front of the crew.</p>
+      <ol class="steps">
+        <li><span class="k">1</span><div><b>Right-click a person on a mission</b><p>On a phone, press and hold their card.</p></div></li>
+        <li><span class="k">2</span><div><b>Choose Make Leader</b><p>If the mission already has one, the menu says who will be replaced. One Leader per mission.</p></div></li>
+        <li><span class="k">3</span><div><b>The crown follows the crew</b><p>Carry over brings the Leader along. Moving the Leader to another mission, leave or Standby clears it.</p></div></li>
+      </ol>
+      <div class="fact-row">
+        <span>Org Chart shows a Leader chip</span>
+        <span>Org Chart PowerPoint</span>
+        <span>Excel: new Leader column</span>
+        <span>JPG and PDF export</span>
+        <span>Thai: หัวหน้าทีม</span>
+      </div>
+      <p class="otw-note">Viewers see the crown but cannot change it. Present mode does not show the Leader yet. It goes live once the update is merged and a one-time database step has run. Try it now on the <a href="https://deploy-preview-134--trigoth-manpowerboard.netlify.app/?demo" target="_blank" rel="noopener">preview with sample data</a>.</p>
+    </div>
+    <div class="otw-shots">
+      <button class="shot" type="button" data-cap="A mission card with its Leader: the teal crown on the first person's card."><img src="img/leader-card.jpg" alt="Mission card where the first crew member has a teal crown badge" loading="lazy" width="1136" height="328"></button>
+      <button class="shot" type="button" data-cap="Right-click a person on a mission: Make Leader is the second item."><img src="img/leader-menu.jpg" alt="Right-click menu with Make Leader" loading="lazy" width="1184" height="860"></button>
+    </div>
+  </div>
+</div>
+
+<section id="board">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Planning the board</h2>
+      <p>Less hunting for people, fewer wrong numbers, and a clear sign when the day is ready.</p>
+    </div>
+
+    <div class="feature">
+      <div class="copy">
+        <h3>Tick when your part is planned</h3>
+        <p>When several engineers plan one board, each ticks their own name once their missions are done.</p>
+        <ul class="ticks">
+          <li>The line shows <b>1 of 3 planned</b> and names who is still working on it.</li>
+          <li>When everyone has ticked it reads <b>Ready to share with crew</b>.</li>
+          <li>It is a flag only. Nothing gets locked. Admins and managers can tick for anyone.</li>
+          <li>Each day starts empty, and works on phones too.</li>
+        </ul>
+        <span class="pr">PR #131</span>
+      </div>
+      <div class="phone-pair">
+        <button class="shot" type="button" data-cap="Desktop: the Planned line at the end of By area."><img src="img/planned-line.jpg" alt="Planned line on desktop" loading="lazy" width="940" height="72"></button>
+        <button class="shot" type="button" data-cap="Phone: your tick and the count, then who the board is waiting for."><img src="img/phone-planned.jpg" alt="Planned line on a phone" loading="lazy" width="700" height="754"></button>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="copy">
+        <h3>Find crew who know the host</h3>
+        <p>The app now remembers who has worked at each host, and uses it to help you staff a mission.</p>
+        <ul class="ticks">
+          <li><b>Bring back the last crew</b> adds the people from the last time, if they are free.</li>
+          <li><b>Suggest crew</b> picks people with the most days at that host.</li>
+          <li><b>Sort people by days at this host</b> reorders the people panel.</li>
+          <li>An amber <b>Crew new to this host</b> line warns when nobody on the crew has been there before.</li>
+          <li><b>Find replacement</b> appears when you move someone from a mission to leave.</li>
+        </ul>
+        <span class="pr">PR #127</span>
+      </div>
+      <button class="shot" type="button" data-cap="Find crew on a mission with no crew."><img src="img/find-crew.jpg" alt="Find crew menu" loading="lazy" width="1290" height="350"></button>
+    </div>
+
+    <div class="feature">
+      <div class="copy">
+        <h3>Mission numbers match Etraq</h3>
+        <p>Every mission number must follow the Etraq format, so the board, the Host record and reports agree.</p>
+        <ul class="ticks">
+          <li>Wrong numbers show in red on the card, with a <b>Fix number</b> button.</li>
+          <li>Not in Etraq yet? Use a <b>temporary number</b>. It is flagged after 3 days as a reminder.</li>
+          <li>Numbers are always saved in capitals, however they are typed.</li>
+        </ul>
+        <span class="pr">PR #130, #132</span>
+      </div>
+      <div class="stack-shots">
+        <button class="shot" type="button" data-cap="A card with a wrong number: the red line and Fix number."><img src="img/wrong-number.jpg" alt="Mission card flagged Wrong number with a Fix number button" loading="lazy" width="1136" height="372"></button>
+        <div class="formats" aria-label="Number formats">
+          <div class="fmt"><code>RYGTH.26.0101</code><span>Correct: site code, year, four digits</span></div>
+          <div class="fmt"><code class="tmp">BANGN.26.TMP001</code><span>Temporary, until the Etraq number exists</span></div>
+          <div class="fmt"><code class="bad">RYGTH.26.104</code><span>Wrong: flagged in red until fixed</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="missions">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>The new Missions tab</h2>
+      <p>One list of every mission across your boards. It answers which jobs are running, which have no crew, and which need attention.</p>
+    </div>
+    <div class="missions-wide">
+      <button class="shot" type="button" data-cap="The Missions tab."><img src="img/missions.jpg" alt="Missions tab" loading="lazy" width="1600" height="622"></button>
+      <div class="callouts">
+        <div><b>Open and Closed</b><p>Close a mission when the job ends, reopen it if needed. Counts sit on the switch, and the tiles filter.</p></div>
+        <div><b>Alerts under the status</b><p>No crew for 25 days, hidden 9 days, off the board, wrong number. You see what needs a look.</p></div>
+        <div><b>This year first</b><p>The list opens on this year's missions. A chip brings back earlier years.</p></div>
+        <div><b>Your columns</b><p>Columns, Filters, Bulk edit and Export. Hover a row for Close and the ⋯ menu.</p></div>
+      </div>
+      <div class="num-strip">
+        <button class="shot" type="button" data-cap="Double-click a mission for its panel: details, crew per day and who has worked on it."><img src="img/mission-panel.jpg" alt="Mission panel" loading="lazy" width="1000" height="1184"></button>
+        <div class="copy" style="display:grid;gap:12px">
+          <h3 style="font-size:22px;color:var(--navy-deep)">Double-click for the whole story</h3>
+          <ul class="ticks">
+            <li>Crew per working day, average crew, and everyone who has worked on it.</li>
+            <li>Highlight, Duplicate, Move or copy, Hide and Close from one place.</li>
+            <li>New-year numbers: last year's number stays beside the new one for two weeks.</li>
+            <li>A new <b>Site Admin</b> role for the people who manage the mission list.</li>
+          </ul>
+          <span class="pr">PR #106, #120, #128, #129, #130</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="overview">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Overview and reports</h2>
+      <p>The Overview tab grew into a monthly picture for managers: who worked, who was on leave, and how that compares. Scroll the pictures sideways.</p>
+    </div>
+    <div class="gallery" tabindex="0" aria-label="Overview pictures, scroll sideways">
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="History: six tiles, each compared with the previous period. Group by Day, Week or Month."><img src="img/ov-history.jpg" alt="History section" loading="lazy" width="1600" height="640"></button></div>
+        <figcaption><b>History</b><span>Leave per day and on-call per day join the tiles. Each tile shows the change from the previous period.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="People: workload spread, leave, nights, on-call and alerts, one row per person."><img src="img/ov-people.jpg" alt="People section" loading="lazy" width="1600" height="964"></button></div>
+        <figcaption><b>People</b><span>Workload, leave, nights and on-call for each person. Click a bar to filter the list.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="Workforce: headcount at the end of each month by years of service, with joiners and leavers."><img src="img/ov-workforce.jpg" alt="Workforce section" loading="lazy" width="1600" height="644"></button></div>
+        <figcaption><b>Workforce</b><span>Headcount each month by years of service, with joiners, leavers and a total on every bar.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="Present mode keeps the Overview's own filters working on stage."><img src="img/present.jpg" alt="Present mode" loading="lazy" width="1600" height="1000"></button></div>
+        <figcaption><b>Present mode</b><span>Full-screen slides for meetings. Keys: B next board, G group by, C compare.</span></figcaption>
+      </figure>
+      <figure>
+        <div class="frame"><button class="shot" type="button" data-cap="Report dialog."><img src="img/report.jpg" alt="Report dialog" loading="lazy" width="700" height="1109"></button></div>
+        <figcaption><b>Monthly report</b><span>PDF or Excel, English or Thai. Names are left out unless you tick them.</span></figcaption>
+      </figure>
+    </div>
+    <p class="gallery-hint">Swipe or scroll to see all five.</p>
+    <div class="ov-list">
+      <div><b>Pick several boards</b><p>Show one board, a few, or all. View them combined, side by side, or A against B.</p></div>
+      <div><b>Compare with</b><p>Previous period, or the same period last year.</p></div>
+      <div><b>Click any day</b><p>Click a day on a chart to open that board on that date.</p></div>
+      <div><b>Deployed per day, split</b><p>By permanent and on-call, or by service area. Line, bars or stacked, with the figure on each bar.</p></div>
+      <div><b>Resigned status</b><p>When someone leaves, choose Resigned or Inactive for now. Resigned people get their own filter.</p></div>
+      <div><b>Host skills matrix</b><p>Who is experienced at each host, and which hosts are at risk.</p></div>
+    </div>
+    <p class="pr" style="margin-top:16px;display:block">PR #98, #101 to #105, #109, #111 to #115</p>
+  </div>
+</section>
+
+<section id="records">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>People, hosts and records</h2>
+      <p>Manpower, Host and Missions now look and work the same way. Click a row and a record opens to read first. Edit turns the same panel into the form.</p>
+    </div>
+    <div class="records">
+      <div class="record">
+        <div class="frame"><button class="shot" type="button" data-cap="Host record: experienced people, who is free today, and the host's missions."><img src="img/host-record.jpg" alt="Host record panel" loading="lazy" width="1000" height="1184"></button></div>
+        <b>Host record</b>
+        <p>Everyone who has worked at the host, their days there, and where they are today. Assign a free person in one click.</p>
+        <span class="pr">PR #126, #127</span>
+      </div>
+      <div class="record">
+        <div class="frame"><button class="shot" type="button" data-cap="Profile: every detail of a person, edited in the same place."><img src="img/profile.jpg" alt="Employee profile panel" loading="lazy" width="1000" height="1184"></button></div>
+        <b>Profile</b>
+        <p>The one place to check and edit a person: details, notes, leave record, and the hosts they have worked at.</p>
+        <span class="pr">PR #108, #124</span>
+      </div>
+      <div class="record">
+        <div class="frame"><button class="shot" type="button" data-cap="Manpower list: two-line rows, status with the alert under it, and a Columns button."><img src="img/manpower.jpg" alt="Manpower list" loading="lazy" width="1600" height="667"></button></div>
+        <b>One look for every list</b>
+        <p>Two-line rows, the status with its alert under it, and a Columns button on Manpower, Host and Missions. Fits the screen without sideways scrolling.</p>
+        <span class="pr">PR #107, #123, #125</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="more">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Smaller changes</h2>
+      <p>Worth knowing, even if you won't notice them every day.</p>
+    </div>
+    <div class="small">
+      <div><b>Demo mode for training</b><span class="pr">#118</span><p>Add ?demo to the address to open the app on sample data. Nothing is saved, so trainees can try anything. Each person gets their own copy.</p></div>
+      <div><b>No TRIGO ID alert for on-call people</b><span class="pr">#133</span><p>On-call staff no longer show a missing ID. When someone becomes permanent, the app asks for their TRIGO ID.</p></div>
+      <div><b>Host experience is now a setting</b><span class="pr">#121</span><p>Settings, Host experience: how many days make someone experienced (5 to begin with) and when a host is at risk (2 or fewer).</p></div>
+      <div><b>Site code length is a setting</b><span class="pr">#130</span><p>Settings, Mission numbers: how many letters the site code has (5 to begin with).</p></div>
+      <div><b>On-call list: least called in first</b><span class="pr">#107</span><p>In the Overview's On-call view, the people called in least are at the top.</p></div>
+      <div><b>Fixed: Today slide counts</b><span class="pr">#111</span><p>Present's Today slide now shows missions and crew separately, like the Overview card.</p></div>
+      <div><b>New top bar</b><span class="pr">#97</span><p>The app icon and "Manpower Board" in the top left. The TRIGO logo moved to the bottom of Settings.</p></div>
+      <div><b>Workforce chart filters</b><span class="pr">#109</span><p>Click a years-of-service group to show or hide it. The totals follow.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span><b>Manpower Board</b> updates, 1 to 16 November 2026</span>
+    <span>Pictures are from the demo, with sample names and numbers.</span>
+  </div>
+</footer>
+
+<dialog id="lb" aria-label="Picture">
+  <button class="close" type="button" aria-label="Close">×</button>
+  <img id="lb-img" alt="">
+  <p class="cap" id="lb-cap"></p>
+</dialog>
+
+<script>
+(function () {
+  // Updates that went live per day (Thailand time), from the merged pull requests.
+  var live = { 3: 1, 4: 5, 5: 9, 9: 4, 10: 7, 12: 3, 16: 1 };
+  var waiting = { 16: 1 };
+  var names = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  var chart = document.getElementById("chart");
+  var html = "";
+  for (var d = 1; d <= 16; d++) {
+    var wd = new Date(2026, 10, d).getDay();
+    var n = live[d] || 0, w = waiting[d] || 0, bars = "";
+    for (var k = 0; k < w; k++) bars += '<i class="wait" style="--d:' + d + '" title="Waiting: Mission Leader"></i>';
+    for (var j = 0; j < n; j++) bars += '<i style="--d:' + d + '"></i>';
+    var label = n ? '<span class="n">' + n + (w ? ' +' + w : '') + '</span>' : '';
+    html += '<div class="day' + (wd === 0 || wd === 6 ? ' weekend' : '') + '"><div class="col">' + label + bars + '</div><div class="d"><b>' + d + '</b>' + names[wd] + '</div></div>';
+  }
+  chart.innerHTML = html;
+
+  var lb = document.getElementById("lb"), img = document.getElementById("lb-img"), cap = document.getElementById("lb-cap");
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button.shot");
+    if (!b) return;
+    var i = b.querySelector("img");
+    img.src = i.src; img.alt = i.alt; cap.textContent = b.getAttribute("data-cap") || "";
+    if (lb.showModal) lb.showModal();
+  });
+  lb.addEventListener("click", function (e) { if (e.target === lb || e.target.classList.contains("close")) lb.close(); });
+})();
+</script>
