@@ -411,7 +411,8 @@
           const cur = r.id ? (emps.find((e) => e.id === r.id) || {}) : {};
           const tidAfter = r.kind === "create" ? r.create.trigoId : (r.patch && r.patch.trigoId !== undefined ? r.patch.trigoId : cur.trigoId);
           const nameAfter = r.kind === "create" ? r.create.name : (r.patch && r.patch.name !== undefined ? r.patch.name : cur.name);
-          if (!tidAfter) n.noTrigoId++;
+          const contractAfter = r.kind === "create" ? r.create.contract : (r.patch && r.patch.contract !== undefined ? r.patch.contract : cur.contract);
+          if (!tidAfter && contractAfter !== "oncall") n.noTrigoId++;   // on-call people are fine without a TRIGO ID
           if (EmployeeId.checkFullName(nameAfter)) n.shortName++;
         }
         for (const ch of r.changes) {

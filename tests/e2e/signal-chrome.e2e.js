@@ -261,10 +261,23 @@ async function step(name, fn) {
       const chip = p.locator("#board-status .status-chip", { hasText: "missing TRIGO ID" });
       assert.equal(await chip.count(), 1);
       await chip.click();
-      assert.equal(await p.locator("#emplist-table tbody tr").count(), all - 1, "the chip shows only the people it counts");
+      const missing = await p.evaluate(() => D().employees.filter((e) => e.active !== false && !e.trigoId && e.contract !== "oncall").length);
+      assert.ok(missing > 0 && missing < all, "some people, but not everyone, are missing an ID (on-call people are fine without)");
+      assert.equal(await p.locator("#emplist-table tbody tr").count(), missing, "the chip shows only the people it counts");
       await p.locator("#board-status .status-chip", { hasText: "missing TRIGO ID" }).click();
       assert.equal(await p.locator("#emplist-table tbody tr").count(), all, "a second click shows everyone again");
       await p.evaluate(() => { D().employees[0].trigoId = null; });
+      // an on-call person with no ID has no alert, in the list or the profile; the same person as permanent has one
+      const oc = await p.evaluate(() => {
+        const e = D().employees.find((x) => x.active !== false && x.contract === "oncall" && !x.trigoId);
+        const has = (alerts) => alerts.some((x) => /TRIGO ID/.test(x.text));
+        const onCall = [has(empAlerts(e)), has(employeeAlerts(e, null))];
+        e.contract = "permanent";
+        const permanent = [has(empAlerts(e)), has(employeeAlerts(e, null))];
+        e.contract = "oncall";
+        return { onCall, permanent };
+      });
+      assert.deepEqual(oc, { onCall: [false, false], permanent: [true, true] });
     });
 
     await step("no page errors", async () => { assert.deepEqual(a.errors, []); });
