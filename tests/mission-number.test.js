@@ -213,3 +213,19 @@ test("the site code length follows Settings -> Mission numbers (5 until changed,
     MN.setPrefixLength(5);
   }
 });
+
+test("sameSpelling: only a mistyped spelling of the same number, never a different job", () => {
+  const same = (a, b) => MN.sameSpelling(a, b);
+  const THAI = "\u0E3A";   // a vowel mark typed from the wrong keyboard, in front of a number
+  assert.equal(same(THAI + "LCBTH.26.0049", "LCBTH.26.0049"), true, "a stray vowel mark in front");
+  assert.equal(same("LCBTH.26.0075.", "LCBTH.26.0075"), true, "a dot after");
+  assert.equal(same(".LCBTH.26.0049", "LCBTH.26.0049"), true, "a dot in front");
+  assert.equal(same("lcbth 26.0049", "LCBTH.26.0049"), true, "capitals and spaces");
+  assert.equal(same("LCBTH-26-0049", "LCBTH.26.0049"), true, "dashes for dots");
+  assert.equal(same("LCBTH.26.0049.AB", "LCBTH.26.0049"), true, "the monthly suffix");
+  assert.equal(same("LCBTH.26.0049", "LCBTH.26.0050"), false, "another number");
+  assert.equal(same("LCBTH.26.TMP001", "LCBTH.26.0007"), false, "a temporary number is not the Etraq number of another job");
+  assert.equal(same("108", "LCBTH.26.0108"), false, "a short number is not merged: the digits are not the whole number");
+  assert.equal(same("", ""), false, "nothing is not a spelling");
+  assert.equal(same(THAI, "LCBTH.26.0049"), false);
+});

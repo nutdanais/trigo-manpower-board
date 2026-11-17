@@ -79,6 +79,8 @@ class FakeDb {
     this.ready = opts.ready !== false;
     // migration-2026-11-11 (replace_mission_number); { numberFix: false } is a database without it
     this.numberFix = this.missions && opts.numberFix !== false;
+    // migration-2026-11-18b (merge_mission_number); { numberMerge: false } is a database without it
+    this.numberMerge = this.numberFix && opts.numberMerge !== false;
     // migration-2026-11-12b (the capitals trigger on mission numbers); { numberCaps: false } is a database without it
     this.numberCaps = this.missions && opts.numberCaps !== false;
     this.tables = {};
@@ -462,7 +464,7 @@ class FakeDb {
 
   /* ---------- RPCs ---------- */
   _rpc(q, user) {
-    const fn = q.fn === "replace_mission_number" && !this.numberFix ? null : this.rpcs[q.fn];
+    const fn = (q.fn === "replace_mission_number" && !this.numberFix) || (q.fn === "merge_mission_number" && !this.numberMerge) ? null : this.rpcs[q.fn];
     if (!fn) return { data: null, error: { code: "PGRST202", message: `Could not find the function public.${q.fn} in the schema cache` } };
     if (this._missing({ stamp_carry: "plan_day_stamps", stamp_forecast_merge: "plan_day_stamps", set_forecast_assignment: "forecast_assignments", acknowledge_hold_events: "forecast_hold_events", record_forecast_merge: "forecast_merge_decisions",
       close_mission: "mission_register", reopen_mission: "mission_register", renumber_missions: "mission_register" }[q.fn] || "")) {
@@ -647,6 +649,80 @@ class FakeDb {
       } finally { this._renumbering = false; }
       this.tables.plan_day_stamps = stamps;
       return reg.length;
+    };
+    /* mirrors public.merge_mission_number (migration-2026-11-18b): the typo made on a mission that already exists under
+       the right number on the same board and shift. Every day goes under the right number; a day that has both keeps
+       the card of the right number and gets the other's crew; the two Missions list rows become one (open if either
+       is open, so a closed one is reopened: Site Admin / Manager); the history and the Host Record follow */
+    this.rpcs.merge_mission_number = (a, u) => {
+      if (!this._can(u, "missions", "edit")) fail("Your role cannot change mission numbers.", "42501");
+      const from = String(a.p_old || "").trim(), to = String(a.p_new || "").replace(/\s/g, "").toUpperCase();
+      if (!new RegExp("^" + this._sitePattern() + "\\.[0-9]{2}\\.[0-9]{4}$").test(to)) fail(`Mission number ${to} is not in the form PREFIX.YY.NNNN.`, "23514");
+      if (to === from) return 0;
+      // only a mistyped spelling of the same number (stray characters, or the monthly suffix): two different jobs are never merged
+      const squash = (s) => {
+        let n = String(s || "").replace(/\s/g, "").toUpperCase();
+        const m = n.match(new RegExp("^(" + this._sitePattern() + "\\.[0-9]{2}\\.[0-9]{4})\\.[A-Z]{2}$"));
+        if (m) n = m[1];
+        return n.replace(/[^A-Z0-9]/g, "");
+      };
+      if (squash(from) !== squash(to)) fail(`Mission ${from} is not a mistyped spelling of ${to}, so the two are not merged.`, "23514");
+      const reg = this.t("mission_register");
+      const olds = reg.filter((r) => r.number === from);
+      if (!olds.length) fail(`Mission ${from} is not in the Missions list.`, "P0002");
+      const place = (x) => x.board_id + "|" + x.shift;
+      const oldPlaces = new Set(olds.map(place));
+      if (reg.some((r) => r.number === to && !oldPlaces.has(place(r))) || this.t("missions").some((m) => m.number === to && !oldPlaces.has(place(m)))) {
+        fail(`Mission number ${to} is also used on another board or shift, so the two are not merged.`, "23505");
+      }
+      if (this.forwardPlanning) {
+        const fm = this.t("forecast_missions");
+        const n = fm.filter((x) => x.number === from && fm.some((y) => y.number === to && y.board_id === x.board_id && y.plan_date === x.plan_date && y.shift === x.shift)).length;
+        if (n) fail(`Both ${from} and ${to} are on ${n} forecast day(s). Merge those forecast days first.`, "23514");
+      }
+      const twinOf = (o) => reg.find((n) => n.number === to && n.board_id === o.board_id && n.shift === o.shift);
+      if (olds.some((o) => { const n = twinOf(o); return n && n.status === "closed" && o.status === "open"; }) && !this._can(u, "missionadmin", "edit")) {
+        fail(`Mission ${to} is closed. A Site Admin or a Manager can reopen it by merging.`, "42501");
+      }
+      const stamps = clone(this.t("plan_day_stamps"));
+      let merged = 0;
+      this._renumbering = true;
+      try {
+        for (const o of olds) {
+          const n = twinOf(o);
+          if (!n) { const prev = clone(o); o.number = to; o.updated_at = this.now(); o.updated_by = email(u); this._emit("mission_register", "UPDATE", o, prev); continue; }
+          for (const md of this.t("missions").filter((m) => m.number === from && m.board_id === o.board_id && m.shift === o.shift)) {
+            const mt = this.t("missions").find((m) => m.number === to && m.board_id === o.board_id && m.shift === o.shift && m.plan_date === md.plan_date);
+            if (!mt) { const prevM = clone(md); md.number = to; this._emit("missions", "UPDATE", md, prevM); continue; }
+            for (const x of this.t("assignments").filter((x) => x.mission_id === md.id)) { const prev = clone(x); x.mission_id = mt.id; this._emit("assignments", "UPDATE", x, prev); }
+            const prevT = clone(mt);
+            if (!mt.lead_employee_id && md.lead_employee_id) mt.lead_employee_id = md.lead_employee_id;
+            mt.hidden = !!(mt.hidden && md.hidden);
+            if (!mt.highlight && md.highlight) { mt.highlight = md.highlight; mt.highlight_note = md.highlight_note; }
+            this._emit("missions", "UPDATE", mt, prevT);
+            this._deleteRow("missions", md, u);
+            merged++;
+          }
+          const later = (o.last_on || o.opened_on || "") >= (n.last_on || n.opened_on || "");
+          const prevN = clone(n), anyOpen = o.status === "open" || n.status === "open";
+          n.opened_on = [n.opened_on, o.opened_on].filter(Boolean).sort()[0] || null;
+          n.last_on = [n.last_on, o.last_on].filter(Boolean).sort().pop() || null;
+          if (later) for (const k of ["host", "customer", "start_time", "end_time", "engineer_id", "ppe", "remark"]) n[k] = o[k];
+          if (anyOpen) { n.status = "open"; n.closed_on = null; n.closed_by = null; n.closed_at = null; n.close_note = null; }
+          else n.closed_on = [n.closed_on, o.closed_on].filter(Boolean).sort().pop() || null;
+          n.updated_at = this.now(); n.updated_by = email(u);
+          this._emit("mission_register", "UPDATE", n, prevN);
+          this._deleteRow("mission_register", o, u);
+        }
+        for (const t of ["missions"].concat(this.forwardPlanning ? ["forecast_missions"] : [])) {
+          for (const m of this.t(t).filter((m) => m.number === from)) { const prev = clone(m); m.number = to; this._emit(t, "UPDATE", m, prev); }
+        }
+        for (const h of this.t("deployment_history").filter((h) => h.mission_number === from)) h.mission_number = to;
+        const first = this.t("mission_register").filter((r) => r.number === to).map((r) => r.opened_on).filter(Boolean).sort()[0] || this.now().slice(0, 10);
+        this._insertRow("mission_number_history", { old_number: from, new_number: to, valid_from: first, entered_by: email(u), entered_at: this.now() }, u);
+      } finally { this._renumbering = false; }
+      this.tables.plan_day_stamps = stamps;
+      return merged;
     };
     this.rpcs.acknowledge_hold_events = (a, u) => {
       let n = 0;

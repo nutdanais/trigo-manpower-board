@@ -2874,9 +2874,14 @@ const cloud = {
   /* A wrong or temporary mission number corrected on every day: the Missions list rows (all boards,
      both shifts), the board and forecast days and the Host Record (migration-2026-11-11). Engineer and
      up, and Site Admin. Returns how many Missions list rows changed. */
-  async replaceMissionNumber(oldNumber, newNumber) {
-    const { data, error } = await sb.rpc("replace_mission_number", { p_old: oldNumber, p_new: newNumber });
+  async replaceMissionNumber(oldNumber, newNumber, { merge = false } = {}) {
+    // merge: the new number is already the same job's other spelling (same board and shift): merge_mission_number
+    const fn = merge ? "merge_mission_number" : "replace_mission_number";
+    const { data, error } = await sb.rpc(fn, { p_old: oldNumber, p_new: newNumber });
     if (error) {
+      if (merge && (error.code === "PGRST202" || error.code === "42883" || /merge_mission_number/.test(error.message || "") && /find|exist/i.test(error.message || ""))) {
+        throw new Error("The database needs a one-time update before two missions can be merged: run supabase/migration-2026-11-18b-merge-mission-number.sql in the Supabase SQL Editor.");
+      }
       // a database without the migration: PostgREST cannot find the function
       if (error.code === "PGRST202" || error.code === "42883" || /replace_mission_number/.test(error.message || "") && /find|exist/i.test(error.message || "")) {
         throw new Error("The database needs a one-time update before a mission number can be corrected: run supabase/migration-2026-11-11-mission-number-rules.sql in the Supabase SQL Editor.");
