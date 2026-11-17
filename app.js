@@ -10372,14 +10372,14 @@ function missionNumberUsedWhere(number) {
   return places.join(", ");
 }
 const trText = (s) => (window.I18N ? I18N.t(s) : s);
-/* The same job under its right number: the old number is a mistyped spelling of the one typed (MissionNumber.
-   sameSpelling) and the number typed is on the Missions list only where the old number is too (the same board
-   and shift), so the two are one job, not two missions. A typo made on a mission that
+/* The same job under its right number: the number typed is on the Missions list only where the old number is too
+   (the same board and shift), so the two may be one job, not two missions. When the old number is a mistyped
+   spelling of it (MissionNumber.sameSpelling) they are; otherwise (a letter too many in the site code) the person
+   says so with a tick box, with the other mission's host, customer and dates in front of them. A typo made on a mission that
    already exists (a stray character in front, closed or open) is fixed by merging, not renaming: a rename
    would put two cards with one number on the same days. null when it is not that case (the number is also on
    another board or shift: a different location, which the Fix number dialog refuses). */
 function missionNumberMergeInfo(oldNumber, newNumber) {
-  if (!MissionNumber.sameSpelling(oldNumber, newNumber)) return null;   // two different jobs on one board and shift are never merged
   const reg = D().register || [];
   const olds = reg.filter(r => r.number === oldNumber), news = reg.filter(r => r.number === newNumber);
   if (!olds.length || !news.length) return null;
@@ -10389,7 +10389,16 @@ function missionNumberMergeInfo(oldNumber, newNumber) {
   if ((getPlan().missions || []).some(m => m.number === newNumber && !olds.some(o => o.boardId === D().activeBoardId && o.shift === m.shift))) return null;
   const reopens = news.some(n => n.status === "closed" && olds.some(o => same(o, n) && o.status === "open"));
   const closedOns = news.filter(n => n.status === "closed" && n.closedOn).map(n => n.closedOn).sort();
-  return { reopens, closed: news.every(n => n.status === "closed"), closedOn: closedOns[closedOns.length - 1] || "" };
+  // what the other mission is, so the person can tell whether it is the same job (the host and customer first)
+  const norm = (s) => String(s || "").trim().toLowerCase();
+  const t = news[0], me = olds.find(o => same(o, t)) || olds[0];
+  return {
+    // a spelling of the number (stray characters, the monthly suffix) is the same job without asking; anything else is asked
+    sameSpelling: MissionNumber.sameSpelling(oldNumber, newNumber),
+    sameHostCustomer: norm(t.host) === norm(me.host) && norm(t.customer) === norm(me.customer),
+    reopens, closed: news.every(n => n.status === "closed"), closedOn: closedOns[closedOns.length - 1] || "",
+    what: `${t.host || "—"} → ${t.customer || "—"}, ${t.openedOn ? fmtDate(t.openedOn) : "?"} – ${t.lastOn ? fmtDate(t.lastOn) : "?"}`,
+  };
 }
 /* the site codes in use, most used first; `boardId` puts that board's own first */
 function knownMissionPrefixes(boardId) {
@@ -10479,6 +10488,12 @@ function fixNumberChoice() {
   if (where) {
     const mg = missionNumberMergeInfo(f.number, c.number);
     if (!mg) return { ok: false, number: c.number, error: `${c.number} is already used by another mission (${where}).` };
+    if (!mg.sameSpelling) {
+      // not a spelling of it: the same job only if the person says so (ticked for this number only)
+      const box = $("#fix-number-same");
+      if (box.dataset.for !== c.number) { box.checked = false; box.dataset.for = c.number; }
+      if (!box.checked) return { ok: false, number: c.number, ask: mg };
+    }
     // merging into a closed mission reopens it, which anyone who can edit missions may do (as Reopen on the Missions tab)
     return { ok: true, number: c.number, merge: mg };
   }
@@ -10502,6 +10517,21 @@ function updateFixNumberState() {
   $("#fix-number-prefix-row").classList.toggle("hidden", !temp);
   const c = fixNumberChoice();
   const note = $("#fix-number-preview");
+  // the tick box is only there while another mission has the number and it is not a plain spelling of this one
+  const asked = c.ask || (c.merge && !c.merge.sameSpelling ? c.merge : null);
+  $("#fix-number-same-row").classList.toggle("hidden", !asked);
+  if (asked) $("#fix-number-same-label").textContent = `Same job: merge ${_fixingNumber.number} into ${c.number}`;
+  else $("#fix-number-same").checked = false;
+  if (c.ask) {
+    const a = c.ask, st = a.closed ? trText("Closed") + (a.closedOn ? " " + fmtDate(a.closedOn) : "") : trText("Open");
+    note.textContent = a.sameHostCustomer
+      ? `${c.number} is already on the Missions list for this board and shift (${st}): ${a.what}. If it is the same job as ${_fixingNumber.number}, tick the box to merge the two. If it is not, type another number.`
+      : `${c.number} is already on the Missions list for this board and shift (${st}): ${a.what}. Its host and customer are not this mission's. Tick the box only if it is really the same job as ${_fixingNumber.number}; if not, type another number.`;
+    note.classList.remove("fix-bad");
+    $("#btn-fix-number-go").textContent = "Save number";
+    $("#btn-fix-number-go").disabled = true;
+    return;
+  }
   note.textContent = c.error || (c.ok
     ? (c.merge ? `${c.number} is already on the Missions list for this board and shift (${c.merge.closed ? trText("Closed") + (c.merge.closedOn ? " " + fmtDate(c.merge.closedOn) : "") : trText("Open")}). Merging moves every day of ${_fixingNumber.number} under it: a day that has both keeps the card of ${c.number} and gets the crew of the other, the two Missions list rows become one, and ${c.number} is open again if it was closed.`
       : c.temp ? `It gets the temporary number ${c.number}.` : `${_fixingNumber.number} becomes ${c.number}.`) : "");

@@ -2001,9 +2001,10 @@ grant execute on function public.replace_mission_number(text, text) to authentic
    become one: the first and last day of both, open if either is open (a closed one is reopened), the details of the one
    with the later last day. The number history, the Host Record
    and the days' edit stamps follow replace_mission_number. Refused when the new number is also on another
-   board or shift (a different location), when p_old is not a mistyped spelling of p_new (the same letters and
-   digits, stray characters around or between them, or the monthly suffix: two different jobs are never merged),
-   or when both numbers are on one forecast day. Returns how many days had both. */
+   board or shift (a different location), or when both numbers are on one forecast day. Whether the two are the
+   same job is the person's call: the Fix number dialog merges a plain spelling of the number straight away
+   (MissionNumber.sameSpelling) and asks for a tick, with the other mission's host, customer and dates in
+   front of them, for anything else (a letter too many in the site code). Returns how many days had both. */
 create or replace function public.merge_mission_number(p_old text, p_new text)
 returns int language plpgsql security definer set search_path = public, pg_temp as $fn$
 declare
@@ -2028,13 +2029,6 @@ begin
     raise exception 'Mission number % is not in the form PREFIX.YY.NNNN.', v_new using errcode = 'check_violation';
   end if;
   if v_new = v_old then return 0; end if;
-  -- only a mistyped spelling of the same number: the same letters and digits with stray characters around or
-  -- between them (a dot, a dash, a vowel mark typed from the wrong keyboard), or the monthly suffix (.AB).
-  -- Two different jobs on the same board and shift are never merged.
-  if regexp_replace(regexp_replace(upper(regexp_replace(v_old, '\s', '', 'g')), '^(' || v_site || '\.[0-9]{2}\.[0-9]{4})\.[A-Z]{2}$', '\1'), '[^A-Z0-9]', '', 'g')
-     <> regexp_replace(v_new, '[^A-Z0-9]', '', 'g') then
-    raise exception 'Mission % is not a mistyped spelling of %, so the two are not merged.', v_old, v_new using errcode = 'check_violation';
-  end if;
   if not exists (select 1 from mission_register where number = v_old) then
     raise exception 'Mission % is not in the Missions list.', v_old using errcode = 'no_data_found';
   end if;

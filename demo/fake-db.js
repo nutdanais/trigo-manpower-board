@@ -650,8 +650,8 @@ class FakeDb {
       this.tables.plan_day_stamps = stamps;
       return reg.length;
     };
-    /* mirrors public.merge_mission_number (migration-2026-11-18b): the typo made on a mission that already exists under
-       the right number on the same board and shift. Every day goes under the right number; a day that has both keeps
+    /* mirrors public.merge_mission_number (migration-2026-11-18b, -18c): the typo made on a mission that already exists under
+       the right number on the same board and shift (whether it is the same job is the app's question). Every day goes under the right number; a day that has both keeps
        the card of the right number and gets the other's crew; the two Missions list rows become one (open if either
        is open, so a closed one is reopened: Site Admin / Manager); the history and the Host Record follow */
     this.rpcs.merge_mission_number = (a, u) => {
@@ -659,14 +659,6 @@ class FakeDb {
       const from = String(a.p_old || "").trim(), to = String(a.p_new || "").replace(/\s/g, "").toUpperCase();
       if (!new RegExp("^" + this._sitePattern() + "\\.[0-9]{2}\\.[0-9]{4}$").test(to)) fail(`Mission number ${to} is not in the form PREFIX.YY.NNNN.`, "23514");
       if (to === from) return 0;
-      // only a mistyped spelling of the same number (stray characters, or the monthly suffix): two different jobs are never merged
-      const squash = (s) => {
-        let n = String(s || "").replace(/\s/g, "").toUpperCase();
-        const m = n.match(new RegExp("^(" + this._sitePattern() + "\\.[0-9]{2}\\.[0-9]{4})\\.[A-Z]{2}$"));
-        if (m) n = m[1];
-        return n.replace(/[^A-Z0-9]/g, "");
-      };
-      if (squash(from) !== squash(to)) fail(`Mission ${from} is not a mistyped spelling of ${to}, so the two are not merged.`, "23514");
       const reg = this.t("mission_register");
       const olds = reg.filter((r) => r.number === from);
       if (!olds.length) fail(`Mission ${from} is not in the Missions list.`, "P0002");
