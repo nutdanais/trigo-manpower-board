@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# migration-2026-11-18b (merge_mission_number): a typo made on a mission that already exists under the right
+# migration-2026-11-18b and -18c (merge_mission_number): a typo made on a mission that already exists under the right
 # number on the same board and shift. The case from the live board: LCBTH.26.0049 closed on 12 October, and the
 # job carried on as <THAI VOWEL MARK>LCBTH.26.0049 (typed from the wrong keyboard), with both spellings on the
 # same days. Checks: every day ends under the right number, one card a day; the crew of a day that has both is
@@ -19,7 +19,9 @@ eq() { local got; got="$(q "$1")"; [ "$got" = "$2" ] || fail "$3 (expected '$2',
 bash tests/sql/setup-db.sh $DB >/dev/null
 $P -d $DB -f supabase/migration-2026-11-18b-merge-mission-number.sql >/dev/null
 $P -d $DB -f supabase/migration-2026-11-18b-merge-mission-number.sql >/dev/null
-ok "the migration runs twice on a database built from schema.sql"
+$P -d $DB -f supabase/migration-2026-11-18c-merge-same-job.sql >/dev/null
+$P -d $DB -f supabase/migration-2026-11-18c-merge-same-job.sql >/dev/null
+ok "the migrations run twice on a database built from schema.sql"
 
 RIGHT='TSTTH.26.0049'
 TYPO="$(printf '\xe0\xb8\xba')TSTTH.26.0049"     # U+0E3A THAI CHARACTER PHINTHU in front: not a space, not a dot
@@ -73,9 +75,13 @@ SA="$(q "select count(*) from assignments")"
 case "$(qa viewer.c@example.com "select public.merge_mission_number('$TYPO', '$RIGHT')")" in *"cannot change"*) ok "a viewer cannot merge";; *) fail "a viewer could merge";; esac
 case "$(qa site.b@example.com "select public.merge_mission_number('TSTTH.26.0060.', 'TSTTH.26.0060')")" in *"another board or shift"*) ok "a number also on another board is refused";; *) fail "a number on another board was merged";; esac
 case "$(qa site.b@example.com "select public.merge_mission_number('$TYPO', 'TSTTH.26.0049.AA')")" in *"not in the form"*) ok "a wrong form is refused";; *) fail "a wrong form was accepted";; esac
-# two different jobs are never merged, even on the same board and shift
-case "$(qa site.b@example.com "select public.merge_mission_number('BAD-2', '$RIGHT')")" in *"not a mistyped spelling"*) ok "a different number on the same board and shift is not merged";; *) fail "two different jobs were merged";; esac
-case "$(qa site.b@example.com "select public.merge_mission_number('TSTTH.26.0071.', '$RIGHT')")" in *"not a mistyped spelling"*) ok "nor a different job that is merely close";; *) fail "a close number was merged";; esac
+# a number that is not a plain spelling of the old one (a letter too many in the site code) is the app's question
+# ("same job?" and a tick): the database merges it when the app asks, on the same board and shift
+q "insert into missions (board_id, plan_date, number, host, customer, shift) values
+   ('$B1', '2026-10-12', 'TSTTH.26.0090', 'Host P', 'Cust P', 'day'), ('$B1', '2026-10-13', 'TSTTHA.26.0090', 'Host P', 'Cust P', 'day');" >/dev/null
+eq "$(as site.b@example.com) select public.merge_mission_number('TSTTHA.26.0090', 'TSTTH.26.0090')" 0 "an extra letter in the site code: merged when the app asks (no day had both)"
+eq "select string_agg(plan_date::text, ',' order by plan_date) from missions where number = 'TSTTH.26.0090'" "2026-10-12,2026-10-13" "both days under the right number"
+eq "select count(*) from mission_register where number in ('TSTTH.26.0090', 'TSTTHA.26.0090')" 1 "one Missions list row"
 eq "select count(*) from missions where number = '$TYPO'" 4 "nothing changed by the refusals"
 
 eq "$(as eng.a@example.com) select public.merge_mission_number('$TYPO', '$RIGHT')" 2 "an engineer merges into the closed mission, reopening it: two days had both"
@@ -88,7 +94,7 @@ eq "select coalesce(lead_employee_id::text, '') from missions where number = '$R
 eq "select count(*) from mission_register where number in ('$RIGHT', '$TYPO')" 1 "the two Missions list rows are one"
 eq "select status || '|' || coalesce(closed_on::text, '') || '|' || opened_on || '|' || last_on || '|' || host from mission_register where number = '$RIGHT'" "open||2026-10-05|2026-11-18|Host New" "open again, from the first day to the last, the details of the later one"
 eq "select mission_number from deployment_history" "$RIGHT" "the Host Record follows"
-eq "select old_number = '$TYPO' and new_number = '$RIGHT' from mission_number_history" t "the history records the merge"
+eq "select count(*) from mission_number_history where old_number = '$TYPO' and new_number = '$RIGHT'" 1 "the history records the merge"
 eq "select last_edited_by from plan_day_stamps where board_id = '$B1' and plan_date = '2026-10-08'" "planner@example.com" "a day's edit stamp is kept"
 
 eq "$(as site.b@example.com) select public.merge_mission_number('TSTTH.26.0071.', 'TSTTH.26.0071')" 0 "a typo with no twin is simply renamed"

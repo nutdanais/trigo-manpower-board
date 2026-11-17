@@ -70,6 +70,25 @@ function twinDb(opts) {
   return db;
 }
 
+/* BANGNA.26.0007 for BANGN.26.0007: a letter too many in the site code is not a spelling of the number, so the dialog
+   asks "same job?" (the other mission shown) instead of merging by itself. Closed right number, open typo, both on PREV. */
+const RIGHT2 = `TSTTH.${YY}.0120`, TYPO2 = `TSTTHA.${YY}.0120`;
+function extraLetterDb() {
+  const db = seed();
+  db.seed("missions", [
+    { id: "x-r1", board_id: "b1", plan_date: PREV, number: RIGHT2, host: "Host Alpha", customer: "Cust Merge", shift: "day", engineer_id: "eng-1" },
+    { id: "x-t1", board_id: "b1", plan_date: PREV, number: TYPO2, host: "Host Alpha", customer: "Cust Merge", shift: "day", engineer_id: "eng-1" },
+    { id: "x-t2", board_id: "b1", plan_date: SRC, number: TYPO2, host: "Host Alpha", customer: "Cust Merge", shift: "day", engineer_id: "eng-1" },
+  ]);
+  db.seed("assignments", [
+    { employee_id: "e6", plan_date: PREV, mission_id: "x-r1", zone: null },
+    { employee_id: "e7", plan_date: PREV, mission_id: "x-t1", zone: null },
+    { employee_id: "e8", plan_date: SRC, mission_id: "x-t2", zone: null },
+  ]);
+  Object.assign(db.t("mission_register").find((r) => r.number === RIGHT2), { status: "closed", closed_on: PREV, closed_by: "admin@example.com", closed_at: new Date().toISOString() });
+  return db;
+}
+
 (async () => {
   const env = await h.launch();
   let failed = false;
@@ -177,7 +196,8 @@ function twinDb(opts) {
       assert.match(await p.locator("#fix-number-preview").innerText(), /looks like BANGN/);
       assert.equal(await p.locator("#btn-fix-number-go").isDisabled(), true);
       await p.fill("#fix-number-input", M7.toLowerCase());
-      assert.match(await p.locator("#fix-number-preview").innerText(), /already used by another mission \(.+\(Day\)\)/, "it says where: the board and shift");
+      assert.match(await p.locator("#fix-number-preview").innerText(), /is already on the Missions list for this board and shift \(Open\): Host Beta → Cust Seven, .+ – .+\. Its host and customer are not this mission's\. Tick the box only if it is really the same job/, "the other mission is shown, with a warning when its host and customer differ");
+      assert.equal(await p.locator("#fix-number-same-row").isVisible(), true, "and the person is asked: same job?");
       await p.fill("#fix-number-input", `tstth.${YY}.0123`);
       assert.match(await p.locator("#fix-number-preview").innerText(), new RegExp(`becomes TSTTH\\.${YY}\\.0123`));
       await p.click("#btn-fix-number-go");
@@ -405,6 +425,45 @@ function twinDb(opts) {
       assert.match(th[0], /รวมเข้ากับ/);
       assert.match(th[1], /รวม .* เข้ากับ/);
       await o.close();
+    });
+
+    await step("an extra letter in the site code is not a spelling: the dialog shows the other mission and asks, then merges on a tick", async () => {
+      const db2 = extraLetterDb();
+      const e = await env.openAs(db2, h.USERS.a);
+      await goDay(e.page);
+      await e.page.evaluate((n) => openFixNumberModal(n), TYPO2);
+      await e.page.locator("#modal-fix-number:not(.hidden)").waitFor();
+      await e.page.fill("#fix-number-input", RIGHT2);
+      const ask = await e.page.locator("#fix-number-preview").innerText();
+      assert.match(ask, new RegExp(`${RIGHT2.replace(/\./g, "\\.")} is already on the Missions list for this board and shift \\(Closed .+\\): Host Alpha → Cust Merge, .+ – .+\\. If it is the same job as ${TYPO2.replace(/\./g, "\\.")}, tick the box to merge the two\\. If it is not, type another number\\.`));
+      assert.equal(await e.page.locator("#fix-number-same-row").isVisible(), true);
+      assert.equal((await e.page.locator("#fix-number-same-label").innerText()).trim(), `Same job: merge ${TYPO2} into ${RIGHT2}`);
+      assert.equal(await e.page.locator("#btn-fix-number-go").isDisabled(), true, "nothing is merged until the person says it is the same job");
+      // the question is translated, with the values in it
+      const th = await e.page.evaluate((s) => { I18N.setLang("th"); const r = I18N.t(s); I18N.setLang("en"); return r; }, ask);
+      assert.match(th, /หากเป็นงานเดียวกับ/);
+      await e.page.check("#fix-number-same");
+      assert.equal(await e.page.locator("#btn-fix-number-go").isDisabled(), false);
+      assert.equal((await e.page.locator("#btn-fix-number-go").innerText()).trim(), `Merge into ${RIGHT2}`);
+      assert.match(await e.page.locator("#fix-number-preview").innerText(), /Merging moves every day of .+ under it/);
+      // the tick is for that number only: typing another number and coming back asks again
+      await e.page.fill("#fix-number-input", `TSTTH.${YY}.0121`);
+      assert.equal(await e.page.locator("#fix-number-same-row").isVisible(), false, "a free number: nothing to ask");
+      assert.equal(await e.page.locator("#btn-fix-number-go").isDisabled(), false, "a free number is a plain rename");
+      await e.page.fill("#fix-number-input", RIGHT2);
+      assert.equal(await e.page.locator("#fix-number-same").isChecked(), false, "asked again");
+      assert.equal(await e.page.locator("#btn-fix-number-go").isDisabled(), true);
+      await e.page.check("#fix-number-same");
+      await e.page.click("#btn-fix-number-go");
+      await e.page.locator(".toast", { hasText: `is merged into ${RIGHT2}` }).waitFor();
+      assert.equal(db2.t("missions").filter((m) => m.number === TYPO2).length, 0, "no day left on the typo");
+      const prevCard = db2.t("missions").find((m) => m.number === RIGHT2 && m.plan_date === PREV);
+      assert.deepEqual(db2.t("assignments").filter((x) => x.mission_id === prevCard.id).map((x) => x.employee_id).sort(), ["e6", "e7"], "both crews");
+      assert.equal(db2.t("missions").filter((m) => m.number === RIGHT2).length, 2, "one card a day");
+      const rows = db2.t("mission_register").filter((r) => r.number === RIGHT2 || r.number === TYPO2);
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].status, "open", "reopened by merging");
+      await e.close();
     });
 
     assert.deepEqual(a.errors, [], "page errors");
