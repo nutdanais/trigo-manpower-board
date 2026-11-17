@@ -245,7 +245,8 @@ returns void language plpgsql security definer set search_path = public, pg_temp
 declare
   v_by text := coalesce(auth.jwt() ->> 'email', 'system');
 begin
-  if not (select public.can('missionadmin', 'edit')) then
+  -- anyone who may close a mission may reopen it (Engineer and up, Site Admin); missionadmin keeps the new-year numbers
+  if not (select public.can('missions', 'edit')) then
     raise exception 'Your role cannot reopen missions.' using errcode = 'insufficient_privilege';
   end if;
   update mission_register

@@ -104,9 +104,12 @@ eq "select count(*) from assignments where plan_date = '2026-11-08'" 0 "its crew
 eq "select string_agg(plan_date::text, ',') from deployment_history where mission_number = 'TSTTH.26.0009'" 2026-11-07 "the Host Record keeps the days up to the close"
 q "insert into missions (board_id, plan_date, number, host, customer, shift) values ('$(B 1)', '2026-11-09', 'TSTTH.26.0009', 'Host C', 'Cust C', 'day')" >/dev/null
 eq "select count(*) from missions where number = 'TSTTH.26.0009' and plan_date = '2026-11-09'" 0 "carry over never puts a closed mission on a later day"
-case "$(qa eng.a@example.com "select public.reopen_mission('$R9')")" in *"cannot reopen"*) ok "an engineer cannot reopen";; *) fail "an engineer could reopen";; esac
+case "$(qa viewer.c@example.com "select public.reopen_mission('$R9')")" in *"cannot reopen"*) ok "a viewer cannot reopen";; *) fail "a viewer could reopen";; esac
+qa eng.a@example.com "select public.reopen_mission('$R9')" >/dev/null
+eq "select status || coalesce(closed_on::text, '-') from mission_register where id = '$R9'" "open-" "an engineer reopens it, as they close it"
+qa site.b@example.com "select public.close_mission('$R9', '2026-11-07')" >/dev/null
 qa site.b@example.com "select public.reopen_mission('$R9')" >/dev/null
-eq "select status || coalesce(closed_on::text, '-') from mission_register where id = '$R9'" "open-" "a Site Admin reopens it"
+eq "select status || coalesce(closed_on::text, '-') from mission_register where id = '$R9'" "open-" "a Site Admin reopens it too"
 
 # ---------- the new-year number ----------
 q "insert into missions (board_id, plan_date, number, host, customer, shift) values

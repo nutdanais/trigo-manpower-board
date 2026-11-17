@@ -4,9 +4,15 @@
 -- or open (a stray Thai vowel mark in front of LCBTH.26.0049, typed from the wrong keyboard), could not be
 -- fixed: the number is rightly "already used", and a plain rename would put two cards with one number on
 -- the same day. merge_mission_number moves every day under the right number, adds the crew of a day that
--- has both, folds the two Missions list rows into one and reopens it if it was closed (Site Admin, Manager).
--- Nothing is lost: a person is on one mission a day, so the crews never clash. New function; nothing that
--- exists is changed. Safe to run more than once. Run it in the Supabase SQL Editor, after
+-- has both, folds the two Missions list rows into one and reopens it if it was closed.
+-- Nothing is lost: a person is on one mission a day, so the crews never clash.
+--
+-- Reopening a closed mission is now allowed to anyone who may edit missions (Engineer and up, Site Admin),
+-- the same as closing one: reopen_mission and merge_mission_number check the Missions permission, not
+-- "Reopen missions & new-year numbers", which from now on is only the new-year numbers.
+--
+-- Safe to run more than once (run it again if an earlier copy of this file was already run: it only
+-- replaces the two functions). Run it in the Supabase SQL Editor, after
 -- migration-2026-11-18-mission-number-reuse.sql.
 
 /* Fix mission number when the correct number is already the same job's other spelling (migration-2026-11-18b).
@@ -15,8 +21,8 @@
    the two sets of days are one job. This moves every day of p_old under p_new. A day that has both keeps the
    card of p_new and gets the crew of the other (a person is on one mission a day, so no crew is lost; the
    Leader, a highlight and "not hidden" carry over when the card kept has none). The two Missions list rows
-   become one: the first and last day of both, open if either is open (a closed one is reopened: a Site Admin
-   or a Manager only), the details of the one with the later last day. The number history, the Host Record
+   become one: the first and last day of both, open if either is open (a closed one is reopened), the details of the one
+   with the later last day. The number history, the Host Record
    and the days' edit stamps follow replace_mission_number. Refused when the new number is also on another
    board or shift (a different location), when p_old is not a mistyped spelling of p_new (the same letters and
    digits, stray characters around or between them, or the monthly suffix: two different jobs are never merged),
@@ -72,12 +78,7 @@ begin
       raise exception 'Both % and % are on % forecast day(s). Merge those forecast days first.', v_old, v_new, v_clash using errcode = 'check_violation';
     end if;
   end if;
-  -- merging into a closed mission reopens it
-  if exists (select 1 from mission_register n join mission_register o on o.board_id = n.board_id and o.shift = n.shift and o.number = v_old
-              where n.number = v_new and n.status = 'closed' and o.status = 'open')
-     and not (select public.can('missionadmin', 'edit')) then
-    raise exception 'Mission % is closed. A Site Admin or a Manager can reopen it by merging.', v_new using errcode = 'insufficient_privilege';
-  end if;
+  -- merging into a closed mission reopens it: allowed to whoever may edit missions, as reopen_mission is
 
   -- renaming a day is not a change to its plan: keep the days' edit stamps as they were
   if v_stamps then
@@ -156,3 +157,24 @@ end;
 $fn$;
 
 grant execute on function public.merge_mission_number(text, text) to authenticated;
+
+create or replace function public.reopen_mission(p_id uuid)
+returns void language plpgsql security definer set search_path = public, pg_temp as $fn$
+declare
+  v_by text := coalesce(auth.jwt() ->> 'email', 'system');
+begin
+  -- anyone who may close a mission may reopen it (Engineer and up, Site Admin); missionadmin keeps the new-year numbers
+  if not (select public.can('missions', 'edit')) then
+    raise exception 'Your role cannot reopen missions.' using errcode = 'insufficient_privilege';
+  end if;
+  update mission_register
+     set status = 'open', closed_on = null, closed_by = null, closed_at = null, close_note = null,
+         updated_at = now(), updated_by = v_by
+   where id = p_id and status = 'closed';
+  if not found then
+    raise exception 'That mission is not closed.' using errcode = 'no_data_found';
+  end if;
+end;
+$fn$;
+
+grant execute on function public.reopen_mission(uuid) to authenticated;

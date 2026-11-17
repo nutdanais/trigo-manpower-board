@@ -679,7 +679,7 @@ const PERM_AREAS = [
     { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
     { key: "hostlist", label: "Host",           hint: "Sites and their records" },
     { key: "missions", label: "Missions",       hint: "The Missions tab, and closing a mission" },
-    { key: "missionadmin", label: "Reopen missions & new-year numbers", hint: "Missions tab: reopen a closed mission, enter next year's mission numbers" },
+    { key: "missionadmin", label: "New-year mission numbers", hint: "Missions tab: enter next year's mission numbers (anyone who can edit missions can reopen a closed one)" },
     { key: "capacity", label: "Capacity",       hint: "Headcount needed per host vs available, weeks ahead" },
     { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
@@ -8527,7 +8527,7 @@ function bulkMissionCtx(rows) {
   const engineers = D().engineers.map(e => ({ id: e.id, label: engineerLabelFor(e.id) })).filter(e => e.label);
   return {
     register: rows, boards: D().boards, hosts: D().hosts.filter(h => !h.archived).map(h => h.name), engineers,
-    canReopen: can("missionadmin", "edit"), canRenumber: can("missionadmin", "edit"),
+    canReopen: can("missions", "edit"), canRenumber: can("missionadmin", "edit"),
     previousNumber: (n) => cloud.previousNumber(n),
   };
 }
@@ -10024,7 +10024,7 @@ function renderMissionList() {
     th.classList.toggle("sorted", th.dataset.sort === st.sort.key);
     th.setAttribute("aria-sort", th.dataset.sort === st.sort.key ? (st.sort.dir > 0 ? "ascending" : "descending") : "none");
   }
-  const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit"), canHost = can("hostlist");
+  const canClose = can("missions", "edit"), canReopen = can("missions", "edit"), canAdd = can("board", "edit"), canHost = can("hostlist");
   const body = $("#missions-body");
   const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);   // an attribute the translator does not walk
   // a ticked mission that a search or filter now hides is no longer ticked: Close… acts on what the list shows
@@ -10129,7 +10129,7 @@ function renderMissionRowMenu({ addTitle, addItem }) {
   if (canPlan && hasDay) addItem("Duplicate", () => openMissionFromList(r, { then: "btn-md-dup" }), null, "copy");
   if (canPlan && hasDay && D().boards.length > 1) addItem("Move or copy…", () => openMissionFromList(r, { then: "btn-md-move" }), null, "swap");
   if (canPlan && onBoard) addItem(p.kind === "hidden" ? "Unhide" : "Hide", () => openMissionFromList(r, { then: "btn-md-hide" }), null, p.kind === "hidden" ? "eye" : "eye-off");
-  if (r.status === "closed" && can("missionadmin", "edit")) addItem("Reopen", () => reopenMissionRow(r), null, "undo");
+  if (r.status === "closed" && can("missions", "edit")) addItem("Reopen", () => reopenMissionRow(r), null, "undo");
 }
 function missionFromRow(el) {
   const tr = el.closest("tr[data-id]");
@@ -10479,10 +10479,7 @@ function fixNumberChoice() {
   if (where) {
     const mg = missionNumberMergeInfo(f.number, c.number);
     if (!mg) return { ok: false, number: c.number, error: `${c.number} is already used by another mission (${where}).` };
-    // merging into a closed mission reopens it: a Site Admin or a Manager (the same as Reopen on the Missions tab)
-    if (mg.reopens && !can("missionadmin", "edit")) {
-      return { ok: false, number: c.number, error: `${c.number} is a closed mission on the Missions list (${where}). Only a Site Admin or a Manager can reopen it, so ask one of them to merge ${f.number} into it.` };
-    }
+    // merging into a closed mission reopens it, which anyone who can edit missions may do (as Reopen on the Missions tab)
     return { ok: true, number: c.number, merge: mg };
   }
   return c;
@@ -10533,10 +10530,6 @@ function checkMissionNumberUse(number, shift, then, backToForm) {
   const boardId = D().activeBoardId;
   const mine = cloud.registerFor(boardId, number, shift);
   if (mine && mine.status === "closed" && mine.closedOn && state.date > mine.closedOn) {
-    if (!can("missionadmin", "edit")) {
-      toast(`${number} (${shift === "night" ? "Night" : "Day"}) was closed on ${fmtDate(mine.closedOn)}. A Site Admin or a Manager can reopen it on the Missions tab.`, "warn");
-      return;
-    }
     showConfirm("Reopen mission?", `${number} (${shift === "night" ? "Night" : "Day"}) was closed on ${fmtDate(mine.closedOn)}. Reopen it and save it on this day?`,
       () => safely(async () => { await cloud.reopenMission(mine.id); then(); }), backToForm);
     return;

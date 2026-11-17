@@ -4,7 +4,7 @@
 # job carried on as <THAI VOWEL MARK>LCBTH.26.0049 (typed from the wrong keyboard), with both spellings on the
 # same days. Checks: every day ends under the right number, one card a day; the crew of a day that has both is
 # added, nobody lost; the Leader, the Host Record, the history and the days' edit stamps follow; the two Missions
-# list rows become one, open, from the first day to the last (a closed one reopened: Site Admin / Manager only);
+# list rows become one, open, from the first day to the last (a closed one reopened, by an engineer too);
 # a number also on another board or shift is refused; a number that is not a mistyped spelling of the other (two different jobs on one board and shift) is never merged; a typo with no twin is just renamed; it runs twice.
 # Needs a local Postgres (PGHOST/PGPORT/PGUSER as for the other tests/sql scripts). Fixtures are fake.
 set -euo pipefail
@@ -71,7 +71,6 @@ eq "select count(*) from assignments" 6 "before: six crew placements"
 SA="$(q "select count(*) from assignments")"
 
 case "$(qa viewer.c@example.com "select public.merge_mission_number('$TYPO', '$RIGHT')")" in *"cannot change"*) ok "a viewer cannot merge";; *) fail "a viewer could merge";; esac
-case "$(qa eng.a@example.com "select public.merge_mission_number('$TYPO', '$RIGHT')")" in *"is closed. A Site Admin or a Manager"*) ok "an engineer cannot reopen a closed mission by merging";; *) fail "an engineer merged into a closed mission";; esac
 case "$(qa site.b@example.com "select public.merge_mission_number('TSTTH.26.0060.', 'TSTTH.26.0060')")" in *"another board or shift"*) ok "a number also on another board is refused";; *) fail "a number on another board was merged";; esac
 case "$(qa site.b@example.com "select public.merge_mission_number('$TYPO', 'TSTTH.26.0049.AA')")" in *"not in the form"*) ok "a wrong form is refused";; *) fail "a wrong form was accepted";; esac
 # two different jobs are never merged, even on the same board and shift
@@ -79,7 +78,7 @@ case "$(qa site.b@example.com "select public.merge_mission_number('BAD-2', '$RIG
 case "$(qa site.b@example.com "select public.merge_mission_number('TSTTH.26.0071.', '$RIGHT')")" in *"not a mistyped spelling"*) ok "nor a different job that is merely close";; *) fail "a close number was merged";; esac
 eq "select count(*) from missions where number = '$TYPO'" 4 "nothing changed by the refusals"
 
-eq "$(as site.b@example.com) select public.merge_mission_number('$TYPO', '$RIGHT')" 2 "a Site Admin merges: two days had both"
+eq "$(as eng.a@example.com) select public.merge_mission_number('$TYPO', '$RIGHT')" 2 "an engineer merges into the closed mission, reopening it: two days had both"
 eq "select count(*) from missions where number = '$TYPO'" 0 "no day is left on the typo"
 eq "select string_agg(plan_date::text, ',' order by plan_date) from missions where number = '$RIGHT' and board_id = '$B1'" "2026-10-05,2026-10-06,2026-10-07,2026-10-08,2026-11-18" "one card a day, every day of both"
 eq "select count(*) from assignments" "$SA" "nobody lost: the same number of crew placements"

@@ -584,7 +584,7 @@ class FakeDb {
       return null;
     };
     this.rpcs.reopen_mission = (a, u) => {
-      if (!this._can(u, "missionadmin", "edit")) fail("Your role cannot reopen missions.", "42501");
+      if (!this._can(u, "missions", "edit")) fail("Your role cannot reopen missions.", "42501");
       const r = this.t("mission_register").find((x) => x.id === a.p_id && x.status === "closed");
       if (!r) fail("That mission is not closed.", "P0002");
       const prev = clone(r);
@@ -681,9 +681,6 @@ class FakeDb {
         if (n) fail(`Both ${from} and ${to} are on ${n} forecast day(s). Merge those forecast days first.`, "23514");
       }
       const twinOf = (o) => reg.find((n) => n.number === to && n.board_id === o.board_id && n.shift === o.shift);
-      if (olds.some((o) => { const n = twinOf(o); return n && n.status === "closed" && o.status === "open"; }) && !this._can(u, "missionadmin", "edit")) {
-        fail(`Mission ${to} is closed. A Site Admin or a Manager can reopen it by merging.`, "42501");
-      }
       const stamps = clone(this.t("plan_day_stamps"));
       let merged = 0;
       this._renumbering = true;

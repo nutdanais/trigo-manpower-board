@@ -50,7 +50,7 @@ function seed(opts) {
 
 /* The case from the live board: LCBTH.26.0049 was closed, and the job carried on as <THAI VOWEL MARK>LCBTH.26.0049
    (typed from the wrong keyboard), both spellings on the same day. Board One, Day: PREV has both cards (a crew each),
-   SRC only the typo. user b is a Site Admin here (the base has two engineers and a viewer). */
+   SRC only the typo. The right number is closed: an engineer reopens it by merging. */
 const RIGHT = `TSTTH.${YY}.0049`, TYPO = "\u0E3A" + RIGHT;
 function twinDb(opts) {
   const db = seed(opts);
@@ -348,23 +348,9 @@ function twinDb(opts) {
       await o.close();
     });
 
-    await step("a typo on a mission that already exists under the right number: an engineer is told who can merge it", async () => {
+    await step("an engineer merges it (the right number is closed, and merging reopens it): every day under the right number, both crews, one Missions list row", async () => {
       const tw = twinDb();
-      const e = await env.openAs(tw, h.USERS.a);
-      await goDay(e.page);
-      await e.page.locator("#missions-grid .mission-card .m-num-fix").first().waitFor();
-      await e.page.evaluate((n) => openFixNumberModal(n), TYPO);
-      await e.page.locator("#modal-fix-number:not(.hidden)").waitFor();
-      await e.page.fill("#fix-number-input", RIGHT);
-      assert.match(await e.page.locator("#fix-number-preview").innerText(), /is a closed mission on the Missions list \(Board One \(Day, closed\)\)\. Only a Site Admin or a Manager can reopen it/);
-      assert.equal(await e.page.locator("#btn-fix-number-go").isDisabled(), true, "an engineer cannot reopen a closed mission by merging");
-      assert.equal(await tw.t("missions").filter((m) => m.number === TYPO).length, 2, "nothing changed");
-      await e.close();
-    });
-
-    await step("a Site Admin merges it: every day under the right number, both crews, one Missions list row, reopened", async () => {
-      const tw = twinDb();
-      const s = await env.openAs(tw, h.USERS.b);
+      const s = await env.openAs(tw, h.USERS.a);
       await goDay(s.page);
       await card(s.page, TYPO).locator(".m-num-fix").click();
       await s.page.locator("#modal-fix-number:not(.hidden)").waitFor();
