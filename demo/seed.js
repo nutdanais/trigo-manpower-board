@@ -276,19 +276,8 @@ function seed(db) {
     employee_id: a.employee_id, plan_date: a.plan_date, forecast_mission_id: a.mission_id ? fmap[a.mission_id] : null, zone: a.zone, held_by: PROFILES[1].email,
   })));
 
-  // Capacity: Rayong's demand per host and shift for the next three weeks, a few days short
-  const cap = [];
-  let c = NEXT;
-  for (let i = 0; i < 15; i++) {
-    for (const [, host, , shift, , crew] of MISSIONS.b1) {
-      if (!crew) continue;
-      const bump = (i === 3 || i === 4 || i === 9) && host === "Siam Auto Parts" ? 3 : 0;
-      const row = cap.find((r) => r.plan_date === c && r.host === host && r.shift === shift);
-      if (row) row.headcount += crew; else cap.push({ board_id: "b1", plan_date: c, host, shift, headcount: crew + bump });
-    }
-    c = nextWorking(c);
-  }
-  db.seed("capacity_demand", cap);
+  // Capacity needs no rows of its own: the tab reads the boards above, and a visitor's
+  // requests stay in their own browser.
   // "my part is planned": on Rayong's next working day Somchai has ticked his part, the others not yet
   db.seed("plan_day_ready", [{ board_id: "b1", plan_date: NEXT, engineer_id: "eng-1", ticked_by: PROFILES[1].email,
     ticked_at: new Date(Date.now() - 40 * 60e3).toISOString() }]);
