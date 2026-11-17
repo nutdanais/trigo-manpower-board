@@ -631,8 +631,9 @@ class FakeDb {
       if (/\.TMP[0-9]{3}$/.test(to) && new RegExp("^" + site + "\\.[0-9]{2}\\.[0-9]{4}$").test(from)) fail(`Mission ${from} already has its Etraq number.`, "23514");
       const reg = this.t("mission_register").filter((r) => r.number === from);
       if (!reg.length) fail(`Mission ${from} is not in the Missions list.`, "P0002");
+      // in use: on the Missions list or on a day. Only in the history: free again, except a replaced temporary number
       if (this.t("mission_register").some((r) => r.number === to) || this.t("missions").some((m) => m.number === to)
-        || this.t("mission_number_history").some((h) => h.old_number === to)) fail(`Mission number ${to} is already used.`, "23505");
+        || (/\.TMP[0-9]{3}$/.test(to) && this.t("mission_number_history").some((h) => h.old_number === to))) fail(`Mission number ${to} is already used.`, "23505");
       const firstOn = reg.map((r) => r.opened_on).filter(Boolean).sort()[0] || this.now().slice(0, 10);
       const stamps = clone(this.t("plan_day_stamps"));
       this._renumbering = true;

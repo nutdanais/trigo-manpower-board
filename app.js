@@ -3317,7 +3317,7 @@ function renderMissions() {
     // a new-year number: the old one stays beside it for two weeks (cloud.recentOldNumber)
     const oldNumber = missionsOn() ? cloud.recentOldNumber(m.number, todayStr()) : null;
     const wasLine = oldNumber
-      ? `<div class="m-was-line" title="This mission's number changed (a new-year number, or a corrected one). The old number is shown here for two weeks after the change."><span class="m-was-tag">New number</span> was <b data-no-i18n>${escapeHtml(oldNumber)}</b></div>` : "";
+      ? `<div class="m-was-line" title="This mission's number changed (a new-year number, or the Etraq number that replaced a temporary one). The old number is shown here for two weeks after the change."><span class="m-was-tag">New number</span> was <b data-no-i18n>${escapeHtml(oldNumber)}</b></div>` : "";
     // a wrong number, or a temporary one: a flag until somebody corrects it (missionNumberIssue; never in an export)
     const numIssue = !fcView ? missionNumberIssue(m.number) : null;
     const canFixNumber = numIssue && can("missions", "edit");
@@ -10350,6 +10350,19 @@ function knownMissionNumbers() {
   for (const m of getPlan().missions || []) out.add(m.number);
   return out;
 }
+/* Where a number is in use right now, as "Non-Rayong (Day), Rayong (Night)"; "" when no mission has it: the Missions
+   list rows and the days on the board. A number that is only in the rename history (a mission once had it and was
+   renamed) is free: Etraq gives a number to one job, so with no mission on it, it can be typed again (a typo
+   corrected back to the number the job always had). A temporary number is the exception, never given out twice
+   (knownMissionNumbers, nextTemp). */
+function missionNumberUsedWhere(number) {
+  const shiftOf = (s) => (s === "night" ? "Night" : "Day");
+  const places = [];
+  const add = (boardId, shift) => { const p = `${boardNameOf(boardId)} (${shiftOf(shift)})`; if (!places.includes(p)) places.push(p); };
+  for (const r of D().register || []) if (r.number === number) add(r.boardId, r.shift);
+  for (const m of getPlan().missions || []) if (m.number === number) add(D().activeBoardId, m.shift);
+  return places.join(", ");
+}
 /* the site codes in use, most used first; `boardId` puts that board's own first */
 function knownMissionPrefixes(boardId) {
   const count = new Map();
@@ -10434,7 +10447,8 @@ function fixNumberChoice() {
   if (!form.number.value.trim()) return { ok: false, error: null };
   const c = MissionNumber.checkReplacement(f.number, form.number.value);
   if (!c.ok) return c;
-  if (knownMissionNumbers().has(c.number)) return { ok: false, number: c.number, error: `${c.number} is already used by another mission.` };
+  const where = missionNumberUsedWhere(c.number);
+  if (where) return { ok: false, number: c.number, error: `${c.number} is already used by another mission (${where}).` };
   return c;
 }
 /* An input event on a mission number or site code field: upper case what was typed, keeping the cursor where it was
@@ -12585,7 +12599,8 @@ function saveMission(ev) {
   // a wrong or temporary number changed in the form is corrected on every day of the mission, not this day only
   const fixFrom = numberRules && editing && newNumber && !isForecastView() && MissionNumber.kindOf(editing.number) !== "real"
     && (D().register || []).some(r => r.number === editing.number) ? editing.number : null;
-  if (fixFrom && knownMissionNumbers().has(vals.number)) { toast(`${vals.number} is already used by another mission.`, "warn"); return; }
+  const usedWhere = fixFrom ? missionNumberUsedWhere(vals.number) : "";
+  if (usedWhere) { toast(`${vals.number} is already used by another mission (${usedWhere}).`, "warn"); return; }
   // instant client-side check (same number + shift, excluding the mission being edited);
   // scans hidden missions too — the DB unique constraint covers them regardless —
   // this just avoids a round trip and points at the hidden one if that's the clash

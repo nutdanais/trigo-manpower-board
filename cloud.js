@@ -2873,10 +2873,14 @@ const cloud = {
   },
   /* the number `number` replaced, while the board still shows it beside the new one (the first
      two weeks after the new number was entered, MissionNumber.showsOldNumber); else null.
+     Only a number that was really somebody's gets this: a new-year number, or the Etraq number that
+     replaced a temporary one. A typo corrected (a stray dot or space, "108") is not a new number, so
+     nothing is shown beside it, though the history keeps it for numberChain and the search.
      enteredAt is the server's timestamp, read as a date in the browser's own time zone. */
   recentOldNumber(number, today) {
     const h = (this.data.numberHistory || []).filter((x) => x.newNumber === number).pop();
     if (!h || typeof MissionNumber === "undefined") return null;
+    if (MissionNumber.kindOf(h.oldNumber) === "bad") return null;
     const t = new Date(h.enteredAt);
     const entered = isNaN(t) ? String(h.enteredAt || "").slice(0, 10)
       : t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");

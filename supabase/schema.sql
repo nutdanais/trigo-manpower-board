@@ -1952,9 +1952,12 @@ begin
     raise exception 'Mission % is not in the Missions list.', v_old using errcode = 'no_data_found';
   end if;
   select min(opened_on) into v_from from mission_register where number = v_old;
+  -- in use: on the Missions list or on a day. A number only in the history (a mission once had it, then was
+  -- renamed) is free again, since Etraq gives a number to one job: a typo can go back to the number the job
+  -- always had. A temporary number that was replaced is never given out twice.
   if exists (select 1 from mission_register where number = v_new)
      or exists (select 1 from missions where number = v_new)
-     or exists (select 1 from mission_number_history where old_number = v_new) then
+     or (v_new ~ '\.TMP[0-9]{3}$' and exists (select 1 from mission_number_history where old_number = v_new)) then
     raise exception 'Mission number % is already used.', v_new using errcode = 'unique_violation';
   end if;
   -- renaming a day is not a change to its plan: keep the days' edit stamps as they were

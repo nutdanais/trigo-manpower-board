@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# migration-2026-11-17: "DELETE requires a WHERE clause" when fixing a mission number.
+# migration-2026-11-17 (and -18): "DELETE requires a WHERE clause" when fixing a mission number.
 # Supabase runs the app's calls with pg-safeupdate, which refuses a DELETE or UPDATE without a WHERE
 # clause, inside functions too. A plain local Postgres does not have it, so the other tests never saw
 # replace_mission_number / renumber_missions fail. This one looks for the cause instead: a function
@@ -12,6 +12,7 @@ cd "$(dirname "$0")/../.."
 DB=safeupdate_delete_where_test
 export PGOPTIONS='-c client_min_messages=warning'
 MIG=supabase/migration-2026-11-17-mission-number-delete-where.sql
+MIG2=supabase/migration-2026-11-18-mission-number-reuse.sql   # replace_mission_number as schema.sql has it now
 P="psql -v ON_ERROR_STOP=1 -q -X -At"
 fail() { echo "FAIL: $*"; exit 1; }
 ok() { echo "ok - $*"; }
@@ -53,7 +54,9 @@ $P -d $DB -f $MIG >/dev/null
 $P -d $DB -f $MIG >/dev/null
 ok "the migration runs twice"
 eq "$BARE_FN" "" "after the migration neither function has a bare DELETE"
-eq "$FN" "$SCHEMA_FN" "the migration leaves both functions exactly as schema.sql defines them"
+$P -d $DB -f $MIG2 >/dev/null
+eq "$BARE_FN" "" "and none after the later migration that changes replace_mission_number"
+eq "$FN" "$SCHEMA_FN" "the migrations leave both functions exactly as schema.sql defines them"
 
 # --- a number can still be fixed
 B1=10000000-0000-0000-0000-000000000001
