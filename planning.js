@@ -24,7 +24,10 @@
      members: [empId]}], zones: {annual: [empId], ...} }.
 
      Missions are matched by number + shift, exactly as the carry-over itself
-     matches them (ids differ from day to day). */
+     matches them (ids differ from day to day). A mission that is on a day twice (one
+     mission at two hosts: two cards) is matched by number + shift + host, in both
+     plans, so the two cards are never mixed up; a mission on a day once keeps the
+     plain key, so a changed host is still a changed field, not a remove and an add. */
 
   const MISSION_FIELDS = [
     { key: "host", label: "Host" },
@@ -37,16 +40,27 @@
   ];
 
   const missionKey = (m) => m.number + "|" + m.shift;
+  /* the key of a mission in a comparison of these plans: number + shift, plus the host for a mission that is on
+     a day more than once in any of them */
+  function keyer(...plans) {
+    const multi = new Set();
+    for (const plan of plans) {
+      const n = new Map();
+      for (const m of (plan && plan.missions) || []) n.set(missionKey(m), (n.get(missionKey(m)) || 0) + 1);
+      for (const [k, c] of n) if (c > 1) multi.add(k);
+    }
+    return (m) => (multi.has(missionKey(m)) ? missionKey(m) + "|" + (m.host || "") : missionKey(m));
+  }
   const norm = (v) => (v == null ? "" : String(v).trim());
 
   /* where each in-scope employee sits in a plan: a mission (by key), a leave
      zone, or standby (not stored anywhere) */
-  function placements(plan, scope) {
+  function placements(plan, scope, keyOf = missionKey) {
     const out = new Map();
     for (const m of plan.missions || []) {
       for (const id of m.members || []) {
         if (scope && !scope.has(id)) continue;
-        if (!out.has(id)) out.set(id, { kind: "mission", key: missionKey(m) });
+        if (!out.has(id)) out.set(id, { kind: "mission", key: keyOf(m) });
       }
     }
     for (const z of LEAVE_ZONE_KEYS) {
@@ -65,8 +79,9 @@
      roster). Anyone outside it is ignored on both sides. */
   function compute(base, proposed, opts = {}) {
     const scope = opts.employeeIds ? new Set(opts.employeeIds) : null;
-    const baseByKey = new Map((base.missions || []).map((m) => [missionKey(m), m]));
-    const propByKey = new Map((proposed.missions || []).map((m) => [missionKey(m), m]));
+    const keyOf = keyer(base, proposed);
+    const baseByKey = new Map((base.missions || []).map((m) => [keyOf(m), m]));
+    const propByKey = new Map((proposed.missions || []).map((m) => [keyOf(m), m]));
     const items = [];
     const added = new Set();
 
@@ -95,8 +110,8 @@
       items.push({ id: "remove:" + key, type: "remove", key, baseId: bm.id, mission: bm, ticked: false });
     }
 
-    const bPlace = placements(base, scope);
-    const pPlace = placements(proposed, scope);
+    const bPlace = placements(base, scope, keyOf);
+    const pPlace = placements(proposed, scope, keyOf);
     const everyone = new Set([...bPlace.keys(), ...pPlace.keys()]);
     const addItemByKey = new Map(items.filter((i) => i.type === "add").map((i) => [i.key, i]));
     for (const empId of everyone) {
@@ -182,8 +197,9 @@
   function computeMerge(base, forecast, opts = {}) {
     const scope = opts.employeeIds ? new Set(opts.employeeIds) : null;
     const holds = forecast.holds || {};
-    const baseByKey = new Map((base.missions || []).map((m) => [missionKey(m), m]));
-    const propByKey = new Map((forecast.missions || []).map((m) => [missionKey(m), m]));
+    const keyOf = keyer(base, forecast);
+    const baseByKey = new Map((base.missions || []).map((m) => [keyOf(m), m]));
+    const propByKey = new Map((forecast.missions || []).map((m) => [keyOf(m), m]));
     const items = [];
     const addKeys = new Set(), removeKeys = new Set();
 
@@ -211,8 +227,8 @@
       items.push({ id: "remove:" + key, type: "remove", key, mission: bm, forecaster: null, decision: null });
     }
 
-    const bPlace = placements(base, scope);
-    const pPlace = placements(forecast, scope);
+    const bPlace = placements(base, scope, keyOf);
+    const pPlace = placements(forecast, scope, keyOf);
     const people = new Map();
     for (const empId of new Set([...bPlace.keys(), ...pPlace.keys()])) {
       const from = bPlace.get(empId) || STANDBY;
@@ -311,7 +327,8 @@
      ({kind, key|zone}) and a field value into the text the log shows —
      the app owns those words (zone names, engineer names). */
   function decisionRows(model, label, reasons = {}) {
-    const split = (key) => { const i = key.lastIndexOf("|"); return { mission_number: key.slice(0, i), mission_shift: key.slice(i + 1) }; };
+    // "number|shift" or, for a mission on a day twice, "number|shift|host": the log keeps the number and the shift
+    const split = (key) => { const [n, s] = key.split("|"); return { mission_number: n, mission_shift: s }; };
     const rows = [];
     for (const it of model.items) {
       const choice = decisionOf(model, it.id);
@@ -343,7 +360,7 @@
     return rows;
   }
 
-  const PlanDiff = { compute, groups, plan, missionKey, MISSION_FIELDS, STANDBY,
+  const PlanDiff = { compute, groups, plan, missionKey, keyer, MISSION_FIELDS, STANDBY,
                      computeMerge, decisionOf, decide, pending, mergeLocked, carryPlace, resultPlace, missionOnBoard, toDiff, decisionRows };
 
   /* ================= Horizon =================

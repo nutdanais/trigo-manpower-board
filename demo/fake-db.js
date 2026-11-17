@@ -81,6 +81,9 @@ class FakeDb {
     this.numberFix = this.missions && opts.numberFix !== false;
     // migration-2026-11-18b (merge_mission_number); { numberMerge: false } is a database without it
     this.numberMerge = this.numberFix && opts.numberMerge !== false;
+    // migration-2026-11-19 (mission_register.hosts, missions.host_unconfirmed, the day's key with the host: one mission at
+    // two hosts on a day is two cards); { missionHosts: false } is a database without it
+    this.missionHosts = this.missions && opts.missionHosts !== false;
     // migration-2026-11-12b (the capitals trigger on mission numbers); { numberCaps: false } is a database without it
     this.numberCaps = this.missions && opts.numberCaps !== false;
     this.tables = {};
@@ -144,7 +147,8 @@ class FakeDb {
      for reading or writing a column that isn't there. Only the highlight columns and employees.exit_reason
      are emulated (the others predate every test). */
   _missingColumn(q) {
-    const cols = q.table === "missions" ? [].concat(this.highlight ? [] : ["highlight", "highlight_note"], this.lead ? [] : ["lead_employee_id"])
+    const cols = q.table === "missions" ? [].concat(this.highlight ? [] : ["highlight", "highlight_note"], this.lead ? [] : ["lead_employee_id"], this.missionHosts ? [] : ["host_unconfirmed"])
+      : q.table === "mission_register" && !this.missionHosts ? ["hosts"]
       : q.table === "employees" && !this.exitReason ? ["exit_reason"] : [];
     if (!cols.length) return null;
     const col = cols.find((c) =>
@@ -251,12 +255,17 @@ class FakeDb {
     return this._finish(this.t(q.table).filter((r) => this._match(r, q.filters)), q);
   }
 
-  _key(table, row) {
+  /* the unique key of a table; a day's card (and a forecast card) is board + date + number + shift + HOST once migration-2026-11-19 has run */
+  _uniqueCols(table) {
     const cols = UNIQUE[table];
+    return cols && (table === "missions" || table === "forecast_missions") && this.missionHosts ? [...cols, "host"] : cols;
+  }
+  _key(table, row) {
+    const cols = this._uniqueCols(table);
     return cols ? cols.map((c) => String(row[c])).join("\u0001") : null;
   }
   _findConflict(table, row, cols) {
-    const keyCols = cols || UNIQUE[table];
+    const keyCols = cols || this._uniqueCols(table);
     if (!keyCols) return null;
     return this.t(table).find((r) => keyCols.every((c) => String(r[c]) === String(row[c]))) || null;
   }
@@ -274,6 +283,9 @@ class FakeDb {
     if (table === "missions" && this.missions && this.t("mission_register").some((r) => r.board_id === row.board_id && r.number === row.number
         && r.shift === row.shift && r.status === "closed" && r.closed_on && row.plan_date > r.closed_on)) return null;
     if (!NO_ID.has(table) && !row.id) row.id = uuid();
+    // migration-2026-11-19 columns and their defaults
+    if (this.missionHosts && table === "missions" && !("host_unconfirmed" in row)) row.host_unconfirmed = false;
+    if (this.missionHosts && table === "mission_register" && !("hosts" in row)) row.hosts = [];
     if (TIMESTAMPS.has(table)) {
       const ts = this.now();
       if (!row.created_at && table !== "assignments") row.created_at = ts;
@@ -298,6 +310,14 @@ class FakeDb {
   _write(q, user, isUpsert) {
     const rows = Array.isArray(q.values) ? q.values : [q.values];
     const conflictCols = q.onConflict ? q.onConflict.split(",").map((s) => s.trim()) : null;
+    // Postgres refuses an ON CONFLICT target that no unique constraint matches (42P10): the app has to name the key the
+    // database has (with the host once migration-2026-11-19 has run, without it before)
+    if (isUpsert && conflictCols && (q.table === "missions" || q.table === "forecast_missions")) {
+      const want = this._uniqueCols(q.table);
+      if (want.length !== conflictCols.length || !want.every((c) => conflictCols.includes(c))) {
+        return { data: null, error: { code: "42P10", message: "there is no unique or exclusion constraint matching the ON CONFLICT specification" } };
+      }
+    }
     const written = [];
     for (const v of rows) {
       const existing = isUpsert ? this._findConflict(q.table, this._caps(q.table, { ...v }), conflictCols) : null;
@@ -669,7 +689,7 @@ class FakeDb {
       }
       if (this.forwardPlanning) {
         const fm = this.t("forecast_missions");
-        const n = fm.filter((x) => x.number === from && fm.some((y) => y.number === to && y.board_id === x.board_id && y.plan_date === x.plan_date && y.shift === x.shift)).length;
+        const n = fm.filter((x) => x.number === from && fm.some((y) => y.number === to && y.board_id === x.board_id && y.plan_date === x.plan_date && y.shift === x.shift && y.host === x.host)).length;
         if (n) fail(`Both ${from} and ${to} are on ${n} forecast day(s). Merge those forecast days first.`, "23514");
       }
       const twinOf = (o) => reg.find((n) => n.number === to && n.board_id === o.board_id && n.shift === o.shift);
@@ -680,8 +700,15 @@ class FakeDb {
         for (const o of olds) {
           const n = twinOf(o);
           if (!n) { const prev = clone(o); o.number = to; o.updated_at = this.now(); o.updated_by = email(u); this._emit("mission_register", "UPDATE", o, prev); continue; }
+          // every host the job has been at: both rows' lists and hosts and every day of both (one customer, several hosts)
+          const inPlace = (x) => x.board_id === o.board_id && x.shift === o.shift && (x.number === from || x.number === to);
+          const hostsHere = [...new Set([].concat(
+            ...this.t("mission_register").filter(inPlace).map((x) => [x.host, ...(x.hosts || [])]),
+            this.t("missions").filter(inPlace).map((m) => m.host),
+          ).map((h) => String(h || "").trim()).filter(Boolean))].sort();
           for (const md of this.t("missions").filter((m) => m.number === from && m.board_id === o.board_id && m.shift === o.shift)) {
-            const mt = this.t("missions").find((m) => m.number === to && m.board_id === o.board_id && m.shift === o.shift && m.plan_date === md.plan_date);
+            // a day with both numbers at the SAME host is one card; at two hosts it stays two cards
+            const mt = this.t("missions").find((m) => m.number === to && m.board_id === o.board_id && m.shift === o.shift && m.plan_date === md.plan_date && m.host === md.host);
             if (!mt) { const prevM = clone(md); md.number = to; this._emit("missions", "UPDATE", md, prevM); continue; }
             for (const x of this.t("assignments").filter((x) => x.mission_id === md.id)) { const prev = clone(x); x.mission_id = mt.id; this._emit("assignments", "UPDATE", x, prev); }
             const prevT = clone(mt);
@@ -694,6 +721,7 @@ class FakeDb {
           }
           const later = (o.last_on || o.opened_on || "") >= (n.last_on || n.opened_on || "");
           const prevN = clone(n), anyOpen = o.status === "open" || n.status === "open";
+          if (this.missionHosts) n.hosts = hostsHere;
           n.opened_on = [n.opened_on, o.opened_on].filter(Boolean).sort()[0] || null;
           n.last_on = [n.last_on, o.last_on].filter(Boolean).sort().pop() || null;
           if (later) for (const k of ["host", "customer", "start_time", "end_time", "engineer_id", "ppe", "remark"]) n[k] = o[k];

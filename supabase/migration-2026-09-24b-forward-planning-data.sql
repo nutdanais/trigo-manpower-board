@@ -83,7 +83,7 @@ begin
     from missions m
    where m.plan_date >= s.cutoff
      and not coalesce((to_jsonb(m) ->> 'hidden')::boolean, false)
-  on conflict (board_id, plan_date, number, shift) do nothing;
+  on conflict do nothing;   -- any unique key (the day's key has had the host since migration-2026-11-19)
   get diagnostics n_fm = row_count;
 
   insert into forecast_assignments (employee_id, plan_date, forecast_mission_id, zone, held_by, updated_at)

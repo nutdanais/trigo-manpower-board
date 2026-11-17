@@ -21,6 +21,8 @@ $P -d $DB -f supabase/migration-2026-11-18b-merge-mission-number.sql >/dev/null
 $P -d $DB -f supabase/migration-2026-11-18b-merge-mission-number.sql >/dev/null
 $P -d $DB -f supabase/migration-2026-11-18c-merge-same-job.sql >/dev/null
 $P -d $DB -f supabase/migration-2026-11-18c-merge-same-job.sql >/dev/null
+$P -d $DB -f supabase/migration-2026-11-19-mission-hosts.sql >/dev/null
+$P -d $DB -f supabase/migration-2026-11-19-mission-hosts.sql >/dev/null
 ok "the migrations run twice on a database built from schema.sql"
 
 RIGHT='TSTTH.26.0049'
@@ -35,8 +37,8 @@ q "insert into boards (id, name) values ('$B1', 'Board One'), ('$B2', 'Board Two
    ('$B1', '2026-10-05', '$RIGHT', 'Host Old', 'Cust Old', 'day'),
    ('$B1', '2026-10-06', '$RIGHT', 'Host Old', 'Cust Old', 'day'),
    ('$B1', '2026-10-07', '$RIGHT', 'Host Old', 'Cust Old', 'day'),
-   ('$B1', '2026-10-06', '$TYPO', 'Host New', 'Cust New', 'day'),
-   ('$B1', '2026-10-07', '$TYPO', 'Host New', 'Cust New', 'day'),
+   ('$B1', '2026-10-06', '$TYPO', 'Host Old', 'Cust New', 'day'),
+   ('$B1', '2026-10-07', '$TYPO', 'Host Old', 'Cust New', 'day'),
    ('$B1', '2026-10-08', '$TYPO', 'Host New', 'Cust New', 'day'),
    ('$B1', '2026-11-18', '$TYPO', 'Host New', 'Cust New', 'day');" >/dev/null
 mid() { q "select id from missions where board_id = '$B1' and plan_date = '$2' and number = '$1'"; }
@@ -93,6 +95,7 @@ eq "select string_agg(a.employee_id::text, ',' order by a.employee_id) from assi
 eq "select coalesce(lead_employee_id::text, '') from missions where number = '$RIGHT' and plan_date = '2026-10-06'" "$(E 3)" "the Leader of the other card is kept when this one had none"
 eq "select count(*) from mission_register where number in ('$RIGHT', '$TYPO')" 1 "the two Missions list rows are one"
 eq "select status || '|' || coalesce(closed_on::text, '') || '|' || opened_on || '|' || last_on || '|' || host from mission_register where number = '$RIGHT'" "open||2026-10-05|2026-11-18|Host New" "open again, from the first day to the last, the details of the later one"
+eq "select hosts::text from mission_register where number = '$RIGHT'" '{"Host New","Host Old"}' "the Missions list row keeps every host of both"
 eq "select mission_number from deployment_history" "$RIGHT" "the Host Record follows"
 eq "select count(*) from mission_number_history where old_number = '$TYPO' and new_number = '$RIGHT'" 1 "the history records the merge"
 eq "select last_edited_by from plan_day_stamps where board_id = '$B1' and plan_date = '2026-10-08'" "planner@example.com" "a day's edit stamp is kept"

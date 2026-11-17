@@ -7970,6 +7970,12 @@ button.stat-tile.st-click { font: inherit; color: inherit; text-align: left; cur
   padding: 0 7px; font: inherit; font-weight: 600; line-height: 18px; cursor: pointer; }
 .mission-header .m-num-flag.temp .m-num-fix { color: var(--primary); }
 .mission-header .m-num-fix:hover { background: var(--hover-tint); }
+/* a carried-over card of a mission with several hosts: "Confirm host" until somebody confirms or changes the host
+   (it is a .m-num-flag too, so it is left out of the JPG, the PDF and Present mode with the number flags) */
+.mission-header .m-host-confirm { margin-left: auto; border: 1px solid var(--primary); background: var(--panel); color: var(--primary); border-radius: 6px;
+  padding: 0 7px; font: inherit; font-weight: 600; line-height: 18px; cursor: pointer; }
+.mission-header .m-host-confirm:hover { background: var(--hover-tint); }
+.mission-header .m-host-flag .m-num-text { font-weight: 600; }
 /* the crew never see these warnings: not in the JPG (body.exporting), the PDF (print) or Present mode */
 body.exporting .mission-header .m-num-flag, body.presenting .mission-header .m-num-flag { display: none; }
 @media print { .mission-header .m-num-flag { display: none !important; } }
@@ -7984,3 +7990,16 @@ label.num-opt { display: inline-flex; align-items: center; gap: 6px; font-weight
 label.num-opt input[type="radio"] { width: auto; flex: none; margin: 0; accent-color: var(--primary); }
 .import-note.fix-bad { color: var(--danger-text); }
 #modal-fix-number form > * + * { margin-top: 10px; }
+
+/* the other hosts of a mission, in the mission form: one row each */
+.mh-block { display: grid; gap: 6px; }
+.mh-title { font-weight: 600; font-size: 13px; }
+.mh-row { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.mh-row input { flex: 1; min-width: 0; }
+.mh-remove { border: 1px solid var(--border); background: var(--panel); color: var(--muted); border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 16px; line-height: 1; }
+.mh-remove:hover { background: var(--hover-tint); color: var(--danger-text); }
+/* the Which host? dialog: one line per mission */
+.ph-row { display: grid; grid-template-columns: 1fr minmax(140px, 1fr); gap: 8px; align-items: center; margin: 6px 0; }
+.ph-row .ph-what { font-size: 13px; overflow-wrap: anywhere; }
+/* the Missions list: a mission with several hosts shows the first and "+N" */
+.ml-hosts-more { margin-left: 4px; font-size: 11px; font-weight: 700; color: var(--muted); background: var(--bg-soft); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; white-space: nowrap; }

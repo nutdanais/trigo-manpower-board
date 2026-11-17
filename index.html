@@ -34,7 +34,7 @@
      version.js and every ?v= below in one go (tests/version.test.js fails if
      they disagree). config.js and the vendor bundle are deliberately left off:
      one isn't in the repo, the other never changes. -->
-<link rel="stylesheet" href="styles.css?v=2026-11-17d">
+<link rel="stylesheet" href="styles.css?v=2026-11-17e">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
   <div class="splash-sub">Loading shifts…</div>
   <img class="splash-logo" src="logo-on-navy.png" alt="TRIGO Global Quality Solutions">
 </div>
-<script src="version.js?v=2026-11-17d"></script>
+<script src="version.js?v=2026-11-17e"></script>
 <script>
   // version.js is already loaded above; app.js fills every slot again later
   (function () { var v = window.APP_VERSION || ""; var e = document.querySelector("#splash [data-app-version]"); if (e) e.textContent = v; })();
@@ -1045,6 +1045,14 @@
         <label>Host (company) <span class="req" aria-hidden="true">*</span> <input name="host" required list="host-options" autocomplete="off" placeholder="Search the Host list…"></label>
         <datalist id="host-options"></datalist>
         <p id="mission-host-note" class="import-note hidden"></p>
+        <!-- One mission has one customer but can be done at several hosts: the other hosts, one row each
+             (migration-2026-11-19; shown on the confirmed board's missions once the database has it) -->
+        <div id="mission-more-hosts-row" class="rp-full mh-block hidden">
+          <div class="mh-title">Also at (other hosts of this mission)</div>
+          <div id="mission-more-hosts"></div>
+          <button type="button" class="btn btn-sm" id="btn-mission-add-host">+ Add another host</button>
+          <p class="import-note">One mission has one customer, but can be done at several hosts. Whenever it is put on a day you choose which host; the same mission can be at two hosts on one day.</p>
+        </div>
         <label>Customer (company) <span class="req" aria-hidden="true">*</span> <input name="customer" required placeholder="e.g. Hayashi"></label>
         <!-- Engineer is a search over the people who may run a mission: everyone
              from Engineer upwards, by the display name on their account. Same
@@ -1815,9 +1823,26 @@
     <form id="form-mission-add">
       <p class="import-note" id="mission-add-what"></p>
       <label>Date <input type="date" name="date" id="mission-add-date" required></label>
+      <!-- a mission with several hosts: which host on this day, every time it is added -->
+      <label id="mission-add-host-row" class="hidden">Host on this day <select name="host" id="mission-add-host"></select></label>
       <div class="modal-actions">
         <button type="button" class="btn" data-close>Cancel</button>
         <button type="submit" class="btn btn-primary">Add to the board</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Which host? One row per mission with several hosts: the Confirm host chip on a carried-over card, and "Start from
+       the Missions list" on an empty day (fillPickHost / submitPickHost in app.js) -->
+  <div class="modal hidden" id="modal-pick-host" role="dialog" aria-modal="true" aria-labelledby="pick-host-title">
+    <h3><span id="pick-host-title">Which host?</span><button type="button" class="modal-close" data-close aria-label="Close">&times;</button></h3>
+    <form id="form-pick-host">
+      <p class="import-note" id="pick-host-what"></p>
+      <div id="pick-host-rows"></div>
+      <p class="import-note" id="pick-host-note" role="status"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-pick-host-go">OK</button>
       </div>
     </form>
   </div>
@@ -1844,22 +1869,22 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="i18n.js?v=2026-11-17d"></script>
-<script src="i18n-th.js?v=2026-11-17d"></script>
-<script src="planning.js?v=2026-11-17d"></script>
-<script src="employee-id.js?v=2026-11-17d"></script>
-<script src="mission-number.js?v=2026-11-17d"></script>
-<script src="mission-activity.js?v=2026-11-17d"></script>
+<script src="i18n.js?v=2026-11-17e"></script>
+<script src="i18n-th.js?v=2026-11-17e"></script>
+<script src="planning.js?v=2026-11-17e"></script>
+<script src="employee-id.js?v=2026-11-17e"></script>
+<script src="mission-number.js?v=2026-11-17e"></script>
+<script src="mission-activity.js?v=2026-11-17e"></script>
 <!-- Demo mode: does nothing unless the address has ?demo, when it swaps Supabase
      for an in-memory sample database before cloud.js runs (see demo/demo-gate.js). -->
-<script src="demo/demo-gate.js?v=2026-11-17d"></script>
-<script src="cloud.js?v=2026-11-17d"></script>
-<script src="charts.js?v=2026-11-17d"></script>
-<script src="xlsx-export.js?v=2026-11-17d"></script>
-<script src="orgchart-pptx.js?v=2026-11-17d"></script>
-<script src="bulk-edit.js?v=2026-11-17d"></script>
-<script src="app.js?v=2026-11-17d"></script>
-<script src="report.js?v=2026-11-17d"></script>
-<script src="present.js?v=2026-11-17d"></script>
+<script src="demo/demo-gate.js?v=2026-11-17e"></script>
+<script src="cloud.js?v=2026-11-17e"></script>
+<script src="charts.js?v=2026-11-17e"></script>
+<script src="xlsx-export.js?v=2026-11-17e"></script>
+<script src="orgchart-pptx.js?v=2026-11-17e"></script>
+<script src="bulk-edit.js?v=2026-11-17e"></script>
+<script src="app.js?v=2026-11-17e"></script>
+<script src="report.js?v=2026-11-17e"></script>
+<script src="present.js?v=2026-11-17e"></script>
 </body>
 </html>

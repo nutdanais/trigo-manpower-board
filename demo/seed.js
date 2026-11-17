@@ -248,6 +248,15 @@ function seed(db) {
   db.seed("missions", missions);
   // ...and a mission registered in Bulk edit that has no day on a board yet (Status: Not started)
   db.seed("mission_register", [{ board_id: "b1", number: N("RYGTH", "0108"), shift: "day", source: "list", status: "open", host: "Map Ta Phut Steel", customer: "Gear Works Ltd.", engineer_id: "eng-2", updated_by: ME.email }]);
+  // ...two missions at several hosts (one customer, several hosts): the registered job above is also done at Eastern Seaboard
+  // Motors (Add to board asks which host), and a running Rayong one is also at Eastern Seaboard Motors, its latest card still asking
+  // to be confirmed ("Confirm host", as after a carry over)
+  const manyHosts = (num, hosts) => { const r = db.t("mission_register").find((x) => x.board_id === "b1" && x.number === num); if (r) r.hosts = hosts; return r; };
+  manyHosts(N("RYGTH", "0108"), ["Map Ta Phut Steel", "Eastern Seaboard Motors"]);
+  if (manyHosts(N("RYGTH", "0107"), ["Siam Auto Parts", "Eastern Seaboard Motors"])) {
+    const last = db.t("missions").filter((m) => m.board_id === "b1" && m.number === N("RYGTH", "0107")).sort((a, b) => (a.plan_date < b.plan_date ? 1 : -1))[0];
+    if (last) last.host_unconfirmed = true;
+  }
   // ...and a Rayong job that ended in December of last year: off the list until "from earlier years" is on
   const LAST = String(+TODAY.slice(0, 4) - 1);
   db.seed("mission_register", [{ board_id: "b1", number: `RAYTH.${LY}.0091`, shift: "day", source: "list", status: "closed", host: "Rayong Precision", customer: "Brake Systems Ltd.",

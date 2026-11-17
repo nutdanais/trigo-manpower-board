@@ -196,7 +196,7 @@ function extraLetterDb() {
       assert.match(await p.locator("#fix-number-preview").innerText(), /looks like BANGN/);
       assert.equal(await p.locator("#btn-fix-number-go").isDisabled(), true);
       await p.fill("#fix-number-input", M7.toLowerCase());
-      assert.match(await p.locator("#fix-number-preview").innerText(), /is already on the Missions list for this board and shift \(Open\): Host Beta → Cust Seven, .+ – .+\. Its host and customer are not this mission's\. Tick the box only if it is really the same job/, "the other mission is shown, with a warning when its host and customer differ");
+      assert.match(await p.locator("#fix-number-preview").innerText(), /is already on the Missions list for this board and shift \(Open\): Host Beta → Cust Seven, .+ – .+\. Its customer is not this mission's\. Tick the box only if it is really the same job/, "the other mission is shown, with a warning when its customer differs");
       assert.equal(await p.locator("#fix-number-same-row").isVisible(), true, "and the person is asked: same job?");
       await p.fill("#fix-number-input", `tstth.${YY}.0123`);
       assert.match(await p.locator("#fix-number-preview").innerText(), new RegExp(`becomes TSTTH\\.${YY}\\.0123`));
@@ -375,7 +375,7 @@ function extraLetterDb() {
       await card(s.page, TYPO).locator(".m-num-fix").click();
       await s.page.locator("#modal-fix-number:not(.hidden)").waitFor();
       await s.page.fill("#fix-number-input", RIGHT);
-      assert.match(await s.page.locator("#fix-number-preview").innerText(), /is already on the Missions list for this board and shift \(Closed .+\)\. Merging moves every day of .+ under it: a day that has both keeps the card of/);
+      assert.match(await s.page.locator("#fix-number-preview").innerText(), /is already on the Missions list for this board and shift \(Closed .+\)\. Merging moves every day of .+ under it: a day that has both at the same host keeps the card of/);
       assert.equal((await s.page.locator("#btn-fix-number-go").innerText()).trim(), `Merge into ${RIGHT}`);
       assert.equal(await s.page.locator("#btn-fix-number-go").isDisabled(), false);
       await s.page.click("#btn-fix-number-go");
@@ -435,7 +435,7 @@ function extraLetterDb() {
       await e.page.locator("#modal-fix-number:not(.hidden)").waitFor();
       await e.page.fill("#fix-number-input", RIGHT2);
       const ask = await e.page.locator("#fix-number-preview").innerText();
-      assert.match(ask, new RegExp(`${RIGHT2.replace(/\./g, "\\.")} is already on the Missions list for this board and shift \\(Closed .+\\): Host Alpha → Cust Merge, .+ – .+\\. If it is the same job as ${TYPO2.replace(/\./g, "\\.")}, tick the box to merge the two\\. If it is not, type another number\\.`));
+      assert.match(ask, new RegExp(`${RIGHT2.replace(/\./g, "\\.")} is already on the Missions list for this board and shift \\(Closed .+\\): Host Alpha → Cust Merge, .+ – .+\\. If it is the same job as ${TYPO2.replace(/\./g, "\\.")}, tick the box to merge the two; the hosts of both are kept\\. If it is not, type another number\\.`));
       assert.equal(await e.page.locator("#fix-number-same-row").isVisible(), true);
       assert.equal((await e.page.locator("#fix-number-same-label").innerText()).trim(), `Same job: merge ${TYPO2} into ${RIGHT2}`);
       assert.equal(await e.page.locator("#btn-fix-number-go").isDisabled(), true, "nothing is merged until the person says it is the same job");
