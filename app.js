@@ -3335,7 +3335,13 @@ function renderMissions() {
         + `<span class="m-num-tag">${numIssue.kind === "temp" && !numIssue.overdue ? "" : icon("alert")}${numIssue.kind === "bad" ? "Wrong number" : "Temporary number"}</span>`
         + `<span class="m-num-text">${numIssue.kind === "bad" ? "Not in Etraq format" : numIssue.overdue ? `${numIssue.days} days: enter the Etraq number` : "Etraq number to follow"}</span>`
         + (canFixNumber ? `<button type="button" class="m-num-fix">Fix number</button>` : "") + `</div>`;
-    header.innerHTML = `${hlTag}${wasLine}${numLine}
+    // a carried-over card of a mission with several hosts: kept at the host it was at, until somebody confirms it
+    const hostFlag = !fcView && m.hostUnconfirmed
+      ? `<div class="m-num-flag temp m-host-flag" title="This mission has several hosts. It was carried over at the host it was at before: confirm which host it is at today.">`
+        + `<span class="m-num-tag">Confirm host</span><span class="m-num-text" data-no-i18n>${escapeHtml(m.host)}?</span>`
+        + (can("board", "edit") ? `<button type="button" class="m-host-confirm">Confirm host</button>` : "") + `</div>`
+      : "";
+    header.innerHTML = `${hlTag}${wasLine}${numLine}${hostFlag}
       <div class="m-line1">
         <span class="m-number">${escapeHtml(m.number)}</span>
         <span class="m-sep">|</span>
@@ -3362,6 +3368,11 @@ function renderMissions() {
     if (fixBtn) {
       fixBtn.onclick = (ev) => { ev.stopPropagation(); openFixNumberModal(m.number); };
       fixBtn.ondblclick = (ev) => ev.stopPropagation();
+    }
+    const hostBtn = header.querySelector(".m-host-confirm");
+    if (hostBtn) {
+      hostBtn.onclick = (ev) => { ev.stopPropagation(); confirmMissionHost(m); };
+      hostBtn.ondblclick = (ev) => ev.stopPropagation();
     }
     // the quick panel: right-click anywhere on the card (a person's card inside
     // it keeps its own menu), or hold the header on a phone
@@ -10040,9 +10051,11 @@ function renderMissionList() {
     // Add to board sits with the state it fixes: a mission that is not on its board (registered with no day, or off it)
     if (r.status === "open" && canAdd && (info.p.kind === "off" || info.p.kind === "notstarted")) acts.push(`<button type="button" class="lt-act ml-hov" data-act="add" title="Put this mission on a day of its board">Add to board</button>`);
     acts.push(`<button type="button" class="btn btn-small ml-hov ml-more lt-dots" data-act="more" aria-haspopup="menu" aria-label="${lbl("More actions")}" title="${lbl("More actions")}">${icon("more")}</button>`);
-    const host = r.host ? (canHost
+    const hostsAll = hostsOfMission(r);
+    const host = (r.host ? (canHost
       ? `<button type="button" class="ml-host-link" data-act="host" title="${escapeHtml(window.I18N ? I18N.t("Open this host") : "Open this host")}">${escapeHtml(r.host)}</button>`
-      : escapeHtml(r.host)) : emptyCell();
+      : escapeHtml(r.host)) : emptyCell())
+      + (hostsAll.length > 1 ? `<span class="ml-hosts-more" title="${escapeHtml(hostsAll.join(", "))}" data-no-i18n>+${hostsAll.length - 1}</span>` : "");
     const area = hostAreaOf(r.host);
     const eng = r.engineerId ? escapeHtml(engineerLabelFor(r.engineerId)) : emptyCell();
     const avg = info.avg == null || r.status === "closed" ? emptyCell()
@@ -10127,6 +10140,8 @@ function renderMissionRowMenu({ addTitle, addItem }) {
   if (r.status === "open" && can("missions", "edit") && missionNumberIssue(r.number)) addItem("Fix mission number…", () => openFixNumberModal(r.number), null, "edit");
   if (canPlan && onBoard && feat().highlight) addItem("Highlight…", () => openMissionFromList(r, { then: "btn-md-hl" }), null, "star");
   if (canPlan && hasDay) addItem("Duplicate", () => openMissionFromList(r, { then: "btn-md-dup" }), null, "copy");
+  // a mission with several hosts: put it on the day shown at the top at another of its hosts (the same day, a second card)
+  if (canPlan && r.status === "open" && hostsOfMission(r).length > 1) addItem("Add at another host…", () => openMissionAddModal(r, { date: state.date }), null, "plus");
   if (canPlan && hasDay && D().boards.length > 1) addItem("Move or copy…", () => openMissionFromList(r, { then: "btn-md-move" }), null, "swap");
   if (canPlan && onBoard) addItem(p.kind === "hidden" ? "Unhide" : "Hide", () => openMissionFromList(r, { then: "btn-md-hide" }), null, p.kind === "hidden" ? "eye" : "eye-off");
   if (r.status === "closed" && can("missions", "edit")) addItem("Reopen", () => reopenMissionRow(r), null, "undo");
@@ -10217,16 +10232,71 @@ function reopenMissionRow(r) {
     }));
 }
 
-/* Add to board: put a register mission on one day of its board, with no crew. */
+/* ---------- A mission at several hosts (migration-2026-11-19) ----------
+   One mission has one customer and can be done at several hosts, listed on its Missions list row. Whenever it is put on
+   a day (Add to board, Start from the Missions list) the person chooses which host; the same mission can be at two hosts
+   on one day (two cards), the same host twice is refused with an alert. A carried-over card of such a mission keeps the
+   previous day's host and shows "Confirm host" until somebody confirms or changes it. */
+const missionHostsOn = () => !!feat().missionHosts && missionsOn();
+/* the hosts of a mission, its own first */
+const hostsOfMission = (r) => (missionHostsOn() ? cloud.registerHosts(r.boardId, r.number, r.shift) : []);
+
+/* "Which host?": one row per mission, each with its hosts to choose from. onOk gets [{ row, host }]. */
+let _pickHost = null;
+function openPickHost({ title, what, rows, okLabel = "OK", onOk }) {
+  _pickHost = { rows, onOk };
+  $("#pick-host-title").textContent = title;
+  $("#pick-host-what").textContent = what || "";
+  $("#pick-host-rows").innerHTML = rows.map((r, i) => `<div class="ph-row"><span class="ph-what" data-no-i18n>${escapeHtml(r.label)}</span>`
+    + `<select data-i="${i}" aria-label="${escapeHtml(r.label)}">${r.hosts.map(h => `<option value="${escapeHtml(h)}"${h === r.value ? " selected" : ""}>${escapeHtml(h)}</option>`).join("")}</select></div>`).join("");
+  $("#pick-host-note").textContent = "";
+  $("#btn-pick-host-go").textContent = okLabel;
+  openModal("#modal-pick-host");
+}
+function submitPickHost(ev) {
+  ev.preventDefault();
+  const f = _pickHost;
+  if (!f) return;
+  const picked = [...document.querySelectorAll("#pick-host-rows select")].map(s => ({ row: f.rows[+s.dataset.i], host: s.value }));
+  closeModal();
+  _pickHost = null;
+  f.onOk(picked);
+}
+/* the "Confirm host" chip on a carried-over card of a mission with several hosts */
+function confirmMissionHost(m) {
+  const hosts = cloud.registerHosts(D().activeBoardId, m.number, m.shift);
+  const list = hosts.includes(m.host) ? hosts : [m.host, ...hosts];
+  openPickHost({
+    title: "Confirm host",
+    what: `${m.number} has several hosts. Which host is it at on ${fmtDow(state.date)} ${fmtDate(state.date)}?`,
+    rows: [{ label: `${m.number} · ${shiftWord(m.shift)}`, hosts: list, value: m.host }],
+    okLabel: "Confirm host",
+    onOk: ([p]) => {
+      // the same mission at the same host already on this day (it can be at two hosts, not twice at one)
+      if (p.host !== m.host && getPlan().missions.some(x => x.id !== m.id && x.number === m.number && x.shift === m.shift && x.host === p.host)) {
+        toast(`${m.number} is already on the board at ${p.host} on this day.`, "warn");
+        return;
+      }
+      safely(async () => { await cloud.setMissionHost(m.id, p.host); await refreshAndRender(); });
+    },
+  });
+}
+
+/* Add to board: put a register mission on one day of its board, with no crew. A mission with several hosts asks which
+   host on that day, every time. */
 let _addingMission = null;
-function openMissionAddModal(r) {
+function openMissionAddModal(r, opts = {}) {
   if (!can("board", "edit")) { toast("Your role can view the board but not change it.", "info"); return; }
   _addingMission = r;
-  $("#mission-add-what").textContent = `${r.number} · ${boardNameOf(r.boardId)} · ${r.shift === "night" ? "Night" : "Day"} · ${r.host || "—"} → ${r.customer || "—"}. It is added with no crew.`;
+  const hosts = hostsOfMission(r);
+  const several = hosts.length > 1;
+  $("#mission-add-what").textContent = `${r.number} · ${boardNameOf(r.boardId)} · ${r.shift === "night" ? "Night" : "Day"} · ${several ? hosts.join(" / ") : (r.host || "—")} → ${r.customer || "—"}. It is added with no crew.`;
+  $("#mission-add-host-row").classList.toggle("hidden", !several);
+  $("#mission-add-host").innerHTML = several ? hosts.map(h => `<option value="${escapeHtml(h)}"${h === r.host ? " selected" : ""}>${escapeHtml(h)}</option>`).join("") : "";
   const d = $("#mission-add-date");
   d.min = todayStr();
   d.max = feat().forecast ? horizonEndFor(r.boardId) : "";
-  d.value = feat().forecast ? horizonEndFor(r.boardId) : addDays(todayStr(), 1);
+  d.value = opts.date || (feat().forecast ? horizonEndFor(r.boardId) : addDays(todayStr(), 1));
   openModal("#modal-mission-add");
 }
 function submitMissionAdd(ev) {
@@ -10236,10 +10306,17 @@ function submitMissionAdd(ev) {
   if (!r || !date) return;
   if (isLocked(r.boardId, date)) { toast(`${boardNameOf(r.boardId)} is locked on ${fmtDate(date)}. Unlock that day first.`, "warn"); return; }
   if (feat().forecast && date > horizonEndFor(r.boardId)) { toast("That day is a forecast. Pick a day up to the next working day.", "warn"); return; }
+  const several = !$("#mission-add-host-row").classList.contains("hidden");
+  const host = several ? $("#mission-add-host").value : "";
   safely(async () => {
-    const res = await cloud.addMissionsFromRegister(r.boardId, date, [r.id]);
+    const res = await cloud.addMissionsFromRegister(r.boardId, date, [r.id], host ? { [r.id]: host } : {});
     closeModal();
-    toast(res.added ? `Added ${r.number} to ${boardNameOf(r.boardId)} on ${fmtDow(date)} ${fmtDate(date)}.` : `${r.number} is already on ${boardNameOf(r.boardId)} that day.`, "info");
+    if (several && res.sameHost && res.sameHost.length) {
+      // the same mission at the same host twice on a day is refused
+      toast(`${r.number} is already on ${boardNameOf(r.boardId)} on ${fmtDow(date)} ${fmtDate(date)} at ${res.sameHost[0].host}. Choose another host to add it a second time.`, "warn");
+    } else {
+      toast(res.added ? `Added ${r.number} to ${boardNameOf(r.boardId)} on ${fmtDow(date)} ${fmtDate(date)}${host ? " at " + host : ""}.` : `${r.number} is already on ${boardNameOf(r.boardId)} that day.`, "info");
+    }
     await refreshAndRender();
   });
 }
@@ -10247,12 +10324,23 @@ function submitMissionAdd(ev) {
    day, or a day with nothing to carry over). */
 function startDayFromRegister() {
   const boardId = D().activeBoardId, date = state.date;
-  const ids = (D().register || []).filter(r => r.boardId === boardId && r.status === "open").map(r => r.id);
+  const rows = (D().register || []).filter(r => r.boardId === boardId && r.status === "open");
+  const ids = rows.map(r => r.id);
   if (!ids.length) return;
-  safely(async () => {
-    const res = await cloud.addMissionsFromRegister(boardId, date, ids);
+  const go = (hostById) => safely(async () => {
+    const res = await cloud.addMissionsFromRegister(boardId, date, ids, hostById);
     toast(`Added ${plural(res.added, "mission", "missions")} from the Missions list. Drag people onto them to plan the crew.`, "info");
     await refreshAndRender();
+  });
+  // a mission with several hosts: which host on this day (the others are single-host and need no question)
+  const several = rows.filter(r => hostsOfMission(r).length > 1);
+  if (!several.length) { go({}); return; }
+  openPickHost({
+    title: "Which host?",
+    what: `These missions have several hosts. Choose the host of each on ${fmtDow(date)} ${fmtDate(date)}; add one again later for a second host.`,
+    rows: several.map(r => ({ id: r.id, label: `${r.number} · ${shiftWord(r.shift)} · ${r.customer || "—"}`, hosts: hostsOfMission(r), value: r.host })),
+    okLabel: "Add to the board",
+    onOk: (picked) => go(Object.fromEntries(picked.map(p => [p.row.id, p.host]))),
   });
 }
 
@@ -10395,9 +10483,10 @@ function missionNumberMergeInfo(oldNumber, newNumber) {
   return {
     // a spelling of the number (stray characters, the monthly suffix) is the same job without asking; anything else is asked
     sameSpelling: MissionNumber.sameSpelling(oldNumber, newNumber),
-    sameHostCustomer: norm(t.host) === norm(me.host) && norm(t.customer) === norm(me.customer),
+    // one mission has one customer (and can have several hosts, all kept by a merge): a different customer is the warning
+    sameCustomer: norm(t.customer) === norm(me.customer),
     reopens, closed: news.every(n => n.status === "closed"), closedOn: closedOns[closedOns.length - 1] || "",
-    what: `${t.host || "—"} → ${t.customer || "—"}, ${t.openedOn ? fmtDate(t.openedOn) : "?"} – ${t.lastOn ? fmtDate(t.lastOn) : "?"}`,
+    what: `${(missionHostsOn() ? cloud.registerHosts(t.boardId, t.number, t.shift) : []).join(" / ") || t.host || "—"} → ${t.customer || "—"}, ${t.openedOn ? fmtDate(t.openedOn) : "?"} – ${t.lastOn ? fmtDate(t.lastOn) : "?"}`,
   };
 }
 /* the site codes in use, most used first; `boardId` puts that board's own first */
@@ -10524,16 +10613,16 @@ function updateFixNumberState() {
   else $("#fix-number-same").checked = false;
   if (c.ask) {
     const a = c.ask, st = a.closed ? trText("Closed") + (a.closedOn ? " " + fmtDate(a.closedOn) : "") : trText("Open");
-    note.textContent = a.sameHostCustomer
-      ? `${c.number} is already on the Missions list for this board and shift (${st}): ${a.what}. If it is the same job as ${_fixingNumber.number}, tick the box to merge the two. If it is not, type another number.`
-      : `${c.number} is already on the Missions list for this board and shift (${st}): ${a.what}. Its host and customer are not this mission's. Tick the box only if it is really the same job as ${_fixingNumber.number}; if not, type another number.`;
+    note.textContent = a.sameCustomer
+      ? `${c.number} is already on the Missions list for this board and shift (${st}): ${a.what}. If it is the same job as ${_fixingNumber.number}, tick the box to merge the two; the hosts of both are kept. If it is not, type another number.`
+      : `${c.number} is already on the Missions list for this board and shift (${st}): ${a.what}. Its customer is not this mission's. Tick the box only if it is really the same job as ${_fixingNumber.number}; if not, type another number.`;
     note.classList.remove("fix-bad");
     $("#btn-fix-number-go").textContent = "Save number";
     $("#btn-fix-number-go").disabled = true;
     return;
   }
   note.textContent = c.error || (c.ok
-    ? (c.merge ? `${c.number} is already on the Missions list for this board and shift (${c.merge.closed ? trText("Closed") + (c.merge.closedOn ? " " + fmtDate(c.merge.closedOn) : "") : trText("Open")}). Merging moves every day of ${_fixingNumber.number} under it: a day that has both keeps the card of ${c.number} and gets the crew of the other, the two Missions list rows become one, and ${c.number} is open again if it was closed.`
+    ? (c.merge ? `${c.number} is already on the Missions list for this board and shift (${c.merge.closed ? trText("Closed") + (c.merge.closedOn ? " " + fmtDate(c.merge.closedOn) : "") : trText("Open")}). Merging moves every day of ${_fixingNumber.number} under it: a day that has both at the same host keeps the card of ${c.number} and gets the crew of the other, a day at two hosts keeps two cards, the hosts of both are kept, the two Missions list rows become one, and ${c.number} is open again if it was closed.`
       : c.temp ? `It gets the temporary number ${c.number}.` : `${_fixingNumber.number} becomes ${c.number}.`) : "");
   note.classList.toggle("fix-bad", !!c.error);
   $("#btn-fix-number-go").textContent = c.merge ? `Merge into ${c.number}` : "Save number";
@@ -12339,9 +12428,26 @@ function setMissionView(view) {
   $("#form-mission").classList.toggle("hidden", detail);
   if (!detail) $("#mission-modal-acts").classList.add("hidden");
 }
+/* the other hosts of a mission, one row each in the mission form (one customer, several hosts) */
+function addMoreHostRow(value = "") {
+  const row = document.createElement("div");
+  row.className = "mh-row";
+  row.innerHTML = `<input class="mh-input" list="host-options" autocomplete="off" placeholder="Search the Host list…" value="${escapeHtml(value)}">`
+    + `<button type="button" class="mh-remove" aria-label="Remove this host" title="Remove this host">&times;</button>`;
+  row.querySelector(".mh-remove").onclick = () => row.remove();
+  $("#mission-more-hosts").appendChild(row);
+  return row;
+}
+function fillMoreHosts(src, missionId) {
+  const show = missionHostsOn() && !isForecastView();
+  $("#mission-more-hosts-row").classList.toggle("hidden", !show);
+  $("#mission-more-hosts").innerHTML = "";
+  if (show && src && missionId) for (const h of cloud.registerHosts(D().activeBoardId, src.number, src.shift)) if (h !== src.host) addMoreHostRow(h);
+}
 function fillMissionForm(src, missionId, opts = {}) {
   const form = $("#form-mission");
   form.reset();
+  fillMoreHosts(src, missionId);
   if (src) {
     form.number.value = missionId ? src.number : (opts.number || "");
     form.host.value = src.host;
@@ -12629,6 +12735,17 @@ function saveMission(ev) {
     return;
   }
   vals.host = hostRec.name;
+  // the other hosts of this mission: each from the Host list, none twice
+  const moreHosts = [];
+  if (missionHostsOn() && !isForecastView()) {
+    for (const input of document.querySelectorAll("#mission-more-hosts .mh-input")) {
+      const typed = input.value.trim();
+      if (!typed) continue;
+      const rec = hostRecordOf(typed);
+      if (!rec) { toast(`"${typed}" is not in the Host list. Add it on the Host tab first, or remove that row.`, "warn"); input.focus(); return; }
+      if (rec.name !== vals.host && !moreHosts.includes(rec.name)) moreHosts.push(rec.name);
+    }
+  }
   /* The engineer has to be somebody the board knows — an account from Engineer
      upwards, or one of the engineer records that predate accounts. Resolved to
      an engineers row below, because that is what a mission stores and what the
@@ -12671,12 +12788,20 @@ function saveMission(ev) {
   // instant client-side check (same number + shift, excluding the mission being edited);
   // scans hidden missions too — the DB unique constraint covers them regardless —
   // this just avoids a round trip and points at the hidden one if that's the clash
+  // with migration-2026-11-19 a day's card is number + shift + host: one mission at two hosts on a day is two cards,
+  // the same host twice is refused
+  const byHost = !!feat().missionHosts;
   const dup = getPlan().missions.find(m =>
     m.number.trim().toLowerCase() === vals.number.toLowerCase() &&
-    m.shift === vals.shift && m.id !== state.editingMissionId);
+    m.shift === vals.shift && m.id !== state.editingMissionId &&
+    (!byHost || String(m.host).trim().toLowerCase() === vals.host.toLowerCase()));
   if (dup) {
     const shiftLabel = vals.shift === "night" ? "Night" : "Day";
-    toast(dup.hidden
+    toast(byHost
+      ? (dup.hidden
+        ? `A hidden mission "${vals.number}" is already on the ${shiftLabel} shift for this date at ${vals.host}. Use "Hide/Unhide" to unhide and reuse it, or pick another host or shift.`
+        : `Mission "${vals.number}" is already on the ${shiftLabel} shift for this date at ${vals.host}. Pick another host or shift, or edit the existing card instead.`)
+      : dup.hidden
       ? `A hidden mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use "Hide/Unhide" to unhide and reuse it, or pick a different shift.`
       : `A mission "${vals.number}" already exists on the ${shiftLabel} shift for this date. Use a different shift, or edit the existing mission instead.`, "warn");
     return;
@@ -12690,6 +12815,14 @@ function saveMission(ev) {
     if (fixFrom) { await cloud.replaceMissionNumber(fixFrom, vals.number); state.missions.activityKey = null; }
     if (forecast) await cloud.saveForecastMission(boardId, state.date, editingId, vals);
     else await cloud.saveMission(boardId, state.date, editingId, vals);
+    // the hosts of the mission: an edited mission has exactly the rows of the form; a new card adds its host (and the
+    // others typed) to the hosts the mission already has, so adding it at a second host makes it a two-host mission
+    if (!forecast && missionHostsOn() && (editingId || moreHosts.length || cloud.registerHosts(boardId, vals.number, vals.shift).length)) {
+      await cloud.loadMissionRegister();
+      const had = editingId ? [] : cloud.registerHosts(boardId, vals.number, vals.shift);
+      const list = [...new Set([...had, vals.host, ...moreHosts])];
+      if (editingId || list.length > 1) await cloud.setRegisterHosts(boardId, vals.number, vals.shift, list);
+    }
     if (editingId && mdState.fromDetail && !forecast) {
       // opened from the detail: back to the detail with what was saved (a confirm in between may have closed the panel)
       await refreshAndRender();
@@ -20305,6 +20438,8 @@ function wireApp() {
   $("#btn-new-mission").onclick = () => guardEdit(() => openMissionModal(null));
   $("#btn-new-employee").onclick = () => guardEdit(() => openEmployeeModal(null));
   $("#form-mission").onsubmit = saveMission;
+  $("#btn-mission-add-host").onclick = () => addMoreHostRow().querySelector("input").focus();
+  $("#form-pick-host").onsubmit = submitPickHost;
   // the number: the Etraq one, or a temporary one from the site code (missionNumberMode)
   for (const r of $$("#form-mission [name=numMode]")) r.onchange = updateMissionNumberMode;
   // a mission number and a site code are capitals: typed (or pasted) lower case turns into capitals in place,

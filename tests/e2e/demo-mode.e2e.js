@@ -115,6 +115,27 @@ async function step(name, fn) {
       await ctx.close();
     });
 
+    await step("?demo shows a mission at several hosts: +1 on the Missions list, Add to board asks which host, and a card asks to Confirm host", async () => {
+      const { ctx, page } = await open("?demo");
+      await board(page);
+      await page.evaluate(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); });
+      await page.locator("#missions-panel:not(.hidden)").waitFor();
+      const yy = String(new Date().getFullYear()).slice(2);
+      assert.match(await page.locator("#missions-body tr", { hasText: `RYGTH.${yy}.0108` }).locator(".ml-hosts-more").innerText(), /\+1/, "two hosts: +1");
+      await page.evaluate((n) => openMissionAddModal(D().register.find((r) => r.number === n)), `RYGTH.${yy}.0108`);
+      await page.locator("#modal-mission-add:not(.hidden)").waitFor();
+      assert.deepEqual(await page.locator("#mission-add-host option").allInnerTexts(), ["Map Ta Phut Steel", "Eastern Seaboard Motors"], "it asks which host");
+      await page.evaluate(() => closeModal());
+      // the running Rayong mission at two hosts: its latest card asks to be confirmed
+      const latest = await page.evaluate((n) => { const m = [...cloud.data.register].find((r) => r.number === n); return m ? m.hosts : null; }, `RYGTH.${yy}.0107`);
+      assert.deepEqual(latest, ["Siam Auto Parts", "Eastern Seaboard Motors"]);
+      // and the board it opens on shows the chip on that mission's card, not on the single-host ones
+      await page.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
+      assert.equal(await page.locator(".m-host-flag").count(), 1, "one card asks to Confirm host");
+      assert.match(await page.locator(".m-host-flag").innerText(), /confirm host/i);
+      await ctx.close();
+    });
+
     await step("?demo&role=viewer signs in as a viewer: no New Mission", async () => {
       const { ctx, page } = await open("?demo&role=viewer");
       await board(page);

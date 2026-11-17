@@ -112,10 +112,12 @@ create table if not exists missions (
   updated_at timestamptz not null default now()
 );
 create index if not exists missions_board_date_idx on missions(board_id, plan_date);
--- one mission number per board + date + shift (Day and Night can coexist)
+-- one mission number per board + date + shift + host (Day and Night can coexist, and so can one mission at two
+-- hosts on the same day: migration-2026-11-19-mission-hosts.sql). The key used to be without the host.
+alter table missions drop constraint if exists missions_unique_number_shift;
 do $$
 begin
-  alter table missions add constraint missions_unique_number_shift unique (board_id, plan_date, number, shift);
+  alter table missions add constraint missions_unique_number_shift_host unique (board_id, plan_date, number, shift, host);
 -- an existing constraint reports duplicate_table (its backing index), not
 -- duplicate_object — catching only the latter broke this file's promise to be
 -- safe to run more than once
@@ -154,6 +156,9 @@ create index if not exists assignments_date_idx on assignments(plan_date);
 -- One column on the mission, so a crew has at most one head. The head must be on the
 -- mission that day, and is cleared when they leave it (moved, leave, Standby, lent, deleted).
 alter table missions add column if not exists lead_employee_id uuid references employees(id) on delete set null;
+-- a carried-over card of a mission that has several hosts keeps the previous day's host but asks to be confirmed
+-- (the "Confirm host" chip on the card) until somebody confirms or changes it (migration-2026-11-19-mission-hosts.sql)
+alter table missions add column if not exists host_unconfirmed boolean not null default false;
 
 create or replace function public.check_mission_lead() returns trigger
 language plpgsql security definer set search_path = public, pg_temp as $fn$
@@ -1041,9 +1046,15 @@ create table if not exists forecast_missions (
   created_by  text,
   updated_by  text,
   created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
-  unique (board_id, plan_date, number, shift)
+  updated_at  timestamptz not null default now()
 );
+-- one forecast card per board + date + number + shift + host. An older database has the key without the host: one mission at two hosts on a day is two forecast cards too
+alter table forecast_missions drop constraint if exists forecast_missions_board_id_plan_date_number_shift_key;
+do $$
+begin
+  alter table forecast_missions add constraint forecast_missions_unique_number_shift_host unique (board_id, plan_date, number, shift, host);
+exception when duplicate_object or duplicate_table then null;
+end $$;
 create index if not exists forecast_missions_board_date_idx on forecast_missions(board_id, plan_date);
 
 -- One row per employee per date, like assignments: a forecast placement is a
@@ -1670,6 +1681,10 @@ create table if not exists mission_register (
   updated_by  text,
   unique (board_id, number, shift)
 );
+-- every host the mission is done at (one customer, several hosts). Empty = just the host above. Set by the New
+-- Mission form with several hosts, by merging two missions and by "Hosts…" on the mission; the Add to board host
+-- picker offers these (migration-2026-11-19-mission-hosts.sql)
+alter table mission_register add column if not exists hosts text[] not null default '{}';
 create index if not exists mission_register_number_idx on mission_register(number);
 
 create table if not exists mission_number_history (
@@ -1996,7 +2011,7 @@ grant execute on function public.replace_mission_number(text, text) to authentic
    A typo (a stray character in front, typed from the wrong keyboard) is often made on a mission that already
    exists under the right number on the same board and shift, closed or open: the two Missions list rows and
    the two sets of days are one job. This moves every day of p_old under p_new. A day that has both keeps the
-   card of p_new and gets the crew of the other (a person is on one mission a day, so no crew is lost; the
+   card of p_new at the same host and gets the crew of the other (a person is on one mission a day, so no crew is lost; two cards at two different hosts stay two cards: one mission, several hosts; the
    Leader, a highlight and "not hidden" carry over when the card kept has none). The two Missions list rows
    become one: the first and last day of both, open if either is open (a closed one is reopened), the details of the one
    with the later last day. The number history, the Host Record
@@ -2015,6 +2030,7 @@ declare
   v_merged int := 0;
   v_clash int := 0;
   v_lead uuid;
+  v_hosts text[];
   v_stamps boolean := to_regclass('public.plan_day_stamps') is not null;
   v_fc boolean := to_regclass('public.forecast_missions') is not null;
   v_site text := '[A-Z][A-Z0-9]{' || (public.mission_prefix_length() - 1) || '}';
@@ -2043,7 +2059,7 @@ begin
   end if;
   if v_fc then
     execute 'select count(*) from forecast_missions a join forecast_missions b
-               on b.board_id = a.board_id and b.plan_date = a.plan_date and b.shift = a.shift and b.number = $2
+               on b.board_id = a.board_id and b.plan_date = a.plan_date and b.shift = a.shift and b.number = $2 and b.host = a.host
              where a.number = $1' into v_clash using v_old, v_new;
     if v_clash > 0 then
       raise exception 'Both % and % are on % forecast day(s). Merge those forecast days first.', v_old, v_new, v_clash using errcode = 'check_violation';
@@ -2067,9 +2083,16 @@ begin
 
   -- a place where both are: one job
   for r_old in select * from mission_register where number = v_old loop
+    -- every host the job has been at, from both Missions list rows and every day of both: one customer, several hosts
+    select coalesce(array_agg(distinct h order by h), '{}') into v_hosts from (
+      select unnest(hosts) as h from mission_register where board_id = r_old.board_id and shift = r_old.shift and number in (v_old, v_new)
+      union all select host from mission_register where board_id = r_old.board_id and shift = r_old.shift and number in (v_old, v_new)
+      union all select host from missions where board_id = r_old.board_id and shift = r_old.shift and number in (v_old, v_new)
+    ) s where h is not null and btrim(h) <> '';
+    -- a day that has both cards at the SAME host is one card; at two hosts it stays two cards (one mission, two hosts)
     for d in select md.id as old_id, mt.id as new_id
                from missions md
-               join missions mt on mt.board_id = md.board_id and mt.plan_date = md.plan_date and mt.shift = md.shift and mt.number = v_new
+               join missions mt on mt.board_id = md.board_id and mt.plan_date = md.plan_date and mt.shift = md.shift and mt.number = v_new and mt.host = md.host
               where md.board_id = r_old.board_id and md.shift = r_old.shift and md.number = v_old loop
       select lead_employee_id into v_lead from missions where id = d.old_id;
       update assignments set mission_id = d.new_id where mission_id = d.old_id;
@@ -2089,6 +2112,7 @@ begin
     update mission_register r
        set opened_on  = least(r_new.opened_on, r_old.opened_on),
            last_on    = greatest(r_new.last_on, r_old.last_on),
+           hosts      = v_hosts,
            host       = case when coalesce(r_old.last_on, r_old.opened_on) >= coalesce(r_new.last_on, r_new.opened_on) then r_old.host else r_new.host end,
            customer   = case when coalesce(r_old.last_on, r_old.opened_on) >= coalesce(r_new.last_on, r_new.opened_on) then r_old.customer else r_new.customer end,
            start_time = case when coalesce(r_old.last_on, r_old.opened_on) >= coalesce(r_new.last_on, r_new.opened_on) then r_old.start_time else r_new.start_time end,

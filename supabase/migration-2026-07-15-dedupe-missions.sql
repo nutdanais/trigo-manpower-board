@@ -9,18 +9,22 @@
 -- happened, then adds a database rule so the same mission number can never
 -- exist twice for the same board + date + shift again (Day and Night remain
 -- allowed as separate mission boxes).
+--
+-- Updated with migration-2026-11-19 (a mission at several hosts): a duplicate is now the same board + date +
+-- number + shift + HOST. One mission at two hosts on one day is two cards on purpose, so this migration, if it is
+-- run again, only merges copies at the same host and adds the key with the host.
 
--- 1) For each (board_id, plan_date, number, shift) group with more than one row,
+-- 1) For each (board_id, plan_date, number, shift, host) group with more than one row,
 --    keep the most recently updated copy and move any assignments pointing at
 --    the other copies onto it, so nobody's placement is lost.
 with ranked as (
   select id,
          row_number() over (
-           partition by board_id, plan_date, number, shift
+           partition by board_id, plan_date, number, shift, host
            order by updated_at desc, created_at desc, id asc
          ) as rn,
          first_value(id) over (
-           partition by board_id, plan_date, number, shift
+           partition by board_id, plan_date, number, shift, host
            order by updated_at desc, created_at desc, id asc
          ) as canonical_id
   from missions
@@ -34,7 +38,7 @@ where a.mission_id = r.id and r.rn > 1;
 with ranked as (
   select id,
          row_number() over (
-           partition by board_id, plan_date, number, shift
+           partition by board_id, plan_date, number, shift, host
            order by updated_at desc, created_at desc, id asc
          ) as rn
   from missions
@@ -43,10 +47,10 @@ delete from missions m
 using ranked r
 where m.id = r.id and r.rn > 1;
 
--- 3) Guardrail: one mission number per board + date + shift, going forward.
+-- 3) Guardrail: one mission number per board + date + shift + host, going forward.
 do $$
 begin
-  alter table missions add constraint missions_unique_number_shift unique (board_id, plan_date, number, shift);
+  alter table missions add constraint missions_unique_number_shift_host unique (board_id, plan_date, number, shift, host);
 -- an existing constraint reports duplicate_table (its backing index), not
 -- duplicate_object — catching only the latter broke this file's promise to be
 -- safe to run more than once

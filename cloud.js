@@ -92,7 +92,7 @@ const cloud = {
              forecast edit never throws away the confirmed plans and vice versa.
              `holdEvents` are the unacknowledged "someone took your hold" rows,
              with `holdMissions` naming the forecast missions they point at. */
-          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, lead: false, missions: false, appSettings: false },
+          features: { stamps: false, forecast: false, capacity: false, mergeLog: false, loans: false, highlight: false, lead: false, missions: false, missionHosts: false, appSettings: false },
           /* shared settings (migration-2026-11-09b, table app_settings): { hostExperiencedDays, hostAtRiskMax }.
              A setting nobody has changed is absent here, and app.js uses its own default. */
           settings: {},
@@ -363,11 +363,14 @@ const cloud = {
     const exitReason = await probe("employees", "exit_reason");
     // the Missions tab: the register, its number history and the Site Admin role (migration-2026-11-09)
     const missions = (await probe("mission_register", "id")) && (await probe("mission_number_history", "id"));
+    // a mission at several hosts (migration-2026-11-19): the hosts list on the register, the "Confirm host" flag on a day's
+    // card, and the day's key with the host in it (one mission at two hosts on one day = two cards)
+    const missionHosts = missions && (await probe("mission_register", "hosts")) && (await probe("missions", "host_unconfirmed"));
     // shared settings, e.g. the days that make someone experienced at a host (migration-2026-11-09b)
     const appSettings = await probe("app_settings", "key");
     // the "my part is planned" ticks on a board's day (migration-2026-11-12)
     const ready = await probe("plan_day_ready", "board_id");
-    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, lead, exitReason, missions, appSettings, ready };
+    this.data.features = { stamps, forecast, capacity, mergeLog, loans, highlight, lead, exitReason, missions, missionHosts, appSettings, ready };
   },
 
   async _loadAreas() {
@@ -671,7 +674,7 @@ const cloud = {
     const missionMap = {};
     for (const m of missionRows || []) {
       const obj = {
-        id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+        id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift, hostUnconfirmed: !!m.host_unconfirmed,
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
         ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
         highlight: m.highlight || null, highlightNote: m.highlight_note || "",
@@ -718,10 +721,18 @@ const cloud = {
      if that hasn't been run yet, Postgres rejects the ON CONFLICT target (42P10) —
      fall back to a plain insert so the app still works, just without the guard,
      exactly like before that migration existed. */
+  /* the key a day's card is matched by on insert: number + shift, and the host too once the database allows one
+     mission at two hosts on one day (migration-2026-11-19); the old key until then, since a conflict target has to
+     match a constraint that exists */
+  _missionConflictCols() {
+    return this.data.features && this.data.features.missionHosts ? "board_id,plan_date,number,shift,host" : "board_id,plan_date,number,shift";
+  },
   async _upsertMissionsGuarded(rows) {
     if (!rows.length) return;
+    // a column of migration-2026-11-19 on a database that has not run it
+    if (!(this.data.features && this.data.features.missionHosts)) rows = rows.map(({ host_unconfirmed, ...rest }) => rest);
     const { error } = await sb.from("missions")
-      .upsert(rows, { onConflict: "board_id,plan_date,number,shift", ignoreDuplicates: true });
+      .upsert(rows, { onConflict: this._missionConflictCols(), ignoreDuplicates: true });
     if (!error) return;
     // a column-level migration (remark, hidden, ...) hasn't been run yet on this
     // database - read the missing column's name out of Postgres's error message
@@ -778,7 +789,11 @@ const cloud = {
   _carryPlacements(boardId, srcMissions, srcAssignments, destMissions, destDate) {
     const idMap = {};
     for (const sm of srcMissions) {
-      const match = (destMissions || []).find((dm) => dm.number === sm.number && dm.shift === sm.shift);
+      // the same number + shift + host; when the mission is only once on each day, number + shift alone (the planner
+      // may have set another host on a day that already had its missions: the crew still comes across)
+      const same = (destMissions || []).filter((dm) => dm.number === sm.number && dm.shift === sm.shift);
+      const match = same.find((dm) => dm.host === sm.host)
+        || (same.length === 1 && srcMissions.filter((x) => x.number === sm.number && x.shift === sm.shift).length === 1 ? same[0] : null);
       if (match) idMap[sm.id] = match.id;
     }
     // active !== false — a new day's plan is a "current roster" operation,
@@ -809,21 +824,23 @@ const cloud = {
 
   /* What "Carry over" from srcDate would put on an EMPTY day — same shape as
      ensurePlanLoaded returns, no writes. Mission ids are placeholders
-     ("preview:<number>|<shift>"); PlanDiff matches by number+shift anyway. */
+     ("preview:<number>|<shift>|<host>"); PlanDiff matches by number+shift (+host for a mission twice on a day). */
   async buildCarryPreview(boardId, srcDate, destDate) {
     const { srcMissions, srcAssignments } = await this._carrySource(boardId, srcDate, destDate);
     const plan = { missions: [], zones: emptyZones(), updatedAt: null, sourceDate: srcDate };
     const byId = {};
-    const virtualDest = srcMissions.map((m) => ({ id: "preview:" + m.number + "|" + m.shift, number: m.number, shift: m.shift }));
+    const previewId = (m) => "preview:" + m.number + "|" + m.shift + "|" + m.host;
+    const virtualDest = srcMissions.map((m) => ({ id: previewId(m), number: m.number, shift: m.shift, host: m.host }));
     for (const m of srcMissions) {
       const obj = {
-        id: "preview:" + m.number + "|" + m.shift, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+        id: previewId(m), number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+        hostUnconfirmed: this._carryNeedsHostConfirm(boardId, m),
         startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id,
         ppe: m.ppe || "", remark: m.remark || "", hidden: !!m.hidden, members: [],
         highlight: null, highlightNote: "",   // a carry never copies a highlight (setMissionHighlight)
         leadId: null,   // set below, once the crew is placed (_carryLeads)
       };
-      if (byId[obj.id]) continue;   // a duplicate number+shift (pre-2026-07-15 data) carries once
+      if (byId[obj.id]) continue;   // a duplicate number+shift+host (pre-2026-07-15 data) carries once
       byId[obj.id] = obj;
       plan.missions.push(obj);
     }
@@ -846,7 +863,7 @@ const cloud = {
     // day, leave those untouched and carry over ONLY the employees — so pre-set
     // mission details survive while the previous day's people still come across.
     let { data: destMissions, error: destErr } = await sb
-      .from("missions").select("id, number, shift").eq("board_id", boardId).eq("plan_date", destDate);
+      .from("missions").select("id, number, shift, host").eq("board_id", boardId).eq("plan_date", destDate);
     if (destErr) throw destErr;
 
     if ((!destMissions || destMissions.length === 0) && srcMissions.length) {
@@ -854,6 +871,9 @@ const cloud = {
         board_id: boardId, plan_date: destDate, number: m.number, host: m.host, customer: m.customer,
         shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id,
         ppe: m.ppe, remark: m.remark, hidden: m.hidden, updated_by: updatedBy,
+        // a mission with several hosts is carried to the host it was at, to be confirmed on the card
+        // (only written when true: the column defaults to false, so every other carry writes the rows it always did)
+        ...(this._carryNeedsHostConfirm(boardId, m) ? { host_unconfirmed: true } : {}),
       }));
       // guarded upsert makes this safe to run twice at once (e.g. the holiday
       // toggle's own refresh racing with the Realtime-triggered one): whichever
@@ -861,7 +881,7 @@ const cloud = {
       // inserting a second copy of the same mission.
       await this._upsertMissionsGuarded(inserts);
       ({ data: destMissions } = await sb
-        .from("missions").select("id, number, shift").eq("board_id", boardId).eq("plan_date", destDate));
+        .from("missions").select("id, number, shift, host").eq("board_id", boardId).eq("plan_date", destDate));
     }
 
     const assignInserts = [];
@@ -897,6 +917,18 @@ const cloud = {
       const { error } = await sb.from("missions").update({ lead_employee_id: empId }).eq("id", missionId).is("lead_employee_id", null);
       if (error) console.error("carrying the Leader failed:", error);
     }
+  },
+
+  /* Every host a mission is done at: its own host and the ones listed on the Missions list (migration-2026-11-19). */
+  registerHosts(boardId, number, shift) {
+    const r = this.registerFor(boardId, number, shift);
+    if (!r) return [];
+    return [...new Set([r.host, ...(r.hosts || [])].map((h) => String(h || "").trim()).filter(Boolean))];
+  },
+  /* A carried-over (or copied) card of a mission that has several hosts keeps the previous day's host and asks to be
+     confirmed (the "Confirm host" chip) until somebody confirms or changes it. */
+  _carryNeedsHostConfirm(boardId, m) {
+    return !!(this.data.features && this.data.features.missionHosts) && this.registerHosts(boardId, m.number, m.shift).length > 1;
   },
 
   /* The Leaders a carry brings across: [destMissionId, employeeId] for each source mission
@@ -993,7 +1025,11 @@ const cloud = {
   /* Postgres unique_violation (23505) on missions_unique_number_shift → a friendlier message */
   _friendlyMissionError(error) {
     if (error && error.code === "23505") {
-      return new Error("A mission with this number already exists on this shift for this date. Use a different shift, or edit the existing mission instead.");
+      // the day's key is number + shift + host (one mission at two hosts on one day is two cards): the same host twice is refused
+      const withHost = this.data.features && this.data.features.missionHosts;
+      return new Error(withHost
+        ? "This mission is already on this shift for this date at this host. Pick another host or shift, or edit the existing card instead."
+        : "A mission with this number already exists on this shift for this date. Use a different shift, or edit the existing mission instead.");
     }
     return error;
   },
@@ -1006,6 +1042,8 @@ const cloud = {
       ppe: vals.ppe || null, remark: vals.remark || null,
       updated_at: new Date().toISOString(), updated_by: updatedBy,
     };
+    // saving a card is confirming its host (the "Confirm host" chip, migration-2026-11-19)
+    if (missionId && this.data.features && this.data.features.missionHosts) row.host_unconfirmed = false;
     const attempt = (r) => missionId
       ? sb.from("missions").update(r).eq("id", missionId)
       : sb.from("missions").insert({ ...r, board_id: boardId, plan_date: date }).select("id").single();
@@ -1026,6 +1064,16 @@ const cloud = {
     this._invalidatePlans();
     // the new mission's id, for a caller that places people on it straight away
     return missionId || (data && data.id) || null;
+  },
+  /* Confirm or change the host of one card (the "Confirm host" chip): the card's host, and it no longer asks to be
+     confirmed. The same mission at the same host on that day is refused by the database (the day's key has the host). */
+  async setMissionHost(missionId, host) {
+    const row = { host, updated_at: new Date().toISOString(), updated_by: await this._currentEmail() };
+    if (this.data.features && this.data.features.missionHosts) row.host_unconfirmed = false;
+    let { error } = await sb.from("missions").update(row).eq("id", missionId);
+    if (error && this._missingColumnFromError(error) === "updated_by") { const { updated_by, ...rest } = row; ({ error } = await sb.from("missions").update(rest).eq("id", missionId)); }
+    if (error) throw this._friendlyMissionError(error);
+    this._invalidatePlans();
   },
   async deleteMission(missionId) {
     const { error } = await sb.from("missions").delete().eq("id", missionId);
@@ -1093,7 +1141,7 @@ const cloud = {
       .from("missions").select("*").eq("board_id", boardId).eq("plan_date", date).order("number");
     if (error) throw error;
     return (data || []).map((m) => ({
-      id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
+      id: m.id, number: m.number, host: m.host, customer: m.customer, shift: m.shift, hostUnconfirmed: !!m.host_unconfirmed,
       startTime: hhmm(m.start_time), endTime: hhmm(m.end_time), engineerId: m.engineer_id, ppe: m.ppe || "",
       hidden: !!m.hidden,
     }));
@@ -1109,6 +1157,7 @@ const cloud = {
       board_id: boardId, plan_date: targetDate, number: m.number, host: m.host, customer: m.customer,
       shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id, ppe: m.ppe,
       remark: m.remark, hidden: false,   // an explicitly imported mission is always visible
+      ...(this._carryNeedsHostConfirm(boardId, m) ? { host_unconfirmed: true } : {}),
     }));
     const before = await sb.from("missions").select("id", { count: "exact", head: true }).eq("board_id", boardId).eq("plan_date", targetDate);
     await this._upsertMissionsGuarded(inserts);
@@ -2461,17 +2510,17 @@ const cloud = {
         board_id: boardId, plan_date: date, number: m.number, host: m.host, customer: m.customer, shift: m.shift,
         start_time: m.startTime, end_time: m.endTime, engineer_id: m.engineerId || null,
         ppe: m.ppe || null, remark: m.remark || null, created_by: me, updated_by: me, updated_at: now,
-      })), { onConflict: "board_id,plan_date,number,shift", ignoreDuplicates: true });
+      })), { onConflict: this._missionConflictCols(), ignoreDuplicates: true });
       if (error) throw error;
     }
-    const { data: dest, error: dErr } = await sb.from("forecast_missions").select("id, number, shift")
+    const { data: dest, error: dErr } = await sb.from("forecast_missions").select("id, number, shift, host")
       .eq("board_id", boardId).eq("plan_date", date);
     if (dErr) throw dErr;
-    const idOf = new Map((dest || []).map((m) => [m.number + "|" + m.shift, m.id]));
+    const idOf = new Map((dest || []).map((m) => [m.number + "|" + m.shift + "|" + m.host, m.id]));
     const active = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
     const rows = [];
     for (const m of missions) {
-      const id = idOf.get(m.number + "|" + m.shift);
+      const id = idOf.get(m.number + "|" + m.shift + "|" + m.host);
       if (!id) continue;
       for (const empId of m.members || []) if (active.has(empId)) rows.push({ employee_id: empId, plan_date: date, forecast_mission_id: id, zone: null, held_by: me, updated_at: now });
     }
@@ -2516,16 +2565,17 @@ const cloud = {
     const preview = await this.buildCarryPreview(boardId, srcDate);
     const picked = preview.missions.filter((m) => !m.hidden && want.has(m.number + "|" + m.shift));
     const before = await this.ensureForecastLoaded(boardId, date, { force: true });
-    const have = new Set(before.missions.map((m) => m.number + "|" + m.shift));
-    const fresh = picked.filter((m) => !have.has(m.number + "|" + m.shift))
+    const hk = (m) => m.number + "|" + m.shift + "|" + m.host;
+    const have = new Set(before.missions.map(hk));
+    const fresh = picked.filter((m) => !have.has(hk(m)))
       .map((m) => (withCrew ? m : { ...m, members: [] }));
     if (!fresh.length) return { added: 0, skipped: picked.length, crewPlaced: 0, crewKept: 0 };
     await this._writeForecastPlan(boardId, date, { missions: fresh, zones: {} });
     const after = await this.ensureForecastLoaded(boardId, date, { force: true });
-    const freshKeys = new Set(fresh.map((m) => m.number + "|" + m.shift));
+    const freshKeys = new Set(fresh.map(hk));
     const active = new Set(this.data.employees.filter((e) => e.boardId === boardId && e.active !== false).map((e) => e.id));
     const wanted = fresh.reduce((n, m) => n + m.members.filter((id) => active.has(id)).length, 0);
-    const crewPlaced = after.missions.filter((m) => freshKeys.has(m.number + "|" + m.shift))
+    const crewPlaced = after.missions.filter((m) => freshKeys.has(hk(m)))
       .reduce((n, m) => n + m.members.length, 0);
     return { added: fresh.length, skipped: picked.length - fresh.length, crewPlaced, crewKept: Math.max(0, wanted - crewPlaced) };
   },
@@ -2641,6 +2691,8 @@ const cloud = {
   _registerFromRow(r) {
     return {
       id: r.id, boardId: r.board_id, number: r.number, shift: r.shift, host: r.host || "", customer: r.customer || "",
+      // every host the mission is done at (one customer, several hosts; migration-2026-11-19); empty = just `host`
+      hosts: Array.isArray(r.hosts) ? r.hosts.filter(Boolean) : [],
       startTime: r.start_time ? hhmm(r.start_time) : "", endTime: r.end_time ? hhmm(r.end_time) : "", engineerId: r.engineer_id || null,
       ppe: r.ppe || "", remark: r.remark || "", status: r.status, openedOn: r.opened_on || null, lastOn: r.last_on || null,
       closedOn: r.closed_on || null, closedBy: r.closed_by || "", closedAt: r.closed_at || null, closeNote: r.close_note || "",
@@ -2895,13 +2947,25 @@ const cloud = {
   },
   /* Put register missions on a day, with the details the register holds (no crew). A mission
      already on that day, or closed before it, is skipped. Returns { added, skipped }. */
-  async addMissionsFromRegister(boardId, date, ids) {
+  async addMissionsFromRegister(boardId, date, ids, hostByRegisterId = {}) {
     const rows = (this.data.register || []).filter((r) => ids.includes(r.id) && r.boardId === boardId && r.status === "open");
-    if (!rows.length) return { added: 0, skipped: ids.length };
+    if (!rows.length) return { added: 0, skipped: ids.length, sameHost: [] };
     const updatedBy = await this._currentEmail();
     const night = (r) => r.shift === "night";
-    const inserts = rows.map((r) => ({
-      board_id: boardId, plan_date: date, number: r.number, host: r.host, customer: r.customer, shift: r.shift,
+    // a mission with several hosts goes on the day at the host the person chose (one card per host: the same mission at
+    // a second host on the same day is another card; the same host twice is refused, and reported in `sameHost`)
+    const { data: onDay, error: dayErr } = await sb.from("missions").select("number, shift, host").eq("board_id", boardId).eq("plan_date", date);
+    if (dayErr) throw dayErr;
+    const have = new Set((onDay || []).map((m) => m.number + "|" + m.shift + "|" + m.host));
+    const sameHost = [], picked = [];
+    for (const r of rows) {
+      const host = (hostByRegisterId[r.id] || r.host || "").trim();
+      if (have.has(r.number + "|" + r.shift + "|" + host)) { sameHost.push({ number: r.number, shift: r.shift, host }); continue; }
+      have.add(r.number + "|" + r.shift + "|" + host);
+      picked.push({ r, host });
+    }
+    const inserts = picked.map(({ r, host }) => ({
+      board_id: boardId, plan_date: date, number: r.number, host, customer: r.customer, shift: r.shift,
       start_time: r.startTime || (night(r) ? "20:00" : "08:00"), end_time: r.endTime || (night(r) ? "05:00" : "17:00"),
       engineer_id: r.engineerId, ppe: r.ppe || null, remark: r.remark || null, updated_by: updatedBy,
     }));
@@ -2911,7 +2975,18 @@ const cloud = {
     const added = (await count()) - before;
     this._invalidatePlans();
     await this.loadMissionRegister();
-    return { added, skipped: ids.length - added };
+    return { added, skipped: ids.length - added, sameHost };
+  },
+
+  /* The hosts a mission is done at (one customer, several hosts): the Missions list row's list. `hosts` is every host,
+     the mission's own included; one host (or none) means a plain single-host mission. Needs migration-2026-11-19. */
+  async setRegisterHosts(boardId, number, shift, hosts) {
+    if (!(this.data.features && this.data.features.missionHosts)) return;
+    const list = [...new Set((hosts || []).map((h) => String(h || "").trim()).filter(Boolean))];
+    const { error } = await sb.from("mission_register").update({ hosts: list.length > 1 ? list : [], updated_at: new Date().toISOString() })
+      .eq("board_id", boardId).eq("number", number).eq("shift", shift);
+    if (error) throw error;
+    await this.loadMissionRegister();
   },
 
   /* Bulk edit on the Missions tab (bulk-edit.js planMissions): new missions (source 'list', no
