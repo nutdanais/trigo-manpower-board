@@ -55,6 +55,16 @@
     return { ok: false, number: n, error: `A mission number looks like ${EXAMPLE}: the ${LEN}-character site code, the year's two digits and four digits.` };
   }
 
+  /* true when `a` is only a mistyped spelling of `b`: the same letters and digits with stray characters around or
+     between them (a dot, a dash, a vowel mark typed from the wrong keyboard), or the monthly suffix the admins'
+     workbook uses (BANGN.26.0005.AB). Used to tell a typo made on a mission that already exists under the right
+     number (merge them) from two different jobs (never merged). The same rule as merge_mission_number. */
+  function sameSpelling(a, b) {
+    const squash = (s) => { let n = tidy(s); const m = n.match(WITH_SUFFIX); if (m) n = m[1]; return n.replace(/[^A-Z0-9]/g, ""); };
+    const x = squash(a), y = squash(b);
+    return !!x && x === y;
+  }
+
   /* "real": an Etraq number; "temp": a temporary one; "bad": anything else (a typo, extra characters) */
   function kindOf(number) {
     const n = tidy(number);
@@ -170,7 +180,7 @@
     return !end || end >= String(today).slice(0, 4) + "-01-01";
   }
 
-  const api = { tidy, check, kindOf, isTemp, checkPrefix, prefixOf, nextTemp, daysSince, tempOverdue, checkReplacement, setPrefixLength,
+  const api = { tidy, check, kindOf, sameSpelling, isTemp, checkPrefix, prefixOf, nextTemp, daysSince, tempOverdue, checkReplacement, setPrefixLength,
     PREFIX_DEFAULT, PREFIX_MIN, PREFIX_MAX, TEMP_ALERT_AFTER_DAYS, yearOf, needsNewYearNumber, daysWaiting, ALERT_AFTER_DAYS, validFrom, checkNewYear,
     SHOW_OLD_DAYS, showsOldNumber, runsInYear };
   // follow the setting: read each time, never copied

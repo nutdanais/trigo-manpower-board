@@ -722,7 +722,7 @@ async function step(name, fn) {
       assert.equal(await row(p, "102").count(), 0, "closed missions are not in the Open view");
       await p.selectOption("#missions-status", "closed");
       assert.match(await row(p, "102").innerText(), /Closed/);
-      assert.equal(await row(p, "102").locator("button[data-act=reopen]").count(), 0, "an engineer cannot reopen");
+      assert.equal(await row(p, "102").locator("button[data-act=reopen]").count(), 1, "an engineer can reopen a mission, as they close one");
       await p.selectOption("#missions-status", "open");
     });
 

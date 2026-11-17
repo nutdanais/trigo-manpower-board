@@ -679,7 +679,7 @@ const PERM_AREAS = [
     { key: "emplist",  label: "Manpower",       hint: "The employee roster" },
     { key: "hostlist", label: "Host",           hint: "Sites and their records" },
     { key: "missions", label: "Missions",       hint: "The Missions tab, and closing a mission" },
-    { key: "missionadmin", label: "Reopen missions & new-year numbers", hint: "Missions tab: reopen a closed mission, enter next year's mission numbers" },
+    { key: "missionadmin", label: "New-year mission numbers", hint: "Missions tab: enter next year's mission numbers (anyone who can edit missions can reopen a closed one)" },
     { key: "capacity", label: "Capacity",       hint: "Headcount needed per host vs available, weeks ahead" },
     { key: "forecast", label: "Forecast",       hint: "Tentative plans after tomorrow, and holds on people" },
     { key: "settings", label: "Settings",       hint: "Engineers, service areas, board weekends" },
@@ -8527,7 +8527,7 @@ function bulkMissionCtx(rows) {
   const engineers = D().engineers.map(e => ({ id: e.id, label: engineerLabelFor(e.id) })).filter(e => e.label);
   return {
     register: rows, boards: D().boards, hosts: D().hosts.filter(h => !h.archived).map(h => h.name), engineers,
-    canReopen: can("missionadmin", "edit"), canRenumber: can("missionadmin", "edit"),
+    canReopen: can("missions", "edit"), canRenumber: can("missionadmin", "edit"),
     previousNumber: (n) => cloud.previousNumber(n),
   };
 }
@@ -10024,7 +10024,7 @@ function renderMissionList() {
     th.classList.toggle("sorted", th.dataset.sort === st.sort.key);
     th.setAttribute("aria-sort", th.dataset.sort === st.sort.key ? (st.sort.dir > 0 ? "ascending" : "descending") : "none");
   }
-  const canClose = can("missions", "edit"), canReopen = can("missionadmin", "edit"), canAdd = can("board", "edit"), canHost = can("hostlist");
+  const canClose = can("missions", "edit"), canReopen = can("missions", "edit"), canAdd = can("board", "edit"), canHost = can("hostlist");
   const body = $("#missions-body");
   const lbl = (t) => escapeHtml(window.I18N ? I18N.t(t) : t);   // an attribute the translator does not walk
   // a ticked mission that a search or filter now hides is no longer ticked: Close… acts on what the list shows
@@ -10129,7 +10129,7 @@ function renderMissionRowMenu({ addTitle, addItem }) {
   if (canPlan && hasDay) addItem("Duplicate", () => openMissionFromList(r, { then: "btn-md-dup" }), null, "copy");
   if (canPlan && hasDay && D().boards.length > 1) addItem("Move or copy…", () => openMissionFromList(r, { then: "btn-md-move" }), null, "swap");
   if (canPlan && onBoard) addItem(p.kind === "hidden" ? "Unhide" : "Hide", () => openMissionFromList(r, { then: "btn-md-hide" }), null, p.kind === "hidden" ? "eye" : "eye-off");
-  if (r.status === "closed" && can("missionadmin", "edit")) addItem("Reopen", () => reopenMissionRow(r), null, "undo");
+  if (r.status === "closed" && can("missions", "edit")) addItem("Reopen", () => reopenMissionRow(r), null, "undo");
 }
 function missionFromRow(el) {
   const tr = el.closest("tr[data-id]");
@@ -10365,10 +10365,31 @@ function knownMissionNumbers() {
 function missionNumberUsedWhere(number) {
   const shiftOf = (s) => (s === "night" ? "Night" : "Day");
   const places = [];
-  const add = (boardId, shift) => { const p = `${boardNameOf(boardId)} (${shiftOf(shift)})`; if (!places.includes(p)) places.push(p); };
-  for (const r of D().register || []) if (r.number === number) add(r.boardId, r.shift);
-  for (const m of getPlan().missions || []) if (m.number === number) add(D().activeBoardId, m.shift);
+  // a closed mission is easy to miss: the Missions list shows open ones first, so the message says it is closed
+  const add = (boardId, shift, closed) => { const p = `${boardNameOf(boardId)} (${shiftOf(shift)}${closed ? ", " + trText("closed") : ""})`; if (!places.includes(p)) places.push(p); };
+  for (const r of D().register || []) if (r.number === number) add(r.boardId, r.shift, r.status === "closed");
+  for (const m of getPlan().missions || []) if (m.number === number) add(D().activeBoardId, m.shift, false);
   return places.join(", ");
+}
+const trText = (s) => (window.I18N ? I18N.t(s) : s);
+/* The same job under its right number: the old number is a mistyped spelling of the one typed (MissionNumber.
+   sameSpelling) and the number typed is on the Missions list only where the old number is too (the same board
+   and shift), so the two are one job, not two missions. A typo made on a mission that
+   already exists (a stray character in front, closed or open) is fixed by merging, not renaming: a rename
+   would put two cards with one number on the same days. null when it is not that case (the number is also on
+   another board or shift: a different location, which the Fix number dialog refuses). */
+function missionNumberMergeInfo(oldNumber, newNumber) {
+  if (!MissionNumber.sameSpelling(oldNumber, newNumber)) return null;   // two different jobs on one board and shift are never merged
+  const reg = D().register || [];
+  const olds = reg.filter(r => r.number === oldNumber), news = reg.filter(r => r.number === newNumber);
+  if (!olds.length || !news.length) return null;
+  const same = (a, b) => a.boardId === b.boardId && a.shift === b.shift;
+  if (!news.every(n => olds.some(o => same(o, n)))) return null;
+  // today's board has the new number on a shift the old number is not on
+  if ((getPlan().missions || []).some(m => m.number === newNumber && !olds.some(o => o.boardId === D().activeBoardId && o.shift === m.shift))) return null;
+  const reopens = news.some(n => n.status === "closed" && olds.some(o => same(o, n) && o.status === "open"));
+  const closedOns = news.filter(n => n.status === "closed" && n.closedOn).map(n => n.closedOn).sort();
+  return { reopens, closed: news.every(n => n.status === "closed"), closedOn: closedOns[closedOns.length - 1] || "" };
 }
 /* the site codes in use, most used first; `boardId` puts that board's own first */
 function knownMissionPrefixes(boardId) {
@@ -10455,7 +10476,12 @@ function fixNumberChoice() {
   const c = MissionNumber.checkReplacement(f.number, form.number.value);
   if (!c.ok) return c;
   const where = missionNumberUsedWhere(c.number);
-  if (where) return { ok: false, number: c.number, error: `${c.number} is already used by another mission (${where}).` };
+  if (where) {
+    const mg = missionNumberMergeInfo(f.number, c.number);
+    if (!mg) return { ok: false, number: c.number, error: `${c.number} is already used by another mission (${where}).` };
+    // merging into a closed mission reopens it, which anyone who can edit missions may do (as Reopen on the Missions tab)
+    return { ok: true, number: c.number, merge: mg };
+  }
   return c;
 }
 /* An input event on a mission number or site code field: upper case what was typed, keeping the cursor where it was
@@ -10476,8 +10502,11 @@ function updateFixNumberState() {
   $("#fix-number-prefix-row").classList.toggle("hidden", !temp);
   const c = fixNumberChoice();
   const note = $("#fix-number-preview");
-  note.textContent = c.error || (c.ok ? (c.temp ? `It gets the temporary number ${c.number}.` : `${_fixingNumber.number} becomes ${c.number}.`) : "");
+  note.textContent = c.error || (c.ok
+    ? (c.merge ? `${c.number} is already on the Missions list for this board and shift (${c.merge.closed ? trText("Closed") + (c.merge.closedOn ? " " + fmtDate(c.merge.closedOn) : "") : trText("Open")}). Merging moves every day of ${_fixingNumber.number} under it: a day that has both keeps the card of ${c.number} and gets the crew of the other, the two Missions list rows become one, and ${c.number} is open again if it was closed.`
+      : c.temp ? `It gets the temporary number ${c.number}.` : `${_fixingNumber.number} becomes ${c.number}.`) : "");
   note.classList.toggle("fix-bad", !!c.error);
+  $("#btn-fix-number-go").textContent = c.merge ? `Merge into ${c.number}` : "Save number";
   $("#btn-fix-number-go").disabled = !c.ok;
 }
 function submitFixNumber(ev) {
@@ -10485,9 +10514,9 @@ function submitFixNumber(ev) {
   const f = _fixingNumber, c = fixNumberChoice();
   if (!f || !c.ok) { if (c.error) toast(c.error, "warn"); return; }
   safely(async () => {
-    await cloud.replaceMissionNumber(f.number, c.number);
+    await cloud.replaceMissionNumber(f.number, c.number, { merge: !!c.merge });
     closeModal();
-    toast(`${f.number} is now ${c.number} on every day of the mission.`, "info");
+    toast(c.merge ? `${f.number} is merged into ${c.number}: its days and crew are now under ${c.number}.` : `${f.number} is now ${c.number} on every day of the mission.`, "info");
     _fixingNumber = null;
     state.missions.activityKey = null;   // the crew facts are read by number
     await refreshAndRender();
@@ -10501,10 +10530,6 @@ function checkMissionNumberUse(number, shift, then, backToForm) {
   const boardId = D().activeBoardId;
   const mine = cloud.registerFor(boardId, number, shift);
   if (mine && mine.status === "closed" && mine.closedOn && state.date > mine.closedOn) {
-    if (!can("missionadmin", "edit")) {
-      toast(`${number} (${shift === "night" ? "Night" : "Day"}) was closed on ${fmtDate(mine.closedOn)}. A Site Admin or a Manager can reopen it on the Missions tab.`, "warn");
-      return;
-    }
     showConfirm("Reopen mission?", `${number} (${shift === "night" ? "Night" : "Day"}) was closed on ${fmtDate(mine.closedOn)}. Reopen it and save it on this day?`,
       () => safely(async () => { await cloud.reopenMission(mine.id); then(); }), backToForm);
     return;
@@ -12607,7 +12632,12 @@ function saveMission(ev) {
   const fixFrom = numberRules && editing && newNumber && !isForecastView() && MissionNumber.kindOf(editing.number) !== "real"
     && (D().register || []).some(r => r.number === editing.number) ? editing.number : null;
   const usedWhere = fixFrom ? missionNumberUsedWhere(vals.number) : "";
-  if (usedWhere) { toast(`${vals.number} is already used by another mission (${usedWhere}).`, "warn"); return; }
+  if (usedWhere) {
+    toast(missionNumberMergeInfo(fixFrom, vals.number)
+      ? `${vals.number} is already on the Missions list for this job (${usedWhere}). Close this form and use Fix number on the mission's card or a Missions row to merge the two.`
+      : `${vals.number} is already used by another mission (${usedWhere}).`, "warn");
+    return;
+  }
   // instant client-side check (same number + shift, excluding the mission being edited);
   // scans hidden missions too — the DB unique constraint covers them regardless —
   // this just avoids a round trip and points at the hidden one if that's the clash

@@ -48,6 +48,28 @@ function seed(opts) {
   return db;
 }
 
+/* The case from the live board: LCBTH.26.0049 was closed, and the job carried on as <THAI VOWEL MARK>LCBTH.26.0049
+   (typed from the wrong keyboard), both spellings on the same day. Board One, Day: PREV has both cards (a crew each),
+   SRC only the typo. The right number is closed: an engineer reopens it by merging. */
+const RIGHT = `TSTTH.${YY}.0049`, TYPO = "\u0E3A" + RIGHT;
+function twinDb(opts) {
+  const db = seed(opts);
+  db.seed("missions", [
+    { id: "w-r1", board_id: "b1", plan_date: PREV, number: RIGHT, host: "Host Alpha", customer: "Cust Merge", shift: "day", engineer_id: "eng-1" },
+    { id: "w-t1", board_id: "b1", plan_date: PREV, number: TYPO, host: "Host Alpha", customer: "Cust Merge", shift: "day", engineer_id: "eng-1" },
+    { id: "w-t2", board_id: "b1", plan_date: SRC, number: TYPO, host: "Host Alpha", customer: "Cust Merge", shift: "day", engineer_id: "eng-1" },
+  ]);
+  db.seed("assignments", [
+    { employee_id: "e6", plan_date: PREV, mission_id: "w-r1", zone: null },
+    { employee_id: "e7", plan_date: PREV, mission_id: "w-t1", zone: null },
+    { employee_id: "e8", plan_date: SRC, mission_id: "w-t2", zone: null },
+  ]);
+  const reg = db.t("mission_register").find((r) => r.number === RIGHT);
+  Object.assign(reg, { status: "closed", closed_on: PREV, closed_by: "admin@example.com", closed_at: new Date().toISOString() });
+  db.t("profiles").find((x) => x.email === h.USERS.b.email).role_key = "siteadmin";
+  return db;
+}
+
 (async () => {
   const env = await h.launch();
   let failed = false;
@@ -323,6 +345,65 @@ function seed(opts) {
       await o.page.click("#btn-fix-number-go");
       await o.page.locator(".toast", { hasText: "migration-2026-11-11-mission-number-rules.sql" }).waitFor();
       assert.ok(old.t("missions").some((m) => m.number === "101"), "nothing changed");
+      await o.close();
+    });
+
+    await step("an engineer merges it (the right number is closed, and merging reopens it): every day under the right number, both crews, one Missions list row", async () => {
+      const tw = twinDb();
+      const s = await env.openAs(tw, h.USERS.a);
+      await goDay(s.page);
+      await card(s.page, TYPO).locator(".m-num-fix").click();
+      await s.page.locator("#modal-fix-number:not(.hidden)").waitFor();
+      await s.page.fill("#fix-number-input", RIGHT);
+      assert.match(await s.page.locator("#fix-number-preview").innerText(), /is already on the Missions list for this board and shift \(Closed .+\)\. Merging moves every day of .+ under it: a day that has both keeps the card of/);
+      assert.equal((await s.page.locator("#btn-fix-number-go").innerText()).trim(), `Merge into ${RIGHT}`);
+      assert.equal(await s.page.locator("#btn-fix-number-go").isDisabled(), false);
+      await s.page.click("#btn-fix-number-go");
+      await s.page.locator(".toast", { hasText: `is merged into ${RIGHT}` }).waitFor();
+      assert.equal(tw.t("missions").filter((m) => m.number === TYPO).length, 0, "no day left on the typo");
+      assert.deepEqual(tw.t("missions").filter((m) => m.number === RIGHT && m.board_id === "b1").map((m) => m.plan_date).sort(), [PREV, SRC].sort(), "one card a day");
+      const prevCard = tw.t("missions").find((m) => m.number === RIGHT && m.plan_date === PREV);
+      assert.deepEqual(tw.t("assignments").filter((x) => x.mission_id === prevCard.id).map((x) => x.employee_id).sort(), ["e6", "e7"], "the day that had both has both crews");
+      const srcCard = tw.t("missions").find((m) => m.number === RIGHT && m.plan_date === SRC);
+      assert.deepEqual(tw.t("assignments").filter((x) => x.mission_id === srcCard.id).map((x) => x.employee_id), ["e8"], "the other day keeps its crew");
+      const rows = tw.t("mission_register").filter((r) => r.number === RIGHT || r.number === TYPO);
+      assert.equal(rows.length, 1, "one Missions list row");
+      assert.equal(rows[0].status, "open", "reopened");
+      assert.equal(rows[0].closed_on, null);
+      assert.equal(rows[0].opened_on, PREV);
+      assert.equal(rows[0].last_on, SRC);
+      assert.ok(tw.t("mission_number_history").some((x) => x.old_number === TYPO && x.new_number === RIGHT), "the history records it");
+      await card(s.page, RIGHT).waitFor();
+      assert.equal(await card(s.page, RIGHT).count(), 1, "one card on the day");
+      assert.equal(await card(s.page, RIGHT).locator(".m-num-flag").count(), 0, "the flag is gone");
+      assert.equal(await card(s.page, RIGHT).locator(".m-was-line").count(), 0, "a typo is not a new number");
+      await s.close();
+    });
+
+    await step("merging: a number that is also on another board is refused, Thai is translated, and a database without the migration says so", async () => {
+      const tw = twinDb();
+      tw.seed("missions", [{ id: "w-x", board_id: "b2", plan_date: SRC, number: RIGHT, host: "Host Beta", customer: "Cust Other", shift: "day", engineer_id: "eng-2" }]);
+      const s = await env.openAs(tw, h.USERS.b);
+      await goDay(s.page);
+      await s.page.evaluate((n) => openFixNumberModal(n), TYPO);
+      await s.page.locator("#modal-fix-number:not(.hidden)").waitFor();
+      await s.page.fill("#fix-number-input", RIGHT);
+      assert.match(await s.page.locator("#fix-number-preview").innerText(), /is already used by another mission \(.*Board Two \(Day\)/, "also another board: a different location, not merged");
+      assert.equal(await s.page.locator("#btn-fix-number-go").isDisabled(), true);
+      await s.close();
+
+      const old = twinDb({ numberMerge: false });
+      const o = await env.openAs(old, h.USERS.b);
+      await goDay(o.page);
+      await o.page.evaluate((n) => openFixNumberModal(n), TYPO);
+      await o.page.locator("#modal-fix-number:not(.hidden)").waitFor();
+      await o.page.fill("#fix-number-input", RIGHT);
+      await o.page.click("#btn-fix-number-go");
+      await o.page.locator(".toast", { hasText: "migration-2026-11-18b-merge-mission-number.sql" }).waitFor();
+      assert.equal(old.t("missions").filter((m) => m.number === TYPO).length, 2, "nothing changed");
+      const th = await o.page.evaluate((n) => { I18N.setLang("th"); const r = [I18N.t("Merge into " + n), I18N.t(n + " is merged into " + n + ": its days and crew are now under " + n + ".")]; I18N.setLang("en"); return r; }, RIGHT);
+      assert.match(th[0], /รวมเข้ากับ/);
+      assert.match(th[1], /รวม .* เข้ากับ/);
       await o.close();
     });
 
