@@ -1,6 +1,7 @@
 <title>Manpower Board in November</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="color-scheme" content="light">
+<script>document.documentElement.lang = "th";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap">
@@ -130,7 +131,7 @@ code { font-family: var(--font-mono); background: var(--paper); border: 1px soli
 /* Release chart */
 .chart-card { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 24px 24px 16px; }
 .chart-scroll { overflow-x: auto; }
-.chart { display: grid; grid-template-columns: repeat(16, minmax(36px, 1fr)); gap: 6px; align-items: end; min-width: 640px; height: 240px; padding-top: 24px; }
+.chart { display: grid; grid-template-columns: repeat(17, minmax(34px, 1fr)); gap: 6px; align-items: end; min-width: 640px; height: 240px; padding-top: 24px; }
 .day { display: grid; grid-template-rows: 1fr auto; height: 100%; text-align: center; }
 .col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; }
 .col .n { font-weight: 700; color: var(--navy); font-size: 14px; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
@@ -276,7 +277,7 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
     <div class="hero-grid">
       <div>
         <h1 data-th="มีอะไรใหม่เดือนนี้">What's new this month</h1>
-        <p class="sub" data-th="<b>31 อัปเดต</b> ระหว่างวันที่ 3 ถึง 16 พฤศจิกายน รวมถึงฟีเจอร์ใหม่ <b>หัวหน้าทีม</b> ของมิชชั่น"><b>31 updates</b> from 3 to 16 November, including the new <b>Mission Leader</b>.</p>
+        <p class="sub" data-th="<b>36 อัปเดต</b> ระหว่างวันที่ 3 ถึง 17 พฤศจิกายน รวมถึง <b>หัวหน้าทีม</b> และ <b>กำลังรองรับ</b> แบบใหม่"><b>36 updates</b> from 3 to 17 November, including <b>Mission Leader</b> and the new <b>Capacity</b> sandbox.</p>
         <div class="ctas">
           <a class="btn btn-green" href="#highlights" data-th="ดูไฮไลต์">See the highlights</a>
           <a class="btn btn-ghost" href="#leader" data-th="หัวหน้าทีม">Mission Leader</a>
@@ -291,10 +292,10 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
 
 <div class="wrap">
   <div class="numbers" role="list">
-    <div role="listitem"><b>31</b><span data-th="อัปเดต">updates</span></div>
+    <div role="listitem"><b>36</b><span data-th="อัปเดต">updates</span></div>
     <div role="listitem"><b>1</b><span data-th="แท็บใหม่: มิชชั่น">new tab: Missions</span></div>
     <div role="listitem"><b>1</b><span data-th="รายงานใหม่: รายงานประจำเดือน">new monthly report</span></div>
-    <div role="listitem"><b>7</b><span data-th="วันที่ออกอัปเดต">release days</span></div>
+    <div role="listitem"><b>8</b><span data-th="วันที่ออกอัปเดต">release days</span></div>
   </div>
 </div>
 
@@ -302,6 +303,7 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
   <div class="wrap">
     <div class="links">
       <a href="#highlights" data-th="ไฮไลต์">Highlights</a>
+      <a href="#latest" class="teal" data-th="ล่าสุด 17 พ.ย.">Latest: 17 Nov</a>
       <a href="#timeline" data-th="รายวัน">Day by day</a>
       <a href="#leader" class="teal" data-th="หัวหน้าทีม (ใหม่)">Mission Leader (new)</a>
       <a href="#board" data-th="บอร์ด">Board</a>
@@ -374,23 +376,53 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
   </div>
 </section>
 
+<section id="latest">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="ล่าสุด: 17 พฤศจิกายน">Latest: 17 November</h2>
+      <p data-th="ห้าอัปเดตใหม่ สำหรับการวางแผนล่วงหน้าและหมายเลขมิชชั่น">Five new updates, for planning ahead and for mission numbers.</p>
+    </div>
+    <div class="feature">
+      <div class="copy">
+        <h3 data-th="กำลังรองรับ: แซนด์บ็อกซ์ส่วนตัว">Capacity: your own what-if sandbox</h3>
+        <ul class="ticks">
+          <li data-th="เติมข้อมูลเองจากบอร์ดที่ใช้งานอยู่ ไม่ต้องพิมพ์ตัวเลขเอง">Fills itself from the running board. No more typing the numbers in.</li>
+          <li data-th="<b>+ เพิ่มคำขอ</b> เพื่อลองมิชชั่นใหม่ ทีมงานที่ต่างไป หรือวันสิ้นสุด แล้วดูว่าขาดคนวันไหน">Use <b>+ Add request</b> to try a new mission, a different crew or an end date, and see which days fall short.</li>
+          <li data-th="เห็นเฉพาะคุณ ไม่มีอะไรถูกบันทึกลงบอร์ด ดูทุกบอร์ดพร้อมกันได้">Only you see it, and nothing is saved to the board. View all boards together.</li>
+        </ul>
+      </div>
+      <button class="shot" type="button" data-cap="Capacity: filled from the board, with your requests on top." data-cap-th="กำลังรองรับ: เติมจากบอร์ด พร้อมคำขอของคุณ"><img src="img/capacity.jpg" alt="" loading="lazy" width="1600" height="676"></button>
+    </div>
+    <div class="feature flip">
+      <div class="copy">
+        <h3 data-th="หนึ่งมิชชั่น หลายโฮสต์">One mission at several hosts</h3>
+        <ul class="ticks">
+          <li data-th="มิชชั่นมีลูกค้าเดียว แต่มีได้หลายโฮสต์ และอยู่สองโฮสต์ในวันเดียวกันได้ (การ์ดละโฮสต์)">One customer, several hosts, even two hosts on the same day (one card per host).</li>
+          <li data-th="ตอนเพิ่มลงบอร์ด แอปจะถาม <b>โฮสต์ในวันนี้</b>">Adding it to the board asks for the <b>Host on this day</b>.</li>
+          <li data-th="หลังยกแผนมา การ์ดจะขึ้น <b>ยืนยันโฮสต์</b> ให้กดยืนยัน">After Carry over, the card asks you to <b>Confirm host</b>.</li>
+        </ul>
+      </div>
+      <button class="shot" type="button" data-cap="A carried-over card asking to Confirm host." data-cap-th="การ์ดที่ยกแผนมา ขอให้ยืนยันโฮสต์"><img src="img/confirm-host.jpg" alt="" loading="lazy" width="1136" height="350"></button>
+    </div>
+    <div class="ov-list">
+      <div><b data-th="แก้หมายเลข: รวมมิชชั่นได้">Fix number can merge</b><p data-th="ถ้าหมายเลขที่ถูกมีอยู่แล้ว แอปจะเสนอให้รวมสองมิชชั่นเป็นหนึ่ง ทีมงานครบทุกคน">If the right number already exists, it offers to merge the two missions. No crew is lost.</p></div>
+      <div><b data-th="วิศวกรเปิดมิชชั่นอีกครั้งได้">Engineers can reopen</b><p data-th="วิศวกรเปิดมิชชั่นที่ปิดแล้วได้เอง เหมือนการปิด">Engineers can now reopen a closed mission, the same as closing one.</p></div>
+      <div><b data-th="แก้แล้ว: บันทึกหมายเลข">Fixed: saving a number</b><p data-th="แก้หมายเลขบันทึกได้แล้ว และการแก้คำผิดไม่ขึ้นว่า หมายเลขใหม่">Fix number saves again, and a typo fix no longer shows New number.</p></div>
+    </div>
+  </div>
+</section>
+
 <section id="timeline">
   <div class="wrap">
     <div class="sec-head">
       <h2 data-th="รายวัน">Day by day</h2>
-      <p data-th="จำนวนอัปเดตในแต่ละวัน 1 ถึง 16 พฤศจิกายน (เวลาประเทศไทย)">How many updates arrived each day, 1 to 16 November (Thailand time).</p>
+      <p data-th="จำนวนอัปเดตในแต่ละวัน 1 ถึง 17 พฤศจิกายน (เวลาประเทศไทย)">How many updates arrived each day, 1 to 17 November (Thailand time).</p>
     </div>
     <div class="chart-card">
       <div class="chart-scroll">
-        <div class="chart" id="chart" role="img" aria-label="3 Nov 1, 4 Nov 5, 5 Nov 9, 9 Nov 4, 10 Nov 7, 12 Nov 3, 16 Nov 2"></div>
+        <div class="chart" id="chart" role="img" aria-label="3 Nov 1, 4 Nov 5, 5 Nov 9, 9 Nov 4, 10 Nov 7, 12 Nov 3, 16 Nov 2, 17 Nov 5"></div>
       </div>
       <div class="legend"><span><i></i><span data-th="อัปเดต">Update</span></span><span><i class="lead"></i><span data-th="หัวหน้าทีม">Mission Leader</span></span></div>
-      <div class="chart-notes">
-        <div><b data-th="4 ถึง 5 พ.ย.">4 to 5 Nov</b><span data-th="ภาพรวมสำหรับผู้จัดการ โหมดนำเสนอ โปรไฟล์">Overview for managers, Present mode, the Profile</span></div>
-        <div><b data-th="9 พ.ย.">9 Nov</b><span data-th="แท็บมิชชั่น โหมดเดโม ตั้งค่าความชำนาญหน้างาน">Missions tab, demo mode, Settings for host experience</span></div>
-        <div><b data-th="10 พ.ย.">10 Nov</b><span data-th="ทุกรายการหน้าตาเดียวกัน ประวัติโฮสต์ หาทีมงาน">One look for every list, Host record, Find crew</span></div>
-        <div><b data-th="12 ถึง 16 พ.ย.">12 to 16 Nov</b><span data-th="กฎหมายเลขมิชชั่น ติ๊กวางแผนแล้ว TRIGO ID หัวหน้าทีม">Mission number rules, Planned ticks, TRIGO ID, Mission Leader</span></div>
-      </div>
     </div>
   </div>
 </section>
@@ -439,7 +471,6 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
           <li data-th="เป็นแค่สัญลักษณ์ ไม่มีอะไรถูกล็อก แอดมินและผู้จัดการติ๊กแทนใครก็ได้">It is a flag only. Nothing gets locked. Admins and managers can tick for anyone.</li>
           <li data-th="แต่ละวันเริ่มต้นใหม่ และใช้บนโทรศัพท์ได้ด้วย">Each day starts empty, and it works on phones too.</li>
         </ul>
-        <span class="pr">PR #131</span>
       </div>
       <div class="phone-pair">
         <button class="shot" type="button" data-cap="Desktop: the Planned line at the end of By area." data-cap-th="คอมพิวเตอร์: บรรทัดวางแผนแล้ว อยู่ท้ายแถวตามพื้นที่"><img src="img/planned-line.jpg" alt="" loading="lazy" width="940" height="72"></button>
@@ -458,7 +489,6 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
           <li data-th="บรรทัดสีเหลืองอำพัน <b>ทีมงานใหม่สำหรับโฮสต์นี้</b> เตือนเมื่อไม่มีใครในทีมเคยไปที่นั่น">An amber <b>Crew new to this host</b> line warns when nobody on the crew has been there before.</li>
           <li data-th="<b>หาคนแทน</b> จะขึ้นมาเมื่อย้ายคนจากมิชชั่นไปลา"><b>Find replacement</b> appears when you move someone from a mission to leave.</li>
         </ul>
-        <span class="pr">PR #127</span>
       </div>
       <button class="shot" type="button" data-cap="Find crew on a mission with no crew." data-cap-th="หาทีมงาน บนมิชชั่นที่ยังไม่มีทีมงาน"><img src="img/find-crew.jpg" alt="" loading="lazy" width="1290" height="350"></button>
     </div>
@@ -472,7 +502,6 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
           <li data-th="ยังไม่มีใน Etraq? ใช้ <b>หมายเลขชั่วคราว</b> ได้ จะมีการเตือนเมื่อผ่านไป 3 วัน">Not in Etraq yet? Use a <b>temporary number</b>. It is flagged after 3 days as a reminder.</li>
           <li data-th="หมายเลขถูกบันทึกเป็นตัวพิมพ์ใหญ่เสมอ ไม่ว่าจะพิมพ์แบบไหน">Numbers are always saved in capitals, however they are typed.</li>
         </ul>
-        <span class="pr">PR #130, #132</span>
       </div>
       <div class="stack-shots">
         <button class="shot" type="button" data-cap="A card with a wrong number: the red line and Fix number." data-cap-th="การ์ดที่หมายเลขผิด: บรรทัดสีแดงและปุ่มแก้หมายเลข"><img src="img/wrong-number.jpg" alt="" loading="lazy" width="1136" height="372"></button>
@@ -493,7 +522,6 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
       <p data-th="รายการเดียวของทุกมิชชั่นในบอร์ดของคุณ ตอบได้ว่างานไหนกำลังทำ งานไหนยังไม่มีทีมงาน และงานไหนต้องดู">One list of every mission across your boards. It answers which jobs are running, which have no crew, and which need attention.</p>
     </div>
     <div class="missions-wide">
-      <button class="shot" type="button" data-cap="The Missions tab." data-cap-th="แท็บมิชชั่น"><img src="img/missions.jpg" alt="" loading="lazy" width="1600" height="622"></button>
       <div class="callouts">
         <div><b data-th="เปิดอยู่และปิดแล้ว">Open and Closed</b><p data-th="ปิดมิชชั่นเมื่องานจบ เปิดใหม่ได้ถ้าจำเป็น จำนวนอยู่บนสวิตช์ และไทล์กดกรองได้">Close a mission when the job ends, reopen it if needed. Counts sit on the switch, and the tiles filter.</p></div>
         <div><b data-th="การแจ้งเตือนใต้สถานะ">Alerts under the status</b><p data-th="ไม่มีทีมงาน 25 วัน ซ่อน 9 วัน ไม่อยู่บนบอร์ด หมายเลขผิด เห็นได้ทันทีว่าอะไรต้องดู">No crew for 25 days, hidden 9 days, off the board, wrong number. You see what needs a look.</p></div>
@@ -510,7 +538,6 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
             <li data-th="หมายเลขปีใหม่: หมายเลขของปีที่แล้วจะแสดงข้างหมายเลขใหม่สองสัปดาห์">New-year numbers: last year's number stays beside the new one for two weeks.</li>
             <li data-th="บทบาทใหม่ <b>ผู้ดูแลไซต์</b> สำหรับคนที่ดูแลรายการมิชชั่น">A new <b>Site Admin</b> role for the people who manage the mission list.</li>
           </ul>
-          <span class="pr">PR #106, #120, #128, #129, #130</span>
         </div>
       </div>
     </div>
@@ -554,7 +581,6 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
       <div><b data-th="สถานะลาออก">Resigned status</b><p data-th="เมื่อมีคนออก เลือกได้ว่า ลาออก หรือ ไม่ใช้งานชั่วคราว คนที่ลาออกมีตัวกรองของตัวเอง">When someone leaves, choose Resigned or Inactive for now. Resigned people get their own filter.</p></div>
       <div><b data-th="ตารางทักษะของโฮสต์">Host skills matrix</b><p data-th="ใครชำนาญโฮสต์ไหน และโฮสต์ไหนมีความเสี่ยง">Who is experienced at each host, and which hosts are at risk.</p></div>
     </div>
-    <p class="pr" style="margin-top:16px;display:block">PR #98, #101 to #105, #109, #111 to #115</p>
   </div>
 </section>
 
@@ -569,19 +595,16 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
         <div class="frame"><button class="shot" type="button" data-cap="Host record: experienced people, who is free today, and the host's missions." data-cap-th="ประวัติโฮสต์: คนที่ชำนาญ ใครว่างวันนี้ และมิชชั่นของโฮสต์"><img src="img/host-record.jpg" alt="" loading="lazy" width="1000" height="1184"></button></div>
         <b data-th="ประวัติโฮสต์">Host record</b>
         <p data-th="ทุกคนที่เคยทำงานที่โฮสต์ จำนวนวันที่นั่น และวันนี้อยู่ที่ไหน มอบหมายคนที่ว่างได้ในคลิกเดียว">Everyone who has worked at the host, their days there, and where they are today. Assign a free person in one click.</p>
-        <span class="pr">PR #126, #127</span>
       </div>
       <div class="record">
         <div class="frame"><button class="shot" type="button" data-cap="Profile: every detail of a person, edited in the same place." data-cap-th="โปรไฟล์: ข้อมูลทุกอย่างของคน และแก้ไขได้ในที่เดียวกัน"><img src="img/profile.jpg" alt="" loading="lazy" width="1000" height="1184"></button></div>
         <b data-th="โปรไฟล์">Profile</b>
         <p data-th="ที่เดียวสำหรับดูและแก้ไขข้อมูลของคน รายละเอียด หมายเหตุ ประวัติการลา และโฮสต์ที่เคยไป">The one place to check and edit a person: details, notes, leave record, and the hosts they have worked at.</p>
-        <span class="pr">PR #108, #124</span>
       </div>
       <div class="record">
         <div class="frame"><button class="shot" type="button" data-cap="Manpower list: two-line rows, status with the alert under it, and a Columns button." data-cap-th="รายการกำลังคน: แถวสองบรรทัด สถานะพร้อมการแจ้งเตือนข้างใต้ และปุ่มคอลัมน์"><img src="img/manpower.jpg" alt="" loading="lazy" width="1600" height="666"></button></div>
         <b data-th="ทุกรายการหน้าตาเดียวกัน">One look for every list</b>
         <p data-th="แถวสองบรรทัด สถานะพร้อมการแจ้งเตือนข้างใต้ และปุ่มคอลัมน์ ในกำลังคน โฮสต์ และมิชชั่น พอดีจอโดยไม่ต้องเลื่อนด้านข้าง">Two-line rows, the status with its alert under it, and a Columns button on Manpower, Host and Missions. Fits the screen without sideways scrolling.</p>
-        <span class="pr">PR #107, #123, #125</span>
       </div>
     </div>
   </div>
@@ -594,14 +617,12 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
       <p data-th="ควรรู้ไว้ แม้จะไม่ได้เห็นทุกวัน">Worth knowing, even if you won't notice them every day.</p>
     </div>
     <div class="small">
-      <div><b data-th="โหมดเดโมสำหรับฝึกอบรม">Demo mode for training</b><span class="pr">#118</span><p data-th="เติม ?demo ต่อท้ายที่อยู่ เพื่อเปิดแอปด้วยข้อมูลตัวอย่าง ไม่มีอะไรถูกบันทึก ผู้ฝึกจึงลองได้ทุกอย่าง แต่ละคนได้ข้อมูลชุดของตัวเอง">Add ?demo to the address to open the app on sample data. Nothing is saved, so trainees can try anything. Each person gets their own copy.</p></div>
-      <div><b data-th="ไม่เตือน TRIGO ID สำหรับคนออนคอล">No TRIGO ID alert for on-call people</b><span class="pr">#133</span><p data-th="พนักงานออนคอลจะไม่ขึ้นเตือนว่าไม่มี ID อีกต่อไป เมื่อเปลี่ยนเป็นพนักงานประจำ แอปจะถามหา TRIGO ID">On-call staff no longer show a missing ID. When someone becomes permanent, the app asks for their TRIGO ID.</p></div>
-      <div><b data-th="ความชำนาญหน้างานตั้งค่าได้">Host experience is now a setting</b><span class="pr">#121</span><p data-th="ตั้งค่า &gt; ความชำนาญหน้างาน: ทำงานที่โฮสต์กี่วันจึงนับว่าชำนาญ (เริ่มต้น 5 วัน) และโฮสต์เสี่ยงเมื่อมีคนชำนาญเหลือเท่าไร (2 คนหรือน้อยกว่า)">Settings &gt; Host experience: how many days make someone experienced (5 to begin with) and when a host is at risk (2 or fewer).</p></div>
-      <div><b data-th="ความยาวรหัสไซต์ตั้งค่าได้">Site code length is a setting</b><span class="pr">#130</span><p data-th="ตั้งค่า &gt; หมายเลขมิชชั่น: รหัสไซต์มีกี่ตัวอักษร (เริ่มต้น 5)">Settings &gt; Mission numbers: how many letters the site code has (5 to begin with).</p></div>
-      <div><b data-th="ออนคอล: คนที่ถูกเรียกน้อยสุดขึ้นก่อน">On-call list: least called in first</b><span class="pr">#107</span><p data-th="ในมุมมองออนคอลของภาพรวม คนที่ถูกเรียกน้อยที่สุดอยู่ด้านบน">In the Overview's On-call view, the people called in least are at the top.</p></div>
-      <div><b data-th="แก้แล้ว: ตัวเลขในสไลด์วันนี้">Fixed: Today slide counts</b><span class="pr">#111</span><p data-th="สไลด์วันนี้ในโหมดนำเสนอ แสดงจำนวนมิชชั่นและทีมงานแยกกัน เหมือนการ์ดในภาพรวม">Present's Today slide now shows missions and crew separately, like the Overview card.</p></div>
-      <div><b data-th="แถบด้านบนแบบใหม่">New top bar</b><span class="pr">#97</span><p data-th="ไอคอนแอปและคำว่า Manpower Board ที่มุมซ้ายบน โลโก้ TRIGO ย้ายไปด้านล่างของหน้าตั้งค่า">The app icon and "Manpower Board" in the top left. The TRIGO logo moved to the bottom of Settings.</p></div>
-      <div><b data-th="ตัวกรองในกราฟกำลังคน">Workforce chart filters</b><span class="pr">#109</span><p data-th="คลิกกลุ่มอายุงานเพื่อแสดงหรือซ่อน ยอดรวมจะเปลี่ยนตาม">Click a years-of-service group to show or hide it. The totals follow.</p></div>
+      <div><b data-th="โหมดเดโมสำหรับฝึกอบรม">Demo mode for training</b><p data-th="เติม ?demo ต่อท้ายที่อยู่ เพื่อเปิดแอปด้วยข้อมูลตัวอย่าง ไม่มีอะไรถูกบันทึก ผู้ฝึกจึงลองได้ทุกอย่าง แต่ละคนได้ข้อมูลชุดของตัวเอง">Add ?demo to the address to open the app on sample data. Nothing is saved, so trainees can try anything. Each person gets their own copy.</p></div>
+      <div><b data-th="ไม่เตือน TRIGO ID สำหรับคนออนคอล">No TRIGO ID alert for on-call people</b><p data-th="พนักงานออนคอลจะไม่ขึ้นเตือนว่าไม่มี ID อีกต่อไป เมื่อเปลี่ยนเป็นพนักงานประจำ แอปจะถามหา TRIGO ID">On-call staff no longer show a missing ID. When someone becomes permanent, the app asks for their TRIGO ID.</p></div>
+      <div><b data-th="ความชำนาญหน้างานตั้งค่าได้">Host experience is now a setting</b><p data-th="ตั้งค่า &gt; ความชำนาญหน้างาน: ทำงานที่โฮสต์กี่วันจึงนับว่าชำนาญ (เริ่มต้น 5 วัน) และโฮสต์เสี่ยงเมื่อมีคนชำนาญเหลือเท่าไร (2 คนหรือน้อยกว่า)">Settings &gt; Host experience: how many days make someone experienced (5 to begin with) and when a host is at risk (2 or fewer).</p></div>
+      <div><b data-th="ความยาวรหัสไซต์ตั้งค่าได้">Site code length is a setting</b><p data-th="ตั้งค่า &gt; หมายเลขมิชชั่น: รหัสไซต์มีกี่ตัวอักษร (เริ่มต้น 5)">Settings &gt; Mission numbers: how many letters the site code has (5 to begin with).</p></div>
+      <div><b data-th="ออนคอล: คนที่ถูกเรียกน้อยสุดขึ้นก่อน">On-call list: least called in first</b><p data-th="ในมุมมองออนคอลของภาพรวม คนที่ถูกเรียกน้อยที่สุดอยู่ด้านบน">In the Overview's On-call view, the people called in least are at the top.</p></div>
+      <div><b data-th="แถบด้านบนแบบใหม่">New top bar</b><p data-th="ไอคอนแอปและคำว่า Manpower Board ที่มุมซ้ายบน โลโก้ TRIGO ย้ายไปด้านล่างของหน้าตั้งค่า">The app icon and "Manpower Board" in the top left. The TRIGO logo moved to the bottom of Settings.</p></div>
     </div>
   </div>
 </section>
@@ -609,7 +630,7 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
 
 <footer>
   <div class="wrap">
-    <span data-th="<b>Manpower Board</b> อัปเดตวันที่ 1 ถึง 16 พฤศจิกายน 2026"><b>Manpower Board</b> updates, 1 to 16 November 2026</span>
+    <span data-th="<b>Manpower Board</b> อัปเดตวันที่ 1 ถึง 17 พฤศจิกายน 2026"><b>Manpower Board</b> updates, 1 to 17 November 2026</span>
     <span data-th="รูปทั้งหมดมาจากโหมดเดโม ชื่อและตัวเลขเป็นข้อมูลตัวอย่าง">Pictures are from the demo, with sample names and numbers.</span>
   </div>
 </footer>
@@ -623,14 +644,14 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
 <script>
 (function () {
   // Updates per day (Thailand time), from the pull requests. 16 Nov holds #133 and Mission Leader (#134).
-  var live = { 3: 1, 4: 5, 5: 9, 9: 4, 10: 7, 12: 3, 16: 1 };
+  var live = { 3: 1, 4: 5, 5: 9, 9: 4, 10: 7, 12: 3, 16: 1, 17: 5 };
   var leader = { 16: 1 };
   var DAYS = { en: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], th: ["อา.","จ.","อ.","พ.","พฤ.","ศ.","ส."] };
   var lang = "en";
 
   function drawChart() {
     var html = "";
-    for (var d = 1; d <= 16; d++) {
+    for (var d = 1; d <= 17; d++) {
       var wd = new Date(2026, 10, d).getDay();
       var n = (live[d] || 0) + (leader[d] || 0), bars = "";
       for (var k = 0; k < (leader[d] || 0); k++) bars += '<i class="lead" style="--d:' + d + '"></i>';
@@ -656,7 +677,7 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
     var btns = document.querySelectorAll(".lang button");
     for (var k = 0; k < btns.length; k++) btns[k].setAttribute("aria-pressed", btns[k].getAttribute("data-lang") === lang ? "true" : "false");
     drawChart();
-    try { localStorage.setItem("nov26-lang", lang); } catch (e) {}
+    try { localStorage.setItem("nov26-lang-v2", lang); } catch (e) {}
   }
 
   document.addEventListener("click", function (e) {
@@ -674,15 +695,11 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
     if (e.target.id === "lb" || e.target.classList.contains("close")) e.currentTarget.close();
   });
 
-  // Start in Thai for #th, a remembered choice, or a Thai browser; English otherwise.
-  var start = "en";
-  if (location.hash === "#th") start = "th";
-  else if (location.hash === "#en") start = "en";
-  else {
-    var saved = null;
-    try { saved = localStorage.getItem("nov26-lang"); } catch (e) {}
-    if (saved) start = saved;
-    else if (/^th/i.test(navigator.language || "")) start = "th";
+  // Thai by default; English for #en or for someone who picked English.
+  var start = "th";
+  if (location.hash === "#en") start = "en";
+  else if (location.hash !== "#th") {
+    try { if (localStorage.getItem("nov26-lang-v2") === "en") start = "en"; } catch (e) {}
   }
   setLang(start);
 })();
