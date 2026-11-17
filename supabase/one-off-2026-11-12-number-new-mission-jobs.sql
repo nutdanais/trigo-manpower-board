@@ -30,7 +30,7 @@ begin
     from (select number as x from missions union all select number from mission_register) t;
 
   create temp table if not exists _nm_jobs (job_key text primary key, new_number text not null) on commit drop;
-  delete from _nm_jobs;
+  delete from _nm_jobs where true;
   insert into _nm_jobs
     select g.job_key, 'NEW MISSION' || lpad((v_base + row_number() over (order by g.first_day, g.job_key))::text, 3, '0')
       from (select lower(btrim(host)) || ' | ' || lower(btrim(coalesce(customer, ''))) as job_key, min(plan_date) as first_day
@@ -46,7 +46,7 @@ begin
   -- the days that will be renamed: their stamps are put back afterwards (has_stamp: the day had one)
   if v_stamps then
     create temp table if not exists _nm_stamps (board_id uuid, plan_date date, has_stamp boolean, last_edited_at timestamptz, last_edited_by text) on commit drop;
-    delete from _nm_stamps;
+    delete from _nm_stamps where true;
     insert into _nm_stamps
       select d.board_id, d.plan_date, s.board_id is not null, s.last_edited_at, s.last_edited_by
         from (select distinct board_id, plan_date from missions
@@ -56,7 +56,7 @@ begin
 
   -- the Missions list rows' closed state, to copy to the new rows (the old rows go afterwards)
   create temp table if not exists _nm_closed (board_id uuid, shift text, closed_on date, closed_by text, closed_at timestamptz, close_note text) on commit drop;
-  delete from _nm_closed;
+  delete from _nm_closed where true;
   if to_regclass('public.mission_register') is not null then
     insert into _nm_closed
       select distinct on (board_id, shift) board_id, shift, closed_on, closed_by, closed_at, close_note
