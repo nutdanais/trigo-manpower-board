@@ -177,3 +177,12 @@ four present options (P1 clean screen, P2 slides, P3 wall display, P4 spotlight 
 sample day (4 boards, 106 people). It lists what every Overview section does with 2 or more boards, compares the
 options, recommends A for the page, then E for the Period group, and P2 with P3's auto-advance for presenting, and ends with a decision picker.
 Light only, like the app. Not loaded by the app.
+
+`capacity-sandbox-directions.html` proposes turning the Capacity tab into a
+private what-if sandbox: it fills itself from the running board, each person's
+plan stays in their own browser (per board), and the shared Team plan stays
+beside it. Three options (a switch on the grid, requests on top of the running
+board, one question and one answer), a comparison, and the open questions.
+Option B's tick boxes work on invented sample numbers.
+Option B was built (requests on top of the running board), with the shared
+Team plan dropped and an All boards view added.

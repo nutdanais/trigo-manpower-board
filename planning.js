@@ -2,7 +2,7 @@
    "Review changes" / "Review & merge", the confirm horizon, and the Capacity
    tab's arithmetic. Kept pure so the same code runs in the browser and in the
    node tests (tests/*.test.js). Loaded before app.js; defines PlanDiff,
-   Horizon and Capacity. */
+   Horizon, Capacity and Sandbox. */
 
 "use strict";
 
@@ -488,34 +488,170 @@
     return gridDates.filter((d) => d > date && d <= end && isWorking(d));
   }
 
-  /* "Start from confirmed plan": a day's deployment turned into demand — how
-     many people are on each host x shift, counting only visible missions and
-     only the people in `activeIds` (the board's current roster). Several
-     missions at one host on one shift add up to one row. */
-  function seedFromPlan(plan, activeIds) {
-    const byKey = new Map();
-    for (const m of (plan && plan.missions) || []) {
-      if (m.hidden || !m.host) continue;
-      const n = (m.members || []).filter((id) => !activeIds || activeIds.has(id)).length;
-      if (!n) continue;
-      const k = m.host + "\u0001" + m.shift;
-      byKey.set(k, (byKey.get(k) || 0) + n);
+  /* ================= Sandbox =================
+     The Capacity tab is a private what-if: demand starts from the crew on the
+     running board (the baseline) and the person's own requests are laid on
+     top. Nothing here is saved to the database; the requests live in the
+     browser, per person and board. All pure, so the numbers can be tested. */
+
+  const SEP = "\u0001";
+  /* One row per mission: number + shift, as the carry-over matches missions.
+     A mission with no number falls back to host + customer + shift. */
+  const sandboxKey = (m) => (m.number ? "m" + SEP + m.number + SEP + m.shift
+    : "h" + SEP + (m.host || "") + SEP + (m.customer || "") + SEP + m.shift);
+  const requestKey = (id) => "r" + SEP + id;
+
+  /* The baseline of one board: for every date, how many people are on each
+     mission.
+       boardId, dates [iso]
+       isForecast (date) -> bool         beyond the board's confirm horizon
+       confirmed  { missions: [{id, board_id, plan_date, number, shift, host, customer, hidden}],
+                    assignments: [{employee_id, plan_date, mission_id}] }
+       forecast   { missions: [...same, no hidden], assignments: [{employee_id, plan_date, forecast_mission_id}] }
+       fallback   { date, missions: [{number, shift, host, customer, hidden, members: [empId]}] } | null
+                  the latest working day with missions before the range
+       closed     [{number, shift, closedOn}]   missions closed on the Missions tab
+       activeIds  Set of employee ids that count (the active roster), optional
+     A date with people placed (confirmed up to the horizon, forecast after it)
+     shows them. A date with nobody placed yet repeats the latest confirmed day
+     that has people (in the range, else the fallback), leaving out a mission
+     closed before that date.
+     -> { rows: [{key, number, shift, host, customer, base: {date: n}}],
+          source: {date: "confirmed" | "forecast" | "repeat" | "none"}, repeatDate } */
+  function baseline({ boardId, dates, isForecast, confirmed, forecast, fallback, closed, activeIds }) {
+    const counts = (plan, missionField) => {
+      const crew = new Map();
+      for (const a of (plan && plan.assignments) || []) {
+        if (!a[missionField] || (activeIds && !activeIds.has(a.employee_id))) continue;
+        crew.set(a[missionField], (crew.get(a[missionField]) || 0) + 1);
+      }
+      const byDate = new Map();
+      for (const m of (plan && plan.missions) || []) {
+        if (m.board_id !== boardId || m.hidden) continue;
+        const n = crew.get(m.id) || 0;
+        if (!n) continue;
+        if (!byDate.has(m.plan_date)) byDate.set(m.plan_date, []);
+        byDate.get(m.plan_date).push({ number: m.number || "", shift: m.shift, host: m.host || "", customer: m.customer || "", n });
+      }
+      return byDate;
+    };
+    const conf = counts(confirmed, "mission_id");
+    const fore = counts(forecast, "forecast_mission_id");
+
+    // the day to repeat: the latest confirmed date in the range with people, else the fallback
+    let repeatDate = null, repeat = [];
+    for (const d of dates) if (!isForecast(d) && conf.has(d)) { repeatDate = d; repeat = conf.get(d); }
+    if (!repeatDate && fallback && fallback.date) {
+      const list = [];
+      for (const m of fallback.missions || []) {
+        if (m.hidden) continue;
+        const n = (m.members || []).filter((id) => !activeIds || activeIds.has(id)).length;
+        if (n) list.push({ number: m.number || "", shift: m.shift, host: m.host || "", customer: m.customer || "", n });
+      }
+      if (list.length) { repeatDate = fallback.date; repeat = list; }
     }
-    return [...byKey].map(([k, headcount]) => {
-      const [host, shift] = k.split("\u0001");
-      return { host, shift, headcount };
-    }).sort((a, b) => a.host.localeCompare(b.host) || (a.shift === "night") - (b.shift === "night"));
+    const closedOn = new Map((closed || []).filter((c) => c.closedOn).map((c) => [c.number + SEP + c.shift, c.closedOn]));
+
+    const rows = new Map();
+    const source = {};
+    for (const d of dates) {
+      const own = (isForecast(d) ? fore : conf).get(d);
+      let list;
+      if (own) { list = own; source[d] = isForecast(d) ? "forecast" : "confirmed"; }
+      else {
+        list = repeat.filter((m) => { const c = closedOn.get(m.number + SEP + m.shift); return !(c && c < d); });
+        source[d] = list.length ? "repeat" : "none";
+      }
+      for (const m of list) {
+        const key = sandboxKey(m);
+        let r = rows.get(key);
+        if (!r) { r = { key, number: m.number, shift: m.shift, host: m.host, customer: m.customer, base: {} }; rows.set(key, r); }
+        // the details of the latest day it appears on
+        r.host = m.host; r.customer = m.customer;
+        r.base[d] = (r.base[d] || 0) + m.n;
+      }
+    }
+    return { rows: sortRows([...rows.values()]), source, repeatDate };
+  }
+  function sortRows(rows) {
+    return rows.sort((a, b) => (a.host || "").localeCompare(b.host || "") || (a.shift === "night") - (b.shift === "night") ||
+      (a.number || "").localeCompare(b.number || "") || (a.customer || "").localeCompare(b.customer || ""));
   }
 
-  /* The seed copied onto every date, but only into cells that are still empty
-     (`has(date, host, shift)` false): a number someone already typed is theirs. */
-  function fillEmpty(seed, dates, has) {
+  const inRange = (d, r) => d >= r.from && (!r.to || d <= r.to);
+
+  /* The outcome: the baseline rows with the person's requests laid on top.
+     requests, in the order they were made (on === false: switched off):
+       { id, kind: "new",    host, customer, shift, headcount, from, to|null }
+       { id, kind: "change", key, headcount, from, to|null }    a running mission's crew (0: it ends)
+       { id, kind: "cells",  key, cells: {date: n} }            numbers typed into the grid
+     New missions go in first, then the changes, then the typed cells, so a
+     typed number always wins. A request for a mission that is no longer in
+     the baseline does nothing and is reported in `orphans`.
+     -> { rows: [{...row, values: {date: n}, isNew?, reqId?}], orphans: Set(id) } */
+  function apply(baseRows, requests, dates) {
+    const rows = baseRows.map((r) => ({ ...r, base: { ...r.base }, values: { ...r.base } }));
+    const live = (requests || []).filter((q) => q && q.on !== false);
+    for (const q of live.filter((x) => x.kind === "new")) {
+      const values = {};
+      for (const d of dates) if (inRange(d, q)) values[d] = Math.max(0, Number(q.headcount) || 0);
+      rows.push({ key: requestKey(q.id), reqId: q.id, isNew: true, number: "", shift: q.shift === "night" ? "night" : "day",
+        host: q.host || "", customer: q.customer || "", base: {}, values });
+    }
+    const byKey = new Map(rows.map((r) => [r.key, r]));
+    const orphans = new Set();
+    for (const q of (requests || [])) if (q && q.kind !== "new" && !byKey.has(q.key)) orphans.add(q.id);
+    for (const q of live.filter((x) => x.kind === "change")) {
+      const r = byKey.get(q.key);
+      if (!r) continue;
+      for (const d of dates) if (inRange(d, q)) r.values[d] = Math.max(0, Number(q.headcount) || 0);
+    }
+    for (const q of live.filter((x) => x.kind === "cells")) {
+      const r = byKey.get(q.key);
+      if (!r) continue;
+      for (const d of dates) if (q.cells && q.cells[d] != null) r.values[d] = Math.max(0, Number(q.cells[d]) || 0);
+    }
+    return { rows: sortRows(rows), orphans };
+  }
+
+  /* per date: the sum of a field ("values" or "base") over the rows */
+  function totals(rows, dates, field) {
+    return dates.map((d) => rows.reduce((s, r) => s + ((r[field] || {})[d] || 0), 0));
+  }
+  /* rows grouped by host, in row order: [{host, rows}] */
+  function byHost(rows) {
     const out = [];
-    for (const d of dates) {
-      for (const s of seed) if (!has(d, s.host, s.shift)) out.push({ date: d, host: s.host, shift: s.shift, headcount: s.headcount });
+    for (const r of rows) {
+      const last = out[out.length - 1];
+      if (last && last.host === r.host) last.rows.push(r); else out.push({ host: r.host, rows: [r] });
     }
     return out;
   }
+
+  /* Numbers typed into the grid: cells [{key, date, value}] (value null: take
+     my typed number away). Returns a new requests list. A typed number equal
+     to what the cell would show anyway is not kept, and a "cells" request
+     with nothing left in it goes. newId() names a new request. */
+  function setCells(requests, cells, baseRows, dates, newId) {
+    let out = (requests || []).map((q) => (q.kind === "cells" ? { ...q, cells: { ...q.cells } } : q));
+    const touched = new Set(cells.map((c) => c.key));
+    // what each cell shows without the typed numbers of the rows being changed
+    const under = apply(baseRows, out.filter((q) => !(q.kind === "cells" && touched.has(q.key))), dates);
+    const underByKey = new Map(under.rows.map((r) => [r.key, r]));
+    for (const c of cells) {
+      const row = underByKey.get(c.key);
+      if (!row) continue;
+      let q = out.find((x) => x.kind === "cells" && x.key === c.key);
+      const same = c.value == null || Math.max(0, Math.round(Number(c.value))) === (row.values[c.date] || 0);
+      if (same) { if (q) delete q.cells[c.date]; continue; }
+      if (!q) { q = { id: newId(), kind: "cells", key: c.key, cells: {}, on: true }; out.push(q); }
+      q.on = true;
+      q.cells[c.date] = Math.max(0, Math.round(Number(c.value)));
+    }
+    return out.filter((q) => q.kind !== "cells" || Object.keys(q.cells).length);
+  }
+
+  const Sandbox = { baseline, apply, totals, byHost, setCells, sandboxKey, requestKey };
 
   /* Clipboard text as Excel and the Capacity grid write it: rows split by
      newlines, cells by tabs, one trailing newline. A blank cell clears.
@@ -593,9 +729,9 @@
     };
   }
 
-  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, seedFromPlan, fillEmpty, parseClip, pastePlan, exportBoard, EXPORT_HOST_COLUMNS };
+  const Capacity = { aggregate, demandTotals, fillRightDates, weekStart, weekEnd, parseClip, pastePlan, exportBoard, EXPORT_HOST_COLUMNS };
 
-  const api = { PlanDiff, Horizon, PlanStatus, Capacity };
+  const api = { PlanDiff, Horizon, PlanStatus, Capacity, Sandbox };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(root, api);
 })(globalThis);
