@@ -61,7 +61,7 @@ begin
   -- the days that will be renamed: their stamps are put back afterwards (has_stamp: the day had one)
   if v_stamps then
     create temp table if not exists _caps_stamps (board_id uuid, plan_date date, has_stamp boolean, last_edited_at timestamptz, last_edited_by text) on commit drop;
-    delete from _caps_stamps;
+    delete from _caps_stamps where true;
     insert into _caps_stamps
       select d.board_id, d.plan_date, s.board_id is not null, s.last_edited_at, s.last_edited_by
         from (select distinct board_id, plan_date from missions where number <> upper(number)) d
@@ -76,8 +76,8 @@ begin
   if to_regclass('public.mission_register') is not null then
     create temp table if not exists _caps_reg_keep (id uuid, opened_on date, last_on date, any_open boolean, closed_on date) on commit drop;
     create temp table if not exists _caps_reg_drop (id uuid) on commit drop;
-    delete from _caps_reg_keep;
-    delete from _caps_reg_drop;
+    delete from _caps_reg_keep where true;
+    delete from _caps_reg_drop where true;
     insert into _caps_reg_keep
       select t.id, g.opened_on, g.last_on, g.any_open, g.closed_on
         from (select id, row_number() over (partition by board_id, shift, upper(number)

@@ -73,7 +73,7 @@ begin
   -- renaming a day is not a change to its plan: keep the days' edit stamps as they were
   if v_stamps then
     create temp table if not exists _replace_stamps (board_id uuid, plan_date date, last_edited_at timestamptz, last_edited_by text) on commit drop;
-    delete from _replace_stamps;
+    delete from _replace_stamps where true;
     insert into _replace_stamps
       select s.board_id, s.plan_date, s.last_edited_at, s.last_edited_by from plan_day_stamps s
        where exists (select 1 from missions m where m.board_id = s.board_id and m.plan_date = s.plan_date and m.number = v_old);
@@ -123,7 +123,7 @@ begin
   -- carried-over day starts saying its source was edited
   if v_stamps then
     create temp table if not exists _renumber_stamps (board_id uuid, plan_date date, last_edited_at timestamptz, last_edited_by text) on commit drop;
-    delete from _renumber_stamps;
+    delete from _renumber_stamps where true;
     insert into _renumber_stamps
       select board_id, plan_date, last_edited_at, last_edited_by from plan_day_stamps where plan_date >= p_valid_from;
   end if;

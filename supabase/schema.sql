@@ -1869,7 +1869,7 @@ begin
   -- carried-over day starts saying its source was edited
   if v_stamps then
     create temp table if not exists _renumber_stamps (board_id uuid, plan_date date, last_edited_at timestamptz, last_edited_by text) on commit drop;
-    delete from _renumber_stamps;
+    delete from _renumber_stamps where true;
     insert into _renumber_stamps
       select board_id, plan_date, last_edited_at, last_edited_by from plan_day_stamps where plan_date >= p_valid_from;
   end if;
@@ -1952,15 +1952,18 @@ begin
     raise exception 'Mission % is not in the Missions list.', v_old using errcode = 'no_data_found';
   end if;
   select min(opened_on) into v_from from mission_register where number = v_old;
+  -- in use: on the Missions list or on a day. A number only in the history (a mission once had it, then was
+  -- renamed) is free again, since Etraq gives a number to one job: a typo can go back to the number the job
+  -- always had. A temporary number that was replaced is never given out twice.
   if exists (select 1 from mission_register where number = v_new)
      or exists (select 1 from missions where number = v_new)
-     or exists (select 1 from mission_number_history where old_number = v_new) then
+     or (v_new ~ '\.TMP[0-9]{3}$' and exists (select 1 from mission_number_history where old_number = v_new)) then
     raise exception 'Mission number % is already used.', v_new using errcode = 'unique_violation';
   end if;
   -- renaming a day is not a change to its plan: keep the days' edit stamps as they were
   if v_stamps then
     create temp table if not exists _replace_stamps (board_id uuid, plan_date date, last_edited_at timestamptz, last_edited_by text) on commit drop;
-    delete from _replace_stamps;
+    delete from _replace_stamps where true;
     insert into _replace_stamps
       select s.board_id, s.plan_date, s.last_edited_at, s.last_edited_by from plan_day_stamps s
        where exists (select 1 from missions m where m.board_id = s.board_id and m.plan_date = s.plan_date and m.number = v_old);
@@ -2178,7 +2181,7 @@ begin
   -- the days that will be renamed: their stamps are put back afterwards (has_stamp: the day had one)
   if v_stamps then
     create temp table if not exists _caps_stamps (board_id uuid, plan_date date, has_stamp boolean, last_edited_at timestamptz, last_edited_by text) on commit drop;
-    delete from _caps_stamps;
+    delete from _caps_stamps where true;
     insert into _caps_stamps
       select d.board_id, d.plan_date, s.board_id is not null, s.last_edited_at, s.last_edited_by
         from (select distinct board_id, plan_date from missions where number <> upper(number)) d
@@ -2193,8 +2196,8 @@ begin
   if to_regclass('public.mission_register') is not null then
     create temp table if not exists _caps_reg_keep (id uuid, opened_on date, last_on date, any_open boolean, closed_on date) on commit drop;
     create temp table if not exists _caps_reg_drop (id uuid) on commit drop;
-    delete from _caps_reg_keep;
-    delete from _caps_reg_drop;
+    delete from _caps_reg_keep where true;
+    delete from _caps_reg_drop where true;
     insert into _caps_reg_keep
       select t.id, g.opened_on, g.last_on, g.any_open, g.closed_on
         from (select id, row_number() over (partition by board_id, shift, upper(number)

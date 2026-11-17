@@ -40,6 +40,9 @@ function seed(opts) {
     { id: "st2", board_id: "b2", plan_date: SRC, number: TMP2, host: "Host Gamma", customer: "Cust Temp Two", shift: "day", engineer_id: "eng-2" },
   ]);
   db.seed("deployment_history", [{ employee_id: "e1", plan_date: PREV, mission_number: TMP1, host: "Host Gamma", customer: "Cust Temp One", board_id: "b1" }]);
+  // a number only in the rename history: a mission once had TSTTH.<yy>.0101 and was renamed away, nothing has it now.
+  // "101" is later corrected to it (Etraq gives a number to one job), and that must not count as "used"
+  db.seed("mission_number_history", [{ old_number: `TSTTH.${YY}.0101`, new_number: `TSTTH.${Number(YY) + 1}.0001`, valid_from: `20${Number(YY) + 1}-01-01`, entered_by: "admin@example.com", entered_at: new Date().toISOString() }]);
   // the temporary number's three days count from when the mission was first registered
   for (const r of db.t("mission_register")) r.created_at = r.number === TMP1 ? new Date(Date.now() - 4 * 86400e3).toISOString() : new Date().toISOString();
   return db;
@@ -152,7 +155,7 @@ function seed(opts) {
       assert.match(await p.locator("#fix-number-preview").innerText(), /looks like BANGN/);
       assert.equal(await p.locator("#btn-fix-number-go").isDisabled(), true);
       await p.fill("#fix-number-input", M7.toLowerCase());
-      assert.match(await p.locator("#fix-number-preview").innerText(), /already used by another mission/);
+      assert.match(await p.locator("#fix-number-preview").innerText(), /already used by another mission \(.+\(Day\)\)/, "it says where: the board and shift");
       await p.fill("#fix-number-input", `tstth.${YY}.0123`);
       assert.match(await p.locator("#fix-number-preview").innerText(), new RegExp(`becomes TSTTH\\.${YY}\\.0123`));
       await p.click("#btn-fix-number-go");
@@ -180,6 +183,8 @@ function seed(opts) {
       assert.match(await p.locator("#confirm-message").innerText(), new RegExp(`101 becomes ${N.replace(/\./g, "\\.")} on every day`));
       await p.click("#btn-confirm-yes");
       await card(p, N).waitFor();
+      assert.equal(await card(p, N).locator(".m-was-line").count(), 0, "a typo corrected is not a new number: no New number / was line");
+      assert.ok(db.t("mission_number_history").some((x) => x.old_number === "101" && x.new_number === N), "the history still records it");
       assert.deepEqual(db.t("missions").filter((m) => m.number === N).map((m) => m.plan_date).sort(), [PREV, SRC], "both days");
       assert.ok(!numbers("missions").includes("101"));
       assert.equal(db.t("mission_register").filter((r) => r.number === N).length, 1);
