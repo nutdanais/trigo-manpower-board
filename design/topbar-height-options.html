@@ -1,0 +1,412 @@
+<title>Top Bar Height Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow reading column; each option is a 1:1 render of the two top bars (1100px wide, real CSS pixels) in a horizontally scrolling stage, with a dashed guide at Manpower's bottom edge. */
+:root {
+  --paper: #f3f6fa;
+  --card: #ffffff;
+  --ink: #12263a;
+  --muted: #566679;
+  --line: #d6dde6;
+  --navy: #003a66;
+  --good: #1b6e3a;
+  --good-bg: #e6f4ea;
+  --warn: #9a4a06;
+  --warn-bg: #fdf0dd;
+  --guide: #d6204c;
+  --font: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+
+  /* the two apps, sampled from the screenshots */
+  --inv-bg: #0a1939;
+  --inv-side: #0b1a38;
+  --inv-line: #1d2b49;
+  --inv-pill: #172643;
+  --inv-pill-line: #3a465f;
+  --inv-lime: #a3e635;
+  --mp-bg: #003a66;
+  --mp-line: #002a4a;
+  --mp-green: #a8c855;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; }
+h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; text-wrap: balance; letter-spacing: -.01em; }
+h2 { font-size: 20px; margin: 0 0 4px; text-wrap: balance; }
+h3 { font-size: 17px; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 68ch; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* suggestion card */
+.suggest { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; display: grid; gap: 14px; }
+.suggest strong.big { font-size: 19px; }
+.suggest ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 78ch; }
+
+/* measurement table */
+.tbl-wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14px; }
+th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: #f8fafc; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { font-size: 13px; color: var(--muted); max-width: 80ch; margin-top: 10px; }
+
+/* option block */
+.opt { display: grid; gap: 14px; }
+.opt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.opt-head .sub { color: var(--muted); font-size: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: #e8edf3; color: var(--ink); white-space: nowrap; }
+.chip.rec { background: var(--good-bg); color: var(--good); }
+.chip.no { background: var(--warn-bg); color: var(--warn); }
+.stage { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.stage-row { display: grid; grid-template-columns: 1100px 84px; gap: 0; min-width: 1184px; align-items: start; }
+.stage-row + .stage-row { margin-top: 16px; }
+.cap { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 6px; }
+.ruler { margin-left: 12px; position: relative; border-left: 2px solid var(--guide); }
+.ruler::before, .ruler::after { content: ""; position: absolute; left: -6px; width: 10px; border-top: 2px solid var(--guide); }
+.ruler::before { top: -1px; } .ruler::after { bottom: -1px; }
+.ruler span { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font: 600 12px var(--mono); color: var(--guide); white-space: nowrap; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.fact { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.fact b { display: block; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.fact span { font: 600 15px var(--mono); }
+.fact em { font-style: normal; font-size: 13px; color: var(--muted); display: block; }
+.pc { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pc > div { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; font-size: 14px; }
+.pc h4 { margin: 0 0 6px; font-size: 13px; letter-spacing: .05em; text-transform: uppercase; }
+.pc .pro h4 { color: var(--good); } .pc .con h4 { color: var(--warn); }
+.pc ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+@media (max-width: 640px) { .pc { grid-template-columns: 1fr; } }
+
+/* ===== screens (1:1 replicas) ===== */
+.screen { position: relative; width: 1100px; height: 262px; overflow: hidden; border: 1px solid var(--line); background: #f5f8fb; font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+.screen svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.guide { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--guide); z-index: 20; pointer-events: none; }
+.guide span { position: absolute; right: 10px; top: 3px; background: var(--guide); color: #fff; font: 600 11px var(--mono); padding: 1px 7px; border-radius: 4px; }
+
+/* Inventory */
+.inv { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
+.inv-side { background: var(--inv-side); color: #e6ecf8; display: flex; flex-direction: column; overflow: hidden; }
+.inv-brand { display: flex; align-items: center; justify-content: space-between; padding: 0 16px 0 16px; border-bottom: 1px solid var(--inv-line); flex: none; }
+.inv-brand .l { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; color: #fff; }
+.cube { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #38bdf8, #0b5cff); display: grid; place-items: center; color: #fff; }
+.cube svg { width: 18px; height: 18px; }
+.inv-brand > svg { color: #9aa8c7; }
+.inv-nav { padding: 12px 12px; display: grid; gap: 4px; }
+.inv-nav div { display: flex; align-items: center; gap: 12px; height: 38px; padding: 0 12px; border-radius: 10px; font-size: 14px; color: #dbe3f4; }
+.inv-nav div.on { background: var(--inv-lime); color: #0a1939; font-weight: 600; }
+.inv-nav i { width: 16px; height: 16px; border: 1.8px solid currentColor; border-radius: 4px; opacity: .8; flex: none; }
+.inv-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.inv-top { background: var(--inv-bg); border-bottom: 1px solid var(--inv-line); display: flex; align-items: center; justify-content: space-between; padding: 0 22px; color: #fff; flex: none; }
+.inv-pill { display: inline-flex; align-items: center; gap: 8px; height: var(--pill); padding: 0 14px; background: var(--inv-pill); border: 1px solid var(--inv-pill-line); border-radius: 10px; font-size: 14px; color: #e8eefb; }
+.inv-pill b { color: #fff; font-weight: 700; }
+.inv-pill .dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; }
+.inv-pill svg { width: 16px; height: 16px; }
+.inv-right { display: flex; align-items: center; gap: 6px; }
+.inv-ic { width: var(--ic); height: var(--ic); display: grid; place-items: center; color: #dbe3f4; }
+.inv-ic svg { width: 20px; height: 20px; }
+.inv-user { display: flex; align-items: center; gap: 10px; margin-left: 10px; }
+.inv-user .t { text-align: right; line-height: 1.2; }
+.inv-user .t b { display: block; font-size: 14px; font-weight: 600; }
+.inv-user .t small { display: block; font-size: 12px; color: #c4cde3; }
+.inv-av { width: var(--av); height: var(--av); border-radius: 50%; background: var(--inv-lime); color: #0a1939; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+.inv-user > svg { width: 16px; height: 16px; color: #c4cde3; }
+.inv-banner { background: #f7fee7; border-bottom: 1px solid #d9f99d; color: #365314; font-size: 13px; height: 38px; display: flex; align-items: center; padding: 0 22px; gap: 8px; flex: none; }
+.inv-body { flex: 1; padding: 14px 22px; min-height: 0; overflow: hidden; }
+.inv-body h5 { margin: 0 0 12px; font-size: 21px; font-weight: 600; color: #0f1b34; }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.cards i { display: block; height: 70px; border-radius: 12px; background: #fff; box-shadow: 0 0 0 1px #e3e9f1; }
+
+/* Manpower */
+.mp { height: 100%; display: flex; flex-direction: column; background: #eef2f7; }
+.mp-top { background: var(--mp-bg); border-bottom: 1px solid var(--mp-line); display: flex; align-items: center; gap: 6px; padding: 0 20px; color: #fff; flex: none; }
+.mp-brand { display: flex; align-items: center; gap: 10px; margin-right: 10px; font-weight: 700; font-size: 16px; letter-spacing: -.1px; white-space: nowrap; }
+.mp-logo { width: 28px; height: 28px; border-radius: 7px; background: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,.28); display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 5px; }
+.mp-logo i { background: var(--mp-bg); border-radius: 1.5px; }
+.mp-tabs { display: flex; gap: 2px; }
+.mp-tabs span { display: inline-flex; align-items: center; gap: 6px; height: var(--ctl); padding: 0 9px; border-radius: 8px; font-size: 13.5px; font-weight: 550; color: rgba(255,255,255,.78); white-space: nowrap; }
+.mp-tabs span.on { background: #fff; color: var(--mp-bg); font-weight: 700; }
+.mp-tabs svg { width: 16px; height: 16px; opacity: .85; }
+.mp-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.mp-date { display: inline-flex; align-items: stretch; height: calc(var(--ctl) + 2px); border: 1px solid rgba(255,255,255,.4); border-radius: 10px; overflow: hidden; font-size: 13.5px; font-weight: 600; }
+.mp-date span { display: grid; place-items: center; border-left: 1px solid rgba(255,255,255,.26); }
+.mp-date span:first-child { border-left: 0; }
+.mp-date .arr { width: 38px; }
+.mp-date .d { width: 10.5em; gap: 8px; display: flex; align-items: center; justify-content: center; }
+.mp-av { width: var(--av); height: var(--av); border-radius: 9px; background: var(--mp-green); color: #1d2c05; display: grid; place-items: center; font-weight: 700; font-size: 12px; margin-left: 4px; }
+.mp-rule { height: 2px; background: var(--mp-green); flex: none; }
+.mp-bar { background: #fff; border-bottom: 1px solid #d8dde4; height: 46px; display: flex; align-items: center; gap: 14px; padding: 0 20px; font-size: 13px; color: #334155; flex: none; }
+.mp-bar .sel { border: 1px solid #d8dde4; border-radius: 8px; padding: 5px 12px; font-weight: 600; }
+.mp-body { padding: 14px 20px; flex: 1; min-height: 0; overflow: hidden; }
+.mp-card { background: #fff; border-radius: 10px; box-shadow: 0 0 0 1px #e3e9f1; border-left: 4px solid #f59e0b; padding: 12px 16px; height: 100%; font-size: 17px; font-weight: 700; color: #0f1b34; }
+.mp-card small { display: block; font-size: 13px; font-weight: 400; color: #64748b; margin-top: 2px; }
+
+/* flip test */
+.flip { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+.ctrls { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+.seg { display: inline-flex; background: #e8edf3; border-radius: 10px; padding: 3px; gap: 2px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 6px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg input:checked + label { background: var(--card); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+.seg input:focus-visible + label { outline: 2px solid var(--navy); outline-offset: 1px; }
+.flipbtn { font: 600 14px var(--font); background: var(--navy); color: #fff; border: 0; border-radius: 10px; padding: 9px 18px; cursor: pointer; }
+.flipbtn:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.flipnow { font: 600 13px var(--mono); color: var(--muted); }
+.scopelist { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 80ch; }
+code { font-family: var(--mono); font-size: 13px; background: #e8edf3; padding: 1px 6px; border-radius: 5px; }
+@media (prefers-reduced-motion: no-preference) { .seg label { transition: background-color .12s; } }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">TRIGO Inventory &amp; Quality · Manpower Board</div>
+    <h1>Matching Inventory's top bar to Manpower's</h1>
+    <p class="lede">Manpower stays as it is and Inventory changes. Every bar below is drawn at its real CSS pixel size, so a height you see here is the height you get. The dashed red line is Manpower's bottom edge.</p>
+  </header>
+
+  <section class="suggest">
+    <div>
+      <div class="eyebrow">My suggestion</div>
+      <strong class="big">Option A: make Inventory's top bar 55&nbsp;px tall, the same as Manpower's.</strong>
+    </div>
+    <ul>
+      <li>It fits. Inventory's tallest control is the Warehouse picker. At 34&nbsp;px, with 10&nbsp;px above and below, it fills the bar exactly (34 + 10 + 10 = 54, plus a 1&nbsp;px line).</li>
+      <li>It fixes a mismatch Inventory already has. Today the sidebar's logo row is about 6&nbsp;px shorter than the header, so the two dividers don't meet. Both would become 55&nbsp;px.</li>
+      <li>Inventory gets 14&nbsp;px of height back on every screen, which helps a data-heavy app.</li>
+      <li>Nothing changes in Manpower, and the controls end up the same size in both apps (34&nbsp;px controls, 32&nbsp;px avatar).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>What I measured</h2>
+    <p class="lede" style="margin-bottom:12px">From your two screenshots. The screen is scaled to 125%, which I confirmed from Manpower's 32&nbsp;px avatar measuring 40 screen pixels, so all sizes below are CSS pixels.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Part of the bar</th><th>Manpower Board</th><th>Inventory (today)</th><th>Gap</th></tr></thead>
+        <tbody>
+          <tr><td>Whole top bar, incl. 1&nbsp;px bottom line</td><td class="num">55 px</td><td class="num">69 px</td><td class="num">14 px</td></tr>
+          <tr><td>Main control (date picker / Warehouse picker)</td><td class="num">34 px</td><td class="num">44 px</td><td class="num">10 px</td></tr>
+          <tr><td>Avatar</td><td class="num">32 px</td><td class="num">36 px</td><td class="num">4 px</td></tr>
+          <tr><td>Sidebar logo row (Inventory only)</td><td>none</td><td class="num">63 px</td><td>6&nbsp;px shorter than Inventory's own header</td></tr>
+          <tr><td>Green accent line under the bar</td><td class="num">2 px</td><td>none</td><td>Not part of this change</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">The Inventory sizes are read off a screenshot, so treat them as within about 1&nbsp;px. The Manpower sizes match its stylesheet (<code>min-height: 54px</code> plus a 1&nbsp;px line). The numbers on this page use them.</p>
+  </section>
+
+  <section class="opt" id="opt-now">
+    <div class="opt-head"><h3>Today</h3><span class="sub">for reference</span></div>
+    <div class="stage" data-variant="now"></div>
+    <div class="facts" data-facts="now"></div>
+  </section>
+
+  <section class="opt" id="opt-a">
+    <div class="opt-head"><h3>Option A · Match Manpower exactly</h3><span class="chip rec">Recommended</span></div>
+    <div class="stage" data-variant="a"></div>
+    <div class="facts" data-facts="a"></div>
+    <div class="pc">
+      <div class="pro"><h4>Gains</h4><ul>
+        <li>Identical bar height and identical control sizes in both apps.</li>
+        <li>Sidebar logo row and header line up at 55&nbsp;px.</li>
+        <li>14&nbsp;px more room for content on every Inventory page.</li>
+        <li>No change to Manpower.</li>
+      </ul></div>
+      <div class="con"><h4>Costs</h4><ul>
+        <li>The Warehouse picker shrinks from 44 to 34&nbsp;px, a smaller click target.</li>
+        <li>On touch screens a 40&nbsp;px control still fits (40 + 7 + 7 = 54), so the bar can stay 55&nbsp;px there too.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="opt" id="opt-b">
+    <div class="opt-head"><h3>Option B · Same height, larger controls</h3><span class="chip">Fallback</span></div>
+    <div class="stage" data-variant="b"></div>
+    <div class="facts" data-facts="b"></div>
+    <div class="pc">
+      <div class="pro"><h4>Gains</h4><ul>
+        <li>The bar height still matches, so switching apps doesn't move anything.</li>
+        <li>Controls stay a little easier to hit than Option A.</li>
+      </ul></div>
+      <div class="con"><h4>Costs</h4><ul>
+        <li>Controls are 4&nbsp;px bigger than Manpower's, so the two apps look close but not identical.</li>
+        <li>Only 8&nbsp;px of space above and below the picker, against Manpower's 10&nbsp;px.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="opt" id="opt-c">
+    <div class="opt-head"><h3>Option C · Meet in the middle at 62&nbsp;px</h3><span class="chip no">Changes both apps</span></div>
+    <div class="stage" data-variant="c"></div>
+    <div class="facts" data-facts="c"></div>
+    <div class="pc">
+      <div class="pro"><h4>Gains</h4><ul>
+        <li>Neither app takes the whole change: Inventory gives up 7&nbsp;px and Manpower takes 7&nbsp;px.</li>
+        <li>Both bars have roomier controls (38&nbsp;px in Manpower, 40&nbsp;px in Inventory).</li>
+      </ul></div>
+      <div class="con"><h4>Costs</h4><ul>
+        <li>Manpower's sticky header, which stays on screen while a long board scrolls, grows by 7&nbsp;px on every board page.</li>
+        <li>Two apps to change and test instead of one.</li>
+        <li>You said Manpower is the reference, so this works against that.</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="flip">
+    <div>
+      <h2>Flip test</h2>
+      <p class="lede">This is what a user sees when switching between the two apps with the browser tab. Pick an option, then switch. The dashed line stays in the same place, so any jump in the bar's bottom edge is easy to see.</p>
+    </div>
+    <div class="ctrls">
+      <div class="seg" role="radiogroup" aria-label="Inventory option">
+        <input type="radio" name="fv" id="fv-now" value="now"><label for="fv-now">Today</label>
+        <input type="radio" name="fv" id="fv-a" value="a" checked><label for="fv-a">Option A</label>
+        <input type="radio" name="fv" id="fv-b" value="b"><label for="fv-b">Option B</label>
+        <input type="radio" name="fv" id="fv-c" value="c"><label for="fv-c">Option C</label>
+      </div>
+      <button type="button" class="flipbtn" id="flipbtn">Switch app</button>
+      <span class="flipnow" id="flipnow"></span>
+    </div>
+    <div class="stage"><div class="stage-row" id="flipstage"></div></div>
+  </section>
+
+  <section>
+    <h2>If you choose Option A, this is what changes</h2>
+    <p class="lede" style="margin-bottom:10px">All in the Inventory app. The Manpower Board's files are not touched. I haven't changed anything yet.</p>
+    <ul class="scopelist">
+      <li>Top bar: content height 68 → 54&nbsp;px (the line adds 1&nbsp;px).</li>
+      <li>Warehouse picker: 44 → 34&nbsp;px tall. Avatar: 36 → 32&nbsp;px. Bell and cart hit areas: 34&nbsp;px.</li>
+      <li>Sidebar logo row: 63 → 55&nbsp;px, so its divider meets the header line.</li>
+      <li>The "New address" banner and the page content below keep their sizes and move up 14&nbsp;px.</li>
+      <li>Anything in Inventory that sticks below the bar (for example a sticky table header offset by the old height) needs its offset updated to 55&nbsp;px. I'd check this when implementing.</li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var ICON = {
+    bell: '<svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 7 2 7H4s2-1 2-7Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+    cart: '<svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M3 4h2.5l2.4 11h10.6L21 8H6.4"/></svg>',
+    chev: '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>',
+    panel: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>',
+    cube: '<svg viewBox="0 0 24 24"><path d="M12 3 20 7.5v9L12 21 4 16.5v-9L12 3Z"/><path d="M12 12 4 7.5M12 12l8-4.5M12 12v9"/></svg>',
+    wh: '<svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M3 9 12 4l9 5"/></svg>',
+    cal: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
+    left: '<svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg>',
+    right: '<svg viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></svg>',
+    tab: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>'
+  };
+
+  /* hdr = content height of the bar, the 1px line is added on top (as in both apps) */
+  var V = {
+    now: { name: 'Today',    inv: { hdr: 68, pill: 44, av: 36, ic: 36, brand: 63 }, mp: { hdr: 54, ctl: 34, av: 32 } },
+    a:   { name: 'Option A', inv: { hdr: 54, pill: 34, av: 32, ic: 34, brand: 55 }, mp: { hdr: 54, ctl: 34, av: 32 } },
+    b:   { name: 'Option B', inv: { hdr: 54, pill: 38, av: 34, ic: 36, brand: 55 }, mp: { hdr: 54, ctl: 34, av: 32 } },
+    c:   { name: 'Option C', inv: { hdr: 61, pill: 40, av: 34, ic: 38, brand: 62 }, mp: { hdr: 61, ctl: 38, av: 36 } }
+  };
+
+  function invScreen(v) {
+    var i = v.inv, guideY = v.mp.hdr + 1;
+    return '<div class="screen" style="--pill:' + i.pill + 'px;--av:' + i.av + 'px;--ic:' + i.ic + 'px">' +
+      '<div class="inv">' +
+        '<aside class="inv-side">' +
+          '<div class="inv-brand" style="height:' + i.brand + 'px"><span class="l"><span class="cube">' + ICON.cube + '</span>Inventory</span>' + ICON.panel + '</div>' +
+          '<nav class="inv-nav"><div class="on"><i></i>Dashboard</div><div><i></i>Consumables</div><div><i></i>Tools &amp; Calibration</div><div><i></i>Customer Parts</div></nav>' +
+        '</aside>' +
+        '<div class="inv-main">' +
+          '<header class="inv-top" style="height:' + (i.hdr + 1) + 'px">' +
+            '<span class="inv-pill">' + ICON.wh + 'Warehouse: <span class="dot"></span><b>Amata</b>' + ICON.chev + '</span>' +
+            '<div class="inv-right"><span class="inv-ic">' + ICON.bell + '</span><span class="inv-ic">' + ICON.cart + '</span>' +
+              '<div class="inv-user"><div class="t"><b>Nutdanai S.</b><small>Operations System Admin</small></div><span class="inv-av">N</span>' + ICON.chev + '</div></div>' +
+          '</header>' +
+          '<div class="inv-banner">New address: update your bookmark and Home Screen app.</div>' +
+          '<div class="inv-body"><h5>Dashboard</h5><div class="cards"><i></i><i></i><i></i><i></i></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="guide" style="top:' + guideY + 'px"><span>Manpower bottom edge · ' + guideY + ' px</span></div>' +
+    '</div>';
+  }
+
+  function mpScreen(v) {
+    var m = v.mp, guideY = m.hdr + 1;
+    return '<div class="screen" style="--ctl:' + m.ctl + 'px;--av:' + m.av + 'px">' +
+      '<div class="mp">' +
+        '<header class="mp-top" style="height:' + (m.hdr + 1) + 'px">' +
+          '<div class="mp-brand"><span class="mp-logo"><i></i><i></i><i></i><i></i></span>Manpower Board</div>' +
+          '<nav class="mp-tabs"><span>' + ICON.tab + 'Board</span><span class="on">' + ICON.tab + 'Overview</span><span>' + ICON.tab + 'Org Chart</span><span>' + ICON.tab + 'Manpower</span><span>' + ICON.tab + 'Host</span><span>' + ICON.tab + 'Capacity</span></nav>' +
+          '<div class="mp-right"><div class="mp-date"><span class="arr">' + ICON.left + '</span><span class="d">' + ICON.cal + 'Mon 9 Nov 2026</span><span class="arr">' + ICON.right + '</span></div><span class="mp-av">NS</span></div>' +
+        '</header>' +
+        '<div class="mp-rule"></div>' +
+        '<div class="mp-bar"><span>Board</span><span class="sel">Non-Rayong 109</span><span>Utilization: <b>0%</b></span><span>Assigned: <b>0</b></span><span>Standby: <b>62</b></span></div>' +
+        '<div class="mp-body"><div class="mp-card">62 permanent staff have no mission<small>Mon 9 Nov 2026 · Non-Rayong</small></div></div>' +
+      '</div>' +
+      '<div class="guide" style="top:' + guideY + 'px"><span>Bottom edge · ' + guideY + ' px</span></div>' +
+    '</div>';
+  }
+
+  function row(title, screen, outer) {
+    return '<div class="stage-row"><div><p class="cap">' + title + '</p>' + screen + '</div>' +
+      '<div style="padding-top:' + (24) + 'px"><div class="ruler" style="height:' + outer + 'px"><span>' + outer + ' px</span></div></div></div>';
+  }
+
+  function delta(n) { return n === 0 ? 'no change' : (n > 0 ? '+' : '−') + Math.abs(n) + ' px'; }
+
+  document.querySelectorAll('.stage[data-variant]').forEach(function (el) {
+    var k = el.getAttribute('data-variant'), v = V[k];
+    var h = row('Inventory · ' + v.name, invScreen(v), v.inv.hdr + 1);
+    if (k === 'c') h += row('Manpower Board after the change', mpScreen(v), v.mp.hdr + 1);
+    el.innerHTML = h;
+  });
+
+  var base = V.now;
+  document.querySelectorAll('[data-facts]').forEach(function (el) {
+    var k = el.getAttribute('data-facts'), v = V[k];
+    var invOuter = v.inv.hdr + 1, d = invOuter - (base.inv.hdr + 1), mpd = (v.mp.hdr + 1) - (base.mp.hdr + 1);
+    var html = '';
+    if (k === 'now') {
+      html = '<div class="fact"><b>Inventory bar</b><span>69 px</span></div>' +
+             '<div class="fact"><b>Manpower bar</b><span>55 px</span><em>14 px shorter</em></div>' +
+             '<div class="fact"><b>Warehouse picker</b><span>44 px</span></div>' +
+             '<div class="fact"><b>Sidebar logo row</b><span>63 px</span><em>6 px short of the header</em></div>';
+    } else {
+      html = '<div class="fact"><b>Inventory bar</b><span>' + invOuter + ' px</span><em>' + delta(d) + ' from today</em></div>' +
+             '<div class="fact"><b>Manpower bar</b><span>' + (v.mp.hdr + 1) + ' px</span><em>' + delta(mpd) + '</em></div>' +
+             '<div class="fact"><b>Warehouse picker</b><span>' + v.inv.pill + ' px</span><em>Manpower controls: ' + v.mp.ctl + ' px</em></div>' +
+             '<div class="fact"><b>Avatar</b><span>' + v.inv.av + ' px</span><em>Manpower: ' + v.mp.av + ' px</em></div>';
+    }
+    el.innerHTML = html;
+  });
+
+  /* flip test */
+  var which = 'mp', sel = 'a';
+  var stage = document.getElementById('flipstage'), now = document.getElementById('flipnow');
+  function drawFlip() {
+    var v = V[sel];
+    stage.innerHTML = which === 'mp'
+      ? '<div><p class="cap">Manpower Board</p>' + mpScreen(v) + '</div><div></div>'
+      : '<div><p class="cap">Inventory · ' + v.name + '</p>' + invScreen(v) + '</div><div></div>';
+    now.textContent = (which === 'mp' ? 'Showing Manpower Board' : 'Showing Inventory (' + v.name + ')');
+  }
+  document.getElementById('flipbtn').addEventListener('click', function () { which = which === 'mp' ? 'inv' : 'mp'; drawFlip(); });
+  document.querySelectorAll('input[name="fv"]').forEach(function (r) {
+    r.addEventListener('change', function () { sel = r.value; drawFlip(); });
+  });
+  drawFlip();
+})();
+</script>
