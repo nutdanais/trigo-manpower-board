@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Soft Fade Variations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&display=block">
+<style>
+/* Four variations on the Soft Fade sample (A). Same content and type family; the fade is used differently in each. */
+
+:root{
+  --navy:#062A44; --navy-2:#0B3A5C; --sky:#2E7FB8; --green:#97C21D;
+  --mut:#5A6E7E; --hair:rgba(6,42,68,.10);
+  --grad-text:linear-gradient(95deg,#0B3A5C 0%,#2E7FB8 48%,#7FA81A 100%);
+  --grad-chip:linear-gradient(135deg,rgba(151,194,29,.28),rgba(46,127,184,.20));
+  --bg:#F3F6F9; --surface:#FFFFFF; --fg:#13222F; --fg-mut:#55697A; --rule:#D8E0E7;
+  --f:"Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"Geist Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#0B151D; --surface:#121F2A; --fg:#E4ECF2; --fg-mut:#93A6B5; --rule:#22384A; color-scheme:dark }
+}
+:root[data-theme="dark"]{ --bg:#0B151D; --surface:#121F2A; --fg:#E4ECF2; --fg-mut:#93A6B5; --rule:#22384A; color-scheme:dark }
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 var(--f); padding:0 16px 64px}
+.wrap{max-width:1180px; margin:0 auto}
+.ms{font-family:"Material Symbols Rounded"; font-weight:normal; font-style:normal; line-height:1; display:inline-block; white-space:nowrap; font-feature-settings:"liga"; -webkit-font-smoothing:antialiased; font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24}
+
+/* review chrome */
+.top{padding:36px 0 8px; display:grid; gap:10px; max-width:78ch}
+.top h1{margin:0; font-size:clamp(24px,3.4vw,34px); font-weight:650; line-height:1.15; letter-spacing:-.02em}
+.top p{margin:0; color:var(--fg-mut)}
+.top a{color:inherit}
+.var{display:grid; gap:16px; padding-top:40px}
+.var header{display:grid; gap:4px; border-top:1px solid var(--rule); padding-top:20px}
+.var h2{margin:0; font-size:22px; font-weight:650; letter-spacing:-.02em}
+.var h2 small{font:500 13px/1 var(--f-mono); letter-spacing:.12em; color:var(--fg-mut); margin-right:10px}
+.var header p{margin:0; color:var(--fg-mut); max-width:90ch}
+.pair{display:grid; gap:20px}
+@media (min-width:900px){ .pair{grid-template-columns:1fr 1fr} }
+
+/* slide base, with per-variant colour variables */
+.slide{--hc:var(--navy); --lc:var(--mut); --em:var(--grad-text); --chip-bg:rgba(255,255,255,.66); --chip-line:rgba(6,42,68,.08); --chip-fg:var(--navy); --chip-ic:var(--sky);
+  --tile:var(--grad-chip); --tile-ic:var(--navy-2); --bar:#F4F7FA; --dot:#D3DCE4; --win-sh:0 0 0 1px var(--hair), 0 .3cqw .6cqw rgba(6,42,68,.06), 0 2.6cqw 6cqw rgba(6,42,68,.18);
+  position:relative; width:100%; aspect-ratio:16/9; container-type:inline-size; overflow:hidden; border-radius:12px;
+  font-family:var(--f); background:#F7FAFC; box-shadow:0 1px 2px rgba(0,0,0,.06), 0 12px 32px rgba(6,42,68,.10)}
+.slide *{margin:0}
+.dark{--hc:#F2F7FB; --lc:#A9BDCC; --em:linear-gradient(95deg,#8CCBFF 0%,#B9E35A 100%); --chip-bg:rgba(255,255,255,.08); --chip-line:rgba(255,255,255,.16); --chip-fg:#EEF4F8; --chip-ic:#B9E35A;
+  --tile:rgba(255,255,255,.09); --tile-ic:#B9E35A; --bar:#0E2536; --dot:#2A4256; --win-sh:0 0 0 1px rgba(255,255,255,.08), 0 3cqw 7cqw rgba(0,0,0,.45)}
+.logo{position:absolute; left:5cqw; top:3.4cqw; height:4.4cqw; z-index:3}
+.num{position:absolute; right:5cqw; top:5cqw; font:500 .95cqw/1 var(--f-mono); letter-spacing:.12em; color:var(--lc); z-index:3}
+.eyebrow{display:inline-flex; align-items:center; gap:.8cqw; font:500 1cqw/1 var(--f-mono); letter-spacing:.16em; text-transform:uppercase; color:var(--lc)}
+.eyebrow::before{content:""; width:2.4cqw; height:.22cqw; border-radius:1cqw; background:linear-gradient(90deg,var(--sky),var(--green))}
+.h{font-weight:650; letter-spacing:-.045em; line-height:1.0; color:var(--hc); text-wrap:balance}
+.h em{font-style:normal; background:var(--em); -webkit-background-clip:text; background-clip:text; color:transparent}
+.lede{font-size:1.55cqw; line-height:1.5; color:var(--lc); text-wrap:pretty}
+.copy{position:absolute; z-index:2; display:grid; align-content:start}
+.win{position:absolute; border-radius:1.1cqw; overflow:hidden; background:#fff; box-shadow:var(--win-sh)}
+.win .bar{height:1.9cqw; display:flex; align-items:center; gap:.5cqw; padding-left:1.1cqw; background:var(--bar); border-bottom:1px solid var(--hair)}
+.win .bar i{width:.62cqw; height:.62cqw; border-radius:50%; background:var(--dot)}
+.win img{display:block; width:100%; height:auto}
+.fade-r{-webkit-mask-image:linear-gradient(90deg,#000 78%,transparent 100%); mask-image:linear-gradient(90deg,#000 78%,transparent 100%)}
+.fade-rb{-webkit-mask-image:linear-gradient(90deg,#000 76%,transparent 100%),linear-gradient(180deg,#000 72%,transparent 100%); -webkit-mask-composite:source-in;
+  mask-image:linear-gradient(90deg,#000 76%,transparent 100%),linear-gradient(180deg,#000 72%,transparent 100%); mask-composite:intersect}
+.phone{position:absolute; aspect-ratio:390/844; border-radius:2.6cqw; padding:.45cqw; background:linear-gradient(160deg,#1B3448,#0A1C2A); z-index:4;
+  box-shadow:0 0 0 1px rgba(255,255,255,.4) inset, 0 2.4cqw 5cqw rgba(6,42,68,.32)}
+.phone img{display:block; width:100%; height:100%; object-fit:cover; object-position:top; border-radius:2.2cqw}
+.chips{display:flex; flex-wrap:wrap; gap:.8cqw}
+.chips > span{display:inline-flex; align-items:center; gap:.6cqw; padding:.7cqw 1.15cqw; border-radius:5cqw; font-size:1.1cqw; font-weight:500; color:var(--chip-fg);
+  background:var(--chip-bg); box-shadow:0 0 0 1px var(--chip-line); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px)}
+.chips .ms{font-size:1.4cqw; color:var(--chip-ic)}
+.feat{list-style:none; padding:0; display:grid; gap:1.3cqw; margin-top:.6cqw}
+.feat li{display:grid; grid-template-columns:3.6cqw 1fr; gap:1.2cqw; align-items:center}
+.feat .ms{width:3.6cqw; height:3.6cqw; display:grid; place-items:center; border-radius:1cqw; background:var(--tile); color:var(--tile-ic); font-size:1.9cqw}
+.feat b{display:block; font-size:1.4cqw; font-weight:600; letter-spacing:-.01em; color:var(--hc)}
+.feat span:not(.ms){display:block; font-size:1.15cqw; color:var(--lc); line-height:1.4}
+.cover .copy{left:5cqw; top:13cqw; width:42cqw; gap:2cqw}
+.cover .h{font-size:5.2cqw}
+.cover .lede{max-width:38cqw}
+.app .copy{left:5cqw; top:12cqw; width:31cqw; gap:1.6cqw}
+.app .h{font-size:3.9cqw}
+
+/* B Dusk: the same fades on deep navy */
+.vb{background:
+  radial-gradient(60cqw 46cqw at 92% 0%, rgba(46,127,184,.55), transparent 70%),
+  radial-gradient(56cqw 42cqw at 100% 100%, rgba(151,194,29,.32), transparent 70%),
+  radial-gradient(50cqw 40cqw at 0% 100%, rgba(13,74,116,.55), transparent 70%),
+  linear-gradient(160deg,#03172A 0%,#062A44 55%,#08314F 100%)}
+.vb.cover .d1{left:50cqw; top:7cqw; width:58cqw}
+.vb.cover .d2{left:60cqw; top:27cqw; width:48cqw; z-index:1}
+.vb.app .d1{left:44cqw; top:8cqw; width:62cqw}
+.vb.app .phone{left:38.5cqw; top:21.5cqw; width:14.2cqw}
+
+/* C Stage: white slide, the fade lives in one rounded panel that holds the app */
+.vc{background:#FBFCFD}
+.vc .panel{position:absolute; left:47cqw; top:3.5cqw; width:50cqw; height:49.25cqw; border-radius:2.4cqw; overflow:hidden;
+  background:radial-gradient(40cqw 30cqw at 20% 10%, rgba(255,255,255,.35), transparent 70%), linear-gradient(140deg,#0B3A5C 0%,#2E7FB8 52%,#97C21D 100%)}
+.vc .panel .win{--win-sh:0 0 0 1px rgba(255,255,255,.25), 0 3cqw 6cqw rgba(3,23,42,.35)}
+.vc.cover .d1{left:5cqw; top:6cqw; width:54cqw}
+.vc.cover .d2{left:13cqw; top:24cqw; width:46cqw}
+.vc.app .d1{left:9cqw; top:7cqw; width:56cqw}
+.vc.app .phone{left:40cqw; top:20cqw; width:14.2cqw}
+.vc .num{color:rgba(255,255,255,.85); top:6cqw; right:6cqw}
+.vc.cover .copy{width:41cqw}
+.vc.cover .chips > span, .ve.cover .chips > span{font-size:1.02cqw; padding:.65cqw 1cqw}
+
+/* D Airy: near white, light-weight headline, one soft glow behind floating windows */
+.vd{--win-sh:0 0 0 1px var(--hair), 0 2cqw 5cqw rgba(6,42,68,.12); background:
+  radial-gradient(34cqw 26cqw at 74% 46%, rgba(151,194,29,.30), transparent 70%),
+  radial-gradient(30cqw 24cqw at 84% 24%, rgba(46,127,184,.26), transparent 70%),
+  #FCFDFE}
+.vd .h{font-weight:300; letter-spacing:-.05em}
+.vd .h em{font-weight:550}
+.vd .eyebrow::before{background:var(--navy)}
+.vd .rule{position:absolute; left:5cqw; right:5cqw; top:10cqw; height:1px; background:var(--hair)}
+.vd .chips > span{background:transparent; box-shadow:0 0 0 1px rgba(6,42,68,.18)}
+.vd .feat .ms{background:transparent; box-shadow:0 0 0 1px rgba(6,42,68,.16)}
+.vd .win{border-radius:1.4cqw}
+.vd.cover .d1{left:51cqw; top:13cqw; width:42cqw}
+.vd.cover .d2{left:58cqw; top:29.5cqw; width:37cqw; z-index:1}
+.vd.app .d1{left:48cqw; top:13.5cqw; width:47cqw}
+.vd.app .phone{left:41cqw; top:21cqw; width:13cqw}
+
+/* E Split: a dark fade panel for the words, a pale side for the app */
+.ve{background:
+  radial-gradient(40cqw 34cqw at 100% 100%, rgba(151,194,29,.26), transparent 70%),
+  radial-gradient(40cqw 30cqw at 80% 0%, rgba(46,127,184,.20), transparent 70%), #F4F7FA}
+.ve .side{position:absolute; left:0; top:0; bottom:0; width:41cqw;
+  background:linear-gradient(172deg,#041B2D 0%,#062A44 38%,#0B4A73 72%,#3E8C6A 100%)}
+.ve .side::after{content:""; position:absolute; inset:0; background:radial-gradient(30cqw 22cqw at 0% 100%, rgba(151,194,29,.45), transparent 70%)}
+.ve .num{color:var(--mut)}
+.ve.cover .side{width:45cqw}
+.ve.cover .copy{width:39cqw; top:14cqw}
+.ve.cover .lede{max-width:36cqw}
+.ve.cover .h{font-size:4.5cqw}
+.ve.cover .lede{font-size:1.4cqw}
+.ve.cover .d1{left:49cqw; top:8cqw; width:60cqw}
+.ve.cover .d2{left:58cqw; top:28cqw; width:50cqw; z-index:1}
+.ve.app .copy{width:30cqw}
+.ve.app .h{font-size:3.6cqw}
+.ve.app .d1{left:47cqw; top:9cqw; width:60cqw}
+.ve.app .phone{left:34cqw; top:17cqw; width:15cqw}
+.ve .win{--win-sh:0 0 0 1px var(--hair), 0 .3cqw .6cqw rgba(6,42,68,.06), 0 2.6cqw 6cqw rgba(6,42,68,.18); --bar:#F4F7FA; --dot:#D3DCE4}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Soft Fade: four more variations</h1>
+    <p>Each variation keeps the Geist type, the navy, sky and green fades and the real screenshots from sample A (the light one you liked), and changes how the colour is used. Every variation shows the same two slides, the cover and an app slide, so they are easy to compare. Pick one, or mix parts, for example C's panel with B's dark cover.</p>
+  </header>
+  
+  <section class="var">
+    <header><h2><small>B</small>Dusk</h2><p>The same fades and type as sample A, on a deep navy base. Strong on a projector and in a dark room, and closest to the TRIGO navy brand.</p></header>
+    <div class="pair"><div class="slide cover vb dark">
+  <img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO">
+  <div class="copy">
+    <span class="eyebrow">Global Quality Solution</span>
+    <h3 class="h">Two apps for the work we do <em>every day.</em></h3>
+    <p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables. Both run in the browser and on your phone.</p>
+    <div class="chips"><span><span class="ms">groups</span>Manpower Board</span><span><span class="ms">inventory_2</span>Inventory &amp; Quality</span><span><span class="ms">smartphone</span>On your phone</span></div>
+  </div>
+  <div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div><div class="win d2 fade-rb"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board for one day"></div>
+  <span class="num">01 / 09</span>
+</div><div class="slide app vb dark">
+  <img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO">
+  <div class="copy">
+    <span class="eyebrow">Manpower Board</span>
+    <h3 class="h">Tomorrow's crew, planned on <em>one board.</em></h3>
+    <p class="lede">The magnet board, made digital. Drag people onto missions, leave or standby, and everyone sees the same plan, live.</p>
+    <ul class="feat">
+      <li><span class="ms">drag_pan</span><div><b>Drag and drop planning</b><span>One board per site, one card per person</span></div></li>
+      <li><span class="ms">location_on</span><div><b>Where to go, what to wear</b><span>The host name opens Google Maps; PPE is on the card</span></div></li>
+      <li><span class="ms">lock</span><div><b>Lock a finished plan</b><span>Nobody bumps it by accident</span></div></li>
+    </ul>
+  </div>
+  <div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board with missions, leave and the standby pool"></div>
+  <div class="phone"><img src="img/mp-merge-phone.jpg" alt="Review and merge forecast on a phone"></div>
+  <span class="num">02 / 09</span>
+</div></div>
+  </section>
+  <section class="var">
+    <header><h2><small>C</small>Stage</h2><p>A clean white slide; the fade lives in one rounded navy-to-green panel that holds the app. The words stay calm and the colour frames the product.</p></header>
+    <div class="pair"><div class="slide cover vc">
+  <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+  <div class="copy">
+    <span class="eyebrow">Global Quality Solution</span>
+    <h3 class="h">Two apps for the work we do <em>every day.</em></h3>
+    <p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables. Both run in the browser and on your phone.</p>
+    <div class="chips"><span><span class="ms">groups</span>Manpower Board</span><span><span class="ms">inventory_2</span>Inventory &amp; Quality</span><span><span class="ms">smartphone</span>On your phone</span></div>
+  </div>
+  <div class="panel"><div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div><div class="win d2 fade-rb"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board for one day"></div></div>
+  <span class="num">01 / 09</span>
+</div><div class="slide app vc">
+  <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+  <div class="copy">
+    <span class="eyebrow">Manpower Board</span>
+    <h3 class="h">Tomorrow's crew, planned on <em>one board.</em></h3>
+    <p class="lede">The magnet board, made digital. Drag people onto missions, leave or standby, and everyone sees the same plan, live.</p>
+    <ul class="feat">
+      <li><span class="ms">drag_pan</span><div><b>Drag and drop planning</b><span>One board per site, one card per person</span></div></li>
+      <li><span class="ms">location_on</span><div><b>Where to go, what to wear</b><span>The host name opens Google Maps; PPE is on the card</span></div></li>
+      <li><span class="ms">lock</span><div><b>Lock a finished plan</b><span>Nobody bumps it by accident</span></div></li>
+    </ul>
+  </div>
+  <div class="panel"><div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board with missions, leave and the standby pool"></div></div>
+  <div class="phone"><img src="img/mp-merge-phone.jpg" alt="Review and merge forecast on a phone"></div>
+  <span class="num">02 / 09</span>
+</div></div>
+  </section>
+  <section class="var">
+    <header><h2><small>D</small>Airy</h2><p>Almost white, with a thin light-weight headline and one soft glow behind windows that float instead of bleeding off. The most minimal and editorial.</p></header>
+    <div class="pair"><div class="slide cover vd"><span class="rule"></span>
+  <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+  <div class="copy">
+    <span class="eyebrow">Global Quality Solution</span>
+    <h3 class="h">Two apps for the work we do <em>every day.</em></h3>
+    <p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables. Both run in the browser and on your phone.</p>
+    <div class="chips"><span><span class="ms">groups</span>Manpower Board</span><span><span class="ms">inventory_2</span>Inventory &amp; Quality</span><span><span class="ms">smartphone</span>On your phone</span></div>
+  </div>
+  <div class="win d1 "><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div><div class="win d2 "><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board for one day"></div>
+  <span class="num">01 / 09</span>
+</div><div class="slide app vd"><span class="rule"></span>
+  <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+  <div class="copy">
+    <span class="eyebrow">Manpower Board</span>
+    <h3 class="h">Tomorrow's crew, planned on <em>one board.</em></h3>
+    <p class="lede">The magnet board, made digital. Drag people onto missions, leave or standby, and everyone sees the same plan, live.</p>
+    <ul class="feat">
+      <li><span class="ms">drag_pan</span><div><b>Drag and drop planning</b><span>One board per site, one card per person</span></div></li>
+      <li><span class="ms">location_on</span><div><b>Where to go, what to wear</b><span>The host name opens Google Maps; PPE is on the card</span></div></li>
+      <li><span class="ms">lock</span><div><b>Lock a finished plan</b><span>Nobody bumps it by accident</span></div></li>
+    </ul>
+  </div>
+  <div class="win d1 "><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board with missions, leave and the standby pool"></div>
+  <div class="phone"><img src="img/mp-merge-phone.jpg" alt="Review and merge forecast on a phone"></div>
+  <span class="num">02 / 09</span>
+</div></div>
+  </section>
+  <section class="var">
+    <header><h2><small>E</small>Split</h2><p>A dark fade panel carries the words, the pale side carries the app, and the phone sits across the seam. Bold and very readable.</p></header>
+    <div class="pair"><div class="slide cover ve"><span class="side"></span>
+  <img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO">
+  <div class="copy dark">
+    <span class="eyebrow">Global Quality Solution</span>
+    <h3 class="h">Two apps for the work we do <em>every day.</em></h3>
+    <p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables. Both run in the browser and on your phone.</p>
+    <div class="chips"><span><span class="ms">groups</span>Manpower Board</span><span><span class="ms">inventory_2</span>Inventory &amp; Quality</span><span><span class="ms">smartphone</span>On your phone</span></div>
+  </div>
+  <div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div><div class="win d2 fade-rb"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board for one day"></div>
+  <span class="num">01 / 09</span>
+</div><div class="slide app ve"><span class="side"></span>
+  <img class="logo" src="img/trigo-logo-white.svg" alt="TRIGO">
+  <div class="copy dark">
+    <span class="eyebrow">Manpower Board</span>
+    <h3 class="h">Tomorrow's crew, planned on <em>one board.</em></h3>
+    <p class="lede">The magnet board, made digital. Drag people onto missions, leave or standby, and everyone sees the same plan, live.</p>
+    <ul class="feat">
+      <li><span class="ms">drag_pan</span><div><b>Drag and drop planning</b><span>One board per site, one card per person</span></div></li>
+      <li><span class="ms">location_on</span><div><b>Where to go, what to wear</b><span>The host name opens Google Maps; PPE is on the card</span></div></li>
+      <li><span class="ms">lock</span><div><b>Lock a finished plan</b><span>Nobody bumps it by accident</span></div></li>
+    </ul>
+  </div>
+  <div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board with missions, leave and the standby pool"></div>
+  <div class="phone"><img src="img/mp-merge-phone.jpg" alt="Review and merge forecast on a phone"></div>
+  <span class="num">02 / 09</span>
+</div></div>
+  </section>
+</div>
+</body>
+</html>
