@@ -87,8 +87,8 @@ async function step(name, fn) {
       await page.getByRole("button", { name: "New Mission" }).first().click();
       await page.locator("#modal-mission:not(.hidden)").waitFor();
       // a number in Etraq's form: the mission form checks it (mission-number.js)
-      await page.fill("#form-mission [name=number]", `RYGTH.${String(new Date().getFullYear()).slice(2)}.0999`);
-      await page.fill("#form-mission [name=host]", "Siam Auto Parts");
+      await page.fill("#form-mission [name=number]", `AMATA.${String(new Date().getFullYear()).slice(2)}.0999`);
+      await page.fill("#form-mission [name=host]", "Amata Seating");
       await page.fill("#form-mission [name=customer]", "Training Customer");
       await page.fill("#form-mission [name=engineer]", "Somchai.P");
       await page.click("#form-mission button[type=submit]");   // the DEMO strip must not sit over Save
@@ -107,8 +107,8 @@ async function step(name, fn) {
       await page.evaluate(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); });
       await page.locator("#missions-panel:not(.hidden)").waitFor();
       const yy = String(new Date().getFullYear()).slice(2), ly = String(new Date().getFullYear() - 1).slice(2);
-      assert.match(await page.locator("#missions-body").innerText(), new RegExp(`AYTTH\\.${yy}\\.0302`));
-      assert.match(await page.locator("#missions-body tr", { hasText: `AYTTH.${yy}.0302` }).locator("td.ml-first .lt-c").getAttribute("title"), new RegExp(`was AYTTH\\.${ly}\\.0157`), "the old number is the tooltip of the new one");
+      assert.match(await page.locator("#missions-body").innerText(), new RegExp(`SRBTH\\.${yy}\\.0302`));
+      assert.match(await page.locator("#missions-body tr", { hasText: `SRBTH.${yy}.0302` }).locator("td.ml-first .lt-c").getAttribute("title"), new RegExp(`was SRBTH\\.${ly}\\.0157`), "the old number is the tooltip of the new one");
       await page.selectOption("#missions-status", "closed");
       assert.match(await page.locator("#missions-body").innerText(), /209[\s\S]*Closed/);
       assert.equal(await page.locator("#btn-new-mission").isVisible(), false, "the board is view-only for a Site Admin");
@@ -121,14 +121,14 @@ async function step(name, fn) {
       await page.evaluate(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); });
       await page.locator("#missions-panel:not(.hidden)").waitFor();
       const yy = String(new Date().getFullYear()).slice(2);
-      assert.match(await page.locator("#missions-body tr", { hasText: `RYGTH.${yy}.0108` }).locator(".ml-hosts-more").innerText(), /\+1/, "two hosts: +1");
-      await page.evaluate((n) => openMissionAddModal(D().register.find((r) => r.number === n)), `RYGTH.${yy}.0108`);
+      assert.match(await page.locator("#missions-body tr", { hasText: `AMATA.${yy}.0054` }).locator(".ml-hosts-more").innerText(), /\+1/, "two hosts: +1");
+      await page.evaluate((n) => openMissionAddModal(D().register.find((r) => r.number === n)), `AMATA.${yy}.0054`);
       await page.locator("#modal-mission-add:not(.hidden)").waitFor();
-      assert.deepEqual(await page.locator("#mission-add-host option").allInnerTexts(), ["Map Ta Phut Steel", "Eastern Seaboard Motors"], "it asks which host");
+      assert.deepEqual(await page.locator("#mission-add-host option").allInnerTexts(), ["Nakhon Pathom Steel", "Laem Chabang Assembly"], "it asks which host");
       await page.evaluate(() => closeModal());
-      // the running Rayong mission at two hosts: its latest card asks to be confirmed
-      const latest = await page.evaluate((n) => { const m = [...cloud.data.register].find((r) => r.number === n); return m ? m.hosts : null; }, `RYGTH.${yy}.0107`);
-      assert.deepEqual(latest, ["Siam Auto Parts", "Eastern Seaboard Motors"]);
+      // the running Non-Rayong mission at two hosts: its latest card asks to be confirmed
+      const latest = await page.evaluate((n) => { const m = [...cloud.data.register].find((r) => r.number === n); return m ? m.hosts : null; }, `AMATA.${yy}.0011`);
+      assert.deepEqual(latest, ["Amata Seating", "Laem Chabang Assembly"]);
       // and the board it opens on shows the chip on that mission's card, not on the single-host ones
       await page.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
       assert.equal(await page.locator(".m-host-flag").count(), 1, "one card asks to Confirm host");

@@ -95,8 +95,8 @@ async function step(name, fn) {
     });
 
     await step("the header actions are Edit, Open map and More: at most three", async () => {
-      await p.locator('#hostlist-body tr[data-host="Siam Auto Parts"] td.hl-name .hl-host').click();
-      await waitRecord(p, "Siam Auto Parts");
+      await p.locator('#hostlist-body tr[data-host="Amata Seating"] td.hl-name .hl-host').click();
+      await waitRecord(p, "Amata Seating");
       const ids = await p.locator("#host-modal-acts > button").evaluateAll((bs) => bs.map((b) => b.id));
       assert.deepEqual(ids, ["btn-hr-edit", "btn-hr-map", "btn-hr-more"]);
       await p.locator("#btn-hr-more").click();
@@ -155,7 +155,7 @@ async function step(name, fn) {
     });
 
     await step("the form's footer is pinned: Clear record on the left, Cancel and Save on the right, in view at any scroll", async () => {
-      await p.evaluate(() => openHostRecord("Siam Auto Parts"));
+      await p.evaluate(() => openHostRecord("Amata Seating"));
       await waitRecord(p);
       await p.locator("#btn-hr-edit").click();
       await p.waitForSelector("#form-host:not(.hidden)");
@@ -168,12 +168,12 @@ async function step(name, fn) {
       assert.ok(await p.locator('#form-host label:has-text("Host name") .req').count() === 1, "the required star");
       assert.ok(await p.locator('#form-host label:has-text("Location") .opt').count() === 1, "optional is said on optional fields");
       await p.locator("#btn-host-cancel").click();
-      await waitRecord(p, "Siam Auto Parts");
+      await waitRecord(p, "Amata Seating");
       await p.evaluate(() => closeModal());
     });
 
     await step("More: Archive then Make active change the status pill in the record and the table", async () => {
-      await p.evaluate(() => openHostRecord("Rojana Electronics"));
+      await p.evaluate(() => openHostRecord("Nong Khae Electronics"));
       await waitRecord(p);
       await p.locator("#btn-hr-more").click();
       await p.locator("#btn-hr-archive").click();
@@ -186,14 +186,14 @@ async function step(name, fn) {
     });
 
     await step("More: Merge into another host… opens the form with the Merge section open; Cancel comes back", async () => {
-      await p.evaluate(() => openHostRecord("Bowin Glass"));
+      await p.evaluate(() => openHostRecord("Pluak Daeng Plastics"));
       await waitRecord(p);
       await p.locator("#btn-hr-more").click();
       await p.locator("#btn-hr-merge").click();
       await p.waitForSelector("#form-host:not(.hidden)");
       assert.equal(await p.locator("#host-merge[open]").count(), 1);
       await p.locator("#btn-host-cancel").click();
-      await waitRecord(p, "Bowin Glass");
+      await waitRecord(p, "Pluak Daeng Plastics");
     });
 
     await step("More: Clear record… asks first; Cancel leaves the record where it was", async () => {
@@ -201,17 +201,17 @@ async function step(name, fn) {
       await p.locator("#btn-hr-clear").click();
       await p.waitForSelector("#modal-confirm:not(.hidden)");
       await p.locator("#btn-confirm-no").click();
-      await waitRecord(p, "Bowin Glass");
+      await waitRecord(p, "Pluak Daeng Plastics");
       await p.evaluate(() => closeModal());
     });
 
     await step("a ⋯ → Open and a double click open the record; + Add opens the form on its field", async () => {
-      await p.locator('#hostlist-body tr[data-host="Siam Auto Parts"] .lt-dots').click();
+      await p.locator('#hostlist-body tr[data-host="Amata Seating"] .lt-dots').click();
       await p.locator("#context-menu .ctx-item", { hasText: /^Open$/ }).click();
-      await waitRecord(p, "Siam Auto Parts");
+      await waitRecord(p, "Amata Seating");
       await p.evaluate(() => closeModal());
-      await p.locator('#hostlist-body tr[data-host="Siam Auto Parts"] td.hl-name').dblclick();
-      await waitRecord(p, "Siam Auto Parts");
+      await p.locator('#hostlist-body tr[data-host="Amata Seating"] td.hl-name').dblclick();
+      await waitRecord(p, "Amata Seating");
       await p.evaluate(() => closeModal());
       await p.locator('#hostlist-body tr[data-host="Hi-Tech Bearings"] .lt-add[data-add="note"]').click({ force: true });
       await p.waitForSelector("#form-host:not(.hidden)");
@@ -267,40 +267,40 @@ async function step(name, fn) {
     });
 
     await step("renaming a host from its record asks first and lands on the renamed record", async () => {
-      await p.evaluate(() => openHostRecord("Rayong Precision"));
-      await waitRecord(p, "Rayong Precision");
+      await p.evaluate(() => openHostRecord("Bang Na Brake Works"));
+      await waitRecord(p, "Bang Na Brake Works");
       await p.locator("#btn-hr-edit").click();
-      await p.fill('#form-host [name="name"]', "Rayong Precision 2");
+      await p.fill('#form-host [name="name"]', "Bang Na Brake Works 2");
       await p.locator('#form-host button[type="submit"]').click();
       await p.waitForSelector("#modal-confirm:not(.hidden)");
       await p.locator("#btn-confirm-yes").click();
-      await waitRecord(p, "Rayong Precision 2");
-      assert.equal(await p.evaluate(() => allHostRows().some((r) => r.name === "Rayong Precision")), false);
+      await waitRecord(p, "Bang Na Brake Works 2");
+      assert.equal(await p.evaluate(() => allHostRows().some((r) => r.name === "Bang Na Brake Works")), false);
       await p.evaluate(() => closeModal());
     });
 
     await step("a change made elsewhere redraws the open record", async () => {
-      await p.evaluate(() => openHostRecord("Pluak Daeng Plastics"));
-      await waitRecord(p, "Pluak Daeng Plastics");
-      await p.evaluate(() => { const r = allHostRows().find((x) => x.name === "Pluak Daeng Plastics"); return cloud.saveHost({ name: r.name, location: r.location, mapUrl: r.mapUrl, areaId: r.area ? r.area.id : "", archived: true, note: "Changed by someone else" }); });
+      await p.evaluate(() => openHostRecord("Rojana Interior Parts"));
+      await waitRecord(p, "Rojana Interior Parts");
+      await p.evaluate(() => { const r = allHostRows().find((x) => x.name === "Rojana Interior Parts"); return cloud.saveHost({ name: r.name, location: r.location, mapUrl: r.mapUrl, areaId: r.area ? r.area.id : "", archived: true, note: "Changed by someone else" }); });
       await p.waitForFunction(() => /Archived/.test(document.querySelector("#host-modal-status").textContent) && /Changed by someone else/.test(document.querySelector("#host-detail").textContent), null, { timeout: 8000 });
       await p.evaluate(() => closeModal());
     });
 
     await step("the experienced-days setting changes the record's Experienced number", async () => {
-      const before = await p.evaluate(async () => { await openHostRecord("Siam Auto Parts"); return null; });
-      await waitRecord(p, "Siam Auto Parts");
+      const before = await p.evaluate(async () => { await openHostRecord("Amata Seating"); return null; });
+      await waitRecord(p, "Amata Seating");
       const at = async () => Number(await p.locator("#host-detail .ov-htile").first().locator(".ov-htile-value").innerText());
       const first = await at();
       const sub = (await p.locator("#host-detail .ov-htile").first().innerText());
       assert.match(sub, /5 days or more/);
       await p.evaluate(() => closeModal());
-      await p.evaluate(() => { D().settings = { ...(D().settings || {}), hostExperiencedDays: 365 }; return openHostRecord("Siam Auto Parts"); });
+      await p.evaluate(() => { D().settings = { ...(D().settings || {}), hostExperiencedDays: 365 }; return openHostRecord("Amata Seating"); });
       await waitRecord(p);
       const strict = await at();
       assert.ok(strict < first || first === 0, `with 365 days the count falls (${first} -> ${strict})`);
       assert.match(await p.locator("#host-detail .ov-htile").first().innerText(), /365 days or more/);
-      await p.evaluate(() => { D().settings = { ...(D().settings || {}), hostExperiencedDays: 1 }; return renderHostRecord("Siam Auto Parts"); });
+      await p.evaluate(() => { D().settings = { ...(D().settings || {}), hostExperiencedDays: 1 }; return renderHostRecord("Amata Seating"); });
       assert.ok(await at() >= first, "with 1 day the count does not fall");
       await p.evaluate(() => closeModal());
       assert.equal(before, null);
@@ -310,7 +310,7 @@ async function step(name, fn) {
       await p.evaluate(() => I18N.setLang("th"));
       await p.waitForTimeout(300);
       const before = await p.evaluate(() => I18N.missing());
-      for (const n of ["Siam Auto Parts", "Hi-Tech Bearings", "Bowin Glass"]) {
+      for (const n of ["Amata Seating", "Hi-Tech Bearings", "Pluak Daeng Plastics"]) {
         await p.evaluate((x) => openHostRecord(x), n);
         await waitRecord(p, n);
         await p.locator("#btn-hr-more").click();
@@ -338,7 +338,7 @@ async function step(name, fn) {
       assert.ok(ids.every((i) => i === "btn-hr-map"), "only Open map: " + ids);
       await v.page.evaluate(() => closeModal());
       // the form cannot be forced open either
-      await v.page.evaluate(() => openHostModal("Siam Auto Parts"));
+      await v.page.evaluate(() => openHostModal("Amata Seating"));
       assert.equal(await v.page.locator("#modal-host:not(.hidden)").count(), 0);
       assert.deepEqual(v.errors, []);
     });
@@ -349,8 +349,8 @@ async function step(name, fn) {
     await step("phone (390 px): the record is full screen and nothing scrolls sideways", async () => {
       const q = ph.page;
       await goHosts(q);
-      await q.evaluate(() => openHostRecord("Siam Auto Parts"));
-      await waitRecord(q, "Siam Auto Parts");
+      await q.evaluate(() => openHostRecord("Amata Seating"));
+      await waitRecord(q, "Amata Seating");
       await q.waitForSelector("#host-detail .hr-missions .hr-mission");
       const m = await q.evaluate(() => {
         const el = document.querySelector("#modal-host"), body = document.querySelector("#host-detail");

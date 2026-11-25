@@ -20,30 +20,35 @@ const YY = TODAY.slice(2, 4), LY = String(+TODAY.slice(0, 4) - 1).slice(2);   //
 const NEXT = nextWorking(TODAY);          // the confirmed day the board opens on
 const FORECAST = nextWorking(NEXT);       // first forecast day
 
-const AREAS = [
-  { id: "a-insp", name: "Inspection", color: "#7fb8ec" },
-  { id: "a-rework", name: "Rework", color: "#f6a06b" },
-  { id: "a-sort", name: "Sorting", color: "#a8d98a" },
-  { id: "a-res", name: "Resident", color: "#c9a0e8" },
+const AREAS = [   // service areas are places (industrial estates and regions), as on the real boards
+  { id: "a-insp", name: "AMATA", color: "#9fb6cc" },
+  { id: "a-rework", name: "AYT", color: "#a9d18e" },
+  { id: "a-sort", name: "NPT", color: "#f0d36a" },
+  { id: "a-res", name: "LCB", color: "#f3a7c2" },
+  { id: "a-esie", name: "ESIE", color: "#8fc0ec" },
+  { id: "a-srb", name: "SRB", color: "#f5c48a" },
 ];
 
 const BOARDS = [
-  { id: "b1", name: "Rayong", weekend_days: [0, 6] },
-  { id: "b2", name: "Chonburi", weekend_days: [0, 6] },
-  { id: "b3", name: "Ayutthaya", weekend_days: [0, 6] },
+  { id: "b1", name: "Non-Rayong", weekend_days: [0, 6] },
+  { id: "b2", name: "Rayong", weekend_days: [0, 6] },
+  { id: "b3", name: "Saraburi", weekend_days: [0, 6] },
 ];
 
 const maps = (q) => "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(q);
 const HOSTS = [
-  { name: "Siam Auto Parts", location: "Pluak Daeng, Rayong", area_id: "a-insp", note: "Gate 2, ask for the QC office" },
-  { name: "Rayong Precision", location: "Nikhom Phatthana, Rayong", area_id: "a-rework", note: "Safety shoes and glasses" },
-  { name: "Eastern Seaboard Motors", location: "Pluak Daeng, Rayong", area_id: "a-insp", note: "" },
-  { name: "Pluak Daeng Plastics", location: "Pluak Daeng, Rayong", area_id: "a-sort", note: "Badge at main gate" },
-  { name: "Map Ta Phut Steel", location: "Map Ta Phut, Rayong", area_id: "a-rework", note: "" },
-  { name: "Laem Chabang Logistics", location: "Laem Chabang, Chonburi", area_id: "a-sort", note: "Warehouse 4" },
-  { name: "Amata Components", location: "Amata City, Chonburi", area_id: "a-res", note: "Resident office, 2nd floor" },
-  { name: "Bowin Glass", location: "Bowin, Chonburi", area_id: "a-insp", note: "" },
-  { name: "Rojana Electronics", location: "Rojana, Ayutthaya", area_id: "a-insp", note: "ESD smock provided" },
+  // Non-Non-Rayong
+  { name: "Amata Seating", location: "Amata City, Chonburi", area_id: "a-insp", note: "Gate 2, ask for the QC office" },
+  { name: "Bang Na Brake Works", location: "Bang Phli, Samut Prakan", area_id: "a-sort", note: "Badge at gate 3" },
+  { name: "Laem Chabang Assembly", location: "Laem Chabang, Chonburi", area_id: "a-res", note: "" },
+  { name: "Rojana Interior Parts", location: "Rojana, Ayutthaya", area_id: "a-rework", note: "Badge at main gate" },
+  { name: "Nakhon Pathom Steel", location: "Sam Phran, Nakhon Pathom", area_id: "a-sort", note: "" },
+  // Non-Rayong
+  { name: "Map Ta Phut Logistics", location: "Map Ta Phut, Rayong", area_id: "a-esie", note: "Warehouse 4" },
+  { name: "Eastern Seaboard Motors", location: "Pluak Daeng, Rayong", area_id: "a-esie", note: "Resident office, 2nd floor" },
+  { name: "Pluak Daeng Plastics", location: "Pluak Daeng, Rayong", area_id: "a-esie", note: "" },
+  // Saraburi
+  { name: "Nong Khae Electronics", location: "Nong Khae, Saraburi", area_id: "a-srb", note: "ESD smock provided" },
   { name: "Hi-Tech Bearings", location: "", area_id: "", note: "" },   // no location yet: shows in the Host list as missing one
 ].map((h, i) => ({ id: "h" + (i + 1), ...h, map_url: h.location ? maps(h.name + " " + h.location) : "", archived: false }));
 
@@ -68,7 +73,8 @@ const NAMES = [
 /* who sits on which board, and which of them are on call */
 const ROSTER = { b1: 26, b2: 10, b3: 6 };
 const ONCALL = { b1: 4, b2: 1, b3: 1 };
-const AREA_CYCLE = ["a-insp", "a-insp", "a-rework", "a-sort", "a-res"];
+/* home service area by board: Non-Non-Rayong people spread over its four areas */
+const AREA_CYCLE = { b1: ["a-insp", "a-rework", "a-sort", "a-res"], b2: ["a-esie"], b3: ["a-srb"] };
 
 function employees() {
   const out = [];
@@ -80,9 +86,9 @@ function employees() {
       const years = (n * 7) % 9;
       out.push({
         id: "e" + (n + 1), name_th: th1 + " " + th2, name_en: en1 + " " + en2, trigo_id: "T" + (210 + n * 3),
-        contract: oncall ? "oncall" : "permanent", position: oncall ? "" : (i % 7 === 0 ? "Team Leader" : "Inspector"),
+        contract: oncall ? "oncall" : "permanent", position: oncall ? "" : (i % 8 === 0 ? "team_leader" : i % 5 === 2 ? "senior_inspector" : i % 9 === 4 ? "technician" : "inspector"),
         phone: "080-555-" + String(1000 + n * 17).slice(-4), start_date: years ? `${2026 - years}-0${(n % 9) + 1}-15` : null,
-        area_id: AREA_CYCLE[n % AREA_CYCLE.length], board_id: b.id, active: true,
+        area_id: AREA_CYCLE[b.id][i % AREA_CYCLE[b.id].length], board_id: b.id, active: true,
       });
       n++;
     }
@@ -113,33 +119,33 @@ const ENGINEERS = [
 
 /* number, host, customer, shift, engineer, crew size, PPE */
 /* Mission numbers in Etraq's form (PREFIX.YY.NNNN), except two typed wrongly before the rule was strict
-   ("RYGTH.YY.104", three digits, and "203"): their cards and Missions rows carry the Wrong number flag. */
+   ("BANGN.YY.104", three digits, and "203"): their cards and Missions rows carry the Wrong number flag. */
 const N = (prefix, n) => `${prefix}.${YY}.${n}`;
 const MISSIONS = {
   b1: [
-    [N("RYGTH", "0101"), "Siam Auto Parts", "Tier-1 Seating", "day", "eng-1", 4, "Gloves"],
-    [N("RYGTH", "0102"), "Rayong Precision", "Brake Systems Ltd.", "day", "eng-2", 3, ""],
-    [N("RYGTH", "0103"), "Eastern Seaboard Motors", "EV Battery Co.", "night", "eng-1", 3, "Reflective vest"],
-    [N("RYGTH", "104"), "Pluak Daeng Plastics", "Interior Trim Co.", "day", "eng-3", 4, ""],
-    [N("RYGTH", "0105"), "Map Ta Phut Steel", "Chassis Works", "day", "eng-2", 2, "Helmet"],
-    [N("RYGTH", "0106"), "Rayong Precision", "Brake Systems Ltd.", "night", "eng-3", 2, ""],
-    [N("RYGTH", "0107"), "Siam Auto Parts", "Door Module Co.", "day", "eng-1", 0, ""],
+    [N("AMATA", "0004"), "Amata Seating", "Tier-1 Seating", "day", "eng-1", 4, "Safety shoes, glasses, gloves"],
+    [N("BANGN", "0007"), "Bang Na Brake Works", "Brake Systems Ltd.", "day", "eng-2", 3, "Safety shoes, glasses"],
+    [N("LCBTH", "0001"), "Laem Chabang Assembly", "EV Battery Co.", "night", "eng-1", 3, "Safety shoes, reflective vest"],
+    [N("BANGN", "104"), "Rojana Interior Parts", "Interior Trim Co.", "day", "eng-3", 4, "Safety shoes, glasses"],
+    [N("BANGN", "0030"), "Nakhon Pathom Steel", "Chassis Works", "day", "eng-2", 2, "Safety shoes, helmet, earplugs"],
+    [N("BANGN", "0008"), "Bang Na Brake Works", "Brake Systems Ltd.", "night", "eng-3", 2, "Safety shoes, glasses"],
+    [N("AMATA", "0011"), "Amata Seating", "Door Module Co.", "day", "eng-1", 0, "Safety shoes, glasses"],
   ],
   b2: [
-    [N("CHBTH", "0201"), "Laem Chabang Logistics", "Export Packing Co.", "day", "eng-2", 4, ""],
-    [N("CHBTH", "0202"), "Amata Components", "Wiring Harness Co.", "day", "eng-3", 3, ""],
-    ["203", "Bowin Glass", "Glazing Partners", "night", "eng-2", 2, ""],
+    [N("RYGTH", "0201"), "Map Ta Phut Logistics", "Export Packing Co.", "day", "eng-2", 4, "Safety shoes, glasses"],
+    [N("RYGTH", "0202"), "Eastern Seaboard Motors", "Wiring Harness Co.", "day", "eng-3", 3, "Safety shoes, glasses"],
+    ["203", "Pluak Daeng Plastics", "Glazing Partners", "night", "eng-2", 2, "Safety shoes, glasses"],
   ],
   b3: [
-    [N("AYTTH", "0301"), "Rojana Electronics", "Sensor Tech", "day", "eng-3", 3, ""],
+    [N("SRBTH", "0301"), "Nong Khae Electronics", "Sensor Tech", "day", "eng-3", 3, "Safety shoes, glasses"],
     // a mission number in Etraq's form, renumbered for this year three days ago (see seed():
     // the card shows "New number · was …" for two weeks)
-    [`AYTTH.${YY}.0302`, "Hi-Tech Bearings", "Motion Parts", "day", "eng-1", 2, ""],
+    [`SRBTH.${YY}.0302`, "Hi-Tech Bearings", "Motion Parts", "day", "eng-1", 2, "Safety shoes, glasses"],
   ],
 };
 const TIMES = { day: ["08:00:00", "17:00:00"], night: ["20:00:00", "05:00:00"] };
 /* a remark on a few missions, so the Missions tab's Remark column has something to show */
-const REMARKS = { [N("RYGTH", "0107")]: "Waiting for the customer's PO before the crew is booked", "203": "Night crew enters by gate 2", [N("AYTTH", "0301")]: "Sorting and rework of door seals" };
+const REMARKS = { [N("AMATA", "0011")]: "Waiting for the customer's PO before the crew is booked", "203": "Night crew enters by gate 2", [N("SRBTH", "0301")]: "Sorting and rework of door seals" };
 const LEAVE_PATTERN = ["annual", "sick", "business"];
 
 /* One day's plan for one board: missions plus who goes where. `k` rotates the
@@ -164,7 +170,7 @@ function dayPlan(board, date, k, emps, { loanOut } = {}) {
     const size = short && crew > 2 ? crew - 1 : crew;
     const first = w;
     for (let i = 0; i < size && w < workers.length; i++) assignments.push({ employee_id: workers[w++].id, plan_date: date, mission_id: id, zone: null });
-    // the head of the crew (right-click → Make Leader): on Rayong, every other mission
+    // the head of the crew (right-click → Make Leader): on Non-Rayong, every other mission
     // with two or more people, so the board shows missions with a head and without one
     if (board === "b1" && w - first >= 2 && missions.length % 2 === 1) missions[missions.length - 1].lead_employee_id = workers[first].id;
   }
@@ -226,58 +232,58 @@ function seed(db) {
       }
     }
   });
-  // the Missions tab: a Chonburi job that ran for the first two weeks of the history and was
+  // the Missions tab: a Rayong job that ran for the first two weeks of the history and was
   // closed on its last day (the register rows are made by the database as the days are saved)
   const ended = days.slice(0, 10);
   for (const date of ended) {
-    missions.push({ id: `m-b2-209-${date}`, board_id: "b2", plan_date: date, number: N("CHBTH", "0209"), host: "Amata Components", customer: "Seat Belt Co.",
+    missions.push({ id: `m-b2-209-${date}`, board_id: "b2", plan_date: date, number: N("RYGTH", "0209"), host: "Eastern Seaboard Motors", customer: "Seat Belt Co.",
       shift: "day", start_time: TIMES.day[0], end_time: TIMES.day[1], engineer_id: "eng-3", ppe: null, remark: null, hidden: false });
   }
-  // ...a Chonburi job that was running and has been hidden on the board for its last ten days, so it is
+  // ...a Rayong job that was running and has been hidden on the board for its last ten days, so it is
   // open but on no board (Status: Hidden, with a pill suggesting Close)...
   const mk = (id, board, num, host, customer, eng, date, hidden) => ({ id: `${id}-${date}`, board_id: board, plan_date: date, number: num, host, customer,
     shift: "day", start_time: TIMES.day[0], end_time: TIMES.day[1], engineer_id: eng, ppe: null, remark: null, hidden });
-  days.forEach((date, i) => missions.push(mk("m-b2-204", "b2", N("CHBTH", "0204"), "Amata Components", "Cable Assembly Co.", "eng-3", date, i >= days.length - 10)));
-  // ...an Ayutthaya job that stopped being planned nine working days ago (Status: Off the board, with Add to board)
-  days.slice(0, days.length - 9).forEach((date) => missions.push(mk("m-b3-303", "b3", N("AYTTH", "0303"), "Rojana Electronics", "Optic Parts Ltd.", "eng-1", date, false)));
-  // ...two jobs started before Etraq had a number for them (temporary numbers, PREFIX.YY.TMPNNN): a Rayong one
-  // made five days ago, flagged red from its third day, and a Chonburi one made today for the next working day
+  days.forEach((date, i) => missions.push(mk("m-b2-204", "b2", N("RYGTH", "0204"), "Eastern Seaboard Motors", "Cable Assembly Co.", "eng-3", date, i >= days.length - 10)));
+  // ...an Saraburi job that stopped being planned nine working days ago (Status: Off the board, with Add to board)
+  days.slice(0, days.length - 9).forEach((date) => missions.push(mk("m-b3-303", "b3", N("SRBTH", "0303"), "Nong Khae Electronics", "Optic Parts Ltd.", "eng-1", date, false)));
+  // ...two jobs started before Etraq had a number for them (temporary numbers, PREFIX.YY.TMPNNN): a Non-Rayong one
+  // made five days ago, flagged red from its third day, and a Rayong one made today for the next working day
   const tempDays = days.filter((x) => x >= addDays(TODAY, -5));
-  tempDays.forEach((date) => missions.push(mk("m-b1-tmp1", "b1", N("RYGTH", "TMP001"), "Pluak Daeng Plastics", "Bumper Line Co.", "eng-2", date, false)));
-  missions.push(mk("m-b2-tmp1", "b2", N("CHBTH", "TMP001"), "Laem Chabang Logistics", "Pallet Repair Co.", "eng-3", NEXT, false));
+  tempDays.forEach((date) => missions.push(mk("m-b1-tmp1", "b1", N("AMATA", "TMP001"), "Rojana Interior Parts", "Bumper Line Co.", "eng-2", date, false)));
+  missions.push(mk("m-b2-tmp1", "b2", N("RYGTH", "TMP001"), "Map Ta Phut Logistics", "Pallet Repair Co.", "eng-3", NEXT, false));
   db.seed("missions", missions);
   // ...and a mission registered in Bulk edit that has no day on a board yet (Status: Not started)
-  db.seed("mission_register", [{ board_id: "b1", number: N("RYGTH", "0108"), shift: "day", source: "list", status: "open", host: "Map Ta Phut Steel", customer: "Gear Works Ltd.", engineer_id: "eng-2", updated_by: ME.email }]);
+  db.seed("mission_register", [{ board_id: "b1", number: N("AMATA", "0054"), shift: "day", source: "list", status: "open", host: "Nakhon Pathom Steel", customer: "Gear Works Ltd.", engineer_id: "eng-2", updated_by: ME.email }]);
   // ...two missions at several hosts (one customer, several hosts): the registered job above is also done at Eastern Seaboard
-  // Motors (Add to board asks which host), and a running Rayong one is also at Eastern Seaboard Motors, its latest card still asking
+  // Motors (Add to board asks which host), and a running Non-Rayong one is also at Eastern Seaboard Motors, its latest card still asking
   // to be confirmed ("Confirm host", as after a carry over)
   const manyHosts = (num, hosts) => { const r = db.t("mission_register").find((x) => x.board_id === "b1" && x.number === num); if (r) r.hosts = hosts; return r; };
-  manyHosts(N("RYGTH", "0108"), ["Map Ta Phut Steel", "Eastern Seaboard Motors"]);
-  if (manyHosts(N("RYGTH", "0107"), ["Siam Auto Parts", "Eastern Seaboard Motors"])) {
-    const last = db.t("missions").filter((m) => m.board_id === "b1" && m.number === N("RYGTH", "0107")).sort((a, b) => (a.plan_date < b.plan_date ? 1 : -1))[0];
+  manyHosts(N("AMATA", "0054"), ["Nakhon Pathom Steel", "Laem Chabang Assembly"]);
+  if (manyHosts(N("AMATA", "0011"), ["Amata Seating", "Laem Chabang Assembly"])) {
+    const last = db.t("missions").filter((m) => m.board_id === "b1" && m.number === N("AMATA", "0011")).sort((a, b) => (a.plan_date < b.plan_date ? 1 : -1))[0];
     if (last) last.host_unconfirmed = true;
   }
-  // ...and a Rayong job that ended in December of last year: off the list until "from earlier years" is on
+  // ...and a Non-Rayong job that ended in December of last year: off the list until "from earlier years" is on
   const LAST = String(+TODAY.slice(0, 4) - 1);
-  db.seed("mission_register", [{ board_id: "b1", number: `RAYTH.${LY}.0091`, shift: "day", source: "list", status: "closed", host: "Rayong Precision", customer: "Brake Systems Ltd.",
+  db.seed("mission_register", [{ board_id: "b1", number: `AMATA.${LY}.0091`, shift: "day", source: "list", status: "closed", host: "Bang Na Brake Works", customer: "Brake Systems Ltd.",
     engineer_id: "eng-2", opened_on: `${LAST}-09-01`, last_on: `${LAST}-12-18`, closed_on: `${LAST}-12-18`, closed_by: PROFILES[3].email, closed_at: `${LAST}-12-18T10:00:00.000Z`,
     close_note: "Contract ended", updated_by: ME.email }]);
-  const closed = db.t("mission_register").find((r) => r.board_id === "b2" && r.number === N("CHBTH", "0209"));
+  const closed = db.t("mission_register").find((r) => r.board_id === "b2" && r.number === N("RYGTH", "0209"));
   if (closed) Object.assign(closed, { status: "closed", closed_on: ended[ended.length - 1], closed_by: PROFILES[3].email, closed_at: new Date().toISOString(), close_note: "Contract ended" });
-  // ...and the new-year number of Ayutthaya's bearing job, entered three days ago
-  db.seed("mission_number_history", [{ id: "mnh-1", old_number: `AYTTH.${LY}.0157`, new_number: `AYTTH.${YY}.0302`, valid_from: TODAY.slice(0, 4) + "-01-01",
+  // ...and the new-year number of Saraburi's bearing job, entered three days ago
+  db.seed("mission_number_history", [{ id: "mnh-1", old_number: `SRBTH.${LY}.0157`, new_number: `SRBTH.${YY}.0302`, valid_from: TODAY.slice(0, 4) + "-01-01",
     entered_by: "ploy.s@trigo-group.com", entered_at: new Date(Date.now() - 3 * 86400e3).toISOString() }]);
   db.seed("assignments", assignments);
   db.seed("deployment_history", history);
-  db.seed("employee_loans", [{ id: "loan-1", employee_id: LOANED, to_board_id: "b2", start_date: TODAY, end_date: addDays(NEXT, 2), note: "Extra sorting at Laem Chabang", created_by: ME.email }]);
+  db.seed("employee_loans", [{ id: "loan-1", employee_id: LOANED, to_board_id: "b2", start_date: TODAY, end_date: addDays(NEXT, 2), note: "Extra sorting at Map Ta Phut", created_by: ME.email }]);
 
-  // the first forecast day on Rayong, held by Somchai
+  // the first forecast day on Non-Rayong, held by Somchai
   const fc = dayPlan("b1", FORECAST, 3, emps, { loanOut: LOANED });
   const fmap = {};
   // the temporary number's three days count from when it was first registered
-  const temp = db.t("mission_register").find((r) => r.number === N("RYGTH", "TMP001"));
+  const temp = db.t("mission_register").find((r) => r.number === N("AMATA", "TMP001"));
   if (temp) temp.created_at = new Date(Date.now() - 5 * 86400e3).toISOString();
-  db.seed("forecast_missions", fc.missions.filter((m) => m.number !== N("RYGTH", "0107")).map((m) => {
+  db.seed("forecast_missions", fc.missions.filter((m) => m.number !== N("AMATA", "0011")).map((m) => {
     const id = m.id.replace("m-", "f-"); fmap[m.id] = id;
     return { id, board_id: m.board_id, plan_date: m.plan_date, number: m.number, host: m.host, customer: m.customer, shift: m.shift, start_time: m.start_time, end_time: m.end_time, engineer_id: m.engineer_id, created_by: PROFILES[1].email };
   }));
@@ -287,7 +293,7 @@ function seed(db) {
 
   // Capacity needs no rows of its own: the tab reads the boards above, and a visitor's
   // requests stay in their own browser.
-  // "my part is planned": on Rayong's next working day Somchai has ticked his part, the others not yet
+  // "my part is planned": on Non-Rayong's next working day Somchai has ticked his part, the others not yet
   db.seed("plan_day_ready", [{ board_id: "b1", plan_date: NEXT, engineer_id: "eng-1", ticked_by: PROFILES[1].email,
     ticked_at: new Date(Date.now() - 40 * 60e3).toISOString() }]);
   return { emps };
