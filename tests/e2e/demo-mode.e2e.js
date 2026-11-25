@@ -90,7 +90,7 @@ async function step(name, fn) {
       await page.fill("#form-mission [name=number]", `RYGTH.${String(new Date().getFullYear()).slice(2)}.0999`);
       await page.fill("#form-mission [name=host]", "Siam Auto Parts");
       await page.fill("#form-mission [name=customer]", "Training Customer");
-      await page.fill("#form-mission [name=engineer]", "Somchai.P");
+      await page.fill("#form-mission [name=engineer]", "Narin.K");
       await page.click("#form-mission button[type=submit]");   // the DEMO strip must not sit over Save
       await page.locator("#modal-mission.hidden").waitFor({ state: "attached" });
       await page.locator(".mission-card", { hasText: "Training Customer" }).first().waitFor();
@@ -106,11 +106,11 @@ async function step(name, fn) {
       assert.equal(await page.evaluate(() => window.__demo.role), "siteadmin");
       await page.evaluate(() => { D().activeBoardId = MISSIONS_ID; return refreshAndRender(); });
       await page.locator("#missions-panel:not(.hidden)").waitFor();
-      const yy = String(new Date().getFullYear()).slice(2), ly = String(new Date().getFullYear() - 1).slice(2);
-      assert.match(await page.locator("#missions-body").innerText(), new RegExp(`AYTTH\\.${yy}\\.0302`));
-      assert.match(await page.locator("#missions-body tr", { hasText: `AYTTH.${yy}.0302` }).locator("td.ml-first .lt-c").getAttribute("title"), new RegExp(`was AYTTH\\.${ly}\\.0157`), "the old number is the tooltip of the new one");
+      const yy = String(new Date().getFullYear()).slice(2);
+      assert.match(await page.locator("#missions-body").innerText(), new RegExp(`AMATA\\.${yy}\\.0056`));
+      assert.match(await page.locator("#missions-body tr", { hasText: `AMATA.${yy}.0056` }).locator("td.ml-first .lt-c").getAttribute("title"), new RegExp(`was AMATA\\.${yy}\\.TMP002`), "the old number is the tooltip of the new one");
       await page.selectOption("#missions-status", "closed");
-      assert.match(await page.locator("#missions-body").innerText(), /209[\s\S]*Closed/);
+      assert.match(await page.locator("#missions-body").innerText(), /0090[\s\S]*Closed/);
       assert.equal(await page.locator("#btn-new-mission").isVisible(), false, "the board is view-only for a Site Admin");
       await ctx.close();
     });
@@ -130,7 +130,7 @@ async function step(name, fn) {
       const latest = await page.evaluate((n) => { const m = [...cloud.data.register].find((r) => r.number === n); return m ? m.hosts : null; }, `RYGTH.${yy}.0107`);
       assert.deepEqual(latest, ["Siam Auto Parts", "Eastern Seaboard Motors"]);
       // and the board it opens on shows the chip on that mission's card, not on the single-host ones
-      await page.evaluate(() => { D().activeBoardId = "b1"; return refreshAndRender(); });
+      await page.evaluate(() => { D().activeBoardId = "b2"; return refreshAndRender(); });
       assert.equal(await page.locator(".m-host-flag").count(), 1, "one card asks to Confirm host");
       assert.match(await page.locator(".m-host-flag").innerText(), /confirm host/i);
       await ctx.close();

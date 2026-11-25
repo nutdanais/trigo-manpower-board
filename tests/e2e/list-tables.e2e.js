@@ -105,7 +105,7 @@ const TABS = {
       await go(p, "emplist");
       assert.equal(await p.locator("#emplist-body .toggle, #emplist-body .el-status input").count(), 0, "no switch in the table");
       // someone without a TRIGO ID and a service area, active: an amber alert on line 2 of the Status cell
-      await p.evaluate(() => { const e = D().employees.find((x) => x.active !== false); e.trigoId = ""; e.areaId = null; window.__e = e.id; return refreshAndRender(); });
+      await p.evaluate(() => { const e = D().employees.find((x) => x.active !== false && x.contract === "permanent"); e.trigoId = ""; e.areaId = null; window.__e = e.id; return refreshAndRender(); });
       const tr = p.locator("#emplist-body tr").filter({ has: p.locator(".lt-name") }).first();
       const row = p.locator(`#emplist-body tr[data-emp-id="${await p.evaluate(() => window.__e)}"]`);
       const al = row.locator("td.el-status .lt-l2 .lt-al");
@@ -193,7 +193,7 @@ const TABS = {
 
     await step("Host: the bulk bar archives and reactivates the ticked hosts; the ⋯ menu has Edit, Open map, Archive", async () => {
       await go(p, "hostlist");
-      const names = await p.locator("#hostlist-body tr").evaluateAll((trs) => trs.slice(0, 2).map((t) => t.dataset.host));
+      const names = await p.locator("#hostlist-body tr").evaluateAll((trs) => trs.map((t) => t.dataset.host).filter((n) => n !== "Alpha Industry").slice(0, 2));   // Alpha Industry has no location, so no map to open
       for (const n of names) await p.locator(`#hostlist-body tr[data-host="${n}"] .el-check input`).check();
       assert.equal(await p.locator("#hostlist-bulkbar").isVisible(), true);
       assert.match(await p.locator("#hostlist-bulk-count").innerText(), /2 selected/);
