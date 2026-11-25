@@ -133,24 +133,24 @@ async function step(name, fn) {
     });
 
     await step("No location: the alert box offers + Add location, which opens the form on Location; Cancel and Save come back", async () => {
-      await p.evaluate(() => openHostRecord("Hi-Tech Bearings"));
-      await waitRecord(p, "Hi-Tech Bearings");
+      await p.evaluate(() => openHostRecord("Alpha Industry"));
+      await waitRecord(p, "Alpha Industry");
       assert.match(await p.locator("#host-detail .rp-alert .lt-al-warn").first().innerText(), /No location/);
       assert.equal(await p.locator("#btn-hr-map").count(), 0, "no map to open");
       await p.locator("#host-detail .rp-al-fix", { hasText: "+ Add location" }).click();
       await p.waitForSelector("#form-host:not(.hidden)");
       assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.name), "location", "the cursor is on Location");
-      assert.equal((await p.locator("#host-modal-title").innerText()).trim(), "Hi-Tech Bearings", "same header in the form");
+      assert.equal((await p.locator("#host-modal-title").innerText()).trim(), "Alpha Industry", "same header in the form");
       assert.equal(await p.locator("#host-modal-acts:not(.hidden)").count(), 0, "no action row in the form");
       await p.locator("#btn-host-cancel").click();
-      await waitRecord(p, "Hi-Tech Bearings");
+      await waitRecord(p, "Alpha Industry");
       await p.locator("#btn-hr-edit").click();
       await p.fill('#form-host [name="location"]', "Bang Pakong, Chachoengsao");
       await p.locator('#form-host button[type="submit"]').click();
-      await waitRecord(p, "Hi-Tech Bearings");
+      await waitRecord(p, "Alpha Industry");
       assert.match(await p.locator("#host-detail .rp-dl").innerText(), /Bang Pakong, Chachoengsao/);
       assert.equal(await p.locator("#host-detail .rp-alert .lt-al-warn", { hasText: "No location" }).count(), 0, "the alert is gone once it has a location");
-      assert.equal(await p.locator("#hostlist-body tr[data-host=\"Hi-Tech Bearings\"] .lt-al-warn").count(), 0);
+      assert.equal(await p.locator("#hostlist-body tr[data-host=\"Alpha Industry\"] .lt-al-warn").count(), 0);
       await p.evaluate(() => closeModal());
     });
 
@@ -173,7 +173,7 @@ async function step(name, fn) {
     });
 
     await step("More: Archive then Make active change the status pill in the record and the table", async () => {
-      await p.evaluate(() => openHostRecord("Rojana Electronics"));
+      await p.evaluate(() => openHostRecord("Hirota and Sumida"));
       await waitRecord(p);
       await p.locator("#btn-hr-more").click();
       await p.locator("#btn-hr-archive").click();
@@ -186,14 +186,14 @@ async function step(name, fn) {
     });
 
     await step("More: Merge into another host… opens the form with the Merge section open; Cancel comes back", async () => {
-      await p.evaluate(() => openHostRecord("Bowin Glass"));
+      await p.evaluate(() => openHostRecord("Sakuda"));
       await waitRecord(p);
       await p.locator("#btn-hr-more").click();
       await p.locator("#btn-hr-merge").click();
       await p.waitForSelector("#form-host:not(.hidden)");
       assert.equal(await p.locator("#host-merge[open]").count(), 1);
       await p.locator("#btn-host-cancel").click();
-      await waitRecord(p, "Bowin Glass");
+      await waitRecord(p, "Sakuda");
     });
 
     await step("More: Clear record… asks first; Cancel leaves the record where it was", async () => {
@@ -201,7 +201,7 @@ async function step(name, fn) {
       await p.locator("#btn-hr-clear").click();
       await p.waitForSelector("#modal-confirm:not(.hidden)");
       await p.locator("#btn-confirm-no").click();
-      await waitRecord(p, "Bowin Glass");
+      await waitRecord(p, "Sakuda");
       await p.evaluate(() => closeModal());
     });
 
@@ -213,11 +213,11 @@ async function step(name, fn) {
       await p.locator('#hostlist-body tr[data-host="Siam Auto Parts"] td.hl-name').dblclick();
       await waitRecord(p, "Siam Auto Parts");
       await p.evaluate(() => closeModal());
-      await p.locator('#hostlist-body tr[data-host="Hi-Tech Bearings"] .lt-add[data-add="note"]').click({ force: true });
+      await p.locator('#hostlist-body tr[data-host="Alpha Industry"] .lt-add[data-add="note"]').click({ force: true });
       await p.waitForSelector("#form-host:not(.hidden)");
       assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.name), "note");
       await p.locator("#btn-host-cancel").click();
-      await waitRecord(p, "Hi-Tech Bearings");
+      await waitRecord(p, "Alpha Industry");
       await p.evaluate(() => closeModal());
     });
 
@@ -310,7 +310,7 @@ async function step(name, fn) {
       await p.evaluate(() => I18N.setLang("th"));
       await p.waitForTimeout(300);
       const before = await p.evaluate(() => I18N.missing());
-      for (const n of ["Siam Auto Parts", "Hi-Tech Bearings", "Bowin Glass"]) {
+      for (const n of ["Siam Auto Parts", "Alpha Industry", "Sakuda"]) {
         await p.evaluate((x) => openHostRecord(x), n);
         await waitRecord(p, n);
         await p.locator("#btn-hr-more").click();
