@@ -38,9 +38,9 @@ test("round trip: the Excel template read straight back changes nothing", async 
 test("editing cells in the Excel template is picked up (dates, text phone, dropdown values)", async () => {
   const wb = await B.buildTemplateWorkbook(ExcelJS, "employees", ctx());
   const ws = wb.getWorksheet("Employees");
-  ws.getCell("G3").value = 812345678;                                // Excel ate the leading zero
-  ws.getCell("H3").value = new Date(Date.UTC(2024, 1, 29));          // a real date cell
-  ws.getCell("K2").value = "Rayong";
+  ws.getCell("H3").value = 812345678;                                // Excel ate the leading zero
+  ws.getCell("I3").value = new Date(Date.UTC(2024, 1, 29));          // a real date cell
+  ws.getCell("L2").value = "Rayong";
   const wb2 = new ExcelJS.Workbook();
   await wb2.xlsx.load(await wb.xlsx.writeBuffer());
   const p = B.planEmployees(B.readTable(B.rowsFromWorkbook(wb2, "employees"), B.EMP_COLUMNS), ctx());

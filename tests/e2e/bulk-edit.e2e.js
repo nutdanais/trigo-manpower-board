@@ -69,9 +69,9 @@ async function writeXlsx(file, sheet, rows2d) {
     // edit: rename, phone, clear a position, move A to Board Two, deactivate someone
     const rA = rowOf("Person A"), rB = rowOf("Person B"), rC = rowOf("Person C");
     ws.getCell(rA, 2).value = "Person A Renamed";
-    ws.getCell(rA, 7).value = "081-000-0000";
-    ws.getCell(rB, 11).value = "Board Two";
-    ws.getCell(rC, 12).value = "Inactive";
+    ws.getCell(rA, 8).value = "081-000-0000";
+    ws.getCell(rB, 12).value = "Board Two";
+    ws.getCell(rC, 13).value = "Inactive";
     const edited = path.join(TMP, "emp-edited.xlsx");
     fs.writeFileSync(edited, Buffer.from(await wb.xlsx.writeBuffer()));
     await p.setInputFiles("#bulk-file", edited);

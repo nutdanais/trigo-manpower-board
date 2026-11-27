@@ -486,7 +486,7 @@ const state = {
   listCols: { emplist: {}, hostlist: {}, missions: {} },   // the Columns button on the three list tabs: what each person switched on or off (loadListColumns)
   emplist: {                  // Manpower List tab: search/filter/sort, independent of any board or date
     search: "",
-    filters: { contract: [], position: [], service: [], areaId: [], boardId: [], status: [] },
+    filters: { contract: [], terms: [], position: [], service: [], areaId: [], boardId: [], status: [] },
     sortKey: "name",
     sortDir: 1,
     issue: null,         // a status chip's narrowing: "trigo" | "area" | "en" (active people missing it), or null
@@ -2365,10 +2365,26 @@ function renderLockButton() {
   }
 }
 
-/* display order for any list of employee cards: permanent before on-call, then by name */
+/* An on-call person's contract terms (employees.oncall_terms, migration-2026-11-27): "daily", "monthly"
+   or "" (not set, or not on-call). Only shown, on the card, the Profile, the Manpower List and the
+   exports; no count or chart reads it (design/oncall-contract-terms-options.html, option A). */
+const ONCALL_TERMS_LABEL = { daily: "Daily", monthly: "Monthly" };
+const ONCALL_TERMS_RANK = { monthly: 0, daily: 1, "": 2 };   // Monthly first, then Daily, then not set
+function oncallTermsOf(e) { return e && e.contract === "oncall" && ONCALL_TERMS_LABEL[e.oncallTerms] ? e.oncallTerms : ""; }
+/* "Permanent", "On-call", "On-call · Daily" or "On-call · Monthly" */
+function contractLabel(e) {
+  if (!e || e.contract !== "oncall") return "Permanent";
+  const t = oncallTermsOf(e);
+  return t ? "On-call · " + ONCALL_TERMS_LABEL[t] : "On-call";
+}
+
+/* display order for any list of employee cards: permanent before on-call, on-call Monthly before
+   Daily before terms not set, then by name */
 function sortEmployeesDisplay(emps) {
   return [...emps].sort((a, b) =>
-    (a.contract === "oncall") - (b.contract === "oncall") || a.name.localeCompare(b.name));
+    (a.contract === "oncall") - (b.contract === "oncall")
+    || ONCALL_TERMS_RANK[oncallTermsOf(a)] - ONCALL_TERMS_RANK[oncallTermsOf(b)]
+    || a.name.localeCompare(b.name));
 }
 
 /* "สมชาย ใจดี" → ["สมชาย", "ใจดี"]; everything after the first space is the surname */
@@ -2419,10 +2435,13 @@ function empCard(emp, opts = {}) {
   const alsoEn = view === "both" && emp.nameEn && emp.nameEn !== emp.name ? emp.nameEn : "";
   const role = emp.contract === "oncall" ? `<span class="emp-oc">OC</span>`
     : pos ? `<span class="emp-pos">${pos.short}</span>` : "";
+  // on-call terms in the first line's corner, where a permanent card has its TRIGO ID: Monthly filled, Daily outlined
+  const terms = oncallTermsOf(emp);
   card.innerHTML =
     `<span class="emp-row1">` +
       `<span class="emp-name">${escapeHtml(firstName)}</span>` +
       (emp.trigoId ? `<span class="emp-tid">${escapeHtml(emp.trigoId)}</span>` : "") +
+      (terms ? `<span class="emp-ct emp-ct-${terms}">${ONCALL_TERMS_LABEL[terms]}</span>` : "") +
     `</span>` +
     // the space keeps the card's text "first surname" (search, copy, screen
     // readers); a flex container drops it from the layout
@@ -2432,7 +2451,7 @@ function empCard(emp, opts = {}) {
       role +
       (area ? `<span class="emp-area" style="${areaSoftStyle(area.color)}">${escapeHtml(area.name)}</span>` : "") +
     `</span>`;
-  card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${emp.contract === "oncall" ? "On-call" : "Permanent"}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select, click again to unselect · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
+  card.title = `${emp.name}${emp.nameEn && emp.nameEn !== emp.name ? " / " + emp.nameEn : ""}${emp.trigoId ? " (" + emp.trigoId + ")" : ""} • ${contractLabel(emp)}${pos ? " • " + pos.label : ""} • ${area ? area.name : "?"}\nClick to select, click again to unselect · Ctrl-click to add · drag or click a mission to assign · double-click to edit`;
   // the head of this mission's crew (right-click → Make Leader): a teal crown
   // badge on the top-left corner, the mirror of the selection tick on the right
   // (design/crew-head-options.html, option A)
@@ -7097,7 +7116,9 @@ function profileFacts(e, ctx) {
   const sc = (v) => `<span data-no-i18n>${escapeHtml(v)}</span>`;
   return rpGroupEls([
     ["Contract", [
-      ["Contract type", e.contract === "oncall" ? "On-call" : "Permanent"],
+      ["Contract type", e.contract === "oncall"
+        ? "On-call" + (oncallTermsOf(e) ? ` <span class="ct-chip ct-chip-${oncallTermsOf(e)}">${ONCALL_TERMS_LABEL[oncallTermsOf(e)]}</span>` : ` <small>terms not set</small>`)
+        : "Permanent"],
       ["Position", pos ? pos.label : emptyCell()],
       ["Start date", e.startDate ? `${escapeHtml(fmtDate(e.startDate))} <small>${escapeHtml(ManpowerXlsx.serviceLength(e.startDate, today))}</small>` : emptyCell()],
       ["On the board from", e.addedOn ? escapeHtml(fmtDate(e.addedOn)) : emptyCell()],
@@ -7683,7 +7704,7 @@ function renderOverview() {
     chip.className = "ov-mini" + (emp.contract === "oncall" ? " oncall" : "");
     chip.textContent = emp.name;
     if (multiArea && area) chip.appendChild(Object.assign(document.createElement("small"), { textContent: area.name }));
-    chip.title = `${emp.contract === "oncall" ? "On-call" : "Permanent"}${area ? " · " + area.name : ""} — click to open ${b.name}`;
+    chip.title = `${contractLabel(emp)}${area ? " · " + area.name : ""} — click to open ${b.name}`;
     // borrowed from another board and idle here: the plainest case for sending them back
     if (emp.boardId !== b.id) {
       chip.classList.add("borrowed");
@@ -8276,7 +8297,7 @@ function updateFilterBadge() {
 }
 
 /* ---------- Manpower List tab (all employees, every board, no date scope) ---------- */
-const EMPLIST_FILTER_LABELS = { contract: "Contract", position: "Position", service: "Years of service", areaId: "Service area", boardId: "Board", status: "Status" };
+const EMPLIST_FILTER_LABELS = { contract: "Contract", terms: "On-call terms", position: "Position", service: "Years of service", areaId: "Service area", boardId: "Board", status: "Status" };
 
 /* Years-of-service filter: whole completed years from the start date to today */
 const SERVICE_BUCKETS = [
@@ -8298,6 +8319,7 @@ const EMP_STATUS_LABEL = { active: "Active", inactive: "Inactive", resigned: "Re
 
 function emplistFilterOptions(key) {
   if (key === "contract") return [{ value: "permanent", label: "Permanent" }, { value: "oncall", label: "On-call" }];
+  if (key === "terms") return [{ value: "daily", label: "Daily" }, { value: "monthly", label: "Monthly" }, { value: "__none__", label: "Not set" }];
   if (key === "position") {
     return [...Object.keys(POSITIONS).map(k => ({ value: k, label: POSITIONS[k].label })), { value: "__none__", label: "— none —" }];
   }
@@ -8372,6 +8394,7 @@ function emplistFilteredSorted() {
   const q = state.emplist.search.trim().toLowerCase();
   const emps = D().employees.filter(e => {
     if (f.contract.length && !f.contract.includes(e.contract)) return false;
+    if (f.terms.length && (e.contract !== "oncall" || !f.terms.includes(oncallTermsOf(e) || "__none__"))) return false;
     if (f.position.length && !f.position.includes(e.position || "__none__")) return false;
     if (f.service.length && !f.service.includes(serviceBucketOf(e))) return false;
     if (f.areaId.length && !f.areaId.includes(D().areas.some(a => a.id === e.areaId) ? e.areaId : "__none__")) return false;
@@ -8386,7 +8409,7 @@ function emplistFilteredSorted() {
   const { sortKey, sortDir } = state.emplist;
   const sortVal = (e) => {
     switch (sortKey) {
-      case "contract": return e.contract === "oncall" ? "On-call" : "Permanent";
+      case "contract": return e.contract === "oncall" ? "On-call " + ONCALL_TERMS_RANK[oncallTermsOf(e)] : "Permanent";   // Monthly, Daily, not set
       case "position": return e.position && POSITIONS[e.position] ? POSITIONS[e.position].label : "";   // a position the list does not know sorts with "none"
       case "phone": return e.phone || "";
       case "trigoId": return e.trigoId ? "T" + e.trigoId.slice(1).padStart(6, "0") : "";   // T9 sorts before T10; people with none sort first
@@ -8473,7 +8496,8 @@ function emplistXlsxRows() {
     const loan = loanOf(e);
     const to = loan && D().boards.find(b => b.id === loan.toBoardId);
     return {
-      name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent", position: pos ? pos.label : "",
+      name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: e.contract === "oncall" ? "On-call" : "Permanent",
+      oncallTerms: ONCALL_TERMS_LABEL[oncallTermsOf(e)] || "", position: pos ? pos.label : "",
       phone: e.phone || "", startDate: e.startDate || "", area: area ? area.name : "", board: board ? board.name : "",
       loanTo: loan ? (to ? to.name : "?") : "", loanFrom: loan ? loan.startDate : "", loanUntil: loan ? loan.endDate : "",
       util: state.emplist.util ? state.emplist.util[e.id] : undefined, active: e.active !== false, exitReason: e.exitReason || "",
@@ -8865,7 +8889,9 @@ function renderEmployeeRows() {
         board ? boardChipHtml(board.name) : add("boardId", "current board"),
         loan ? loanCellHtml(e).trim() : area ? areaMarkHtml(area) : addOrNone("areaId", "service area", "+ Add service area") || emptyCell(),
         { keep: !!loan, title: loan && area ? `Service area: ${area.name}` : "" })}</td>
-      <td data-label="Contract type" data-col="contract">${ltCell(e.contract === "oncall" ? "On-call" : "Permanent", since)}</td>
+      <td data-label="Contract type" data-col="contract">${ltCell(e.contract === "oncall"
+        ? "On-call" + (oncallTermsOf(e) ? ` <span class="ct-chip ct-chip-${oncallTermsOf(e)}">${ONCALL_TERMS_LABEL[oncallTermsOf(e)]}</span>` : "")
+        : "Permanent", since)}</td>
       <td data-label="Mobile number" data-col="phone">${e.phone ? telLink(e.phone) : add("phone", "mobile number")}</td>
       <td data-label="${EMPLIST_PERIODS[state.emplist.period || "30"]} utilization" data-col="util" class="el-util">${utilCell(util)}</td>
       <td data-label="Worked · Leave" data-col="wl" class="el-wl r lt-ph-off${showWl ? "" : " hidden"}">${!w ? ltCell("…") : ltCell(`${w.worked} · ${w.leave}`,
@@ -12969,6 +12995,7 @@ function employeeFormMount(slot, emp) {
     form.name.value = emp.name;
     form.nameEn.value = emp.nameEn || "";
     form.contract.value = emp.contract;
+    form.oncallTerms.value = oncallTermsOf(emp);
     form.position.value = emp.position || "";
     form.phone.value = emp.phone || "";
     form.trigoId.value = emp.trigoId || "";
@@ -12977,6 +13004,11 @@ function employeeFormMount(slot, emp) {
     form.areaId.value = emp.areaId;
     form.boardId.value = emp.boardId;
   }
+  // On-call terms belong to on-call people only: the row shows while Contract type is On-call (a term
+  // picked and then hidden is kept in the form, and saved as cleared while the person is permanent)
+  const termsRow = () => form.querySelector(".emp-terms-field").classList.toggle("hidden", form.contract.value !== "oncall");
+  form.contract.addEventListener("change", termsRow);
+  termsRow();
   syncSegmented(form);
   form.addEventListener("submit", saveEmployee);
   return form;
@@ -12999,7 +13031,7 @@ function saveEmployee(ev) {
   const form = ev.target;
   const inProfile = !!form.closest("#modal-profile");
   const editingId = inProfile ? state.profile.id : null;
-  const vals = { name: form.name.value.trim(), nameEn: form.nameEn.value.trim(), trigoId: form.trigoId.value.trim(), contract: form.contract.value, position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
+  const vals = { name: form.name.value.trim(), nameEn: form.nameEn.value.trim(), trigoId: form.trigoId.value.trim(), contract: form.contract.value, oncallTerms: form.contract.value === "oncall" ? form.oncallTerms.value : "", position: form.position.value, phone: form.phone.value.trim(), startDate: form.startDate.value, addedOn: form.addedOn.value, areaId: form.areaId.value, boardId: form.boardId.value };
   // instant client-side checks (the same rules cloud.saveEmployee enforces, which is the real
   // guard): the name is the FULL name only, the TRIGO ID is T + digits and unique, and two people
   // may share a name only when both have a TRIGO ID. A short name saved earlier can be left as it is.
@@ -20784,7 +20816,9 @@ function wireApp() {
   $("#emplist-bulk-contract").onchange = (ev) => {
     const val = ev.target.value; ev.target.value = "";
     if (!val || !state.selectedEmps.size) return;
-    safely(async () => { await cloud.setEmployeesContract([...state.selectedEmps], val); await refreshAndRender(); });
+    // "oncall:daily" / "oncall:monthly" set the on-call terms with the contract
+    const [contract, terms] = val.split(":");
+    safely(async () => { await cloud.setEmployeesContract([...state.selectedEmps], contract, terms); await refreshAndRender(); });
   };
   $("#emplist-bulk-position").onchange = (ev) => {
     const val = ev.target.value; ev.target.value = "";
