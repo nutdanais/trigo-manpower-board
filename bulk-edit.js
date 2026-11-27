@@ -68,6 +68,7 @@
     { key: "nameEn",    label: "English name",       aliases: ["english name", "name (english)", "eng name", "ชื่ออังกฤษ", "ชื่อ (อังกฤษ)"], width: 30 },
     { key: "trigoId",   label: "TRIGO ID",           aliases: ["trigo id", "trigoid", "trigo", "employee code", "รหัสพนักงาน", "รหัส trigo"], width: 12 },
     { key: "contract",  label: "Contract type",      aliases: ["contract type", "contract", "ประเภทสัญญา"], width: 15 },
+    { key: "oncallTerms", label: "On-call terms",    aliases: ["on-call terms", "oncall terms", "on call terms", "terms", "รูปแบบจ้างออนคอล", "รูปแบบการจ้าง"], width: 15 },
     { key: "position",  label: "Position",           aliases: ["position", "ตำแหน่ง"], width: 24 },
     { key: "phone",     label: "Mobile number",      aliases: ["mobile number", "mobile", "phone", "เบอร์มือถือ"], width: 16 },
     { key: "startDate", label: "Start date",         aliases: ["start date", "วันที่เริ่มงาน"], width: 14 },
@@ -227,6 +228,15 @@
 
   /* ---------- planning: employees ---------- */
   const CONTRACT_LABEL = { permanent: "Permanent", oncall: "On-call" };
+  const TERMS_LABEL = { daily: "Daily", monthly: "Monthly" };
+  /* On-call terms: Daily / Monthly (English or Thai), blank = not set */
+  function parseTerms(v) {
+    const s = lower(str(v));
+    if (!s) return { value: "" };
+    if (s === "daily" || s === "รายวัน" || s === "d") return { value: "daily" };
+    if (s === "monthly" || s === "รายเดือน" || s === "m") return { value: "monthly" };
+    return { error: `On-call terms "${str(v)}" must be Daily, Monthly or blank` };
+  }
 
   /* ctx: { employees:[{id,name,contract,position,phone,startDate,addedOn,areaId,boardId,active}],
             areas:[{id,name}], boards:[{id,name}], positions:{key:{label,short}} }
@@ -299,6 +309,14 @@
       if (tid) next.trigoId = tid;
 
       if (has("contract")) { const r = parseContract(c.contract); if (r.error) err(r.error); else next.contract = r.value; }
+      // on-call terms belong to on-call people: a permanent person's are always cleared (a term typed
+      // for one is dropped with a warning; one left over from being on-call is cleared quietly)
+      if (has("oncallTerms")) { const r = parseTerms(c.oncallTerms); if (r.error) err(r.error); else next.oncallTerms = r.value; }
+      const contractAfter = next.contract !== undefined ? next.contract : cur ? cur.contract : undefined;
+      if (contractAfter !== "oncall") {
+        if (next.oncallTerms) row.warnings.push("on-call terms are only kept for on-call people, so they are left empty");
+        if (next.oncallTerms || (cur && cur.oncallTerms)) next.oncallTerms = "";
+      }
       if (has("position")) {
         const s = str(c.position);
         if (!s) next.position = "";
@@ -332,16 +350,16 @@
 
       if (cur) {
         const was = {
-          name: norm(cur.name), nameEn: norm(cur.nameEn || ""), trigoId: cur.trigoId || "", contract: cur.contract, position: cur.position || "", phone: cur.phone || "",
+          name: norm(cur.name), nameEn: norm(cur.nameEn || ""), trigoId: cur.trigoId || "", contract: cur.contract, oncallTerms: cur.oncallTerms || "", position: cur.position || "", phone: cur.phone || "",
           startDate: cur.startDate || "", addedOn: cur.addedOn || "", areaId: cur.areaId || null, boardId: cur.boardId,
           active: cur.active !== false,
         };
         const label = {
-          name: "Thai name", nameEn: "English name", trigoId: "TRIGO ID", contract: "Contract type", position: "Position", phone: "Mobile number", startDate: "Start date",
+          name: "Thai name", nameEn: "English name", trigoId: "TRIGO ID", contract: "Contract type", oncallTerms: "On-call terms", position: "Position", phone: "Mobile number", startDate: "Start date",
           addedOn: "On the board from", areaId: "Service area", boardId: "Board", active: "Status",
         };
         const text = {
-          contract: (v) => CONTRACT_LABEL[v] || v, position: posLabel, areaId: areaName, boardId: boardName,
+          contract: (v) => CONTRACT_LABEL[v] || v, oncallTerms: (v) => TERMS_LABEL[v] || "", position: posLabel, areaId: areaName, boardId: boardName,
           active: (v) => (v ? "Active" : "Inactive"),
         };
         for (const f of Object.keys(next)) {
@@ -364,7 +382,7 @@
         if (!has("board") || next.boardId === undefined) err("A new person needs a Board");
         if (row.errors.length) { row.kind = "error"; continue; }
         row.create = {
-          name, nameEn: next.nameEn || "", trigoId: next.trigoId || "", contract: next.contract, position: next.position || "", phone: next.phone || "",
+          name, nameEn: next.nameEn || "", trigoId: next.trigoId || "", contract: next.contract, oncallTerms: next.contract === "oncall" ? next.oncallTerms || "" : "", position: next.position || "", phone: next.phone || "",
           startDate: next.startDate || "", addedOn: next.addedOn || "",   // blank addedOn = the database default (today)
           areaId: next.areaId || null, boardId: next.boardId, active: next.active !== false,
         };
@@ -709,6 +727,7 @@
     const boardName = (id) => ((ctx.boards || []).find((b) => b.id === id) || {}).name || "";
     const rows = (ctx.employees || []).map((e) => ({
       id: e.id, name: e.name, nameEn: e.nameEn || "", trigoId: e.trigoId || "", contract: CONTRACT_LABEL[e.contract] || e.contract,
+      oncallTerms: e.contract === "oncall" ? TERMS_LABEL[e.oncallTerms] || "" : "",
       position: e.position && ctx.positions && ctx.positions[e.position] ? ctx.positions[e.position].label : "",
       phone: e.phone || "", startDate: dateOut(e.startDate), addedOn: dateOut(e.addedOn),
       area: areaName(e.areaId), board: boardName(e.boardId), status: e.active === false ? "Inactive" : "Active",
@@ -752,7 +771,7 @@
 
     const posLabels = Object.values(ctx.positions || {}).map((p) => p.label);
     const listDefs = isEmp
-      ? { contract: ["Permanent", "On-call"], position: posLabels, area: (ctx.areas || []).map((a) => a.name), board: (ctx.boards || []).map((b) => b.name), status: ["Active", "Inactive"] }
+      ? { contract: ["Permanent", "On-call"], oncallTerms: ["Daily", "Monthly"], position: posLabels, area: (ctx.areas || []).map((a) => a.name), board: (ctx.boards || []).map((b) => b.name), status: ["Active", "Inactive"] }
       : isMis
         ? { board: (ctx.boards || []).map((b) => b.name), shift: ["Day", "Night"], status: ["Open", "Closed"],
             host: (ctx.hosts || []).slice().sort((a, b) => a.localeCompare(b)), engineer: (ctx.engineers || []).map((e) => e.label).sort((a, b) => a.localeCompare(b)) }
@@ -816,9 +835,10 @@
       "• Do not edit or delete the grey ID column. It is how the app tracks a row, so you can rename someone safely.",
       "  A row is matched by ID, then TRIGO ID, then name. A name that does not exist yet adds a NEW person (you will be asked first).",
       "• Only the columns present are updated. Delete a column you do not want touched. Keep the header names.",
-      "• An empty cell clears that field (Position, Mobile number, Start date). Thai name, Contract type and Board cannot be empty. An empty 'On the board from' leaves it as it is.",
+      "• An empty cell clears that field (Position, Mobile number, Start date, On-call terms). Thai name, Contract type and Board cannot be empty. An empty 'On the board from' leaves it as it is.",
       "• Rows you delete from the file are NOT deleted in the app. To retire someone, set Status to Inactive.",
       "• Contract type, Position, Service area, Board and Status must match the Lists sheet (use the dropdowns).",
+      "• On-call terms (Daily or Monthly) are only kept for On-call people; for a Permanent person they are left empty.",
       "• Dates: 2023-04-20 (also 20-Apr-2023 or 20/04/2023, day first). Buddhist-era years are converted.",
       "• Changing a Board clears that person's assignment on the day you are viewing in the app.",
       "• 'On the board from' is the day someone was added to the app; headcount and Standby count them only from that day.",

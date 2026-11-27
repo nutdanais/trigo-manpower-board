@@ -206,6 +206,8 @@ function employees() {
           // on-call people usually have no TRIGO ID yet
           trigo_id: oncall ? null : "T" + (100 + (n * 37) % 900),
           contract: oncall ? "oncall" : "permanent", position: POS_KEY[p],
+          // on-call terms: mostly Daily, about one in three Monthly, and one in six not set yet
+          oncall_terms: !oncall ? null : n % 6 === 5 ? null : n % 3 === 0 ? "monthly" : "daily",
           phone: "08" + (1 + n % 9) + "-555-" + String(1000 + n * 17).slice(-4),
           start_date: years ? `${+TODAY.slice(0, 4) - years}-0${(n % 9) + 1}-15` : null,
           area_id: AREA_ID[a], board_id: b.id, active: true,

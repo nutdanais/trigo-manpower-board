@@ -129,7 +129,7 @@ const X = require("../../xlsx-export.js");
     let ws = wb.worksheets[0];
     assert.equal(ws.name, "Manpower List");
     const head = (w) => { const o = []; w.getRow(1).eachCell((c) => o.push(c.value)); return o; };
-    assert.deepEqual(head(ws), ["Thai Name", "English Name", "TRIGO ID", "Contract Type", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Current Board", "30D Utilization", "Worked (days)", "Leave (days)", "Leave Share", "Status"]);
+    assert.deepEqual(head(ws), ["Thai Name", "English Name", "TRIGO ID", "Contract Type", "On-call Terms", "Position", "Mobile Number", "Start Date", "Years of Service", "Service Area", "Current Board", "30D Utilization", "Worked (days)", "Leave (days)", "Leave Share", "Status"]);
     const names = []; const shown = (await rowsText()).length;
     for (let r = 2; r <= 1 + shown; r++) names.push(ws.getCell(r, 1).value);
     assert.deepEqual(names, await rowsText(), "same rows, same order as the table");
@@ -146,11 +146,11 @@ const X = require("../../xlsx-export.js");
     await wb.xlsx.load(fs.readFileSync("/tmp/emplist-th.xlsx"));
     ws = wb.worksheets[0];
     assert.equal(ws.name, "รายชื่อพนักงาน");
-    assert.deepEqual(head(ws), ["ชื่อ (ไทย)", "ชื่อ (อังกฤษ)", "รหัส TRIGO", "ประเภทสัญญา", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "บอร์ดปัจจุบัน", "การใช้งาน 30 วัน", "ทำงาน (วัน)", "ลา (วัน)", "สัดส่วนการลา", "สถานะ"]);
+    assert.deepEqual(head(ws), ["ชื่อ (ไทย)", "ชื่อ (อังกฤษ)", "รหัส TRIGO", "ประเภทสัญญา", "รูปแบบจ้างออนคอล", "ตำแหน่ง", "เบอร์มือถือ", "วันที่เริ่มงาน", "อายุงาน", "พื้นที่บริการ", "บอร์ดปัจจุบัน", "การใช้งาน 30 วัน", "ทำงาน (วัน)", "ลา (วัน)", "สัดส่วนการลา", "สถานะ"]);
     const row = {}; for (let r = 2; r <= 1 + shown; r++) row[ws.getCell(r, 1).value] = r;
     assert.equal(ws.getCell(row["Dated Person"], 4).value, "ประจำ");
-    assert.equal(ws.getCell(row["Dated Person"], 8).value, X.serviceLength(ago(3, 5, 12), T, "th"));
-    assert.equal(ws.getCell(row["Dated Person"], 15).value, "ใช้งาน");   // after the Worked, Leave and Leave share columns
+    assert.equal(ws.getCell(row["Dated Person"], 9).value, X.serviceLength(ago(3, 5, 12), T, "th"));
+    assert.equal(ws.getCell(row["Dated Person"], 16).value, "ใช้งาน");   // after the Worked, Leave and Leave share columns
     // the Thai choice is remembered by both exports
     await p.click("#btn-export");
     await p.waitForSelector("#modal-emplist-xlsx:not(.hidden)");

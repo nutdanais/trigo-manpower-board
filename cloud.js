@@ -8,6 +8,7 @@
 const sb = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
 
 /* zone keys shared with app.js (loaded after this script) */
+const ONCALL_TERMS_MIGRATION = "On-call terms (Daily / Monthly) need a one-time database update (migration-2026-11-27-oncall-terms.sql) before they can be saved.";
 const ZONES = ["annual", "sick", "business", "unpaid", "exchange"]; // "standby" is computed (permanent + unassigned), not a manual zone
 
 function todayStrISO() {
@@ -457,7 +458,7 @@ const cloud = {
     // assignments still need to resolve through D().employees when rendering
     // history. app.js filters to "active only" at the specific call sites
     // where "current roster" (not "who was really there") is the right idea.
-    this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active, deactivatedOn: e.deactivated_on || "", exitReason: e.exit_reason || "" }));
+    this.data.employees = data.map((e) => ({ id: e.id, name: e.name_th, nameEn: e.name_en || "", contract: e.contract, oncallTerms: e.contract === "oncall" && (e.oncall_terms === "daily" || e.oncall_terms === "monthly") ? e.oncall_terms : "", position: e.position || "", phone: e.phone || "", startDate: e.start_date || "", addedOn: e.added_on || "", trigoId: e.trigo_id || "", areaId: e.area_id, boardId: e.board_id, active: e.active, deactivatedOn: e.deactivated_on || "", exitReason: e.exit_reason || "" }));
   },
   /* Is `e` on the roster on `date`, as far as being deactivated goes? Someone active
      counts on every date. Someone deactivated counts on the days BEFORE the day they
@@ -1332,6 +1333,11 @@ const cloud = {
       { ...baseRow, position: vals.position || null },
       baseRow,
     ];
+    // on-call terms (Daily / Monthly / not set): cleared for a permanent person. Tried first on every
+    // candidate, and dropped like the other new columns when migration-2026-11-27 hasn't been run.
+    const termsRow = vals.oncallTerms === undefined ? null
+      : { oncall_terms: vals.contract === "oncall" && (vals.oncallTerms === "daily" || vals.oncallTerms === "monthly") ? vals.oncallTerms : null };
+    if (termsRow) candidates.unshift(...candidates.map((c) => ({ ...c, ...termsRow })));
     const attempt = (row) => employeeId
       ? sb.from("employees").update(row).eq("id", employeeId)
       : sb.from("employees").insert(row);
@@ -1348,6 +1354,9 @@ const cloud = {
       }
       if (trigoId && this._missingColumnFromError(error) === "trigo_id") {
         throw new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql) before they can be saved.");
+      }
+      if (termsRow && termsRow.oncall_terms && this._missingColumnFromError(error) === "oncall_terms") {
+        throw new Error(ONCALL_TERMS_MIGRATION);
       }
     }
     if (error) {
@@ -1424,10 +1433,18 @@ const cloud = {
     }
     await this._loadEmployees();
   },
-  /* bulk-set the contract type of one or many employees */
-  async setEmployeesContract(ids, contract) {
+  /* bulk-set the contract type of one or many employees. terms (on-call only): "daily" | "monthly" sets
+     the on-call terms too; left out, an on-call person keeps theirs. Permanent always clears them. */
+  async setEmployeesContract(ids, contract, terms) {
     if (!ids.length) return;
-    const { error } = await sb.from("employees").update({ contract }).in("id", ids);
+    const patch = { contract };
+    if (contract !== "oncall") patch.oncall_terms = null;
+    else if (terms === "daily" || terms === "monthly") patch.oncall_terms = terms;
+    let { error } = await sb.from("employees").update(patch).in("id", ids);
+    if (error && this._missingColumnFromError(error) === "oncall_terms") {
+      if (patch.oncall_terms) throw new Error(ONCALL_TERMS_MIGRATION);
+      ({ error } = await sb.from("employees").update({ contract }).in("id", ids));   // before the migration: the contract alone
+    }
     if (error) throw error;
     await this._loadEmployees();
   },
@@ -1513,13 +1530,15 @@ const cloud = {
     // 3. the other fields: one UPDATE per person, a few at a time
     const nz = (v) => (v === "" || v === undefined ? null : v);
     const friendly = (e) => (e && e.code === "23505" && /trigo/i.test(e.message || "") ? new Error("That TRIGO ID is already used by another employee.")
-      : this._missingColumnFromError(e) === "trigo_id" ? new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql).") : e);
+      : this._missingColumnFromError(e) === "trigo_id" ? new Error("TRIGO IDs need a one-time database update (migration-2026-10-03-trigo-id.sql).")
+      : this._missingColumnFromError(e) === "oncall_terms" ? new Error(ONCALL_TERMS_MIGRATION) : e);
     const dbPatch = (p) => {
       const o = {};
       if (p.name !== undefined) o.name_th = p.name;
       if (p.nameEn !== undefined) o.name_en = nz(p.nameEn);
       if (p.trigoId !== undefined) o.trigo_id = nz(p.trigoId);
       if (p.contract !== undefined) o.contract = p.contract;
+      if (p.oncallTerms !== undefined) o.oncall_terms = nz(p.oncallTerms);
       if (p.position !== undefined) o.position = nz(p.position);
       if (p.phone !== undefined) o.phone = nz(p.phone);
       if (p.startDate !== undefined) o.start_date = nz(p.startDate);
@@ -1544,6 +1563,7 @@ const cloud = {
       const c = r.create;
       const row = { name_th: c.name, name_en: nz(c.nameEn), trigo_id: nz(c.trigoId), contract: c.contract, position: nz(c.position), phone: nz(c.phone), start_date: nz(c.startDate), area_id: c.areaId, board_id: c.boardId };
       if (c.addedOn) row.added_on = c.addedOn;
+      if (c.oncallTerms) row.oncall_terms = c.oncallTerms;
       if (c.active === false) row.active = false;
       const { error } = await sb.from("employees").insert(row);
       if (error) fail(r, friendly(error));

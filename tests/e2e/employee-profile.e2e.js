@@ -149,7 +149,7 @@ async function step(name, fn) {
       const row = db.t("employees").find((e) => e.id === "e1");
       assert.deepEqual([row.trigo_id, row.phone, row.contract, row.position], ["T555", "089-000-1111", "oncall", "senior_inspector"]);
       const f = await facts();
-      for (const x of ["Contract type On-call", "Position Senior Inspector", "Mobile number 089-000-1111"]) assert.ok(f.includes(x), x + " in " + JSON.stringify(f));
+      for (const x of ["Contract type On-call terms not set", "Position Senior Inspector", "Mobile number 089-000-1111"]) assert.ok(f.includes(x), x + " in " + JSON.stringify(f));
       assert.match(await head(), /T555/, "the new TRIGO ID is in the header");
       assert.equal(await p.locator("#modal-profile:not(.hidden)").count(), 1, "the Profile stays open");
     });

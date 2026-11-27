@@ -78,12 +78,17 @@ create table if not exists employees (
   exit_reason text,
   -- the TRIGO ID (T + digits, e.g. T329), kept apart from the full name; unique when set. See migration-2026-10-03.
   trigo_id text,
+  -- an on-call person's contract terms: 'daily', 'monthly' or NULL (not set). Only shown, never counted;
+  -- cleared when the person is permanent. See migration-2026-11-27-oncall-terms.sql.
+  oncall_terms text,
   area_id uuid references service_areas(id) on delete restrict,
   board_id uuid not null references boards(id) on delete cascade,
   created_at timestamptz not null default now()
 );
 alter table employees drop constraint if exists employees_exit_reason_check;
 alter table employees add constraint employees_exit_reason_check check (exit_reason is null or exit_reason in ('resigned'));
+alter table employees drop constraint if exists employees_oncall_terms_check;
+alter table employees add constraint employees_oncall_terms_check check (oncall_terms is null or oncall_terms in ('daily', 'monthly'));
 create unique index if not exists employees_trigo_id_key
   on employees (upper(trigo_id)) where trigo_id is not null and trigo_id <> '';
 

@@ -79,6 +79,7 @@
   const VALUES = {
     th: {
       contract: { "Permanent": "ประจำ", "On-call": "ออนคอล" },
+      oncallTerms: { "Daily": "รายวัน", "Monthly": "รายเดือน" },
       shift: { "Day": "กลางวัน", "Night": "กลางคืน" },
       position: {
         "Inspector": "ผู้ตรวจสอบ", "Senior Inspector": "ผู้ตรวจสอบอาวุโส", "Technician": "ช่างเทคนิค",
@@ -310,7 +311,7 @@
       v = serviceLength(r.startDate, spec.today, lang);
     } else if (col.key === "name" && !col.exact) {
       v = personName(r, lang);
-    } else if (col.key === "contract" || col.key === "shift" || col.key === "position") {
+    } else if (col.key === "contract" || col.key === "oncallTerms" || col.key === "shift" || col.key === "position") {
       v = say(col.key, v, lang);
     } else if (col.key === "leave") {
       v = leaveLabel(r, lang);
@@ -533,7 +534,7 @@
      No banner or logo: row 1 is the header, in the same table design as the
      board export (navy header with the green rule, tinted alternate rows, pale
      total row under the table), frozen, filterable and repeated on every
-     printed page. One row per person in the order given. A row is { name, contract: "Permanent"|"On-call",
+     printed page. One row per person in the order given. A row is { name, contract: "Permanent"|"On-call", oncallTerms: "Daily"|"Monthly"|"",
      position (English label or ""), phone, trigoId, startDate: "YYYY-MM-DD"|"", area,
      board, util: percent|null|undefined, active: boolean, and for someone on loan
      to another board that day loanTo (board name), loanFrom / loanUntil: "YYYY-MM-DD" }.
@@ -545,6 +546,7 @@
     { key: "nameEn",    label: "English Name",    th: "ชื่อ (อังกฤษ)",      width: 30 },
     { key: "trigoId",   label: "TRIGO ID",        th: "รหัส TRIGO",         width: 11, center: true },
     { key: "contract",  label: "Contract Type",   th: "ประเภทสัญญา",       width: 17 },
+    { key: "oncallTerms", label: "On-call Terms", th: "รูปแบบจ้างออนคอล",  width: 17 },   // "Daily" | "Monthly" | "" (on-call only)
     { key: "position",  label: "Position",        th: "ตำแหน่ง",           width: 25 },
     { key: "phone",     label: "Mobile Number",   th: "เบอร์มือถือ",        width: 16 },
     { key: "startDate", label: "Start Date",      th: "วันที่เริ่มงาน",     width: 14, center: true },

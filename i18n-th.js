@@ -3594,4 +3594,12 @@ I18N.add({
   "The board has {a}": "บนบอร์ดมี {a}",
   "Take my numbers out of {a} selected cells": "นำตัวเลขของฉันออกจาก {a} เซลล์ที่เลือก",
   "personal what-if by {a}": "แผนทดลองส่วนตัวโดย {a}",
+  // on-call terms (employees.oncall_terms)
+  "On-call terms": "รูปแบบจ้างออนคอล",
+  "On-call terms: All": "รูปแบบจ้างออนคอล: ทั้งหมด",
+  "Not set": "ยังไม่ระบุ",
+  "terms not set": "ยังไม่ระบุรูปแบบจ้าง",
+  "On-call · Daily": "ออนคอล · รายวัน",
+  "On-call · Monthly": "ออนคอล · รายเดือน",
+  "On-call terms (Daily / Monthly) need a one-time database update (migration-2026-11-27-oncall-terms.sql) before they can be saved.": "รูปแบบจ้างออนคอล (รายวัน / รายเดือน) ต้องอัปเดตฐานข้อมูลครั้งเดียว (migration-2026-11-27-oncall-terms.sql) ก่อนจึงจะบันทึกได้",
 });

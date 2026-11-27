@@ -45,7 +45,7 @@ const FORWARD_TABLES = new Set(["plan_day_stamps", "capacity_demand", "forecast_
 const DEFAULTS = {
   missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", hidden: false, ppe: null, remark: null, engineer_id: null }),
   forecast_missions: () => ({ start_time: "08:00:00", end_time: "17:00:00", ppe: null, remark: null, engineer_id: null }),
-  employees: () => ({ active: true, position: null, phone: null, start_date: null, added_on: null }),
+  employees: () => ({ active: true, position: null, phone: null, start_date: null, added_on: null, oncall_terms: null }),
   boards: () => ({ weekend_days: [0, 6] }),
   plan_day_ready: () => ({ ticked_at: new Date().toISOString() }),
   mission_register: () => ({ status: "open", source: "board", host: null, customer: null, start_time: null, end_time: null, engineer_id: null,
@@ -71,6 +71,8 @@ class FakeDb {
     this.lead = opts.lead !== false;
     // migration-2026-11-04 (employees.exit_reason); { exitReason: false } is a database without it
     this.exitReason = opts.exitReason !== false;
+    // migration-2026-11-27 (employees.oncall_terms: Daily / Monthly); { oncallTerms: false } is a database without it
+    this.oncallTerms = opts.oncallTerms !== false;
     // migration-2026-11-09 (mission_register, mission_number_history and their RPCs); { missions: false } is a database without it
     this.missions = opts.missions !== false;
     // migration-2026-11-09b (app_settings: shared settings such as the days that make someone experienced); { appSettings: false } is a database without it
@@ -144,12 +146,12 @@ class FakeDb {
   }
 
   /* A column-level migration not run yet: the errors Postgres / PostgREST give
-     for reading or writing a column that isn't there. Only the highlight columns and employees.exit_reason
-     are emulated (the others predate every test). */
+     for reading or writing a column that isn't there. Only the highlight columns, employees.exit_reason
+     and employees.oncall_terms are emulated (the others predate every test). */
   _missingColumn(q) {
     const cols = q.table === "missions" ? [].concat(this.highlight ? [] : ["highlight", "highlight_note"], this.lead ? [] : ["lead_employee_id"], this.missionHosts ? [] : ["host_unconfirmed"])
       : q.table === "mission_register" && !this.missionHosts ? ["hosts"]
-      : q.table === "employees" && !this.exitReason ? ["exit_reason"] : [];
+      : q.table === "employees" ? [].concat(this.exitReason ? [] : ["exit_reason"], this.oncallTerms ? [] : ["oncall_terms"]) : [];
     if (!cols.length) return null;
     const col = cols.find((c) =>
       (typeof q.select === "string" && q.select.split(",").map((x) => x.trim()).includes(c))
@@ -169,6 +171,11 @@ class FakeDb {
       }
       const noCol = this._missingColumn(q);
       if (noCol) return { data: null, error: noCol };
+      // employees_oncall_terms_check (migration-2026-11-27): 'daily', 'monthly' or null
+      if (q.table === "employees" && q.op !== "select" && q.op !== "delete"
+          && [].concat(q.values || []).some((v) => v && v.oncall_terms != null && v.oncall_terms !== "daily" && v.oncall_terms !== "monthly")) {
+        return { data: null, error: { code: "23514", message: 'new row for relation "employees" violates check constraint "employees_oncall_terms_check"' } };
+      }
       if (q.table === "app_settings") {
         const refused = this._appSettingsGuard(q, user);
         if (refused) return { data: null, error: refused };

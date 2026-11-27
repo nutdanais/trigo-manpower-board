@@ -150,6 +150,7 @@ td .nm { font-weight: 600; }
 .chip { font-size: 12px; font-weight: 600; border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; background: var(--panel); }
 .chip[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
 
+.decided { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--ok-line); background: var(--ok-surface); border-radius: 8px; font-size: 13.5px; }
 .qs { display: grid; gap: 8px; font-size: 13.5px; padding-left: 20px; }
 .qs li { max-width: 80ch; }
 </style>
@@ -158,6 +159,7 @@ td .nm { font-weight: 600; }
   <header>
     <h1>On-call contract terms: Daily or Monthly</h1>
     <p class="lede">On-call inspectors are hired on one of two terms. This page shows how the app could record the term and show it on the employee card, the profile and the Manpower List. Three ways to mark the card are shown below, A to C. The form, profile and list work the same whichever card option you pick.</p>
+    <p class="decided"><b>Decided (27 Nov 2026):</b> option A, the term tag in the card's corner. Monthly first in Available On-call. The term is only shown and changes no numbers. Thai รายวัน / รายเดือน. One field per person, with no dated history.</p>
   </header>
 
   <div class="tools" role="toolbar" aria-label="Sample settings">
@@ -271,7 +273,7 @@ td .nm { font-weight: 600; }
   </section>
 
   <section class="panel">
-    <h2>Questions before building</h2>
+    <h2>Questions before building <span class="muted small">(all answered; see Decided above)</span></h2>
     <ol class="qs">
       <li><b>Which card option: A, B or C?</b> I recommend A.</li>
       <li><b>Is it only shown, or does it change any numbers?</b> I've assumed it is only shown. For example, it does not change utilization or the <i>On-call free</i> count. If Monthly people are paid to be available, you may want <i>Not called in</i> counted differently for them.</li>
