@@ -131,7 +131,7 @@ code { font-family: var(--font-mono); background: var(--paper); border: 1px soli
 /* Release chart */
 .chart-card { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 24px 24px 16px; }
 .chart-scroll { overflow-x: auto; }
-.chart { display: grid; grid-template-columns: repeat(17, minmax(34px, 1fr)); gap: 6px; align-items: end; min-width: 640px; height: 240px; padding-top: 24px; }
+.chart { display: grid; grid-template-columns: repeat(27, minmax(30px, 1fr)); gap: 5px; align-items: end; min-width: 940px; height: 240px; padding-top: 24px; }
 .day { display: grid; grid-template-rows: 1fr auto; height: 100%; text-align: center; }
 .col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; }
 .col .n { font-weight: 700; color: var(--navy); font-size: 14px; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
@@ -176,6 +176,7 @@ code { font-family: var(--font-mono); background: var(--paper); border: 1px soli
 .ticks li { padding-left: 26px; position: relative; font-size: 15px; }
 .ticks li::before { content: ""; position: absolute; left: 2px; top: 7px; width: 12px; height: 7px; border-left: 2.5px solid var(--green-ink); border-bottom: 2.5px solid var(--green-ink); transform: rotate(-45deg); }
 .stack-shots { display: grid; gap: 14px; }
+.stack-shots button.shot.oc-pool { width: min(100%, 340px); justify-self: center; }
 .phone-pair { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; }
 .formats { display: grid; gap: 10px; }
 .fmt { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 15px; }
@@ -277,7 +278,7 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
     <div class="hero-grid">
       <div>
         <h1 data-th="มีอะไรใหม่เดือนนี้">What's new this month</h1>
-        <p class="sub" data-th="<b>36 อัปเดต</b> ระหว่างวันที่ 3 ถึง 17 พฤศจิกายน รวมถึง <b>หัวหน้าทีม</b> และ <b>กำลังรองรับ</b> แบบใหม่"><b>36 updates</b> from 3 to 17 November, including <b>Mission Leader</b> and the new <b>Capacity</b> sandbox.</p>
+        <p class="sub" data-th="<b>37 อัปเดต</b> ระหว่างวันที่ 3 ถึง 27 พฤศจิกายน รวมถึง <b>หัวหน้าทีม</b> <b>กำลังรองรับ</b> แบบใหม่ และ <b>รูปแบบจ้างออนคอล</b>"><b>37 updates</b> from 3 to 27 November, including <b>Mission Leader</b>, the new <b>Capacity</b> sandbox and <b>on-call terms</b>.</p>
         <div class="ctas">
           <a class="btn btn-green" href="#highlights" data-th="ดูไฮไลต์">See the highlights</a>
           <a class="btn btn-ghost" href="#leader" data-th="หัวหน้าทีม">Mission Leader</a>
@@ -292,10 +293,10 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
 
 <div class="wrap">
   <div class="numbers" role="list">
-    <div role="listitem"><b>36</b><span data-th="อัปเดต">updates</span></div>
+    <div role="listitem"><b>37</b><span data-th="อัปเดต">updates</span></div>
     <div role="listitem"><b>1</b><span data-th="แท็บใหม่: มิชชั่น">new tab: Missions</span></div>
     <div role="listitem"><b>1</b><span data-th="รายงานใหม่: รายงานประจำเดือน">new monthly report</span></div>
-    <div role="listitem"><b>8</b><span data-th="วันที่ออกอัปเดต">release days</span></div>
+    <div role="listitem"><b>9</b><span data-th="วันที่ออกอัปเดต">release days</span></div>
   </div>
 </div>
 
@@ -303,7 +304,8 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
   <div class="wrap">
     <div class="links">
       <a href="#highlights" data-th="ไฮไลต์">Highlights</a>
-      <a href="#latest" class="teal" data-th="ล่าสุด 17 พ.ย.">Latest: 17 Nov</a>
+      <a href="#latest" class="teal" data-th="ล่าสุด 27 พ.ย.">Latest: 27 Nov</a>
+      <a href="#nov17" data-th="17 พ.ย.">17 Nov</a>
       <a href="#timeline" data-th="รายวัน">Day by day</a>
       <a href="#leader" class="teal" data-th="หัวหน้าทีม (ใหม่)">Mission Leader (new)</a>
       <a href="#board" data-th="บอร์ด">Board</a>
@@ -379,7 +381,34 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
 <section id="latest">
   <div class="wrap">
     <div class="sec-head">
-      <h2 data-th="ล่าสุด: 17 พฤศจิกายน">Latest: 17 November</h2>
+      <h2 data-th="ล่าสุด: 27 พฤศจิกายน">Latest: 27 November</h2>
+      <p data-th="หนึ่งอัปเดตใหม่ สำหรับพนักงานออนคอล">One new update, for on-call staff.</p>
+    </div>
+    <div class="feature">
+      <div class="copy">
+        <h3 data-th="รูปแบบจ้างออนคอล: รายวันหรือรายเดือน">On-call terms: Daily or Monthly</h3>
+        <p data-th="ระบุได้แล้วว่าพนักงานออนคอลแต่ละคนจ้างแบบรายวันหรือรายเดือน">Each on-call person can now be marked as on Daily or Monthly terms.</p>
+        <ul class="ticks">
+          <li data-th="การ์ดบนบอร์ดแสดง <b>รายเดือน</b> (สีทึบ) หรือ <b>รายวัน</b> (เส้นขอบ) ที่มุม ตรงที่พนักงานประจำแสดง TRIGO ID">The board card shows <b>Monthly</b> (filled) or <b>Daily</b> (outlined) in the corner where permanent staff show their TRIGO ID.</li>
+          <li data-th="<b>ออนคอลที่ว่าง</b> เรียงคนรายเดือนก่อน แล้วจึงรายวัน"><b>Available On-call</b> lists Monthly people first, then Daily.</li>
+          <li data-th="ตั้งได้ในโปรไฟล์ (แก้ไข) หรือหลายคนพร้อมกันด้วย <b>กำหนดประเภทสัญญา…</b> ในรายการกำลังคน หรือแก้ไขเป็นกลุ่ม">Set it in the person's Profile (Edit), or for many people at once with <b>Set contract…</b> in the Manpower List, or with Bulk edit.</li>
+          <li data-th="รายการกำลังคนแสดงในคอลัมน์สัญญา มีตัวกรอง <b>รูปแบบจ้างออนคอล</b> และไฟล์ Excel มีคอลัมน์นี้ด้วย">The Manpower List shows it in the Contract column and has an <b>On-call terms</b> filter. The Excel file has a column for it.</li>
+          <li data-th="ใช้แสดงผลเท่านั้น ตัวเลขและกราฟไม่เปลี่ยน">It is only shown. Counts and charts do not change.</li>
+        </ul>
+        <p data-th="ทุกคนเริ่มต้นเป็น ยังไม่ระบุ ป้ายจะขึ้นเมื่อกรอกข้อมูลแล้ว">Everyone starts as not set, so the tag appears once someone fills it in.</p>
+      </div>
+      <div class="stack-shots">
+        <button class="shot" type="button" data-cap="Edit a person: On-call terms appears when Contract type is On-call." data-cap-th="แก้ไขข้อมูลคน: รูปแบบจ้างออนคอล จะขึ้นเมื่อประเภทสัญญาเป็นออนคอล"><img src="img/oncall-form.jpg" alt="" loading="lazy" width="1520" height="200"></button>
+        <button class="shot oc-pool" type="button" data-cap="Available On-call: Monthly first, then Daily. The last card is not set yet." data-cap-th="ออนคอลที่ว่าง: รายเดือนก่อน แล้วรายวัน การ์ดสุดท้ายยังไม่ระบุ"><img src="img/oncall-terms.jpg" alt="" loading="lazy" width="530" height="756"></button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="nov17">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 data-th="17 พฤศจิกายน">17 November</h2>
       <p data-th="ห้าอัปเดตใหม่ สำหรับการวางแผนล่วงหน้าและหมายเลขมิชชั่น">Five new updates, for planning ahead and for mission numbers.</p>
     </div>
     <div class="feature">
@@ -416,11 +445,11 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
   <div class="wrap">
     <div class="sec-head">
       <h2 data-th="รายวัน">Day by day</h2>
-      <p data-th="จำนวนอัปเดตในแต่ละวัน 1 ถึง 17 พฤศจิกายน (เวลาประเทศไทย)">How many updates arrived each day, 1 to 17 November (Thailand time).</p>
+      <p data-th="จำนวนอัปเดตในแต่ละวัน 1 ถึง 27 พฤศจิกายน (เวลาประเทศไทย)">How many updates arrived each day, 1 to 27 November (Thailand time).</p>
     </div>
     <div class="chart-card">
       <div class="chart-scroll">
-        <div class="chart" id="chart" role="img" aria-label="3 Nov 1, 4 Nov 5, 5 Nov 9, 9 Nov 4, 10 Nov 7, 12 Nov 3, 16 Nov 2, 17 Nov 5"></div>
+        <div class="chart" id="chart" role="img" aria-label="3 Nov 1, 4 Nov 5, 5 Nov 9, 9 Nov 4, 10 Nov 7, 12 Nov 3, 16 Nov 2, 17 Nov 5, 27 Nov 1"></div>
       </div>
       <div class="legend"><span><i></i><span data-th="อัปเดต">Update</span></span><span><i class="lead"></i><span data-th="หัวหน้าทีม">Mission Leader</span></span></div>
     </div>
@@ -630,7 +659,7 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
 
 <footer>
   <div class="wrap">
-    <span data-th="<b>Manpower Board</b> อัปเดตวันที่ 1 ถึง 17 พฤศจิกายน 2026"><b>Manpower Board</b> updates, 1 to 17 November 2026</span>
+    <span data-th="<b>Manpower Board</b> อัปเดตวันที่ 1 ถึง 27 พฤศจิกายน 2026"><b>Manpower Board</b> updates, 1 to 27 November 2026</span>
     <span data-th="รูปทั้งหมดมาจากโหมดเดโม ชื่อและตัวเลขเป็นข้อมูลตัวอย่าง">Pictures are from the demo, with sample names and numbers.</span>
   </div>
 </footer>
@@ -643,15 +672,15 @@ dialog .close { position: fixed; top: calc(14px + env(safe-area-inset-top, 0px))
 
 <script>
 (function () {
-  // Updates per day (Thailand time), from the pull requests. 16 Nov holds #133 and Mission Leader (#134).
-  var live = { 3: 1, 4: 5, 5: 9, 9: 4, 10: 7, 12: 3, 16: 1, 17: 5 };
+  // Updates per day (Thailand time), from the pull requests. 16 Nov holds #133 and Mission Leader (#134); 27 Nov is on-call terms (#146).
+  var live = { 3: 1, 4: 5, 5: 9, 9: 4, 10: 7, 12: 3, 16: 1, 17: 5, 27: 1 };
   var leader = { 16: 1 };
   var DAYS = { en: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], th: ["อา.","จ.","อ.","พ.","พฤ.","ศ.","ส."] };
   var lang = "en";
 
   function drawChart() {
     var html = "";
-    for (var d = 1; d <= 17; d++) {
+    for (var d = 1; d <= 27; d++) {
       var wd = new Date(2026, 10, d).getDay();
       var n = (live[d] || 0) + (leader[d] || 0), bars = "";
       for (var k = 0; k < (leader[d] || 0); k++) bars += '<i class="lead" style="--d:' + d + '"></i>';
