@@ -1,0 +1,548 @@
+<title>TRIGO Apps: Hosting and Database Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a briefing paper. Fixed navy masthead with the two numbers the meeting decides on,
+   a sticky section bar to jump between parts, then one column of sections, each with its own Comment button.
+   Light only, matching the Manpower Board app palette. */
+:root {
+  color-scheme: light;
+  --ground: #eef1f4;
+  --paper: #ffffff;
+  --ink: #1f2937;
+  --muted: #5b6573;
+  --rule: #d8dde4;
+  --navy: #003a66;
+  --navy-deep: #002a4a;
+  --navy-tint: #e6eef6;
+  --green: #a8c855;
+  --green-text: #4d6810;
+  --green-tint: #f3f8e6;
+  --warn-text: #8a4f10;
+  --warn-tint: #fdf8ef;
+  --warn-line: #e0c9a4;
+  --on-navy: #ffffff;
+  --on-navy-muted: #bcd0e4;
+  --f-display: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Masthead */
+.mast { background: var(--navy); color: var(--on-navy); margin-top: calc(-1 * env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px); }
+.mast .wrap { padding-block: 40px 32px; display: grid; gap: 24px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--on-navy-muted); }
+.mast h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(28px, 4.2vw, 42px); line-height: 1.1; margin: 6px 0 0; text-wrap: balance; }
+.mast .lead { font-size: 17px; max-width: 64ch; color: var(--on-navy); margin: 0; }
+.figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.fig { border-top: 3px solid var(--green); padding-top: 10px; }
+.fig b { display: block; font-family: var(--f-display); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fig span { font-size: 13px; color: var(--on-navy-muted); }
+.mast-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* Section bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); border-bottom: 1px solid var(--rule); }
+.bar .wrap { display: flex; gap: 4px; overflow-x: auto; padding-block: 8px; scrollbar-width: thin; }
+.bar button { flex: none; font: 500 13px var(--f-body); color: var(--muted); background: none; border: 0; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.bar button:hover, .bar button.on { color: var(--navy); background: var(--navy-tint); }
+
+/* Sections */
+main .wrap { padding-block: 24px 64px; display: grid; gap: 20px; }
+section { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 24px clamp(16px, 3vw, 32px) 28px; scroll-margin-top: 64px; min-width: 0; }
+.sec-head { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; }
+h2 { font-family: var(--f-display); font-weight: 700; font-size: 22px; color: var(--navy); margin: 0; text-wrap: balance; }
+h3 { font-family: var(--f-display); font-weight: 600; font-size: 16px; margin: 22px 0 6px; color: var(--ink); }
+p { margin: 10px 0; max-width: 72ch; }
+.point { font-size: 16px; font-weight: 500; }
+.note { font-size: 13px; color: var(--muted); }
+ul, ol { padding-left: 22px; margin: 10px 0; max-width: 76ch; }
+li { margin: 6px 0; }
+li::marker { color: var(--navy); }
+strong { font-weight: 600; }
+code { font-family: var(--f-mono); font-size: 13px; background: var(--navy-tint); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--navy); }
+
+.btn { font: 500 13px var(--f-body); border-radius: 6px; padding: 6px 12px; cursor: pointer; border: 1px solid var(--rule); background: var(--paper); color: var(--navy); }
+.btn:hover { border-color: var(--navy); }
+.btn-on-navy { background: transparent; color: var(--on-navy); border-color: var(--on-navy-muted); }
+.btn-on-navy:hover { border-color: var(--on-navy); }
+button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* Tables */
+.tbl { overflow-x: auto; margin: 12px 0; border: 1px solid var(--rule); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+th { font: 600 12px var(--f-body); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--ground); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.total td { font-weight: 600; background: var(--navy-tint); }
+.tbl.wide table { min-width: 760px; }
+.tbl.mid table { min-width: 620px; }
+
+.pill { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+.pill.yes { background: var(--green-tint); color: var(--green-text); }
+.pill.free { background: var(--navy-tint); color: var(--navy); }
+.pill.no { background: var(--ground); color: var(--muted); }
+.pill.watch { background: var(--warn-tint); color: var(--warn-text); }
+
+/* Decision box */
+.ask { border-left: 4px solid var(--green); background: var(--green-tint); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+.ask p { margin: 4px 0; }
+
+/* Three apps */
+.apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+.app { border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.app h3 { margin: 0; }
+.app dl { margin: 0; display: grid; grid-template-columns: 76px 1fr; gap: 4px 10px; font-size: 13.5px; }
+.app dt { color: var(--muted); }
+.app dd { margin: 0; }
+.app .now { font-size: 12px; font-weight: 600; color: var(--green-text); }
+
+/* Diagram */
+.diagram { overflow-x: auto; margin: 14px 0 6px; }
+.diagram svg { display: block; width: 100%; min-width: 640px; height: auto; font-family: var(--f-body); }
+.d-box { fill: var(--paper); stroke: #8c97a6; stroke-width: 1.25; }
+.d-main { fill: var(--navy-tint); stroke: var(--navy); stroke-width: 2; }
+.d-ext { fill: var(--paper); stroke: #8c97a6; stroke-width: 1.25; stroke-dasharray: 5 4; }
+.d-acct { fill: #f5f7fa; stroke: #8c97a6; stroke-width: 1.25; }
+.d-line { fill: none; stroke: #8c97a6; stroke-width: 1.25; }
+.d-name { font-size: 13px; font-weight: 600; fill: var(--ink); }
+.d-txt { font-size: 11.5px; fill: var(--ink); }
+.d-quiet { font-size: 11.5px; fill: var(--muted); }
+.d-head { font-size: 13px; font-weight: 600; fill: var(--navy); }
+.d-arrow { fill: #8c97a6; }
+
+/* Budget bars */
+.bars { display: grid; gap: 8px; margin: 14px 0 4px; }
+.brow { display: grid; grid-template-columns: 64px 1fr 72px; gap: 10px; align-items: center; font-size: 13px; }
+.brow .track { display: flex; height: 18px; border-radius: 4px; overflow: hidden; background: var(--ground); }
+.brow .seg { height: 100%; }
+.s-cf { background: #f6a33a; }
+.s-sb { background: var(--navy); }
+.s-em { background: var(--green); }
+.brow .v { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--f-mono); font-size: 12.5px; }
+.key { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* Steps */
+.steps { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 10px; max-width: none; }
+.steps li { display: grid; grid-template-columns: 40px 1fr; gap: 12px; margin: 0; border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.steps .n { font-family: var(--f-display); font-weight: 700; font-size: 20px; color: var(--navy); line-height: 1.2; }
+.steps h4 { margin: 0; font: 600 15px var(--f-body); }
+.steps .when { font-family: var(--f-mono); font-size: 12px; color: var(--muted); margin-left: 6px; font-weight: 400; }
+.steps p { margin: 4px 0 0; }
+.steps .chk { font-size: 13.5px; color: var(--green-text); }
+.steps .chk b { font-weight: 600; }
+.steps li.later { border-style: dashed; }
+
+.checks { list-style: none; padding: 0; }
+.checks li { display: grid; grid-template-columns: 22px 1fr; gap: 6px; }
+.checks li::before { content: ""; width: 14px; height: 14px; border: 1.5px solid var(--navy); border-radius: 3px; margin-top: 4px; }
+.checks li.done::before { background: var(--green); border-color: var(--green-text); }
+.checks li.done { color: var(--muted); }
+
+.sources { font-size: 13px; columns: 2 260px; padding-left: 18px; }
+footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-block: 0 32px; }
+
+@media (max-width: 560px) {
+  .brow { grid-template-columns: 52px 1fr 60px; }
+  .steps li { grid-template-columns: 28px 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<header class="mast" id="top">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">TRIGO Thailand · Proposal for review · 27 Nov 2026</div>
+      <h1>TRIGO Apps: Hosting and Database Plan</h1>
+    </div>
+    <p class="lead">Run Manpower Board, Inventory and the new Document Approval app from one company-owned Cloudflare account. Manpower Board keeps its database on Supabase, moved to a company Pro plan.</p>
+    <div class="figs">
+      <div class="fig"><b>USD 30 / month</b><span>about THB 1,000: Cloudflare Workers Paid + Supabase Pro</span></div>
+      <div class="fig"><b>USD 50 / month</b><span>about THB 1,700, once Approval sends emails</span></div>
+      <div class="fig"><b>USD 3,600 / 5 years</b><span>about THB 122,000, with 10% for price rises</span></div>
+    </div>
+    <div class="mast-actions">
+      <button class="btn btn-on-navy" type="button" data-comment="top" hidden>Comment on the whole plan</button>
+    </div>
+  </div>
+</header>
+
+<nav class="bar" aria-label="Sections">
+  <div class="wrap" id="navlist">
+    <button type="button" data-go="summary">Summary</button>
+    <button type="button" data-go="apps">Three apps</button>
+    <button type="button" data-go="architecture">Architecture</button>
+    <button type="button" data-go="plans">Plans and prices</button>
+    <button type="button" data-go="capacity">How long space lasts</button>
+    <button type="button" data-go="budget">5-year budget</button>
+    <button type="button" data-go="changes">Changes and security</button>
+    <button type="button" data-go="risks">Risks</button>
+    <button type="button" data-go="steps">Steps to start</button>
+  </div>
+</nav>
+
+<main>
+  <div class="wrap">
+
+    <section id="summary">
+      <div class="sec-head"><h2>Summary</h2><button class="btn" type="button" data-comment="summary" hidden>Comment</button></div>
+      <p class="point">Two paid plans cover all three apps for about USD 30 a month, with room for at least 5 years at today's size.</p>
+      <div class="ask">
+        <p><strong>Decision asked for:</strong> approve Cloudflare Workers Paid for hosting all three apps and for the Approval and Inventory data, and Supabase Pro for Manpower Board's data, both on company accounts and a company card.</p>
+      </div>
+      <ul>
+        <li><strong>Why Cloudflare:</strong> Inventory is already live there, and the Approval app is not built yet, so changing an unbuilt app's plan is cheaper and safer than moving a working one.</li>
+        <li><strong>Why Manpower Board stays on Supabase:</strong> it depends on Postgres features Cloudflare's D1 database lacks (row-level security, triggers, live updates). Moving it would save about USD 1,700 over 5 years but take weeks of rebuilding.</li>
+        <li><strong>What it unlocks:</strong> PO deliveries confirmed once, in the app where the goods arrive, and seen by both apps; one login for staff; one vendor, user and item list. Manpower Board gets daily backups and no free-tier pause.</li>
+        <li><strong>What changes:</strong> the Approval app's technology plan (now in its repo) and changes the answers to Q26 to Q28, Q46 and Q51 of the Requirements Confirmation Report; Inventory gains "Receive against PO" and reads shared master data; Manpower Board moves its pages from Netlify to Cloudflare Pages and its Supabase project to a company-owned organisation.</li>
+      </ul>
+    </section>
+
+    <section id="apps">
+      <div class="sec-head"><h2>Three apps, today and proposed</h2><button class="btn" type="button" data-comment="apps" hidden>Comment</button></div>
+      <p class="point">The three apps serve the same staff, and Approval and Inventory need to share PO and delivery data.</p>
+      <div class="apps">
+        <div class="app">
+          <span class="now">Live, in daily use</span>
+          <h3>Manpower Board</h3>
+          <dl>
+            <dt>Purpose</dt><dd>Daily crew planning per board: missions, hosts, engineers, leave and on-call; about 120 people</dd>
+            <dt>Today</dt><dd>Netlify for pages; Supabase free plan (Postgres, about 30 tables, Realtime, one Edge Function)</dd>
+            <dt>Proposed</dt><dd>Cloudflare Pages + Supabase Pro</dd>
+            <dt>Sign-in</dt><dd>Supabase email/password, @trigo-group.com, admin approval; can join the shared sign-in later</dd>
+          </dl>
+        </div>
+        <div class="app">
+          <span class="now">Live, in daily use</span>
+          <h3>Inventory</h3>
+          <dl>
+            <dt>Purpose</dt><dd>Consumables, tool crib and calibration, customer parts; Rayong and Amata warehouses</dd>
+            <dt>Today</dt><dd>Cloudflare free tier: Pages, Workers API, D1 database, R2 files</dd>
+            <dt>Proposed</dt><dd>Same services on Workers Paid, in a company-owned account</dd>
+            <dt>Sign-in</dt><dd>Firebase email/password, @trigo-group.com, admin approval</dd>
+          </dl>
+        </div>
+        <div class="app">
+          <span class="now" style="color:var(--muted)">Designed, not built</span>
+          <h3>Document Approval</h3>
+          <dl>
+            <dt>Purpose</dt><dd>PR, PO and document approvals, vendor management, delivery tracking</dd>
+            <dt>Stack</dt><dd>Next.js, Tailwind and shadcn/ui</dd>
+            <dt>Proposed</dt><dd>Next.js on Cloudflare Workers, D1, R2 on the paid plan, beside Inventory</dd>
+            <dt>Sign-in</dt><dd>Shared Firebase sign-in with Inventory, the same flow: staff register with @trigo-group.com, an admin approves</dd>
+          </dl>
+        </div>
+      </div>
+      <p class="note">Decisions from 3 Nov 2026: delivery confirmation is in the first release for both apps; new-vendor feedback comes from the PR requester after a set time; Approval and Inventory run on Cloudflare on a paid plan; Inventory can start a PR from low-stock items. Manpower Board was added to the plan on 27 Nov 2026.</p>
+    </section>
+
+    <section id="architecture">
+      <div class="sec-head"><h2>Target architecture</h2><button class="btn" type="button" data-comment="architecture" hidden>Comment</button></div>
+      <p class="point">All three apps are hosted in one TRIGO Cloudflare account: Approval as a Next.js app on Workers, Inventory and Manpower Board on Pages. Approval and Inventory share a sign-in, a core database and private file storage; Manpower Board keeps its data on Supabase.</p>
+      <div class="diagram">
+        <svg viewBox="0 0 760 520" role="img" aria-label="Three apps on one Cloudflare account; Manpower Board's data stays on Supabase">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-arrow" d="M0 0L10 5L0 10z"/></marker></defs>
+          <rect class="d-box" x="24" y="24" width="192" height="72" rx="8"/>
+          <text class="d-name" x="120" y="56" text-anchor="middle">Staff</text>
+          <text class="d-quiet" x="120" y="74" text-anchor="middle">Desktop and phone</text>
+          <rect class="d-box" x="272" y="24" width="216" height="72" rx="8"/>
+          <text class="d-name" x="288" y="48">Firebase sign-in, shared</text>
+          <text class="d-quiet" x="288" y="64">@trigo-group.com only</text>
+          <text class="d-quiet" x="288" y="80">Manpower Board joins later</text>
+          <rect class="d-ext" x="504" y="24" width="232" height="72" rx="8"/>
+          <text class="d-name" x="520" y="48">Supabase Pro</text>
+          <text class="d-txt" x="520" y="64">Manpower data, Realtime, sign-in</text>
+          <text class="d-txt" x="520" y="80">Daily backups, kept 7 days</text>
+          <rect class="d-acct" x="24" y="120" width="712" height="284" rx="8"/>
+          <text class="d-head" x="184" y="142">TRIGO Cloudflare account · Workers Paid</text>
+          <path class="d-line" d="M216 60H272" marker-end="url(#ar)"/>
+          <text class="d-quiet" x="244" y="52" text-anchor="middle">signs in</text>
+          <path class="d-line" d="M120 96V152" marker-end="url(#ar)"/>
+          <path class="d-line" d="M168 96V108H560V152" marker-end="url(#ar)"/>
+          <path class="d-line" d="M408 108V152" marker-end="url(#ar)"/>
+          <path class="d-line" d="M680 96V152" marker-start="url(#ar)" marker-end="url(#ar)"/>
+          <path class="d-line" d="M248 200H304" marker-start="url(#ar)" marker-end="url(#ar)"/>
+          <text class="d-quiet" x="276" y="175" text-anchor="middle">service</text>
+          <text class="d-quiet" x="276" y="188" text-anchor="middle">binding</text>
+          <rect class="d-main" x="40" y="152" width="208" height="96" rx="8"/>
+          <text class="d-name" x="56" y="176">Document Approval</text>
+          <text class="d-txt" x="56" y="196">Worker: Next.js web app</text>
+          <text class="d-txt" x="56" y="212">API, permissions, PDF</text>
+          <text class="d-txt" x="56" y="228">D1: PR, PO, deliveries</text>
+          <rect class="d-box" x="304" y="152" width="208" height="96" rx="8"/>
+          <text class="d-name" x="320" y="176">Inventory (live today)</text>
+          <text class="d-txt" x="320" y="196">Pages: web app</text>
+          <text class="d-txt" x="320" y="212">Worker: API, stock, receiving</text>
+          <text class="d-txt" x="320" y="228">D1: items, stock, tools</text>
+          <rect class="d-box" x="528" y="152" width="192" height="96" rx="8"/>
+          <text class="d-name" x="544" y="176">Manpower Board (live)</text>
+          <text class="d-txt" x="544" y="196">Pages: board and phone</text>
+          <text class="d-txt" x="544" y="212">Moves here from Netlify</text>
+          <text class="d-txt" x="544" y="228">Data: Supabase, above</text>
+          <path class="d-line" d="M144 248V272M408 248V272M144 272H612"/>
+          <path class="d-line" d="M148 272V296" marker-end="url(#ar)"/>
+          <path class="d-line" d="M380 272V296" marker-end="url(#ar)"/>
+          <path class="d-line" d="M612 272V296" marker-end="url(#ar)"/>
+          <rect class="d-box" x="40" y="296" width="216" height="92" rx="8"/>
+          <text class="d-name" x="56" y="320">Core D1, shared</text>
+          <text class="d-txt" x="56" y="340">Users, positions, limits</text>
+          <text class="d-txt" x="56" y="356">Departments, sites, warehouses</text>
+          <text class="d-txt" x="56" y="372">Vendors and evaluations</text>
+          <rect class="d-box" x="272" y="296" width="216" height="92" rx="8"/>
+          <text class="d-name" x="288" y="320">R2 files, private</text>
+          <text class="d-txt" x="288" y="340">Attachments and versions</text>
+          <text class="d-txt" x="288" y="356">Vendor certificates, PO PDFs</text>
+          <text class="d-txt" x="288" y="372">Weekly exports, all 3 apps</text>
+          <rect class="d-box" x="504" y="296" width="216" height="92" rx="8"/>
+          <text class="d-name" x="520" y="320">Cron Triggers</text>
+          <text class="d-txt" x="520" y="340">Reminders, digests</text>
+          <text class="d-txt" x="520" y="356">Late-delivery alerts</text>
+          <text class="d-txt" x="520" y="372">Vendor feedback emails</text>
+          <path class="d-line" d="M612 388V444" marker-end="url(#ar)"/>
+          <rect class="d-box" x="504" y="444" width="216" height="48" rx="8"/>
+          <text class="d-name" x="612" y="472" text-anchor="middle">Email: Resend or Brevo</text>
+          <text class="d-quiet" x="24" y="472">Dashed box: outside the Cloudflare account.</text>
+        </svg>
+      </div>
+      <p class="note">The Approval and Inventory Workers call each other through a service binding, a private link inside the account, so neither app exposes an integration address to the internet. Manpower Board's pages talk to Supabase directly, as today: row-level security decides who sees what, and Realtime pushes each change to every open board.</p>
+    </section>
+
+    <section id="plans">
+      <div class="sec-head"><h2>Plans to subscribe and their prices</h2><button class="btn" type="button" data-comment="plans" hidden>Comment</button></div>
+      <p class="point">Two paid plans, Cloudflare Workers Paid and Supabase Pro, for about USD 30 (THB 1,000) a month; a paid email plan adds USD 20 from Approval go-live.</p>
+      <div class="tbl wide">
+        <table>
+          <thead><tr><th>Service and plan</th><th>Used for</th><th class="num">USD / month</th><th>What is included</th><th>Needed</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Cloudflare Workers Paid</strong><br><span class="note">one account</span></td><td>Hosting for all three apps; Workers, D1, R2 and Cron Triggers for Approval and Inventory</td><td class="num">5 + usage</td><td>10 million requests and 30 million CPU-ms a month; D1: 25 billion rows read, 50 million rows written, 5 GB; R2: 10 GB free, then 0.015 per GB-month</td><td><span class="pill yes">Yes, step 2</span></td></tr>
+            <tr><td><strong>Supabase Pro</strong><br><span class="note">one organisation</span></td><td>Manpower Board database, sign-in and live updates</td><td class="num">25</td><td>Includes a USD 10 credit that pays for one Micro project; 8 GB disk, 250 GB egress, 100,000 monthly users, 100 GB files, daily backups kept 7 days</td><td><span class="pill yes">Yes, step 2</span></td></tr>
+            <tr><td><strong>Resend</strong><br><span class="note">Free, then Pro</span></td><td>Approval notification emails</td><td class="num">0, then 20</td><td>Free: 100 emails a day. Pro: 50,000 a month</td><td><span class="pill watch">Pro at Approval go-live</span></td></tr>
+            <tr><td><strong>Firebase Authentication</strong><br><span class="note">Spark</span></td><td>Shared sign-in for Approval and Inventory</td><td class="num">0</td><td>50,000 monthly active users</td><td><span class="pill free">Yes, free</span></td></tr>
+            <tr><td><strong>GitHub organisation</strong><br><span class="note">Free</span></td><td>Company-owned home for the three repos</td><td class="num">0</td><td>Private repos, 2,000 Actions minutes a month; Team plan is USD 4 per user if wanted</td><td><span class="pill free">Recommended</span></td></tr>
+            <tr><td><strong>Netlify</strong></td><td>Manpower Board pages today</td><td class="num">0 now</td><td>Pro would be USD 20 a month</td><td><span class="pill no">No: close after the move</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Prices exclude VAT. These services bill a company card in USD, so check with Finance whether 7% VAT must be self-assessed (P.P.36). THB at about 34 per USD (33.3 to 34.0 in November 2026). Not needed now: Supabase point-in-time recovery (about USD 100 a month) and Cloudflare Zero Trust seats.</p>
+    </section>
+
+    <section id="capacity">
+      <div class="sec-head"><h2>How long the space lasts</h2><button class="btn" type="button" data-comment="capacity" hidden>Comment</button></div>
+      <p class="point">Every plan has room for at least 5 years at today's scale. Only R2's free 10 GB fills, in about 15 months, and after that it costs under USD 1 a month.</p>
+      <div class="tbl wide">
+        <table>
+          <thead><tr><th>Resource</th><th>Plan allowance</th><th>Estimated use</th><th>Lasts (estimate)</th></tr></thead>
+          <tbody>
+            <tr><td>Worker requests</td><td>10 million a month</td><td>About 1.5 million a month (150 users × 450 requests a day × 22 days)</td><td><span class="pill yes">6× headroom</span> fits about 900 users</td></tr>
+            <tr><td>D1 storage, all databases</td><td>5 GB, then USD 0.75 per GB-month; 10 GB cap per database</td><td>About 0.3 GB a year (Inventory 0.1, Approval with its audit log 0.2)</td><td><span class="pill yes">About 15 years</span> about 1.5 GB after 5 years</td></tr>
+            <tr><td>D1 rows read</td><td>25 billion a month</td><td>Up to about 3 billion a month by year 5, because Inventory loads its whole history when it opens</td><td><span class="pill watch">Fits 5 years</span> add paged history to Inventory by year 3</td></tr>
+            <tr><td>D1 rows written</td><td>50 million a month</td><td>Under 0.5 million a month</td><td><span class="pill yes">No limit in sight</span></td></tr>
+            <tr><td>R2 files</td><td>10 GB free, then USD 0.015 per GB-month</td><td>About 8 GB a year: Approval attachments 7.5 GB (30 documents × 2 files × 0.5 MB × 250 days), Inventory certificates and exports under 0.5 GB</td><td><span class="pill watch">Free space ~15 months</span> about 40 GB by year 5, under USD 1 a month</td></tr>
+            <tr><td>Supabase disk (Manpower Board)</td><td>8 GB, then USD 0.125 per GB-month</td><td>About 0.2 GB a year, plus today's size (check the dashboard)</td><td><span class="pill yes">Over 20 years</span></td></tr>
+            <tr><td>Supabase egress</td><td>250 GB a month</td><td>About 50 GB a month (120 users × 20 MB a day × 22 days)</td><td><span class="pill yes">5× headroom</span></td></tr>
+            <tr><td>Supabase compute (Micro, 1 GB memory)</td><td>One Micro included</td><td>120 users, a small database</td><td><span class="pill watch">May need Small</span> 2 GB, USD 5 a month more; budgeted from year 3</td></tr>
+            <tr><td>Firebase sign-in</td><td>50,000 monthly users</td><td>About 300</td><td><span class="pill yes">No limit in sight</span></td></tr>
+            <tr><td>Email (Resend Pro)</td><td>50,000 a month</td><td>About 4,000 a month (30 documents × 6 emails × 22 days)</td><td><span class="pill yes">12× headroom</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Assumes about 120 Manpower Board users, 150 Approval and Inventory users, 30 PR or PO documents a working day and flat headcount. Measure real use in the first month after the move and redo this table.</p>
+    </section>
+
+    <section id="budget">
+      <div class="sec-head"><h2>Five-year budget</h2><button class="btn" type="button" data-comment="budget" hidden>Comment</button></div>
+      <p class="point">Plan for about USD 3,600 (THB 122,000) over 5 years: USD 605 to 675 a year, plus 10% for price rises.</p>
+      <div class="bars" aria-hidden="true">
+        <div class="brow"><span>Year 1</span><div class="track"><div class="seg s-sb" style="width:44.4%"></div><div class="seg s-em" style="width:35.6%"></div><div class="seg s-cf" style="width:9.6%"></div></div><span class="v">605</span></div>
+        <div class="brow"><span>Year 2</span><div class="track"><div class="seg s-sb" style="width:44.4%"></div><div class="seg s-em" style="width:35.6%"></div><div class="seg s-cf" style="width:9.6%"></div></div><span class="v">605</span></div>
+        <div class="brow"><span>Year 3</span><div class="track"><div class="seg s-sb" style="width:53.3%"></div><div class="seg s-em" style="width:35.6%"></div><div class="seg s-cf" style="width:10.4%"></div></div><span class="v">670</span></div>
+        <div class="brow"><span>Year 4</span><div class="track"><div class="seg s-sb" style="width:53.3%"></div><div class="seg s-em" style="width:35.6%"></div><div class="seg s-cf" style="width:10.4%"></div></div><span class="v">670</span></div>
+        <div class="brow"><span>Year 5</span><div class="track"><div class="seg s-sb" style="width:53.3%"></div><div class="seg s-em" style="width:35.6%"></div><div class="seg s-cf" style="width:11.1%"></div></div><span class="v">675</span></div>
+      </div>
+      <div class="key"><span><i class="s-sb"></i>Supabase Pro</span><span><i class="s-em"></i>Email (Resend Pro)</span><span><i class="s-cf"></i>Cloudflare plan + usage</span><span>Bar length to scale, USD; full width = USD 675</span></div>
+      <div class="tbl mid">
+        <table>
+          <thead><tr><th>Year</th><th class="num">Cloudflare Workers Paid</th><th class="num">Cloudflare usage</th><th class="num">Supabase Pro</th><th class="num">Email</th><th class="num">Total USD</th><th class="num">Total THB (×34)</th></tr></thead>
+          <tbody>
+            <tr><td>Year 1</td><td class="num">60</td><td class="num">5</td><td class="num">300</td><td class="num">240</td><td class="num">605</td><td class="num">20,570</td></tr>
+            <tr><td>Year 2</td><td class="num">60</td><td class="num">5</td><td class="num">300</td><td class="num">240</td><td class="num">605</td><td class="num">20,570</td></tr>
+            <tr><td>Year 3</td><td class="num">60</td><td class="num">10</td><td class="num">360</td><td class="num">240</td><td class="num">670</td><td class="num">22,780</td></tr>
+            <tr><td>Year 4</td><td class="num">60</td><td class="num">10</td><td class="num">360</td><td class="num">240</td><td class="num">670</td><td class="num">22,780</td></tr>
+            <tr><td>Year 5</td><td class="num">60</td><td class="num">15</td><td class="num">360</td><td class="num">240</td><td class="num">675</td><td class="num">22,950</td></tr>
+            <tr class="total"><td>5 years</td><td class="num">300</td><td class="num">45</td><td class="num">1,680</td><td class="num">1,200</td><td class="num">3,225</td><td class="num">109,650</td></tr>
+            <tr class="total"><td>With 10% for price rises</td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num">3,548</td><td class="num">120,615</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="note">
+        <li>Year 3 onward includes Supabase Small compute (USD 5 a month more) as a precaution. Email is counted from year 1 to stay on the safe side; without paid email the 5 years cost about USD 2,000.</li>
+        <li>Not in the budget: a Supabase project in Singapore for Approval data if Legal or IT rule out D1 (about USD 10 a month, USD 600 over 5 years), and GitHub Team for two admins (USD 480).</li>
+        <li>Compared over 5 years: moving Manpower Board's data to D1 saves about USD 1,700 (its Supabase cost) but needs a rebuild; putting all three apps on Supabase Pro + Netlify Pro costs about USD 65 a month (USD 3,900 before email) and still means migrating Inventory.</li>
+      </ul>
+    </section>
+
+    <section id="changes">
+      <div class="sec-head"><h2>Changes to each app, data and security</h2><button class="btn" type="button" data-comment="changes" hidden>Comment</button></div>
+      <p class="point">Approval's technology is set in its repo, Inventory gains two features, and Manpower Board changes where it is hosted and who owns its accounts, not how it works.</p>
+      <h3>Manpower Board</h3>
+      <ul>
+        <li><strong>Pages:</strong> move from Netlify to Cloudflare Pages on the TRIGO account, built from GitHub on every push; <code>config.js</code> is generated from the project's environment variables, as on Netlify today.</li>
+        <li><strong>Previews:</strong> each pull request gets a Pages preview link, so the <code>/?demo</code> previews keep working.</li>
+        <li><strong>Database:</strong> transfer the Supabase project into a TRIGO organisation on Pro. Tables, row-level security, Realtime and the admin-users function stay as they are.</li>
+        <li><strong>Sign-in, later and optional:</strong> once Approval is live, Manpower Board can accept the shared Firebase sign-in through Supabase's third-party auth, so one login works in all three apps.</li>
+      </ul>
+      <h3>Inventory</h3>
+      <ul>
+        <li><strong>Request purchase:</strong> pick low-stock or chosen consumables, set quantities and a requester, and send them to Approval as a draft PR; follow its status and the quantity on order per item. A weekly draft of all low-stock items is prepared automatically.</li>
+        <li><strong>Receive against PO:</strong> pick an expected delivery, lines pre-filled, record actual quantities with short or over differences, lot and expiry as today.</li>
+        <li><strong>Shared master data:</strong> the supplier field becomes the shared vendor list; users, departments and warehouses come from the core database.</li>
+      </ul>
+      <h3>Document Approval technology</h3>
+      <ul>
+        <li>Web app and hosting (Q28): Next.js, Tailwind and shadcn/ui on Cloudflare Workers (OpenNext adapter). Database (Q26, Q27): D1 for its own data plus the shared core, Asia-Pacific location hint, permissions checked in the Worker. Sign-in: the Firebase project shared with Inventory, with the same register-then-approve flow.</li>
+        <li>Scheduled jobs on Cloudflare Cron Triggers; files in R2 with versions kept and hashed; email through Resend (Brevo as the alternative) from <code>no-reply@trigo-group.com</code>, once IT adds its DNS records; the PO PDF with Thai text on Workers is proven in the first sprint; Word and Excel exports run in the Worker too.</li>
+        <li>PO life (Q46): the PO continues to delivery: "Deliver to" per line, Warehouse lines received in Inventory and other lines in Approval, PO closed when all lines are received. Site map (Q51): Deliveries and Vendors have their own menu items; Settings adds Departments and sites.</li>
+        <li>Full plan in the Approval repo: <a href="https://github.com/nutdanais/trigoth-approval/blob/main/docs/technology.md" target="_blank" rel="noopener">technology.md</a> and <a href="https://github.com/nutdanais/trigoth-approval/blob/main/docs/service-plan.md" target="_blank" rel="noopener">service-plan.md</a>.</li>
+      </ul>
+      <h3>Who owns which data</h3>
+      <div class="tbl mid">
+        <table>
+          <thead><tr><th>Data</th><th>Lives in</th><th>Written by</th><th>Read by</th></tr></thead>
+          <tbody>
+            <tr><td>Users, positions, approval limits, delegations</td><td>Core DB</td><td>Approval</td><td>Approval, Inventory</td></tr>
+            <tr><td>Departments, sites, warehouses</td><td>Core DB</td><td>Approval (departments, sites); Inventory (warehouses)</td><td>Approval, Inventory</td></tr>
+            <tr><td>Vendors, vendor documents, evaluations</td><td>Core DB</td><td>Approval</td><td>Approval, Inventory</td></tr>
+            <tr><td>Items, stock, lots, movements, tools, customer parts</td><td>Inventory DB</td><td>Inventory</td><td>Approval reads items for PR lines</td></tr>
+            <tr><td>PR, PO, routes, approvals, expected deliveries, receipts</td><td>Approval DB</td><td>Approval; Inventory records receipts</td><td>Approval, Inventory</td></tr>
+            <tr><td>Employees, boards, missions, assignments, leave, on-call</td><td>Manpower DB (Supabase)</td><td>Manpower Board</td><td>Manpower Board only, for now</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Security, location and backups</h3>
+      <ul>
+        <li><strong>Ownership:</strong> the Cloudflare account, the Supabase organisation and a GitHub organisation belong to TRIGO Thailand, billed to a company card, with at least two administrators using two-factor sign-in.</li>
+        <li><strong>Permissions:</strong> D1 has no row-level security, so each Worker checks role, position and route before reading or writing, with automated tests before go-live. Manpower Board keeps its row-level security in Supabase.</li>
+        <li><strong>Files and audit:</strong> private R2 buckets opened only through the Worker; every create, edit, approve, reject, view and download logged and kept 3 years.</li>
+        <li><strong>Backups:</strong> D1 restores to any point in the last 30 days, plus a weekly export to R2. Manpower Board gets Supabase Pro daily backups kept 7 days, plus the same weekly export.</li>
+        <li><strong>Data location:</strong> D1 databases and R2 files take an Asia-Pacific hint but do not guarantee a country, and Firebase keeps sign-in accounts in the United States (as for Inventory today); Legal or IT must confirm all three under TRIGO policy and Thai PDPA. A Supabase project stays in the region chosen when it was created, so check which region Manpower Board uses today.</li>
+      </ul>
+    </section>
+
+    <section id="risks">
+      <div class="sec-head"><h2>Risks and open questions</h2><button class="btn" type="button" data-comment="risks" hidden>Comment</button></div>
+      <p class="point">Data location and PDF generation on Workers must be settled before the Approval build; the rest have known fallbacks.</p>
+      <div class="tbl wide">
+        <table>
+          <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation or fallback</th></tr></thead>
+          <tbody>
+            <tr><td>D1 and R2 cannot guarantee data stays in one country; Firebase sign-in data is in the US</td><td>Possible conflict with TRIGO policy or PDPA</td><td>Legal or IT confirm before build; fallback: Approval data on Supabase in Singapore, still on the shared sign-in</td></tr>
+            <tr><td>PO PDF on letterhead may be heavy for a Worker</td><td>PDF download fails or is slow</td><td>Prove it in sprint 1; fallback: lighter PDF library or Cloudflare Browser Rendering</td></tr>
+            <tr><td>Permission bugs without database-level security</td><td>A user sees a document they should not</td><td>Shared permission module, automated tests per role, reviewed before go-live</td></tr>
+            <tr><td>Manpower Board's Supabase Micro compute runs short</td><td>The board loads slowly</td><td>Watch the usage page; move to Small (USD 5 a month more), budgeted from year 3</td></tr>
+            <tr><td>App addresses change when Netlify and the Inventory account move</td><td>Staff open old links</td><td>Use company subdomains from the start; run old and new addresses side by side for a week</td></tr>
+            <tr><td>Two vendors to manage (Cloudflare and Supabase)</td><td>Two bills, two sets of admins</td><td>Same two admins and company card on both</td></tr>
+            <tr><td>Shared core database couples Approval and Inventory</td><td>A change for one app breaks the other</td><td>Core tables change only through reviewed migrations used by both</td></tr>
+            <tr><td>One person knows the setup</td><td>Nobody can maintain it if they leave</td><td>Two account admins, a written runbook, all three repos documented</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>Open questions</h3>
+      <ul class="checks">
+        <li>Is Asia-Pacific storage acceptable for the databases and files, or must data stay in Singapore or Thailand? Can sign-in accounts stay in Firebase in the US?</li>
+        <li>Who in TRIGO owns the Cloudflare and Supabase accounts and their billing?</li>
+        <li>Which Supabase region does Manpower Board use today, and is it acceptable?</li>
+        <li>Do the apps keep their free pages.dev and netlify.app addresses, or move to company subdomains (IT owns the DNS)?</li>
+        <li>Refill quantity rule for purchase requests from Inventory: up to safety stock, or up to a maximum stock level per item?</li>
+      </ul>
+    </section>
+
+    <section id="steps">
+      <div class="sec-head"><h2>Steps to start moving</h2><button class="btn" type="button" data-comment="steps" hidden>Comment</button></div>
+      <p class="point">Start with company-owned accounts and Manpower Board's backups, then move the live apps one at a time; each step ends in a check before the next starts.</p>
+      <ol class="steps">
+        <li><span class="n">1</span><div><h4>Approve</h4><p>Agree this plan and the 5-year budget; name the account owner and a second administrator.</p></div></li>
+        <li><span class="n">2</span><div><h4>Company accounts <span class="when">week 1</span></h4><p>Create a shared admin mailbox on trigo-group.com, then a Cloudflare account on Workers Paid, a Supabase organisation on Pro and a GitHub organisation, all on a company card, each with the two administrators and two-factor sign-in.</p><p class="chk"><b>Check:</b> both administrators can sign in to all three.</p></div></li>
+        <li><span class="n">3</span><div><h4>Manpower Board database <span class="when">weeks 1–2</span></h4><p>Transfer its Supabase project into the company organisation; the project and its data stay where they are, and it moves onto Pro with daily backups.</p><p class="chk"><b>Check:</b> the board works unchanged, the first daily backup is listed, the region is noted.</p></div></li>
+        <li><span class="n">4</span><div><h4>Repos <span class="when">week 2</span></h4><p>Transfer the three GitHub repos to the organisation; GitHub redirects the old links.</p><p class="chk"><b>Check:</b> tests and deploys still run.</p></div></li>
+        <li><span class="n">5</span><div><h4>Manpower Board pages <span class="when">weeks 2–3</span></h4><p>Create a Cloudflare Pages project from the repo with Netlify's environment variables and preview links on. Run both addresses for a week, then send staff to the new one and close Netlify.</p><p class="chk"><b>Check:</b> staff sign in on the new address; <code>/?demo</code> works on a preview link.</p></div></li>
+        <li><span class="n">6</span><div><h4>Inventory <span class="when">weeks 3–4</span></h4><p>Move its Pages project, Worker, D1 database and R2 bucket into the company account (export and import D1, copy R2), then switch the address.</p><p class="chk"><b>Check:</b> Inventory runs unchanged; a restore from backup works.</p></div></li>
+        <li><span class="n">7</span><div><h4>Backups <span class="when">week 4</span></h4><p>Weekly exports of every D1 database and of Manpower Board's Supabase database to R2.</p><p class="chk"><b>Check:</b> one test restore from each.</p></div></li>
+        <li><span class="n">8</span><div><h4>Shared core</h4><p>Create the core database (users, departments, sites, warehouses, vendors) and move Inventory's users onto it.</p><p class="chk"><b>Check:</b> Inventory sign-in and permissions unchanged.</p></div></li>
+        <li><span class="n">9</span><div><h4>Approval app, first sprint</h4><p>Build sign-in, permissions, scheduled jobs and the PO PDF with Thai text on Workers first; IT adds Resend's SPF and DKIM records to the trigo-group.com DNS.</p><p class="chk"><b>Check:</b> PDF and permission tests pass; a test email arrives from no-reply@trigo-group.com; data location confirmed by Legal or IT.</p></div></li>
+        <li><span class="n">10</span><div><h4>Approval app, full build</h4><p>PR, PO, documents, vendors, delivery tracking, settings, audit trail; turn on Resend Pro.</p><p class="chk"><b>Check:</b> user acceptance test with Purchasing, Finance and one warehouse.</p></div></li>
+        <li><span class="n">11</span><div><h4>Integration and go-live</h4><p>Expected deliveries, Receive against PO in Inventory, receipts back to Approval.</p><p class="chk"><b>Check:</b> one month of POs received end to end without double entry.</p></div></li>
+        <li class="later"><span class="n">12</span><div><h4>Later, optional</h4><p>Manpower Board accepts the shared Firebase sign-in.</p><p class="chk"><b>Check:</b> one login opens all three apps.</p></div></li>
+      </ol>
+      <h3>Decisions needed</h3>
+      <ul class="checks">
+        <li>Approve Cloudflare Workers Paid and Supabase Pro (about USD 30 a month) and the 5-year budget of about USD 3,600.</li>
+        <li>Confirm the data-location requirement (Asia-Pacific, Singapore or Thailand) for databases and files, and that sign-in accounts may stay in Firebase in the US.</li>
+        <li>Name the account owner and the second administrator.</li>
+        <li>Choose the app addresses: free pages.dev names or company subdomains.</li>
+        <li>Update the Requirements Confirmation Report (Q26 to Q28, Q46, Q51) and set new trial dates.</li>
+      </ul>
+      <h3>Sources</h3>
+      <p class="note">Prices checked 27 Nov 2026 through search results and pricing summaries; confirm each on the provider's own page before budgeting.</p>
+      <ul class="sources">
+        <li><a href="https://developers.cloudflare.com/workers/platform/pricing/" target="_blank" rel="noopener">Cloudflare Workers pricing</a></li>
+        <li><a href="https://developers.cloudflare.com/d1/platform/pricing/" target="_blank" rel="noopener">Cloudflare D1 pricing</a></li>
+        <li><a href="https://developers.cloudflare.com/r2/pricing/" target="_blank" rel="noopener">Cloudflare R2 pricing</a></li>
+        <li><a href="https://supabase.com/pricing" target="_blank" rel="noopener">Supabase pricing</a></li>
+        <li><a href="https://supabase.com/docs/guides/platform/compute-and-disk" target="_blank" rel="noopener">Supabase compute</a></li>
+        <li><a href="https://supabase.com/docs/guides/platform/project-transfer" target="_blank" rel="noopener">Supabase project transfers</a></li>
+        <li><a href="https://supabase.com/docs/guides/auth/third-party/firebase-auth" target="_blank" rel="noopener">Supabase with Firebase Auth</a></li>
+        <li><a href="https://www.netlify.com/changelog/2026-07-14-pro-plan-credit-tiers.md" target="_blank" rel="noopener">Netlify Pro credit tiers</a></li>
+        <li><a href="https://resend.com/pricing" target="_blank" rel="noopener">Resend pricing</a></li>
+        <li><a href="https://firebase.google.com/pricing" target="_blank" rel="noopener">Firebase pricing</a></li>
+        <li><a href="https://github.com/pricing" target="_blank" rel="noopener">GitHub pricing</a></li>
+        <li><a href="https://fred.stlouisfed.org/series/DEXTHUS" target="_blank" rel="noopener">USD/THB rate (FRED)</a></li>
+      </ul>
+    </section>
+
+  </div>
+</main>
+<footer><div class="wrap">TRIGO Apps: Hosting and Database Plan · 27 Nov 2026 · estimates to be re-checked one month after the move</div></footer>
+
+<script>
+(function () {
+  var nav = document.getElementById('navlist');
+  nav.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-go]');
+    if (!b) return;
+    var el = document.getElementById(b.getAttribute('data-go'));
+    if (el) el.scrollIntoView({ block: 'start' });
+  });
+  var buttons = Array.prototype.slice.call(nav.querySelectorAll('button[data-go]'));
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        buttons.forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-go') === en.target.id); });
+      });
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    buttons.forEach(function (b) { var s = document.getElementById(b.getAttribute('data-go')); if (s) io.observe(s); });
+  }
+
+  var commentBtns = Array.prototype.slice.call(document.querySelectorAll('[data-comment]'));
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('comments').then(function (comments) {
+      if (!comments) return;
+      commentBtns.forEach(function (btn) {
+        btn.hidden = false;
+        btn.addEventListener('click', function () {
+          var key = btn.getAttribute('data-comment');
+          var target = key === 'top' ? document.getElementById('top') : document.getElementById(key);
+          comments.openComposer({ element: target }).catch(function () { btn.hidden = true; });
+        });
+      });
+    }).catch(function () {});
+  }
+})();
+</script>
