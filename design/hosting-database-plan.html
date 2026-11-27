@@ -199,9 +199,9 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
       </div>
       <ul>
         <li><strong>Why Cloudflare:</strong> Inventory is already live there, and the Approval app is not built yet, so changing an unbuilt app's plan is cheaper and safer than moving a working one.</li>
-        <li><strong>Why Manpower Board stays on Supabase:</strong> it depends on Postgres features Cloudflare's D1 database lacks (row-level security, triggers, live updates). Moving it would save USD 1,500 over 5 years but take weeks of rebuilding.</li>
+        <li><strong>Why Manpower Board stays on Supabase:</strong> it depends on Postgres features Cloudflare's D1 database lacks (row-level security, triggers, live updates). Moving it would save about USD 1,700 over 5 years but take weeks of rebuilding.</li>
         <li><strong>What it unlocks:</strong> PO deliveries confirmed once, in the app where the goods arrive, and seen by both apps; one login for staff; one vendor, user and item list. Manpower Board gets daily backups and no free-tier pause.</li>
-        <li><strong>What changes:</strong> the Approval app's technology plan (now in its repo) and answers Q26 to Q28 of the Requirements Confirmation Report; Inventory gains "Receive against PO" and reads shared master data; Manpower Board moves its pages from Netlify to Cloudflare Pages and its Supabase project to a company-owned organisation.</li>
+        <li><strong>What changes:</strong> the Approval app's technology plan (now in its repo) and changes the answers to Q26 to Q28, Q46 and Q51 of the Requirements Confirmation Report; Inventory gains "Receive against PO" and reads shared master data; Manpower Board moves its pages from Netlify to Cloudflare Pages and its Supabase project to a company-owned organisation.</li>
       </ul>
     </section>
 
@@ -236,7 +236,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
             <dt>Purpose</dt><dd>PR, PO and document approvals, vendor management, delivery tracking</dd>
             <dt>Stack</dt><dd>Next.js, Tailwind and shadcn/ui</dd>
             <dt>Proposed</dt><dd>Next.js on Cloudflare Workers, D1, R2 on the paid plan, beside Inventory</dd>
-            <dt>Sign-in</dt><dd>Shared Firebase sign-in with Inventory</dd>
+            <dt>Sign-in</dt><dd>Shared Firebase sign-in with Inventory, the same flow: staff register with @trigo-group.com, an admin approves</dd>
           </dl>
         </div>
       </div>
@@ -383,8 +383,8 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
       </div>
       <ul class="note">
         <li>Year 3 onward includes Supabase Small compute (USD 5 a month more) as a precaution. Email is counted from year 1 to stay on the safe side; without paid email the 5 years cost about USD 2,000.</li>
-        <li>Not in the budget: a Supabase project for Approval data in Singapore if Legal or IT rule out D1 (USD 600 over 5 years), and GitHub Team for two admins (USD 480).</li>
-        <li>Compared over 5 years: moving Manpower Board's data to D1 saves about USD 1,500 but needs a rebuild; putting all three apps on Supabase Pro + Netlify Pro costs about USD 65 a month (USD 3,900 before email) and still means migrating Inventory.</li>
+        <li>Not in the budget: a Supabase project in Singapore for Approval data if Legal or IT rule out D1 (about USD 10 a month, USD 600 over 5 years), and GitHub Team for two admins (USD 480).</li>
+        <li>Compared over 5 years: moving Manpower Board's data to D1 saves about USD 1,700 (its Supabase cost) but needs a rebuild; putting all three apps on Supabase Pro + Netlify Pro costs about USD 65 a month (USD 3,900 before email) and still means migrating Inventory.</li>
       </ul>
     </section>
 
@@ -406,9 +406,9 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
       </ul>
       <h3>Document Approval technology</h3>
       <ul>
-        <li>Web app and hosting (Q28): Next.js, Tailwind and shadcn/ui on Cloudflare Workers (OpenNext adapter). Database (Q26, Q27): D1 for its own data plus the shared core, Asia-Pacific location hint, permissions checked in the Worker. Sign-in: the Firebase project shared with Inventory.</li>
-        <li>Scheduled jobs on Cloudflare Cron Triggers; files in R2 with versions kept and hashed; email through Resend (Brevo as the alternative); the PO PDF on Workers is proven in the first sprint.</li>
-        <li>The PO continues to delivery: "Deliver to" per line, receipts, PO closed when all lines are received. Vendors have their own module.</li>
+        <li>Web app and hosting (Q28): Next.js, Tailwind and shadcn/ui on Cloudflare Workers (OpenNext adapter). Database (Q26, Q27): D1 for its own data plus the shared core, Asia-Pacific location hint, permissions checked in the Worker. Sign-in: the Firebase project shared with Inventory, with the same register-then-approve flow.</li>
+        <li>Scheduled jobs on Cloudflare Cron Triggers; files in R2 with versions kept and hashed; email through Resend (Brevo as the alternative) from <code>no-reply@trigo-group.com</code>, once IT adds its DNS records; the PO PDF with Thai text on Workers is proven in the first sprint; Word and Excel exports run in the Worker too.</li>
+        <li>PO life (Q46): the PO continues to delivery: "Deliver to" per line, Warehouse lines received in Inventory and other lines in Approval, PO closed when all lines are received. Site map (Q51): Deliveries and Vendors have their own menu items; Settings adds Departments and sites.</li>
         <li>Full plan in the Approval repo: <a href="https://github.com/nutdanais/trigoth-approval/blob/main/docs/technology.md" target="_blank" rel="noopener">technology.md</a> and <a href="https://github.com/nutdanais/trigoth-approval/blob/main/docs/service-plan.md" target="_blank" rel="noopener">service-plan.md</a>.</li>
       </ul>
       <h3>Who owns which data</h3>
@@ -429,9 +429,9 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
       <ul>
         <li><strong>Ownership:</strong> the Cloudflare account, the Supabase organisation and a GitHub organisation belong to TRIGO Thailand, billed to a company card, with at least two administrators using two-factor sign-in.</li>
         <li><strong>Permissions:</strong> D1 has no row-level security, so each Worker checks role, position and route before reading or writing, with automated tests before go-live. Manpower Board keeps its row-level security in Supabase.</li>
-        <li><strong>Files and audit:</strong> private R2 buckets opened only through the Worker; every create, edit, approve, view and download logged and kept 3 years.</li>
+        <li><strong>Files and audit:</strong> private R2 buckets opened only through the Worker; every create, edit, approve, reject, view and download logged and kept 3 years.</li>
         <li><strong>Backups:</strong> D1 restores to any point in the last 30 days, plus a weekly export to R2. Manpower Board gets Supabase Pro daily backups kept 7 days, plus the same weekly export.</li>
-        <li><strong>Data location:</strong> D1 takes an Asia-Pacific hint but does not guarantee a country; Legal or IT must confirm this under TRIGO policy and Thai PDPA. A Supabase project stays in the region chosen when it was created, so check which region Manpower Board uses today.</li>
+        <li><strong>Data location:</strong> D1 databases and R2 files take an Asia-Pacific hint but do not guarantee a country, and Firebase keeps sign-in accounts in the United States (as for Inventory today); Legal or IT must confirm all three under TRIGO policy and Thai PDPA. A Supabase project stays in the region chosen when it was created, so check which region Manpower Board uses today.</li>
       </ul>
     </section>
 
@@ -442,7 +442,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
         <table>
           <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation or fallback</th></tr></thead>
           <tbody>
-            <tr><td>D1 cannot guarantee data stays in one country</td><td>Possible conflict with TRIGO policy or PDPA</td><td>Legal or IT confirm before build; fallback: Approval data on Supabase in Singapore, still on the shared sign-in</td></tr>
+            <tr><td>D1 and R2 cannot guarantee data stays in one country; Firebase sign-in data is in the US</td><td>Possible conflict with TRIGO policy or PDPA</td><td>Legal or IT confirm before build; fallback: Approval data on Supabase in Singapore, still on the shared sign-in</td></tr>
             <tr><td>PO PDF on letterhead may be heavy for a Worker</td><td>PDF download fails or is slow</td><td>Prove it in sprint 1; fallback: lighter PDF library or Cloudflare Browser Rendering</td></tr>
             <tr><td>Permission bugs without database-level security</td><td>A user sees a document they should not</td><td>Shared permission module, automated tests per role, reviewed before go-live</td></tr>
             <tr><td>Manpower Board's Supabase Micro compute runs short</td><td>The board loads slowly</td><td>Watch the usage page; move to Small (USD 5 a month more), budgeted from year 3</td></tr>
@@ -455,7 +455,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
       </div>
       <h3>Open questions</h3>
       <ul class="checks">
-        <li>Is Asia-Pacific D1 storage acceptable, or must data stay in Singapore or Thailand?</li>
+        <li>Is Asia-Pacific storage acceptable for the databases and files, or must data stay in Singapore or Thailand? Can sign-in accounts stay in Firebase in the US?</li>
         <li>Who in TRIGO owns the Cloudflare and Supabase accounts and their billing?</li>
         <li>Which Supabase region does Manpower Board use today, and is it acceptable?</li>
         <li>Do the apps keep their free pages.dev and netlify.app addresses, or move to company subdomains (IT owns the DNS)?</li>
@@ -475,7 +475,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
         <li><span class="n">6</span><div><h4>Inventory <span class="when">weeks 3–4</span></h4><p>Move its Pages project, Worker, D1 database and R2 bucket into the company account (export and import D1, copy R2), then switch the address.</p><p class="chk"><b>Check:</b> Inventory runs unchanged; a restore from backup works.</p></div></li>
         <li><span class="n">7</span><div><h4>Backups <span class="when">week 4</span></h4><p>Weekly exports of every D1 database and of Manpower Board's Supabase database to R2.</p><p class="chk"><b>Check:</b> one test restore from each.</p></div></li>
         <li><span class="n">8</span><div><h4>Shared core</h4><p>Create the core database (users, departments, sites, warehouses, vendors) and move Inventory's users onto it.</p><p class="chk"><b>Check:</b> Inventory sign-in and permissions unchanged.</p></div></li>
-        <li><span class="n">9</span><div><h4>Approval app, first sprint</h4><p>Build sign-in, permissions and the PO PDF on Workers first.</p><p class="chk"><b>Check:</b> PDF and permission tests pass; data location confirmed by Legal or IT.</p></div></li>
+        <li><span class="n">9</span><div><h4>Approval app, first sprint</h4><p>Build sign-in, permissions, scheduled jobs and the PO PDF with Thai text on Workers first; IT adds Resend's SPF and DKIM records to the trigo-group.com DNS.</p><p class="chk"><b>Check:</b> PDF and permission tests pass; a test email arrives from no-reply@trigo-group.com; data location confirmed by Legal or IT.</p></div></li>
         <li><span class="n">10</span><div><h4>Approval app, full build</h4><p>PR, PO, documents, vendors, delivery tracking, settings, audit trail; turn on Resend Pro.</p><p class="chk"><b>Check:</b> user acceptance test with Purchasing, Finance and one warehouse.</p></div></li>
         <li><span class="n">11</span><div><h4>Integration and go-live</h4><p>Expected deliveries, Receive against PO in Inventory, receipts back to Approval.</p><p class="chk"><b>Check:</b> one month of POs received end to end without double entry.</p></div></li>
         <li class="later"><span class="n">12</span><div><h4>Later, optional</h4><p>Manpower Board accepts the shared Firebase sign-in.</p><p class="chk"><b>Check:</b> one login opens all three apps.</p></div></li>
@@ -483,7 +483,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
       <h3>Decisions needed</h3>
       <ul class="checks">
         <li>Approve Cloudflare Workers Paid and Supabase Pro (about USD 30 a month) and the 5-year budget of about USD 3,600.</li>
-        <li>Confirm the data-location requirement (Asia-Pacific, Singapore or Thailand).</li>
+        <li>Confirm the data-location requirement (Asia-Pacific, Singapore or Thailand) for databases and files, and that sign-in accounts may stay in Firebase in the US.</li>
         <li>Name the account owner and the second administrator.</li>
         <li>Choose the app addresses: free pages.dev names or company subdomains.</li>
         <li>Update the Requirements Confirmation Report (Q26 to Q28, Q46, Q51) and set new trial dates.</li>
