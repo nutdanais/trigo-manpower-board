@@ -1,0 +1,365 @@
+<meta charset="utf-8">
+<title>On-call Contract Terms</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+/* Design collateral, not app code: how to record and show an on-call person's contract
+   terms (Daily or Monthly). Card, chip, form and table styles are copied from styles.css
+   (light theme, white cards, warm on-call) so the samples look like the real board.
+   The three card options are one class each on their sample wrapper (.opt-a, .opt-b, .opt-c).
+   Light only, like the app. */
+:root {
+  /* layout: one column — findings, the three card options, then the parts that are the same in every option */
+  --bg: #eef1f4; --panel: #ffffff; --border: #d8dde4; --text: #1f2937; --muted: #6b7280;
+  --primary: #003a66; --primary-text: #003a66; --hover-tint: #eef3fb; --bg-soft: #eef1f5;
+  --emp-bg: #ffffff; --emp-perm-border: #dfe4ea; --emp-oncall-bg: #fffaf2; --emp-oncall-border: #c9a878;
+  --emp-ink: #1a1a1a; --emp-sub: #545c66; --emp-pos-bg: rgba(0,73,131,.09);
+  --oc-bg: #fff1dd; --oc-ink: #8a4f10; --oc-line: #efd2ab;
+  /* the two terms: Monthly is the filled warm, Daily the outlined warm */
+  --mo-bg: #8a4f10; --mo-ink: #ffffff;
+  --ok-surface: #f7faef; --ok-line: #cfdcae; --ok-text: #4d6810; --ok-dot: #7fa32a;
+  --mission-head: #e3ecf6; --mission-bar: #2a78d6;
+  --font-ui: "Geist", "Noto Sans Thai", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); line-height: 1.45; font-size: 14px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 24px; }
+h1 { font-size: 26px; letter-spacing: -.4px; text-wrap: balance; }
+h2 { font-size: 19px; letter-spacing: -.2px; text-wrap: balance; }
+h3 { font-size: 14px; }
+p { max-width: 74ch; }
+.lede { color: var(--muted); margin-top: 6px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.small { font-size: 12.5px; }
+.muted { color: var(--muted); }
+code { font-size: 12.5px; background: var(--bg-soft); padding: 0 4px; border-radius: 4px; }
+
+/* toolbar */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.tools { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 14px rgba(8,28,56,.06); }
+.tools .lab { font-size: 12px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+.tg { font: inherit; font-size: 12.5px; font-weight: 600; height: 30px; padding: 0 12px; border: 0; background: var(--panel); color: var(--text); cursor: pointer; }
+.tg + .tg { border-left: 1px solid var(--border); }
+.tg:hover { background: var(--hover-tint); }
+.tg[aria-pressed="true"] { background: var(--primary); color: #fff; }
+.tg:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.tools .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+/* findings */
+.find { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+.find div { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.find div > b:first-child { display: block; margin-bottom: 2px; }
+
+/* option panels */
+.opt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.opt-head h2 span { color: var(--muted); margin-right: 6px; }
+.rec { font-size: 11px; font-weight: 700; color: #fff; background: var(--primary); border-radius: 999px; padding: 1px 9px; letter-spacing: .2px; }
+.opt-why { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 6px 24px; font-size: 13px; }
+.opt-why ul { padding-left: 18px; }
+.opt-why li { margin: 2px 0; }
+.opt-why .lbl { font-weight: 700; font-size: 12px; color: var(--muted); }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 268px; gap: 14px; align-items: start; background: var(--bg); border-radius: 8px; padding: 14px; }
+@media (max-width: 760px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+
+/* a mission, trimmed */
+.mission { background: var(--panel); border: 1px solid var(--border); border-top: 4px solid var(--mission-bar); border-radius: 8px; overflow: hidden; min-width: 0; }
+.mission-h { background: var(--mission-head); padding: 7px 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.mission-h b { font-weight: 700; }
+.mission-h .tag { margin-left: auto; font-size: 10px; font-weight: 700; padding: 1px 5px; border: 1px solid #b9c9dc; border-radius: 3px; background: #fff; color: var(--primary-text); }
+.crew { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+
+/* the people panel's Available On-call pool */
+.pool { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: grid; gap: 8px; }
+.pool-h { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; font-weight: 700; flex-wrap: wrap; }
+.pool-h .n { font-size: 10.5px; font-weight: 700; background: var(--bg-soft); border-radius: 999px; padding: 0 6px; }
+.pool-h small { width: 100%; font-weight: 400; font-size: 11px; color: var(--muted); }
+.pool-cards { display: grid; grid-template-columns: repeat(2, 116px); gap: 6px; }
+.pool-legend { display: flex; gap: 10px; font-size: 11px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+.pool-legend i { display: inline-block; width: 18px; height: 11px; border-radius: 3px; background: var(--emp-oncall-bg); vertical-align: -1px; margin-right: 4px; }
+.pool-legend .lg-d { border: 1px dashed var(--emp-oncall-border); }
+.pool-legend .lg-m { border: 2px solid var(--oc-ink); }
+
+/* ===== employee card, as in styles.css ===== */
+.emp-card { width: 116px; height: 70px; border-radius: 6px; padding: 5px 6px 6px; background: var(--emp-bg); border: 1px solid var(--emp-perm-border); box-shadow: 0 1px 2px rgba(8,28,56,.08); position: relative; display: flex; flex-direction: column; color: var(--emp-ink); }
+.emp-card.oncall { border: 1px dashed var(--emp-oncall-border); background: var(--emp-oncall-bg); }
+.emp-row1 { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.emp-name, .emp-surname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-name { flex: 1 1 auto; font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+.emp-surname { font-size: 11px; font-weight: 500; line-height: 1.3; color: var(--emp-sub); }
+.emp-meta { margin-top: auto; display: flex; align-items: center; gap: 3px; min-width: 0; }
+.emp-pos, .emp-oc, .emp-area { font-size: 9.5px; font-weight: 700; line-height: 1.6; letter-spacing: .2px; padding: 0 5px; border-radius: 999px; flex: none; }
+.emp-pos { color: var(--primary-text); background: var(--emp-pos-bg); }
+.emp-oc { background: var(--oc-bg); color: var(--oc-ink); box-shadow: inset 0 0 0 1px var(--oc-line); padding: 0 4px; }
+.emp-area { margin-left: auto; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-tid { flex: none; font-variant-numeric: tabular-nums; font-size: 10px; font-weight: 700; line-height: 1.6; letter-spacing: .02em; padding: 0 4px; border-radius: 4px; background: var(--emp-pos-bg); color: var(--primary-text); }
+.a-amata { background: #e3eefa; color: #1d4f86; }
+.a-lcb { background: #fbe9f1; color: #8a2a55; }
+.a-ryg { background: #e3f5ef; color: #1f6b52; }
+
+/* ===== Option A: a term tag in the corner the TRIGO ID uses on permanent cards ===== */
+.ct { display: none; }
+.opt-a .ct { display: inline-block; flex: none; font-size: 9.5px; font-weight: 700; line-height: 1.6; letter-spacing: .02em; padding: 0 4px; border-radius: 4px; }
+.opt-a .ct-d { color: var(--oc-ink); background: #fff; box-shadow: inset 0 0 0 1px var(--oc-line); }
+.opt-a .ct-m { color: var(--mo-ink); background: var(--mo-bg); }
+
+/* ===== Option B: the OC chip carries the term in a second segment ===== */
+.ocx { display: none; }
+.opt-b .ocx { display: inline; margin-left: 3px; padding-left: 3px; border-left: 1px solid var(--oc-line); }
+.opt-b .is-m .emp-oc { background: var(--mo-bg); color: var(--mo-ink); box-shadow: none; }
+.opt-b .is-m .ocx { border-left-color: rgba(255,255,255,.45); }
+
+/* ===== Option C: the border carries it (Monthly solid, Daily dashed as today) ===== */
+.opt-c .emp-card.oncall.is-m { border: 2px solid var(--oc-ink); padding: 4px 5px 5px; }
+
+/* ===== shared parts: form, profile, list ===== */
+.shared { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 14px; }
+.box { border: 1px solid var(--border); border-radius: 8px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; background: var(--panel); }
+.box h3 { display: flex; gap: 8px; align-items: baseline; }
+.box h3 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.fg { font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+.field { display: grid; gap: 4px; font-size: 13px; }
+.fseg { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; width: max-content; max-width: 100%; }
+.fseg button { font: inherit; font-size: 13px; height: 32px; padding: 0 14px; border: 0; background: var(--panel); color: var(--text); cursor: pointer; }
+.fseg button + button { border-left: 1px solid var(--border); }
+.fseg button[aria-pressed="true"] { background: var(--primary); color: #fff; font-weight: 600; }
+.fseg button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.hint { font-size: 12px; color: var(--muted); }
+.reveal { border-left: 3px solid var(--oc-line); padding-left: 10px; display: grid; gap: 4px; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 13px; }
+.kv dt { color: var(--muted); font-size: 12.5px; }
+.kv dd { font-size: 14px; }
+.sub-chip { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-left: 4px; color: var(--oc-ink); background: var(--oc-bg); box-shadow: inset 0 0 0 1px var(--oc-line); vertical-align: 1px; }
+.sub-chip.m { background: var(--mo-bg); color: #fff; box-shadow: none; }
+
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 520px; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 10px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+td small { display: block; color: var(--muted); font-size: 12px; }
+td .nm { font-weight: 600; }
+.status { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; font-weight: 600; color: var(--ok-text); background: var(--ok-surface); border: 1px solid var(--ok-line); border-radius: 999px; padding: 0 8px; }
+.status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok-dot); }
+.tiles { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12px; color: var(--muted); }
+.tiles b { display: block; font-size: 20px; color: var(--text); font-variant-numeric: tabular-nums; }
+.tiles .sub { padding-left: 12px; border-left: 2px solid var(--oc-line); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: 12px; font-weight: 600; border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; background: var(--panel); }
+.chip[aria-pressed="true"] { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.qs { display: grid; gap: 8px; font-size: 13.5px; padding-left: 20px; }
+.qs li { max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>On-call contract terms: Daily or Monthly</h1>
+    <p class="lede">On-call inspectors are hired on one of two terms. This page shows how the app could record the term and show it on the employee card, the profile and the Manpower List. Three ways to mark the card are shown below, A to C. The form, profile and list work the same whichever card option you pick.</p>
+  </header>
+
+  <div class="tools" role="toolbar" aria-label="Sample settings">
+    <span class="lab">Language</span>
+    <span class="seg" id="lang-seg">
+      <button type="button" class="tg" id="lang-en" data-lang="en" aria-pressed="true">English</button>
+      <button type="button" class="tg" id="lang-th" data-lang="th" aria-pressed="false">ไทย</button>
+    </span>
+    <span class="hint">All names are invented sample data</span>
+  </div>
+
+  <section class="panel">
+    <h2>What the app does today</h2>
+    <div class="find">
+      <div><b>Two contract types</b>Each person is <code>permanent</code> or <code>oncall</code>. The database allows only these two values.</div>
+      <div><b>On-call is used everywhere</b>About 40 places check for on-call: the Available On-call pool, the <i>On-call free</i> count, utilization, the Overview charts and the Excel export. They should keep working unchanged.</div>
+      <div><b>The card</b>On-call cards have a dashed warm border and an <b>OC</b> chip where permanent cards show the position. On-call people have no TRIGO ID, so the corner where the ID sits is empty.</div>
+      <div><b>Proposed record</b>A new field, <b>On-call terms</b> (Daily or Monthly), used only when the contract type is On-call. It is a separate field, so the 40 on-call checks stay as they are. Existing on-call people start as <i>Not set</i> until someone fills it in. Bulk edit can fill many at once.</div>
+    </div>
+  </section>
+
+  <!-- ===== Option A ===== -->
+  <section class="panel">
+    <div class="opt-head"><h2><span>A</span>Term tag in the card's corner</h2><span class="rec">Recommended</span></div>
+    <p class="small muted">The word <b>Daily</b> or <b>Monthly</b> sits in the top-right corner, where permanent cards show the TRIGO ID. Monthly is filled and Daily is outlined, so they can be told apart at a glance.</p>
+    <div class="stage opt-a" data-sample></div>
+    <div class="opt-why">
+      <div><div class="lbl">Good</div><ul><li>The full word is readable, with no code to learn.</li><li>It uses empty space, so the card keeps its size and the bottom row is unchanged.</li><li>A card with no tag shows clearly that the term is not set yet.</li></ul></div>
+      <div><div class="lbl">Watch</div><ul><li>If on-call people get TRIGO IDs later, the ID and the tag share that corner and a long first name gets shorter.</li><li>In Thai, <i>รายเดือน</i> is a little wider than <i>Monthly</i>.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ===== Option B ===== -->
+  <section class="panel">
+    <div class="opt-head"><h2><span>B</span>The OC chip shows the term</h2></div>
+    <p class="small muted">The OC chip gets a second part: <b>OC | D</b> for Daily and <b>OC | M</b> for Monthly. Monthly fills the chip. Where the term is not set, the chip is the plain OC it is today.</p>
+    <div class="stage opt-b" data-sample></div>
+    <div class="opt-why">
+      <div><div class="lbl">Good</div><ul><li>The term stays next to the OC chip, where people already look for the contract type.</li><li>The top corner stays free for a TRIGO ID if on-call people get one later.</li></ul></div>
+      <div><div class="lbl">Watch</div><ul><li>D and M are codes people have to learn. The full word is only in the tooltip.</li><li>The chip is wider, so a long area name such as <i>Wellgrow</i> is cut short sooner.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ===== Option C ===== -->
+  <section class="panel">
+    <div class="opt-head"><h2><span>C</span>The border shows the term</h2></div>
+    <p class="small muted">Monthly on-call cards get a solid dark-warm border. Daily cards keep today's dashed border. The pool header has a small key.</p>
+    <div class="stage opt-c" data-sample></div>
+    <div class="opt-why">
+      <div><div class="lbl">Good</div><ul><li>No extra text on the card, so it is the calmest of the three.</li><li>Monthly people stand out in the pool when you pick who to call in.</li></ul></div>
+      <div><div class="lbl">Watch</div><ul><li>People need the key to know what the border means.</li><li><i>Not set</i> looks the same as Daily.</li><li>The selected-card outline is also a solid frame, so the two could be confused.</li></ul></div>
+    </div>
+  </section>
+
+  <!-- ===== same in every option ===== -->
+  <section class="panel">
+    <h2>The same in every option</h2>
+    <div class="shared">
+      <div class="box">
+        <h3>Employee form <small>New Employee and Profile → Edit</small></h3>
+        <div class="fg">Contract</div>
+        <div class="field"><span>Contract type</span>
+          <span class="fseg" id="f-contract"><button type="button" id="f-perm" aria-pressed="false">Permanent</button><button type="button" id="f-oc" aria-pressed="true">On-call</button></span>
+        </div>
+        <div class="field reveal" id="f-terms-wrap"><span>On-call terms <span class="muted small">optional</span></span>
+          <span class="fseg" id="f-terms"><button type="button" id="f-daily" aria-pressed="false">Daily</button><button type="button" id="f-monthly" aria-pressed="true">Monthly</button></span>
+          <span class="hint">Shown only for On-call. Click the selected one again to clear it.</span>
+        </div>
+        <p class="hint">Try it: switch Contract type to Permanent and the terms row goes away. Changing back to On-call brings back the term that was saved.</p>
+      </div>
+
+      <div class="box">
+        <h3>Profile <small>Contract section</small></h3>
+        <div class="fg">Contract</div>
+        <dl class="kv">
+          <div><dt>Contract type</dt><dd>On-call <span class="sub-chip m">Monthly</span></dd></div>
+          <div><dt>Position</dt><dd>—</dd></div>
+          <div><dt>Start date</dt><dd>15 Jul 2020 <span class="muted small">6 years 4 months</span></dd></div>
+          <div><dt>On the board from</dt><dd>—</dd></div>
+        </dl>
+        <p class="hint">The 12-month chart already compares an on-call person with the on-call average. It stays that way: Daily and Monthly people are still compared with all on-call staff.</p>
+      </div>
+    </div>
+
+    <div class="box">
+      <h3>Manpower List <small>Contract column, header tiles and Filters</small></h3>
+      <div class="tiles">
+        <div>Permanent<b>87</b></div>
+        <div>On-call<b>59</b></div>
+        <div class="sub">Daily<b>34</b></div>
+        <div class="sub">Monthly<b>18</b></div>
+        <div class="sub">Not set<b>7</b></div>
+      </div>
+      <div class="chips" aria-label="Filter: on-call terms">
+        <span class="muted small">Filters → On-call terms</span>
+        <span class="chip" aria-pressed="true">All</span><span class="chip">Daily</span><span class="chip">Monthly</span><span class="chip">Not set</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Person</th><th>Status</th><th>Board and area</th><th>Contract</th><th>Mobile</th></tr></thead>
+          <tbody>
+            <tr><td><span class="nm">Apichat Jaingam</span></td><td><span class="status">Active</span></td><td>Non-Rayong<small>LCB</small></td><td>On-call <span class="sub-chip">Daily</span><small>since Jul 2020 · 6y 4m</small></td><td>087-555-2785</td></tr>
+            <tr><td><span class="nm">Boonmee Mankong</span></td><td><span class="status">Active</span></td><td>Non-Rayong<small>AMATA</small></td><td>On-call <span class="sub-chip m">Monthly</span><small>since Jul 2020 · 6y 4m</small></td><td>087-555-1408</td></tr>
+            <tr><td><span class="nm">Kanjana Srithong</span></td><td><span class="status">Active</span></td><td>Non-Rayong<small>LCB</small></td><td>On-call<small>terms not set</small></td><td>089-555-3310</td></tr>
+            <tr><td><span class="nm">Arunee Wongyai</span><small>T100 · Inspector</small></td><td><span class="status">Active</span></td><td>Non-Rayong<small>AMATA</small></td><td>Permanent</td><td>081-555-1000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">Excel export and Bulk edit by file get an <b>On-call terms</b> column (Daily, Monthly or blank). The Bulk edit panel can set the term for many people at once.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Questions before building</h2>
+    <ol class="qs">
+      <li><b>Which card option: A, B or C?</b> I recommend A.</li>
+      <li><b>Is it only shown, or does it change any numbers?</b> I've assumed it is only shown. For example, it does not change utilization or the <i>On-call free</i> count. If Monthly people are paid to be available, you may want <i>Not called in</i> counted differently for them.</li>
+      <li><b>Should the Available On-call pool list Monthly first?</b> Today it is sorted by name.</li>
+      <li><b>Thai wording.</b> <i>รายวัน</i> / <i>รายเดือน</i>, as used on the cards in Thai mode above?</li>
+      <li><b>Does the term change over time?</b> If people move from Daily to Monthly and past reports must show the old term, the app needs a dated history, not one field. One field is simpler and is what is shown here.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+  const L = {
+    en: { daily: "Daily", monthly: "Monthly", dShort: "D", mShort: "M", pool: "Available On-call", notFlagged: "not flagged", keyD: "Daily", keyM: "Monthly" },
+    th: { daily: "รายวัน", monthly: "รายเดือน", dShort: "วัน", mShort: "เดือน", pool: "ออนคอลที่ว่าง", notFlagged: "ยังไม่ได้เรียก", keyD: "รายวัน", keyM: "รายเดือน" }
+  };
+  // invented sample people; term: d = Daily, m = Monthly, "" = not set
+  const pool = [
+    { f: "Boonmee", s: "Mankong", a: "AMATA", ac: "a-amata", t: "m" },
+    { f: "Kanjana", s: "Srithong", a: "LCB", ac: "a-lcb", t: "" },
+    { f: "Montri", s: "Sriwong", a: "LCB", ac: "a-lcb", t: "d" },
+    { f: "Piyanuch", s: "Kaewmanee", a: "AMATA", ac: "a-amata", t: "d" },
+    { f: "กองเกียรติ", s: "ศิริวัฒน์", a: "LCB", ac: "a-lcb", t: "m" },
+    { f: "สมศักดิ์", s: "ใจดี", a: "RYG", ac: "a-ryg", t: "d" }
+  ];
+  const crew = [
+    { f: "Chutima", s: "Thongkham", a: "AMATA", ac: "a-amata", tid: "T285", pos: "Ins" },
+    { f: "Kiattisak", s: "Kongcharoen", a: "AMATA", ac: "a-amata", tid: "T137", pos: "Ins" },
+    { f: "Wanna", s: "Jaiyen", a: "AMATA", ac: "a-amata", t: "m" },
+    { f: "Teerawat", s: "Boonma", a: "AMATA", ac: "a-amata", t: "d" },
+    { f: "ณัฐวุฒิ", s: "สายทอง", a: "AMATA", ac: "a-amata", t: "" }
+  ];
+  const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+  function card(p, l) {
+    const oc = !p.pos;
+    const term = p.t === "m" ? l.monthly : p.t === "d" ? l.daily : "";
+    const tip = `${p.f} ${p.s} • ${oc ? "On-call" + (term ? " · " + term : " · terms not set") : "Permanent • Inspector"} • ${p.a}`;
+    const corner = oc
+      ? (term ? `<span class="ct ct-${p.t}">${esc(term)}</span>` : "")
+      : `<span class="emp-tid">${p.tid}</span>`;
+    const role = oc
+      ? `<span class="emp-oc">OC${p.t ? `<span class="ocx">${esc(p.t === "m" ? l.mShort : l.dShort)}</span>` : ""}</span>`
+      : `<span class="emp-pos">${p.pos}</span>`;
+    return `<div class="emp-card${oc ? " oncall" : ""}${p.t === "m" ? " is-m" : ""}" title="${esc(tip)}">` +
+      `<span class="emp-row1"><span class="emp-name">${esc(p.f)}</span>${corner}</span>` +
+      `<span class="emp-surname">${esc(p.s)}</span>` +
+      `<span class="emp-meta">${role}<span class="emp-area ${p.ac}">${p.a}</span></span></div>`;
+  }
+
+  function render(lang) {
+    const l = L[lang];
+    document.querySelectorAll("[data-sample]").forEach((el) => {
+      const c = el.classList.contains("opt-c");
+      el.innerHTML =
+        `<div class="mission"><div class="mission-h"><b>AMATA.26.0004</b> | <b>TTKM</b> <span class="muted small">Wolfen Electric · 08:00–17:00</span><span class="tag">DAY</span></div>` +
+        `<div class="crew">${crew.map((p) => card(p, l)).join("")}</div></div>` +
+        `<div class="pool"><div class="pool-h">${esc(l.pool)} <span class="n">${pool.length}</span><small>${esc(l.notFlagged)}</small></div>` +
+        (c ? `<div class="pool-legend"><span><i class="lg-d"></i>${esc(l.keyD)}</span><span><i class="lg-m"></i>${esc(l.keyM)}</span></div>` : "") +
+        `<div class="pool-cards">${pool.map((p) => card(p, l)).join("")}</div></div>`;
+    });
+  }
+
+  let lang = "en";
+  try { if (localStorage.getItem("octerms.lang") === "th") lang = "th"; } catch (e) {}
+  function setLang(v) {
+    lang = v;
+    document.querySelectorAll("#lang-seg .tg").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === v)));
+    try { localStorage.setItem("octerms.lang", v); } catch (e) {}
+    render(v);
+  }
+  document.querySelectorAll("#lang-seg .tg").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
+  setLang(lang);
+
+  // the form demo: terms show only for On-call, and survive a switch away and back
+  let contract = "oncall", terms = "monthly";
+  const wrap = document.getElementById("f-terms-wrap");
+  function drawForm() {
+    document.getElementById("f-perm").setAttribute("aria-pressed", String(contract === "permanent"));
+    document.getElementById("f-oc").setAttribute("aria-pressed", String(contract === "oncall"));
+    document.getElementById("f-daily").setAttribute("aria-pressed", String(terms === "daily"));
+    document.getElementById("f-monthly").setAttribute("aria-pressed", String(terms === "monthly"));
+    wrap.hidden = contract !== "oncall";
+  }
+  document.getElementById("f-perm").onclick = () => { contract = "permanent"; drawForm(); };
+  document.getElementById("f-oc").onclick = () => { contract = "oncall"; drawForm(); };
+  document.getElementById("f-daily").onclick = () => { terms = terms === "daily" ? "" : "daily"; drawForm(); };
+  document.getElementById("f-monthly").onclick = () => { terms = terms === "monthly" ? "" : "monthly"; drawForm(); };
+  drawForm();
+})();
+</script>
