@@ -201,13 +201,13 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
         <li><strong>Why Cloudflare:</strong> Inventory is already live there, and the Approval app is not built yet, so changing an unbuilt app's plan is cheaper and safer than moving a working one.</li>
         <li><strong>Why Manpower Board stays on Supabase:</strong> it depends on Postgres features Cloudflare's D1 database lacks (row-level security, triggers, live updates). Moving it would save USD 1,500 over 5 years but take weeks of rebuilding.</li>
         <li><strong>What it unlocks:</strong> PO deliveries confirmed once, in the app where the goods arrive, and seen by both apps; one login for staff; one vendor, user and item list. Manpower Board gets daily backups and no free-tier pause.</li>
-        <li><strong>What changes:</strong> section 07 of the Approval spec and answers Q26 to Q28 of the Requirements Confirmation Report; Inventory gains "Receive against PO" and reads shared master data; Manpower Board moves its pages from Netlify to Cloudflare Pages and its Supabase project to a company-owned organisation.</li>
+        <li><strong>What changes:</strong> the Approval app's technology plan (now in its repo) and answers Q26 to Q28 of the Requirements Confirmation Report; Inventory gains "Receive against PO" and reads shared master data; Manpower Board moves its pages from Netlify to Cloudflare Pages and its Supabase project to a company-owned organisation.</li>
       </ul>
     </section>
 
     <section id="apps">
       <div class="sec-head"><h2>Three apps, today and proposed</h2><button class="btn" type="button" data-comment="apps" hidden>Comment</button></div>
-      <p class="point">The apps run, or were planned, on different platforms; Approval and Inventory now need to share PO and delivery data.</p>
+      <p class="point">The three apps serve the same staff, and Approval and Inventory need to share PO and delivery data.</p>
       <div class="apps">
         <div class="app">
           <span class="now">Live, in daily use</span>
@@ -234,8 +234,8 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
           <h3>Document Approval</h3>
           <dl>
             <dt>Purpose</dt><dd>PR, PO and document approvals, vendor management, delivery tracking</dd>
-            <dt>Spec</dt><dd>Netlify + Supabase</dd>
-            <dt>Proposed</dt><dd>Same as Inventory: Cloudflare Pages, Workers, D1, R2 on the paid plan</dd>
+            <dt>Stack</dt><dd>Next.js, Tailwind and shadcn/ui</dd>
+            <dt>Proposed</dt><dd>Next.js on Cloudflare Workers, D1, R2 on the paid plan, beside Inventory</dd>
             <dt>Sign-in</dt><dd>Shared Firebase sign-in with Inventory</dd>
           </dl>
         </div>
@@ -245,7 +245,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
 
     <section id="architecture">
       <div class="sec-head"><h2>Target architecture</h2><button class="btn" type="button" data-comment="architecture" hidden>Comment</button></div>
-      <p class="point">Every app has its own Pages site in one TRIGO Cloudflare account. Approval and Inventory share a sign-in, a core database and private file storage; Manpower Board keeps its data on Supabase.</p>
+      <p class="point">All three apps are hosted in one TRIGO Cloudflare account: Approval as a Next.js app on Workers, Inventory and Manpower Board on Pages. Approval and Inventory share a sign-in, a core database and private file storage; Manpower Board keeps its data on Supabase.</p>
       <div class="diagram">
         <svg viewBox="0 0 760 520" role="img" aria-label="Three apps on one Cloudflare account; Manpower Board's data stays on Supabase">
           <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="d-arrow" d="M0 0L10 5L0 10z"/></marker></defs>
@@ -273,8 +273,8 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
           <text class="d-quiet" x="276" y="188" text-anchor="middle">binding</text>
           <rect class="d-main" x="40" y="152" width="208" height="96" rx="8"/>
           <text class="d-name" x="56" y="176">Document Approval</text>
-          <text class="d-txt" x="56" y="196">Pages: web app, phone layout</text>
-          <text class="d-txt" x="56" y="212">Worker: API, permissions, PDF</text>
+          <text class="d-txt" x="56" y="196">Worker: Next.js web app</text>
+          <text class="d-txt" x="56" y="212">API, permissions, PDF</text>
           <text class="d-txt" x="56" y="228">D1: PR, PO, deliveries</text>
           <rect class="d-box" x="304" y="152" width="208" height="96" rx="8"/>
           <text class="d-name" x="320" y="176">Inventory (live today)</text>
@@ -321,7 +321,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
         <table>
           <thead><tr><th>Service and plan</th><th>Used for</th><th class="num">USD / month</th><th>What is included</th><th>Needed</th></tr></thead>
           <tbody>
-            <tr><td><strong>Cloudflare Workers Paid</strong><br><span class="note">one account</span></td><td>Pages for all three apps; Workers, D1, R2 and Cron Triggers for Approval and Inventory</td><td class="num">5 + usage</td><td>10 million requests and 30 million CPU-ms a month; D1: 25 billion rows read, 50 million rows written, 5 GB; R2: 10 GB free, then 0.015 per GB-month</td><td><span class="pill yes">Yes, step 2</span></td></tr>
+            <tr><td><strong>Cloudflare Workers Paid</strong><br><span class="note">one account</span></td><td>Hosting for all three apps; Workers, D1, R2 and Cron Triggers for Approval and Inventory</td><td class="num">5 + usage</td><td>10 million requests and 30 million CPU-ms a month; D1: 25 billion rows read, 50 million rows written, 5 GB; R2: 10 GB free, then 0.015 per GB-month</td><td><span class="pill yes">Yes, step 2</span></td></tr>
             <tr><td><strong>Supabase Pro</strong><br><span class="note">one organisation</span></td><td>Manpower Board database, sign-in and live updates</td><td class="num">25</td><td>Includes a USD 10 credit that pays for one Micro project; 8 GB disk, 250 GB egress, 100,000 monthly users, 100 GB files, daily backups kept 7 days</td><td><span class="pill yes">Yes, step 2</span></td></tr>
             <tr><td><strong>Resend</strong><br><span class="note">Free, then Pro</span></td><td>Approval notification emails</td><td class="num">0, then 20</td><td>Free: 100 emails a day. Pro: 50,000 a month</td><td><span class="pill watch">Pro at Approval go-live</span></td></tr>
             <tr><td><strong>Firebase Authentication</strong><br><span class="note">Spark</span></td><td>Shared sign-in for Approval and Inventory</td><td class="num">0</td><td>50,000 monthly active users</td><td><span class="pill free">Yes, free</span></td></tr>
@@ -390,7 +390,7 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
 
     <section id="changes">
       <div class="sec-head"><h2>Changes to each app, data and security</h2><button class="btn" type="button" data-comment="changes" hidden>Comment</button></div>
-      <p class="point">Approval changes its technology plan, Inventory gains two features, and Manpower Board changes where it is hosted and who owns its accounts, not how it works.</p>
+      <p class="point">Approval's technology is set in its repo, Inventory gains two features, and Manpower Board changes where it is hosted and who owns its accounts, not how it works.</p>
       <h3>Manpower Board</h3>
       <ul>
         <li><strong>Pages:</strong> move from Netlify to Cloudflare Pages on the TRIGO account, built from GitHub on every push; <code>config.js</code> is generated from the project's environment variables, as on Netlify today.</li>
@@ -404,11 +404,12 @@ footer { color: var(--muted); font-size: 12.5px; text-align: center; padding-blo
         <li><strong>Receive against PO:</strong> pick an expected delivery, lines pre-filled, record actual quantities with short or over differences, lot and expiry as today.</li>
         <li><strong>Shared master data:</strong> the supplier field becomes the shared vendor list; users, departments and warehouses come from the core database.</li>
       </ul>
-      <h3>Document Approval spec</h3>
+      <h3>Document Approval technology</h3>
       <ul>
-        <li>Hosting (Q28): Netlify becomes Cloudflare Pages + Workers. Database (Q26, Q27): Supabase becomes D1 with an Asia-Pacific location hint, permissions checked in the Worker. Sign-in: the shared Firebase project.</li>
-        <li>Scheduled jobs move to Cloudflare Cron Triggers; files stay in R2; email stays Brevo or Resend; the PO PDF on Workers is proven in the first sprint.</li>
-        <li>The PO continues to delivery: "Deliver to" per line, receipts, PO closed when all lines are received. Vendors become their own module.</li>
+        <li>Web app and hosting (Q28): Next.js, Tailwind and shadcn/ui on Cloudflare Workers (OpenNext adapter). Database (Q26, Q27): D1 for its own data plus the shared core, Asia-Pacific location hint, permissions checked in the Worker. Sign-in: the Firebase project shared with Inventory.</li>
+        <li>Scheduled jobs on Cloudflare Cron Triggers; files in R2 with versions kept and hashed; email through Resend (Brevo as the alternative); the PO PDF on Workers is proven in the first sprint.</li>
+        <li>The PO continues to delivery: "Deliver to" per line, receipts, PO closed when all lines are received. Vendors have their own module.</li>
+        <li>Full plan in the Approval repo: <a href="https://github.com/nutdanais/trigoth-approval/blob/claude/paid-tier-hosting-database-recommendations/docs/technology.md" target="_blank" rel="noopener">technology.md</a> and <a href="https://github.com/nutdanais/trigoth-approval/blob/claude/paid-tier-hosting-database-recommendations/docs/service-plan.md" target="_blank" rel="noopener">service-plan.md</a>.</li>
       </ul>
       <h3>Who owns which data</h3>
       <div class="tbl mid">
