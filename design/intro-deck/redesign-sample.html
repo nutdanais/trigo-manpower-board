@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deck Redesign Sample</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&display=block">
+<style>
+/* Redesign sample: "Soft Fade". Light slides washed with TRIGO navy, sky and green gradients,
+   one modern sans (Geist) set large and tight. Slides are 16:9 and sized in container units. */
+:root{
+  /* slide artwork, fixed in both themes */
+  --navy:#062A44; --navy-2:#0B3A5C; --sky:#2E7FB8; --green:#97C21D; --green-d:#6E9312;
+  --ink:#0E2233; --mut:#5A6E7E; --hair:rgba(6,42,68,.10);
+  --grad-text:linear-gradient(95deg,#0B3A5C 0%,#2E7FB8 48%,#7FA81A 100%);
+  --grad-chip:linear-gradient(135deg,rgba(151,194,29,.28),rgba(46,127,184,.20));
+
+  /* page chrome */
+  --bg:#F3F6F9; --surface:#FFFFFF; --fg:#13222F; --fg-mut:#55697A; --rule:#D8E0E7;
+
+  --f:"Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"Geist Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#0B151D; --surface:#121F2A; --fg:#E4ECF2; --fg-mut:#93A6B5; --rule:#22384A; color-scheme:dark }
+}
+:root[data-theme="dark"]{ --bg:#0B151D; --surface:#121F2A; --fg:#E4ECF2; --fg-mut:#93A6B5; --rule:#22384A; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 var(--f); padding:0 16px 64px}
+.wrap{max-width:1180px; margin:0 auto}
+.ms{font-family:"Material Symbols Rounded"; font-weight:normal; font-style:normal; line-height:1; display:inline-block; white-space:nowrap; font-feature-settings:"liga"; -webkit-font-smoothing:antialiased; font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24}
+
+/* ---------- review chrome ---------- */
+.top{padding:36px 0 24px; display:grid; gap:10px; max-width:76ch}
+.top h1{margin:0; font-size:clamp(24px,3.4vw,34px); font-weight:650; line-height:1.15; letter-spacing:-.02em}
+.top p{margin:0; color:var(--fg-mut)}
+.spec{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+.spec span{display:inline-flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid var(--rule); border-radius:999px; background:var(--surface); font-size:13px; color:var(--fg-mut)}
+.spec i{width:14px; height:14px; border-radius:50%; display:inline-block}
+.deck{display:grid; gap:40px}
+.item{display:grid; gap:12px}
+.meta{display:grid; gap:4px; color:var(--fg-mut); font-size:14px; max-width:90ch}
+.meta b{color:var(--fg); font-weight:600}
+
+/* ---------- slide ---------- */
+.slide{position:relative; width:100%; aspect-ratio:16/9; container-type:inline-size; overflow:hidden; border-radius:14px;
+  color:var(--ink); font-family:var(--f); background:#F7FAFC; box-shadow:0 1px 2px rgba(0,0,0,.06), 0 12px 32px rgba(6,42,68,.10)}
+.slide *{margin:0}
+.logo{position:absolute; left:5cqw; top:3.4cqw; height:4.4cqw; z-index:3}
+.num{position:absolute; right:5cqw; top:5cqw; font:500 .95cqw/1 var(--f-mono); letter-spacing:.12em; color:var(--mut); z-index:3}
+.eyebrow{display:inline-flex; align-items:center; gap:.8cqw; font:500 1cqw/1 var(--f-mono); letter-spacing:.16em; text-transform:uppercase; color:var(--mut)}
+.eyebrow::before{content:""; width:2.4cqw; height:.22cqw; border-radius:1cqw; background:linear-gradient(90deg,var(--sky),var(--green))}
+.h{font-weight:650; letter-spacing:-.045em; line-height:1.0; color:var(--navy); text-wrap:balance}
+.h em{font-style:normal; background:var(--grad-text); -webkit-background-clip:text; background-clip:text; color:transparent}
+.lede{font-size:1.55cqw; line-height:1.5; font-weight:400; color:var(--mut); text-wrap:pretty}
+.copy{position:absolute; z-index:2; display:grid; align-content:start}
+
+/* fade washes */
+.wash-cover{background:
+  radial-gradient(62cqw 46cqw at 88% 6%, rgba(46,127,184,.40), transparent 70%),
+  radial-gradient(58cqw 42cqw at 100% 100%, rgba(151,194,29,.48), transparent 70%),
+  radial-gradient(48cqw 36cqw at 0% 100%, rgba(11,58,92,.10), transparent 70%),
+  linear-gradient(180deg,#F9FBFD 0%,#EEF4F8 100%)}
+.wash-mp{background:
+  radial-gradient(56cqw 42cqw at 100% 0%, rgba(151,194,29,.36), transparent 70%),
+  radial-gradient(60cqw 44cqw at 70% 110%, rgba(46,127,184,.30), transparent 70%),
+  linear-gradient(180deg,#FAFCFD 0%,#F0F5F8 100%)}
+.wash-qr{background:
+  radial-gradient(54cqw 44cqw at 10% 105%, rgba(151,194,29,.40), transparent 70%),
+  radial-gradient(64cqw 48cqw at 95% 0%, rgba(46,127,184,.34), transparent 70%),
+  radial-gradient(40cqw 30cqw at 55% 55%, rgba(255,255,255,.7), transparent 70%),
+  linear-gradient(180deg,#F9FBFD 0%,#EDF3F7 100%)}
+
+/* app windows: light frame, soft shadow, edge fades into the wash where it bleeds off */
+.win{position:absolute; border-radius:1.1cqw; overflow:hidden; background:#fff;
+  box-shadow:0 0 0 1px var(--hair), 0 .3cqw .6cqw rgba(6,42,68,.06), 0 2.6cqw 6cqw rgba(6,42,68,.18)}
+.win .bar{height:1.9cqw; display:flex; align-items:center; gap:.5cqw; padding-left:1.1cqw; background:#F4F7FA; border-bottom:1px solid var(--hair)}
+.win .bar i{width:.62cqw; height:.62cqw; border-radius:50%; background:#D3DCE4}
+.win img{display:block; width:100%; height:auto}
+.fade-r{-webkit-mask-image:linear-gradient(90deg,#000 78%,transparent 100%); mask-image:linear-gradient(90deg,#000 78%,transparent 100%)}
+.fade-rb{-webkit-mask-image:linear-gradient(90deg,#000 76%,transparent 100%),linear-gradient(180deg,#000 72%,transparent 100%);
+  -webkit-mask-composite:source-in; mask-image:linear-gradient(90deg,#000 76%,transparent 100%),linear-gradient(180deg,#000 72%,transparent 100%); mask-composite:intersect}
+.phone{position:absolute; aspect-ratio:390/844; border-radius:2.6cqw; padding:.45cqw; background:linear-gradient(160deg,#1B3448,#0A1C2A); z-index:2;
+  box-shadow:0 0 0 1px rgba(255,255,255,.4) inset, 0 2.4cqw 5cqw rgba(6,42,68,.30)}
+.phone img{display:block; width:100%; height:100%; object-fit:cover; object-position:top; border-radius:2.2cqw}
+
+.chips{display:flex; flex-wrap:wrap; gap:.8cqw}
+.chips > span{display:inline-flex; align-items:center; gap:.6cqw; padding:.7cqw 1.15cqw; border-radius:5cqw; font-size:1.1cqw; font-weight:500; color:var(--navy);
+  background:rgba(255,255,255,.66); box-shadow:0 0 0 1px rgba(6,42,68,.08), 0 .4cqw 1.2cqw rgba(6,42,68,.06); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px)}
+.chips .ms{font-size:1.4cqw; color:var(--sky)}
+
+/* S1 cover */
+.s1 .copy{left:5cqw; top:13cqw; width:42cqw; gap:2cqw}
+.s1 .h{font-size:5.2cqw}
+.s1 .lede{max-width:38cqw}
+.s1 .d1{left:50cqw; top:7cqw; width:58cqw}
+.s1 .d2{left:60cqw; top:27cqw; width:48cqw; z-index:1}
+
+/* S2 manpower */
+.s2 .copy{left:5cqw; top:12cqw; width:31cqw; gap:1.6cqw}
+.s2 .h{font-size:3.9cqw}
+.s2 .d1{left:44cqw; top:8cqw; width:62cqw}
+.s2 .phone{left:38.5cqw; top:21.5cqw; width:14.2cqw}
+.feat{list-style:none; padding:0; display:grid; gap:1.3cqw; margin-top:.6cqw}
+.feat li{display:grid; grid-template-columns:3.6cqw 1fr; gap:1.2cqw; align-items:center}
+.feat .ms{width:3.6cqw; height:3.6cqw; display:grid; place-items:center; border-radius:1cqw; background:var(--grad-chip); color:var(--navy-2); font-size:1.9cqw}
+.feat b{display:block; font-size:1.4cqw; font-weight:600; letter-spacing:-.01em; color:var(--navy)}
+.feat span:not(.ms){display:block; font-size:1.15cqw; color:var(--mut); line-height:1.4}
+
+/* S9 phones and QR */
+.s8 .copy{left:5cqw; top:12.5cqw; width:35cqw; gap:1.8cqw}
+.s8 .h{font-size:4.4cqw}
+.steps{display:grid; gap:1.4cqw; margin-top:.6cqw}
+.step{display:grid; grid-template-columns:3.4cqw 1fr; gap:1.1cqw; align-items:baseline}
+.step i{font:600 1.9cqw/1 var(--f); font-style:normal; letter-spacing:-.03em; background:var(--grad-text); -webkit-background-clip:text; background-clip:text; color:transparent}
+.step p{font-size:1.2cqw; line-height:1.45; color:var(--mut)}
+.step b{color:var(--navy); font-weight:600}
+.apps{position:absolute; left:44cqw; top:7.5cqw; width:51.5cqw; display:grid; grid-template-columns:1fr 1fr; gap:2.2cqw; z-index:2}
+.app{display:grid; justify-items:center; gap:1.4cqw; padding:2.4cqw 1.6cqw 2.2cqw; border-radius:2.2cqw;
+  background:rgba(255,255,255,.62); box-shadow:0 0 0 1px rgba(255,255,255,.9) inset, 0 0 0 1px rgba(6,42,68,.06), 0 2.4cqw 5cqw rgba(6,42,68,.12);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px)}
+.app-head{display:grid; justify-items:center; gap:.9cqw}
+.app-icon{width:5cqw; height:5cqw; border-radius:1.2cqw; box-shadow:0 .6cqw 1.4cqw rgba(6,42,68,.18)}
+.app h3{font-size:1.8cqw; font-weight:600; letter-spacing:-.025em; color:var(--navy)}
+.qr{width:17cqw; padding:1.3cqw; border-radius:1.4cqw; background:#fff; box-shadow:0 0 0 1px var(--hair)}
+.qr img{display:block; width:100%}
+.url{font:500 1cqw/1 var(--f); letter-spacing:-.005em; color:var(--navy-2); white-space:nowrap; padding:.8cqw 1.1cqw; border-radius:5cqw; background:var(--grad-chip)}
+.s8 .chips{position:absolute; left:44cqw; width:51.5cqw; top:46cqw; justify-content:center; z-index:2}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Deck redesign sample: Soft Fade</h1>
+    <p>Three slides from the deck restyled: the cover, one app slide and the QR slide. The screenshots, wording and QR codes are the same as the current deck. Only the look changes. Once you're happy with this direction I'll apply it to all nine slides and redo the .pptx.</p>
+    <div class="spec">
+      <span>Type: Geist (one family, 400 to 650)</span>
+      <span><i style="background:#062A44"></i>Navy text</span>
+      <span><i style="background:linear-gradient(135deg,#2E7FB8,#97C21D)"></i>Sky to green fades</span>
+      <span>Light, airy slides</span>
+    </div>
+  </header>
+
+  <main class="deck">
+    <section class="item">
+      <div class="slide s1 wash-cover">
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <span class="eyebrow">Global Quality Solution</span>
+          <h2 class="h">Two apps for the work we do <em>every day.</em></h2>
+          <p class="lede">The Manpower Board plans who goes where. The Inventory &amp; Quality System tracks tools, parts and consumables. Both run in the browser and on your phone.</p>
+          <div class="chips"><span><span class="ms">groups</span>Manpower Board</span><span><span class="ms">inventory_2</span>Inventory &amp; Quality</span><span><span class="ms">smartphone</span>On your phone</span></div>
+        </div>
+        <div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/inv-dashboard-desktop.jpg" alt="Inventory and Quality dashboard"></div>
+        <div class="win d2 fade-rb"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board for one day"></div>
+        <span class="num">01 / 09</span>
+      </div>
+      <div class="meta"><b>Slide 1 · Cover</b><span>A gradient headline word, glass chips, and two app windows that fade into the colour wash on the right instead of being cut off hard.</span></div>
+    </section>
+
+    <section class="item">
+      <div class="slide s2 wash-mp">
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <span class="eyebrow">Manpower Board</span>
+          <h2 class="h">Tomorrow's crew, planned on <em>one board.</em></h2>
+          <p class="lede">The magnet board, made digital. Drag people onto missions, leave or standby, and everyone sees the same plan, live.</p>
+          <ul class="feat">
+            <li><span class="ms">drag_pan</span><div><b>Drag and drop planning</b><span>One board per site, one card per person</span></div></li>
+            <li><span class="ms">location_on</span><div><b>Where to go, what to wear</b><span>The host name opens Google Maps; PPE is on the card</span></div></li>
+            <li><span class="ms">lock</span><div><b>Lock a finished plan</b><span>Nobody bumps it by accident</span></div></li>
+          </ul>
+        </div>
+        <div class="win d1 fade-r"><div class="bar"><i></i><i></i><i></i></div><img src="img/mp-board-desktop.jpg" alt="Manpower Board with missions, leave and the standby pool"></div>
+        <div class="phone"><img src="img/mp-merge-phone.jpg" alt="Review and merge forecast on a phone"></div>
+        <span class="num">02 / 09</span>
+      </div>
+      <div class="meta"><b>Slide 2 · App feature slide</b><span>This pattern carries to slides 2 to 8: copy on one side, a full app window fading off the edge, a phone or second window overlapping. Inventory slides use a blue-led wash so the two apps feel distinct.</span></div>
+    </section>
+
+    <section class="item">
+      <div class="slide s8 wash-qr">
+        <img class="logo" src="img/trigo-logo-color.svg" alt="TRIGO">
+        <div class="copy">
+          <span class="eyebrow">On your phone</span>
+          <h2 class="h">Both apps fit in <em>your pocket.</em></h2>
+          <p class="lede">Each app has its own phone layout and installs from the browser like a native app. No app store needed.</p>
+          <div class="steps">
+            <div class="step"><i>01</i><p><b>Scan</b> the code and sign in with your @trigo-group.com email.</p></div>
+            <div class="step"><i>02</i><p><b>iPhone:</b> in Safari tap Share, then Add to Home Screen.</p></div>
+            <div class="step"><i>03</i><p><b>Android:</b> in Chrome tap the menu, then Install app.</p></div>
+          </div>
+        </div>
+        <div class="chips"><span><span class="ms">install_mobile</span>Installable app (PWA)</span><span><span class="ms">smartphone</span>Phone layout</span></div>
+        <div class="apps">
+          <div class="app">
+            <div class="app-head"><img class="app-icon" src="img/icon-manpower.png" alt="Manpower Board app icon"><h3>Manpower Board</h3></div>
+            <div class="qr"><img src="img/qr-manpower.svg" alt="QR code for the Manpower Board"></div>
+            <div class="url">trigoth-manpowerboard.netlify.app</div>
+          </div>
+          <div class="app">
+            <div class="app-head"><img class="app-icon" src="img/icon-inventory.png" alt="Inventory and Quality app icon"><h3>Inventory &amp; Quality</h3></div>
+            <div class="qr"><img src="img/qr-inventory.svg" alt="QR code for the Inventory and Quality System"></div>
+            <div class="url">trigoth-inventory.pages.dev</div>
+          </div>
+        </div>
+        <span class="num">09 / 09</span>
+      </div>
+      <div class="meta"><b>Slide 9 · Phones and QR</b><span>Frosted glass cards on the fade, gradient step numbers, and the URL in one line under each code.</span></div>
+    </section>
+  </main>
+</div>
+</body>
+</html>
